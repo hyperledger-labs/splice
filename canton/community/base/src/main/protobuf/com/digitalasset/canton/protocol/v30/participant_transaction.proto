@@ -37,7 +37,7 @@ message RootHashMessage {
   option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
   bytes root_hash = 1;
-  string synchronizer_id = 2;
+  string physical_synchronizer_id = 2;
   ViewType view_type = 3;
   int64 submission_topology_time = 4; // in microseconds of UTC time since Unix epoch
   bytes payload = 5; // optional
@@ -62,7 +62,7 @@ message ViewCommonData {
 }
 
 message Informee {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   string party = 1;
   int32 weight = 2; // optional: only set if party is confirming
@@ -77,14 +77,14 @@ message ViewParticipantMessage {
 // InformeeMessage
 
 message InformeeMessage {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   FullInformeeTree full_informee_tree = 1;
   com.digitalasset.canton.crypto.v30.Signature submitting_participant_signature = 2;
 }
 
 message LightTransactionViewTree {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   GenTransactionTree tree = 1;
   repeated ViewHashAndKey subview_hashes_and_keys = 2;
@@ -103,29 +103,29 @@ message FullInformeeTree {
 }
 
 message CreatedContract {
-  v30.SerializableContract contract = 1;
+  bytes contract = 1; // Encoded ContractInstance
   bool consumed_in_core = 2;
   bool rolled_back = 3;
 }
 
 message InputContract {
-  v30.SerializableContract contract = 1;
+  bytes contract = 1; // Encoded ContractInstance
   bool consumed = 2;
 }
 
 message CommonMetadata {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   com.digitalasset.canton.crypto.v30.Salt salt = 1;
   // this used to contain a confirmation policy (Signatory or VIP) that no longer exists
   reserved 2;
-  string synchronizer_id = 3;
+  string physical_synchronizer_id = 3;
   string uuid = 4;
   int32 mediator_group = 5;
 }
 
 message SubmitterMetadata {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   com.digitalasset.canton.crypto.v30.Salt salt = 1;
   repeated string act_as = 2;
@@ -139,7 +139,7 @@ message SubmitterMetadata {
 }
 
 message EncryptedViewMessage {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   bytes view_tree = 1;
 
@@ -149,7 +149,7 @@ message EncryptedViewMessage {
   com.digitalasset.canton.crypto.v30.Signature submitting_participant_signature = 3; // optional
   bytes view_hash = 4;
   repeated com.digitalasset.canton.crypto.v30.AsymmetricEncrypted session_key_lookup = 5;
-  string synchronizer_id = 6;
+  string physical_synchronizer_id = 6;
   v30.ViewType view_type = 7;
 }
 
@@ -229,14 +229,14 @@ message ViewParticipantData {
 // by signing it with a private key not known to the network.
 
 message ExternalPartyAuthorization {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   string party = 1; // Submitting party
   repeated com.digitalasset.canton.crypto.v30.Signature signatures = 2; // Signatures
 }
 
 message ExternalAuthorization {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   // The hashing scheme version used when building the hash
   enum HashingSchemeVersion {

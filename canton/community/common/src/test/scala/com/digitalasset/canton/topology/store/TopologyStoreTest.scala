@@ -7,7 +7,6 @@ import cats.syntax.option.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.{String255, String300}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.SynchronizerCryptoPureApi
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.topology.processing.{
@@ -17,15 +16,14 @@ import com.digitalasset.canton.topology.processing.{
 }
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.PositiveStoredTopologyTransactions
 import com.digitalasset.canton.topology.store.TopologyStore.EffectiveStateChange
-import com.digitalasset.canton.topology.store.TopologyTransactionRejection.InvalidTopologyMapping
-import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
+import com.digitalasset.canton.topology.transaction.{TopologyMapping, *}
 import com.digitalasset.canton.topology.{
   DefaultTestIdentities,
   ParticipantId,
   PartyId,
-  SynchronizerId,
+  PhysicalSynchronizerId,
 }
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.version.ProtocolVersion
@@ -177,7 +175,7 @@ trait TopologyStoreTest
   // TODO(#14066): Test coverage is rudimentary - enough to convince ourselves that queries basically seem to work.
   //  Increase coverage.
   def topologyStore(
-      mk: SynchronizerId => TopologyStore[TopologyStoreId.SynchronizerStore]
+      mk: PhysicalSynchronizerId => TopologyStore[TopologyStoreId.SynchronizerStore]
   ): Unit = {
 
     val bootstrapTransactions = StoredTopologyTransactions(
@@ -203,7 +201,8 @@ trait TopologyStoreTest
         ts5 -> (ptp_fred_p1, None, None),
         ts5 -> (dtc_p2_synchronizer1, ts6.some, None),
         ts6 -> (dtc_p2_synchronizer1_update, None, None),
-        ts6 -> (mds_med1_synchronizer1_invalid, ts6.some, s"No delegation found for keys ${seqKey.fingerprint}".some),
+        ts6 -> (mds_med1_synchronizer1_invalid, ts6.some,
+        s"No delegation found for keys ${seqKey.fingerprint}".some),
       ).map { case (from, (tx, until, rejection)) =>
         StoredTopologyTransaction(
           SequencedTime(from),
@@ -218,8 +217,8 @@ trait TopologyStoreTest
     "topology store" should {
 
       "clear all data without affecting other stores" in {
-        val store1 = mk(synchronizer1_p1p2_synchronizerId)
-        val store2 = mk(da_p1p2_synchronizerId)
+        val store1 = mk(synchronizer1_p1p2_physicalSynchronizerId)
+        val store2 = mk(da_p1p2_physicalSynchronizerId)
 
         for {
           _ <- update(store1, ts1, add = Seq(nsd_p1))
@@ -251,9 +250,46 @@ trait TopologyStoreTest
         }
       }
 
+      "properly evolve party participant hosting" in {
+        val store = mk(synchronizer1_p1p2_physicalSynchronizerId)
+        def ptpFred(
+            participants: HostingParticipant*
+        ) =
+          makeSignedTx(
+            PartyToParticipant.tryCreate(
+              partyId = `fred::p2Namepsace`,
+              threshold = PositiveInt.one,
+              participants = participants,
+            )
+          )(p1Key)
+        val ptp1 = ptpFred(
+          HostingParticipant(p1Id, ParticipantPermission.Submission)
+        )
+        val ptp2 = ptpFred(
+          HostingParticipant(p1Id, ParticipantPermission.Submission),
+          HostingParticipant(p2Id, ParticipantPermission.Confirmation, onboarding = true),
+        )
+        val ptp3 = ptpFred(
+          HostingParticipant(p1Id, ParticipantPermission.Submission),
+          HostingParticipant(p2Id, ParticipantPermission.Confirmation, onboarding = false),
+        )
+        for {
+          _ <- update(store, ts1, add = Seq(ptp1))
+          _ <- update(store, ts2, add = Seq(ptp2), removeTxs = Set(ptp1.transaction.hash))
+          _ <- update(store, ts3, add = Seq(ptp3), removeTxs = Set(ptp2.transaction.hash))
+          snapshot1 <- inspect(store, TimeQuery.Snapshot(ts1.immediateSuccessor))
+          snapshot2 <- inspect(store, TimeQuery.Snapshot(ts2.immediateSuccessor))
+          snapshot3 <- inspect(store, TimeQuery.Snapshot(ts3.immediateSuccessor))
+        } yield {
+          expectTransactions(snapshot1, Seq(ptp1))
+          expectTransactions(snapshot2, Seq(ptp2))
+          expectTransactions(snapshot3, Seq(ptp3))
+        }
+      }
+
       "deal with authorized transactions" when {
         "handle simple operations" in {
-          val store = mk(synchronizer1_p1p2_synchronizerId)
+          val store = mk(synchronizer1_p1p2_physicalSynchronizerId)
 
           for {
             _ <- update(store, ts1, add = Seq(nsd_p1, dop_synchronizer1_proposal))
@@ -290,7 +326,7 @@ trait TopologyStoreTest
             txProtocolVersion <- store.findStoredForVersion(
               CantonTimestamp.MaxValue,
               nsd_p1.transaction,
-              ProtocolVersion.v33,
+              ProtocolVersion.v34,
             )
 
             proposalTransactions <- inspect(
@@ -389,7 +425,7 @@ trait TopologyStoreTest
           }
         }
         "able to filter with inspect" in {
-          val store = mk(synchronizer1_p1p2_synchronizerId)
+          val store = mk(synchronizer1_p1p2_physicalSynchronizerId)
 
           for {
             _ <- update(store, ts2, add = Seq(otk_p1))
@@ -437,17 +473,12 @@ trait TopologyStoreTest
         }
 
         "able to inspect" in {
-          val store = mk(synchronizer1_p1p2_synchronizerId)
-
+          val store = mk(synchronizer1_p1p2_physicalSynchronizerId)
           for {
             _ <- new InitialTopologySnapshotValidator(
-              pureCrypto = new SynchronizerCryptoPureApi(
-                defaultStaticSynchronizerParameters,
-                testData.factory.cryptoApi.crypto.pureCrypto,
-              ),
+              pureCrypto = testData.factory.syncCryptoClient.crypto.pureCrypto,
               store = store,
               validateInitialSnapshot = true,
-              timeouts = timeouts,
               loggerFactory = loggerFactory,
             ).validateAndApplyInitialTopologySnapshot(bootstrapTransactions)
               .valueOrFail("topology bootstrap")
@@ -548,17 +579,17 @@ trait TopologyStoreTest
             allParties shouldBe Set(
               dtc_p1_synchronizer1.mapping.participantId.adminParty,
               ptp_fred_p1.mapping.partyId,
-              dtc_p2_synchronizer1.mapping.participantId.adminParty,
+              // p2 cannot appear here as OTKP2 is only a proposal
             )
             onlyFred shouldBe Set(ptp_fred_p1.mapping.partyId)
             fredFullySpecified shouldBe Set(ptp_fred_p1.mapping.partyId)
-            onlyParticipant2 shouldBe Set(dtc_p2_synchronizer1.mapping.participantId.adminParty)
+            onlyParticipant2 shouldBe Set() // p2 cannot appear as OTKP2 is only a proposal
             neitherParty shouldBe Set.empty
           }
         }
 
         "handle rejected transactions" in {
-          val store = mk(synchronizer1_p1p2_synchronizerId)
+          val store = mk(synchronizer1_p1p2_physicalSynchronizerId)
 
           val bootstrapTransactions = StoredTopologyTransactions(
             Seq[
@@ -585,13 +616,9 @@ trait TopologyStoreTest
 
           for {
             _ <- new InitialTopologySnapshotValidator(
-              new SynchronizerCryptoPureApi(
-                defaultStaticSynchronizerParameters,
-                factory.cryptoApi.crypto.pureCrypto,
-              ),
+              factory.syncCryptoClient.crypto.pureCrypto,
               store,
               validateInitialSnapshot = true,
-              timeouts,
               loggerFactory,
             ).validateAndApplyInitialTopologySnapshot(bootstrapTransactions)
               .valueOrFail("topology bootstrap")
@@ -606,7 +633,7 @@ trait TopologyStoreTest
         }
 
         "able to findEssentialStateAtSequencedTime" in {
-          val store = mk(synchronizer1_p1p2_synchronizerId)
+          val store = mk(synchronizer1_p1p2_physicalSynchronizerId)
           for {
             _ <- update(store, ts2, add = Seq(otk_p1))
             _ <- update(store, ts5, add = Seq(dtc_p2_synchronizer1))
@@ -633,17 +660,13 @@ trait TopologyStoreTest
         }
 
         "able to find positive transactions" in {
-          val store = mk(synchronizer1_p1p2_synchronizerId)
+          val store = mk(synchronizer1_p1p2_physicalSynchronizerId)
 
           for {
             _ <- new InitialTopologySnapshotValidator(
-              new SynchronizerCryptoPureApi(
-                defaultStaticSynchronizerParameters,
-                factory.cryptoApi.crypto.pureCrypto,
-              ),
+              factory.syncCryptoClient.crypto.pureCrypto,
               store,
               validateInitialSnapshot = true,
-              timeouts,
               loggerFactory,
             ).validateAndApplyInitialTopologySnapshot(bootstrapTransactions)
               .valueOrFail("topology bootstrap")
@@ -671,7 +694,8 @@ trait TopologyStoreTest
               store,
               ts6,
               filterUid = Some(
-                Seq(
+                NonEmpty(
+                  Seq,
                   ptp_fred_p1.mapping.partyId.uid,
                   dtc_p2_synchronizer1.mapping.participantId.uid,
                 )
@@ -681,7 +705,7 @@ trait TopologyStoreTest
               store,
               ts6,
               filterNamespace = Some(
-                Seq(dns_p1seq, p2Namespace)
+                NonEmpty(Seq, dns_p1seq, p2Namespace)
               ),
             )
 
@@ -804,7 +828,7 @@ trait TopologyStoreTest
         }
 
         "correctly store rejected and accepted topology transactions with the same unique key within a batch" in {
-          val store = mk(synchronizer1_p1p2_synchronizerId)
+          val store = mk(synchronizer1_p1p2_physicalSynchronizerId)
 
           // * create two transactions with the same unique key but different content.
           // * use the signatures of the transaction to accept for the transaction to reject.
@@ -813,11 +837,11 @@ trait TopologyStoreTest
           //    the accepted transaction will not be stored correctly.
 
           val good_otk = makeSignedTx(
-            OwnerToKeyMapping(p1Id, NonEmpty(Seq, factory.SigningKeys.key1))
+            OwnerToKeyMapping.tryCreate(p1Id, NonEmpty(Seq, factory.SigningKeys.key1))
           )(p1Key, factory.SigningKeys.key1)
 
           val bad_otkTx = makeSignedTx(
-            OwnerToKeyMapping(p1Id, NonEmpty(Seq, factory.EncryptionKeys.key2))
+            OwnerToKeyMapping.tryCreate(p1Id, NonEmpty(Seq, factory.EncryptionKeys.key2))
           )(p1Key, factory.SigningKeys.key2)
           val bad_otk = bad_otkTx
             .copy(signatures =
@@ -835,7 +859,11 @@ trait TopologyStoreTest
               additions = Seq(
                 ValidatedTopologyTransaction(
                   bad_otk,
-                  Some(TopologyTransactionRejection.InvalidTopologyMapping("bad signature")),
+                  Some(
+                    TopologyTransactionRejection.RequiredMapping.InvalidTopologyMapping(
+                      "bad signature"
+                    )
+                  ),
                 ),
                 ValidatedTopologyTransaction(good_otk),
               ),
@@ -850,8 +878,6 @@ trait TopologyStoreTest
       }
 
       "compute correctly effective state changes" when {
-//        import DefaultTestIdentities.*
-
         def assertResult(
             actual: Seq[EffectiveStateChange],
             expected: Seq[EffectiveStateChange],
@@ -874,7 +900,7 @@ trait TopologyStoreTest
         }
 
         "store is evolving in different ways" in {
-          val store = mk(synchronizer1_p1p2_synchronizerId)
+          val store = mk(synchronizer1_p1p2_physicalSynchronizerId)
 
           for {
             // store is empty
@@ -947,7 +973,8 @@ trait TopologyStoreTest
                 ),
                 ValidatedTopologyTransaction(
                   transaction = rejectedPartyToParticipant,
-                  rejectionReason = Some(InvalidTopologyMapping("sad")),
+                  rejectionReason =
+                    Some(TopologyTransactionRejection.RequiredMapping.InvalidTopologyMapping("sad")),
                 ),
                 ValidatedTopologyTransaction(
                   transaction = proposedPartyToParticipant,
@@ -960,9 +987,21 @@ trait TopologyStoreTest
                 fromEffectiveInclusive = ts1,
                 onlyAtEffective = true,
               )
-              atTs2Result <- store.findEffectiveStateChanges(
+
+              atTs2ResultWithoutMappingFilter <- store.findEffectiveStateChanges(
                 fromEffectiveInclusive = ts2,
                 onlyAtEffective = true,
+              )
+              atTs2ResultWithMappingFilter <- store.findEffectiveStateChanges(
+                fromEffectiveInclusive = ts2,
+                onlyAtEffective = true,
+                filterTypes = Some(Seq(TopologyMapping.Code.PartyToParticipant)),
+              )
+              // no OTK
+              atTs2ResultWithMappingEmptyFilter <- store.findEffectiveStateChanges(
+                fromEffectiveInclusive = ts2,
+                onlyAtEffective = true,
+                filterTypes = Some(Seq(TopologyMapping.Code.OwnerToKeyMapping)),
               )
               atTs3Result <- store.findEffectiveStateChanges(
                 fromEffectiveInclusive = ts3,
@@ -1000,7 +1039,11 @@ trait TopologyStoreTest
                 ),
               )
               assertResult(atTs1Result, Seq.empty)
-              assertResult(atTs2Result, Seq(resultTs2))
+
+              assertResult(atTs2ResultWithoutMappingFilter, Seq(resultTs2))
+              assertResult(atTs2ResultWithMappingFilter, Seq(resultTs2))
+              assertResult(atTs2ResultWithMappingEmptyFilter, Seq())
+
               assertResult(atTs3Result, Seq.empty)
               assertResult(fromTs1Result, Seq(resultTs2))
               assertResult(fromTs2Result, Seq(resultTs2))

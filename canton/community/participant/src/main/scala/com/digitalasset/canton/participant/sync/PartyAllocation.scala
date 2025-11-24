@@ -12,7 +12,6 @@ import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.ledger.participant.state.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.parallelInstanceFutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.topology.ParticipantTopologyManagerError.IdentityManagerParentError
 import com.digitalasset.canton.participant.topology.{LedgerServerPartyNotifier, PartyOps}
@@ -21,10 +20,10 @@ import com.digitalasset.canton.topology.{
   ExternalPartyOnboardingDetails,
   ParticipantId,
   PartyId,
+  PhysicalSynchronizerId,
   UniqueIdentifier,
 }
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LedgerSubmissionId, LfPartyId}
 import io.opentelemetry.api.trace.Tracer
 
@@ -45,17 +44,19 @@ private[sync] class PartyAllocation(
   def allocate(
       hint: LfPartyId,
       rawSubmissionId: LedgerSubmissionId,
+      synchronizerId: PhysicalSynchronizerId,
       externalPartyOnboardingDetails: Option[ExternalPartyOnboardingDetails],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[SubmissionResult] =
     withSpan("CantonSyncService.allocateParty") { implicit traceContext => span =>
       span.setAttribute("submission_id", rawSubmissionId)
 
-      allocateInternal(hint, rawSubmissionId, externalPartyOnboardingDetails)
+      allocateInternal(hint, rawSubmissionId, synchronizerId, externalPartyOnboardingDetails)
     }
 
   private def allocateInternal(
       partyName: LfPartyId,
       rawSubmissionId: LedgerSubmissionId,
+      synchronizerId: PhysicalSynchronizerId,
       externalPartyOnboardingDetails: Option[ExternalPartyOnboardingDetails],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[SubmissionResult] = {
     import com.google.rpc.status.Status
@@ -65,8 +66,6 @@ private[sync] class PartyAllocation(
       SubmissionResult.SynchronousError(
         Status.of(statusCode.getOrElse(Code.UNKNOWN).value(), reason, Seq())
       )
-
-    val protocolVersion = ProtocolVersion.latest
 
     val result =
       for {
@@ -90,13 +89,15 @@ private[sync] class PartyAllocation(
             .fromProtoPrimitive(rawSubmissionId, "LedgerSubmissionId")
             .leftMap(err => SyncServiceError.Synchronous.internalError(err.toString))
         )
-        // Allow party allocation via ledger API only if the participant is connected to a synchronizer
+        // Allow party allocation via ledger API only if the participant is connected to the synchronizer.
         // Otherwise the gRPC call will just timeout without a meaningful error message
         _ <- EitherT.cond[FutureUnlessShutdown](
-          connectedSynchronizersLookup.snapshot.nonEmpty,
+          connectedSynchronizersLookup.isConnected(synchronizerId),
           (),
           SubmissionResult.SynchronousError(
-            SyncServiceError.PartyAllocationNoSynchronizerError.Error(rawSubmissionId).rpcStatus()
+            SyncServiceInjectionError.NotConnectedToSynchronizer
+              .Error(synchronizerId.toProtoPrimitive)
+              .rpcStatus()
           ),
         )
         _ <-
@@ -114,8 +115,8 @@ private[sync] class PartyAllocation(
           } else EitherT.pure[FutureUnlessShutdown, SubmissionResult](())
         _ <- (externalPartyOnboardingDetails match {
           case Some(details) =>
-            partyOps.allocateExternalParty(participantId, details, protocolVersion)
-          case None => partyOps.allocateParty(partyId, participantId, protocolVersion)
+            partyOps.allocateExternalParty(participantId, details, synchronizerId)
+          case None => partyOps.allocateParty(partyId, participantId, synchronizerId)
         })
           .leftMap[SubmissionResult] {
             case IdentityManagerParentError(e) if e.code == MappingAlreadyExists =>
@@ -125,7 +126,7 @@ private[sync] class PartyAllocation(
                 e.code.category.grpcCode,
               )
             case IdentityManagerParentError(e) => reject(e.cause, e.code.category.grpcCode)
-            case e => reject(e.toString, Some(Code.INTERNAL))
+            case e => reject(e.cause, e.code.category.grpcCode)
           }
           .leftMap { x =>
             partyNotifier.expireExpectedPartyAllocationForNodes(
@@ -135,7 +136,7 @@ private[sync] class PartyAllocation(
             )
             x
           }
-        // TODO(i21341) remove this waiting logic once topology events are published on the ledger api
+        // TODO(i25076) remove this waiting logic once topology events are published on the ledger api
         // wait for parties to be available on the currently connected synchronizers
         waitingSuccessful <- EitherT
           .right[SubmissionResult](

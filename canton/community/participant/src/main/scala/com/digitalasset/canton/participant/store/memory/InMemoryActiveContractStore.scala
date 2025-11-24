@@ -36,6 +36,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
+import com.digitalasset.canton.util.collection.MapsUtil
 import com.digitalasset.daml.lf.data.Ref.PackageId
 
 import java.util.ConcurrentModificationException
@@ -223,7 +224,7 @@ class InMemoryActiveContractStore(
       reassignments: Seq[
         (LfContractId, ReassignmentTag[SynchronizerId], ReassignmentCounter, TimeOfChange)
       ]
-  ): CheckedT[FutureUnlessShutdown, AcsError, AcsWarning, Seq[
+  )(implicit traceContext: TraceContext): CheckedT[FutureUnlessShutdown, AcsError, AcsWarning, Seq[
     (LfContractId, Int, ReassignmentCounter, TimeOfChange)
   ]] = {
     val synchronizers = reassignments.map { case (_, synchronizer, _, _) =>

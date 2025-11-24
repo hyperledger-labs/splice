@@ -11,7 +11,7 @@ import com.digitalasset.canton.config.{DbConfig, PositiveDurationSeconds}
 import com.digitalasset.canton.console.InstanceReference
 import com.digitalasset.canton.crypto.{EncryptionPublicKey, KeyPurpose, SigningKeyUsage}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.plugins.{UseCommunityReferenceBlockSequencer, UseH2}
+import com.digitalasset.canton.integration.plugins.{UseH2, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -81,8 +81,7 @@ trait IgnoreSequencedEventsIntegrationTest extends CommunityIntegrationTest with
   ): PossiblyIgnoredSequencedEvent[DefaultOpenEnvelope] = {
     import env.*
     participant1.testing.state_inspection
-      .findMessage(daName, LatestUpto(CantonTimestamp.MaxValue))
-      .value
+      .findMessage(daId, LatestUpto(CantonTimestamp.MaxValue))
       .value
   }
 
@@ -105,12 +104,12 @@ trait IgnoreSequencedEventsIntegrationTest extends CommunityIntegrationTest with
         assertThrowsAndLogsCommandFailures(
           participant1.repair
             .ignore_events(daId, SequencerCounter.Genesis, SequencerCounter.Genesis),
-          _.commandFailureMessage should include("Could not find synchronizer1"),
+          _.commandFailureMessage should include(s"Could not find persistent state for $daId"),
         )
         assertThrowsAndLogsCommandFailures(
           participant1.repair
             .unignore_events(daId, SequencerCounter.Genesis, SequencerCounter.Genesis),
-          _.commandFailureMessage should include("Could not find synchronizer1"),
+          _.commandFailureMessage should include(s"Could not find persistent state for $daId"),
         )
       }
     }
@@ -149,28 +148,26 @@ trait IgnoreSequencedEventsIntegrationTest extends CommunityIntegrationTest with
 
         // Ignore the next two events, corresponding to a single create ping request.
         val synchronizer = daName
+        val synchronizerId = daId
         val participant = participant1
         participant.synchronizers.disconnect(synchronizer)
         // user-manual-entry-begin: LookUpLastSequencedEventToIgnore
         import com.digitalasset.canton.store.SequencedEventStore.SearchCriterion
         val lastSequencedEvent = participant.testing.state_inspection
-          .findMessage(synchronizer, SearchCriterion.Latest)
+          .findMessage(synchronizerId, SearchCriterion.Latest)
           .getOrElse(throw new Exception("Sequenced event not found"))
-          .getOrElse(throw new Exception("Unable to parse sequenced event"))
         val lastCounter = lastSequencedEvent.counter
         // user-manual-entry-end: LookUpLastSequencedEventToIgnore
         val sequencedEventTimestamp = lastSequencedEvent.timestamp
         // user-manual-entry-begin: LookUpSequencedEventToIgnoreByTimestamp
         import com.digitalasset.canton.store.SequencedEventStore.ByTimestamp
         val sequencedEvent = participant.testing.state_inspection
-          .findMessage(synchronizer, ByTimestamp(sequencedEventTimestamp))
+          .findMessage(synchronizerId, ByTimestamp(sequencedEventTimestamp))
           .getOrElse(throw new Exception("Sequenced event not found"))
-          .getOrElse(throw new Exception("Unable to parse sequenced event"))
         val sequencerCounter = sequencedEvent.counter
         // user-manual-entry-end: LookUpSequencedEventToIgnoreByTimestamp
         lastCounter shouldBe sequencerCounter
 
-        val synchronizerId = daId
         val fromInclusive = lastCounter + 1
         val toInclusive = lastCounter + 2
 
@@ -350,7 +347,6 @@ trait IgnoreSequencedEventsIntegrationTest extends CommunityIntegrationTest with
           daId,
           MessageId.tryCreate("schnitzel"),
           SequencerErrors.SubmissionRequestRefused(""),
-          testedProtocolVersion,
           Option.empty[TrafficReceipt],
         )
         val tracedSignedTamperedEvent =
@@ -358,13 +354,12 @@ trait IgnoreSequencedEventsIntegrationTest extends CommunityIntegrationTest with
 
         // Replace last event by the tamperedEvent
         val p1Node = participant1.underlying.value
-        val p1PersistentState =
-          p1Node.sync.syncPersistentStateManager.getByAlias(daName).value
+        val p1PersistentState = p1Node.sync.syncPersistentStateManager.get(daId).value
         val p1SequencedEventStore = p1PersistentState.sequencedEventStore
         p1SequencedEventStore.delete(lastStoredEvent.counter).futureValueUS
         p1SequencedEventStore.store(Seq(tracedSignedTamperedEvent)).futureValueUS
 
-        loggerFactory.assertLogs(
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
           {
             participant1.synchronizers.reconnect(daName)
 
@@ -376,9 +371,16 @@ trait IgnoreSequencedEventsIntegrationTest extends CommunityIntegrationTest with
           },
           // The problem happens to be "ForkHappened" due to the order of checks carried out by the sequencer client.
           // Feel free to change, if another property is checked first, e.g., "SignatureInvalid".
-          _.shouldBeCantonErrorCode(ResilientSequencerSubscription.ForkHappened),
-          _.warningMessage should include("ForkHappened"),
-          _.shouldBeCantonErrorCode(SyncServiceSynchronizerDisconnect),
+          { entries =>
+            val requiredErrorMessages = Seq(
+              ResilientSequencerSubscription.ForkHappened.id,
+              "ForkHappened",
+              SyncServiceSynchronizerDisconnect.id,
+            )
+            requiredErrorMessages.forall(errMsg =>
+              entries.exists(_.message.contains(errMsg))
+            ) shouldBe true
+          },
         )
 
         eventually() {
@@ -451,31 +453,31 @@ trait IgnoreSequencedEventsIntegrationTest extends CommunityIntegrationTest with
             )
             .loneElement
             .item
-          val otk = previousOtk.copy(keys =
-            NonEmpty(Seq, missingEncryptionKey) ++
-              previousOtk.keys.filterNot(_.purpose == KeyPurpose.Encryption)
-          )
 
           loggerFactory.assertLogs(
             {
               participant2.topology.owner_to_key_mappings.propose(
-                otk,
+                member = previousOtk.member,
+                keys = NonEmpty(Seq, missingEncryptionKey) ++
+                  previousOtk.keys.filterNot(_.purpose == KeyPurpose.Encryption),
                 Some(PositiveInt.tryCreate(2)),
                 signedBy = Seq(signingKey.fingerprint),
                 store = daId,
                 force = ForceFlags(ForceFlag.AlienMember),
               )
-              // Wait until p1 has processed the topology transaction.
+              // Wait until p1 and p2 have processed the topology transaction.
               eventually() {
-                participant1.topology.owner_to_key_mappings
-                  .list(
-                    store = daId,
-                    filterKeyOwnerUid = participant1.id.filterString,
-                  )
-                  .flatMap(_.item.keys)
-                  .filter(_.purpose == missingEncryptionKey.purpose)
-                  .loneElement
-                  .fingerprint shouldBe missingEncryptionKey.fingerprint
+                forAll(Seq(participant1, participant2))(
+                  _.topology.owner_to_key_mappings
+                    .list(
+                      store = daId,
+                      filterKeyOwnerUid = participant1.id.filterString,
+                    )
+                    .flatMap(_.item.keys)
+                    .filter(_.purpose == missingEncryptionKey.purpose)
+                    .loneElement
+                    .fingerprint shouldBe missingEncryptionKey.fingerprint
+                )
               }
             },
             // Participant1 will emit an error, because the key is not present.
@@ -496,8 +498,11 @@ trait IgnoreSequencedEventsIntegrationTest extends CommunityIntegrationTest with
 
         // Note: The following ping will bring transaction processing to a halt,
         // because it can't decrypt the confirmation request.
-        loggerFactory.assertLoggedWarningsAndErrorsSeq(
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
           {
+            env.environment.simClock.foreach(_.advance(java.time.Duration.ofSeconds(5)))
+            participant1.synchronizers.list_connected() should not be empty
+
             clue("pinging to halt") {
               pokeAndAdvance(Future {
                 participant2.health.maybe_ping(participant1, timeout = 2.seconds)
@@ -515,7 +520,7 @@ trait IgnoreSequencedEventsIntegrationTest extends CommunityIntegrationTest with
             participant1.synchronizers.list_connected() shouldBe empty
           },
           forAtLeast(1, _) {
-            _.message should startWith("Asynchronous event processing failed")
+            _.toString should include("Can't decrypt the randomness of the view")
           },
         )
       }
@@ -524,8 +529,7 @@ trait IgnoreSequencedEventsIntegrationTest extends CommunityIntegrationTest with
         import env.*
 
         val lastEvent = participant1.testing.state_inspection
-          .findMessage(daName, LatestUpto(CantonTimestamp.MaxValue))
-          .value
+          .findMessage(daId, LatestUpto(CantonTimestamp.MaxValue))
           .value
         val lastEventRecipients =
           lastEvent.underlying.value.content.asInstanceOf[Deliver[_]].batch.allRecipients
@@ -572,5 +576,5 @@ trait IgnoreSequencedEventsIntegrationTest extends CommunityIntegrationTest with
 
 class IgnoreSequencedEventsIntegrationTestH2 extends IgnoreSequencedEventsIntegrationTest {
   registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 }

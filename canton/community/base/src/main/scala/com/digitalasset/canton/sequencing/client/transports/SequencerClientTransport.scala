@@ -4,6 +4,7 @@
 package com.digitalasset.canton.sequencing.client.transports
 
 import cats.data.EitherT
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.sequencing.SequencedEventHandler
 import com.digitalasset.canton.sequencing.client.SendAsyncClientError.SendAsyncClientResponseError
@@ -53,6 +54,11 @@ trait SequencerClientTransportCommon extends FlagCloseable {
   def downloadTopologyStateForInit(request: TopologyStateForInitRequest)(implicit
       traceContext: TraceContext
   ): EitherT[Future, String, TopologyStateForInitResponse]
+
+  /** Fetches the "current" sequencing time */
+  def getTime(timeout: Duration)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, Option[CantonTimestamp]]
 }
 
 /** Implementation dependent operations for a client to read and write to a synchronizer sequencer.
@@ -68,7 +74,7 @@ trait SequencerClientTransport extends SequencerClientTransportCommon {
     * [[com.digitalasset.canton.sequencing.client.SubscriptionCloseReason.SubscriptionError]]. The
     * transport is not expected to provide retries of subscriptions.
     */
-  def subscribe[E](request: SubscriptionRequestV2, handler: SequencedEventHandler[E])(implicit
+  def subscribe[E](request: SubscriptionRequest, handler: SequencedEventHandler[E])(implicit
       traceContext: TraceContext
   ): SequencerSubscription[E]
 

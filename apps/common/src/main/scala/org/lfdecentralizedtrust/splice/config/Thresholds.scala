@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.config
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.util.Contract
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
 
 import scala.math.{ceil, floor}
@@ -20,6 +20,9 @@ object Thresholds {
       PositiveInt.tryCreate(Math.floorDiv(n - 1, 3) + 1)
     }
   }
+
+  private def FThreshold(n: Int): NonNegativeInt =
+    FPlus1Threshold(n).decrement
 
   def mediatorDomainStateThreshold(
       currentMediatorSize: Int
@@ -40,6 +43,11 @@ object Thresholds {
       sequencersSize
     )
 
+  // Sequencer connection pools keep threshold + liveness margin connections.
+  // so with this set to f, we get 2f+1 total connections.
+  def sequencerConnectionsLivenessMargin(sequencersSize: Int): NonNegativeInt =
+    FThreshold(sequencersSize)
+
   def sequencerSubmissionRequestAmplification(sequencersSize: Int): PositiveInt =
     sequencerConnectionsSizeThreshold(sequencersSize)
 
@@ -58,5 +66,9 @@ object Thresholds {
     // as per `DsoRules` / `summarizeDso`
     val f = floor((svNum - 1) / 3.0).toInt
     PositiveInt.tryCreate(ceil((svNum + f + 1) / 2.0).toInt)
+  }
+
+  def requiredNumScanThreshold(svNum: Int) = {
+    FPlus1Threshold(svNum)
   }
 }

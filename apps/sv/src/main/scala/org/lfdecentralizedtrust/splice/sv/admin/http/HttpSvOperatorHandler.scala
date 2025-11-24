@@ -16,7 +16,6 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ErrorUtil
-import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice as spliceCodegen
@@ -83,29 +82,18 @@ class HttpSvOperatorHandler(
 
   // Similar to PublishScanConfigTrigger, this class creates its own scan connection
   // on demand, because scan might not be available at application startup.
-  private def createScanConnection(): Future[ScanConnection] =
-    config.scan match {
-      case None =>
-        Future.failed(
-          Status.UNAVAILABLE
-            .withDescription(
-              "This application is not configured to connect to a scan service. " +
-                " Check the application configuration or use the scan API to query votes information."
-            )
-            .asRuntimeException()
-        )
-      case Some(scanConfig) =>
-        implicit val tc: TraceContext = TraceContext.empty
-        ScanConnection
-          .singleUncached(
-            ScanAppClientConfig(NetworkAppClientConfig(scanConfig.internalUrl)),
-            upgradesConfig,
-            clock,
-            retryProvider,
-            loggerFactory,
-            retryConnectionOnInitialFailure = true,
-          )
-    }
+  private def createScanConnection(): Future[ScanConnection] = {
+    implicit val tc: TraceContext = TraceContext.empty
+    ScanConnection
+      .singleUncached(
+        ScanAppClientConfig(NetworkAppClientConfig(config.scan.internalUrl)),
+        upgradesConfig,
+        clock,
+        retryProvider,
+        loggerFactory,
+        retryConnectionOnInitialFailure = true,
+      )
+  }
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var scanConnectionV: Option[Future[ScanConnection]] = None
   private def scanConnectionF: Future[ScanConnection] = blocking {

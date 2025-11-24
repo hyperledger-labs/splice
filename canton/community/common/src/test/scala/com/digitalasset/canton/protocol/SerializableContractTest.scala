@@ -5,7 +5,6 @@ package com.digitalasset.canton.protocol
 
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, TestHash, TestSalt}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.{
   BaseTest,
   LfPackageName,
@@ -15,7 +14,7 @@ import com.digitalasset.canton.{
   LfVersioned,
 }
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, Node}
+import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance, Node}
 import com.digitalasset.daml.lf.value.Value
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -26,44 +25,58 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
 
   private val templateId = ExampleTransactionFactory.templateId
 
+  def fromFatContract(inst: LfFatContractInst): Either[String, SerializableContract] =
+    ContractInstance.toSerializableContract(inst)
+
   "SerializableContractInstance" should {
-    "deserialize correctly" in {
-      val someContractSalt = TestSalt.generateSalt(0)
-      val contractId = ExampleTransactionFactory.suffixedId(0, 0)
 
-      val metadata = ContractMetadata.tryCreate(
-        signatories = Set(alice),
-        stakeholders = Set(alice, bob),
-        maybeKeyWithMaintainersVersioned = Some(
-          ExampleTransactionFactory.globalKeyWithMaintainers(
-            LfGlobalKey
-              .build(templateId, Value.ValueUnit, LfPackageName.assertFromString("package-name"))
-              .value,
-            Set(alice),
-          )
-        ),
-      )
+    // TODO(#23971) use CantonContractIdVersion.all
+    forEvery(CantonContractIdVersion.allV1) { contractIdVersion =>
+      s"deserialize $contractIdVersion correctly" in {
+        val someContractSalt = TestSalt.generateSalt(0)
 
-      val sci = ExampleTransactionFactory.asSerializable(
-        contractId,
-        ExampleTransactionFactory.contractInstance(Seq(contractId)),
-        metadata,
-        CantonTimestamp.now(),
-        someContractSalt,
-      )
-      SerializableContract.fromProtoVersioned(
-        sci.toProtoVersioned(testedProtocolVersion)
-      ) shouldEqual Right(sci)
+        val contractId = ExampleTransactionFactory.suffixedId(0, 0, contractIdVersion)
+
+        val metadata = ContractMetadata.tryCreate(
+          signatories = Set(alice),
+          stakeholders = Set(alice, bob),
+          maybeKeyWithMaintainersVersioned = Some(
+            ExampleTransactionFactory.globalKeyWithMaintainers(
+              LfGlobalKey
+                .build(
+                  templateId,
+                  Value.ValueUnit,
+                  LfPackageName.assertFromString("package-name"),
+                )
+                .value,
+              Set(alice),
+            )
+          ),
+        )
+
+        val ci = ExampleTransactionFactory.asContractInstance(
+          contractId,
+          ExampleTransactionFactory.contractInstance(Seq(contractId)),
+          metadata,
+          CreationTime.CreatedAt(CantonTimestamp.now().toLf),
+        )(
+          ContractAuthenticationDataV1(someContractSalt)(contractIdVersion)
+        )
+        val sci = SerializableContract.fromLfFatContractInst(ci.inst).value
+        SerializableContract.fromProtoVersioned(
+          sci.toProtoVersioned(testedProtocolVersion)
+        ) shouldEqual Right(sci)
+      }
     }
   }
 
-  "SerializableContract.fromDisclosedContract" when {
-    val transactionVersion = LfLanguageVersion.v2_dev
+  "SerializableContract.fromFatContract" when {
+    val serializationVersion = LfSerializationVersion.V1
 
     val createdAt = LfTimestamp.Epoch
     val contractSalt = TestSalt.generateSalt(0)
-    val driverMetadata =
-      Bytes.fromByteArray(DriverContractMetadata(contractSalt).toByteArray(testedProtocolVersion))
+    val authenticationData =
+      ContractAuthenticationDataV1(contractSalt)(CantonContractIdVersion.maxV1)
 
     val contractIdDiscriminator = ExampleTransactionFactory.lfHash(0)
     val contractIdSuffix =
@@ -72,7 +85,7 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
     val invalidFormatContractId = LfContractId.assertFromString("00" * 34)
 
     val authenticatedContractId =
-      AuthenticatedContractIdVersionV11.fromDiscriminator(contractIdDiscriminator, contractIdSuffix)
+      CantonContractIdVersion.maxV1.fromDiscriminator(contractIdDiscriminator, contractIdSuffix)
 
     val pkgName = Ref.PackageName.assertFromString("pkgName")
 
@@ -84,25 +97,27 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
       signatories = Set(alice),
       stakeholders = Set(alice),
       keyOpt = None,
-      version = transactionVersion,
+      version = serializationVersion,
     )
 
     val disclosedContract =
-      FatContractInstance.fromCreateNode(createNode, createdAt, driverMetadata)
+      FatContractInstance.fromCreateNode(
+        createNode,
+        CreationTime.CreatedAt(createdAt),
+        authenticationData.toLfBytes,
+      )
 
     "provided a valid disclosed contract" should {
       "succeed" in {
-        val actual = SerializableContract
-          .fromDisclosedContract(disclosedContract)
-          .value
+        val actual = fromFatContract(disclosedContract).value
 
         actual shouldBe SerializableContract(
           contractId = authenticatedContractId,
           rawContractInstance = SerializableRawContractInstance
             .create(
               LfVersioned(
-                transactionVersion,
-                LfValue.ContractInstance(
+                serializationVersion,
+                LfValue.ThinContractInstance(
                   packageName = pkgName,
                   template = templateId,
                   arg = LfValue.ValueInt64(123L),
@@ -111,35 +126,33 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
             )
             .value,
           metadata = ContractMetadata.tryCreate(Set(alice), Set(alice), None),
-          ledgerCreateTime = LedgerCreateTime(CantonTimestamp(createdAt)),
-          contractSalt = contractSalt,
+          ledgerCreateTime = CreationTime.CreatedAt(createdAt),
+          authenticationData = authenticationData,
         )
       }
     }
 
     "provided a disclosed contract with unknown contract id format" should {
       "fail" in {
-        SerializableContract
-          .fromDisclosedContract(
-            FatContractInstance.fromCreateNode(
-              createNode.mapCid(_ => invalidFormatContractId),
-              createdAt,
-              driverMetadata,
-            )
+        fromFatContract(
+          FatContractInstance.fromCreateNode(
+            createNode.mapCid(_ => invalidFormatContractId),
+            CreationTime.CreatedAt(createdAt),
+            authenticationData.toLfBytes,
           )
-          .left
-          .value shouldBe s"Invalid disclosed contract id: malformed contract id '${invalidFormatContractId.toString}'. Suffix 00 is not a supported contract-id prefix"
+        ).left.value shouldBe s"Invalid disclosed contract id: Malformed contract ID: Suffix '00' is not a supported contract-id V1 prefix"
       }
     }
 
-    "provided a disclosed contract with missing driver contract metadata" should {
+    "provided a disclosed contract with missing contract authentication data" should {
       "fail" in {
-        SerializableContract
-          .fromDisclosedContract(
-            FatContractInstance.fromCreateNode(createNode, createdAt, cantonData = Bytes.Empty)
+        fromFatContract(
+          FatContractInstance.fromCreateNode(
+            createNode,
+            CreationTime.CreatedAt(createdAt),
+            authenticationData = Bytes.Empty,
           )
-          .left
-          .value shouldBe "Missing driver contract metadata in provided disclosed contract"
+        ).left.value shouldBe "Missing authentication data in provided disclosed contract"
       }
     }
   }

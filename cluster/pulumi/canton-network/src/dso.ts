@@ -14,11 +14,10 @@ import {
   svKeyFromSecret,
   svCometBftGovernanceKeyFromSecret,
   DecentralizedSynchronizerMigrationConfig,
-  ApprovedSvIdentity,
   config,
-  approvedSvIdentities,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
+  approvedSvIdentities,
   configForSv,
   coreSvsToDeploy,
   initialRound,
@@ -29,13 +28,11 @@ import {
   StaticSvConfig,
   SvOnboarding,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
-import _ from 'lodash';
 
 import { InstalledSv, installSvNode } from './sv';
 
 interface DsoArgs {
   auth0Client: Auth0Client;
-  approvedSvIdentities: ApprovedSvIdentity[];
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[]; // Only used by the sv1
   isDevNet: boolean;
   periodicBackupConfig?: BackupConfig;
@@ -70,35 +67,11 @@ export class Dso extends pulumi.ComponentResource {
       sv1: StaticCometBftConfigWithNodeName;
       peers: StaticCometBftConfigWithNodeName[];
     },
-    extraApprovedSvIdentities: ApprovedSvIdentity[],
     expectedValidatorOnboardings: ExpectedValidatorOnboarding[],
     isFirstSv = false,
     cometBftGovernanceKey: CnInput<SvCometBftGovernanceKey> | undefined = undefined,
     extraDependsOn: CnInput<pulumi.Resource>[] = []
   ) {
-    const approvedSvIdentitiesFromFile = approvedSvIdentities();
-    const approvedSvIdentitiesFromConfigs = _.uniqBy(
-      [
-        ...extraApprovedSvIdentities,
-        ...this.args.approvedSvIdentities, // typically just runbook or no
-      ],
-      'name'
-    );
-    const configuredPublicKeys = approvedSvIdentitiesFromConfigs.reduce(
-      (acc, identity) => ({ ...acc, [identity.name]: identity.publicKey }),
-      {} as Record<string, string | pulumi.Output<string>>
-    );
-
-    const identities = _.uniqBy(
-      [...approvedSvIdentitiesFromFile, ...approvedSvIdentitiesFromConfigs],
-      'name'
-      // We override public keys to the locally configured one,
-      // to support using real approved-sv-id-values files on CI clusters that don't have access to the real keys.
-    ).map(identity => ({
-      ...identity,
-      publicKey: configuredPublicKeys[identity.name] ?? identity.publicKey,
-    }));
-
     return installSvNode(
       {
         isFirstSv,
@@ -112,7 +85,6 @@ export class Dso extends pulumi.ComponentResource {
         auth0SvAppName: svConf.auth0SvAppName,
         onboarding,
         auth0Client: this.args.auth0Client,
-        approvedSvIdentities: identities,
         expectedValidatorOnboardings,
         isDevNet: this.args.isDevNet,
         periodicBackupConfig: this.args.periodicBackupConfig,
@@ -159,14 +131,6 @@ export class Dso extends pulumi.ComponentResource {
         };
       }, {});
 
-    const svIdentitiesFromConfigs: ApprovedSvIdentity[] = Object.entries(
-      svIdKeys
-    ).map<ApprovedSvIdentity>(([onboardingName, keys]) => ({
-      name: onboardingName,
-      publicKey: keys.publicKey, // we always use that one if we have it, overriding approved-sv-id-values-$CLUSTER.yaml
-      rewardWeightBps: 10000, // if already defined in approved-sv-id-values-$CLUSTER.yaml, this will be ignored.
-    }));
-
     const sv1CometBftConf = {
       ...sv1Conf.cometBft,
       nodeName: sv1Conf.nodeName,
@@ -200,7 +164,6 @@ export class Dso extends pulumi.ComponentResource {
         sv1: sv1CometBftConf,
         peers: peerCometBftConfs,
       },
-      svIdentitiesFromConfigs,
       this.args.expectedValidatorOnboardings,
       true,
       cometBftGovernanceKeys[sv1Conf.onboardingName]
@@ -233,7 +196,6 @@ export class Dso extends pulumi.ComponentResource {
         conf,
         onboarding,
         cometBft,
-        svIdentitiesFromConfigs,
         [],
         false,
         cometBftGovernanceKeys[conf.onboardingName],

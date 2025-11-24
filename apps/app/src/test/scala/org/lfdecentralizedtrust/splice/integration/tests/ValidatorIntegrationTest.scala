@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.PartyId
@@ -152,6 +152,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
         .sequencerConnections
       sequencerConnections.connections.size shouldBe 4
       sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(2)
+      sequencerConnections.sequencerLivenessMargin shouldBe NonNegativeInt.one
       sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
         PositiveInt.tryCreate(2),
         ValidatorAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION_PATIENCE,
@@ -482,21 +483,29 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     aliceWalletClient.tap(tapAmount)
     assertUserFullyOnboarded(aliceWalletClient, aliceValidatorBackend)
 
+    val aliceUserParty = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+      .get(aliceWalletClient.config.ledgerApiUser)
+      .primaryParty
+      .value
+
     actAndCheck(
       "Offboard a user",
       aliceValidatorBackend.offboardUser(aliceWalletClient.config.ledgerApiUser),
     )(
       "Wait for the validator and wallet to report the user offboarded",
       _ => {
+        val usersWhoRemain = (testUsers ++ aliceValidatorBackend.config.validatorWalletUsers)
+          .filter(_ != aliceWalletClient.config.ledgerApiUser)
+
         val usernames = aliceValidatorBackend.listUsers()
-        usernames should contain theSameElementsAs (testUsers ++ aliceValidatorBackend.config.validatorWalletUsers)
-        assertUserFullyOffboarded(aliceWalletClient, aliceValidatorBackend)
+        usernames should contain theSameElementsAs usersWhoRemain
+        assertUserFullyOffboarded(aliceWalletClient, aliceValidatorBackend, aliceUserParty)
       },
     )
 
     clue("Offboarding alice again - offboarding should be idempotent") {
       aliceValidatorBackend.offboardUser(aliceWalletClient.config.ledgerApiUser)
-      assertUserFullyOffboarded(aliceWalletClient, aliceValidatorBackend)
+      assertUserFullyOffboarded(aliceWalletClient, aliceValidatorBackend, aliceUserParty)
     }
 
     actAndCheck(
@@ -535,12 +544,14 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
 
   }
 
-  "support existing party with invalid hit" in { implicit env =>
+  "support existing party with invalid hint" in { implicit env =>
     initDsoWithSv1Only()
     val validator = v(invalidValidator)
     val participantClientWithAdminToken = validator.participantClientWithAdminToken
+    val partyId =
+      PartyId.tryCreate(validatorPartyHint, participantClientWithAdminToken.id.namespace)
     participantClientWithAdminToken.topology.party_to_participant_mappings.propose(
-      PartyId.tryCreate(validatorPartyHint, participantClientWithAdminToken.id.namespace),
+      partyId,
       Seq(
         (
           participantClientWithAdminToken.id,
@@ -548,6 +559,15 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
         )
       ),
     )
+
+    clue("party is seen on the ledger api") {
+      eventually() {
+        participantClientWithAdminToken.ledger_api.parties
+          .list()
+          .exists(_.party == partyId) shouldBe true
+      }
+    }
+
     val configuredUser = validator.config.ledgerApiUser
 
     def getUser = {

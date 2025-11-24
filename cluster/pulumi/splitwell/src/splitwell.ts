@@ -16,7 +16,7 @@ import {
   ExactNamespace,
   failOnAppVersionMismatch,
   imagePullSecret,
-  installAuth0Secret,
+  installLedgerApiSecret,
   installSpliceHelmChart,
   ValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
@@ -64,6 +64,7 @@ export async function installSplitwell(
     decentralizedSynchronizerMigrationConfig.active.id,
     xns,
     auth0Client.getCfg(),
+    false,
     decentralizedSynchronizerMigrationConfig.active.version,
     sharedPostgres,
     {
@@ -109,6 +110,7 @@ export async function installSplitwell(
       failOnAppVersionMismatch: failOnAppVersionMismatch,
       maxDarVersion: splitwellConfig?.maxDarVersion,
       logLevel: splitwellConfig.logging?.level,
+      logAsyncFlush: splitwellConfig.logging?.async,
     },
     activeVersion,
     { dependsOn: imagePullDeps }
@@ -127,7 +129,7 @@ export async function installSplitwell(
   const validatorDbName = 'val_splitwell';
 
   const extraDependsOn = imagePullDeps.concat(
-    await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell')
+    await installLedgerApiSecret(auth0Client, xns, 'splitwell')
   );
 
   return await installValidatorApp({
@@ -164,15 +166,13 @@ export async function installSplitwell(
       postgresName: validatorPostgres.instanceName,
     },
     scanAddress: scanAddress,
-    secrets: {
-      xns: xns,
-      auth0Client: auth0Client,
-      auth0AppName: 'splitwell_validator',
-    },
+    auth0Client: auth0Client,
+    auth0ValidatorAppName: 'splitwell_validator',
     validatorWalletUsers: pulumi.output([validatorWalletUser]),
     validatorPartyHint: 'digitalasset-splitwell-1',
     nodeIdentifier: 'splitwell',
     logLevel: splitwellConfig.logging?.level,
+    logAsync: splitwellConfig.logging?.async,
   });
 }
 

@@ -1075,6 +1075,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Dar"
+        synchronizer_was_paused:
+          type: boolean
+        separate_payload_files:
+          type: boolean
+          description: |
+            If set to true, genesis_state and acs_snapshot are filenames
 
     Dar:
       type: object
@@ -1097,6 +1103,8 @@ components:
         migration_id:
           type: integer
           format: int64
+        timestamp:
+          type: string
 
     GetDomainMigrationDumpResponse:
       type: object

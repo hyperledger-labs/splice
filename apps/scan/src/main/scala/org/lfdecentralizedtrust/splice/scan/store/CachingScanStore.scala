@@ -34,6 +34,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{CacheConfig, ScanCacheConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanStoreMetrics, ScanAggregator}
 import org.lfdecentralizedtrust.splice.store.{
   Limit,
+  MiningRoundsStore,
   MultiDomainAcsStore,
   PageLimit,
   SortOrder,
@@ -58,6 +59,7 @@ class CachingScanStore(
     with FlagCloseableAsync
     with RetryProvider.Has {
 
+  override val storeName: String = store.storeName
   override lazy val txLogConfig: TxLogStore.Config[TxLogEntry] = store.txLogConfig
 
   override def key: ScanStore.Key = store.key
@@ -306,12 +308,14 @@ class CachingScanStore(
 
   override def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
       companion: C,
+      updateHistory: UpdateHistory,
       recordTime: CantonTimestamp,
   )(implicit
       companionClass: MultiDomainAcsStore.ContractCompanion[C, TCId, T],
       tc: TraceContext,
   ): Future[Option[Contract[TCId, T]]] = store.lookupContractByRecordTime(
     companion,
+    updateHistory,
     recordTime,
   )
 
@@ -366,11 +370,19 @@ class CachingScanStore(
       store.lookupSvNodeState,
     ).get(svPartyId)
 
+  override def lookupOpenMiningRoundTriple()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[MiningRoundsStore.OpenMiningRoundTriple]] =
+    getCache(
+      "openMiningRounds",
+      cacheConfig.openMiningRounds,
+      (_: Unit) => store.lookupOpenMiningRoundTriple(),
+    ).get(())
+
   override def domains: SynchronizerStore = store.domains
 
   override def multiDomainAcsStore: MultiDomainAcsStore = store.multiDomainAcsStore
-
-  override def updateHistory: UpdateHistory = store.updateHistory
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   private def getCache[Key, Value](

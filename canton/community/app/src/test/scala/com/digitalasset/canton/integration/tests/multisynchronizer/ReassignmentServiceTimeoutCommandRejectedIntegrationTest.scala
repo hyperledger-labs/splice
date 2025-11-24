@@ -9,14 +9,14 @@ import com.digitalasset.canton.config.{
   NonNegativeFiniteDuration as ConfigNonNegativeFiniteDuration,
 }
 import com.digitalasset.canton.console.LocalParticipantReference
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, UnassignmentData}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.integration.bootstrap.InitializedSynchronizer
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.HasCommandRunnersHelpers.{
@@ -37,7 +37,6 @@ import com.digitalasset.canton.integration.{
   TestConsoleEnvironment,
 }
 import com.digitalasset.canton.logging.LogEntry
-import com.digitalasset.canton.participant.protocol.reassignment.UnassignmentData
 import com.digitalasset.canton.participant.store.ReassignmentStore
 import com.digitalasset.canton.participant.store.ReassignmentStore.UnknownReassignmentId
 import com.digitalasset.canton.participant.util.JavaCodegenUtil.*
@@ -48,11 +47,17 @@ import com.digitalasset.canton.synchronizer.sequencer.{
   ProgrammableSequencerPolicies,
 }
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.util.ReassignmentTag.Source
-import com.digitalasset.canton.{BaseTest, HasExecutionContext, SynchronizerAlias}
+import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
+import com.digitalasset.canton.{
+  BaseTest,
+  HasExecutionContext,
+  ReassignmentCounter,
+  SynchronizerAlias,
+}
 import org.scalatest.Assertion
 
 import scala.collection.mutable
+import scala.concurrent.duration.DurationInt
 
 sealed trait ReassignmentServiceTimeoutCommandRejectedIntegrationTest
     extends CommunityIntegrationTest
@@ -66,6 +71,7 @@ sealed trait ReassignmentServiceTimeoutCommandRejectedIntegrationTest
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2_S1M1_S1M1
       .addConfigTransforms(ConfigTransforms.useStaticTime)
+      .addConfigTransforms(ConfigTransforms.updateTargetTimestampForwardTolerance(60.seconds))
       .withSetup { implicit env =>
         import env.*
 
@@ -84,7 +90,8 @@ sealed trait ReassignmentServiceTimeoutCommandRejectedIntegrationTest
         disableAssignmentExclusivityTimeout(getInitializedSynchronizer(daName))
         disableAssignmentExclusivityTimeout(getInitializedSynchronizer(acmeName))
 
-        participants.all.dars.upload(BaseTest.CantonExamplesPath)
+        participants.all.dars.upload(BaseTest.CantonExamplesPath, synchronizerId = daId)
+        participants.all.dars.upload(BaseTest.CantonExamplesPath, synchronizerId = acmeId)
         programmableSequencers.put(daName, getProgrammableSequencer(sequencer1.name))
         programmableSequencers.put(acmeName, getProgrammableSequencer(sequencer2.name))
       }
@@ -179,7 +186,12 @@ sealed trait ReassignmentServiceTimeoutCommandRejectedIntegrationTest
             .fromProtoTimestamp(unassignmentCompletion.synchronizerTime.value.recordTime.value)
             .value
 
-          val reassignmentId = ReassignmentId(Source(daId), unassignmentTs)
+          val reassignmentId = ReassignmentId(
+            Source(daId),
+            Target(acmeId),
+            unassignmentTs,
+            Seq(cid -> ReassignmentCounter(0)),
+          )
 
           // Entry is deleted upon timeout
           getReassignmentData(
@@ -259,7 +271,7 @@ sealed trait ReassignmentServiceTimeoutCommandRejectedIntegrationTest
       loggerFactory.assertLoggedWarningsAndErrorsSeq(
         {
           val failedAssignmentCompletion = failingAssignment(
-            unassignId = unassignedEvent.unassignId,
+            reassignmentId = unassignedEvent.reassignmentId,
             source = daId,
             target = acmeId,
             submittingParty = signatory.toLf,
@@ -283,7 +295,7 @@ sealed trait ReassignmentServiceTimeoutCommandRejectedIntegrationTest
           )
 
           assign(
-            unassignId = unassignedEvent.unassignId,
+            reassignmentId = unassignedEvent.reassignmentId,
             source = daId,
             target = acmeId,
             submittingParty = signatory.toLf,
@@ -315,7 +327,7 @@ class ReassignmentServiceTimeoutCommandRejectedIntegrationTestPostgres
     extends ReassignmentServiceTimeoutCommandRejectedIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2"))

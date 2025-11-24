@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
+import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
@@ -47,6 +48,10 @@ class ScanTimeBasedIntegrationTest
           _.copy(initialRound = initialRound)
         )(config)
       )
+      .withAdditionalSetup { implicit env =>
+        // start at a point where the reward trigers can run so that we avoid warnings about missed rewards
+        advanceTimeForRewardAutomationToRunForCurrentRound
+      }
 
   def firstRound(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Long =
     sv1ScanBackend.getDsoInfo().initialRound match {
@@ -59,7 +64,7 @@ class ScanTimeBasedIntegrationTest
       sv1ScanBackend.getLatestOpenMiningRound(getLedgerTime).contract.payload.round.number
     roundNum() shouldBe firstRound + 1
 
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
     roundNum() shouldBe firstRound + 2
   }
 
@@ -69,7 +74,7 @@ class ScanTimeBasedIntegrationTest
     // captured in the tx log, so for now we first advance a round, and query only on that
     // round and beyond. Once that is fixed, we should make sure that querying for round 0 is reliable as well.
 
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     clue(s"Get config for round ${firstRound + 3}") {
       val cfg = eventuallySucceeds() {
@@ -129,7 +134,7 @@ class ScanTimeBasedIntegrationTest
             .rate
         ) should be(newHoldingFee)
       }
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
     }
     clue(s"Round ${firstRound + 4} should now be open, and have the new configuration") {
       eventuallySucceeds() {
@@ -164,14 +169,14 @@ class ScanTimeBasedIntegrationTest
     clue(
       "Advance a round and generate some more reward coupons - this time with alice's validator being featured"
     )({
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
       grantFeaturedAppRight(aliceValidatorWalletClient)
       p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 41.0)
       p2pTransfer(bobWalletClient, aliceWalletClient, aliceUserParty, 101.0)
     })
     clue("Advance 2 ticks for the first coupons to be collectable")({
-      advanceRoundsByOneTick
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
     })
     clue("Alice's and Bob's validators use their app&validator rewards when transfering CC")({
       p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0)
@@ -180,19 +185,19 @@ class ScanTimeBasedIntegrationTest
     clue(
       s"Some more transfers collect more rewards in round ${firstRound + 5} (issued in round ${firstRound + 1})"
     )({
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
       p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0)
       p2pTransfer(bobValidatorWalletClient, aliceWalletClient, aliceUserParty, 10.0)
     })
     val baseRoundWithLatestData = clue(
       "Advance 1 more tick to make sure we capture at least one round change in the tx history"
     ) {
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
       sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
       sv1ScanBackend.getRoundOfLatestData()._1
     }
     clue("Advance one more tick to get to the next closed round") {
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
       val ledgerTime = getLedgerTime.toInstant
       val expectedLastRound = baseRoundWithLatestData + 1
       sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
@@ -223,7 +228,7 @@ class ScanTimeBasedIntegrationTest
     val latestRound = baseRoundWithLatestData + 4
     actAndCheck(
       "Advance four more rounds, for the previous rounds to close (where rewards were collected)",
-      Range(0, 3).foreach(_ => advanceRoundsByOneTick),
+      Range(0, 3).foreach(_ => advanceRoundsToNextRoundOpening),
     )(
       s"Test leaderboards for latest rounds ${latestRound}",
       _ => {
@@ -297,7 +302,7 @@ class ScanTimeBasedIntegrationTest
       aliceWalletClient.tap(tapRound1Amount)
     }
 
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     roundNum() shouldBe (firstRound + 2)
 
@@ -308,7 +313,7 @@ class ScanTimeBasedIntegrationTest
 
     actAndCheck(
       s"advance to close round ${firstRound + 2}",
-      (0 to 4).foreach(_ => advanceRoundsByOneTick),
+      (0 to 4).foreach(_ => advanceRoundsToNextRoundOpening),
     )(
       s"check round ${firstRound + 2} is closed",
       _ => {
@@ -434,7 +439,7 @@ class ScanTimeBasedIntegrationTest
       "Wait for backfilling to complete, as the ACS snapshot trigger is paused until then"
     ) {
       eventually() {
-        sv1ScanBackend.automation.store.updateHistory
+        sv1ScanBackend.automation.updateHistory
           .getBackfillingState()
           .futureValue should be(BackfillingState.Complete)
         advanceTime(sv1ScanBackend.config.automation.pollingInterval.asJava)
@@ -473,12 +478,46 @@ class ScanTimeBasedIntegrationTest
       migrationId,
       templates = Some(
         Vector(
-          PackageQualifiedName.getFromResources(Amulet.TEMPLATE_ID_WITH_PACKAGE_ID),
-          PackageQualifiedName.getFromResources(AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID),
+          PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION),
+          PackageQualifiedName.fromJavaCodegenCompanion(AnsEntry.COMPANION),
         )
       ),
       partyIds = Some(Vector(aliceUserParty)),
     )
+
+    advanceTime(java.time.Duration.ofMinutes(10))
+
+    val atOrBefore = getLedgerTime
+
+    // afOrBefore should return the same ACS snapshot as the exact time given by snapshotAfter
+    val snapshotAtOrBeforeAfterData = sv1ScanBackend.getAcsSnapshotAt(
+      CantonTimestamp.assertFromInstant(atOrBefore.toInstant),
+      migrationId,
+      recordTimeMatch = Some(definitions.AcsRequest.RecordTimeMatch.AtOrBefore),
+      templates = Some(
+        Vector(
+          PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION),
+          PackageQualifiedName.fromJavaCodegenCompanion(AnsEntry.COMPANION),
+        )
+      ),
+      partyIds = Some(Vector(aliceUserParty)),
+    )
+
+    snapshotAfterData shouldBe snapshotAtOrBeforeAfterData
+    snapshotAtOrBeforeAfterData.value.recordTime shouldBe snapshotAfter.value
+
+    sv1ScanBackend.getAcsSnapshotAt(
+      CantonTimestamp.assertFromInstant(atOrBefore.toInstant),
+      migrationId,
+      recordTimeMatch = Some(definitions.AcsRequest.RecordTimeMatch.Exact),
+      templates = Some(
+        Vector(
+          PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION),
+          PackageQualifiedName.fromJavaCodegenCompanion(AnsEntry.COMPANION),
+        )
+      ),
+      partyIds = Some(Vector(aliceUserParty)),
+    ) shouldBe None
 
     inside(snapshotAfterData) { case Some(data) =>
       val (entries, coins) =
@@ -495,15 +534,64 @@ class ScanTimeBasedIntegrationTest
           .decode(new JsonLfReader(createdEvent.createArguments.noSpaces))
           .owner should be(aliceUserParty.toProtoPrimitive)
       }
-
+      val snapshotAfterCts = CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant)
       val holdingsState = sv1ScanBackend.getHoldingsStateAt(
-        CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant),
+        snapshotAfterCts,
         migrationId,
         partyIds = Vector(aliceUserParty),
       )
       inside(holdingsState) { case Some(holdings) =>
         holdings.createdEvents should be(coins)
       }
+
+      val holdingsSummary = sv1ScanBackend.getHoldingsSummaryAt(
+        snapshotAfterCts,
+        migrationId,
+        ownerPartyIds = Vector(aliceUserParty),
+      )
+
+      inside(holdingsSummary) { case Some(res) =>
+        res.migrationId should be(migrationId)
+        res.recordTime should be(snapshotAfter.value)
+        res.summaries.map(_.partyId).distinct shouldBe (Vector(aliceUserParty.toProtoPrimitive))
+      }
+
+      // afOrBefore should return the same holdingsState and holdingsSummary as the exact time given by snapshotAfter
+      advanceTime(java.time.Duration.ofMinutes(10))
+      val atOrBefore = getLedgerTime
+      val atOrBeforeCts = CantonTimestamp.assertFromInstant(atOrBefore.toInstant)
+      val holdingsStateAtOrBefore = sv1ScanBackend.getHoldingsStateAt(
+        atOrBeforeCts,
+        migrationId,
+        partyIds = Vector(aliceUserParty),
+        recordTimeMatch = Some(definitions.HoldingsStateRequest.RecordTimeMatch.AtOrBefore),
+      )
+      inside(holdingsStateAtOrBefore) { case Some(holdings) =>
+        holdings.createdEvents should be(coins)
+        holdings.recordTime shouldBe snapshotAfter.value
+      }
+
+      sv1ScanBackend.getHoldingsStateAt(
+        atOrBeforeCts,
+        migrationId,
+        partyIds = Vector(aliceUserParty),
+        recordTimeMatch = Some(definitions.HoldingsStateRequest.RecordTimeMatch.Exact),
+      ) shouldBe None
+
+      val holdingsSummaryAtOrBefore = sv1ScanBackend.getHoldingsSummaryAt(
+        atOrBeforeCts,
+        migrationId,
+        ownerPartyIds = Vector(aliceUserParty),
+        recordTimeMatch = Some(definitions.HoldingsSummaryRequest.RecordTimeMatch.AtOrBefore),
+      )
+      holdingsSummaryAtOrBefore shouldBe holdingsSummary
+
+      sv1ScanBackend.getHoldingsSummaryAt(
+        atOrBeforeCts,
+        migrationId,
+        ownerPartyIds = Vector(aliceUserParty),
+        recordTimeMatch = Some(definitions.HoldingsSummaryRequest.RecordTimeMatch.Exact),
+      ) shouldBe None
     }
   }
 }

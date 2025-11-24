@@ -22,6 +22,14 @@ const MonitoringConfigSchema = z.object({
   alerting: z.object({
     enableNoDataAlerts: z.boolean(),
     alerts: z.object({
+      pruning: z.object({
+        participantRetentionDays: z.number(),
+        sequencerRetentionDays: z.number(),
+        mediatorRetentionDays: z.number(),
+      }),
+      ingestion: z.object({
+        thresholdEntriesPerBatch: z.number(),
+      }),
       delegatelessContention: z.object({
         thresholdPerNamespace: z.number(),
       }),
@@ -65,8 +73,15 @@ const CloudArmorConfigSchema = z.object({
     .object({})
     .catchall(
       z.object({
-        domain: z.string(),
-        // TODO (DACH-NY/canton-network-internal#2115) more config
+        rulePreviewOnly: z.boolean().default(false),
+        hostname: z.string().regex(/^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/, 'valid DNS hostname'),
+        pathPrefix: z.string().regex(/^\/[^"]*$/, 'HTTP request path starting with /'),
+        throttleAcrossAllEndpointsAllIps: z.object({
+          withinIntervalSeconds: z.number().positive(),
+          maxRequestsBeforeHttp429: z
+            .number()
+            .min(0, '0 to disallow requests or positive to allow'),
+        }),
       })
     )
     .default({}),
@@ -82,9 +97,11 @@ export const InfraConfigSchema = z.object({
       storageSize: z.string(),
       retentionDuration: z.string(),
       retentionSize: z.string(),
+      installPrometheusPushgateway: z.boolean().default(false),
     }),
     istio: z.object({
       enableIngressAccessLogging: z.boolean(),
+      enableClusterAccessLogging: z.boolean().default(false),
     }),
     extraCustomResources: z.object({}).catchall(z.any()).default({}),
   }),

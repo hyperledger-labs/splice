@@ -1,4 +1,4 @@
--- Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
 create table par_daml_packages (
@@ -13,13 +13,11 @@ create table par_daml_packages (
 );
 
 create table par_dars (
-
   main_package_id varchar collate "C" not null primary key,
   data bytea not null,
   description varchar collate "C" null,
   name varchar collate "C" not null,
   version varchar collate "C" not null
-
 );
 
 -- This table tracks the packages contained in the uploaded DARs
@@ -73,31 +71,27 @@ create table common_crypto_public_keys (
 
 -- Stores the immutable contracts, however a creation of a contract can be rolled back.
 create table par_contracts (
+  internal_contract_id bigint generated always as identity,
   contract_id bytea not null,
-  -- The contract is serialized using the LF contract proto serializer.
+  -- The contract is a serialized LfFatContractInst using the LF contract proto serializer.
   instance bytea not null,
-  -- Metadata: signatories, stakeholders, keys
-  -- Stored as a Protobuf blob as H2 will only support typed arrays in 1.4.201
-  metadata bytea not null,
-  -- The ledger time when the contract was created.
-  ledger_create_time varchar collate "C" not null,
-  -- We store metadata of the contract instance for inspection
   package_id varchar collate "C" not null,
   template_id varchar collate "C" not null,
-  contract_salt bytea not null,
-  primary key (contract_id)
+  primary key (contract_id) include (internal_contract_id)
 );
 
+-- Index for lookup per internal_contract_id
+create index idx_par_contracts_internal on par_contracts(internal_contract_id);
 -- Index to speedup ContractStore.find
 -- package_id comes before template_id, because queries with package_id and without template_id make more sense than vice versa.
 -- contract_id is left out, because a query with contract_id can be served with the primary key.
 create index idx_par_contracts_find on par_contracts(package_id, template_id);
 
--- provides a serial enumeration of static strings so we don't store the same string over and over in the db
+-- provides an enumeration of static strings so we don't store the same string over and over in the db
 -- currently only storing uids
 create table common_static_strings (
-  -- serial identifier of the string (local to this node)
-  id serial not null primary key,
+  -- identifier of the string (local to this node)
+  id integer generated always as identity primary key,
   -- the expression
   string varchar collate "C" not null,
   -- the source (what kind of string are we storing here)
@@ -168,22 +162,22 @@ create index idx_par_active_contracts_pruning on par_active_contracts (synchroni
 
 -- Tables for new submission tracker
 create table par_fresh_submitted_transaction (
-  synchronizer_idx integer not null,
+  physical_synchronizer_idx integer not null,
   root_hash_hex varchar collate "C" not null,
   request_id bigint not null,
   max_sequencing_time bigint not null,
-  primary key (synchronizer_idx, root_hash_hex)
+  primary key (physical_synchronizer_idx, root_hash_hex)
 );
 
 create type pruning_phase as enum ('started', 'completed');
 
 create table par_fresh_submitted_transaction_pruning (
-  synchronizer_idx integer not null,
+  physical_synchronizer_idx integer not null,
   phase pruning_phase not null,
   -- UTC timestamp in microseconds relative to EPOCH
   ts bigint not null,
   succeeded bigint null,
-  primary key (synchronizer_idx)
+  primary key (physical_synchronizer_idx)
 );
 
 create table med_response_aggregations (
@@ -199,7 +193,7 @@ create table med_response_aggregations (
 -- Stores the received sequencer messages
 create table common_sequenced_events (
   -- discriminate between different users of the sequenced events tables
-  synchronizer_idx integer not null,
+  physical_synchronizer_idx integer not null,
   -- Proto serialized signed message
   sequenced_event bytea not null,
   -- Explicit fields to query the messages, which are stored as blobs
@@ -213,71 +207,62 @@ create table common_sequenced_events (
   -- flag to skip problematic events
   ignore boolean not null,
   -- The sequencer ensures that the timestamp is unique
-  primary key (synchronizer_idx, ts)
+  primary key (physical_synchronizer_idx, ts)
 );
 
-create unique index idx_common_sequenced_events_sequencer_counter on common_sequenced_events(synchronizer_idx, sequencer_counter);
+-- Disable Postgres compression; the proto message is already compressed
+alter table common_sequenced_events
+  alter column sequenced_event set storage external;
 
--- Track what send requests we've made but have yet to observe being sequenced.
--- If events are not observed by the max sequencing time we know that the send will never be processed.
-create table sequencer_client_pending_sends (
-  -- synchronizer (index) for distinguishing between different sequencer clients in the same node
-  synchronizer_idx integer not null,
-
-  -- the message id of the send being tracked (expected to be unique for the sequencer client while the send is in-flight)
-  message_id varchar collate "C" not null,
-
-  -- the message id should be unique for the sequencer client
-  primary key (synchronizer_idx, message_id),
-
-  -- the max sequencing time of the send request (UTC timestamp in microseconds relative to EPOCH)
-  max_sequencing_time bigint not null
-);
+create unique index idx_common_sequenced_events_sequencer_counter on common_sequenced_events(physical_synchronizer_idx, sequencer_counter);
 
 create table par_synchronizer_connection_configs(
-  synchronizer_alias varchar collate "C" not null primary key,
-  config bytea, -- the protobuf-serialized versioned synchronizer connection config
-  status char(1) default 'A' not null
+  synchronizer_alias varchar collate "C" not null,
+  physical_synchronizer_id varchar collate "C", -- can be null (id is unknown before the handshake)
+
+  -- We would like to have unique (synchronizer_alias, synchronizer_id). However, for postgres < 15, there is no
+  -- way to force two nulls to be considered distinct. We use generated columns to mimic that behavior.
+  empty_if_null_physical_synchronizer_id varchar collate "C" generated always as (case when physical_synchronizer_id is null then '' else physical_synchronizer_id end) stored not null,
+  unique (synchronizer_alias, empty_if_null_physical_synchronizer_id),
+
+  config bytea not null, -- the protobuf-serialized versioned synchronizer connection config
+  status char(1) default 'A' not null,
+  synchronizer_predecessor bytea -- the protobuf-serialized versioned predecessor (if existing and applicable)
 );
 
+create unique index idx_par_synchronizer_connection_configs_active_per_alias on par_synchronizer_connection_configs (synchronizer_alias)
+where status = 'A';
+
 -- used to register all synchronizers that a participant connects to
-create table par_synchronizers(
-  -- to keep track of the order synchronizers were registered
-  order_number serial not null primary key,
-  -- synchronizer human readable alias
-  alias varchar collate "C" not null unique,
-  -- synchronizer id
-  synchronizer_id varchar collate "C" not null unique,
-  status char(1) default 'A' not null,
-  unique (alias, synchronizer_id)
+create table par_registered_synchronizers(
+  physical_synchronizer_id varchar collate "C" not null primary key,
+  synchronizer_alias varchar collate "C" not null
 );
 
 create table par_reassignments (
   -- reassignment id
   target_synchronizer_idx integer not null,
   source_synchronizer_idx integer not null,
+  reassignment_id varchar collate "C" not null,
 
-  primary key (target_synchronizer_idx, source_synchronizer_idx, unassignment_timestamp),
+  primary key (target_synchronizer_idx, reassignment_id),
 
   unassignment_global_offset bigint,
   assignment_global_offset bigint,
 
   -- UTC timestamp in microseconds relative to EPOCH
   unassignment_timestamp bigint not null,
-  unassignment_request bytea,
-  -- UTC timestamp in microseconds relative to EPOCH
-  unassignment_decision_time bigint not null,
-  unassignment_result bytea,
+  unassignment_data bytea,
 
   -- defined if reassignment was completed
   -- UTC timestamp in microseconds relative to EPOCH
   assignment_timestamp bigint,
-  contract bytea not null
+  contracts bytea array not null
 );
 
 -- stores all requests for the request journal
 create table par_journal_requests (
-  synchronizer_idx integer not null,
+  physical_synchronizer_idx integer not null,
   request_counter bigint not null,
   request_state_index smallint not null,
   -- UTC timestamp in microseconds relative to EPOCH
@@ -285,10 +270,10 @@ create table par_journal_requests (
   -- UTC timestamp in microseconds relative to EPOCH
   -- is set only if the request is clean
   commit_time bigint,
-  primary key (synchronizer_idx, request_counter)
+  primary key (physical_synchronizer_idx, request_counter)
 );
-create unique index idx_journal_request_timestamp on par_journal_requests (synchronizer_idx, request_timestamp);
-create index idx_journal_request_commit_time on par_journal_requests (synchronizer_idx, commit_time);
+create unique index idx_journal_request_timestamp on par_journal_requests (physical_synchronizer_idx, request_timestamp);
+create index idx_journal_request_commit_time on par_journal_requests (physical_synchronizer_idx, commit_time);
 
 -- locally computed ACS commitments to a specific period, counter-participant and synchronizer
 create table par_computed_acs_commitments (
@@ -350,7 +335,7 @@ create table par_commitment_snapshot (
   -- A stable reference to a stakeholder set, that doesn't rely on the Protobuf encoding being deterministic
   -- a hex-encoded hash (not binary so that hash can be indexed in all db server types)
   stakeholders_hash varchar collate "C" not null,
-  stakeholders bytea not null,
+  stakeholders integer[] not null,
   commitment bytea not null,
   primary key (synchronizer_idx, stakeholders_hash)
 );
@@ -362,6 +347,16 @@ create table par_commitment_snapshot_time (
   ts bigint not null,
   tie_breaker bigint not null,
   primary key (synchronizer_idx)
+);
+
+-- Stores commitment reinitialization status (start, end)
+create table par_commitment_reinitialization (
+    synchronizer_idx integer not null,
+    -- UTC timestamp in microseconds relative to EPOCH indicating whether a repair is ongoing for a timestamp
+    ts_reinit_ongoing bigint,
+    -- UTC timestamp in microseconds relative to EPOCH indicating the timestamp of the last completed reinitialization
+    ts_reinit_completed bigint,
+    primary key (synchronizer_idx)
 );
 
 -- Remote commitments that were received but could not yet be checked because the local participant is lagging behind
@@ -382,7 +377,7 @@ create index idx_par_commitment_queue_by_time on par_commitment_queue (synchroni
 
 -- the (current) synchronizer parameters for the given synchronizer
 create table par_static_synchronizer_parameters (
-  synchronizer_id varchar collate "C" primary key,
+  physical_synchronizer_id varchar collate "C" primary key,
   -- serialized form
   params bytea not null
 );
@@ -435,12 +430,12 @@ create table par_commitment_pruning (
 
 -- Maintains the latest timestamp (by sequencer client) for which the sequenced event store pruning has started or finished
 create table common_sequenced_event_store_pruning (
-  synchronizer_idx integer not null,
+  physical_synchronizer_idx integer not null,
   phase pruning_phase not null,
   -- UTC timestamp in microseconds relative to EPOCH
   ts bigint not null,
   succeeded bigint null,
-  primary key (synchronizer_idx)
+  primary key (physical_synchronizer_idx)
 );
 
 -- table to contain the values provided by the synchronizer to the mediator node for initialization.
@@ -449,15 +444,16 @@ create table common_sequenced_event_store_pruning (
 create table mediator_synchronizer_configuration (
   -- this lock column ensures that there can only ever be a single row: https://stackoverflow.com/questions/3967372/sql-server-how-to-constrain-a-table-to-contain-a-single-row
   lock char(1) not null default 'X' primary key check (lock = 'X'),
-  synchronizer_id varchar collate "C" not null,
+  physical_synchronizer_id varchar collate "C" not null,
   static_synchronizer_parameters bytea not null,
-  sequencer_connection bytea not null
+  sequencer_connection bytea not null,
+  is_topology_initialized bool not null default false
 );
 
 -- the last recorded head clean sequencer counter for each synchronizer
 create table common_head_sequencer_counters (
   -- discriminate between different users of the sequencer counter tracker tables
-  synchronizer_idx integer not null primary key,
+  physical_synchronizer_idx integer not null primary key,
   prehead_counter bigint not null, -- sequencer counter before the first unclean sequenced event
   -- UTC timestamp in microseconds relative to EPOCH
   ts bigint not null
@@ -468,7 +464,7 @@ create table common_head_sequencer_counters (
 -- members can read all events from `registered_ts`
 create table sequencer_members (
     member varchar collate "C" primary key,
-    id serial unique,
+    id integer generated always as identity unique,
     registered_ts bigint not null,
     -- we keep the latest event's timestamp below the pruning timestamp,
     -- so that we can produce a valid first event above the pruning timestamp with previousTimestamp populated
@@ -496,28 +492,6 @@ create table sequencer_watermarks (
   sequencer_online bool not null
 );
 
--- readers periodically write checkpoints that maps the calculated timer to a timestamp/event-id.
--- when a new subscription is requested from a counter the sequencer can use these checkpoints to find the closest
--- timestamp below the given counter to start the subscription from.
-create table sequencer_counter_checkpoints (
-  member integer not null,
-  counter bigint not null,
-  ts bigint not null,
-  -- The column latest_sequencer_event_ts stores the latest timestamp before or at the sequencer counter checkpoint
-  -- at which the original batch of a deliver event sent to the member also contained an enveloped addressed
-  -- to the member that updates the SequencerReader's topology client (the sequencer in case of an external sequencer
-  -- and the synchronizer topology manager for embedding sequencers)
-  -- NULL if the sequencer counter checkpoint was generated before this column was added.
-  latest_sequencer_event_ts bigint null,
-  primary key (member, counter, ts)
-);
-
--- This index helps fetching the latest checkpoint for a member
-create index idx_sequencer_counter_checkpoints_by_member_ts on sequencer_counter_checkpoints(member, ts);
-
--- This index helps fetching the latest and earliest checkpoints
-create index idx_sequencer_counter_checkpoints_by_ts on sequencer_counter_checkpoints(ts);
-
 -- record the latest acknowledgement sent by a sequencer client of a member for the latest event they have successfully
 -- processed and will not re-read.
 create table sequencer_acknowledgements (
@@ -525,12 +499,13 @@ create table sequencer_acknowledgements (
   ts bigint not null
 );
 
--- inclusive lower bound of when events can be read
+-- exclusive lower bound of when events can be read
 -- if empty it means all events from epoch can be read
 -- is updated when sequencer is pruned meaning that earlier events can no longer be read (and likely no longer exist)
 create table sequencer_lower_bound (
   single_row_lock char(1) not null default 'X' primary key check(single_row_lock = 'X'),
-  ts bigint not null
+  ts bigint not null,
+  latest_topology_client_timestamp bigint
 );
 
 -- postgres events table (differs from h2 in the recipients array definition)
@@ -559,6 +534,23 @@ create table sequencer_events (
   -- extra traffic remainder at the time of the event
   base_traffic_remainder bigint
 );
+
+-- Normalized table for sequencer event recipients to allow indexed lookups of previous and sequencer-addressed events
+create table sequencer_event_recipients (
+    ts bigint not null,
+    recipient_id integer not null,
+    node_index smallint not null,
+    is_topology_event boolean not null,
+    primary key (node_index, recipient_id, ts)
+);
+
+-- temporal first dimension index used for pruning
+create index sequencer_event_recipients_ts_idx on sequencer_event_recipients(ts);
+
+-- a partial index for when we specifically query only for topology relevant events
+create index sequencer_event_recipients_node_recipient_topology_ts
+    on sequencer_event_recipients (node_index, recipient_id, is_topology_event, ts)
+    where is_topology_event is true;
 
 -- Sequence of local offsets used by the participant event publisher
 create sequence participant_event_publisher_local_offsets minvalue 0 start with 0;
@@ -657,18 +649,17 @@ create table par_command_deduplication_pruning (
 create table sequencer_synchronizer_configuration (
   -- this lock column ensures that there can only ever be a single row: https://stackoverflow.com/questions/3967372/sql-server-how-to-constrain-a-table-to-contain-a-single-row
   lock char(1) not null default 'X' primary key check (lock = 'X'),
-  synchronizer_id varchar collate "C" not null,
+  physical_synchronizer_id varchar collate "C" not null,
   static_synchronizer_parameters bytea not null
 );
 
 
 create table mediator_deduplication_store (
-  mediator_id varchar collate "C" not null,
   uuid varchar collate "C" not null,
   request_time bigint not null,
   expire_after bigint not null
 );
-create index idx_mediator_deduplication_store_expire_after on mediator_deduplication_store(expire_after, mediator_id);
+create index idx_mediator_deduplication_store_expire_after on mediator_deduplication_store(expire_after);
 
 create table common_pruning_schedules(
   -- node_type is one of "MED", or "SEQ"
@@ -682,39 +673,27 @@ create table common_pruning_schedules(
 create table seq_in_flight_aggregation(
   aggregation_id varchar collate "C" not null primary key,
   -- UTC timestamp in microseconds relative to EPOCH
-  first_sequencing_timestamp bigint not null,
-  -- UTC timestamp in microseconds relative to EPOCH
   max_sequencing_time bigint not null,
   -- serialized aggregation rule,
   aggregation_rule bytea not null
 );
 
--- NB: Do not add other indexes to this table, as this will confuse the planner to ignore the BRIN index
-create index idx_seq_in_flight_aggregation_temporal_brin
-    on seq_in_flight_aggregation
-    using brin (first_sequencing_timestamp, max_sequencing_time);
+create index seq_in_flight_aggregation_max_sequencing_time_idx on seq_in_flight_aggregation(max_sequencing_time);
 
 create table seq_in_flight_aggregated_sender(
   aggregation_id varchar collate "C" not null,
-  sender varchar collate "C" not null,
+  sender_id integer not null,
   -- UTC timestamp in microseconds relative to EPOCH
   sequencing_timestamp bigint not null,
-  -- UTC timestamp in microseconds relative to EPOCH
-  max_sequencing_time bigint not null,
   signatures bytea not null,
-  primary key (aggregation_id, sender),
+  primary key (aggregation_id, sender_id),
   constraint foreign_key_seq_in_flight_aggregated_sender foreign key (aggregation_id) references seq_in_flight_aggregation(aggregation_id) on delete cascade
 );
 
--- NB: Do not add other indexes to this table, as this will confuse the planner to ignore the BRIN index
-create index idx_seq_in_flight_aggregated_sender_temporal_brin
-    on seq_in_flight_aggregated_sender
-        using brin (sequencing_timestamp, max_sequencing_time);
-
 -- stores the topology-x state transactions
 create table common_topology_transactions (
-  -- serial identifier used to preserve insertion order
-  id bigserial not null primary key,
+  -- identifier used to preserve insertion order
+  id bigint generated always as identity primary key,
   -- the id of the store
   store_id varchar collate "C" not null,
   -- the timestamp at which the transaction is sequenced by the sequencer
@@ -764,10 +743,30 @@ create table common_topology_transactions (
 );
 create index idx_common_topology_transactions on common_topology_transactions (store_id, transaction_type, namespace, identifier, valid_until, valid_from);
 
+-- for:
+-- - DbTopologyStore.findProposalsByTxHash
+-- - DbTopologyStore.findLatestTransactionsAndProposalsByTxHash
+create index idx_common_topology_transactions_by_tx_hash
+  on common_topology_transactions (store_id, tx_hash, is_proposal, valid_from, valid_until, rejection_reason);
+
+-- for:
+-- - DbTopologyStore.findEffectiveStateChanges
+create index idx_common_topology_transactions_effective_changes
+  on common_topology_transactions (store_id, is_proposal, valid_from, valid_until, rejection_reason)
+  where is_proposal = false;
+
+
+-- for:
+-- - DbTopologyStore.update, updating the valid_until column for past transactions
+create index idx_common_topology_transactions_for_valid_until_update
+  on common_topology_transactions (store_id, mapping_key_hash, serial_counter, valid_from)
+  where valid_until is null;
+
+
 -- Stores the traffic purchased entry updates
 create table seq_traffic_control_balance_updates (
   -- member the traffic purchased entry update is for
-  member varchar collate "C" not null,
+  member_id integer not null,
   -- timestamp at which the update was sequenced
   sequencing_timestamp bigint not null,
   -- total traffic purchased entry after the update
@@ -775,7 +774,7 @@ create table seq_traffic_control_balance_updates (
   -- used to keep balance updates idempotent
   serial bigint not null,
   -- traffic states have a unique sequencing_timestamp per member
-  primary key (member, sequencing_timestamp)
+  primary key (member_id, sequencing_timestamp)
 );
 
 -- Stores the initial timestamp during onboarding. Allows to survive a restart immediately after onboarding
@@ -788,7 +787,7 @@ create table seq_traffic_control_initial_timestamp (
 -- Stores the traffic consumed as a journal
 create table seq_traffic_control_consumed_journal (
     -- member the traffic consumed entry is for
-       member varchar collate "C" not null,
+       member_id integer not null,
     -- timestamp at which the event that caused traffic to be consumed was sequenced
        sequencing_timestamp bigint not null,
     -- total traffic consumed at sequencing_timestamp
@@ -798,11 +797,8 @@ create table seq_traffic_control_consumed_journal (
     -- the last cost consumed at sequencing_timestamp
        last_consumed_cost bigint not null,
     -- traffic entries have a unique sequencing_timestamp per member
-       primary key (member, sequencing_timestamp)
+       primary key (member_id, sequencing_timestamp)
 );
-
--- This index helps joining traffic receipts without a member reference
-create index on seq_traffic_control_consumed_journal(sequencing_timestamp);
 
 --   BFT Ordering Tables
 
@@ -821,6 +817,17 @@ create table ord_epochs (
   in_progress bool not null
 );
 
+-- Auto vacuum/analyze settings for large BFT orderer tables: these are defaults set based on testing of CN CILR test deployment
+alter table ord_epochs
+    set (
+        autovacuum_vacuum_scale_factor = 0.0,
+        autovacuum_vacuum_threshold = 10000,
+        autovacuum_vacuum_cost_limit = 2000,
+        autovacuum_vacuum_cost_delay = 5,
+        autovacuum_vacuum_insert_scale_factor = 0.0,
+        autovacuum_vacuum_insert_threshold = 100000
+        );
+
 create table ord_availability_batch (
   id varchar collate "C" not null,
   batch bytea not null,
@@ -828,6 +835,19 @@ create table ord_availability_batch (
   epoch_number bigint not null,
   primary key (id)
 );
+
+create index idx_ord_availability_batch_prune on ord_availability_batch(epoch_number);
+
+-- Auto vacuum/analyze settings for large BFT orderer tables: these are defaults set based on testing of CN CILR test deployment
+alter table ord_availability_batch
+    set (
+        autovacuum_vacuum_scale_factor = 0.0,
+        autovacuum_vacuum_threshold = 10000,
+        autovacuum_vacuum_cost_limit = 2000,
+        autovacuum_vacuum_cost_delay = 5,
+        autovacuum_vacuum_insert_scale_factor = 0.0,
+        autovacuum_vacuum_insert_threshold = 100000
+        );
 
 -- messages stored during the progress of a block possibly across different pbft views
 create table ord_pbft_messages_in_progress(
@@ -838,7 +858,7 @@ create table ord_pbft_messages_in_progress(
   epoch_number bigint not null,
 
   -- view number
-  view_number smallint not null,
+  view_number bigint not null,
 
   -- pbft message for the block
   message bytea not null,
@@ -852,6 +872,8 @@ create table ord_pbft_messages_in_progress(
   -- for each block number, we only expect one message of each kind for the same sender and view number.
   primary key (block_number, view_number, from_sequencer_id, discriminator)
 );
+
+create index idx_ord_pbft_messages_in_progress_prune on ord_pbft_messages_in_progress(epoch_number);
 
 -- final pbft messages stored only once for each block when it completes
 -- currently only commit messages and the pre-prepare used for that block
@@ -878,6 +900,19 @@ create table ord_pbft_messages_completed(
   primary key (block_number, epoch_number, from_sequencer_id, discriminator)
 );
 
+create index idx_ord_pbft_messages_completed_prune on ord_pbft_messages_completed(epoch_number);
+
+-- Auto vacuum/analyze settings for large BFT orderer tables: these are defaults set based on testing of CN CILR test deployment
+alter table ord_pbft_messages_completed
+    set (
+        autovacuum_vacuum_scale_factor = 0.0,
+        autovacuum_vacuum_threshold = 10000,
+        autovacuum_vacuum_cost_limit = 2000,
+        autovacuum_vacuum_cost_delay = 5,
+        autovacuum_vacuum_insert_scale_factor = 0.0,
+        autovacuum_vacuum_insert_threshold = 100000
+        );
+
 -- Stores metadata for blocks that have been assigned timestamps in the output module
 create table ord_metadata_output_blocks (
   epoch_number bigint not null,
@@ -885,11 +920,35 @@ create table ord_metadata_output_blocks (
   bft_ts bigint not null
 );
 
+create index idx_ord_metadata_output_blocks_prune on ord_metadata_output_blocks(epoch_number);
+
+-- Auto vacuum/analyze settings for large BFT orderer tables: these are defaults set based on testing of CN CILR test deployment
+alter table ord_metadata_output_blocks
+    set (
+        autovacuum_vacuum_scale_factor = 0.0,
+        autovacuum_vacuum_threshold = 10000,
+        autovacuum_vacuum_cost_limit = 2000,
+        autovacuum_vacuum_cost_delay = 5,
+        autovacuum_vacuum_insert_scale_factor = 0.0,
+        autovacuum_vacuum_insert_threshold = 100000
+        );
+
 -- Stores output metadata for epochs
 create table ord_metadata_output_epochs (
   epoch_number bigint not null primary key,
   could_alter_ordering_topology bool not null
 );
+
+-- Auto vacuum/analyze settings for large BFT orderer tables: these are defaults set based on testing of CN CILR test deployment
+alter table ord_metadata_output_epochs
+    set (
+        autovacuum_vacuum_scale_factor = 0.0,
+        autovacuum_vacuum_threshold = 10000,
+        autovacuum_vacuum_cost_limit = 2000,
+        autovacuum_vacuum_cost_delay = 5,
+        autovacuum_vacuum_insert_scale_factor = 0.0,
+        autovacuum_vacuum_insert_threshold = 100000
+        );
 
 -- inclusive lower bound of when blocks can be read.
 -- if empty it means all blocks can be read.
@@ -901,10 +960,25 @@ create table ord_output_lower_bound (
   block_number bigint not null
 );
 
+-- pruning_schedules with parameter specific to bft orderer pruning
+create table ord_pruning_schedules (
+    -- this lock column ensures that there can only ever be a single row: https://stackoverflow.com/questions/3967372/sql-server-how-to-constrain-a-table-to-contain-a-single-row
+   lock char(1) not null default 'X' primary key check (lock = 'X'),
+   cron varchar collate "C" not null,
+   max_duration bigint not null, -- positive number of seconds
+   retention bigint not null, -- positive number of seconds
+   min_blocks_to_keep integer not null -- parameter specific to bft orderer pruning
+);
+
+create table ord_leader_selection_state (
+    epoch_number bigint not null primary key,
+    state bytea not null
+);
+
 -- Stores P2P endpoints from the configuration or admin command
 create table ord_p2p_endpoints (
   address varchar collate "C" not null,
-  port smallint not null,
+  port integer not null,
   transport_security bool not null,
   custom_server_trust_certificates bytea null, -- PEM string
   client_certificate_chain bytea null, -- PEM string
@@ -912,17 +986,7 @@ create table ord_p2p_endpoints (
   primary key (address, port, transport_security)
 );
 
--- Auto-vacuum settings for large sequencer tables: these are defaults set based on testing of CN CILR test deployment
-alter table sequencer_counter_checkpoints
-    set (
-        autovacuum_vacuum_scale_factor = 0.0,
-        autovacuum_vacuum_threshold = 10000,
-        autovacuum_vacuum_cost_limit = 2000,
-        autovacuum_vacuum_cost_delay = 5,
-        autovacuum_vacuum_insert_scale_factor = 0.0,
-        autovacuum_vacuum_insert_threshold = 100000
-        );
-
+-- Auto vacuum/analyze settings for large sequencer tables: these are defaults set based on testing of CN CILR test deployment
 alter table sequencer_events
     set (
         autovacuum_vacuum_scale_factor = 0.0,
@@ -930,7 +994,27 @@ alter table sequencer_events
         autovacuum_vacuum_cost_limit = 2000,
         autovacuum_vacuum_cost_delay = 5,
         autovacuum_vacuum_insert_scale_factor = 0.0,
-        autovacuum_vacuum_insert_threshold = 100000
+        autovacuum_vacuum_insert_threshold = 100000,
+-- By default analyze is triggered when a table has been vacuumed or when considerable part of the table changed.
+-- For very large tables (auto-)vacuuming is too slow, leading to statistics not being updated often enough.
+-- This leads to suboptimal query plans (falling back to Seq Scans), which can be avoided by running analyze more often.
+-- We use 1'000'000 rows as a threshold, with the reasoning: not too often, but enough to keep the query planner happy.
+        autovacuum_analyze_scale_factor = 0.0,
+        autovacuum_analyze_threshold = 1000000
+        );
+
+-- Note: *_threshold is 10x of the other tables, since this table has many more rows.
+alter table sequencer_event_recipients
+    set (
+        autovacuum_vacuum_scale_factor = 0.0,
+        autovacuum_vacuum_threshold = 100000,
+        autovacuum_vacuum_cost_limit = 2000,
+        autovacuum_vacuum_cost_delay = 5,
+        autovacuum_vacuum_insert_scale_factor = 0.0,
+        autovacuum_vacuum_insert_threshold = 1000000,
+        -- Note: auto vacuuming this table is too slow, so we need to run analyze more often than vacuuming completes:
+        autovacuum_analyze_scale_factor = 0.0,
+        autovacuum_analyze_threshold = 10000000
         );
 
 alter table sequencer_payloads
@@ -940,7 +1024,9 @@ alter table sequencer_payloads
         autovacuum_vacuum_cost_limit = 2000,
         autovacuum_vacuum_cost_delay = 5,
         autovacuum_vacuum_insert_scale_factor = 0.0,
-        autovacuum_vacuum_insert_threshold = 100000
+        autovacuum_vacuum_insert_threshold = 100000,
+        autovacuum_analyze_scale_factor = 0.0,
+        autovacuum_analyze_threshold = 1000000
         );
 
 alter table seq_block_height
@@ -950,7 +1036,9 @@ alter table seq_block_height
         autovacuum_vacuum_cost_limit = 2000,
         autovacuum_vacuum_cost_delay = 5,
         autovacuum_vacuum_insert_scale_factor = 0.0,
-        autovacuum_vacuum_insert_threshold = 100000
+        autovacuum_vacuum_insert_threshold = 100000,
+        autovacuum_analyze_scale_factor = 0.0,
+        autovacuum_analyze_threshold = 1000000
         );
 
 alter table seq_traffic_control_consumed_journal
@@ -960,7 +1048,9 @@ alter table seq_traffic_control_consumed_journal
         autovacuum_vacuum_cost_limit = 2000,
         autovacuum_vacuum_cost_delay = 5,
         autovacuum_vacuum_insert_scale_factor = 0.0,
-        autovacuum_vacuum_insert_threshold = 100000
+        autovacuum_vacuum_insert_threshold = 100000,
+        autovacuum_analyze_scale_factor = 0.0,
+        autovacuum_analyze_threshold = 1000000
         );
 
 alter table seq_in_flight_aggregated_sender
@@ -970,7 +1060,9 @@ alter table seq_in_flight_aggregated_sender
         autovacuum_vacuum_cost_limit = 2000,
         autovacuum_vacuum_cost_delay = 5,
         autovacuum_vacuum_insert_scale_factor = 0.0,
-        autovacuum_vacuum_insert_threshold = 100000
+        autovacuum_vacuum_insert_threshold = 100000,
+        autovacuum_analyze_scale_factor = 0.0,
+        autovacuum_analyze_threshold = 1000000
         );
 
 alter table seq_in_flight_aggregation
@@ -980,11 +1072,13 @@ alter table seq_in_flight_aggregation
         autovacuum_vacuum_cost_limit = 2000,
         autovacuum_vacuum_cost_delay = 5,
         autovacuum_vacuum_insert_scale_factor = 0.0,
-        autovacuum_vacuum_insert_threshold = 100000
+        autovacuum_vacuum_insert_threshold = 100000,
+        autovacuum_analyze_scale_factor = 0.0,
+        autovacuum_analyze_threshold = 1000000
         );
 
 -- Stores participants we should not wait for before pruning when handling ACS commitment
-Create TABLE acs_no_wait_counter_participants
+create table acs_no_wait_counter_participants
 (
     synchronizer_id varchar collate "C" not null,
     participant_id varchar collate "C" not null,
@@ -992,7 +1086,7 @@ Create TABLE acs_no_wait_counter_participants
 );
 
 -- Stores configuration for metrics around slow participants
-CREATE TABLE acs_slow_participant_config
+create table acs_slow_participant_config
 (
    synchronizer_id varchar collate "C" not null,
    threshold_distinguished integer not null,
@@ -1001,11 +1095,31 @@ CREATE TABLE acs_slow_participant_config
 );
 
 -- Stores distinguished or specifically measured counter participants for ACS commitment metrics
-CREATE TABLE acs_slow_counter_participants
+create table acs_slow_counter_participants
 (
    synchronizer_id varchar collate "C" not null,
    participant_id varchar  collate "C" not null,
    is_distinguished boolean not null,
    is_added_to_metrics boolean not null,
    primary key(synchronizer_id,participant_id)
+);
+
+-- Specifies the event that triggers the execution of a pending operation
+create type pending_operation_trigger_type as enum ('synchronizer_reconnect');
+
+-- Stores operations that must be completed, ensuring execution even after a node restart (e.g., following a crash)
+create table common_pending_operations (
+  id int not null generated always as identity,
+  operation_trigger pending_operation_trigger_type not null,
+  -- The name of the procedure to execute for this operation.
+  operation_name varchar collate "C" not null,
+  -- A key to uniquely identify an instance of an operation, allowing multiple pending operations of the same type
+  -- An empty string indicates no specific key
+  operation_key varchar collate "C" not null,
+  -- The serialized protobuf message for the operation, wrapped for versioning (HasProtocolVersionedWrapper)
+  operation bytea not null,
+  -- The ID of the synchronizer instance this operation is associated with
+  synchronizer_id varchar collate "C" not null,
+  primary key (id),
+  unique (synchronizer_id, operation_key, operation_name)
 );

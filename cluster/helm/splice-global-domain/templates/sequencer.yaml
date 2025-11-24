@@ -82,7 +82,7 @@ spec:
                   config {
                     cometbft-node-host = {{ .Values.sequencer.driver.host }}
                     cometbft-node-port = {{ .Values.sequencer.driver.port }}
-                    health-check-attempts = 20
+                    health-check-attempts = 100000
                   }
                   type = "CometBFT"
                 }

@@ -4,35 +4,38 @@
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
 import cats.data.OptionT
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTrigger.RoundBasedTask
 import org.lfdecentralizedtrust.splice.automation.{
-  PollingParallelTaskExecutionTrigger,
+  RoundBasedRewardTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.PackageConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvRewardState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
-import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{
   DarResources,
   ParticipantAdminConnection,
   SpliceLedgerConnection,
 }
+import org.lfdecentralizedtrust.splice.store.MiningRoundsStore.OpenMiningRoundContract
 import org.lfdecentralizedtrust.splice.sv.config.BeneficiaryConfig
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import org.lfdecentralizedtrust.splice.store.MiningRoundsStore.OpenMiningRoundContract
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, AssignedContract}
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.ParticipantId
-import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.MonadUtil
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.PackageConfig
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
+import java.time.temporal.ChronoUnit
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.math.Ordering.Implicits.*
@@ -47,14 +50,12 @@ class ReceiveSvRewardCouponTrigger(
     override val ec: ExecutionContext,
     mat: Materializer,
     override val tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[ReceiveSvRewardCouponTrigger.Task] {
-
-  override def isRewardOperationTrigger: Boolean = true
+) extends RoundBasedRewardTrigger[ReceiveSvRewardCouponTrigger.Task] {
 
   private val svParty = store.key.svParty
   private val dsoParty = store.key.dsoParty
 
-  override protected def retrieveTasks()(implicit
+  override protected def retrieveAvailableTasksForRound()(implicit
       tc: TraceContext
   ): Future[Seq[ReceiveSvRewardCouponTrigger.Task]] = {
     for {
@@ -68,7 +69,7 @@ class ReceiveSvRewardCouponTrigger(
           val filterParty = beneficiary.beneficiary.filterString
           participantAdminConnection
             .listPartyToParticipant(
-              store = Some(TopologyStoreId.SynchronizerStore(dsoRules.domain)),
+              store = Some(TopologyStoreId.Synchronizer(dsoRules.domain)),
               filterParty = filterParty,
             )
             .map { txs =>
@@ -98,7 +99,7 @@ class ReceiveSvRewardCouponTrigger(
       val beneficiariesWithoutLatestPackages =
         extraBeneficiaries.diff(beneficiariesWithLatestVettedPackages)
       if (beneficiariesWithoutLatestPackages.isEmpty) {
-        logger.info(s"All beneficiaries vetted the latest packages.")
+        logger.debug(s"All beneficiaries vetted the latest packages.")
       } else {
         logger.warn(
           s"Beneficiaries did not vet the latest packages: $beneficiariesWithoutLatestPackages"
@@ -232,9 +233,10 @@ object ReceiveSvRewardCouponTrigger {
       rewardState: AssignedContract[SvRewardState.ContractId, SvRewardState],
       round: OpenMiningRoundContract,
       beneficiaries: Seq[BeneficiaryConfig],
-  ) extends PrettyPrinting {
-    import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
+  ) extends PrettyPrinting
+      with RoundBasedTask {
     import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
+    import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
     override def pretty: Pretty[this.type] =
       prettyOfClass(
@@ -243,6 +245,15 @@ object ReceiveSvRewardCouponTrigger {
         param("rewardState", _.rewardState),
         param("round", _.round),
       )
+
+    def roundNumber: Long = Long.unbox(round.payload.round.number)
+
+    def opensAt: Instant = round.payload.opensAt
+
+    override def scheduleAtMaxTargetTime: Instant =
+      opensAt.plus(round.payload.tickDuration.microseconds, ChronoUnit.MICROS)
+
+    def closesAt: Instant = round.payload.targetClosesAt
   }
 
   def svLatestVettedPackages(packages: PackageConfig): Seq[String] = Seq(

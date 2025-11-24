@@ -11,12 +11,14 @@ import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.participant.admin.PackageDependencyResolver
+import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLogging}
 import com.digitalasset.canton.participant.protocol.reassignment.IncompleteReassignmentData
+import com.digitalasset.canton.participant.store.memory.PackageMetadataView
 import com.digitalasset.canton.participant.store.{AcsInspection, ReassignmentStore}
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend
+import com.digitalasset.canton.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.topology.TopologyManagerError.ParticipantTopologyManagerError
+import com.digitalasset.canton.topology.TopologyManagerError.ParticipantTopologyManagerError.*
 import com.digitalasset.canton.topology.transaction.HostingParticipant
 import com.digitalasset.canton.topology.{
   ForceFlag,
@@ -27,7 +29,7 @@ import com.digitalasset.canton.topology.{
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
-import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.ExecutionContext
 
@@ -35,25 +37,46 @@ trait ParticipantTopologyValidation extends NamedLogging {
   def validatePackageVetting(
       currentlyVettedPackages: Set[LfPackageId],
       nextPackageIds: Set[LfPackageId],
-      packageDependencyResolver: PackageDependencyResolver,
+      packageMetadataView: PackageMetadataView,
+      dryRunSnapshot: Option[PackageMetadata],
       acsInspections: () => Map[SynchronizerId, AcsInspection],
       forceFlags: ForceFlags,
+      disableUpgradeValidation: Boolean,
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): EitherT[FutureUnlessShutdown, TopologyManagerError, Unit] = {
     val toBeAdded = nextPackageIds -- currentlyVettedPackages
     val toBeDeleted = currentlyVettedPackages -- nextPackageIds
+    val packageMetadataSnapshot = dryRunSnapshot.getOrElse(packageMetadataView.getSnapshot)
     for {
-      _ <- checkPackageDependencies(
-        currentlyVettedPackages,
-        toBeAdded,
-        packageDependencyResolver,
-        forceFlags,
+      _ <- EitherT.fromEither[FutureUnlessShutdown](
+        checkPackageDependencies(
+          nextPackageIds,
+          toBeAdded,
+          toBeDeleted,
+          packageMetadataSnapshot,
+          forceFlags,
+        )
       )
       _ <- toBeDeleted.toList.parTraverse_(packageId =>
         isPackageInUse(packageId, acsInspections, forceFlags)
       )
+      _ <- EitherT.fromEither[FutureUnlessShutdown] {
+        if (
+          disableUpgradeValidation || forceFlags.permits(ForceFlag.AllowVetIncompatibleUpgrades)
+        ) {
+          logger.info(
+            show"Skipping upgrade validation for newly-added packages $toBeAdded because force flag ${ForceFlag.AllowVetIncompatibleUpgrades.toString} is set"
+          )
+          Right(())
+        } else
+          packageMetadataView.packageUpgradeValidator.validateUpgrade(
+            toBeAdded,
+            nextPackageIds,
+            packageMetadataSnapshot.packages,
+          )(LoggingContextWithTrace(loggerFactory))
+      }
     } yield ()
   }
 
@@ -74,8 +97,7 @@ trait ParticipantTopologyValidation extends NamedLogging {
                 if !forceFlags
                   .permits(ForceFlag.AllowInsufficientParticipantPermissionForSignatoryParty) =>
               Left(
-                TopologyManagerError.ParticipantTopologyManagerError.InsufficientParticipantPermissionForSignatoryParty
-                  .Reject(party, synchronizerId): TopologyManagerError
+                InsufficientParticipantPermissionForSignatoryParty.Reject(party, synchronizerId)
               )
             case true =>
               logger.info(
@@ -104,8 +126,7 @@ trait ParticipantTopologyValidation extends NamedLogging {
           .map {
             case true if !forceFlags.permits(ForceFlag.DisablePartyWithActiveContracts) =>
               Left(
-                TopologyManagerError.ParticipantTopologyManagerError.DisablePartyWithActiveContractsRequiresForce
-                  .Reject(party, synchronizerId): TopologyManagerError
+                DisablePartyWithActiveContractsRequiresForce.Reject(party, synchronizerId)
               )
             case true =>
               logger.debug(
@@ -156,7 +177,7 @@ trait ParticipantTopologyValidation extends NamedLogging {
             }.toMap
 
             nextConfirmingParticipants = nextHostingParticipants
-              .filter(_.permission.canConfirm)
+              .filter(_.canConfirm)
               .map(_.participantId)
 
             // find the first reassignment that has less reassigning participants than the threshold
@@ -178,27 +199,25 @@ trait ParticipantTopologyValidation extends NamedLogging {
               nextThresholdO match {
                 case None =>
                   Left(
-                    TopologyManagerError.ParticipantTopologyManagerError.InsufficientSignatoryAssigningParticipantsForParty
-                      .RejectRemovingParty(
-                        party,
-                        synchronizerId,
-                        reassignmentId,
-                      ): TopologyManagerError
+                    InsufficientSignatoryAssigningParticipantsForParty.RejectRemovingParty(
+                      party,
+                      synchronizerId,
+                      reassignmentId,
+                    ): TopologyManagerError
                   )
                 case Some(nextThreshold) if nextThreshold > currentThreshold =>
                   Left(
-                    TopologyManagerError.ParticipantTopologyManagerError.InsufficientSignatoryAssigningParticipantsForParty
-                      .RejectThresholdIncrease(
-                        party,
-                        synchronizerId,
-                        reassignmentId,
-                        nextThreshold,
-                        signatoryAssigningParticipants,
-                      ): TopologyManagerError
+                    InsufficientSignatoryAssigningParticipantsForParty.RejectThresholdIncrease(
+                      party,
+                      synchronizerId,
+                      reassignmentId,
+                      nextThreshold,
+                      signatoryAssigningParticipants,
+                    ): TopologyManagerError
                   )
                 case _ =>
                   Left(
-                    TopologyManagerError.ParticipantTopologyManagerError.InsufficientSignatoryAssigningParticipantsForParty
+                    InsufficientSignatoryAssigningParticipantsForParty
                       .RejectNotEnoughSignatoryAssigningParticipants(
                         party,
                         synchronizerId,
@@ -220,40 +239,41 @@ trait ParticipantTopologyValidation extends NamedLogging {
     }
 
   private def checkPackageDependencies(
-      currentlyVettedPackages: Set[LfPackageId],
+      vettedPackagesTarget: Set[LfPackageId],
       toBeAdded: Set[LfPackageId],
-      packageDependencyResolver: PackageDependencyResolver,
+      toBeRemoved: Set[LfPackageId],
+      packageMetadataSnapshot: PackageMetadata,
       forceFlags: ForceFlags,
   )(implicit
-      traceContext: TraceContext,
-      ec: ExecutionContext,
-  ): EitherT[FutureUnlessShutdown, TopologyManagerError, Unit] =
-    for {
-      dependencies <- packageDependencyResolver
-        .packageDependencies(toBeAdded.toList)
-        .leftFlatMap[Set[PackageId], TopologyManagerError] { missing =>
-          if (forceFlags.permits(ForceFlag.AllowUnknownPackage))
-            EitherT.rightT(Set.empty)
-          else
-            EitherT.leftT(
-              ParticipantTopologyManagerError.CannotVetDueToMissingPackages
-                .Missing(missing): TopologyManagerError
-            )
-        }
-
-      // check that all dependencies are vetted.
-      unvetted = dependencies -- currentlyVettedPackages
-      _ <- EitherT
-        .cond[FutureUnlessShutdown](
-          unvetted.isEmpty || forceFlags.permits(ForceFlag.AllowUnvettedDependencies),
-          (),
-          ParticipantTopologyManagerError.DependenciesNotVetted
-            .Reject(unvetted): TopologyManagerError,
-        )
-    } yield ()
+      traceContext: TraceContext
+  ): Either[TopologyManagerError, Unit] = {
+    def getDependencies(packageId: LfPackageId): Set[LfPackageId] =
+      packageMetadataSnapshot.packages.get(packageId) match {
+        case Some(pkg) => pkg.directDeps
+        case None =>
+          logger.warn(
+            s"Package dependency checks will be ignored for $packageId as it could not be found in the package metadata. " +
+              s"This can happen if the package was previously vetted with ${ForceFlag.AllowUnknownPackage}. " +
+              s"If this was not the case, the participant reached an inconsistent state on the package vetting state and should be investigated."
+          )
+          Set.empty
+      }
+    val (knownToBeAdded, unknownToBeAdded) =
+      toBeAdded.partition(packageMetadataSnapshot.packages.contains)
+    val dependenciesOfAdded = packageMetadataSnapshot.allDependenciesRecursively(knownToBeAdded)
+    val removedDeps =
+      if (toBeRemoved.nonEmpty) vettedPackagesTarget.flatMap(getDependencies).intersect(toBeRemoved)
+      else Set.empty
+    val unvettedDeps = (dependenciesOfAdded -- vettedPackagesTarget) ++ removedDeps
+    if (unknownToBeAdded.nonEmpty && !forceFlags.permits(ForceFlag.AllowUnknownPackage))
+      Left(CannotVetDueToMissingPackages.Missing(unknownToBeAdded))
+    else if (unvettedDeps.nonEmpty && !forceFlags.permits(ForceFlag.AllowUnvettedDependencies))
+      Left(DependenciesNotVetted.Reject(unvettedDeps))
+    else Right(())
+  }
 
   private def isPackageInUse(
-      packageId: PackageId,
+      packageId: LfPackageId,
       acsInspections: () => Map[SynchronizerId, AcsInspection],
       forceFlags: ForceFlags,
   )(implicit

@@ -559,6 +559,27 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
   }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
 
+  if (infraConfig.prometheus.installPrometheusPushgateway) {
+    new k8s.helm.v3.Release('prometheus-pushgateway', {
+      name: 'prometheus-pushgateway',
+      chart: 'prometheus-pushgateway',
+      version: '3.4.1',
+      namespace: namespaceName,
+      repositoryOpts: {
+        repo: 'https://prometheus-community.github.io/helm-charts',
+      },
+      values: {
+        serviceMonitor: {
+          enabled: true,
+          namespace: namespaceName,
+          additionalLabels: { release: 'prometheus-grafana-monitoring' },
+        },
+        ...infraAffinityAndTolerations,
+      },
+      maxHistory: HELM_MAX_HISTORY_SIZE,
+    });
+  }
+
   return prometheusStack;
 }
 
@@ -732,6 +753,32 @@ function createGrafanaAlerting(namespace: Input<string>) {
               }
             : {}),
           ...{
+            'pruning_alerts.yaml': readGrafanaAlertingFile('pruning_alerts.yaml')
+              .replaceAll('$NODATA', loadTesterConfig?.enable ? 'Alerting' : 'OK')
+              .replaceAll(
+                '$PARTICIPANT_PRUNING_RETENTION_IN_DAYS',
+                monitoringConfig.alerting.alerts.pruning.participantRetentionDays.toString()
+              )
+              .replaceAll(
+                '$PARTICIPANT_PRUNING_RETENTION_IN_HOURS',
+                (monitoringConfig.alerting.alerts.pruning.participantRetentionDays * 24).toString()
+              )
+              .replaceAll(
+                '$SEQUENCER_PRUNING_RETENTION_IN_DAYS',
+                monitoringConfig.alerting.alerts.pruning.sequencerRetentionDays.toString()
+              )
+              .replaceAll(
+                '$SEQUENCER_PRUNING_RETENTION_IN_HOURS',
+                (monitoringConfig.alerting.alerts.pruning.sequencerRetentionDays * 24).toString()
+              )
+              .replaceAll(
+                '$MEDIATOR_PRUNING_RETENTION_IN_DAYS',
+                monitoringConfig.alerting.alerts.pruning.mediatorRetentionDays.toString()
+              )
+              .replaceAll(
+                '$MEDIATOR_PRUNING_RETENTION_IN_HOURS',
+                (monitoringConfig.alerting.alerts.pruning.mediatorRetentionDays * 24).toString()
+              ),
             'deployment_alerts.yaml': readGrafanaAlertingFile('deployment_alerts.yaml'),
             'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml')
               .replace(
@@ -746,11 +793,41 @@ function createGrafanaAlerting(namespace: Input<string>) {
               )
               .replaceAll('$ENABLE_COMETBFT_PRUNING', (!ENABLE_COMETBFT_PRUNING).toString())
               .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
-            'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml').replaceAll(
-              '$CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE',
-              monitoringConfig.alerting.alerts.delegatelessContention.thresholdPerNamespace.toString()
+            'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml')
+              .replaceAll(
+                '$CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE',
+                monitoringConfig.alerting.alerts.delegatelessContention.thresholdPerNamespace.toString()
+              )
+              .replaceAll(
+                '$INGESTION_ENTRIES_PER_BATCH_THRESHOLD',
+                monitoringConfig.alerting.alerts.ingestion.thresholdEntriesPerBatch.toString()
+              ),
+            'sv-status-report_alerts.yaml': readAndSetAlertRulesGrafanaAlertingFile(
+              'sv-status-report_alerts.yaml',
+              [
+                {
+                  reportPublisherFormula: '=~"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
+                  notificationDelay: '5m',
+                  teamLabel: 'canton-network',
+                  subtitle: 'internal SVs 5m',
+                  uid: 'adlmhpz5iv4sgc',
+                },
+                {
+                  reportPublisherFormula: '=~"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
+                  notificationDelay: '15m',
+                  teamLabel: 'support',
+                  subtitle: 'internal SVs 15m',
+                  uid: 'bdlmhpz5iv4sgc',
+                },
+                {
+                  reportPublisherFormula: '!~"Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node"',
+                  notificationDelay: '15m',
+                  teamLabel: 'da',
+                  subtitle: 'external SVs 15m',
+                  uid: 'cdlmhpz5iv4sgc',
+                },
+              ]
             ),
-            'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
             ...(enableMiningRoundAlert
               ? {
                   'mining-rounds_alerts.yaml': readGrafanaAlertingFile('mining-rounds_alerts.yaml'),
@@ -774,11 +851,11 @@ function createGrafanaAlerting(namespace: Input<string>) {
               )
               .replaceAll(
                 '$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGE_MINS',
-                monitoringConfig.alerting.alerts.confirmationRequests.total.overMinutes.toString()
+                monitoringConfig.alerting.alerts.confirmationRequests.perMember.overMinutes.toString()
               )
               .replaceAll(
                 '$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_THRESHOLD',
-                monitoringConfig.alerting.alerts.confirmationRequests.total.rate.toString()
+                monitoringConfig.alerting.alerts.confirmationRequests.perMember.rate.toString()
               ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(
@@ -842,6 +919,70 @@ function readGrafanaAlertingFile(file: string) {
     : fileContent;
 }
 
+type ReportMatchOperator = '=~' | '!~';
+type ReportPublisherList = 'Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node';
+type ReportPublisherFormula = `${ReportMatchOperator}"${ReportPublisherList}"`;
+type NotificationDelay = '5m' | '15m';
+type TeamLabel = 'canton-network' | 'support' | 'da';
+type RulesUID = 'adlmhpz5iv4sgc' | 'bdlmhpz5iv4sgc' | 'cdlmhpz5iv4sgc';
+
+interface AlertRulesConfig {
+  reportPublisherFormula: ReportPublisherFormula;
+  notificationDelay: NotificationDelay;
+  teamLabel: TeamLabel;
+  subtitle: string;
+  uid: RulesUID;
+}
+
+interface GrafanaRule {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
+interface GrafanaRuleGroup {
+  name: string;
+  rules: GrafanaRule[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
+interface GrafanaRuleFile {
+  groups: GrafanaRuleGroup[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
+// reads grafana alerting template rule from file, fill it with alert rules custom configurations and append to rules
+function readAndSetAlertRulesGrafanaAlertingFile(file: string, rules: AlertRulesConfig[]) {
+  const fileContent = fs.readFileSync(
+    `${SPLICE_ROOT}/cluster/pulumi/infra/grafana-alerting/${file}`,
+    'utf-8'
+  );
+
+  const content: GrafanaRuleFile = yaml.load(fileContent) as GrafanaRuleFile;
+  if (!content?.groups?.[0]?.rules?.[0]) {
+    throw new Error(`Invalid or empty rule template, Expected 'groups[0].rules[0]' to exist.`);
+  }
+
+  const genericAlertRule = yaml.dump(content.groups[0].rules[0]);
+
+  content.groups[0].rules = rules.map(rule => {
+    const newRuleString = genericAlertRule
+      .replace('$REPORT_PUBLISHER_FORMULA', rule.reportPublisherFormula)
+      .replace('$NOTIFICATION_DELAY', rule.notificationDelay)
+      .replace('$TEAM_LABEL', rule.teamLabel)
+      .replace('$SUB_TITLE', rule.subtitle)
+      .replace('$RULE_UID', rule.uid);
+    return yaml.load(newRuleString) as GrafanaRule;
+  });
+  const newFileContent = yaml.dump(content);
+
+  // Ignore no data or data source error if the cluster is reset periodically
+  return shouldIgnoreNoDataOrDataSourceError
+    ? newFileContent.replace(/(execErrState|noDataState): .+/g, '$1: OK')
+    : newFileContent;
+}
+
 function readAlertingManagerFile(file: string) {
   return fs.readFileSync(`${SPLICE_ROOT}/cluster/pulumi/infra/alert-manager/${file}`, 'utf-8');
 }
@@ -865,6 +1006,9 @@ function installPostgres(namespace: ExactNamespace): SplicePostgres {
     'grafana-pg',
     'grafana-pg-secret',
     { db: { volumeSize: '20Gi' } }, // A tiny pvc should be enough for grafana
-    true // overrideDbSizeFromValues
+    true, // overrideDbSizeFromValues
+    false, // disableProtection
+    undefined, // chart version
+    true // useInfraAffinityAndTolerations
   );
 }

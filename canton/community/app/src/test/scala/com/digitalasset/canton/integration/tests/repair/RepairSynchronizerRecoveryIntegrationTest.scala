@@ -13,9 +13,9 @@ import com.digitalasset.canton.examples.java.iou
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.plugins.{
   UseBftSequencer,
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.util.EntitySyntax
 import com.digitalasset.canton.ledger.participant.state.SequencerIndex
@@ -171,7 +171,7 @@ trait RepairSynchronizerRecoveryIntegrationTest
                         val signedModifiedRequest = signModifiedSubmissionRequest(
                           modifiedRequest,
                           participant1.underlying.value.sync.syncCrypto
-                            .tryForSynchronizer(daId, defaultStaticSynchronizerParameters),
+                            .tryForSynchronizer(daId, staticSynchronizerParameters1),
                         )
                         dropSomeMessagesToP1.set(true)
                         SendDecision.Replace(signedModifiedRequest)
@@ -200,7 +200,7 @@ trait RepairSynchronizerRecoveryIntegrationTest
 
             val cleanTimeOfRequest =
               participant1.testing.state_inspection
-                .lookupCleanTimeOfRequest(daName)
+                .lookupCleanTimeOfRequest(daId)
                 .value
                 .futureValueUS
                 .value
@@ -253,7 +253,7 @@ trait RepairSynchronizerRecoveryIntegrationTest
             eventually() {
               val newCleanRequestIndex =
                 participant1.testing.state_inspection
-                  .lookupCleanTimeOfRequest(daName)
+                  .lookupCleanTimeOfRequest(daId)
                   .value
                   .futureValueUS
                   .value
@@ -276,8 +276,7 @@ trait RepairSynchronizerRecoveryIntegrationTest
 
             clue("Check the clean sequencer index") {
               val deliverErrorP1 = participant1.testing.state_inspection
-                .findMessage(daName, LatestUpto(afterRefusedRequest))
-                .value
+                .findMessage(daId, LatestUpto(afterRefusedRequest))
                 .value
               deliverErrorP1.timestamp shouldBe >(beforeRefusedRequest)
               inside(deliverErrorP1) { case OrdinarySequencedEvent(_, signedEvent) =>
@@ -436,7 +435,7 @@ class RepairSynchronizerRecoveryIntegrationTestPostgres
     extends RepairSynchronizerRecoveryIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
+    new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
   )
   registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 }

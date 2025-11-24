@@ -45,8 +45,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -95,6 +94,7 @@ class HttpValidatorAdminHandler(
     participantAdminConnection,
     retryProvider,
     loggerFactory,
+    config.parameters.enabledFeatures,
   )
 
   private def requireWalletEnabled[T](handleRequest: UserWalletManager => T): T = {
@@ -182,7 +182,11 @@ class HttpValidatorAdminHandler(
           .map { response =>
             v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse.OK(
               definitions
-                .GetValidatorDomainDataSnapshotResponse(response.toHttp, response.migrationId)
+                // DR dumps don't separate output files
+                .GetValidatorDomainDataSnapshotResponse(
+                  response.toHttp(outputDirectory = None),
+                  response.migrationId,
+                )
             )
           }
       } yield res
@@ -209,6 +213,7 @@ class HttpValidatorAdminHandler(
                     transportSecurity,
                     _,
                     sequencerAlias,
+                    _,
                   ) =>
                 definitions.SequencerAliasToConnections(
                   sequencerAlias.toProtoPrimitive,
@@ -216,7 +221,10 @@ class HttpValidatorAdminHandler(
                   transportSecurity,
                 )
             }.toVector,
-            connectionConfig.sequencerConnections.sequencerTrustThreshold.value,
+            sequencerTrustThreshold =
+              connectionConfig.sequencerConnections.sequencerTrustThreshold.value,
+            sequencerLivenessMargin =
+              connectionConfig.sequencerConnections.sequencerLivenessMargin.value,
             definitions.SequencerSubmissionRequestAmplification(
               connectionConfig.sequencerConnections.submissionRequestAmplification.factor.value,
               connectionConfig.sequencerConnections.submissionRequestAmplification.patience.duration.toSeconds,
@@ -360,14 +368,14 @@ class HttpValidatorAdminHandler(
         val partyId = partyToParticipant.partyId
         for {
           _ <- participantAdminConnection.addTopologyTransactions(
-            store = TopologyStoreId.AuthorizedStore,
+            store = TopologyStoreId.Authorized,
             txs = body.signedTopologyTxs.map(decodeSignedTopologyTx(publicKey, _)),
           )
           // Check the authorized store first
           _ <- participantAdminConnection
             .listPartyToKey(
               filterParty = Some(partyId),
-              filterStore = TopologyStoreId.AuthorizedStore,
+              filterStore = TopologyStoreId.Authorized,
             )
             .map { txs =>
               txs.headOption.getOrElse(
@@ -381,7 +389,7 @@ class HttpValidatorAdminHandler(
           // The PartyToParticipant mapping requires both the external signature from the party namespace but also one from the participant which we create here
           participantId <- participantAdminConnection.getParticipantId()
           _ <- participantAdminConnection.proposeMapping(
-            AuthorizedStore,
+            TopologyStoreId.Authorized,
             partyToParticipant,
             serial = PositiveInt.one,
             isProposal = true,
@@ -389,7 +397,7 @@ class HttpValidatorAdminHandler(
           )
           _ <- participantAdminConnection
             .listPartyToParticipant(
-              store = TopologyStoreId.AuthorizedStore.some,
+              store = TopologyStoreId.Authorized.some,
               filterParty = partyId.filterString,
             )
             .map { txs =>
@@ -410,7 +418,7 @@ class HttpValidatorAdminHandler(
             participantAdminConnection
               .listPartyToKey(
                 filterParty = Some(partyId),
-                filterStore = TopologyStoreId.SynchronizerStore(synchronizerId),
+                filterStore = TopologyStoreId.Synchronizer(synchronizerId),
               )
               .map { txs =>
                 txs.headOption.getOrElse(
@@ -430,7 +438,7 @@ class HttpValidatorAdminHandler(
             participantAdminConnection
               .listPartyToParticipant(
                 filterParty = partyId.filterString,
-                store = TopologyStoreId.SynchronizerStore(synchronizerId).some,
+                store = TopologyStoreId.Synchronizer(synchronizerId).some,
               )
               .map { txs =>
                 txs.headOption.getOrElse(

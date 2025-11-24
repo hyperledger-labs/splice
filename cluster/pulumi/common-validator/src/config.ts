@@ -23,6 +23,7 @@ export const ValidatorNodeConfigSchema = z.object({
   logging: z
     .object({
       level: LogLevelSchema.optional(),
+      async: z.boolean().optional(),
     })
     .default({}),
   kms: KmsConfigSchema.optional(),
@@ -35,6 +36,7 @@ export const ValidatorNodeConfigSchema = z.object({
     .optional(),
   participant: ParticipantConfigSchema.optional(),
   validatorApp: ValidatorAppConfigSchema.optional(),
+  disableAuth: z.boolean().default(false), // Note that this is currently ignored everywhere except for validator1, where it is used for testing only
 });
 export const PartyAllocatorConfigSchema = z.object({
   enable: z.boolean(),

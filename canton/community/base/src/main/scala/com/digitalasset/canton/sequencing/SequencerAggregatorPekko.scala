@@ -23,7 +23,7 @@ import com.digitalasset.canton.sequencing.client.{
 }
 import com.digitalasset.canton.sequencing.protocol.SignedContent
 import com.digitalasset.canton.store.SequencedEventStore.SequencedEventWithTraceContext
-import com.digitalasset.canton.topology.{SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.OrderedBucketMergeHub.{
   ActiveSourceTerminated,
@@ -61,7 +61,7 @@ import scala.concurrent.{ExecutionContext, Future}
   *   [[com.digitalasset.canton.sequencing.client.SequencerSubscriptionPekko]].
   */
 class SequencerAggregatorPekko(
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     createEventValidator: NamedLoggerFactory => SequencedEventValidator,
     bufferSize: PositiveInt,
     hashOps: HashOps,
@@ -131,7 +131,8 @@ class SequencerAggregatorPekko(
 
     // We don't want to force trace contexts to be propagated identically.
     // So lets merge them.
-    implicit val mergedTraceContext: TraceContext = TraceContext.ofBatch(elems.values)(logger)
+    implicit val mergedTraceContext: TraceContext =
+      TraceContext.ofBatch("merge_bucket_batch")(elems.values)(logger)
 
     val mergedSigs = elems.flatMap { case (_, event) => event.signedEvent.signatures }.toSeq
     val mergedSignedEvent = SignedContent
@@ -156,8 +157,13 @@ class SequencerAggregatorPekko(
       case DeadlockDetected(elem, trigger) =>
         trigger match {
           case DeadlockTrigger.ActiveSourceTermination =>
-            logger.error(
-              s"Sequencer subscription for synchronizer $synchronizerId is now stuck. Needs operator intervention to reconfigure the sequencer connections."
+            // TODO(#27260): Log this unsettling event as info rather than as error as this condition can
+            //  be flakily triggered upon shutdown by an unpredictable ordering of onUpstreamFinish()
+            //  notifications at different levels of the pekko graph (details in #26543). We get away with
+            //  not investing further into hardening this because the SequencerAggregatorPekko and
+            //  OrderedBucketMergeHub are being removed as part of sequencer connection pooling aggregation.
+            logger.info(
+              s"Sequencer subscription for synchronizer $synchronizerId may now be stuck if this has happened outside the context of shutdown and may need operator intervention to reconfigure the sequencer connections."
             )
           case DeadlockTrigger.Reconfiguration =>
             logger.error(
@@ -300,7 +306,7 @@ object SequencerAggregatorPekko {
   }
 
   private[SequencerAggregatorPekko] class SequencerAggregatorHealth(
-      private val synchronizerId: SynchronizerId,
+      private val synchronizerId: PhysicalSynchronizerId,
       override protected val associatedHasRunOnClosing: HasRunOnClosing,
       override protected val logger: TracedLogger,
   ) extends CompositeHealthComponent[SequencerId, HealthComponent]

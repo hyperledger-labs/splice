@@ -10,17 +10,14 @@ import com.daml.ledger.javaapi.data
 import com.daml.test.evidence.tag.Reliability.ReliabilityTestSuite
 import com.digitalasset.canton.BigDecimalImplicits.*
 import com.digitalasset.canton.SequencerAlias
-import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.DbConfig.Postgres
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.console.{InstanceReference, ParticipantReference}
 import com.digitalasset.canton.examples.java.{cycle as C, iou}
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
+import com.digitalasset.canton.integration.util.UpdateFormatHelpers.getUpdateFormat
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -33,10 +30,14 @@ import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
 import com.digitalasset.canton.participant.config.{ParticipantInitConfig, ParticipantNodeConfig}
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
-import com.digitalasset.canton.sequencing.{SequencerConnections, SubmissionRequestAmplification}
+import com.digitalasset.canton.sequencing.{
+  SequencerConnectionPoolDelays,
+  SequencerConnections,
+  SubmissionRequestAmplification,
+}
 import com.digitalasset.canton.synchronizer.mediator.MediatorNodeConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{PartyId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TracingConfig
 import com.digitalasset.canton.tracing.TracingConfig.Propagation
 import com.digitalasset.canton.util.FutureInstances.*
@@ -67,14 +68,11 @@ abstract class RehydrationIntegrationTest
   private val transactionLimit: Int = iterations * 3
   private val acsLimit: Int = iterations
 
-  private val staticSynchronizerParameters =
-    EnvironmentDefinition.defaultStaticSynchronizerParameters
-
   private var observedTx: Seq[Transaction] = _
   private var observedAcs: Map[String, CreatedEvent] = _
 
   private var alice: PartyId = _
-  private var synchronizerId: SynchronizerId = _
+  private var synchronizerId: PhysicalSynchronizerId = _
 
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition(
@@ -126,7 +124,7 @@ abstract class RehydrationIntegrationTest
           mediators = Seq(mediator1),
           synchronizerOwners = Seq[InstanceReference](sequencer1, mediator1),
           synchronizerThreshold = PositiveInt.two,
-          staticSynchronizerParameters,
+          staticSynchronizerParameters = EnvironmentDefinition.defaultStaticSynchronizerParameters,
         )
 
         sequencer1.health.wait_for_initialized()
@@ -168,15 +166,12 @@ abstract class RehydrationIntegrationTest
     )
 
     observedTx = participant1.ledger_api.updates
-      .flat(
+      .transactions(
         partyIds = Set(alice),
         completeAfter = transactionLimit + 10,
         timeout = 5.seconds,
       )
-      .flatMap {
-        case UpdateService.TransactionWrapper(transaction) => Some(transaction)
-        case _ => None
-      }
+      .map(_.transaction)
     observedAcs = acsAsMap(
       participant1.ledger_api.state.acs
         .of_all(acsLimit + 10)
@@ -198,15 +193,17 @@ abstract class RehydrationIntegrationTest
           SequencerAlias.tryCreate(sequencer2.name)
         )
       ),
-      PositiveInt.one,
+      sequencerTrustThreshold = PositiveInt.one,
+      sequencerLivenessMargin = NonNegativeInt.zero,
       SubmissionRequestAmplification.NoAmplification,
+      SequencerConnectionPoolDelays.default,
     )
 
     // stop mediator1 and copy it over to the fresh mediator2
     better.files.File.usingTemporaryDirectory("mediator") { dir =>
       val tempDirMediator = dir.pathAsString
       clue("move mediator1 to mediator2") {
-        repair.identity.download(mediator1, synchronizerId, tempDirMediator)
+        repair.identity.download(mediator1, synchronizerId, testedProtocolVersion, tempDirMediator)
         mediator1.stop()
 
         // Stop sequencer1 and copy it over to the fresh sequencer2, initializing it from beginning.
@@ -214,7 +211,12 @@ abstract class RehydrationIntegrationTest
         better.files.File.usingTemporaryDirectory("sequencer") { dir =>
           val tempDirSequencer = dir.pathAsString
           clue("move sequencer1 to sequencer2") {
-            repair.identity.download(sequencer1, synchronizerId, tempDirSequencer)
+            repair.identity.download(
+              sequencer1,
+              synchronizerId,
+              testedProtocolVersion,
+              tempDirSequencer,
+            )
             participant1
               .stop() // Avoids connection errors due to the sequencer being stopped, will be restarted later for the migration
             sequencer1.stop()
@@ -223,7 +225,7 @@ abstract class RehydrationIntegrationTest
               sequencer2,
               tempDirSequencer,
               synchronizerId,
-              staticSynchronizerParameters,
+              EnvironmentDefinition.defaultStaticSynchronizerParameters,
               sequencerConnections,
             )
             // architecture-handbook-entry-end: RehydrationSequencer
@@ -236,7 +238,7 @@ abstract class RehydrationIntegrationTest
           mediator2,
           tempDirMediator,
           synchronizerId,
-          staticSynchronizerParameters,
+          EnvironmentDefinition.defaultStaticSynchronizerParameters,
           sequencerConnections,
         )
         // architecture-handbook-entry-end: RehydrationMediator
@@ -249,7 +251,12 @@ abstract class RehydrationIntegrationTest
       clue("move participant1 to participant2") {
         val tempDirParticipant = dir.pathAsString
         // architecture-handbook-entry-begin: RepairMacroCloneIdentityDownload
-        repair.identity.download(participant1, synchronizerId, tempDirParticipant)
+        repair.identity.download(
+          participant1,
+          synchronizerId,
+          testedProtocolVersion,
+          tempDirParticipant,
+        )
         repair.dars.download(participant1, tempDirParticipant)
         participant1.stop()
         // architecture-handbook-entry-end: RepairMacroCloneIdentityDownload
@@ -260,7 +267,7 @@ abstract class RehydrationIntegrationTest
           participant2,
           tempDirParticipant,
           synchronizerId,
-          staticSynchronizerParameters,
+          EnvironmentDefinition.defaultStaticSynchronizerParameters,
           sequencerConnections,
         )
         repair.dars.upload(participant2, tempDirParticipant)
@@ -287,8 +294,10 @@ abstract class RehydrationIntegrationTest
           SequencerAlias.tryCreate(sequencer2.name)
         )
       ),
-      PositiveInt.one,
+      sequencerTrustThreshold = PositiveInt.one,
+      sequencerLivenessMargin = NonNegativeInt.zero,
       SubmissionRequestAmplification.NoAmplification,
+      SequencerConnectionPoolDelays.default,
     )
 
     loggerFactory.assertLogsUnorderedOptional(
@@ -322,15 +331,12 @@ abstract class RehydrationIntegrationTest
     val participantToCheck = participant2
 
     val reconstructedTx = participantToCheck.ledger_api.updates
-      .flat(
+      .transactions(
         partyIds = Set(alice),
         completeAfter = transactionLimit + 10,
         timeout = 5.seconds,
       )
-      .flatMap {
-        case UpdateService.TransactionWrapper(transaction) => Some(transaction)
-        case _ => None
-      }
+      .map(_.transaction)
     def stripParticipantSpecificFields(tx: Transaction): Transaction =
       tx
         .copy(offset = 0L, traceContext = None)
@@ -391,7 +397,7 @@ abstract class RehydrationIntegrationTest
     val cycle = new C.Cycle(id, party.toProtoPrimitive).create.commands.loneElement
 
     val transaction: data.Transaction =
-      initiatorParticipant.ledger_api.javaapi.commands.submit_flat(
+      initiatorParticipant.ledger_api.javaapi.commands.submit(
         Seq(party),
         Seq(cycle),
         commandId = commandId,
@@ -401,13 +407,14 @@ abstract class RehydrationIntegrationTest
 
     // Wait until the transaction was observed on the responder participant
     val cycleTxId = transaction.getUpdateId
+    val updateFormat = getUpdateFormat(Set(party))
     eventually() {
-      responderParticipant.ledger_api.updates.by_id(Set(party), cycleTxId) shouldBe
+      responderParticipant.ledger_api.updates.update_by_id(cycleTxId, updateFormat) shouldBe
         Symbol("defined")
     }
 
     val cycleEx = cycleContract.id.exerciseArchive().commands.asScala.toSeq
-    responderParticipant.ledger_api.javaapi.commands.submit_flat(
+    responderParticipant.ledger_api.javaapi.commands.submit(
       Seq(party),
       cycleEx,
       commandId = if (commandId.isEmpty) "" else s"$commandId-response",
@@ -417,7 +424,7 @@ abstract class RehydrationIntegrationTest
 
 class ReferenceRehydrationIntegrationTestPostgres extends RehydrationIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[Postgres](loggerFactory))
 }
 
 // TODO(#16823): Re-enable test. This test requires that the second sequencer reads old blocks from genesis,

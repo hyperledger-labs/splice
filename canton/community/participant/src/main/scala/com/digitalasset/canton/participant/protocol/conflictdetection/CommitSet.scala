@@ -4,20 +4,21 @@
 package com.digitalasset.canton.participant.protocol.conflictdetection
 
 import cats.syntax.functor.*
-import com.digitalasset.canton.ledger.participant.state.LapiCommitSet
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.data.ContractReassignment
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.protocol.conflictdetection.CommitSet.*
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.protocol.{
   ContractMetadata,
+  GenContractInstance,
   LfContractId,
   ReassignmentId,
   RequestId,
-  SerializableContract,
 }
 import com.digitalasset.canton.topology.SynchronizerId
-import com.digitalasset.canton.util.ReassignmentTag.Target
+import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.SetsUtil.requireDisjoint
 import com.digitalasset.canton.{LfPartyId, ReassignmentCounter}
 
@@ -44,8 +45,7 @@ final case class CommitSet(
     creations: Map[LfContractId, CreationCommit],
     unassignments: Map[LfContractId, UnassignmentCommit],
     assignments: Map[LfContractId, AssignmentCommit],
-) extends LapiCommitSet
-    with PrettyPrinting {
+) extends PrettyPrinting {
   requireDisjoint(unassignments.keySet -> "unassignments", archivals.keySet -> "archivals")
   requireDisjoint(assignments.keySet -> "assignments", creations.keySet -> "creations")
 
@@ -82,11 +82,13 @@ object CommitSet {
     )
   }
   final case class AssignmentCommit(
+      sourceSynchronizerId: Source[SynchronizerId],
       reassignmentId: ReassignmentId,
       contractMetadata: ContractMetadata,
       reassignmentCounter: ReassignmentCounter,
   ) extends PrettyPrinting {
     override protected def pretty: Pretty[AssignmentCommit] = prettyOfClass(
+      param("source", _.sourceSynchronizerId),
       param("reassignmentId", _.reassignmentId),
       param("contractMetadata", _.contractMetadata),
       param("reassignmentCounter", _.reassignmentCounter),
@@ -106,7 +108,7 @@ object CommitSet {
       requestId: RequestId,
       consumedInputsOfHostedParties: Map[LfContractId, Set[LfPartyId]],
       transient: Map[LfContractId, Set[LfPartyId]],
-      createdContracts: Map[LfContractId, SerializableContract],
+      createdContracts: Map[LfContractId, GenContractInstance],
   )(implicit loggingContext: ErrorLoggingContext): CommitSet =
     if (activenessResult.isSuccessful) {
       val archivals = (consumedInputsOfHostedParties ++ transient).map {
@@ -130,4 +132,26 @@ object CommitSet {
       // TODO(i12904) Handle this case gracefully
       throw new RuntimeException(s"Request $requestId with failed activeness check is approved.")
     }
+
+  def createForAssignment(
+      reassignmentId: ReassignmentId,
+      assignments: NonEmpty[Seq[ContractReassignment]],
+      sourceSynchronizerId: Source[SynchronizerId],
+  ): CommitSet =
+    CommitSet(
+      archivals = Map.empty,
+      creations = Map.empty,
+      unassignments = Map.empty,
+      assignments = assignments
+        .map(reassign =>
+          reassign.contract.contractId -> CommitSet.AssignmentCommit(
+            sourceSynchronizerId,
+            reassignmentId,
+            reassign.contract.metadata,
+            reassign.counter,
+          )
+        )
+        .toMap
+        .forgetNE,
+    )
 }

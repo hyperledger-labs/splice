@@ -8,8 +8,8 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.plugins.{
   UseBftSequencer,
-  UseCommunityReferenceBlockSequencer,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -43,6 +43,8 @@ trait LedgerTimeRecordTimeToleranceChangesIntegrationTest
         import env.*
 
         participant1.synchronizers.connect_local(sequencer1, daName)
+        participants.all.dars.upload(CantonExamplesPath)
+
         defaultLedgerTimeRecordTimeTolerance = InternalNonNegativeFiniteDuration.fromConfig(
           sequencer1.topology.synchronizer_parameters
             .get_dynamic_synchronizer_parameters(daId)
@@ -97,16 +99,24 @@ trait LedgerTimeRecordTimeToleranceChangesIntegrationTest
       confirmationRequestMaxSequencingTimes.clear()
 
       // Double the mediatorDeduplicationTimeout and ledgerTimeRecordTimeTolerance
+      val oldParameters = sequencer1.topology.synchronizer_parameters.latest(daId)
+      val newMediatorDeduplicationTimeout = oldParameters.mediatorDeduplicationTimeout * 2
+
       sequencer1.topology.synchronizer_parameters.propose_update(
         daId,
-        previous =>
-          previous.update(
-            mediatorDeduplicationTimeout = previous.mediatorDeduplicationTimeout * 2,
-            ledgerTimeRecordTimeTolerance = previous.ledgerTimeRecordTimeTolerance * 2,
-          ),
+        _.update(
+          mediatorDeduplicationTimeout = newMediatorDeduplicationTimeout,
+          ledgerTimeRecordTimeTolerance = oldParameters.ledgerTimeRecordTimeTolerance * 2,
+        ),
       )
 
       environment.simClock.value.advance(Duration.ofDays(1))
+
+      eventually() {
+        participant1.topology.synchronizer_parameters
+          .latest(daId)
+          .mediatorDeduplicationTimeout shouldBe newMediatorDeduplicationTimeout
+      }
 
       // Second command submitted after doubling ledgerTimeRecordTimeTolerance.
       val command2Time = environment.now
@@ -129,7 +139,7 @@ trait LedgerTimeRecordTimeToleranceChangesIntegrationTest
 class LedgerTimeRecordTimeToleranceChangesIntegrationTestDefault
     extends LedgerTimeRecordTimeToleranceChangesIntegrationTest {
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.H2](loggerFactory)
+    new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory)
   )
   // we need to register the ProgrammableSequencer after the ReferenceBlockSequencer
   registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))

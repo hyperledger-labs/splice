@@ -4,17 +4,23 @@
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.data
 
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.BftSequencerBaseTest
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.pekko.PekkoModuleSystem.PekkoEnv
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.data.OutputMetadataStore.{
   OutputBlockMetadata,
   OutputEpochMetadata,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.data.OutputMetadataStoreTest.createBlock
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.leaders.{
+  BlacklistLeaderSelectionPolicy,
+  BlacklistLeaderSelectionPolicyState,
+  BlacklistStatus,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BftNodeId,
   BlockNumber,
   EpochNumber,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.pekko.PekkoModuleSystem.PekkoEnv
 import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.Future
@@ -375,6 +381,39 @@ trait OutputMetadataStoreTest extends AsyncWordSpec {
             lastBlockAfterPruning <- store.getLastConsecutiveBlock
             _ = lastBlockAfterPruning shouldBe Some(block3)
 
+          } yield succeed
+        }
+      }
+
+      "leader selection policy" should {
+        val epoch = EpochNumber.First
+        val blockNumber = BlockNumber.First
+        val blacklistState: BlacklistLeaderSelectionPolicy.Blacklist =
+          Map[BftNodeId, BlacklistStatus.BlacklistStatusMark](
+            BftNodeId("2") -> BlacklistStatus.OnTrial(1),
+            BftNodeId("3") -> BlacklistStatus.Blacklisted(1, 2),
+          )
+        val state: BlacklistLeaderSelectionPolicyState =
+          BlacklistLeaderSelectionPolicyState.create(epoch, blockNumber, blacklistState)(
+            testedProtocolVersion
+          )
+
+        "be able to insert and fetch" in {
+          val store = createStore()
+          for {
+            _ <- store.insertLeaderSelectionPolicyState(epoch, state)
+            stateFetched <- store.getLeaderSelectionPolicyState(epoch)
+            _ = stateFetched shouldBe Some(state)
+          } yield succeed
+        }
+
+        "be able to be pruned" in {
+          val store = createStore()
+          for {
+            _ <- store.insertLeaderSelectionPolicyState(epoch, state)
+            _ <- store.prune(EpochNumber(epoch + 1))
+            stateFetchedAfterPrune <- store.getLeaderSelectionPolicyState(epoch)
+            _ = stateFetchedAfterPrune shouldBe None
           } yield succeed
         }
       }

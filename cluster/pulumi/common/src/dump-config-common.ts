@@ -5,8 +5,17 @@ import * as path from 'path';
 import * as sinon from 'sinon';
 import { setMocks } from '@pulumi/pulumi/runtime/mocks';
 
-import { Auth0ClientSecret, Auth0ClusterConfig } from './auth0types';
+import {
+  Auth0ClientSecret,
+  Auth0ClusterConfig,
+  Auth0Config,
+  Auth0NamespaceConfig,
+  NamespacedAuth0Configs,
+} from './auth0/auth0types';
 import { isMainNet } from './config';
+
+// Importing DEFAULT_AUDIENCE from auth0/audiences.ts creates a nightmare of things getting initialized too early, so we just redefine it here
+const DEFAULT_AUDIENCE = 'https://canton.network.global';
 
 export enum PulumiFunction {
   // tokens for functions being called during the test run,
@@ -25,63 +34,133 @@ export class SecretsFixtureMap extends Map<string, Auth0ClientSecret> {
   }
 }
 
-export const cantonNetworkAuth0Config = {
-  appToClientId: {
-    validator1: 'validator1-client-id',
+const sv1Auth0Config: Auth0NamespaceConfig = {
+  audiences: {
+    ledgerApi: DEFAULT_AUDIENCE,
+    svAppApi: DEFAULT_AUDIENCE,
+    validatorApi: DEFAULT_AUDIENCE,
+  },
+  backendClientIds: {
+    svApp: 'sv1-sv-client-id',
+    validator: 'sv1-validator-client-id',
+  },
+  uiClientIds: {
+    wallet: 'sv-1-wallet-ui-client-id',
+    cns: 'sv-1-cns-ui-client-id',
+    sv: 'sv-1-sv-ui-client-id',
+  },
+};
+
+const svDa1Auth0Config: Auth0NamespaceConfig = {
+  audiences: {
+    ledgerApi: DEFAULT_AUDIENCE,
+    svAppApi: DEFAULT_AUDIENCE,
+    validatorApi: DEFAULT_AUDIENCE,
+  },
+  backendClientIds: {
+    svApp: 'sv-da-1-sv-client-id',
+    validator: 'sv-da-1-validator-client-id',
+  },
+  uiClientIds: {
+    wallet: 'sv-da-1-wallet-ui-client-id',
+    cns: 'sv-da-1-cns-ui-client-id',
+    sv: 'sv-da-1-sv-ui-client-id',
+  },
+};
+
+const sv2Auth0Config: Auth0NamespaceConfig = {
+  audiences: {
+    ledgerApi: DEFAULT_AUDIENCE,
+    svAppApi: DEFAULT_AUDIENCE,
+    validatorApi: DEFAULT_AUDIENCE,
+  },
+  backendClientIds: {
+    svApp: 'sv2-sv-client-id',
+    validator: 'sv2-validator-client-id',
+  },
+  uiClientIds: {
+    wallet: 'sv-2-wallet-ui-client-id',
+    cns: 'sv-2-cns-ui-client-id',
+    sv: 'sv-2-sv-ui-client-id',
+  },
+};
+
+const sv3Auth0Config: Auth0NamespaceConfig = {
+  audiences: {
+    ledgerApi: DEFAULT_AUDIENCE,
+    svAppApi: DEFAULT_AUDIENCE,
+    validatorApi: DEFAULT_AUDIENCE,
+  },
+  backendClientIds: {
+    svApp: 'sv3-sv-client-id',
+    validator: 'sv3-validator-client-id',
+  },
+  uiClientIds: {
+    wallet: 'sv-3-wallet-ui-client-id',
+    cns: 'sv-3-cns-ui-client-id',
+    sv: 'sv-3-sv-ui-client-id',
+  },
+};
+
+const sv4Auth0Config: Auth0NamespaceConfig = {
+  audiences: {
+    ledgerApi: DEFAULT_AUDIENCE,
+    svAppApi: DEFAULT_AUDIENCE,
+    validatorApi: DEFAULT_AUDIENCE,
+  },
+  backendClientIds: {
+    svApp: 'sv4-sv-client-id',
+    validator: 'sv4-validator-client-id',
+  },
+  uiClientIds: {
+    wallet: 'sv-4-wallet-ui-client-id',
+    cns: 'sv-4-cns-ui-client-id',
+    sv: 'sv-4-sv-ui-client-id',
+  },
+};
+
+const validator1Auth0Config: Auth0NamespaceConfig = {
+  audiences: {
+    ledgerApi: DEFAULT_AUDIENCE,
+    validatorApi: DEFAULT_AUDIENCE,
+  },
+  backendClientIds: {
+    validator: 'validator1-client-id',
+  },
+  uiClientIds: {
+    wallet: 'validator1-wallet-ui-client-id',
+    cns: 'validator1-cns-ui-client-id',
+    splitwell: 'validator1-splitwell-ui-client-id',
+  },
+};
+
+const splitwellAuth0Config: Auth0NamespaceConfig = {
+  audiences: {
+    ledgerApi: DEFAULT_AUDIENCE,
+    validatorApi: DEFAULT_AUDIENCE,
+  },
+  backendClientIds: {
+    validator: 'splitwell-validator-client-id',
     splitwell: 'splitwell-client-id',
-    splitwell_validator: 'splitwell-validator-client-id',
-    'sv-1': 'sv-1-client-id',
-    'sv-2': 'sv-2-client-id',
-    'sv-3': 'sv-3-client-id',
-    'sv-4': 'sv-4-client-id',
-    sv1_validator: 'sv1-validator-client-id',
-    sv2_validator: 'sv2-validator-client-id',
-    sv3_validator: 'sv3-validator-client-id',
-    sv4_validator: 'sv4-validator-client-id',
-    sv: 'sv-client-id',
-    validator: 'sv-client-id',
-    'sv-da-1': 'sv-da-1-client-id',
-    'sv-da-1_validator': 'sv-da-1-validator-client-id',
   },
-  namespaceToUiToClientId: {
-    validator1: {
-      wallet: 'validator1-wallet-ui-client-id',
-      cns: 'validator1-cns-ui-client-id',
-      splitwell: 'validator1-splitwell-ui-client-id',
-    },
-    splitwell: {
-      wallet: 'splitwell-wallet-ui-client-id',
-      cns: 'splitwell-cns-ui-client-id',
-      splitwell: 'splitwell-splitwell-ui-client-id',
-    },
-    'sv-1': {
-      wallet: 'sv-1-wallet-ui-client-id',
-      cns: 'sv-1-cns-ui-client-id',
-      sv: 'sv-1-sv-ui-client-id',
-    },
-    'sv-2': {
-      wallet: 'sv-2-wallet-ui-client-id',
-      cns: 'sv-2-cns-ui-client-id',
-      sv: 'sv-2-sv-ui-client-id',
-    },
-    'sv-3': {
-      wallet: 'sv-3-wallet-ui-client-id',
-      cns: 'sv-3-cns-ui-client-id',
-      sv: 'sv-3-sv-ui-client-id',
-    },
-    'sv-4': {
-      wallet: 'sv-4-wallet-ui-client-id',
-      cns: 'sv-4-cns-ui-client-id',
-      sv: 'sv-4-sv-ui-client-id',
-    },
-    'sv-da-1': {
-      wallet: 'sv-da-1-wallet-ui-client-id',
-      cns: 'sv-da-1-cns-ui-client-id',
-      sv: 'sv-da-1-sv-ui-client-id',
-    },
+  uiClientIds: {
+    wallet: 'splitwell-wallet-ui-client-id',
+    cns: 'splitwell-cns-ui-client-id',
+    splitwell: 'splitwell-splitwell-ui-client-id',
   },
-  appToApiAudience: {},
-  appToClientAudience: {},
+};
+
+const namespacedConfigs: NamespacedAuth0Configs = {};
+namespacedConfigs['sv-1'] = sv1Auth0Config;
+namespacedConfigs['sv-da-1'] = svDa1Auth0Config;
+namespacedConfigs['sv-2'] = sv2Auth0Config;
+namespacedConfigs['sv-3'] = sv3Auth0Config;
+namespacedConfigs['sv-4'] = sv4Auth0Config;
+namespacedConfigs['validator1'] = validator1Auth0Config;
+namespacedConfigs['splitwell'] = splitwellAuth0Config;
+
+export const cantonNetworkAuth0Config: Auth0Config = {
+  namespacedConfigs: namespacedConfigs,
   auth0Domain: isMainNet
     ? 'canton-network-mainnet.us.auth0.com'
     : 'canton-network-dev.us.auth0.com',
@@ -89,28 +168,28 @@ export const cantonNetworkAuth0Config = {
   auth0MgtClientSecret: 'auth0MgtClientSecret',
   fixedTokenCacheName: 'fixedTokenCacheName',
 };
-export const svRunbookAuth0Config = {
-  appToClientId: {
-    sv: 'sv-client-id',
-    validator: 'validator-client-id',
-  },
-  namespaceToUiToClientId: {
-    sv: {
+
+const svRunbookNamespacedConfigs: NamespacedAuth0Configs = {
+  sv: {
+    audiences: {
+      ledgerApi: 'https://ledger_api.example.com', // The Ledger API in the sv-test tenant
+      svAppApi: 'https://sv.example.com/api', // The SV App API in the sv-test tenant
+      validatorApi: 'https://validator.example.com/api', // The Validator App API in the sv-test tenant
+    },
+    backendClientIds: {
+      svApp: 'sv-client-id',
+      validator: 'validator-client-id',
+    },
+    uiClientIds: {
       wallet: 'wallet-client-id',
       cns: 'cns-client-id',
       sv: 'sv-client-id',
     },
   },
-  appToApiAudience: {
-    participant: 'https://ledger_api.example.com', // The Ledger API in the sv-test tenant
-    sv: 'https://sv.example.com/api', // The SV App API in the sv-test tenant
-    validator: 'https://validator.example.com/api', // The Validator App API in the sv-test tenant
-  },
+};
 
-  appToClientAudience: {
-    sv: 'https://ledger_api.example.com',
-    validator: 'https://ledger_api.example.com',
-  },
+export const svRunbookAuth0Config = {
+  namespacedConfigs: svRunbookNamespacedConfigs,
   auth0Domain: 'canton-network-sv-test.us.auth0.com',
   auth0MgtClientId: 'auth0MgtClientId',
   auth0MgtClientSecret: 'auth0MgtClientSecret',

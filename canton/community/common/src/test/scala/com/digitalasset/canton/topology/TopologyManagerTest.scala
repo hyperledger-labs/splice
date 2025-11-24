@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.topology
 
+import com.digitalasset.canton.crypto.BaseCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.processing.TopologyTransactionTestFactory
 import com.digitalasset.canton.topology.store.TopologyStoreId
@@ -33,7 +34,7 @@ class TopologyManagerTest extends AnyWordSpec with BaseTest with HasExecutionCon
   }
 
   private def permittingMissingSigningKeySignatures(
-      topologyManager: TopologyManager[TopologyStoreId]
+      topologyManager: TopologyManager[TopologyStoreId, BaseCrypto]
   ): Unit =
     "permit OwnerToKeyMappings with missing signing key signatures" in {
       val okmS1k7_k1_missing_k7 =
@@ -73,11 +74,11 @@ class TopologyManagerTest extends AnyWordSpec with BaseTest with HasExecutionCon
         .loneElement shouldBe SigningKeys.key7
 
       // check that the only signature is from key1
-      tx.signatures.forgetNE.loneElement.signedBy shouldBe SigningKeys.key1.fingerprint
+      tx.signatures.forgetNE.loneElement.authorizingLongTermKey shouldBe SigningKeys.key1.fingerprint
     }
 
   private def rejectingMissingSigningKeySignatures(
-      topologyManager: TopologyManager[TopologyStoreId]
+      topologyManager: TopologyManager[TopologyStoreId, BaseCrypto]
   ): Unit =
     "permit OwnerToKeyMappings with missing signing key signatures" in {
       val okmS1k7_k1_missing_k7 =
@@ -106,7 +107,7 @@ class TopologyManagerTest extends AnyWordSpec with BaseTest with HasExecutionCon
     new AuthorizedTopologyManager(
       Factory.sequencer1.uid,
       wallClock,
-      Factory.cryptoApi.crypto,
+      Factory.crypto,
       new InMemoryTopologyStore(
         TopologyStoreId.AuthorizedStore,
         testedProtocolVersion,
@@ -123,7 +124,7 @@ class TopologyManagerTest extends AnyWordSpec with BaseTest with HasExecutionCon
     new TemporaryTopologyManager(
       Factory.sequencer1.uid,
       wallClock,
-      Factory.cryptoApi.crypto,
+      Factory.crypto,
       new InMemoryTopologyStore(
         TopologyStoreId.TemporaryStore.tryCreate("test"),
         testedProtocolVersion,
@@ -139,15 +140,16 @@ class TopologyManagerTest extends AnyWordSpec with BaseTest with HasExecutionCon
     new SynchronizerTopologyManager(
       Factory.sequencer1.uid,
       wallClock,
-      Factory.cryptoApi.crypto,
+      Factory.syncCryptoClient.crypto,
       defaultStaticSynchronizerParameters,
       new InMemoryTopologyStore(
-        TopologyStoreId.SynchronizerStore(Factory.synchronizerId1),
+        TopologyStoreId.SynchronizerStore(Factory.physicalSynchronizerId1),
         testedProtocolVersion,
         loggerFactory,
         timeouts,
       ),
       new SynchronizerOutboxQueue(loggerFactory),
+      disableOptionalTopologyChecks = false,
       exitOnFatalFailures = exitOnFatal,
       timeouts = timeouts,
       futureSupervisor = futureSupervisor,

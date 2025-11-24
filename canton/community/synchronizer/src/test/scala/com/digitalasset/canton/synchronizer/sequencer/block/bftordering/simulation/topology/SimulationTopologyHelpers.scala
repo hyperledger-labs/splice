@@ -3,27 +3,22 @@
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.topology
 
-import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.crypto.SigningKeyUsage
+import com.digitalasset.canton.TestEssentials
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.{
-  CryptoProvider,
-  TopologyActivationTime,
-}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.topology.TopologyActivationTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.OrderingTopology
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.SimulationModuleSystem.SimulationEnv
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.SimulationSettings
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.future.SimulationFuture
-import com.digitalasset.canton.version.ReleaseProtocolVersion
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.bftordering.TopologySettings
 
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.DurationConverters.ScalaDurationOps
 import scala.util.Random
 
-object SimulationTopologyHelpers {
+object SimulationTopologyHelpers extends TestEssentials {
 
   def generateNodeOnboardingDelay(
       durationOfFirstPhaseWithFaults: FiniteDuration,
@@ -38,21 +33,26 @@ object SimulationTopologyHelpers {
 
   def sequencerBecomeOnlineTime(
       onboardingTime: TopologyActivationTime,
-      simSettings: SimulationSettings,
+      topologySettings: TopologySettings,
   ): CantonTimestamp =
-    onboardingTime.value.plus(simSettings.becomingOnlineAfterOnboardingDelay.toJava)
+    onboardingTime.value.plus(topologySettings.becomingOnlineAfterOnboardingDelay.toJava)
+
+  private val crypto =
+    SymbolicCrypto.create(testedReleaseProtocolVersion, timeouts, loggerFactory)
+
+  def generateSingleSimulationTopologyData(
+      stageStart: CantonTimestamp,
+      topologyDataFactory: NodeSimulationTopologyDataFactory,
+  ): NodeSimulationTopologyData =
+    topologyDataFactory.toSimulationTopologyData(stageStart, crypto)
 
   def generateSimulationTopologyData(
-      endpointsToOnboardingTimes: Map[P2PEndpoint, TopologyActivationTime],
-      loggerFactory: NamedLoggerFactory,
-  ): Map[P2PEndpoint, SimulationTopologyData] = {
-    val crypto =
-      SymbolicCrypto.create(ReleaseProtocolVersion.latest, ProcessingTimeout(), loggerFactory)
-    endpointsToOnboardingTimes.view.mapValues { timestamp =>
-      val keys = crypto.newSymbolicSigningKeyPair(SigningKeyUsage.ProtocolOnly)
-      SimulationTopologyData(timestamp, keys.publicKey, keys.privateKey)
+      stageStart: CantonTimestamp,
+      endpointsToTopologyDataFactories: Map[P2PEndpoint, NodeSimulationTopologyDataFactory],
+  ): Map[P2PEndpoint, NodeSimulationTopologyData] =
+    endpointsToTopologyDataFactories.view.mapValues { timestamp =>
+      generateSingleSimulationTopologyData(stageStart, timestamp)
     }.toMap
-  }
 
   def resolveOrderingTopology(
       orderingTopology: SimulationFuture[Option[(OrderingTopology, CryptoProvider[SimulationEnv])]]
@@ -66,10 +66,4 @@ object SimulationTopologyHelpers {
           "Simulation ordering topology provider should never fail"
         )
       )
-
-  def onboardingTime(
-      simulationStageStart: CantonTimestamp,
-      onboardingDelay: FiniteDuration,
-  ): TopologyActivationTime =
-    TopologyActivationTime(simulationStageStart.add(onboardingDelay.toJava))
 }

@@ -576,7 +576,7 @@ function installK8sRunnerScaleSet(
                       storageClassName: 'hyperdisk-balanced-rwo',
                       resources: {
                         requests: {
-                          storage: '16Gi',
+                          storage: '32Gi',
                         },
                       },
                     },

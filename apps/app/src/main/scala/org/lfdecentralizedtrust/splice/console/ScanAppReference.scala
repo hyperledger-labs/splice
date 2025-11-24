@@ -398,6 +398,9 @@ abstract class ScanAppReference(
   def getAcsSnapshotAt(
       at: CantonTimestamp,
       migrationId: Long,
+      recordTimeMatch: Option[definitions.AcsRequest.RecordTimeMatch] = Some(
+        definitions.AcsRequest.RecordTimeMatch.Exact
+      ),
       after: Option[Long] = None,
       pageSize: Int = 100,
       partyIds: Option[Vector[PartyId]] = None,
@@ -408,6 +411,7 @@ abstract class ScanAppReference(
         HttpScanAppClient.GetAcsSnapshotAt(
           at.toInstant.atOffset(java.time.ZoneOffset.UTC),
           migrationId,
+          recordTimeMatch,
           after,
           pageSize,
           partyIds,
@@ -420,6 +424,9 @@ abstract class ScanAppReference(
       at: CantonTimestamp,
       migrationId: Long,
       partyIds: Vector[PartyId],
+      recordTimeMatch: Option[definitions.HoldingsStateRequest.RecordTimeMatch] = Some(
+        definitions.HoldingsStateRequest.RecordTimeMatch.Exact
+      ),
       after: Option[Long] = None,
       pageSize: Int = 100,
   ) =
@@ -429,8 +436,30 @@ abstract class ScanAppReference(
           at.toInstant.atOffset(java.time.ZoneOffset.UTC),
           migrationId,
           partyIds,
+          recordTimeMatch,
           after,
           pageSize,
+        )
+      )
+    }
+
+  def getHoldingsSummaryAt(
+      at: CantonTimestamp,
+      migrationId: Long,
+      ownerPartyIds: Vector[PartyId] = Vector.empty,
+      recordTimeMatch: Option[definitions.HoldingsSummaryRequest.RecordTimeMatch] = Some(
+        definitions.HoldingsSummaryRequest.RecordTimeMatch.Exact
+      ),
+      asOfRound: Option[Long] = None,
+  ) =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetHoldingsSummaryAt(
+          at.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          migrationId,
+          ownerPartyIds,
+          recordTimeMatch,
+          asOfRound,
         )
       )
     }

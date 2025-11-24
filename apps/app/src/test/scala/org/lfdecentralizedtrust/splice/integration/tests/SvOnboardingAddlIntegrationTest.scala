@@ -201,7 +201,7 @@ class SvOnboardingAddlIntegrationTest
           .forgetNE
 
         val localSequencerUrls: Seq[String] = sequencerConnections.map {
-          inside(_) { case GrpcSequencerConnection(endpoints, _, _, _) =>
+          inside(_) { case GrpcSequencerConnection(endpoints, _, _, _, _) =>
             endpoints.map(_.toURI(false)).forgetNE.loneElement.toString
           }
         }

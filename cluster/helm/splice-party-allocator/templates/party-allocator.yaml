@@ -63,7 +63,7 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 10G
+      storage: 20G
   storageClassName: {{ .Values.pvc.volumeStorageClass }}
 ---
 apiVersion: v1

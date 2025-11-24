@@ -6,30 +6,31 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulat
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.config.{ProcessingTimeout, TlsClientConfig}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.synchronizer.block.BlockFormat
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcConnectionState
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.{
+  P2PEndpoint,
+  PlainTextP2PEndpoint,
+}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.{
   P2PEndpointConfig,
   P2PNetworkConfig,
   P2PServerConfig,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.AvailabilityStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.memory.SimulationAvailabilityStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.Genesis
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.network.data.memory.SimulationP2PEndpointsStore
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.{
-  P2PEndpoint,
-  PlainTextP2PEndpoint,
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.p2p.data.memory.SimulationP2PEndpointsStore
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.p2p.{
+  P2PNetworkInModule,
+  P2PNetworkOutModule,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.{
-  BftP2PNetworkIn,
-  BftP2PNetworkOut,
-}
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.CryptoProvider
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.endpointToTestBftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Module.{
   SystemInitializationResult,
@@ -69,13 +70,19 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.SimulationModuleSystem.{
   SimulationEnv,
   SimulationInitializer,
+  SimulationP2PNetworkManager,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.onboarding.EmptyOnboardingManager
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.topology.{
+  NodeSimulationTopologyDataFactory,
   SimulationOrderingTopologyProvider,
   SimulationTopologyHelpers,
 }
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.BftOrderingServiceReceiveRequest
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.{
+  BftSequencerBaseTest,
+  endpointToTestBftNodeId,
+}
+import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.BftOrderingMessage
 import com.digitalasset.canton.time.{Clock, SimClock}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.google.protobuf.ByteString
@@ -140,7 +147,7 @@ class AvailabilitySimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
         val requests = Seq(
           Traced(
             OrderingRequest(
-              "tx",
+              BlockFormat.SendTag,
               ByteString.copyFromUtf8(
                 f"$thisNode-request-${simulationModel.requestIndex}"
               ),
@@ -220,6 +227,7 @@ class AvailabilitySimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
             abort("Proposal received before being requested")
           }
 
+        case Consensus.LocalAvailability.NoProposalAvailableYet => ()
         case unexpectedMessage =>
           abort(s"Unexpected message type for consensus module: $unexpectedMessage")
       }
@@ -259,6 +267,7 @@ class AvailabilitySimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
 
   private def availabilityOnlySystemInitializer(
       thisNode: BftNodeId,
+      p2pGrpcConnectionState: P2PGrpcConnectionState,
       config: BftBlockOrdererConfig,
       random: Random,
       simulationModel: SimulationModel,
@@ -266,28 +275,28 @@ class AvailabilitySimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
       cryptoProvider: CryptoProvider[SimulationEnv],
       clock: Clock,
       store: TrieMap[BatchId, OrderingRequestBatch] => AvailabilityStore[SimulationEnv],
+      loggerFactory: NamedLoggerFactory,
   ): SystemInitializer[
     SimulationEnv,
-    BftOrderingServiceReceiveRequest,
+    SimulationP2PNetworkManager[BftOrderingMessage],
+    BftOrderingMessage,
     Availability.LocalDissemination.LocalBatchCreated,
-  ] = (moduleSystem, p2pNetworkManager) => {
-    val loggerFactoryWithSequencerId = loggerFactory.append("sequencerId", thisNode)
-
-    val mempoolRef = moduleSystem.newModuleRef[Mempool.Message](ModuleName("mempool"))
+  ] = (moduleSystem, createP2PNetworkManager) => {
+    val mempoolRef = moduleSystem.newModuleRef[Mempool.Message](ModuleName("mempool"))()
     val p2pNetworkInRef = moduleSystem
-      .newModuleRef[BftOrderingServiceReceiveRequest](ModuleName("p2p-network-in"))
+      .newModuleRef[BftOrderingMessage](ModuleName("p2p-network-in"))()
     val p2pNetworkOutRef = moduleSystem
-      .newModuleRef[P2PNetworkOut.Message](ModuleName("p2p-network-out"))
+      .newModuleRef[P2PNetworkOut.Message](ModuleName("p2p-network-out"))()
     val availabilityRef = moduleSystem
-      .newModuleRef[Availability.Message[SimulationEnv]](ModuleName("availability"))
+      .newModuleRef[Availability.Message[SimulationEnv]](ModuleName("availability"))()
     val consensusRef = moduleSystem
-      .newModuleRef[Consensus.Message[SimulationEnv]](ModuleName("consensus"))
+      .newModuleRef[Consensus.Message[SimulationEnv]](ModuleName("consensus"))()
     val outputRef = moduleSystem
-      .newModuleRef[Output.Message[SimulationEnv]](ModuleName("output"))
+      .newModuleRef[Output.Message[SimulationEnv]](ModuleName("output"))()
     val pruningRef = moduleSystem
-      .newModuleRef[Pruning.Message](ModuleName("pruning"))
+      .newModuleRef[Pruning.Message](ModuleName("pruning"))()
 
-    implicit val bftOrdererConfig: BftBlockOrdererConfig = new BftBlockOrdererConfig()
+    implicit val bftOrdererConfig: BftBlockOrdererConfig = config
 
     val metrics = SequencerMetrics.noop(getClass.getSimpleName).bftOrdering
     implicit val metricsContext: MetricsContext = MetricsContext.Empty
@@ -297,19 +306,19 @@ class AvailabilitySimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
         thisNode,
         simulationModel,
         availabilityRef,
-        loggerFactoryWithSequencerId,
+        loggerFactory,
         timeouts,
       )
     val p2pNetworkIn =
-      new BftP2PNetworkIn[SimulationEnv](
+      new P2PNetworkInModule[SimulationEnv](
         metrics,
         availabilityRef,
         consensusRef,
-        loggerFactoryWithSequencerId,
+        loggerFactory,
         timeouts,
       )
-    val p2PNetworkOutDependencies = P2PNetworkOutModuleDependencies(
-      p2pNetworkManager,
+    val p2pNetworkOutDependencies = P2PNetworkOutModuleDependencies(
+      createP2PNetworkManager,
       p2pNetworkInRef,
       mempoolRef,
       availabilityRef,
@@ -317,9 +326,17 @@ class AvailabilitySimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
       outputRef,
       pruningRef,
     )
+    val sequencerIds = config.initialNetwork.toList
+      .flatMap(_.peerEndpoints.map(P2PEndpoint.fromEndpointConfig))
+      .map(endpointToTestBftNodeId)
+    val membership = Membership(thisNode, orderingTopology, sequencerIds)
     val p2pNetworkOut =
-      new BftP2PNetworkOut[SimulationEnv](
+      new P2PNetworkOutModule[SimulationEnv, SimulationP2PNetworkManager[
+        BftOrderingMessage
+      ]](
         thisNode,
+        isGenesis = true, // This test assumes quorum connectivity
+        new P2PNetworkOutModule.State(p2pGrpcConnectionState, membership),
         new SimulationP2PEndpointsStore(
           config.initialNetwork
             .map(_.peerEndpoints.map(P2PEndpoint.fromEndpointConfig))
@@ -327,20 +344,11 @@ class AvailabilitySimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
             .toSet
         ),
         metrics,
-        p2PNetworkOutDependencies,
-        loggerFactoryWithSequencerId,
+        p2pNetworkOutDependencies,
+        loggerFactory,
         timeouts,
       )
-    val sequencerIds = config.initialNetwork.toList
-      .flatMap(_.peerEndpoints.map(P2PEndpoint.fromEndpointConfig))
-      .map(endpointToTestBftNodeId)
-    val membership = Membership(thisNode, orderingTopology, sequencerIds)
     val availabilityStore = store(simulationModel.availabilityStorage)
-    val availabilityConfig = AvailabilityModuleConfig(
-      config.maxRequestsInBatch,
-      config.maxBatchesPerBlockProposal,
-      config.outputFetchTimeout,
-    )
     val availabilityDependencies = AvailabilityModuleDependencies(
       mempoolRef,
       p2pNetworkOutRef,
@@ -352,12 +360,11 @@ class AvailabilitySimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
       initialEpochNumber = Genesis.GenesisEpochNumber,
       cryptoProvider,
       availabilityStore,
-      availabilityConfig,
       clock,
       random,
       metrics,
       availabilityDependencies,
-      loggerFactoryWithSequencerId,
+      loggerFactory,
       timeouts,
       simulationModel.disseminationProtocolState,
       simulationModel.mainOutputFetchProtocolState,
@@ -373,7 +380,7 @@ class AvailabilitySimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
         simulationModel,
         cryptoProvider,
         consensusDependencies,
-        loggerFactoryWithSequencerId,
+        loggerFactory,
         timeouts,
       )
     val outputSimulationFake =
@@ -381,10 +388,12 @@ class AvailabilitySimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
         simulationModel,
         availabilityRef,
         consensusRef,
-        loggerFactoryWithSequencerId,
+        loggerFactory,
       )
+    val p2pNetworkManager =
+      createP2PNetworkManager(P2PConnectionEventListener.NoOp, p2pNetworkInRef)
     val pruningSimulationFake =
-      new PruningSimulationFake[SimulationEnv](loggerFactoryWithSequencerId)
+      new PruningSimulationFake[SimulationEnv](loggerFactory)
 
     moduleSystem.setModule(mempoolRef, mempoolSimulationFake)
     moduleSystem.setModule(p2pNetworkInRef, p2pNetworkIn)
@@ -403,6 +412,8 @@ class AvailabilitySimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
       p2pNetworkOutRef,
       consensusRef,
       outputRef,
+      pruningRef,
+      p2pNetworkManager,
     )
   }
 
@@ -448,27 +459,30 @@ class AvailabilitySimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
       val simulationModels = range.map(_ => new SimulationModel).toArray
       val clock = new SimClock(loggerFactory = loggerFactory)
 
-      val endpointsToOnboardingTimes = endpoints.map { endpoint =>
+      val endpointsToTopologyDataFactories = endpoints.map { endpoint =>
         P2PEndpoint.fromEndpointConfig(
           endpoint
-        ) -> Genesis.GenesisTopologyActivationTime
+        ) -> NodeSimulationTopologyDataFactory(
+          maybeOnboardingDelay = None,
+          maybeOffboardingDelay = None,
+        )
       }.toMap
 
       val endpointsSimulationTopologyData =
         SimulationTopologyHelpers.generateSimulationTopologyData(
-          endpointsToOnboardingTimes,
-          loggerFactory,
+          stageStart = CantonTimestamp.Epoch,
+          endpointsToTopologyDataFactories,
         )
 
       val topologyInit = range.map { n =>
         val endpointConfig = endpoints(n)
         val endpoint = PlainTextP2PEndpoint(endpointConfig.address, endpointConfig.port)
           .asInstanceOf[P2PEndpoint]
-        val node = endpointToTestBftNodeId(endpoint)
+        val bftNodeId = endpointToTestBftNodeId(endpoint)
 
         val orderingTopologyProvider =
           new SimulationOrderingTopologyProvider(
-            node,
+            bftNodeId,
             () => endpointsSimulationTopologyData,
             loggerFactory,
           )
@@ -476,13 +490,19 @@ class AvailabilitySimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
           orderingTopologyProvider.getOrderingTopologyAt(Genesis.GenesisTopologyActivationTime)
         )
 
+        val loggerFactoryWithSequencerId = loggerFactory.append("sequencerId", bftNodeId)
+
+        val p2pGrpcConnectionState =
+          new P2PGrpcConnectionState(bftNodeId, loggerFactoryWithSequencerId)
+
         endpoint -> SimulationInitializer.noClient[
-          BftOrderingServiceReceiveRequest,
+          BftOrderingMessage,
           Availability.LocalDissemination.LocalBatchCreated,
           Unit,
         ](loggerFactory, timeouts)(
           availabilityOnlySystemInitializer(
-            node,
+            bftNodeId,
+            p2pGrpcConnectionState,
             configs(n),
             new Random(n),
             simulationModels(n),
@@ -490,7 +510,9 @@ class AvailabilitySimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
             cryptoProvider,
             clock,
             xs => new SimulationAvailabilityStore(xs),
-          )
+            loggerFactoryWithSequencerId,
+          ),
+          p2pGrpcConnectionState,
         )
       }.toMap
 

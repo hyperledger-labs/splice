@@ -67,6 +67,11 @@ final case class CircuitBreakersConfig(
     ),
 )
 
+final case class EnabledFeaturesConfig(
+    enableNewAcsExport: Boolean = true,
+    newSequencerConnectionPool: Boolean = false,
+)
+
 /** This class aggregates binary-level configuration options that are shared between each Splice app instance.
   * For example, the [[TracingConfig]] is configured once for all Splice apps that are started by a Splice binary as part of the
   * [[com.digitalasset.canton.config.MonitoringConfig]].
@@ -85,6 +90,7 @@ case class SharedSpliceAppParameters(
     requestTimeout: NonNegativeDuration,
     upgradesConfig: UpgradesConfig = UpgradesConfig(),
     circuitBreakers: CircuitBreakersConfig = CircuitBreakersConfig(),
+    enabledFeatures: EnabledFeaturesConfig = EnabledFeaturesConfig(),
     // TODO(DACH-NY/canton-network-node#736): likely remove all of the following:
     override val cachingConfigs: CachingConfigs,
     override val enableAdditionalConsistencyChecks: Boolean,
@@ -109,7 +115,4 @@ case class SharedSpliceAppParameters(
   override def watchdog: Option[WatchdogConfig] = None
 
   override def startupMemoryCheckConfig: StartupMemoryCheckConfig = StartupMemoryCheckConfig(Warn)
-
-  // not applicable
-  override def sessionSigningKeys: SessionSigningKeysConfig = ???
 }

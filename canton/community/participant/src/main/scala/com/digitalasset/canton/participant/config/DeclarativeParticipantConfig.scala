@@ -5,9 +5,10 @@ package com.digitalasset.canton.participant.config
 
 import cats.implicits.toTraverseOps
 import cats.syntax.either.*
+import com.daml.jwt.JwksUrl
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String255
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.config.{
   CantonConfigValidator,
@@ -15,16 +16,17 @@ import com.digitalasset.canton.config.{
   ConfidentialConfigWriter,
   UniformCantonConfigValidation,
 }
-import com.digitalasset.canton.ledger.api.{IdentityProviderId, JwksUrl}
+import com.digitalasset.canton.ledger.api.IdentityProviderId
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
+  SequencerConnectionPoolDelays,
   SequencerConnections,
   SubmissionRequestAmplification,
 }
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
-import com.digitalasset.canton.topology.{Namespace, UniqueIdentifier}
+import com.digitalasset.canton.topology.{Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.google.protobuf.ByteString
@@ -85,6 +87,7 @@ final case class DeclarativeDarConfig(
     location: String,
     requestHeaders: Map[String, String] = Map(),
     expectedMainPackage: Option[String] = None,
+    synchronizers: Seq[String] = Seq.empty,
 ) extends UniformCantonConfigValidation
 
 sealed trait ParticipantPermissionConfig extends UniformCantonConfigValidation {
@@ -190,25 +193,36 @@ final case class DeclarativeUserConfig(
 )(val resourceVersion: String = "")
     extends UniformCantonConfigValidation {
 
-  /** map party names to namespace and filter out parties that are not yet registered
-    *
-    * the ledger api server needs to know the parties that we add to a user. that requires a
-    * synchronizer connection. therefore, we filter here the parties that are not yet registered as
-    * otherwise the ledger api server will throw errors
+  /** map party names to namespace
     */
   def mapPartiesToNamespace(
-      namespace: Namespace,
-      filterParty: String => Boolean,
+      namespace: Namespace
   ): DeclarativeUserConfig = {
     def mapParty(party: String): String =
       if (party.contains(UniqueIdentifier.delimiter)) party
       else
         UniqueIdentifier.tryCreate(party, namespace).toProtoPrimitive
     copy(
-      primaryParty = primaryParty.map(mapParty).filter(filterParty),
+      primaryParty = primaryParty.map(mapParty),
       rights = rights.copy(
-        actAs = rights.actAs.map(mapParty).filter(filterParty),
-        readAs = rights.readAs.map(mapParty).filter(filterParty),
+        actAs = rights.actAs.map(mapParty),
+        readAs = rights.readAs.map(mapParty),
+      ),
+    )(resourceVersion)
+  }
+
+  def referencedParties: Set[PartyId] =
+    rights.readAs.map(PartyId.tryFromProtoPrimitive) ++ rights.actAs.map(
+      PartyId.tryFromProtoPrimitive
+    ) ++ primaryParty.map(PartyId.tryFromProtoPrimitive)
+
+  def removeParties(unknown: Set[PartyId]): DeclarativeUserConfig = {
+    val unknownStrings = unknown.map(_.toProtoPrimitive)
+    copy(
+      primaryParty = primaryParty.filterNot(unknownStrings.contains),
+      rights = rights.copy(
+        actAs = rights.actAs.diff(unknownStrings),
+        readAs = rights.readAs.diff(unknownStrings),
       ),
     )(resourceVersion)
   }
@@ -275,6 +289,7 @@ final case class DeclarativeConnectionConfig(
     priority: Int = 0,
     initializeFromTrustedSynchronizer: Boolean = false,
     trustThreshold: PositiveInt = PositiveInt.one,
+    livenessMargin: NonNegativeInt = NonNegativeInt.zero,
 ) extends UniformCantonConfigValidation {
 
   def isEquivalent(other: DeclarativeConnectionConfig): Boolean = {
@@ -297,10 +312,13 @@ final case class DeclarativeConnectionConfig(
             transportSecurity = conn.transportSecurity,
             sequencerAlias = SequencerAlias.tryCreate(alias),
             customTrustCertificates = conn.customTrustCertificatesAsByteString.toOption.flatten,
+            sequencerId = None,
           )
         }.toSeq,
         sequencerTrustThreshold = trustThreshold,
+        sequencerLivenessMargin = livenessMargin,
         submissionRequestAmplification = SubmissionRequestAmplification.NoAmplification,
+        sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
       )
 
     sequencerConnectionsE.map { sequencerConnections =>
@@ -312,9 +330,7 @@ final case class DeclarativeConnectionConfig(
         initializeFromTrustedSynchronizer = initializeFromTrustedSynchronizer,
       )
     }
-
   }
-
 }
 
 object DeclarativeConnectionConfig {

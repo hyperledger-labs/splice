@@ -2259,6 +2259,9 @@ class State:
                         round_number, []
                     ).append(validator_liveness_activity_record)
                     del self.active_contracts[cid]
+                case "InputUnclaimedActivityRecord":
+                    cid = value.get_contract_id()
+                    del self.active_contracts[cid]
                 case _:
                     self._fail(transaction, f"Unexpected transfer input: {tag}")
         return TransferInputs(
@@ -3741,6 +3744,21 @@ class State:
         # Unlocking is skipped, if the LockedAmulet was already archived.
         return HandleTransactionResult.empty()
 
+    def handle_allocation_cancel(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                    isinstance(child_event, ExercisedEvent)
+                    and child_event.choice_name == "LockedAmulet_Unlock"
+            ):
+                return self.handle_locked_amulet_unlock(
+                    transaction,
+                    child_event,
+                    log_prefix="Token standard: allocation cancelled - return locked funds",
+                )
+        # Unlocking is skipped, if the LockedAmulet was already archived.
+        return HandleTransactionResult.empty()
+
     def handle_root_exercised_event(self, transaction, event):
         LOG.debug(f"Root exercise: {event.choice_name}")
         match event.choice_name:
@@ -3852,7 +3870,7 @@ class State:
             case "DsoRules_ExpireUnallocatedUnclaimedActivityRecord":
                 return HandleTransactionResult.empty()
             case "DsoRules_ExpireUnclaimedActivityRecord":
-                return HandleTransactionResult.empty()
+                return self.handle_unclaimed_reward_create_archive(transaction, event)
             case "AmuletRules_Fetch":
                 return HandleTransactionResult.empty()
             case "OpenMiningRound_Fetch":
@@ -3918,6 +3936,8 @@ class State:
                 return self.handle_allocation_withdraw(transaction, event)
             case "AmuletConversionRateFeed_Update":
                 return HandleTransactionResult.empty()
+            case "Allocation_Cancel":
+                return self.handle_allocation_cancel(transaction, event)
             # case "AllocationInstruction_Withdraw": -- intentionally not handled, as it is not used by Amulet
             # case "AllocationInstruction_Update": -- intentionally not handled, as it is not used by Amulet
             # no handling of `AllocationRequest` choices as they are not visible to the DSO party

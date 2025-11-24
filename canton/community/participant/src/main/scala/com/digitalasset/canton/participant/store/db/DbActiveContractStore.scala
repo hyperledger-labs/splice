@@ -33,6 +33,7 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.{
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
 import com.digitalasset.canton.store.db.DbPrunableByTimeSynchronizer
 import com.digitalasset.canton.store.{
+  IndexedString,
   IndexedStringStore,
   IndexedSynchronizer,
   PrunableByTimeParameters,
@@ -41,9 +42,11 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
+import com.digitalasset.canton.util.collection.IterableUtil
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import slick.jdbc.*
 
+import java.util.concurrent.atomic.AtomicLong
 import scala.Ordered.orderingToOrdered
 import scala.collection.View
 import scala.collection.immutable.SortedMap
@@ -65,7 +68,7 @@ import scala.concurrent.ExecutionContext
 class DbActiveContractStore(
     override protected val storage: DbStorage,
     protected[this] override val indexedSynchronizer: IndexedSynchronizer,
-    enableAdditionalConsistencyChecks: Boolean,
+    enableAdditionalConsistencyChecks: Option[Long],
     batchingParametersConfig: PrunableByTimeParameters,
     val indexedStringStore: IndexedStringStore,
     override protected val timeouts: ProcessingTimeout,
@@ -73,7 +76,11 @@ class DbActiveContractStore(
 )(implicit val ec: ExecutionContext)
     extends ActiveContractStore
     with DbStore
-    with DbPrunableByTimeSynchronizer {
+    with DbPrunableByTimeSynchronizer[IndexedSynchronizer] {
+
+  override protected[this] implicit def setParameterIndexedSynchronizer
+      : SetParameter[IndexedSynchronizer] = IndexedString.setParameterIndexedString
+  override protected[this] def partitionColumn: String = "synchronizer_idx"
 
   import ActiveContractStore.*
   import DbStorage.Implicits.*
@@ -85,8 +92,11 @@ class DbActiveContractStore(
 
   protected[this] override val pruning_status_table = "par_active_contract_pruning"
 
-  private def checkedTUnit: CheckedT[FutureUnlessShutdown, AcsError, AcsWarning, Unit] =
-    CheckedT.resultT[FutureUnlessShutdown, AcsError, AcsWarning](())
+  /** Counts how many activations have gone this contract store during the lifetime of this object,
+    * if [[enableAdditionalConsistencyChecks]] is defined, to trigger a warning every that many
+    * activations.
+    */
+  private val activationCountForConsistencyChecking: AtomicLong = new AtomicLong()
 
   /*
   Consider the scenario where a contract is created on synchronizer D1, then reassigned to D2, then to D3 and is finally archived.
@@ -151,15 +161,12 @@ class DbActiveContractStore(
         change = ChangeType.Activation,
       )
       _ <-
-        if (enableAdditionalConsistencyChecks) {
-          performUnlessClosingCheckedUST(
-            "additional-consistency-check",
-            Checked.result[AcsError, AcsWarning, Unit](
-              logger.debug(
-                "Could not perform additional consistency check because node is shutting down"
-              )
-            ),
-          ) {
+        enableAdditionalConsistencyChecks.traverse_ { warnFrequency =>
+          observeActivationsAndWarn(
+            newActivations = contracts.size.toLong,
+            warnFrequency = warnFrequency,
+          )
+          synchronizeWithClosing("additional-consistency-check") {
             activeContractsData.asSeq.parTraverse_ { tc =>
               checkActivationsDeactivationConsistency(
                 tc.contractId,
@@ -167,8 +174,18 @@ class DbActiveContractStore(
               )
             }
           }
-        } else checkedTUnit
+        }
     } yield ()
+  }
+
+  private def observeActivationsAndWarn(newActivations: Long, warnFrequency: Long): Unit = {
+    val activationsSeenNow = activationCountForConsistencyChecking.addAndGet(newActivations)
+    val activationsSeenPreviously = activationsSeenNow - newActivations
+    if (activationsSeenNow / warnFrequency > activationsSeenPreviously / warnFrequency) {
+      noTracingLogger.warn(
+        s"Additional consistency checking is enabled. This is very slow for large contract stores. Activations seen so far: $activationsSeenNow"
+      )
+    }
   }
 
   override def purgeOrArchiveContracts(
@@ -186,20 +203,23 @@ class DbActiveContractStore(
         contracts.map(contract => (contract, operation)).toMap,
         change = ChangeType.Deactivation,
       )
-      _ <-
-        if (enableAdditionalConsistencyChecks) {
-          performUnlessClosingCheckedUST(
-            "additional-consistency-check",
-            Checked.result[AcsError, AcsWarning, Unit](
-              logger.debug(
-                "Could not perform additional consistency check because node is shutting down"
-              )
-            ),
-          )(contracts.parTraverse_(checkActivationsDeactivationConsistency tupled))
-        } else checkedTUnit
+      _ <- enableAdditionalConsistencyChecks.traverse_ { _ =>
+        synchronizeWithClosing("additional-consistency-check")(
+          contracts.parTraverse_(checkActivationsDeactivationConsistency tupled)
+        )
+      }
     } yield ()
   }
 
+  /** @param reassignments
+    *   List of reassignments; the reassignment tag corresponds to the remote synchronizer (target
+    *   for unassignment and source for assignment)
+    * @param builder
+    *   Allows to construct a `ReassignmentChangeDetail < ActivenessChangeDetail` from a
+    *   reassignment counter and the index of the remote synchronizer
+    * @param change
+    *   The kind of change.
+    */
   private def reassignContracts(
       reassignments: Seq[
         (LfContractId, ReassignmentTag[SynchronizerId], ReassignmentCounter, TimeOfChange)
@@ -522,7 +542,7 @@ class DbActiveContractStore(
             // use of the partial index "active_contracts_pruning_idx" appears to be splitting the select and delete
             // into separate statements. See #11292.
             for {
-              acsEntriesToPrune <- performUnlessClosingUSF("Fetch ACS entries batch")(
+              acsEntriesToPrune <- synchronizeWithClosing("Fetch ACS entries batch")(
                 storage.query(
                   (sql"""
                   with deactivation_time(contract_id, ts, repair_counter, row_num) as (
@@ -544,7 +564,7 @@ class DbActiveContractStore(
                 )
               )
               totalEntriesPruned <-
-                performUnlessClosingUSF("Delete ACS entries batch")(
+                synchronizeWithClosing("Delete ACS entries batch")(
                   if (acsEntriesToPrune.isEmpty) FutureUnlessShutdown.pure(0)
                   else {
                     val deleteStatement =
@@ -566,7 +586,7 @@ class DbActiveContractStore(
                 )
             } yield totalEntriesPruned
           case _: DbStorage.Profile.H2 =>
-            performUnlessClosingUSF("ACS.doPrune")(
+            synchronizeWithClosing("ACS.doPrune")(
               storage.queryAndUpdate(
                 sqlu"""
             with deactivation_time(contract_id, ts, repair_counter, row_num) as (
@@ -820,14 +840,14 @@ class DbActiveContractStore(
   )(implicit
       traceContext: TraceContext
   ): CheckedT[FutureUnlessShutdown, AcsError, AcsWarning, Unit] =
-    if (enableAdditionalConsistencyChecks) {
+    enableAdditionalConsistencyChecks.traverse_ { _ =>
       reassignments.parTraverse_ { case ((contractId, toc), reassignment) =>
         for {
           _ <- checkReassignmentCountersShouldIncrease(contractId, toc, reassignment)
           _ <- checkActivationsDeactivationConsistency(contractId, toc)
         } yield ()
       }
-    } else CheckedT.pure(())
+    }
 
   private def checkActivationsDeactivationConsistency(
       contractId: LfContractId,
@@ -999,13 +1019,10 @@ class DbActiveContractStore(
     }
 
     CheckedT.result(storage.queryAndUpdate(insertAll, functionFullName)).flatMap { (_: Unit) =>
-      if (enableAdditionalConsistencyChecks) {
+      enableAdditionalConsistencyChecks.traverse_ { _ =>
         // Check all contracts whether they have been inserted or are already there
-        NonEmpty
-          .from(contractChanges.keySet.toSeq)
-          .map(checkIdempotence)
-          .getOrElse(CheckedT.pure(()))
-      } else CheckedT.pure(())
+        NonEmpty.from(contractChanges.keySet.toSeq).traverse_(checkIdempotence)
+      }
     }
   }
 

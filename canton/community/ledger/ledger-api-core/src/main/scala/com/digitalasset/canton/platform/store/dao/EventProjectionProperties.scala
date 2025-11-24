@@ -19,9 +19,6 @@ import scala.concurrent.Future
   *
   * @param verbose
   *   enriching in verbose mode
-  * @param templateWildcardWitnesses
-  *   all the parties for which contract arguments will be populated for all the templates,if None
-  *   then contract arguments for all the parties and for all the templates will be populated
   * @param witnessTemplateProjections
   *   per witness party, per template projections
   * @param templateWildcardCreatedEventBlobParties
@@ -33,29 +30,26 @@ import scala.concurrent.Future
   */
 final case class EventProjectionProperties(
     verbose: Boolean,
-    templateWildcardWitnesses: Option[Set[String]],
     // Map((witness or wildcard) -> Map(template -> projection)), where a None key denotes a party wildcard
-    witnessTemplateProjections: Map[Option[String], Map[Identifier, Projection]] = Map.empty,
+    witnessTemplateProjections: Map[Option[String], Map[Ref.NameTypeConRef, Projection]] =
+      Map.empty,
     templateWildcardCreatedEventBlobParties: Option[Set[String]] = Some(
       Set.empty
-    ), // TODO(#19364) fuse with the templateWildcardWitnesses into a templateWildcard Projection and potentially include it into the following Map
+    ),
 )(
     // Note: including this field in a separate argument list to the case class to not affect the deep equality check of the
     //       regular argument list
     val interfaceViewPackageUpgrade: InterfaceViewPackageUpgrade
 ) {
-  def render(witnesses: Set[String], templateId: Identifier): Projection =
+  def render(witnesses: Set[String], templateId: NameTypeConRef): Projection =
     (witnesses.iterator.map(Some(_))
       ++ Iterator(None)) // for the party-wildcard template specific projections)
       .flatMap(witnessTemplateProjections.get(_).iterator)
       .flatMap(_.get(templateId).iterator)
       .foldLeft(
         Projection(
-          contractArguments = templateWildcardWitnesses.fold(witnesses.nonEmpty)(parties =>
-            witnesses.exists(parties)
-          ),
           createdEventBlob = templateWildcardCreatedEventBlobParties
-            .fold(witnesses.nonEmpty)(parties => witnesses.exists(parties)),
+            .fold(witnesses.nonEmpty)(parties => witnesses.exists(parties))
         )
       )(_ append _)
 }
@@ -63,15 +57,13 @@ final case class EventProjectionProperties(
 object EventProjectionProperties {
 
   final case class Projection(
-      interfaces: Set[Identifier] = Set.empty,
+      interfaces: Set[FullIdentifier] = Set.empty,
       createdEventBlob: Boolean = false,
-      contractArguments: Boolean = false,
   ) {
     def append(other: Projection): Projection =
       Projection(
-        interfaces ++ other.interfaces,
-        createdEventBlob || other.createdEventBlob,
-        contractArguments || other.contractArguments,
+        interfaces = interfaces ++ other.interfaces,
+        createdEventBlob = createdEventBlob || other.createdEventBlob,
       )
   }
 
@@ -86,14 +78,12 @@ object EventProjectionProperties {
     */
   def apply(
       eventFormat: EventFormat,
-      interfaceImplementedBy: Identifier => Set[Identifier],
-      resolveTypeConRef: TypeConRef => Set[Identifier],
+      interfaceImplementedBy: FullIdentifier => Set[FullIdentifier],
+      resolveTypeConRef: TypeConRef => Set[FullIdentifier],
       interfaceViewPackageUpgrade: InterfaceViewPackageUpgrade,
-      alwaysPopulateArguments: Boolean,
   ): EventProjectionProperties =
     EventProjectionProperties(
       verbose = eventFormat.verbose,
-      templateWildcardWitnesses = templateWildcardWitnesses(eventFormat, alwaysPopulateArguments),
       templateWildcardCreatedEventBlobParties =
         templateWildcardCreatedEventBlobParties(eventFormat),
       witnessTemplateProjections = witnessTemplateProjections(
@@ -113,46 +103,18 @@ object EventProjectionProperties {
   @VisibleForTesting
   def apply(
       eventFormat: EventFormat,
-      interfaceImplementedBy: Identifier => Set[Identifier],
-      resolveTypeConRef: TypeConRef => Set[Identifier],
-      alwaysPopulateArguments: Boolean,
+      interfaceImplementedBy: FullIdentifier => Set[FullIdentifier],
+      resolveTypeConRef: TypeConRef => Set[FullIdentifier],
   ): EventProjectionProperties =
     EventProjectionProperties(
       eventFormat = eventFormat,
       interfaceImplementedBy = interfaceImplementedBy,
       resolveTypeConRef = resolveTypeConRef,
-      alwaysPopulateArguments = alwaysPopulateArguments,
       interfaceViewPackageUpgrade = (_: Ref.ValueRef, _: Ref.ValueRef) =>
         Future.failed(
           new UnsupportedOperationException("Not expected to be called in unit tests")
         ),
     )
-
-  private def templateWildcardWitnesses(
-      apiTransactionFilter: EventFormat,
-      alwaysPopulateArguments: Boolean,
-  ): Option[Set[String]] =
-    if (alwaysPopulateArguments) {
-      apiTransactionFilter.filtersForAnyParty match {
-        case Some(_) => None
-        // filters for any party (party-wildcard) is not defined, getting the template wildcard witnesses from the filters by party
-        case None =>
-          Some(
-            apiTransactionFilter.filtersByParty.keysIterator.toSet
-          )
-      }
-    } else
-      apiTransactionFilter.filtersForAnyParty match {
-        case Some(cumulative) if cumulative.templateWildcardFilter.isDefined => None
-        // filters for any party (party-wildcard) not defined at all or defined but for specific templates, getting the template wildcard witnesses from the filters by party
-        case _ =>
-          Some(
-            apiTransactionFilter.filtersByParty.iterator.collect {
-              case (party, cumulative) if cumulative.templateWildcardFilter.isDefined =>
-                party
-            }.toSet
-          )
-      }
 
   private def templateWildcardCreatedEventBlobParties(
       apiTransactionFilter: EventFormat
@@ -178,9 +140,9 @@ object EventProjectionProperties {
 
   private def witnessTemplateProjections(
       apiEventFormat: EventFormat,
-      interfaceImplementedBy: Identifier => Set[Identifier],
-      resolveTypeConRef: TypeConRef => Set[Identifier],
-  ): Map[Option[String], Map[Identifier, Projection]] = {
+      interfaceImplementedBy: FullIdentifier => Set[FullIdentifier],
+      resolveTypeConRef: TypeConRef => Set[FullIdentifier],
+  ): Map[Option[String], Map[NameTypeConRef, Projection]] = {
     val partyFilterPairs =
       apiEventFormat.filtersByParty.view.map { case (p, f) =>
         (Some(p), f)
@@ -193,10 +155,9 @@ object EventProjectionProperties {
         interfaceFilter <- cumulativeFilter.interfaceFilters.view
         interfaceId <- resolveTypeConRef(interfaceFilter.interfaceTypeRef)
         implementor <- interfaceImplementedBy(interfaceId).view
-      } yield implementor -> Projection(
+      } yield implementor.toNameTypeConRef -> Projection(
         interfaces = if (interfaceFilter.includeView) Set(interfaceId) else Set.empty,
         createdEventBlob = interfaceFilter.includeCreatedEventBlob,
-        contractArguments = false,
       )
       val templateProjections = getTemplateProjections(cumulativeFilter, resolveTypeConRef)
       val projectionsForParty =
@@ -212,14 +173,13 @@ object EventProjectionProperties {
 
   private def getTemplateProjections(
       cumulativeFilter: CumulativeFilter,
-      resolveTypeConRef: TypeConRef => Set[Identifier],
-  ): View[(Identifier, Projection)] =
+      resolveTypeConRef: TypeConRef => Set[FullIdentifier],
+  ): View[(NameTypeConRef, Projection)] =
     for {
       templateFilter <- cumulativeFilter.templateFilters.view
       templateId <- resolveTypeConRef(templateFilter.templateTypeRef).view
-    } yield templateId -> Projection(
+    } yield templateId.toNameTypeConRef -> Projection(
       interfaces = Set.empty,
       createdEventBlob = templateFilter.includeCreatedEventBlob,
-      contractArguments = true,
     )
 }

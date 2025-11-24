@@ -46,14 +46,14 @@ import org.lfdecentralizedtrust.splice.scan.store.db.{
   ScanAggregatesReaderContext,
 }
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
-import org.lfdecentralizedtrust.splice.store.PageLimit
+import org.lfdecentralizedtrust.splice.store.{PageLimit, UpdateHistory}
 import org.lfdecentralizedtrust.splice.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
@@ -65,6 +65,7 @@ import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.http.HttpRateLimiter
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 
 /** Class representing a Scan app instance.
   *
@@ -74,7 +75,7 @@ class ScanApp(
     override val name: InstanceName,
     val config: ScanAppBackendConfig,
     val amuletAppParameters: SharedSpliceAppParameters,
-    storage: Storage,
+    storage: DbStorage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
@@ -181,13 +182,25 @@ class ScanApp(
         migrationInfo,
         participantId,
         config.cache,
-        config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore,
+        config.automation.ingestion,
         initialRound.toLong,
+      )
+      updateHistory = new UpdateHistory(
+        storage,
+        migrationInfo,
+        store.storeName,
+        participantId,
+        store.acsContractFilter.ingestionFilter.primaryParty,
+        BackfillingRequirement.NeedsBackfilling,
+        loggerFactory,
+        enableissue12777Workaround = true,
+        enableImportUpdateBackfill = config.updateHistoryBackfillImportUpdatesEnabled,
+        nodeMetrics.dbScanStore.history,
       )
       acsSnapshotStore = AcsSnapshotStore(
         storage,
-        store.updateHistory,
+        updateHistory,
         dsoParty,
         migrationInfo.currentMigrationId,
         loggerFactory,
@@ -206,6 +219,7 @@ class ScanApp(
         retryProvider,
         loggerFactory,
         store,
+        updateHistory,
         storage,
         acsSnapshotStore,
         config.ingestFromParticipantBegin,
@@ -215,15 +229,15 @@ class ScanApp(
         amuletAppParameters.upgradesConfig,
         initialRound.toLong,
       )
-      scanVerdictStore = DbScanVerdictStore(storage, loggerFactory)(ec)
+      scanVerdictStore = DbScanVerdictStore(storage, updateHistory, loggerFactory)(ec)
       scanEventStore = new ScanEventStore(
         scanVerdictStore,
-        store.updateHistory,
+        updateHistory,
         loggerFactory,
       )(ec)
       _ <- appInitStep("Wait until there is an OpenMiningRound contract") {
         retryProvider.waitUntil(
-          RetryFor.WaitingOnInitDependency,
+          RetryFor.WaitingOnInitDependencyLong,
           "wait_open_mining",
           "there is an OpenMiningRound contract",
           store.multiDomainAcsStore
@@ -281,6 +295,7 @@ class ScanApp(
         participantAdminConnection,
         sequencerAdminConnection,
         store,
+        updateHistory,
         acsSnapshotStore,
         scanEventStore,
         dsoAnsResolver,
@@ -321,6 +336,7 @@ class ScanApp(
       httpRateLimiter = new HttpRateLimiter(
         config.parameters.rateLimiting,
         nodeMetrics.openTelemetryMetricsFactory,
+        loggerFactory.getTracedLogger(classOf[HttpRateLimiter]),
       )
       route = cors(
         CorsSettings(ac).withExposedHeaders(Seq("traceparent"))
@@ -393,6 +409,7 @@ class ScanApp(
         loggerFactory.getTracedLogger(ScanApp.State.getClass),
         timeouts,
         bftSequencersWithAdminConnections.map(_._1),
+        Seq(httpRateLimiter),
       )
     }
   }
@@ -415,6 +432,7 @@ object ScanApp {
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
       bftSequencersAdminConnections: Seq[SequencerAdminConnection],
+      cleanups: Seq[AutoCloseable],
   ) extends AutoCloseable
       with HasHealth {
     override def isHealthy: Boolean =
@@ -422,6 +440,7 @@ object ScanApp {
 
     override def close(): Unit = {
       LifeCycle.close(bftSequencersAdminConnections*)(logger)
+      LifeCycle.close(cleanups*)(logger)
       LifeCycle.close(
         automation,
         verdictAutomation,

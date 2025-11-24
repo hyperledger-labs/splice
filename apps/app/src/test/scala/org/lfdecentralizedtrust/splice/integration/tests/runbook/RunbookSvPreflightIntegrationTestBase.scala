@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
 import com.digitalasset.canton.topology.SynchronizerId
+import io.circe.parser.{parse as parseJson}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.util.{
@@ -11,6 +12,9 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletFrontendTestUtil,
 }
 
+import java.net.URI
+import java.net.http.{HttpClient, HttpRequest, HttpResponse}
+import scala.collection.immutable.ArraySeq
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.util.{Random, Try}
@@ -61,7 +65,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
             () => find(id("logout-button")) should not be empty,
           )
 
-          click on "information-tab-cometBft-debug"
+          eventuallyClickOn(id("information-tab-cometBft-debug"))
         },
       )(
         s"We see all other SVs as peers",
@@ -328,6 +332,29 @@ abstract class RunbookSvPreflightIntegrationTestBase
         val sv1TrafficStatus =
           sv1ScanClient.getMemberTrafficStatus(activeSynchronizer, participantId.member)
         svTrafficStatus shouldBe sv1TrafficStatus
+      }
+    }
+  }
+
+  "Info service is reachable and returns a JSON object" in { _ =>
+    val infoUrl = s"https://info.sv.${sys.env("NETWORK_APPS_ADDRESS")}"
+    val requests = ArraySeq("", "/runtime/dso.json")
+      .map(path =>
+        HttpRequest
+          .newBuilder()
+          .uri(URI.create(s"$infoUrl$path"))
+          .build()
+      )
+    val client = HttpClient.newHttpClient()
+
+    for (request <- requests) {
+      clue(s"Testing info endpoint ${request.uri()}") {
+        eventuallySucceeds(timeUntilSuccess = 5.minutes) {
+          val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+          response.statusCode() shouldBe 200
+          val json = parseJson(response.body()).valueOrFail("Response body must be a valid JSON")
+          json.isObject shouldBe true
+        }
       }
     }
   }

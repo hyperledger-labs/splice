@@ -8,7 +8,6 @@ import com.digitalasset.canton.config.{
   CachingConfigs,
   LocalNodeParametersConfig,
   NonNegativeFiniteDuration,
-  SessionSigningKeysConfig,
   WatchdogConfig,
 }
 import org.lfdecentralizedtrust.splice.util.SpliceRateLimitConfig
@@ -23,10 +22,9 @@ final case class SpliceParametersConfig(
       RateLimitersConfig(SpliceRateLimitConfig(enabled = true, ratePerSecond = 200), Map.empty),
     // Configuration for the circuit breaker for ledger API command submissions.
     circuitBreakers: CircuitBreakersConfig = CircuitBreakersConfig(),
+    enabledFeatures: EnabledFeaturesConfig = EnabledFeaturesConfig(),
 ) extends LocalNodeParametersConfig {
   override def alphaVersionSupport: Boolean = false
 
   override def watchdog: Option[WatchdogConfig] = None
-
-  override def sessionSigningKeys: SessionSigningKeysConfig = ???
 }

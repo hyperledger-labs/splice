@@ -23,10 +23,7 @@ import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.*
 import com.digitalasset.canton.synchronizer.sequencer.InFlightAggregation.AggregationBySender
-import com.digitalasset.canton.synchronizer.sequencer.Sequencer.{
-  SignedOrderingRequest,
-  SignedOrderingRequestOps,
-}
+import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedSubmissionRequest
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.synchronizer.sequencer.store.SequencerMemberValidator
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
@@ -72,7 +69,8 @@ private[update] final class SubmissionRequestValidator(
   def applyAggregationAndTrafficControlAndGenerateOutcomes(
       inFlightAggregations: InFlightAggregations,
       sequencingTimestamp: CantonTimestamp,
-      signedOrderingRequest: SignedOrderingRequest,
+      signedSubmissionRequest: SignedSubmissionRequest,
+      orderingSequencerId: SequencerId,
       trafficConsumption: TrafficConsumption,
       errorOrResolvedGroups: Either[SubmissionOutcome, Map[GroupRecipient, Set[Member]]],
       latestSequencerEventTimestamp: Option[CantonTimestamp],
@@ -87,7 +85,7 @@ private[update] final class SubmissionRequestValidator(
             groupToMembers,
             inFlightAggregations,
             sequencingTimestamp,
-            signedOrderingRequest.submissionRequest,
+            signedSubmissionRequest.content,
           ).recover { errorSubmissionOutcome =>
             // Use the traffic updated ephemeral state in the response even if the rest of the processing stopped
             SubmissionRequestValidationResult(inFlightAggregations, errorSubmissionOutcome, None)
@@ -107,7 +105,8 @@ private[update] final class SubmissionRequestValidator(
     trafficControlValidator.applyTrafficControl(
       trafficConsumption,
       processingResult,
-      signedOrderingRequest,
+      signedSubmissionRequest,
+      orderingSequencerId,
       sequencingTimestamp,
       latestSequencerEventTimestamp,
     )
@@ -237,7 +236,8 @@ private[update] final class SubmissionRequestValidator(
       traceContext: TraceContext,
   ): EitherT[FutureUnlessShutdown, SubmissionOutcome, Map[GroupRecipient, Set[Member]]] = {
     val groupRecipients = submissionRequest.batch.allRecipients.collect {
-      case group: GroupRecipient =>
+      // Note: we don't resolve AllMembersOfSynchronizer as it is encoded as -1 and handled internally by db sequencer
+      case group: GroupRecipient if group != AllMembersOfSynchronizer =>
         group
     }
 
@@ -615,7 +615,9 @@ private[update] final class SubmissionRequestValidator(
       //
       // See https://github.com/DACH-NY/canton/pull/17676#discussion_r1515926774
       sequencerEventTimestamp =
-        Option.when(isThisSequencerAddressed(groupToMembers))(sequencingTimestamp)
+        Option.when(isThisSequencerAddressed(groupToMembers, submissionRequest))(
+          sequencingTimestamp
+        )
 
     } yield SubmissionRequestValidationResult(
       inFlightAggregations,
@@ -654,7 +656,6 @@ private[update] final class SubmissionRequestValidator(
           // New aggregation
           validateAggregationRule(submissionRequest, sequencingTimestamp, rule).map { _ =>
             val fresh = FreshInFlightAggregation(
-              sequencingTimestamp,
               submissionRequest.maxSequencingTime,
               rule,
             )
@@ -673,7 +674,6 @@ private[update] final class SubmissionRequestValidator(
 
       aggregatedSender = AggregatedSender(
         submissionRequest.sender,
-        submissionRequest.maxSequencingTime,
         AggregationBySender(
           sequencingTimestamp,
           submissionRequest.batch.envelopes.map(_.signatures),
@@ -788,13 +788,17 @@ private[update] final class SubmissionRequestValidator(
   //  after being deactivated in the Canton topology, specifically until the underlying consensus algorithm
   //  allows them to be also removed from the BFT ordering topology), but they should not be considered addressed,
   //  since they are not active in the Canton topology anymore (i.e., group recipients don't include them).
-  private def isThisSequencerAddressed(groupToMembers: Map[GroupRecipient, Set[Member]]): Boolean =
+  private def isThisSequencerAddressed(
+      groupToMembers: Map[GroupRecipient, Set[Member]],
+      submissionRequest: SubmissionRequest,
+  ): Boolean =
     groupToMembers
       .get(AllMembersOfSynchronizer)
       .exists(_.contains(sequencerId)) ||
       groupToMembers
         .get(SequencersOfSynchronizer)
-        .exists(_.contains(sequencerId))
+        .exists(_.contains(sequencerId)) ||
+      submissionRequest.batch.isBroadcast
 }
 
 private[update] object SubmissionRequestValidator {

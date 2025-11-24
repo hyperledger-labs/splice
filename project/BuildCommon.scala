@@ -88,9 +88,8 @@ object BuildCommon {
           // "-Wunused:patvars",
           "-Wunused:privates",
           "-Wunused:params",
-          // https://github.com/scala/bug/issues/12883 I have no idea what's the purpouse of that warning
+          // https://github.com/scala/bug/issues/12883 I have no idea what's the purpose of that warning
           "-Wconf:msg=access modifiers for `.*` method are copied from the case class constructor under Scala 3:s",
-          "-quickfix:any",
         ),
         Test / testOptions ++= Seq(
           // Enable logging of begin and end of test cases, test suites, and test runs.
@@ -142,7 +141,6 @@ object BuildCommon {
 
   lazy val removeCompileFlagsForDaml =
     Seq(
-      "-Xsource:3",
       "-deprecation",
       "-Xfatal-warnings",
       "-Wunused:implicits",
@@ -325,7 +323,7 @@ object BuildCommon {
         `canton-pekko-fork`,
         `canton-magnolify-addon`,
         `canton-wartremover-extension` % "compile->compile;test->test",
-        `canton-util-logging`,
+        `canton-util-observability`,
         // Canton depends on the Daml code via a git submodule and the two
         // projects below. We instead depend on the artifacts released
         // from the Daml repo listed in libraryDependencies below.
@@ -335,6 +333,9 @@ object BuildCommon {
       .settings(
         sharedCantonSettings,
         libraryDependencies ++= Seq(
+          aws_kms,
+          aws_sts,
+          gcp_kms,
           daml_metrics,
           daml_tracing,
           daml_executors,
@@ -393,12 +394,12 @@ object BuildCommon {
       .dependsOn(
         `canton-util-internal`,
         `canton-wartremover-extension` % "compile->compile;test->test",
-        `canton-util-logging`,
+        `canton-util-observability`,
       )
       .settings(
         sharedCantonSettings,
         libraryDependencies ++= Seq(
-          grpc_netty,
+          grpc_netty_shaded,
           netty_handler,
           netty_boring_ssl, // This should be a Runtime dep, but needs to be declared at Compile scope due to https://github.com/sbt/sbt/issues/5568
           scopt,
@@ -485,10 +486,10 @@ object BuildCommon {
       )
   }
 
-  lazy val `canton-util-logging` = {
+  lazy val `canton-util-observability` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-util-logging", file("canton/community/util-logging"))
+      .apply("canton-util-observability", file("canton/community/util-observability"))
       .dependsOn(
         `canton-base-errors` % "compile->compile;test->test",
         `canton-daml-grpc-utils`,
@@ -499,6 +500,7 @@ object BuildCommon {
         sharedSettings ++ cantonWarts,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
         libraryDependencies ++= Seq(
+          better_files,
           daml_lf_data,
           daml_nonempty_cats,
           daml_metrics,
@@ -675,7 +677,7 @@ object BuildCommon {
           scalaVersion,
           sbtVersion,
           BuildInfoKey("damlLibrariesVersion" -> CantonDependencies.daml_libraries_version),
-          BuildInfoKey("stableProtocolVersions" -> List("33")),
+          BuildInfoKey("stableProtocolVersions" -> List()),
           BuildInfoKey("betaProtocolVersions" -> List()),
         ),
         buildInfoPackage := "com.digitalasset.canton.buildinfo",
@@ -780,6 +782,13 @@ object BuildCommon {
         `canton-ledger-common` % "compile->compile;test->test",
       )
       .settings(
+        removeTestSources,
+        // We only need 3 files out of a lot of test files so add them explicitly
+        Test / managedSources := Seq(
+          (Test / sourceDirectory).value / "scala/com/digitalasset/canton/HasActorSystem.scala",
+          (Test / sourceDirectory).value / "scala/com/digitalasset/canton/store/db/DbTest.scala",
+          (Test / sourceDirectory).value / "scala/com/digitalasset/canton/store/db/DbStorageIdempotency.scala",
+        ),
         disableTests,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
@@ -818,7 +827,7 @@ object BuildCommon {
           jul_to_slf4j % Test,
           bouncycastle_bcprov_jdk15on,
           bouncycastle_bcpkix_jdk15on,
-          grpc_netty,
+          grpc_netty_shaded,
           grpc_services,
           scalapb_runtime_grpc,
           scalapb_runtime,
@@ -1000,21 +1009,21 @@ object BuildCommon {
         Compile / damlCodeGeneration :=
           Seq(
             (
-              (Compile / sourceDirectory).value / "daml" / "AdminWorkflows",
-              (Compile / damlDarOutput).value / "AdminWorkflows-current.dar",
+              (Compile / sourceDirectory).value / "daml" / "canton-builtin-admin-workflow-ping",
+              (Compile / damlDarOutput).value / "canton-builtin-admin-workflow-ping-current.dar",
               "com.digitalasset.canton.participant.admin.workflows",
             ),
             (
-              (Compile / sourceDirectory).value / "daml" / "PartyReplication",
-              (Compile / damlDarOutput).value / "PartyReplication-current.dar",
+              (Compile / sourceDirectory).value / "daml" / "canton-builtin-admin-workflow-party-replication-alpha",
+              (Compile / damlDarOutput).value / "canton-builtin-admin-workflow-party-replication-alpha-current.dar",
               "com.digitalasset.canton.participant.admin.workflows",
             ),
           ),
         Compile / damlEnableJavaCodegen := true,
         Compile / damlCodegenUseProject := false,
         Compile / damlBuildOrder := Seq(
-          "daml/AdminWorkflows/daml.yaml",
-          "daml/PartyReplication/daml.yaml",
+          "daml/canton-builtin-admin-workflow-ping/daml.yaml",
+          "daml/canton-builtin-admin-workflow-party-replication-alpha/daml.yaml",
         ),
         // TODO(DACH-NY/canton-network-node#16168) Before creating the first stable release with backwards compatibility guarantees,
         //  make "AdminWorkflows.dar" stable again
@@ -1175,10 +1184,12 @@ object BuildCommon {
         `canton-daml-errors` % "compile->compile;test->test",
         `canton-bindings-java` % "compile->compile;test->test",
         `canton-daml-grpc-utils`,
-        `canton-util-logging`,
+        `canton-daml-jwt`,
+        `canton-util-observability`,
         `canton-ledger-api`,
       )
       .settings(
+        removeTestSources,
         sharedCantonSettings,
         disableTests,
         sharedSettings,
@@ -1204,7 +1215,7 @@ object BuildCommon {
           slf4j_api,
           grpc_api,
           reflections,
-          grpc_netty,
+          grpc_netty_shaded,
           netty_boring_ssl, // This should be a Runtime dep, but needs to be declared at Compile scope due to https://github.com/sbt/sbt/issues/5568
           netty_handler,
           caffeine,
@@ -1253,6 +1264,7 @@ object BuildCommon {
         ScalafmtPlugin,
       ) // to accommodate different daml repo coding style
       .settings(
+        removeTestSources,
         sharedCantonSettings,
         sharedSettings,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
@@ -1273,7 +1285,7 @@ object BuildCommon {
           bouncycastle_bcprov_jdk15on % Test,
           bouncycastle_bcpkix_jdk15on % Test,
           scalaz_scalacheck % Test,
-          grpc_netty,
+          grpc_netty_shaded,
           grpc_services,
           grpc_protobuf,
           postgres,
@@ -1408,6 +1420,10 @@ object BuildCommon {
         `canton-ledger-api`
       )
       .settings(
+        removeTestSources,
+        Test / managedSources := Seq(
+          (Test / sourceDirectory).value / "scala/com/daml/ledger/javaapi/data/Generators.scala"
+        ),
         sharedCantonSettings,
         Test / unmanagedSources :=
           (Test / unmanagedSources).value.filter(_.getName == "Generators.scala"),
@@ -1449,9 +1465,7 @@ object BuildCommon {
         sharedCantonSettings,
         removeTestSources,
         sharedSettings,
-        scalacOptions --= removeCompileFlagsForDaml
-          // needed for foo.bar.{this as that} imports
-          .filterNot(_ == "-Xsource:3") :+ "-Wnonunit-statement",
+        scalacOptions --= removeCompileFlagsForDaml :+ "-Wnonunit-statement",
         scalacOptions += "-Wconf:src=src_managed/.*:silent" ++ Seq(
           "lint-byname-implicit",
           "other-match-analysis",
@@ -1476,6 +1490,7 @@ object BuildCommon {
           scalaz_scalacheck % Test,
           scalatestScalacheck % Test,
           ujson_circe,
+          upickle,
         ),
         Test / damlCodeGeneration := Seq(
           (
@@ -1493,15 +1508,17 @@ object BuildCommon {
       .apply("canton-transcode", file("canton/community/ledger/transcode/"))
       .settings(
         sharedSettings,
-        scalacOptions --= removeCompileFlagsForDaml
-          // needed for foo.bar.{this as that} imports
-          .filterNot(_ == "-Xsource:3"),
+        scalacOptions --= removeCompileFlagsForDaml,
         libraryDependencies ++= Seq(
           daml_lf_language,
           "com.lihaoyi" %% "ujson" % "4.0.2",
         ),
       )
-      .dependsOn(`canton-ledger-api`)
+      .dependsOn(
+        `canton-ledger-api`,
+        `canton-community-testing` % Test,
+        `canton-community-common` % Test,
+      )
   }
 
   lazy val `canton-sequencer-driver-api` = {
@@ -1539,7 +1556,10 @@ object BuildCommon {
   lazy val `canton-community-reference-driver` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-community-reference-driver", file("canton/community/drivers/reference"))
+      .apply(
+        "canton-community-reference-driver",
+        file("canton/community/reference-sequencer-driver/"),
+      )
       .dependsOn(
         `canton-util-external`,
         `canton-community-common` % "compile->compile;test->test",

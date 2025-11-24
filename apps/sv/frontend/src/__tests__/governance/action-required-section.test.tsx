@@ -9,6 +9,8 @@ import {
 import { ContractId } from '@daml/types';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { MemoryRouter } from 'react-router-dom';
+import dayjs from 'dayjs';
+import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 
 const requests: ActionRequiredData[] = [
   {
@@ -67,11 +69,13 @@ describe('Action Required', () => {
   });
 
   test('should render action required request details', () => {
+    const createdDate = dayjs().format(dateTimeFormatISO);
+    const closesDate = dayjs().add(10, 'days').format(dateTimeFormatISO);
     const actionRequired = {
       actionName: 'Feature Application',
       contractId: '2abcde123456' as ContractId<VoteRequest>,
-      votingCloses: '2029-09-25 11:00',
-      createdAt: '2029-09-25 11:00',
+      votingCloses: closesDate,
+      createdAt: createdDate,
       requester: 'sv1',
     };
 
@@ -81,19 +85,19 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    const action = screen.getByTestId('action-required-action');
+    const action = screen.getByTestId('action-required-action-content');
     expect(action).toBeDefined();
     expect(action.textContent).toBe(actionRequired.actionName);
 
-    const createdAt = screen.getByTestId('action-required-created-at');
+    const createdAt = screen.getByTestId('action-required-created-at-content');
     expect(createdAt).toBeDefined();
     expect(createdAt.textContent).toBe(actionRequired.createdAt);
 
-    const votingCloses = screen.getByTestId('action-required-voting-closes');
+    const votingCloses = screen.getByTestId('action-required-voting-closes-content');
     expect(votingCloses).toBeDefined();
-    expect(votingCloses.textContent).toBe(actionRequired.votingCloses);
+    expect(votingCloses.textContent).toBe('10 days');
 
-    const requester = screen.getByTestId('action-required-requester');
+    const requester = screen.getByTestId('action-required-requester-identifier-party-id');
     expect(requester).toBeDefined();
     expect(requester.textContent).toBe(actionRequired.requester);
 
@@ -117,7 +121,7 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    const isYou = screen.getByTestId('action-required-you');
+    const isYou = screen.getByTestId('action-required-requester-identifier-you');
     expect(isYou).toBeDefined();
   });
 
@@ -136,7 +140,7 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    expect(() => screen.getByTestId('action-required-you')).toThrowError(
+    expect(() => screen.getByTestId('action-required-requester-identifier-you')).toThrowError(
       /Unable to find an element/
     );
   });

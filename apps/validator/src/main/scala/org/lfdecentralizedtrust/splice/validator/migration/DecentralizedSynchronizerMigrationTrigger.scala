@@ -16,6 +16,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.config.EnabledFeaturesConfig
 
 import java.nio.file.Path
 import java.time.Instant
@@ -28,23 +29,28 @@ final class DecentralizedSynchronizerMigrationTrigger(
     override protected val participantAdminConnection: ParticipantAdminConnection,
     override protected val dumpPath: Path,
     scanConnection: ScanConnection,
+    featureConfig: EnabledFeaturesConfig,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends DomainMigrationTrigger[DomainMigrationDump] {
+) extends DomainMigrationTrigger[DomainMigrationDump]()(
+      ec,
+      mat,
+      tracer,
+      DomainMigrationDump.codec(Some(dumpPath.getParent.toString)),
+    ) {
 
   // Disabling domain time and domain paused sync, as it runs after the domain is paused
   override protected lazy val context =
     baseContext.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop)
-
-  override protected val sequencerAdminConnection: None.type = None
 
   private val dumpGenerator = new DomainMigrationDumpGenerator(
     ledgerConnection,
     participantAdminConnection,
     context.retryProvider,
     context.loggerFactory,
+    featureConfig,
   )
 
   override protected def getSchedule(implicit

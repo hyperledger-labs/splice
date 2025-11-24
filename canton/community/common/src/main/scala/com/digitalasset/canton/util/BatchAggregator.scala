@@ -203,7 +203,8 @@ class BatchAggregatorImpl[A, B](
             }
           } else {
             val items = queueItemsNE.map(_._1)
-            val batchTraceContext = TraceContext.ofBatch(items.toList)(processor.logger)
+            val batchTraceContext =
+              TraceContext.ofBatch("run_batch_queued_queries")(items.toList)(processor.logger)
 
             FutureUnlessShutdown
               .fromTry(Try(processor.executeBatch(items)(batchTraceContext, callerCloseContext)))
@@ -240,7 +241,7 @@ class BatchAggregatorImpl[A, B](
                     }
                   case Success(UnlessShutdown.AbortedDueToShutdown) =>
                     queueItems.foreach { case (_, promise) =>
-                      promise.shutdown()
+                      promise.shutdown_()
                     }
                   case Failure(ex) =>
                     implicit val prettyItem = processor.prettyItem

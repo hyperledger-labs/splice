@@ -6,7 +6,7 @@ package com.digitalasset.canton.synchronizer.block.update
 import cats.syntax.functorFilter.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.{SyncCryptoApi, SynchronizerCryptoClient}
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, LogicalUpgradeTime}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -15,19 +15,20 @@ import com.digitalasset.canton.synchronizer.block.LedgerBlockEvent.*
 import com.digitalasset.canton.synchronizer.block.data.{BlockEphemeralState, BlockInfo}
 import com.digitalasset.canton.synchronizer.block.{BlockEvents, LedgerBlockEvent, RawLedgerBlock}
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencer.Sequencer.{
-  SignedOrderingRequest,
-  SignedOrderingRequestOps,
-}
+import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedSubmissionRequest
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
-import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.InvalidLedgerEvent
+import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.{
+  InvalidLedgerEvent,
+  SequencedBeforeOrAtLowerBound,
+}
 import com.digitalasset.canton.synchronizer.sequencer.store.SequencerMemberValidator
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
 import com.digitalasset.canton.synchronizer.sequencer.{InFlightAggregations, SubmissionOutcome}
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.*
+import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
+import com.digitalasset.canton.util.collection.IterableUtil
 import com.digitalasset.canton.version.ProtocolVersion
+import io.opentelemetry.api.trace.Tracer
 
 import scala.collection.immutable
 import scala.concurrent.ExecutionContext
@@ -95,12 +96,14 @@ class BlockUpdateGeneratorImpl(
     sequencerId: SequencerId,
     rateLimitManager: SequencerRateLimitManager,
     orderingTimeFixMode: OrderingTimeFixMode,
+    sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
     metrics: SequencerMetrics,
     protected val loggerFactory: NamedLoggerFactory,
     memberValidator: SequencerMemberValidator,
-)(implicit val closeContext: CloseContext)
+)(implicit val closeContext: CloseContext, tracer: Tracer)
     extends BlockUpdateGenerator
-    with NamedLogging {
+    with NamedLogging
+    with Spanning {
   import BlockUpdateGenerator.*
   import BlockUpdateGeneratorImpl.*
 
@@ -127,17 +130,32 @@ class BlockUpdateGeneratorImpl(
 
   override def extractBlockEvents(block: RawLedgerBlock): BlockEvents = {
     val ledgerBlockEvents = block.events.mapFilter { tracedEvent =>
-      implicit val traceContext: TraceContext = tracedEvent.traceContext
-      // TODO(i10428) Prevent zip bombing when decompressing the request
-      LedgerBlockEvent.fromRawBlockEvent(protocolVersion, MaxRequestSizeToDeserialize.NoLimit)(
-        tracedEvent.value
-      ) match {
-        case Left(error) =>
-          InvalidLedgerEvent.Error(block.blockHeight, error).discard
-          None
-        case Right(value) =>
-          Some(Traced(value))
-      }
+      withSpan("BlockUpdateGenerator.extractBlockEvents") { implicit traceContext => _ =>
+        logger.trace("Extracting event from raw block")
+        // TODO(i26169) Prevent zip bombing when decompressing the request
+        LedgerBlockEvent.fromRawBlockEvent(protocolVersion, MaxRequestSizeToDeserialize.NoLimit)(
+          tracedEvent.value
+        ) match {
+          case Left(error) =>
+            InvalidLedgerEvent.Error(block.blockHeight, error).discard
+            None
+
+          case Right(event) =>
+            sequencingTimeLowerBoundExclusive match {
+              case Some(boundExclusive)
+                  if !LogicalUpgradeTime.canProcessKnowingPastUpgrade(
+                    upgradeTime = Some(boundExclusive),
+                    sequencingTime = event.timestamp,
+                  ) =>
+                SequencedBeforeOrAtLowerBound
+                  .Error(event.timestamp, boundExclusive, event.toString)
+                  .log()
+                None
+
+              case _ => Some(Traced(event))
+            }
+        }
+      }(tracedEvent.traceContext, tracer)
     }
 
     BlockEvents(
@@ -176,9 +194,9 @@ class BlockUpdateGeneratorImpl(
 
   private def isAddressingSequencers(event: LedgerBlockEvent): Boolean =
     event match {
-      case Send(_, signedOrderingRequest, _) =>
+      case Send(_, signedOrderingRequest, _, _) =>
         val allRecipients =
-          signedOrderingRequest.signedSubmissionRequest.content.batch.allRecipients
+          signedOrderingRequest.content.batch.allRecipients
         allRecipients.contains(AllMembersOfSynchronizer) ||
         allRecipients.contains(SequencersOfSynchronizer)
       case _ => false
@@ -214,7 +232,8 @@ object BlockUpdateGeneratorImpl {
 
   private[update] final case class SequencedValidatedSubmission(
       sequencingTimestamp: CantonTimestamp,
-      submissionRequest: SignedOrderingRequest,
+      submissionRequest: SignedSubmissionRequest,
+      orderingSequencerId: SequencerId,
       topologyOrSequencingSnapshot: SyncCryptoApi,
       topologyTimestampError: Option[SequencerDeliverError],
       consumeTraffic: SubmissionRequestValidator.TrafficConsumption,

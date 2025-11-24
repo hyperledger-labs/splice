@@ -20,7 +20,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -50,7 +50,7 @@ class AcsSnapshotStore(
 
   private def historyId = updateHistory.historyId
 
-  def lookupSnapshotBefore(
+  def lookupSnapshotAtOrBefore(
       migrationId: Long,
       before: CantonTimestamp,
   )(implicit tc: TraceContext): Future[Option[AcsSnapshot]] = {
@@ -427,9 +427,9 @@ object AcsSnapshotStore {
   )
 
   private val amuletQualifiedName =
-    PackageQualifiedName.getFromResources(Amulet.TEMPLATE_ID_WITH_PACKAGE_ID)
+    PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION)
   private val lockedAmuletQualifiedName =
-    PackageQualifiedName.getFromResources(LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID)
+    PackageQualifiedName.fromJavaCodegenCompanion(LockedAmulet.COMPANION)
   private val holdingsTemplates = Vector(amuletQualifiedName, lockedAmuletQualifiedName)
 
   private def decodeHoldingContract(createdEvent: CreatedEvent): Either[
@@ -440,16 +440,14 @@ object AcsSnapshotStore {
       .withDescription(s"Failed to decode $createdEvent")
       .asRuntimeException()
     if (
-      PackageQualifiedName.fromEvent(createdEvent) == PackageQualifiedName.getFromResources(
-        Amulet.TEMPLATE_ID_WITH_PACKAGE_ID
-      )
+      PackageQualifiedName
+        .fromEvent(createdEvent) == PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION)
     ) {
       Right(Contract.fromCreatedEvent(Amulet.COMPANION)(createdEvent).getOrElse(failedToDecode))
     } else {
       if (
-        PackageQualifiedName.fromEvent(createdEvent) != PackageQualifiedName.getFromResources(
-          LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID
-        )
+        PackageQualifiedName.fromEvent(createdEvent) != PackageQualifiedName
+          .fromJavaCodegenCompanion(LockedAmulet.COMPANION)
       ) {
         throw io.grpc.Status.INTERNAL
           .withDescription(
@@ -482,16 +480,12 @@ object AcsSnapshotStore {
   }
 
   def apply(
-      storage: Storage,
+      storage: DbStorage,
       updateHistory: UpdateHistory,
       dsoParty: PartyId,
       migrationId: Long,
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext, closeContext: CloseContext): AcsSnapshotStore =
-    storage match {
-      case db: DbStorage =>
-        new AcsSnapshotStore(db, updateHistory, dsoParty, migrationId, loggerFactory)
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-    }
+    new AcsSnapshotStore(storage, updateHistory, dsoParty, migrationId, loggerFactory)
 
 }

@@ -7,8 +7,8 @@ import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest.FakeSigner
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.BftSequencerBaseTest
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.BftSequencerBaseTest.FakeSigner
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.PbftBlockState.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.validation.PbftMessageValidator
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
@@ -37,7 +37,7 @@ import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AsyncWordSpec
-import org.slf4j.event.Level.{INFO, WARN}
+import org.slf4j.event.Level.{DEBUG, WARN}
 
 import java.time.Duration
 
@@ -69,7 +69,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       assertLogs(
         blockState.processMessage(prePrepare),
         log => {
-          log.level shouldBe INFO
+          log.level shouldBe DEBUG
           log.message should include("already exists")
         },
       ) shouldBe false
@@ -85,7 +85,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       assertLogs(
         blockState.processMessage(createPrepare(myId)),
         log => {
-          log.level shouldBe INFO
+          log.level shouldBe DEBUG
           log.message should include("matching hash")
         },
       ) shouldBe false
@@ -110,7 +110,7 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       assertLogs(
         blockState.processMessage(createCommit(myId)),
         log => {
-          log.level shouldBe INFO
+          log.level shouldBe DEBUG
           log.message should include("matching hash")
         },
       ) shouldBe false
@@ -854,7 +854,6 @@ class PbftBlockStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       clock,
       pbftMessageValidator,
       leader,
-      EpochNumber.First,
       viewNumber,
       abort = fail(_),
       SequencerMetrics.noop(getClass.getSimpleName).bftOrdering,

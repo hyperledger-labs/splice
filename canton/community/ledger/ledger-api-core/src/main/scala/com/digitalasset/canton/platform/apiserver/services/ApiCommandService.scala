@@ -30,10 +30,10 @@ import com.digitalasset.canton.logging.{
   NamedLoggerFactory,
   NamedLogging,
 }
+import com.digitalasset.canton.platform.apiserver.services.ApiCommandService.generateTransactionFormatIfEmpty
 import io.grpc.ServerServiceDefinition
 
 import java.time.{Duration, Instant}
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class ApiCommandService(
@@ -65,14 +65,6 @@ class ApiCommandService(
       request: SubmitAndWaitForReassignmentRequest
   ): Future[SubmitAndWaitForReassignmentResponse] =
     enrichRequestAndSubmit(request = request)(service.submitAndWaitForReassignment)
-
-  @nowarn("cat=deprecation")
-  override def submitAndWaitForTransactionTree(
-      request: SubmitAndWaitRequest
-  ): Future[SubmitAndWaitForTransactionTreeResponse] =
-    enrichRequestAndSubmit(request = request)(
-      service.submitAndWaitForTransactionTree
-    )
 
   override def bindService(): ServerServiceDefinition =
     CommandServiceGrpc.bindService(this, executionContext)
@@ -186,29 +178,6 @@ class ApiCommandService(
       commands
     }
 
-  private def generateTransactionFormatIfEmpty(
-      actAs: Seq[String]
-  )(transactionFormat: Option[TransactionFormat]): Option[TransactionFormat] = {
-    val wildcard = Filters(
-      cumulative = Seq(
-        CumulativeFilter(
-          IdentifierFilter.WildcardFilter(
-            WildcardFilter(false)
-          )
-        )
-      )
-    )
-    transactionFormat.orElse(
-      Some(
-        TransactionFormat(
-          eventFormat =
-            Some(EventFormat(actAs.map(party => party -> wildcard).toMap, None, verbose = true)),
-          transactionShape = TRANSACTION_SHAPE_ACS_DELTA,
-        )
-      )
-    )
-  }
-
   private def generateSubmissionIdIfEmptyReassignment(
       commands: Option[ReassignmentCommands]
   ): Option[ReassignmentCommands] =
@@ -236,4 +205,29 @@ class ApiCommandService(
       loggingContext,
       request.reassignmentCommands.map(_.submissionId),
     )
+}
+
+object ApiCommandService {
+  def generateTransactionFormatIfEmpty(
+      actAs: Seq[String]
+  )(transactionFormat: Option[TransactionFormat]): Option[TransactionFormat] = {
+    val wildcard = Filters(
+      cumulative = Seq(
+        CumulativeFilter(
+          IdentifierFilter.WildcardFilter(
+            WildcardFilter(false)
+          )
+        )
+      )
+    )
+    transactionFormat.orElse(
+      Some(
+        TransactionFormat(
+          eventFormat =
+            Some(EventFormat(actAs.map(party => party -> wildcard).toMap, None, verbose = true)),
+          transactionShape = TRANSACTION_SHAPE_ACS_DELTA,
+        )
+      )
+    )
+  }
 }

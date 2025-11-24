@@ -27,10 +27,10 @@ import com.digitalasset.canton.participant.util.{TimeOfChange, TimeOfRequest}
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.store.memory.InMemoryIndexedStringStore
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
-import com.digitalasset.canton.util.ReassignmentTag.Target
+import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.{
   BaseTest,
   HasExecutorService,
@@ -56,7 +56,7 @@ private[protocol] trait ConflictDetectionHelpers {
       parallelExecutionContext
     )
 
-  def mkAcs(
+  protected def mkAcs(
       entries: (LfContractId, TimeOfRequest, ActiveContractStore.Status)*
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[ActiveContractStore] = {
     val acs = mkEmptyAcs()
@@ -66,30 +66,34 @@ private[protocol] trait ConflictDetectionHelpers {
     ).map(_ => acs)
   }
 
-  def mkReassignmentCache(
+  protected def mkReassignmentCache(
       loggerFactory: NamedLoggerFactory,
       store: ReassignmentStore = new InMemoryReassignmentStore(
         ReassignmentStoreTest.targetSynchronizerId,
         loggerFactory,
       ),
   )(
-      entries: (ReassignmentId, MediatorGroupRecipient)*
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[ReassignmentCache] =
+      entries: (Source[PhysicalSynchronizerId], MediatorGroupRecipient)*
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[(ReassignmentCache, Seq[ReassignmentId])] =
     MonadUtil
-      .sequentialTraverse(entries) { case (reassignmentId, sourceMediator) =>
+      .sequentialTraverse(entries) { case (sourceSynchronizer, sourceMediator) =>
         val unassignmentData = ReassignmentStoreTest.mkUnassignmentDataForSynchronizer(
-          reassignmentId,
           sourceMediator,
+          sourceSynchronizerId = sourceSynchronizer,
           targetSynchronizerId = ReassignmentStoreTest.targetSynchronizerId,
         )
 
-        store.addUnassignmentData(unassignmentData).value
+        store.addUnassignmentData(unassignmentData).value.map(_ => unassignmentData.reassignmentId)
       }
-      .map(_ =>
-        new ReassignmentCache(store, futureSupervisor, timeouts, loggerFactory)(
+      .map { reassignmentIds =>
+        val cache = new ReassignmentCache(store, futureSupervisor, timeouts, loggerFactory)(
           parallelExecutionContext
         )
-      )
+
+        (cache, reassignmentIds)
+      }
 }
 
 private[protocol] object ConflictDetectionHelpers extends ScalaFuturesWithPatience {
@@ -119,6 +123,7 @@ private[protocol] object ConflictDetectionHelpers extends ScalaFuturesWithPatien
       free: Set[Key] = Set.empty[Key],
       active: Set[Key] = Set.empty[Key],
       lock: Set[Key] = Set.empty[Key],
+      lockMaybeUnknown: Set[Key] = Set.empty[Key],
       prior: Set[Key] = Set.empty[Key],
   ): ActivenessCheck[Key] =
     ActivenessCheck.tryCreate(
@@ -126,6 +131,7 @@ private[protocol] object ConflictDetectionHelpers extends ScalaFuturesWithPatien
       checkFree = free,
       checkActive = active,
       lock = lock,
+      lockMaybeUnknown = lockMaybeUnknown,
       needPriorState = prior,
     )
 
@@ -142,6 +148,7 @@ private[protocol] object ConflictDetectionHelpers extends ScalaFuturesWithPatien
       checkFree = assign,
       checkActive = deact ++ useOnly,
       lock = create ++ assign ++ deact,
+      lockMaybeUnknown = Set.empty,
       needPriorState = prior,
     )
     ActivenessSet(
@@ -193,8 +200,8 @@ private[protocol] object ConflictDetectionHelpers extends ScalaFuturesWithPatien
   def mkCommitSet(
       arch: Set[LfContractId] = Set.empty,
       create: Set[LfContractId] = Set.empty,
-      unassign: Map[LfContractId, (SynchronizerId, ReassignmentCounter)] = Map.empty,
-      assign: Map[LfContractId, ReassignmentId] = Map.empty,
+      unassign: Map[LfContractId, (Target[SynchronizerId], ReassignmentCounter)] = Map.empty,
+      assign: Map[LfContractId, (Source[SynchronizerId], ReassignmentId)] = Map.empty,
   ): CommitSet =
     CommitSet(
       archivals = arch
@@ -210,19 +217,20 @@ private[protocol] object ConflictDetectionHelpers extends ScalaFuturesWithPatien
           )
         )
         .toMap,
-      unassignments = unassign.fmap { case (id, reassignmentCounter) =>
+      unassignments = unassign.fmap { case (targetSynchronizer, reassignmentCounter) =>
         CommitSet.UnassignmentCommit(
-          Target(id),
+          targetSynchronizer,
           Set.empty,
           reassignmentCounter,
         )
       },
-      assignments = assign.fmap(id =>
+      assignments = assign.fmap { case (sourceSynchronizer, id) =>
         CommitSet.AssignmentCommit(
+          sourceSynchronizer,
           id,
           ContractMetadata.empty,
           initialReassignmentCounter,
         )
-      ),
+      },
     )
 }

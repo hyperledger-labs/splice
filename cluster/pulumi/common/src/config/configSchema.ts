@@ -13,6 +13,7 @@ const PulumiProjectConfigSchema = z.object({
   hasPublicInfo: z.boolean(),
   interAppsDependencies: z.boolean(),
   cloudSql: CloudSqlConfigSchema,
+  allowDowngrade: z.boolean(),
 });
 export type PulumiProjectConfig = z.infer<typeof PulumiProjectConfigSchema>;
 export const ConfigSchema = z.object({
@@ -35,6 +36,8 @@ const SingleResourceSchema = z
     cpu: z.string().optional(),
   })
   .optional();
+
+export type K8sResourceSchema = z.infer<typeof K8sResourceSchema>;
 
 export const K8sResourceSchema = z
   .object({

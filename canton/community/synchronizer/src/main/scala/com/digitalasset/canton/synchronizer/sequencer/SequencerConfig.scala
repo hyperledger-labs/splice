@@ -23,10 +23,10 @@ import com.digitalasset.canton.synchronizer.sequencer.DatabaseSequencerConfig.{
   SequencerPruningConfig,
   TestingInterceptor,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.reference.{
-  CommunityReferenceSequencerDriverFactory,
   ReferenceSequencerDriver,
+  ReferenceSequencerDriverFactory,
 }
 import com.digitalasset.canton.time.Clock
 import pureconfig.ConfigCursor
@@ -52,8 +52,6 @@ object SequencerConfig {
       highAvailability: Option[SequencerHighAvailabilityConfig] = None,
       testingInterceptor: Option[DatabaseSequencerConfig.TestingInterceptor] = None,
       pruning: SequencerPruningConfig = SequencerPruningConfig(),
-      streamInstrumentation: BlockSequencerStreamInstrumentationConfig =
-        BlockSequencerStreamInstrumentationConfig(),
   ) extends SequencerConfig
       with DatabaseSequencerConfig
       with UniformCantonConfigValidation {
@@ -93,7 +91,7 @@ object SequencerConfig {
   }
 
   def default: SequencerConfig = {
-    val driverFactory = new CommunityReferenceSequencerDriverFactory
+    val driverFactory = new ReferenceSequencerDriverFactory
     External(
       driverFactory.name,
       BlockSequencerConfig(),
@@ -183,7 +181,6 @@ trait DatabaseSequencerConfig {
   val testingInterceptor: Option[DatabaseSequencerConfig.TestingInterceptor]
   val pruning: SequencerPruningConfig
   def highAvailabilityEnabled: Boolean
-  val streamInstrumentation: BlockSequencerStreamInstrumentationConfig
 }
 
 object DatabaseSequencerConfig {
@@ -244,9 +241,9 @@ final case class BlockSequencerConfig(
     writer: SequencerWriterConfig = SequencerWriterConfig.HighThroughput(),
     reader: SequencerReaderConfig = SequencerReaderConfig(),
     testingInterceptor: Option[DatabaseSequencerConfig.TestingInterceptor] = None,
+    circuitBreaker: CircuitBreakerConfig = CircuitBreakerConfig(),
     streamInstrumentation: BlockSequencerStreamInstrumentationConfig =
       BlockSequencerStreamInstrumentationConfig(),
-    circuitBreaker: CircuitBreakerConfig = CircuitBreakerConfig(),
 ) extends UniformCantonConfigValidation { self =>
   def toDatabaseSequencerConfig: DatabaseSequencerConfig = new DatabaseSequencerConfig {
     override val writer: SequencerWriterConfig = self.writer
@@ -254,9 +251,8 @@ final case class BlockSequencerConfig(
     override val testingInterceptor: Option[TestingInterceptor] = self.testingInterceptor
     // TODO(#15987): Take pruning config from BlockSequencerConfig once block sequencer supports pruning.
     override val pruning: SequencerPruningConfig = SequencerPruningConfig()
+
     override def highAvailabilityEnabled: Boolean = false
-    override val streamInstrumentation: BlockSequencerStreamInstrumentationConfig =
-      self.streamInstrumentation
   }
 }
 
@@ -291,6 +287,7 @@ object BlockSequencerConfig {
       confirmationResponse: IndividualCircuitBreakerConfig = default3,
       verdict: IndividualCircuitBreakerConfig = default3,
       acknowledgement: IndividualCircuitBreakerConfig = default1,
+      unexpected: IndividualCircuitBreakerConfig = default1,
   ) extends UniformCantonConfigValidation
   object CircuitBreakerByMessageTypeConfig {
     implicit val circuitBreakerByMessageTypeConfigValidator

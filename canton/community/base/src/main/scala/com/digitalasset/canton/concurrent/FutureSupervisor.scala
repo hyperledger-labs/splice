@@ -34,7 +34,6 @@ trait FutureSupervisor {
       description: => String,
       warnAfter: Duration = 10.seconds,
       logLevel: Level = Level.WARN,
-      warnAction: => Unit = (),
   )(fut: Future[T])(implicit
       errorLoggingContext: ErrorLoggingContext
   ): Future[T]
@@ -42,13 +41,12 @@ trait FutureSupervisor {
       description: => String,
       warnAfter: Duration = 10.seconds,
       logLevel: Level = Level.WARN,
-      warnAction: => Unit = (),
   )(
       fut: FutureUnlessShutdown[T]
   )(implicit
       errorLoggingContext: ErrorLoggingContext
   ): FutureUnlessShutdown[T] = FutureUnlessShutdown(
-    supervised(description, warnAfter, logLevel, warnAction)(fut.unwrap)
+    supervised(description, warnAfter, logLevel)(fut.unwrap)
   )
 }
 
@@ -59,7 +57,6 @@ object FutureSupervisor {
         description: => String,
         warnAfter: Duration,
         logLevel: Level = Level.WARN,
-        warnAction: => Unit = (),
     )(fut: Future[T])(implicit
         errorLoggingContext: ErrorLoggingContext
     ): Future[T] = fut
@@ -104,7 +101,6 @@ object FutureSupervisor {
         val message =
           s"${blocked.description()} has not completed after ${LoggerUtil.roundDurationForHumans(dur)}"
         log(message, blocked.logLevel, blocked.errorLoggingContext)
-        blocked.warnAction()
       }
     }
 
@@ -112,7 +108,6 @@ object FutureSupervisor {
         description: => String,
         warnAfter: Duration = defaultWarningInterval.duration,
         logLevel: Level = Level.WARN,
-        warnAction: => Unit = (),
     )(fut: Future[T])(implicit
         errorLoggingContext: ErrorLoggingContext
     ): Future[T] =
@@ -126,7 +121,6 @@ object FutureSupervisor {
           warnAfter.toNanos,
           errorLoggingContext,
           logLevel,
-          () => warnAction,
         )
         // Merely add the new ScheduledFuture to the list and don't filter out no longer relevant items.
         // Otherwise, this will produce a quadratic runtime if many future supervisions are happening at the same time.
@@ -181,7 +175,6 @@ object FutureSupervisor {
         warnNanos: Long,
         errorLoggingContext: ErrorLoggingContext,
         logLevel: Level,
-        warnAction: () => Unit,
     ) {
       val warnCounter = new AtomicInteger(1)
 

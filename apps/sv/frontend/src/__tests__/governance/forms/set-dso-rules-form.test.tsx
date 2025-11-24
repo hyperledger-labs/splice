@@ -5,7 +5,7 @@ import {
   dateTimeFormatISO,
   nextScheduledSynchronizerUpgradeFormat,
 } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import { rest } from 'msw';
@@ -70,6 +70,8 @@ describe('Set DSO Config Rules Form', () => {
     expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
       /Unable to find an element/
     );
+
+    expect(screen.getByTestId('json-diffs-details')).toBeDefined();
   });
 
   test('should render errors when submit button is clicked on new form', async () => {
@@ -109,7 +111,6 @@ describe('Set DSO Config Rules Form', () => {
   });
 
   test('expiry date must be in the future', async () => {
-    const user = userEvent.setup();
     render(
       <Wrapper>
         <SetDsoConfigRulesForm />
@@ -122,22 +123,20 @@ describe('Set DSO Config Rules Form', () => {
     const thePast = dayjs().subtract(1, 'day').format(dateTimeFormatISO);
     const theFuture = dayjs().add(1, 'day').format(dateTimeFormatISO);
 
-    await user.type(expiryDateInput, thePast);
+    fireEvent.change(expiryDateInput, { target: { value: thePast } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
+      expect(screen.queryByText('Expiration must be in the future')).toBeInTheDocument();
     });
 
-    await user.type(expiryDateInput, theFuture);
+    fireEvent.change(expiryDateInput, { target: { value: theFuture } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Expiration must be in the future')).toBeNull();
+      expect(screen.queryByText('Expiration must be in the future')).not.toBeInTheDocument();
     });
   });
 
   test('effective date must be after expiry date', async () => {
-    const user = userEvent.setup();
-
     render(
       <Wrapper>
         <SetDsoConfigRulesForm />
@@ -150,19 +149,25 @@ describe('Set DSO Config Rules Form', () => {
     const expiryDate = dayjs().add(1, 'week');
     const effectiveDate = expiryDate.subtract(1, 'day');
 
-    await user.type(expiryDateInput, expiryDate.format(dateTimeFormatISO));
-    await user.type(effectiveDateInput, effectiveDate.format(dateTimeFormatISO));
+    fireEvent.change(expiryDateInput, { target: { value: expiryDate.format(dateTimeFormatISO) } });
+    fireEvent.change(effectiveDateInput, {
+      target: { value: effectiveDate.format(dateTimeFormatISO) },
+    });
 
     await waitFor(() => {
-      expect(screen.queryByText('Effective Date must be after expiration date')).toBeDefined();
+      expect(
+        screen.queryByText('Effective Date must be after expiration date')
+      ).toBeInTheDocument();
     });
 
     const validEffectiveDate = expiryDate.add(1, 'day').format(dateTimeFormatISO);
 
-    await user.type(effectiveDateInput, validEffectiveDate);
+    fireEvent.change(effectiveDateInput, { target: { value: validEffectiveDate } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+      expect(
+        screen.queryByText('Effective Date must be after expiration date')
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -320,37 +325,6 @@ describe('Set DSO Config Rules Form', () => {
     });
   });
 
-  test('should not render diffs if no changes to config values were made', async () => {
-    const user = userEvent.setup();
-
-    render(
-      <Wrapper>
-        <SetDsoConfigRulesForm />
-      </Wrapper>
-    );
-
-    const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
-    await user.type(summaryInput, 'Summary of the proposal');
-
-    const urlInput = screen.getByTestId('set-dso-config-rules-url');
-    await user.type(urlInput, 'https://example.com');
-
-    const jsonDiffs = screen.getByText('JSON Diffs');
-    expect(jsonDiffs).toBeDefined();
-
-    await user.click(jsonDiffs);
-    expect(screen.queryByText('No changes')).toBeDefined();
-
-    const reviewButton = screen.getByTestId('submit-button');
-    await waitFor(async () => {
-      expect(reviewButton.getAttribute('disabled')).toBeNull();
-    });
-
-    expect(jsonDiffs).toBeDefined();
-    await user.click(jsonDiffs);
-    expect(screen.queryByText('No changes')).toBeDefined();
-  });
-
   test('should render diffs if changes to config values were made', async () => {
     const user = userEvent.setup();
 
@@ -391,8 +365,6 @@ describe('Set DSO Config Rules Form', () => {
 
 describe('Next Scheduled Synchronizer Upgrade', () => {
   test('render default time for next scheduled upgrade', async () => {
-    const user = userEvent.setup();
-
     render(
       <Wrapper>
         <SetDsoConfigRulesForm />
@@ -403,7 +375,8 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
     expect(effectiveDateInput).toBeDefined();
 
     const tenDaysFromNow = dayjs().add(10, 'day').format(dateTimeFormatISO);
-    await user.type(effectiveDateInput, tenDaysFromNow);
+
+    fireEvent.change(effectiveDateInput, { target: { value: tenDaysFromNow } });
 
     const defaultTimeDisplay = screen.getByTestId('next-scheduled-upgrade-time-default');
     expect(defaultTimeDisplay).toBeDefined();
@@ -496,7 +469,8 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
 
     const effectiveDateInput = screen.getByTestId('set-dso-config-rules-effective-date-field');
     const effectiveDate = dayjs().add(10, 'day').format(dateTimeFormatISO);
-    await user.type(effectiveDateInput, effectiveDate);
+
+    fireEvent.change(effectiveDateInput, { target: { value: effectiveDate } });
 
     expect(screen.queryByText(errorMessage)).toBeNull();
 

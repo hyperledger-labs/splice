@@ -78,14 +78,14 @@ class ScanFrontendTimeBasedIntegrationTest
         s"Feature alice's validator and transfer some Amulet, to generate reward coupons"
       )({
         p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
-        advanceRoundsByOneTick
-        advanceRoundsByOneTick
-        advanceRoundsByOneTick
+        advanceRoundsToNextRoundOpening
+        advanceRoundsToNextRoundOpening
+        advanceRoundsToNextRoundOpening
         p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0)
       })
 
       clue("Advance rounds to collect rewards") {
-        Range(0, 6).foreach(_ => advanceRoundsByOneTick)
+        Range(0, 6).foreach(_ => advanceRoundsToNextRoundOpening)
       }
 
       val aliceValidatorWalletParty = aliceValidatorWalletClient.userStatus().party
@@ -145,7 +145,7 @@ class ScanFrontendTimeBasedIntegrationTest
         (1 to 5).foreach { i =>
           p2pTransfer(bobWalletClient, aliceWalletClient, aliceUserParty, i)
         }
-        advanceRoundsByOneTick
+        advanceRoundsToNextRoundOpening
       }
 
       withFrontEnd("scan-ui") { implicit webDriver =>
@@ -168,7 +168,7 @@ class ScanFrontendTimeBasedIntegrationTest
         actAndCheck(
           "Go to Scan homepage and switch to the Network Info Tab", {
             go to s"http://localhost:${scanUIPort}"
-            click on "navlink-/dso"
+            eventuallyClickOn(id("navlink-/dso"))
           },
         )(
           "The tabs 'DSO Info' and 'Amulet Info' are visible",
@@ -180,7 +180,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
         actAndCheck(
           "Click on DSO Info", {
-            click on "information-tab-dso-info"
+            eventuallyClickOn(id("information-tab-dso-info"))
           },
         )(
           "The DSO info is visible",
@@ -208,7 +208,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
         actAndCheck(
           "Click on Amulet Info", {
-            click on "information-tab-amulet-info"
+            eventuallyClickOn(id("information-tab-amulet-info"))
           },
         )(
           "The Amulet info is visible",
@@ -377,7 +377,7 @@ class ScanFrontendTimeBasedIntegrationTest
             trafficAmount,
             env.environment.clock.now,
           )
-          advanceRoundsByOneTick
+          advanceRoundsToNextRoundOpening
           buyMemberTraffic(
             aliceValidatorBackend,
             trafficAmount,
@@ -388,7 +388,7 @@ class ScanFrontendTimeBasedIntegrationTest
             trafficAmount,
             env.environment.clock.now,
           )
-          (1 to 5).foreach(_ => advanceRoundsByOneTick)
+          (1 to 5).foreach(_ => advanceRoundsToNextRoundOpening)
         },
       )(
         "Wait for round to close in scan",
@@ -430,12 +430,12 @@ class ScanFrontendTimeBasedIntegrationTest
         .round
         .number
 
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
       aliceWalletClient.tap(100.0)
 
       actAndCheck(
         "Advance rounds",
-        (1 to 5).foreach(_ => advanceRoundsByOneTick),
+        (1 to 5).foreach(_ => advanceRoundsToNextRoundOpening),
       )(
         "Wait for round to close in scan",
         _ => sv1ScanBackend.getRoundOfLatestData()._1 shouldBe (firstRound + 1),
@@ -497,8 +497,8 @@ class ScanFrontendTimeBasedIntegrationTest
         }
       }
 
-      openRounds.foreach(_ => advanceRoundsByOneTick)
-      advanceRoundsByOneTick
+      openRounds.foreach(_ => advanceRoundsToNextRoundOpening)
+      advanceRoundsToNextRoundOpening
       eventually() {
         aliceValidatorWalletClient.listValidatorLivenessActivityRecords() should have length 0
       }
@@ -586,7 +586,7 @@ class ScanFrontendTimeBasedIntegrationTest
           _ => {
             closeVoteModalsIfOpen
 
-            click on "tab-panel-executed"
+            eventuallyClickOn(id("tab-panel-executed"))
             val rows = getAllVoteRows("sv-vote-results-executed-table-body")
 
             forExactly(1, rows) { reviewButton =>
@@ -652,6 +652,8 @@ class ScanFrontendTimeBasedIntegrationTest
             inside(find(id("navlink-/validator-licenses"))) { case Some(navlink) =>
               navlink.underlying.click()
             }
+            // make sure that seed licenses are rendered in the UI before proceeding to mitigate flakeyness
+            getLicensesTableRows.size shouldBe >(0)
           },
         )
 
@@ -669,7 +671,7 @@ class ScanFrontendTimeBasedIntegrationTest
         )(
           "a new validator row is added",
           _ => {
-            checkLastValidatorLicenseRow(
+            checkValidatorLicenseRow(
               licenseRows.size.toLong,
               sv1Backend.getDsoInfo().svParty,
               newValidatorParty,

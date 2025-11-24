@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TransactionTreeUpdate,
   TreeUpdateOrOffsetCheckpoint,
 }
-import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.migration.{DomainMigrationInfo, MigrationTimeInfo}
 import org.lfdecentralizedtrust.splice.store.StoreTest.testTxLogConfig
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
@@ -35,11 +35,16 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
 
 import java.util.Collections
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
+import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 import org.slf4j.event.Level
 import slick.jdbc.JdbcProfile
 
 import java.time.Instant
 import scala.concurrent.Future
+import StoreTest.*
+import cats.data.NonEmptyList
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 class DbMultiDomainAcsStoreTest
     extends MultiDomainAcsStoreTest[
@@ -338,11 +343,13 @@ class DbMultiDomainAcsStoreTest
           _ <- initWithAcs(acsOffset = 0)(store)
           o1 <- store.lookupLastIngestedOffset()
           _ = o1 shouldBe Some(0)
-          _ <- store.testIngestionSink.ingestUpdate(
-            TreeUpdateOrOffsetCheckpoint.Checkpoint(
-              new OffsetCheckpoint(
-                5,
-                Collections.emptyList(),
+          _ <- store.testIngestionSink.ingestUpdateBatch(
+            NonEmptyList.of(
+              TreeUpdateOrOffsetCheckpoint.Checkpoint(
+                new OffsetCheckpoint(
+                  5,
+                  Collections.emptyList(),
+                )
               )
             )
           )
@@ -546,6 +553,115 @@ class DbMultiDomainAcsStoreTest
         _ = store.containsArchived(Seq()).futureValue shouldBe false
       } yield succeed
     }
+
+    "tx rollbacks after migrations are handled correctly" in {
+      import com.digitalasset.canton.data.CantonTimestamp
+      val store1 = mkStore(acsId = 1, txLogId = Some(1), migrationId = 1L)
+      val coupon1 = c(1)
+      val coupon2 = c(2)
+      val t0 = CantonTimestamp.Epoch
+      val t1 = CantonTimestamp.Epoch.plusSeconds(60)
+      val store2TimeTooEarly = mkStore(
+        acsId = 1,
+        txLogId = Some(1),
+        migrationId = 2L,
+        migrationTimeInfo = Some(MigrationTimeInfo(t0, synchronizerWasPaused = true)),
+      )
+      val store2CorrectTime = mkStore(
+        acsId = 1,
+        txLogId = Some(1),
+        migrationId = 2L,
+        migrationTimeInfo = Some(MigrationTimeInfo(t1, synchronizerWasPaused = true)),
+      )
+      for {
+        _ <- initWithAcs()(store1)
+        _ <- d1.create(coupon1, recordTime = t0.toInstant)(store1)
+        _ <- d1.create(coupon2, recordTime = t1.toInstant)(store1)
+        txLogs <- store1.listTxLogEntries()
+        _ = txLogs should have size 2
+        ex <- recoverToExceptionIf[IllegalStateException](initWithAcs()(store2TimeTooEarly))
+        _ = ex.getMessage should include("Found 1 rows")
+        _ <- initWithAcs()(store2CorrectTime)
+        txLogs <- store2CorrectTime.listTxLogEntries()
+        _ = txLogs should have size 2
+      } yield succeed
+    }
+
+    "tx rollbacks after DR are handled correctly" in {
+      import com.digitalasset.canton.data.CantonTimestamp
+      val store1 = mkStore(acsId = 1, txLogId = Some(1), migrationId = 1L)
+      val coupon1 = c(1)
+      val coupon2 = c(2)
+      val t0 = CantonTimestamp.Epoch
+      val t1 = CantonTimestamp.Epoch.plusSeconds(60)
+      val store2TimeTooEarlyDR = mkStore(
+        acsId = 1,
+        txLogId = Some(1),
+        migrationId = 2L,
+        migrationTimeInfo = Some(MigrationTimeInfo(t0, synchronizerWasPaused = false)),
+      )
+      for {
+        _ <- initWithAcs()(store1)
+        _ <- d1.create(coupon1, recordTime = t0.toInstant)(store1)
+        _ <- d1.create(coupon2, recordTime = t1.toInstant)(store1)
+        txLogs <- store1.listTxLogEntries()
+        _ = txLogs should have size 2
+        _ <- initWithAcs()(store2TimeTooEarlyDR)
+        txLogs <- store2TimeTooEarlyDR.listTxLogEntries()
+        _ = txLogs should have size 1
+      } yield succeed
+    }
+
+    "can ingest large batches" in {
+      implicit val store = mkStore()
+      // 100 txs of 1000 CreatedEvents each
+      val batchSize = 100
+      val createdEventsPerBatch = 1000
+      def bigBatch() = (1 to batchSize).map { i =>
+        val offset = nextOffset() // mutable state
+        TreeUpdateOrOffsetCheckpoint.Update(
+          TransactionTreeUpdate(
+            mkTx(
+              offset = offset,
+              events = (1 to createdEventsPerBatch).map(j =>
+                toCreatedEvent(
+                  amulet(providerParty(j), j, j.toLong, BigDecimal(0.001)),
+                  Seq(providerParty(j), dsoParty),
+                  Seq(providerParty(j), dsoParty),
+                  Map(
+                    holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView(
+                      providerParty(j),
+                      j,
+                      dsoParty,
+                      "AMT",
+                    ).toValue
+                  ),
+                  Map.empty,
+                )
+              ),
+              synchronizerId = d1,
+              recordTime = Instant.EPOCH.plusSeconds(i.toLong),
+            )
+          ),
+          d1,
+        )
+      }
+
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- store.testIngestionSink.ingestUpdateBatch(
+          NonEmptyList.fromListUnsafe(bigBatch().toList)
+        )
+        count <- storage
+          .querySingle(
+            sql"select count(*) from acs_store_template".as[Int].headOption,
+            "bigBatchCount",
+          )
+          .value
+          .failOnShutdown("test doesn't shutdown")
+      } yield count should be(Some(batchSize * createdEventsPerBatch))
+    }
   }
 
   private def failedViewStatus(msg: String) = {
@@ -588,7 +704,7 @@ class DbMultiDomainAcsStoreTest
   }
 
   private def storeDescriptor(id: Int, participantId: ParticipantId) =
-    DbMultiDomainAcsStore.StoreDescriptor(
+    StoreDescriptor(
       version = 1,
       name = "DbMultiDomainAcsStoreTest",
       party = dsoParty,
@@ -607,6 +723,7 @@ class DbMultiDomainAcsStoreTest
         GenericAcsRowData,
         GenericInterfaceRowData,
       ],
+      migrationTimeInfo: Option[MigrationTimeInfo],
   ) = {
     mkStoreWithAcsRowDataF(
       acsId,
@@ -617,6 +734,7 @@ class DbMultiDomainAcsStoreTest
       "acs_store_template",
       txLogId.map(_ => "txlog_store_template"),
       Some("interface_views_template"),
+      migrationTimeInfo,
     )
   }
 
@@ -629,6 +747,7 @@ class DbMultiDomainAcsStoreTest
       acsTableName: String,
       txLogTableName: Option[String],
       interfaceViewsTableNameOpt: Option[String],
+      migrationTimeInfo: Option[MigrationTimeInfo] = None,
   ) = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
@@ -649,10 +768,10 @@ class DbMultiDomainAcsStoreTest
       testTxLogConfig,
       DomainMigrationInfo(
         migrationId,
-        None,
+        migrationTimeInfo,
       ),
-      participantId,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      IngestionConfig(),
     )
   }
 
@@ -671,5 +790,11 @@ class DbMultiDomainAcsStoreTest
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq(
       "ans_entry_name" -> lengthLimited("'); DROP TABLE bobby_tables; --")
     )
+  }
+  object BobbyTablesRowData {
+    implicit val hasIndexColumns: HasIndexColumns[BobbyTablesRowData] =
+      new HasIndexColumns[BobbyTablesRowData] {
+        override def indexColumnNames: Seq[String] = Seq("ans_entry_name")
+      }
   }
 }

@@ -59,7 +59,7 @@ class WalletAuth0FrontendIntegrationTest
             )
             actAndCheck(
               "The user logs out", {
-                click on "logout-button"
+                eventuallyClickOn(id("logout-button"))
               },
             )(
               "The user sees the login screen again",
@@ -79,7 +79,7 @@ class WalletAuth0FrontendIntegrationTest
 
           actAndCheck(
             "The user logs out", {
-              click on "logout-button"
+              eventuallyClickOn(id("logout-button"))
             },
           )(
             "The user sees the login screen again",

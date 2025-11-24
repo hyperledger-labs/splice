@@ -80,9 +80,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
   // The test currently produces 80 transactions, which is 0.000926 tps over 24 hours,
   // so we assert for a range of 70-85 transactions, or 0.0008-0.00099 tps.
   private val avgTps = (0.0008, 0.00099)
-  // The peak is 17 transactions in a (simulated) minute, or 0.28333 tps over a minute,
-  // so we assert 15-20 transactions, or 0.25-0.34 tps
-  private val peakTps = (0.25, 0.34)
+  // The peak is 22 transactions in a (simulated) minute, or 0.36667 tps over a minute,
+  // so we assert 19-25 transactions, or 0.31-0.42 tps
+  private val peakTps = (0.31, 0.42)
   private val totalRounds = 4
 
   override def beforeAll() = {
@@ -272,9 +272,20 @@ class ScanTotalSupplyBigQueryIntegrationTest
   ): Unit = {
     actAndCheck(
       "step forward many rounds", {
-        advanceTimeToRoundOpen
-        (1 to 5).foreach { _ =>
-          advanceRoundsByOneTick
+        actAndCheck(
+          "Advance the first round", {
+            advanceRoundsToNextRoundOpening
+          },
+        )(
+          "Wait for alice to report activity up to round 2",
+          _ =>
+            aliceValidatorWalletClient
+              .listValidatorLivenessActivityRecords()
+              .map(_.payload.round.number) should contain(2),
+        )
+
+        (3 to 6).foreach { _ =>
+          advanceRoundsToNextRoundOpening
         }
       },
     )(
@@ -314,7 +325,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
       case db: DbStorage => db
       case s => fail(s"non-DB storage configured, unsupported for BigQuery: ${s.getClass}")
     }
-    val sourceHistoryId = sv1ScanBackend.appState.store.updateHistory.historyId
+    val sourceHistoryId = sv1ScanBackend.appState.automation.updateHistory.historyId
 
     copyTableToBigQuery(
       "update_history_creates",

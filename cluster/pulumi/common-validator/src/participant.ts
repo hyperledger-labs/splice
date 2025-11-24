@@ -6,7 +6,6 @@ import {
   Auth0Config,
   auth0UserNameEnvVarSource,
   ChartValues,
-  DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
   getAdditionalJvmOptions,
@@ -17,6 +16,7 @@ import {
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
   spliceConfig,
+  getLedgerApiAudience,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { ValidatorNodeConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
@@ -27,6 +27,7 @@ export function installParticipant(
   migrationId: DomainMigrationIndex,
   xns: ExactNamespace,
   auth0Config: Auth0Config,
+  disableAuth?: boolean,
   version: CnChartVersion = activeVersion,
   defaultPostgres?: postgres.Postgres,
   customOptions?: SpliceCustomResourceOptions
@@ -67,7 +68,7 @@ export function installParticipant(
     ...participantValues,
     auth: {
       ...participantValues.auth,
-      targetAudience: auth0Config.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
+      targetAudience: getLedgerApiAudience(auth0Config, xns.logicalName),
     },
   };
 
@@ -80,6 +81,7 @@ export function installParticipant(
     {
       ...participantValuesWithSpecifiedAud,
       logLevel: validatorConfig.logging?.level,
+      logAsyncFlush: validatorConfig.logging?.async,
       persistence: {
         databaseName: pgName,
         schema: 'participant',
@@ -110,6 +112,7 @@ export function installParticipant(
           memory: '8Gi',
         },
       },
+      disableAuth: disableAuth || false,
     },
     version,
     {

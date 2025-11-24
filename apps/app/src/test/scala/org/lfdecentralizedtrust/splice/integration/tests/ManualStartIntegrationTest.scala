@@ -4,7 +4,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.PruningSchedule
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{FullClientConfig, PositiveDurationSeconds}
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.topology.{
   MediatorId,
@@ -15,7 +15,7 @@ import com.digitalasset.canton.topology.{
   SequencerId,
   UniqueIdentifier,
 }
-import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, SpliceBackendConfig}
+import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, PruningConfig, SpliceBackendConfig}
 import org.lfdecentralizedtrust.splice.console.AppBackendReference
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -25,7 +25,6 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.util.{StandaloneCanton, TriggerTestUtil, WalletTestUtil}
-import org.lfdecentralizedtrust.splice.validator.config.ParticipantPruningConfig
 
 import java.util.UUID
 import scala.concurrent.duration.DurationInt
@@ -53,10 +52,7 @@ class ManualStartIntegrationTest
       // This test makes sure apps can automatically initialize Canton instances.
       // The Splice apps in this test should therefore completely ignore the shared canton instances
       // (which are auto-initialized), and only use the manually started fresh Canton instances.
-      .addConfigTransforms(
-        (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
-        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
-      )
+      .addConfigTransforms((_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf))
       // By default, alice validator connects to the splitwell domain. This test doesn't start the splitwell node.
       .addConfigTransform((_, conf) =>
         conf.copy(validatorApps =
@@ -66,7 +62,7 @@ class ManualStartIntegrationTest
               aliceValidatorConfig.copy(
                 domains = withoutExtraDomains,
                 participantPruningSchedule = Some(
-                  ParticipantPruningConfig(
+                  PruningConfig(
                     "0 0 * * * ?",
                     PositiveDurationSeconds.tryFromDuration(1.hours),
                     PositiveDurationSeconds.tryFromDuration(30.hours),
@@ -172,7 +168,9 @@ class ManualStartIntegrationTest
           )
         }
 
-        clue("SV1 and SV2 have configured amplification on the mediator sequencer connection") {
+        clue(
+          "SV1 and SV2 have configured amplification and pruning on the mediator sequencer connection"
+        ) {
           Seq(
             mediatorAdminConnection("sv1", sv1Backend.config),
             mediatorAdminConnection("sv2", sv2Backend.config),
@@ -184,7 +182,13 @@ class ManualStartIntegrationTest
                 .value
             sequencerConnections.connections.size shouldBe 1
             sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
+            sequencerConnections.sequencerLivenessMargin shouldBe NonNegativeInt.zero
             sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification
+            mediatorConnection.getPruningSchedule().futureValue.value shouldBe PruningSchedule(
+              "0 /10 * * * ?",
+              PositiveDurationSeconds.ofMinutes(5),
+              PositiveDurationSeconds.ofDays(30),
+            )
             // otherwise we get log warnings
             mediatorConnection.close()
           }
@@ -270,7 +274,7 @@ class ManualStartIntegrationTest
           def initializeWithKeyReuse(connection: ParticipantAdminConnection, name: String): Unit = {
             // Eventually, because the query to the server will fail while the server is still starting up
             // Long timeout because Canton is slow to start up
-            eventually(timeUntilSuccess = 60.seconds) {
+            eventually(timeUntilSuccess = 120.seconds) {
 
               val signingKey =
                 connection.generateKeyPair("signing", SigningKeyUsage.All).futureValue

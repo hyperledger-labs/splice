@@ -4,6 +4,7 @@
 package com.digitalasset.canton.topology.processing
 
 import com.digitalasset.canton.SequencerCounter
+import com.digitalasset.canton.data.SynchronizerSuccessor
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -25,6 +26,12 @@ trait TerminateProcessing {
       traceContext: TraceContext,
       executionContext: ExecutionContext,
   ): FutureUnlessShutdown[Unit]
+
+  def notifyUpgradeAnnouncement(successor: SynchronizerSuccessor)(implicit
+      traceContext: TraceContext
+  ): Unit
+
+  def notifyUpgradeCancellation()(implicit traceContext: TraceContext): Unit
 }
 
 object TerminateProcessing {
@@ -44,5 +51,11 @@ object TerminateProcessing {
         executionContext: ExecutionContext,
     ): FutureUnlessShutdown[Unit] =
       FutureUnlessShutdown.unit
+
+    override def notifyUpgradeAnnouncement(successor: SynchronizerSuccessor)(implicit
+        traceContext: TraceContext
+    ): Unit = ()
+
+    override def notifyUpgradeCancellation()(implicit traceContext: TraceContext): Unit = ()
   }
 }
