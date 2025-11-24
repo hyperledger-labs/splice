@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import org.lfdecentralizedtrust.splice.store.db.{StoreDescriptor, StoreDescriptorStore}
 import java.util.concurrent.atomic.AtomicReference
 
-class DbValidatorInternalStore(
+class DbValidatorInternalStore private (
     participant: ParticipantId,
     validatorParty: PartyId,
     storage: DbStorage,
@@ -64,7 +64,9 @@ class DbValidatorInternalStore(
       .storeId
       .getOrElse(throw new RuntimeException("Using storeId before it was assigned"))
 
-  def initialize()(implicit tc: TraceContext): Future[DbValidatorInternalStore] = {
+  private def getOrSaveStoreDescriptor()(implicit
+      tc: TraceContext
+  ): Future[DbValidatorInternalStore] = {
 
     StoreDescriptorStore
       .getStoreIdForDescriptor(storeDescriptor, storage)
@@ -139,5 +141,28 @@ class DbValidatorInternalStore(
         "delete config key",
       )
       .map(_.discard)
+  }
+}
+
+object DbValidatorInternalStore {
+
+  def apply(
+      participant: ParticipantId,
+      validatorParty: PartyId,
+      storage: DbStorage,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      ec: ExecutionContext,
+      lc: ErrorLoggingContext,
+      cc: CloseContext,
+      tc: TraceContext,
+  ): Future[DbValidatorInternalStore] = {
+    val store = new DbValidatorInternalStore(
+      participant,
+      validatorParty,
+      storage,
+      loggerFactory,
+    )
+    store.getOrSaveStoreDescriptor()
   }
 }

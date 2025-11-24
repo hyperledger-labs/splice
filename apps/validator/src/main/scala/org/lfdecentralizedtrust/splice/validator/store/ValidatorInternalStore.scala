@@ -46,13 +46,13 @@ object ValidatorInternalStore {
   ): Future[ValidatorInternalStore] = {
     storage match {
       case storage: DbStorage =>
-        val dbStore = new DbValidatorInternalStore(
+        DbValidatorInternalStore(
           participant,
           validatorParty,
           storage,
           loggerFactory,
         )
-        dbStore.initialize()
+
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
   }
