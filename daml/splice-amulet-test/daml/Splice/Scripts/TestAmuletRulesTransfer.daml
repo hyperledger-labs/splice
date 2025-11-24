@@ -579,18 +579,16 @@ testUnclaimedActivityRecordTransferInput = do
 
   pure ()
 
-testInputUnclaimedDevelopmentFundCoupon : Script ()
-testInputUnclaimedDevelopmentFundCoupon = do
+testInputDevelopmentFundCoupon : Script ()
+testInputDevelopmentFundCoupon = do
   defaultAppWithUsers@DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   baseConfig <- getAmuletConfig app
-  -- Replace the default AmuletConfig with a 0.05% allocation for the development fund
-  -- and Alice as the beneficiary. This configuration applies to the next open round.
+  -- Replace the default AmuletConfig with a 0.05% allocation for the development fund.
+  -- This configuration applies to the next open round.
   setAmuletConfig app baseConfig baseConfig with
     issuanceCurve = baseConfig.issuanceCurve with
       initialValue = baseConfig.issuanceCurve.initialValue with
         optDevelopmentFundPercentage = Some 0.05
-    transferConfig = baseConfig.transferConfig with
-      optDevelopmentFundBeneficiary = Some alice.primaryParty
 
   -- Run 3 issuances for the already open rounds without the development fund configuration.
   -- No development fund coupons are minted.
@@ -599,20 +597,8 @@ testInputUnclaimedDevelopmentFundCoupon = do
   runNextIssuance app
   runNextIssuance app
   context <- getPaymentTransferContext app alice
-  [(cid1, coupon1), (cid2, coupon2)] <- query @UnclaimedDevelopmentFundCoupon app.dso
+  [(cid1, coupon1), (cid2, coupon2)] <- query @DevelopmentFundCoupon alice.primaryParty
   let totalAmount = coupon1.amount + coupon2.amount
-
-  -- Unhappy path - requires that the sender matches the development fund beneficiary.
-  submitMultiMustFail [bob.primaryParty] [app.dso] $
-    exerciseCmd context.amuletRules AmuletRules_Transfer with
-      transfer = Transfer with
-        sender = bob.primaryParty
-        provider = bob.primaryParty
-        inputs = [InputUnclaimedDevelopmentFundCoupon cid1, InputUnclaimedDevelopmentFundCoupon cid2]
-        outputs = []
-        beneficiaries = None
-      context = context.context
-      expectedDso = Some app.dso
 
   -- Happy path
   transferResult <-
@@ -623,7 +609,7 @@ testInputUnclaimedDevelopmentFundCoupon = do
           transfer = Transfer with
             sender = alice.primaryParty
             provider = alice.primaryParty
-            inputs = [InputUnclaimedDevelopmentFundCoupon cid1, InputUnclaimedDevelopmentFundCoupon cid2]
+            inputs = [InputDevelopmentFundCoupon cid1, InputDevelopmentFundCoupon cid2]
             outputs = []
             beneficiaries = None
           context = context.context

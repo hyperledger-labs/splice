@@ -50,9 +50,6 @@ defaultTransferConfig = TransferConfig with
     -- Chosen conservatively, but high enough to invite thinking about what's possible.
     maxNumLockHolders = 10
 
-    -- Beneficiary for the Development Fund under CIP-0082.
-    optDevelopmentFundBeneficiary = None
-
 -- | Decentralized synchronizer config to use for testing.
 defaultAmuletDecentralizedSynchronizerConfig : AmuletDecentralizedSynchronizerConfig
 defaultAmuletDecentralizedSynchronizerConfig = AmuletDecentralizedSynchronizerConfig with
