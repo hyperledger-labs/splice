@@ -3,15 +3,20 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import cats.data.NonEmptyList
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.http.v0.wallet as http
 import org.lfdecentralizedtrust.splice.http.v0.wallet.AcceptTokenStandardTransferResponse
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.GetTransferInstructionAcceptContextResponse
@@ -33,6 +38,19 @@ class BftScanConnectionIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs {
+          case (name, c) if name == "aliceValidator" =>
+            val dbEnabledConfig = BftScanClientConfig.Bft(
+              seedUrls = NonEmptyList.of(
+                Uri("http://127.0.0.1:5012")
+              ),
+              scansRefreshInterval = NonNegativeFiniteDuration.ofSeconds(1),
+            )
+            c.copy(scanClient = dbEnabledConfig)
+          case (_, c) => c
+        }(config)
+      )
       .withManualStart
 
   "init fast enough even if there are unavailable scans" in { implicit env =>
@@ -158,6 +176,74 @@ class BftScanConnectionIntegrationTest
         // still different types...
         err1.error should be(err2.error)
     }
+  }
+
+  "validator onboarding and recovery succeed with internal config turned on" in { implicit env =>
+    startAllSync(
+      sv1Backend,
+      sv1ScanBackend,
+    )
+
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+      {
+        aliceValidatorBackend.startSync()
+      },
+      logs => {
+        val messages = logs.map(_.message)
+        withClue("Validator should bootstrap with only sv1 scan") {
+          existsUrl(messages, "http://localhost:5012") &&
+          !existsUrl(messages, "http://localhost:5112") &&
+          !existsUrl(messages, "http://localhost:5212") &&
+          !existsUrl(messages, "http://localhost:5312")
+        } should be(true).withClue(s"Actual Logs: $logs")
+      },
+    )
+
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+      {
+        startAllSync(
+          sv2Backend,
+          sv2ScanBackend,
+          sv3Backend,
+          sv3ScanBackend,
+          sv4Backend,
+          sv4ScanBackend,
+        )
+      },
+      logs => {
+        val messages = logs.map(_.message)
+        withClue("validator should eventually refresh the scan list") {
+          messages.exists(_.contains(s"Updated scan list with 4 scans:"))
+        } should be(true).withClue(s"Actual Logs: $logs")
+      },
+    )
+
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+      {
+        aliceValidatorBackend.stop()
+        aliceValidatorBackend.startSync()
+      },
+      logs => {
+        val messages = logs.map(_.message)
+        withClue("Validator should bootstrap with all scans") {
+          existsUrl(messages, "http://localhost:5012") &&
+          existsUrl(messages, "http://localhost:5112") &&
+          existsUrl(messages, "http://localhost:5212") &&
+          existsUrl(messages, "http://localhost:5312")
+        } should be(true).withClue(s"Actual Logs: $logs")
+      },
+    )
+
+    withClue("Alice's validator should be able to onboard a user after establishing connections.") {
+      eventuallySucceeds() {
+        aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+      }
+    }
+
+  }
+
+  private def existsUrl(messages: Seq[String], uri: String) = {
+    messages.exists(_.contains(s"Validator bootstrapping with scan URI: $uri"))
   }
 
 }
