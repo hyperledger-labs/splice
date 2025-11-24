@@ -29,7 +29,6 @@ data TransferConfig unit = TransferConfig with
     maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
     maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
     maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked amulet.
-    optDevelopmentFundBeneficiary : Optional Party -- ^ Beneficiary for the Development Fund under CIP-0082.
   deriving (Eq, Show)
 
 -- | Configuration includes TransferConfig, issuance curve and tickDuration
@@ -132,7 +131,6 @@ instance Patchable (TransferConfig USD) where
     maxNumInputs = patch new.maxNumInputs base.maxNumInputs current.maxNumInputs
     maxNumOutputs = patch new.maxNumOutputs base.maxNumOutputs current.maxNumOutputs
     maxNumLockHolders = patch new.maxNumLockHolders base.maxNumLockHolders current.maxNumLockHolders
-    optDevelopmentFundBeneficiary = patch new.optDevelopmentFundBeneficiary base.optDevelopmentFundBeneficiary current.optDevelopmentFundBeneficiary
 
 instance Patchable PackageConfig where
   patch new base current = PackageConfig with
