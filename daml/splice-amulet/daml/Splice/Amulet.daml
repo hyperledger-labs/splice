@@ -403,10 +403,13 @@ template DevelopmentFundCoupon
   where
     ensure amount > 0.0
 
-    signatory dso, fundManager
+    signatory dso
 
     -- The beneficiary is an observer of the coupon, as they need to be able to claim it.
     observer beneficiary
+
+    -- The fundManager is an observer so they can see both the transaction creating and the one archiving the coupon.
+    observer fundManager
 
 
 -- | Rewards that have not been claimed and are thus at the disposal of the foundation.
