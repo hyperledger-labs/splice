@@ -64,7 +64,7 @@ data AmuletRules_AdvanceOpenMiningRoundsResult = AmuletRules_AdvanceOpenMiningRo
 
 data AmuletRules_MiningRound_StartIssuingResult = AmuletRules_MiningRound_StartIssuingResult with
     issuingRoundCid : ContractId IssuingMiningRound
-    developmentFundCouponCid : Optional (ContractId DevelopmentFundCoupon)
+    unclaimedDevelopmentFundCouponCid : Optional (ContractId UnclaimedDevelopmentFundCoupon)
 
 data AmuletRules_MiningRound_CloseResult = AmuletRules_MiningRound_CloseResult with
     closedRoundCid : ContractId ClosedMiningRound
@@ -77,8 +77,8 @@ data AmuletRules_ClaimExpiredRewardsResult = AmuletRules_ClaimExpiredRewardsResu
 data AmuletRules_MergeUnclaimedRewardsResult = AmuletRules_MergeUnclaimedRewardsResult with
     unclaimedRewardCid : ContractId UnclaimedReward
 
-data AmuletRules_MergeDevelopmentFundCouponsResult = AmuletRules_MergeDevelopmentFundCouponsResult with
-    developmentFundCouponCid : ContractId DevelopmentFundCoupon
+data AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult = AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult with
+    unclaimedDevelopmentFundCouponCid : ContractId UnclaimedDevelopmentFundCoupon
 
 data AmuletRules_SetConfigResult = AmuletRules_SetConfigResult with
     newAmuletRules : ContractId AmuletRules
@@ -454,11 +454,11 @@ template AmuletRules
             dso
             amount = totalUnclaimedRewards
 
-        -- record development fund coupon contract
-        developmentFundCouponCid <-
+        -- record unclaimed development fund coupon contract
+        unclaimedDevelopmentFundCouponCid <-
           if params.amuletsToIssueToDevelopmentFund > 0.0
             then
-              Some <$> create DevelopmentFundCoupon with
+              Some <$> create UnclaimedDevelopmentFundCoupon with
                 dso
                 amount = params.amuletsToIssueToDevelopmentFund
             else pure None
@@ -592,25 +592,25 @@ template AmuletRules
 
         return AmuletRules_MergeUnclaimedRewardsResult with ..
 
-    -- Batch merge of development fund coupons
-    nonconsuming choice AmuletRules_MergeDevelopmentFundCoupons : AmuletRules_MergeDevelopmentFundCouponsResult
+    -- Batch merge of unclaimed development fund coupons
+    nonconsuming choice AmuletRules_MergeUnclaimedDevelopmentFundCoupons : AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult
       with
-        developmentFundCouponCids : [ContractId DevelopmentFundCoupon]
+        unclaimedDevelopmentFundCouponCids : [ContractId UnclaimedDevelopmentFundCoupon]
       controller dso
       do
-        require "More than one development fund coupon contract" (length developmentFundCouponCids > 1)
+        require "More than one unclaimed development fund coupon contract" (length unclaimedDevelopmentFundCouponCids > 1)
 
         -- archive all given coupons
-        archivedAmounts <- forA developmentFundCouponCids $ \developmentFundCouponCid -> do
-          developmentFundCoupon <- fetchAndArchive (ForDso with dso) developmentFundCouponCid
-          pure developmentFundCoupon.amount
+        archivedAmounts <- forA unclaimedDevelopmentFundCouponCids $ \unclaimedDevelopmentFundCouponCid -> do
+          unclaimedDevelopmentFundCoupon <- fetchAndArchive (ForDso with dso) unclaimedDevelopmentFundCouponCid
+          pure unclaimedDevelopmentFundCoupon.amount
 
-        -- create a new development fund coupon over the total
-        developmentFundCouponCid <- create DevelopmentFundCoupon with
+        -- create a new unclaimed development fund coupon over the total
+        unclaimedDevelopmentFundCouponCid <- create UnclaimedDevelopmentFundCoupon with
           dso
           amount = sum archivedAmounts
 
-        return AmuletRules_MergeDevelopmentFundCouponsResult with ..
+        return AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult with ..
 
     -- This allows fetchByKey-style fetches if you have readAs
     -- but not actAs claims.
@@ -1000,9 +1000,9 @@ summarizeAndConsumeInputs csum dso sender inps = do
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
         totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
-    summarizeAndConsumeInput _round s (InputDevelopmentFundCoupon couponCid) = do
+    summarizeAndConsumeInput _round s (InputUnclaimedDevelopmentFundCoupon couponCid) = do
       case csum.config.optDevelopmentFundBeneficiary of
-        None -> abort "DevelopmentFundCoupon cannot be consumed without the Development Fund beneficiary configured"
+        None -> abort "UnclaimedDevelopmentFundCoupon cannot be consumed without the Development Fund beneficiary configured"
         Some developmentFundBeneficiary -> require "sender matches development fund beneficiary" $ sender == developmentFundBeneficiary
       coupon <- fetchAndArchive forDso couponCid
       return TransferInputsSummary with
@@ -1311,7 +1311,7 @@ data TransferInput
         -- ^ Added in CIP-3. Optional validator faucet coupon input into this transfer.
   | InputValidatorLivenessActivityRecord (ContractId ValidatorLivenessActivityRecord)
   | InputUnclaimedActivityRecord (ContractId UnclaimedActivityRecord)
-  | InputDevelopmentFundCoupon (ContractId DevelopmentFundCoupon)
+  | InputUnclaimedDevelopmentFundCoupon (ContractId UnclaimedDevelopmentFundCoupon)
   deriving (Eq, Ord, Show)
 
 -- | Smart constructor for inputing validator faucet coupons into a transfer.
