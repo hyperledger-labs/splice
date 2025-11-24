@@ -1,6 +1,7 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
+{-# LANGUAGE MultiWayIf #-}
 module Splice.AmuletRules where
 
 import Prelude hiding (forA)
@@ -79,6 +80,10 @@ data AmuletRules_MergeUnclaimedRewardsResult = AmuletRules_MergeUnclaimedRewards
 
 data AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult = AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult with
     unclaimedDevelopmentFundCouponCid : ContractId UnclaimedDevelopmentFundCoupon
+
+data AmuletRules_AllocateDevelopmentFundCouponResult = AmuletRules_AllocateDevelopmentFundCouponResult with
+    developmentFundCouponCid : ContractId DevelopmentFundCoupon
+    optUnclaimedDevelopmentFundCouponCid : Optional (ContractId UnclaimedDevelopmentFundCoupon)
 
 data AmuletRules_SetConfigResult = AmuletRules_SetConfigResult with
     newAmuletRules : ContractId AmuletRules
@@ -611,6 +616,42 @@ template AmuletRules
           amount = sum archivedAmounts
 
         return AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult with ..
+
+    -- Allows the Development Fund manager to allocate a specified amount from a
+    -- collection of UnclaimedDevelopmentFundCoupons to a beneficiary, generating a
+    -- DevelopmentFundCoupon and producing a leftover unclaimed coupon if applicable.
+    nonconsuming choice AmuletRules_AllocateDevelopmentFundCoupon : AmuletRules_AllocateDevelopmentFundCouponResult
+      with
+        unclaimedDevelopmentFundCouponCids : [ContractId UnclaimedDevelopmentFundCoupon]
+        beneficiary : Party
+        amount : Decimal
+        fundManager : Party
+      controller fundManager
+      do
+        -- Verify fundManager
+        now <- getTime
+        case (getValueAsOf now configSchedule).issuanceCurve.initialValue.optDevelopmentFundManager of
+          None -> abort "DevelopmentFundCoupon cannot be allocated without a Development Fund manager configured"
+          Some developmentFundManager ->
+            require ("controller is the configured Development Fund manager: " <> show developmentFundManager) $
+              developmentFundManager == fundManager
+
+        -- Verify the amount and create a leftover UnclaimedDevelopmentFundCoupon if needed
+        totalUnclaimedDevelopmentFundCoupons <- sum <$> forA unclaimedDevelopmentFundCouponCids \cid -> do
+          coupon <- fetchAndArchive (ForDso with dso) cid
+          pure coupon.amount
+        let leftover = totalUnclaimedDevelopmentFundCoupons - amount
+        optUnclaimedDevelopmentFundCouponCid <-
+          if | leftover < 0.0 -> abort $ "insufficient amount to cover the requested allocation: " <> show (negate leftover)
+             | leftover == 0.0 -> pure None
+             | otherwise -> Some <$> create UnclaimedDevelopmentFundCoupon with dso; amount = leftover
+
+        -- record development fund coupon contract
+        developmentFundCouponCid <- create DevelopmentFundCoupon with dso; beneficiary; fundManager; amount
+
+        return AmuletRules_AllocateDevelopmentFundCouponResult with
+          developmentFundCouponCid
+          optUnclaimedDevelopmentFundCouponCid
 
     -- This allows fetchByKey-style fetches if you have readAs
     -- but not actAs claims.
