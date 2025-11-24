@@ -14,13 +14,17 @@ function getTestSuiteTimesFromXml(testReportsDir: string): TestTimes {
     try {
         fs.readdirSync(testReportsDir).forEach(file => {
             if (file.endsWith('.xml')) {
-                console.log(`Parsing xml report ${file}`)
-                const path = `${testReportsDir}/${file}`;
-                const XMLdata = fs.readFileSync(path);
-                const parsed = parser.parse(XMLdata);
-                const testSuiteName = parsed.testsuite['@_name'];
-                const testSuiteTime = parseFloat(parsed.testsuite['@_time']);
-                testTimes[testSuiteName] = testSuiteTime;
+                try {
+                    console.log(`Parsing xml report ${file}`)
+                    const path = `${testReportsDir}/${file}`;
+                    const XMLdata = fs.readFileSync(path);
+                    const parsed = parser.parse(XMLdata);
+                    const testSuiteName = parsed.testsuite['@_name'];
+                    const testSuiteTime = parseFloat(parsed.testsuite['@_time']);
+                    testTimes[testSuiteName] = testSuiteTime;
+                } catch (e) {
+                    console.log(`Failed to parse xml report ${file}`)
+                }
             }
         });
     } catch (err) {
