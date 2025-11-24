@@ -66,7 +66,7 @@ inThisBuild(
     semanticdbVersion := scalafixSemanticdb.revision,
     // slows down just the non integration tests which is a really small subset
     // this helps us get actual realistic times for how long a test takes to run
-    parallelExecution in Test := false,
+    Test / parallelExecution := false,
   )
 )
 
