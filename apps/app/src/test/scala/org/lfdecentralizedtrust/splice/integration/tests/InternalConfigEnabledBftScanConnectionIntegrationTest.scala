@@ -39,7 +39,6 @@ class InternalConfigEnabledBftScanConnectionIntegrationTest
                 Uri("http://127.0.0.1:5012")
               ),
               scansRefreshInterval = NonNegativeFiniteDuration.ofSeconds(1),
-              enableInternalStore = Some(true),
             )
             c.copy(scanClient = dbEnabledConfig)
           case (_, c) => c

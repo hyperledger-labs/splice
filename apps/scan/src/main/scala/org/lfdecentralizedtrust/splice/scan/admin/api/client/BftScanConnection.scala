@@ -1189,7 +1189,6 @@ object BftScanConnection {
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
       builder: (Uri, NonNegativeFiniteDuration) => Future[SingleScanConnection],
-      lastPersistedScanUrlList: Option[Seq[DsoScan]],
       refreshScanUrlsCallback: Option[Seq[(String, String)] => Future[Unit]],
   )(implicit
       ec: ExecutionContextExecutor,
@@ -1198,18 +1197,10 @@ object BftScanConnection {
   ): Future[BftScanConnection] = {
     val logger = loggerFactory.getTracedLogger(getClass)
 
-    val bootstrapUris: NonEmptyList[Uri] = lastPersistedScanUrlList match {
-      case Some(scans) if scans.nonEmpty => {
-        val urls = NonEmptyList.fromList(scans.map(_.publicUrl).toList)
-        urls.getOrElse { seedUrls }
-      }
-      case _ => seedUrls
-    }
-
-    bootstrapUris.toList.foreach(uri => logger.info(s"Validator bootstrapping with scan URI: $uri"))
+    seedUrls.toList.foreach(uri => logger.info(s"Validator bootstrapping with scan URI: $uri"))
 
     for {
-      initialSeedConnections <- bootstrapUris.traverse(uri =>
+      initialSeedConnections <- seedUrls.traverse(uri =>
         builder(uri, amuletRulesCacheTimeToLive).transformWith {
           case Success(conn) => Future.successful(Right(conn))
           case Failure(err) => Future.successful(Left(uri -> err))
@@ -1224,7 +1215,7 @@ object BftScanConnection {
           Future.failed(
             Status.UNAVAILABLE
               .withDescription(
-                s"Failed to connect to any seed URLs for bootstrapping: ${bootstrapUris.toList}"
+                s"Failed to connect to any seed URLs for bootstrapping: ${seedUrls.toList}"
               )
               .asRuntimeException()
           )
@@ -1274,11 +1265,6 @@ object BftScanConnection {
     val builder = buildScanConnection(upgradesConfig, clock, retryProvider, loggerFactory)
     val logger = loggerFactory.getTracedLogger(getClass)
 
-    val lastPersistedDsoScansFuture: Future[Option[Seq[DsoScan]]] = lastPersistedScanUrlList.map {
-      rs =>
-        { rs.map(list => list.map { case (svName, url) => DsoScan(Uri(url), svName) }) }
-    }
-
     config match {
       case BftScanClientConfig.TrustSingle(url, ttl) =>
         for {
@@ -1297,13 +1283,25 @@ object BftScanConnection {
         // We bootstrap with the set of provided seed-urls.
         // Since not all trusted SV seeds are provided (most likely), they will not be used in the initial scan connection checking.
         // In the future, add a new threshold for how many trusted seed-urls should be there.
-
-        val enableValidatorInternalStore = ts.enableInternalStore.getOrElse(false)
-
         for {
-          lastPersistedDsoScans <- lastPersistedDsoScansFuture
+          lastPersistedScans <- lastPersistedScanUrlList
+          bootstrapUris: NonEmptyList[Uri] =
+            if (ts.enableInternalStore) {
+              lastPersistedScans match {
+                case Some(list) if list.nonEmpty =>
+                  val urlStrings: List[String] = list.map(_._2)
+                  val uris: List[Uri] = urlStrings.map(u => Uri(u))
+                  NonEmptyList.fromList(uris).getOrElse {
+                    ts.seedUrls
+                  }
+                case _ =>
+                  ts.seedUrls
+              }
+            } else {
+              ts.seedUrls
+            }
           tempBftConnection <- bootstrapWithSeedNodes(
-            ts.seedUrls,
+            bootstrapUris,
             ts.amuletRulesCacheTimeToLive,
             spliceLedgerClient,
             ts.scansRefreshInterval,
@@ -1311,9 +1309,7 @@ object BftScanConnection {
             retryProvider,
             loggerFactory,
             builder,
-            if (enableValidatorInternalStore) { lastPersistedDsoScans }
-            else { None },
-            if (enableValidatorInternalStore) { persistScanUrlsCallback }
+            if (ts.enableInternalStore) { persistScanUrlsCallback }
             else { None },
           )
 
@@ -1355,7 +1351,7 @@ object BftScanConnection {
             connections,
             failed.toMap,
             uri => builder(uri, ts.amuletRulesCacheTimeToLive),
-            if (enableValidatorInternalStore) { persistScanUrlsCallback }
+            if (ts.enableInternalStore) { persistScanUrlsCallback }
             else { None },
             Bft.getScansInDsoRules,
             ts.scansRefreshInterval,
@@ -1392,11 +1388,26 @@ object BftScanConnection {
         } yield bftConnection
 
       case bft @ BftScanClientConfig.Bft(_, _, _, _) =>
-        val enableValidatorInternalStore = bft.enableInternalStore.getOrElse(false)
         for {
-          lastPersistedDsoScans <- lastPersistedDsoScansFuture
+          lastPersistedScans <- lastPersistedScanUrlList
+          bootstrapUris: NonEmptyList[Uri] =
+            if (bft.enableInternalStore) {
+              lastPersistedScans match {
+                case Some(list) if list.nonEmpty =>
+                  val urlStrings: List[String] = list.map(_._2)
+                  val uris: List[Uri] = urlStrings.map(u => Uri(u))
+                  NonEmptyList.fromList(uris).getOrElse {
+                    bft.seedUrls
+                  }
+                case _ =>
+                  bft.seedUrls
+              }
+            } else {
+              bft.seedUrls
+            }
+
           bftConnection <- bootstrapWithSeedNodes(
-            bft.seedUrls,
+            bootstrapUris,
             bft.amuletRulesCacheTimeToLive,
             spliceLedgerClient,
             bft.scansRefreshInterval,
@@ -1404,9 +1415,7 @@ object BftScanConnection {
             retryProvider,
             loggerFactory,
             builder,
-            if (enableValidatorInternalStore) { lastPersistedDsoScans }
-            else { None },
-            if (enableValidatorInternalStore) { persistScanUrlsCallback }
+            if (bft.enableInternalStore) { persistScanUrlsCallback }
             else { None },
           )
           _ <- retryProvider.waitUntil(
@@ -1550,7 +1559,7 @@ object BftScanConnection {
           ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
         scansRefreshInterval: NonNegativeFiniteDuration =
           ScanAppClientConfig.DefaultScansRefreshInterval,
-        enableInternalStore: Option[Boolean] = Some(false),
+        enableInternalStore: Boolean = true,
     ) extends BftScanClientConfig {
       def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): BftCustom =
         copy(amuletRulesCacheTimeToLive = ttl)
@@ -1562,7 +1571,7 @@ object BftScanConnection {
           ScanAppClientConfig.DefaultScansRefreshInterval,
         amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
           ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
-        enableInternalStore: Option[Boolean] = Some(false),
+        enableInternalStore: Boolean = true,
     ) extends BftScanClientConfig {
       def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): Bft =
         copy(amuletRulesCacheTimeToLive = ttl)
