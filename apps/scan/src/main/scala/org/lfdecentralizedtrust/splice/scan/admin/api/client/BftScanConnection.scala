@@ -945,16 +945,10 @@ object BftScanConnection {
 
         filteredScans = filterScans(scansInDsoRules)
 
-        dsoScanSeq: Seq[(String, String)] = filteredScans.map(scan =>
-          (scan.svName, scan.publicUrl.toString)
-        )
-
-        _ = persistScanUrlsCallback.map(f => f(dsoScanSeq))
-
         newState <- computeNewState(retriedCurrentState, filteredScans)
       } yield {
         currentScanConnectionsRef.set(newState)
-        logger.info(s"Updated scan list with ${dsoScanSeq.length} scans: $newState")
+        logger.info(s"Updated scan list: $newState")
 
         val connections = newState.scanConnections
         validateState(newState)
@@ -985,12 +979,30 @@ object BftScanConnection {
           (newScansFailedConnections, newScansSuccessfulConnections) <- attemptConnections(
             newScans
           )
+
+          newState = BftState(
+            (currentScanConnections -- removedScans) ++ newScansSuccessfulConnections,
+            (currentFailed -- removedScans) ++ newScansFailedConnections,
+          )
+
+          successfullyConnectedUrls = newState.openConnections.keys.toSet
+
+          filteredScans: Seq[DsoScan] = scansInDsoRules
+            .filter(scan => successfullyConnectedUrls.contains(scan.publicUrl))
+
+          dsoScanSeq: Seq[(String, String)] = filteredScans.map(scan =>
+            (scan.svName, scan.publicUrl.toString)
+          )
+
+          _ = persistScanUrlsCallback.map(f => f(dsoScanSeq))
         } yield {
           logger.info(
             s"New successful scans: ${newScansSuccessfulConnections.map(_._1)}, " +
               s"new failed scans: ${newScansFailedConnections.map(_._1)}, " +
               s"removed scans: $removedScans"
           )
+
+          logger.info(s"Updated scan list with ${dsoScanSeq.length} scans: $newState")
 
           removedScans.foreach { url =>
             currentScanConnections.get(url).foreach { case (connection, svName) =>
@@ -1000,11 +1012,7 @@ object BftScanConnection {
               attemptToClose(connection)
             }
           }
-
-          BftState(
-            (currentScanConnections -- removedScans) ++ newScansSuccessfulConnections,
-            (currentFailed -- removedScans) ++ newScansFailedConnections,
-          )
+          newState
         }
       }
     }
