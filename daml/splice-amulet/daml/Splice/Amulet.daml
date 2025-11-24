@@ -383,8 +383,8 @@ template SvRewardCoupon with
       do return SvRewardCoupon_ArchiveAsBeneficiaryResult
 
 
--- | A coupon recording an emission for the Development Fund from CIP-0082.
-template DevelopmentFundCoupon
+-- | A coupon recording an emission for the Unclaimed Development Fund from CIP-0082.
+template UnclaimedDevelopmentFundCoupon
   with
     dso : Party
     amount : Decimal -- ^ The total amount of `Amulet` to mint on collection.
@@ -468,6 +468,6 @@ instance HasCheckedFetch FeaturedAppActivityMarker ForDso where
 instance HasCheckedFetch UnclaimedActivityRecord ForOwner where
   contractGroupId UnclaimedActivityRecord{..} = ForOwner with dso; owner = beneficiary
 
-instance HasCheckedFetch DevelopmentFundCoupon ForDso where
-  contractGroupId DevelopmentFundCoupon{..} = ForDso with dso
+instance HasCheckedFetch UnclaimedDevelopmentFundCoupon ForDso where
+  contractGroupId UnclaimedDevelopmentFundCoupon{..} = ForDso with dso
 
