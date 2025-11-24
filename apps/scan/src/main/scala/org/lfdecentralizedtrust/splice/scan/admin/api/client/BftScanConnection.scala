@@ -870,7 +870,7 @@ object BftScanConnection {
     protected val initialScanConnections: Seq[SingleScanConnection]
     protected val initialFailedConnections: Map[Uri, Throwable]
     protected val connectionBuilder: Uri => Future[SingleScanConnection]
-    protected val persistScanUrlsCallback: Option[Seq[(String, String)] => Future[Unit]]
+    protected val scanUrlsChangedCallback: Option[Seq[(String, String)] => Future[Unit]]
     protected val getScans: BftScanConnection => Future[Seq[DsoScan]]
     val scansRefreshInterval: NonNegativeFiniteDuration
     val retryProvider: RetryProvider
@@ -994,7 +994,7 @@ object BftScanConnection {
             (scan.svName, scan.publicUrl.toString)
           )
 
-          _ = persistScanUrlsCallback.map(f => f(dsoScanSeq))
+          _ = scanUrlsChangedCallback.map(f => f(dsoScanSeq))
         } yield {
           logger.info(
             s"New successful scans: ${newScansSuccessfulConnections.map(_._1)}, " +
@@ -1079,7 +1079,7 @@ object BftScanConnection {
       override val initialScanConnections: Seq[SingleScanConnection],
       override val initialFailedConnections: Map[Uri, Throwable],
       override val connectionBuilder: Uri => Future[SingleScanConnection],
-      protected val persistScanUrlsCallback: Option[Seq[(String, String)] => Future[Unit]],
+      protected val scanUrlsChangedCallback: Option[Seq[(String, String)] => Future[Unit]],
       override val getScans: BftScanConnection => Future[Seq[DsoScan]],
       override val scansRefreshInterval: NonNegativeFiniteDuration,
       override val retryProvider: RetryProvider,
@@ -1106,7 +1106,7 @@ object BftScanConnection {
       override val initialScanConnections: Seq[SingleScanConnection],
       override val initialFailedConnections: Map[Uri, Throwable],
       override val connectionBuilder: Uri => Future[SingleScanConnection],
-      protected val persistScanUrlsCallback: Option[Seq[(String, String)] => Future[Unit]],
+      protected val scanUrlsChangedCallback: Option[Seq[(String, String)] => Future[Unit]],
       override val getScans: BftScanConnection => Future[Seq[DsoScan]],
       override val scansRefreshInterval: NonNegativeFiniteDuration,
       override val retryProvider: RetryProvider,
