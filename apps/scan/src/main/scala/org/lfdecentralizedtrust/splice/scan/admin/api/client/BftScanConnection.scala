@@ -1181,7 +1181,7 @@ object BftScanConnection {
   }
 
   private def bootstrapWithSeedNodes(
-      seedUris: NonEmptyList[Uri],
+      seedUrls: NonEmptyList[Uri],
       amuletRulesCacheTimeToLive: NonNegativeFiniteDuration,
       spliceLedgerClient: SpliceLedgerClient,
       scansRefreshInterval: NonNegativeFiniteDuration,
@@ -1201,9 +1201,9 @@ object BftScanConnection {
     val bootstrapUris: NonEmptyList[Uri] = lastPersistedScanUrlList match {
       case Some(scans) if scans.nonEmpty => {
         val urls = NonEmptyList.fromList(scans.map(_.publicUrl).toList)
-        urls.getOrElse { seedUris }
+        urls.getOrElse { seedUrls }
       }
-      case _ => seedUris
+      case _ => seedUrls
     }
 
     bootstrapUris.toList.foreach(uri => logger.info(s"Validator bootstrapping with scan URI: $uri"))
