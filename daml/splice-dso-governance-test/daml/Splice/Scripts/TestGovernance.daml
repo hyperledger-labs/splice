@@ -730,7 +730,8 @@ testAmuletRulesTickDurationChange = do
 testAmuletRulesConfigChange : Script ()
 testAmuletRulesConfigChange = do
   (app, dso, (sv1, sv2, sv3, _)) <- initMainNet
-  let Some devFundBeneficiary = partyFromText "DevFundBeneficiary"
+  -- TODO: use optDevelopmentFundManager once it is added.
+  -- let Some devFundBeneficiary = partyFromText "DevFundBeneficiary"
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
@@ -747,7 +748,6 @@ testAmuletRulesConfigChange = do
         maxNumInputs = 101
         maxNumOutputs = 101
         maxNumLockHolders = 11
-        optDevelopmentFundBeneficiary = Some devFundBeneficiary
 
   let defaultBaseRateTrafficLimits2 = BaseRateTrafficLimits with
         burstAmount = 10 * 20 * 1000 + 1

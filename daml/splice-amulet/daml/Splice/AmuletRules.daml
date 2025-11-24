@@ -1000,11 +1000,8 @@ summarizeAndConsumeInputs csum dso sender inps = do
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
         totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
-    summarizeAndConsumeInput _round s (InputUnclaimedDevelopmentFundCoupon couponCid) = do
-      case csum.config.optDevelopmentFundBeneficiary of
-        None -> abort "UnclaimedDevelopmentFundCoupon cannot be consumed without the Development Fund beneficiary configured"
-        Some developmentFundBeneficiary -> require "sender matches development fund beneficiary" $ sender == developmentFundBeneficiary
-      coupon <- fetchAndArchive forDso couponCid
+    summarizeAndConsumeInput _round s (InputDevelopmentFundCoupon couponCid) = do
+      coupon <- fetchAndArchive forOwner couponCid
       return TransferInputsSummary with
         totalAmuletAmount = s.totalAmuletAmount
         totalAppRewardAmount = s.totalAppRewardAmount
@@ -1197,7 +1194,6 @@ scaleFees s c = TransferConfig with
     maxNumInputs = c.maxNumInputs
     maxNumOutputs = c.maxNumOutputs
     maxNumLockHolders = c.maxNumLockHolders
-    optDevelopmentFundBeneficiary = c.optDevelopmentFundBeneficiary
 
 transferConfigAmuletFromOpenRound : OpenMiningRound -> TransferConfig Amulet
 transferConfigAmuletFromOpenRound openRound = scaleFees (1.0 / openRound.amuletPrice) openRound.transferConfigUsd
@@ -1311,7 +1307,7 @@ data TransferInput
         -- ^ Added in CIP-3. Optional validator faucet coupon input into this transfer.
   | InputValidatorLivenessActivityRecord (ContractId ValidatorLivenessActivityRecord)
   | InputUnclaimedActivityRecord (ContractId UnclaimedActivityRecord)
-  | InputUnclaimedDevelopmentFundCoupon (ContractId UnclaimedDevelopmentFundCoupon)
+  | InputDevelopmentFundCoupon (ContractId DevelopmentFundCoupon)
   deriving (Eq, Ord, Show)
 
 -- | Smart constructor for inputing validator faucet coupons into a transfer.
