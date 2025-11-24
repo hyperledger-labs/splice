@@ -79,13 +79,12 @@ import org.lfdecentralizedtrust.splice.validator.migration.{
   DomainMigrationDump,
   ParticipantPartyMigrator,
 }
-import org.lfdecentralizedtrust.splice.validator.store.ValidatorConfigProvider.ScanUrlInternalConfig
 import org.lfdecentralizedtrust.splice.validator.store.{
   ValidatorConfigProvider,
   ValidatorInternalStore,
   ValidatorStore,
 }
-import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
+import org.lfdecentralizedtrust.splice.validator.util.{ValidatorScanConnection, ValidatorUtil}
 import org.lfdecentralizedtrust.splice.wallet.admin.http.{
   HttpExternalWalletHandler,
   HttpWalletHandler,
@@ -184,36 +183,6 @@ class ValidatorApp(
     }
   } yield ()
 
-  private def persistScanUrlListBuilder(
-      validatorConfigProvider: ValidatorConfigProvider
-  )(implicit traceContext: TraceContext): Seq[(String, String)] => Future[Unit] = {
-
-    (connections: Seq[(String, String)]) =>
-      {
-        val internalConfigs: Seq[ScanUrlInternalConfig] = connections.map { case (svName, url) =>
-          ScanUrlInternalConfig(
-            svName = svName,
-            url = url,
-          )
-        }
-        validatorConfigProvider.setScanUrlInternalConfig(internalConfigs)
-      }
-  }
-
-  private def getPersistedScanList(
-      validatorConfigProvider: ValidatorConfigProvider
-  )(implicit traceContext: TraceContext): Future[Option[List[(String, String)]]] = {
-
-    val optionTConfig = validatorConfigProvider.getScanUrlInternalConfig()
-
-    optionTConfig.map { internalConfigs =>
-      internalConfigs.map { internalConfig =>
-        (internalConfig.svName, internalConfig.url)
-      }.toList
-    }.value
-
-  }
-
   override def preInitializeAfterLedgerConnection(
       connection: BaseLedgerConnection,
       ledgerClient: SpliceLedgerClient,
@@ -245,8 +214,8 @@ class ValidatorApp(
                 clock,
                 retryProvider,
                 loggerFactory,
-                Some(persistScanUrlListBuilder(configProvider)),
-                getPersistedScanList(configProvider),
+                Some(ValidatorScanConnection.persistScanUrlListBuilder(configProvider)),
+                ValidatorScanConnection.getPersistedScanList(configProvider),
               )
             }
             domainConnector = new DomainConnector(
@@ -773,8 +742,8 @@ class ValidatorApp(
           clock,
           retryProvider,
           loggerFactory,
-          Some(persistScanUrlListBuilder(configProvider)),
-          getPersistedScanList(configProvider),
+          Some(ValidatorScanConnection.persistScanUrlListBuilder(configProvider)),
+          ValidatorScanConnection.getPersistedScanList(configProvider),
         )
       }
 
