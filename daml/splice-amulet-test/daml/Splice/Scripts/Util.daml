@@ -654,6 +654,16 @@ setAmuletConfig app baseConfig newConfig = do
       newConfig
       baseConfig
 
+allocateDevelopmentFundCoupon
+  : AmuletApp -> Party -> Party -> Decimal -> [ContractId UnclaimedDevelopmentFundCoupon]
+  -> Script AmuletRules_AllocateDevelopmentFundCouponResult
+allocateDevelopmentFundCoupon app fundManager beneficiary amount unclaimedDevelopmentFundCouponCids = do
+  submitExerciseAmuletRulesByKey app [fundManager] [] AmuletRules_AllocateDevelopmentFundCoupon with
+    unclaimedDevelopmentFundCouponCids
+    beneficiary
+    amount
+    fundManager
+
 -- Metadata verification
 ------------------------
 
