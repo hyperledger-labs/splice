@@ -730,8 +730,7 @@ testAmuletRulesTickDurationChange = do
 testAmuletRulesConfigChange : Script ()
 testAmuletRulesConfigChange = do
   (app, dso, (sv1, sv2, sv3, _)) <- initMainNet
-  -- TODO: use optDevelopmentFundManager once it is added.
-  -- let Some devFundBeneficiary = partyFromText "DevFundBeneficiary"
+  let Some fundManager = partyFromText "FundManager"
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
@@ -769,6 +768,7 @@ testAmuletRulesConfigChange = do
         validatorRewardPercentage = 0.05
         appRewardPercentage = 0.15
         optDevelopmentFundPercentage = Some 0.05
+        optDevelopmentFundManager = Some fundManager
 
 
   let defaultIssuanceCurve2 = Schedule with
