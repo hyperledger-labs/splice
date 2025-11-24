@@ -23,7 +23,7 @@ function getTestSuiteTimesFromXml(testReportsDir: string): TestTimes {
                     const testSuiteTime = parseFloat(parsed.testsuite['@_time']);
                     testTimes[testSuiteName] = testSuiteTime;
                 } catch (e) {
-                    console.log(`Failed to parse xml report ${file}`)
+                    console.error(`Failed to parse xml report ${file}`)
                 }
             }
         });
