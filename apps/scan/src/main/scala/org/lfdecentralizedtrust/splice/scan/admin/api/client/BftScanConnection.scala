@@ -1205,7 +1205,7 @@ object BftScanConnection {
   ): Future[BftScanConnection] = {
     val logger = loggerFactory.getTracedLogger(getClass)
 
-    seedUrls.toList.foreach(uri => logger.info(s"Validator bootstrapping with scan URI: $uri"))
+    logger.info(s"Validator bootstrapping with ${seedUrls.size} seed URLs")
 
     for {
       initialSeedConnections <- seedUrls.traverse(uri =>

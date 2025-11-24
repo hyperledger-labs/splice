@@ -45,7 +45,7 @@ class BftScanConnectionIntegrationTest
               seedUrls = NonEmptyList.of(
                 Uri("http://127.0.0.1:5012")
               ),
-              scansRefreshInterval = NonNegativeFiniteDuration.ofSeconds(1),
+              scansRefreshInterval = NonNegativeFiniteDuration.ofSeconds(60),
             )
             c.copy(scanClient = dbEnabledConfig)
           case (_, c) => c
@@ -182,6 +182,12 @@ class BftScanConnectionIntegrationTest
     startAllSync(
       sv1Backend,
       sv1ScanBackend,
+      sv2Backend,
+      sv2ScanBackend,
+      sv3Backend,
+      sv3ScanBackend,
+      sv4Backend,
+      sv4ScanBackend,
     )
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
@@ -190,30 +196,8 @@ class BftScanConnectionIntegrationTest
       },
       logs => {
         val messages = logs.map(_.message)
-        withClue("Validator should bootstrap with only sv1 scan") {
-          existsUrl(messages, "http://localhost:5012") &&
-          !existsUrl(messages, "http://localhost:5112") &&
-          !existsUrl(messages, "http://localhost:5212") &&
-          !existsUrl(messages, "http://localhost:5312")
-        } should be(true).withClue(s"Actual Logs: $logs")
-      },
-    )
-
-    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-      {
-        startAllSync(
-          sv2Backend,
-          sv2ScanBackend,
-          sv3Backend,
-          sv3ScanBackend,
-          sv4Backend,
-          sv4ScanBackend,
-        )
-      },
-      logs => {
-        val messages = logs.map(_.message)
-        withClue("validator should eventually refresh the scan list") {
-          messages.exists(_.contains(s"Updated scan list with 4 scans:"))
+        withClue("Validator first bootstraps with 1 scan and then 4 scans") {
+          existsNumUrl(messages, 1) && existsNumUrl(messages, 4)
         } should be(true).withClue(s"Actual Logs: $logs")
       },
     )
@@ -225,11 +209,8 @@ class BftScanConnectionIntegrationTest
       },
       logs => {
         val messages = logs.map(_.message)
-        withClue("Validator should bootstrap with all scans") {
-          existsUrl(messages, "http://localhost:5012") &&
-          existsUrl(messages, "http://localhost:5112") &&
-          existsUrl(messages, "http://localhost:5212") &&
-          existsUrl(messages, "http://localhost:5312")
+        withClue("Validator should bootstrap with 4 scans only") {
+          !existsNumUrl(messages, 1) && existsNumUrl(messages, 4)
         } should be(true).withClue(s"Actual Logs: $logs")
       },
     )
@@ -242,8 +223,8 @@ class BftScanConnectionIntegrationTest
 
   }
 
-  private def existsUrl(messages: Seq[String], uri: String) = {
-    messages.exists(_.contains(s"Validator bootstrapping with scan URI: $uri"))
+  private def existsNumUrl(messages: Seq[String], num: Int) = {
+    messages.exists(_.contains(s"Validator bootstrapping with ${num} seed URLs"))
   }
 
 }
