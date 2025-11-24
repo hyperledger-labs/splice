@@ -77,9 +77,9 @@ def _parse_cli_args() -> argparse.Namespace:
         """
     )
     parser.add_argument(
-        "scan_url",
-        help="Address of the Splice Scan server",
-        default="http://localhost:5012",
+        "scan_urls",
+        nargs="+",
+        help="Address(es) of the Splice Scan server(s). Multiple URLs can be provided for round-robin failover.",
     )
     parser.add_argument("--loglevel", help="Sets the log level", default="INFO")
     parser.add_argument(
@@ -182,10 +182,20 @@ class PaginationKey:
 @dataclass
 class ScanClient:
     session: aiohttp.ClientSession
-    url: str
+    urls: list[str]
     page_size: int
     call_count: int = 0
     retry_count: int = 0
+    current_url_index: int = 0
+
+    def _get_current_url(self) -> str:
+        """Get the current URL from the round-robin list."""
+        return self.urls[self.current_url_index]
+
+    def _rotate_to_next_url(self):
+        """Move to the next URL in the round-robin list."""
+        self.current_url_index = (self.current_url_index + 1) % len(self.urls)
+        LOG.info(f"Rotating to next scan URL: {self._get_current_url()}")
 
     async def updates(self, after: Optional[PaginationKey]):
         payload = {"page_size": self.page_size}
@@ -193,7 +203,7 @@ class ScanClient:
             payload["after"] = after.to_json()
 
         json = await self.__post_with_retry_on_statuses(
-            f"{self.url}/api/scan/v0/updates",
+            f"{self._get_current_url()}/api/scan/v0/updates",
             payload=payload,
             max_retries=30,
             delay_seconds=0.5,
@@ -207,20 +217,38 @@ class ScanClient:
         assert max_retries >= 1
         retry = 0
         self.call_count = self.call_count + 1
-        while retry < max_retries:
-            response = await self.session.post(url, json=payload)
-            if response.status in statuses:
+        total_attempts = max_retries * len(self.urls)
+
+        while retry < total_attempts:
+            try:
+                response = await self.session.post(url, json=payload)
+                if response.status in statuses:
+                    LOG.debug(
+                        f"Request to {url} with payload {payload} failed with status {response.status}"
+                    )
+                    retry += 1
+                    if retry < total_attempts:
+                        self.retry_count = self.retry_count + 1
+                        self._rotate_to_next_url()
+                        url = f"{self._get_current_url()}/api/scan/v0/updates"
+                    await asyncio.sleep(delay_seconds)
+                else:
+                    response.raise_for_status()
+                    return await response.json()
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 LOG.debug(
-                    f"Request to {url} with payload {payload} failed with status {response.status}, retrying after {delay_seconds} seconds"
+                    f"Request to {url} with payload {payload} failed with error: {e}"
                 )
                 retry += 1
-                if retry < max_retries:
+                if retry < total_attempts:
                     self.retry_count = self.retry_count + 1
-                await asyncio.sleep(delay_seconds)
-            else:
-                break
-        if retry == max_retries:
-            LOG.error(f"Exceeded max retries {max_retries}, giving up")
+                    self._rotate_to_next_url()
+                    url = f"{self._get_current_url()}/api/scan/v0/updates"
+                    await asyncio.sleep(delay_seconds)
+                else:
+                    raise
+
+        LOG.error(f"Exceeded max retries {total_attempts} across all URLs, giving up")
         response.raise_for_status()
         return await response.json()
 
@@ -950,6 +978,7 @@ async def main():
     _log_uncaught_exceptions()
 
     LOG.info(f"Starting unclaimed_sv_rewards with arguments: {args}")
+    LOG.info(f"Using scan URLs (round-robin): {args.scan_urls}")
 
     app_state = State.create_or_restore_from_cache(args)
 
@@ -957,7 +986,7 @@ async def main():
     tx_count = 0
 
     async with aiohttp.ClientSession() as session:
-        scan_client = ScanClient(session, args.scan_url, args.page_size)
+        scan_client = ScanClient(session, args.scan_urls, args.page_size)
 
         while True:
             json_batch = await scan_client.updates(app_state.pagination_key)
