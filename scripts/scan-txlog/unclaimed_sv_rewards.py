@@ -37,7 +37,7 @@ def _default_logger(name, loglevel):
     cli_handler = colorlog.StreamHandler()
     cli_handler.setFormatter(
         colorlog.ColoredFormatter(
-            "%(log_color)s%(levelname)s:%(name)s:%(message)s",
+            "%(log_color)s%(asctime)s - %(levelname)s:%(name)s:%(message)s",
             log_colors={
                 "DEBUG": "cyan",
                 "INFO": "green",
@@ -45,10 +45,11 @@ def _default_logger(name, loglevel):
                 "ERROR": "red",
                 "CRITICAL": "red,bg_white",
             },
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
     )
     file_handler = logging.FileHandler("log/scan_txlog.log")
-    file_handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+    file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s:%(name)s:%(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
 
     logger = colorlog.getLogger(name)
     logger.addHandler(cli_handler)
