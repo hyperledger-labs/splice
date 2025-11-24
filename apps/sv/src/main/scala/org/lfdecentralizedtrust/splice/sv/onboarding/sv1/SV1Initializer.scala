@@ -94,6 +94,7 @@ import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
@@ -128,6 +129,7 @@ class SV1Initializer(
     mat: Materializer,
     tracer: Tracer,
     esf: ExecutionSequencerFactory,
+    actorSystem: ActorSystem,
 ) extends NodeInitializerUtil {
 
   import SV1Initializer.bootstrapTransactionOrdering

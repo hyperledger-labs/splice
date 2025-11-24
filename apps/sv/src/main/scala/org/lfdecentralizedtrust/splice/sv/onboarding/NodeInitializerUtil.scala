@@ -13,6 +13,7 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.{
   EnabledFeaturesConfig,
@@ -89,6 +90,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       mat: Materializer,
       tracer: Tracer,
       esf: ExecutionSequencerFactory,
+      actorSystem: ActorSystem,
   ) =
     new SvSvAutomationService(
       clock,

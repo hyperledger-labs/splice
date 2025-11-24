@@ -27,6 +27,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.PeriodicBackupDumpConfig
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
@@ -51,6 +52,7 @@ class SvSvAutomationService(
     mat: Materializer,
     tracer: Tracer,
     esf: ExecutionSequencerFactory,
+    actorSystem: ActorSystem,
 ) extends SpliceAppAutomationService(
       config.automation,
       clock,

@@ -28,6 +28,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import org.lfdecentralizedtrust.splice.config.{
@@ -108,6 +109,7 @@ class JoiningNodeInitializer(
     tc: TraceContext,
     tracer: Tracer,
     esf: ExecutionSequencerFactory,
+    actorSystem: ActorSystem,
 ) extends NodeInitializerUtil {
 
   private lazy val svConnection = OptionT(joiningConfig.traverse { conf =>

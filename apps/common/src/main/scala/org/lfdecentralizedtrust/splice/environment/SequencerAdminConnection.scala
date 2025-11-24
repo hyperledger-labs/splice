@@ -45,7 +45,6 @@ import com.google.protobuf.ByteString
 import com.typesafe.config.ConfigFactory
 import io.grpc.stub.StreamObserver
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.connectors.google.auth.Credentials
 import org.apache.pekko.stream.connectors.google.{GoogleAttributes, GoogleSettings}
 import org.apache.pekko.util.ByteString as PekkoByteString
@@ -140,9 +139,8 @@ class SequencerAdminConnection(
       fileName: String,
   )(implicit
       executionSequencerFactory: ExecutionSequencerFactory,
-      materializer: Materializer,
+      actorSystem: ActorSystem,
   ): Future[StorageObject] = {
-    implicit val system: ActorSystem = materializer.system
 
     val bucketConfig = backupDumConfig match {
       case BackupDumpConfig.Gcp(bucketConfig, _) =>

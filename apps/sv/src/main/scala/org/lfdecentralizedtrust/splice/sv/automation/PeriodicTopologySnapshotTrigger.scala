@@ -12,7 +12,7 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.stream.Materializer
+import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.config.PeriodicBackupDumpConfig
 import org.lfdecentralizedtrust.splice.environment.{
@@ -37,7 +37,7 @@ class PeriodicTopologySnapshotTrigger(
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
-    mat: Materializer,
+    actorSystem: ActorSystem,
     esf: ExecutionSequencerFactory,
 ) extends PeriodicTaskTrigger(config.backupInterval, triggerContext) {
 
@@ -88,7 +88,7 @@ class PeriodicTopologySnapshotTrigger(
   )(implicit
       traceContext: TraceContext,
       esf: ExecutionSequencerFactory,
-      mat: Materializer,
+      actorSystem: ActorSystem,
   ): Future[TaskSuccess] =
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
