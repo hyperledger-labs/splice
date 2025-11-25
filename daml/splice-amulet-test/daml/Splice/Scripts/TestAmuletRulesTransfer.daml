@@ -602,9 +602,11 @@ testInputDevelopmentFundCoupon = do
   let totalAmount = coupon1.amount + coupon2.amount
 
   -- Allocate a DevelopmentFundCoupon
+  now <- getTime
+  let expiresAt = addRelTime now (days 2)
   AmuletRules_AllocateDevelopmentFundCouponResult
     { developmentFundCouponCid, optUnclaimedDevelopmentFundCouponCid = None } <-
-      allocateDevelopmentFundCoupon app alice.primaryParty bob.primaryParty totalAmount [cid1, cid2]
+      allocateDevelopmentFundCoupon app alice.primaryParty bob.primaryParty totalAmount expiresAt [cid1, cid2]
 
   transferResult <-
     checkTransferMetadata app TxKind_MergeSplit bob.primaryParty $
