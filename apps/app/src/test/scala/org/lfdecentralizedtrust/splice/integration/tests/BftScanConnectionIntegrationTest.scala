@@ -211,7 +211,10 @@ class BftScanConnectionIntegrationTest
         withClue("Validator should first bootstrap with 1 and then 4 scans") {
           messages.filter(_.contains(bootstrapsWith1UrlLog)) should have length 1
           messages.filter(_.contains(bootstrapsWith4UrlsLog)) should have length 1
-        }.withClue(s"Actual Logs: $messages")
+        }.withClue(
+          s"Actual Logs: \n ${messages.filter(_.contains(bootstrapsWith1UrlLog))} \n ${messages
+              .filter(_.contains(bootstrapsWith4UrlsLog))} "
+        )
       },
     )
 
@@ -241,7 +244,10 @@ class BftScanConnectionIntegrationTest
         ) {
           messages.filter(_.contains(bootstrapsWith1UrlLog)) should have length 0
           messages.filter(_.contains(bootstrapsWith4UrlsLog)) should have length 2
-        }.withClue(s"Actual Logs: $messages")
+        }.withClue(
+          s"Actual Logs: \n ${messages.filter(_.contains(bootstrapsWith1UrlLog))} \n ${messages
+              .filter(_.contains(bootstrapsWith4UrlsLog))} "
+        )
       },
     )
 
