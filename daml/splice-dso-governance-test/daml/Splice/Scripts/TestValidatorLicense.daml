@@ -256,7 +256,7 @@ testVoteExecutionInstructionExpire = do
   initiateAndAcceptVote app [sv1, sv2, sv3, sv4] (ARC_DsoRules (SRARC_ModifyValidatorLicenses
     (ValidatorLicensesModification with
       changes = [VLC_ChangeWeight with validator = validator1; weight = 5.0
-               , VLC_ChangeWeight with validator = validator2; weight = 10.0])))
+               , VLC_Withdraw with validator = validator2])))
 
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
   instructions <- query @VoteExecutionInstruction app.dso
