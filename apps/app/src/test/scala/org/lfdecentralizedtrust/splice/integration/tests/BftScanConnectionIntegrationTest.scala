@@ -201,7 +201,7 @@ class BftScanConnectionIntegrationTest
       logs => {
         val messages = logs.map(_.message)
         withClue("Validator first bootstraps with 1 scan and then 4 scans") {
-          existsNumUrl(messages, 1) && existsNumUrl(messages, 4)
+          bootstrapsWith1Url(messages) && bootstrapsWith4Urls(messages)
         } should be(true).withClue(s"Actual Logs: $logs")
       },
     )
@@ -234,7 +234,7 @@ class BftScanConnectionIntegrationTest
       logs => {
         val messages = logs.map(_.message)
         withClue("Validator should bootstrap with 4 scans only") {
-          !existsNumUrl(messages, 1) && existsNumUrl(messages, 4)
+          !bootstrapsWith1Url(messages) && bootstrapsWith4Urls(messages)
         } should be(true).withClue(s"Actual Logs: $logs")
       },
     )
@@ -247,8 +247,18 @@ class BftScanConnectionIntegrationTest
 
   }
 
-  private def existsNumUrl(messages: Seq[String], num: Int) = {
-    messages.exists(_.contains(s"Validator bootstrapping with ${num} seed URLs"))
+  private def bootstrapsWith1Url(messages: Seq[String]) = {
+    messages.exists(
+      _.contains(s"Validator bootstrapping with 1 seed URLs: List(http://127.0.0.1:5012)")
+    )
+  }
+
+  private def bootstrapsWith4Urls(messages: Seq[String]) = {
+    messages.exists(
+      _.contains(
+        s"Validator bootstrapping with 4 seed URLs: List(http://localhost:5012, http://localhost:5112, http://localhost:5212, http://localhost:5312)"
+      )
+    )
   }
 
 }
