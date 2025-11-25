@@ -625,11 +625,15 @@ template AmuletRules
         unclaimedDevelopmentFundCouponCids : [ContractId UnclaimedDevelopmentFundCoupon]
         beneficiary : Party
         amount : Decimal
+        expiresAt : Time
         fundManager : Party
       controller fundManager
       do
-        -- Verify fundManager
+        -- Verify expiry
         now <- getTime
+        require "expiresAt is not in the past" (expiresAt > now)
+
+        -- Verify fundManager
         case (getValueAsOf now configSchedule).issuanceCurve.initialValue.optDevelopmentFundManager of
           None -> abort "DevelopmentFundCoupon cannot be allocated without a Development Fund manager configured"
           Some developmentFundManager ->
@@ -647,7 +651,7 @@ template AmuletRules
              | otherwise -> Some <$> create UnclaimedDevelopmentFundCoupon with dso; amount = leftover
 
         -- record development fund coupon contract
-        developmentFundCouponCid <- create DevelopmentFundCoupon with dso; beneficiary; fundManager; amount
+        developmentFundCouponCid <- create DevelopmentFundCoupon with dso; beneficiary; fundManager; amount; expiresAt
 
         return AmuletRules_AllocateDevelopmentFundCouponResult with
           developmentFundCouponCid
