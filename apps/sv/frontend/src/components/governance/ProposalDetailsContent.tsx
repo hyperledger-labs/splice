@@ -7,9 +7,9 @@ import {
   VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
-import { ArrowBack } from '@mui/icons-material';
-import { Box, Button, Chip, Divider, Link, Paper, Tab, Tabs, Typography } from '@mui/material';
-import React, { useMemo, useState } from 'react';
+import { ChevronLeft } from '@mui/icons-material';
+import { Box, Button, Chip, Link, Stack, Tab, Tabs, Typography } from '@mui/material';
+import React, { PropsWithChildren, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import {
@@ -158,30 +158,34 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
   return (
     <Box sx={{ p: 4, display: 'flex', justifyContent: 'center' }}>
       <Box sx={{ width: '100%', p: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" sx={{ flexGrow: 1 }} data-testid="proposal-details-title">
+        <Stack direction="row" alignItems="center" justifyContent="space-between" mb="14px">
+          <Typography
+            variant="h4"
+            fontSize={20}
+            fontWeight={700}
+            data-testid="proposal-details-title"
+          >
             Proposal Details
           </Typography>
           <Button
             component={RouterLink}
             to="/governance-beta/proposals"
             size="small"
-            startIcon={<ArrowBack fontSize="small" />}
-            sx={{ color: 'text.secondary' }}
+            color="secondary"
+            startIcon={<ChevronLeft fontSize="small" />}
           >
             Back to all votes
           </Button>
-        </Box>
+        </Stack>
 
-        <Paper sx={{ bgcolor: 'background.paper', p: 6 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+        <Stack sx={{ bgcolor: '#1b1b1b', p: 6 }} alignItems="center" gap={8}>
+          <VoteSection title="Proposal Details">
             <DetailItem
               label="Action"
               value={proposalDetails.actionName}
               labelId="proposal-details-action-label"
               valueId="proposal-details-action-value"
             />
-            <Divider sx={{ my: 1 }} />
 
             <DetailItem
               label="Contract ID"
@@ -190,7 +194,6 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
               valueId="proposal-details-contractid-value"
               isPartyId
             />
-            <Divider sx={{ my: 1 }} />
 
             {proposalDetails.action === 'SRARC_OffboardSv' && (
               <OffboardMemberSection memberPartyId={proposalDetails.proposal.memberToOffboard} />
@@ -256,15 +259,12 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
               </>
             )}
 
-            <Divider sx={{ my: 1 }} />
-
             <DetailItem
               label="Summary"
               value={proposalDetails.summary}
               labelId="proposal-details-summary-label"
               valueId="proposal-details-summary-value"
             />
-            <Divider sx={{ my: 1 }} />
 
             <DetailItem
               label="URL"
@@ -276,78 +276,41 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
               labelId="proposal-details-url-label"
               valueId="proposal-details-url-value"
             />
-          </Box>
+          </VoteSection>
 
-          <Divider sx={{ mt: 1, mb: 8 }} />
+          <VoteSection title="Voting Information" data-testid="proposal-details-voting-information">
+            <DetailItem
+              label="Requester"
+              value={votingInformation.requester}
+              valueId="proposal-details-requester-party-id"
+              isPartyId
+            />
 
-          {/* Voting Information Section */}
-          <Typography variant="h6" component="h2" gutterBottom sx={{ mb: 3 }}>
-            Voting Information
-          </Typography>
+            <DetailItem
+              label="Threshold Deadline"
+              value={
+                <Stack gap={3}>
+                  <Box>{dayjs(votingInformation.votingThresholdDeadline).fromNow()}</Box>
+                  <Box>{votingInformation.votingThresholdDeadline}</Box>
+                </Stack>
+              }
+              valueId="proposal-details-voting-closes-duration"
+            />
 
-          <Box
-            sx={{ display: 'flex', flexDirection: 'column' }}
-            data-testid="proposal-details-voting-information"
-          >
-            <Box sx={{ py: 1 }}>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Requester
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <PartyId
-                  partyId={votingInformation.requester}
-                  className="proposal-details-requester-party-id"
-                  id="proposal-details-requester-party-id"
-                />
-              </Box>
-            </Box>
-            <Divider sx={{ my: 1 }} />
-
-            <Box sx={{ py: 1 }}>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Threshold Deadline
-              </Typography>
-              <Typography
-                variant="body1"
-                data-testid="proposal-details-voting-closes-duration"
-                gutterBottom
-              >
-                {dayjs(votingInformation.votingThresholdDeadline).fromNow()}
-              </Typography>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                data-testid="proposal-details-voting-closes-value"
-              >
-                {votingInformation.votingThresholdDeadline}
-              </Typography>
-            </Box>
-            <Divider sx={{ my: 1 }} />
-
-            <Box sx={{ py: 1 }}>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Voting Takes Effect On
-              </Typography>
-              <Typography
-                variant="body1"
-                data-testid="proposal-details-vote-takes-effect-duration"
-                gutterBottom
-              >
-                {votingInformation.voteTakesEffect === 'Threshold'
-                  ? 'Threshold'
-                  : dayjs(votingInformation.voteTakesEffect).fromNow()}
-              </Typography>
-              {votingInformation.voteTakesEffect !== 'Threshold' && (
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  data-testid="proposal-details-vote-takes-effect-value"
-                >
-                  {votingInformation.voteTakesEffect}
-                </Typography>
-              )}
-            </Box>
-            <Divider sx={{ my: 1 }} />
+            <DetailItem
+              label="Voting Takes Effect On"
+              value={
+                <Stack gap={3}>
+                  <Box>
+                    {votingInformation.voteTakesEffect === 'Threshold'
+                      ? 'Threshold'
+                      : dayjs(votingInformation.voteTakesEffect).fromNow()}
+                  </Box>
+                  <Box>{votingInformation.voteTakesEffect}</Box>
+                </Stack>
+              }
+              valueId="proposal-details-vote-takes-effect-duration"
+            />
 
             <DetailItem
               label="Status"
@@ -355,16 +318,9 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
               labelId="proposal-details-status-label"
               valueId="proposal-details-status-value"
             />
-          </Box>
+          </VoteSection>
 
-          <Divider sx={{ mt: 1, mb: 8 }} />
-
-          {/* Votes Section */}
-          <Typography variant="h6" component="h2" gutterBottom>
-            Votes
-          </Typography>
-
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <VoteSection title="Votes">
             <Tabs
               value={voteTabValue}
               onChange={handleVoteTabChange}
@@ -393,46 +349,67 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
                 data-testid="no-vote-votes-tab"
               />
             </Tabs>
-          </Box>
 
-          <Box
-            sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 4 }}
-            data-testid="proposal-details-votes"
-          >
-            {getFilteredVotes().map((vote, index) => (
-              <VoteItem
-                key={`${vote.vote}-${index}`}
-                voter={vote.sv}
-                url={vote.reason?.url || ''}
-                comment={vote.reason?.body || ''}
-                status={vote.vote}
-                isYou={vote.isYou}
-                isClosed={isClosed}
+            <Box
+              sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 4 }}
+              data-testid="proposal-details-votes"
+            >
+              {getFilteredVotes().map((vote, index) => (
+                <VoteItem
+                  key={`${vote.vote}-${index}`}
+                  voter={vote.sv}
+                  url={vote.reason?.url || ''}
+                  comment={vote.reason?.body || ''}
+                  status={vote.vote}
+                  isYou={vote.isYou}
+                  isClosed={isClosed}
+                />
+              ))}
+              {getFilteredVotes().length === 0 && (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No votes found for this category.
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          </VoteSection>
+
+          <VoteSection title="Your vote" data-testid="your-vote-form">
+            {proposalDetails.isVoteRequest && !isClosed && (
+              <ProposalVoteForm
+                voteRequestContractId={contractId}
+                currentSvPartyId={currentSvPartyId}
+                votes={votes}
               />
-            ))}
-            {getFilteredVotes().length === 0 && (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <Typography variant="body2" color="text.secondary">
-                  No votes found for this category.
-                </Typography>
-              </Box>
             )}
-          </Box>
-
-          <Divider sx={{ my: 4 }} />
-
-          {proposalDetails.isVoteRequest && !isClosed && (
-            <ProposalVoteForm
-              voteRequestContractId={contractId}
-              currentSvPartyId={currentSvPartyId}
-              votes={votes}
-            />
-          )}
-        </Paper>
+          </VoteSection>
+        </Stack>
       </Box>
     </Box>
   );
 };
+
+interface VoteSectionProps extends PropsWithChildren {
+  title: string;
+}
+
+const VoteSection: React.FC<VoteSectionProps> = ({ title, children }) => (
+  <Box sx={{ width: '100%', maxWidth: '800px' }}>
+    <VoteSectionHeader content={title} />
+    <Stack gap={'24px'}>{children}</Stack>
+  </Box>
+);
+
+interface VoteSectionHeaderProps {
+  content: string;
+}
+
+const VoteSectionHeader: React.FC<VoteSectionHeaderProps> = ({ content }) => (
+  <Typography component="h2" fontSize={18} fontWeight={700} fontFamily="lato" mb={3}>
+    {content}
+  </Typography>
+);
 
 interface VoteItemProps {
   voter: string;
@@ -543,20 +520,15 @@ interface OffboardMemberSectionProps {
 const OffboardMemberSection = ({ memberPartyId }: OffboardMemberSectionProps) => {
   return (
     <Box
-      sx={{ py: 1 }}
       id="proposal-details-offboard-member-section"
       data-testid="proposal-details-offboard-member-section"
     >
-      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-        Member
-      </Typography>
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <PartyId
-          partyId={memberPartyId}
-          className="proposal-details-member-party-id"
-          id="proposal-details-member-party-id"
-        />
-      </Box>
+      <DetailItem
+        label="Member"
+        value={memberPartyId}
+        valueId="proposal-details-member-party-id"
+        isPartyId
+      />
     </Box>
   );
 };
@@ -568,18 +540,15 @@ interface FeatureAppSectionProps {
 const FeatureAppSection = ({ provider }: FeatureAppSectionProps) => {
   return (
     <Box
-      sx={{ py: 1 }}
       id="proposal-details-feature-app-section"
       data-testid="proposal-details-feature-app-section"
     >
-      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-        <DetailItem
-          label="Provider ID"
-          value={provider}
-          labelId="proposal-details-feature-app-label"
-          valueId="proposal-details-feature-app-value"
-        />
-      </Box>
+      <DetailItem
+        label="Provider ID"
+        value={provider}
+        labelId="proposal-details-feature-app-label"
+        valueId="proposal-details-feature-app-value"
+      />
     </Box>
   );
 };
@@ -591,18 +560,15 @@ interface UnfeatureAppSectionProps {
 const UnfeatureAppSection = ({ rightContractId }: UnfeatureAppSectionProps) => {
   return (
     <Box
-      sx={{ py: 1 }}
       id="proposal-details-unfeature-app-section"
       data-testid="proposal-details-unfeature-app-section"
     >
-      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-        <DetailItem
-          label="Contract ID"
-          value={rightContractId}
-          labelId="proposal-details-unfeature-app-label"
-          valueId="proposal-details-unfeature-app-value"
-        />
-      </Box>
+      <DetailItem
+        label="Contract ID"
+        value={rightContractId}
+        labelId="proposal-details-unfeature-app-label"
+        valueId="proposal-details-unfeature-app-value"
+      />
     </Box>
   );
 };
@@ -621,18 +587,15 @@ const UpdateSvRewardWeightSection = ({
   return (
     <>
       <Box
-        sx={{ py: 1 }}
         id="proposal-details-update-sv-reward-weight-section"
         data-testid="proposal-details-update-sv-reward-weight-section"
       >
-        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            Member
-          </Typography>
-          <Box sx={{ mb: 1 }}>
-            <PartyId partyId={svToUpdate} id="proposal-details-member-party-id" />
-          </Box>
-        </Box>
+        <DetailItem
+          label="Member"
+          value={svToUpdate}
+          valueId="proposal-details-member-party-id"
+          isPartyId
+        />
       </Box>
 
       <ConfigValuesChanges
