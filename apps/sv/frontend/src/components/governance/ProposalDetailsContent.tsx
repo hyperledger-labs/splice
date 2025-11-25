@@ -34,6 +34,7 @@ import { JsonDiffAccordion } from './JsonDiffAccordion';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { DetailItem } from './proposal-details/DetailItem';
 import { CreateUnallocatedUnclaimedActivityRecordSection } from './proposal-details/CreateUnallocatedUnclaimedActivityRecordSection';
+import { MemberIdentifier } from '../beta';
 
 dayjs.extend(relativeTime);
 
@@ -189,10 +190,15 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
 
             <DetailItem
               label="Contract ID"
-              value={contractId}
+              value={
+                <MemberIdentifier
+                  partyId={contractId}
+                  isYou={false}
+                  size="large"
+                  data-testid="proposal-details-contractid-value"
+                />
+              }
               labelId="proposal-details-contractid-label"
-              valueId="proposal-details-contractid-value"
-              isPartyId
             />
 
             {proposalDetails.action === 'SRARC_OffboardSv' && (
@@ -269,29 +275,42 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             <DetailItem
               label="URL"
               value={
-                <Link href={sanitizeUrl(proposalDetails.url)} target="_blank" color="primary">
+                <Link
+                  href={sanitizeUrl(proposalDetails.url)}
+                  target="_blank"
+                  color="primary"
+                  data-testid="proposal-details-url-value"
+                >
                   {sanitizeUrl(proposalDetails.url)}
                 </Link>
               }
               labelId="proposal-details-url-label"
-              valueId="proposal-details-url-value"
             />
           </VoteSection>
 
           <VoteSection title="Voting Information" data-testid="proposal-details-voting-information">
             <DetailItem
               label="Requester"
-              value={votingInformation.requester}
-              valueId="proposal-details-requester-party-id"
-              isPartyId
+              value={
+                <MemberIdentifier
+                  partyId={votingInformation.requester}
+                  isYou={false}
+                  size="large"
+                  data-testid="proposal-details-requester-party-id"
+                />
+              }
             />
 
             <DetailItem
               label="Threshold Deadline"
               value={
                 <Stack gap={3}>
-                  <Box>{dayjs(votingInformation.votingThresholdDeadline).fromNow()}</Box>
-                  <Box>{votingInformation.votingThresholdDeadline}</Box>
+                  <Box data-testid="proposal-details-voting-closes-duration">
+                    {dayjs(votingInformation.votingThresholdDeadline).fromNow()}
+                  </Box>
+                  <Box data-testid="proposal-details-voting-closes-value">
+                    {votingInformation.votingThresholdDeadline}
+                  </Box>
                 </Stack>
               }
               valueId="proposal-details-voting-closes-duration"
@@ -301,12 +320,16 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
               label="Voting Takes Effect On"
               value={
                 <Stack gap={3}>
-                  <Box>
+                  <Box data-testid="proposal-details-vote-takes-effect-duration">
                     {votingInformation.voteTakesEffect === 'Threshold'
                       ? 'Threshold'
                       : dayjs(votingInformation.voteTakesEffect).fromNow()}
                   </Box>
-                  <Box>{votingInformation.voteTakesEffect}</Box>
+                  {votingInformation.voteTakesEffect !== 'Threshold' && (
+                    <Box data-testid="proposal-details-vote-takes-effect-value">
+                      {votingInformation.voteTakesEffect}
+                    </Box>
+                  )}
                 </Stack>
               }
               valueId="proposal-details-vote-takes-effect-duration"
@@ -320,7 +343,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             />
           </VoteSection>
 
-          <VoteSection title="Votes">
+          <VoteSection title="Votes" data-testid="proposal-details-votes">
             <Tabs
               value={voteTabValue}
               onChange={handleVoteTabChange}
@@ -352,7 +375,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
 
             <Box
               sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 4 }}
-              data-testid="proposal-details-votes"
+              data-testid="proposal-details-votes-list"
             >
               {getFilteredVotes().map((vote, index) => (
                 <VoteItem
@@ -375,7 +398,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             </Box>
           </VoteSection>
 
-          <VoteSection title="Your vote" data-testid="your-vote-form">
+          <VoteSection title="Your vote" data-testid="proposal-details-your-vote">
             {proposalDetails.isVoteRequest && !isClosed && (
               <ProposalVoteForm
                 voteRequestContractId={contractId}
@@ -392,10 +415,11 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
 
 interface VoteSectionProps extends PropsWithChildren {
   title: string;
+  'data-testid': string;
 }
 
-const VoteSection: React.FC<VoteSectionProps> = ({ title, children }) => (
-  <Box sx={{ width: '100%', maxWidth: '800px' }}>
+const VoteSection: React.FC<VoteSectionProps> = ({ title, children, 'data-testid': testId }) => (
+  <Box sx={{ width: '100%', maxWidth: '800px' }} data-testid={testId}>
     <VoteSectionHeader content={title} />
     <Stack gap={'24px'}>{children}</Stack>
   </Box>
@@ -525,9 +549,14 @@ const OffboardMemberSection = ({ memberPartyId }: OffboardMemberSectionProps) =>
     >
       <DetailItem
         label="Member"
-        value={memberPartyId}
-        valueId="proposal-details-member-party-id"
-        isPartyId
+        value={
+          <MemberIdentifier
+            partyId={memberPartyId}
+            isYou={false}
+            size="large"
+            data-testid="proposal-details-member-party-id"
+          />
+        }
       />
     </Box>
   );
@@ -592,9 +621,14 @@ const UpdateSvRewardWeightSection = ({
       >
         <DetailItem
           label="Member"
-          value={svToUpdate}
-          valueId="proposal-details-member-party-id"
-          isPartyId
+          value={
+            <MemberIdentifier
+              partyId={svToUpdate}
+              isYou={false}
+              size="large"
+              data-testid="proposal-details-member-party-id"
+            />
+          }
         />
       </Box>
 

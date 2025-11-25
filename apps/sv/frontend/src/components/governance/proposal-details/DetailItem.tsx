@@ -3,18 +3,16 @@
 
 import { Divider, Stack, Typography } from '@mui/material';
 import { PropsWithChildren } from 'react';
-import { MemberIdentifier } from '../../beta';
 
 interface DetailItemProps extends PropsWithChildren {
   label: string;
   value: React.ReactNode;
   labelId?: string;
   valueId?: string;
-  isPartyId?: boolean;
 }
 
 export const DetailItem: React.FC<DetailItemProps> = props => {
-  const { label, value, labelId, valueId, isPartyId } = props;
+  const { label, value, labelId, valueId } = props;
 
   return (
     <Stack gap={3}>
@@ -29,12 +27,12 @@ export const DetailItem: React.FC<DetailItemProps> = props => {
       >
         {label}
       </Typography>
-      {isPartyId && typeof value === 'string' ? (
-        <MemberIdentifier partyId={value} isYou={false} size="large" data-testid={valueId!} />
-      ) : (
+      {typeof value === 'string' ? (
         <Typography variant="body1" lineHeight={1} fontSize={16} id={valueId} data-testid={valueId}>
           {value}
         </Typography>
+      ) : (
+        value
       )}
       <Divider sx={{ borderBottomWidth: 2 }} />
     </Stack>
