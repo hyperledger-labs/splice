@@ -195,9 +195,17 @@ class BftScanConnectionIntegrationTest
     )
 
     eventually() {
-      val allHealthy = Seq(sv1ScanBackend, sv2ScanBackend, sv3ScanBackend, sv4ScanBackend).forall {
-        scan =>
-          scan.httpHealth.successOption.exists(_.active)
+      val allHealthy = Seq(
+        sv1Backend,
+        sv1ScanBackend,
+        sv2Backend,
+        sv2ScanBackend,
+        sv3Backend,
+        sv3ScanBackend,
+        sv4Backend,
+        sv4ScanBackend,
+      ).forall { scan =>
+        scan.httpHealth.successOption.exists(_.active)
       }
       allHealthy shouldBe true
     }
