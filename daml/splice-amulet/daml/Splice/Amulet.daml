@@ -84,6 +84,12 @@ data UnclaimedActivityRecord_ArchiveAsBeneficiaryResult = UnclaimedActivityRecor
 data UnclaimedActivityRecord_DsoExpireResult = UnclaimedActivityRecord_DsoExpireResult with
   unclaimedRewardCid : ContractId UnclaimedReward
 
+data DevelopmentFundCoupon_WithdrawResult = DevelopmentFundCoupon_WithdrawResult with
+  unclaimedDevelopmentFundCouponCid : ContractId UnclaimedDevelopmentFundCoupon
+
+data DevelopmentFundCoupon_DsoExpireResult = DevelopmentFundCoupon_DsoExpireResult with
+  unclaimedDevelopmentFundCouponCid : ContractId UnclaimedDevelopmentFundCoupon
+
 -- | A amulet, which can be locked and whose amount expires over time.
 --
 -- The expiry serves to charge an inactivity fee, and thereby ensures that the
@@ -400,6 +406,7 @@ template DevelopmentFundCoupon
     beneficiary : Party -- ^ The owner of the `Amulet` to be minted.
     fundManager : Party -- ^ The party authorized to manage and allocate minting rights from the Development Fund.
     amount : Decimal -- ^ The total amount of `Amulet` to mint on collection.
+    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the contract.
   where
     ensure amount > 0.0
 
@@ -411,6 +418,12 @@ template DevelopmentFundCoupon
     -- The fundManager is an observer so they can see both the transaction creating and the one archiving the coupon.
     observer fundManager
 
+    choice DevelopmentFundCoupon_Withdraw : DevelopmentFundCoupon_WithdrawResult
+      controller fundManager
+      do
+        assertWithinDeadline "DevelopmentFundCoupon.expiresAt" expiresAt
+        unclaimedDevelopmentFundCouponCid <- create UnclaimedDevelopmentFundCoupon with dso; amount
+        return DevelopmentFundCoupon_WithdrawResult with unclaimedDevelopmentFundCouponCid
 
 -- | Rewards that have not been claimed and are thus at the disposal of the foundation.
 template UnclaimedReward with
