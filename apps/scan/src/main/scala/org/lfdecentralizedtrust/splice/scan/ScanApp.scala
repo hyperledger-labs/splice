@@ -294,7 +294,7 @@ class ScanApp(
         config.spliceInstanceNames,
         participantAdminConnection,
         sequencerAdminConnection,
-        store,
+        automation,
         updateHistory,
         acsSnapshotStore,
         scanEventStore,
