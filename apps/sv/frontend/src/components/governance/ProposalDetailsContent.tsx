@@ -180,7 +180,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
         </Stack>
 
         <Stack sx={{ bgcolor: '#1b1b1b', p: 6 }} alignItems="center" gap={8}>
-          <VoteSection title="Proposal Details">
+          <VoteSection title="Proposal Details" data-testid="proposal-details-proposal-details">
             <DetailItem
               label="Action"
               value={proposalDetails.actionName}
