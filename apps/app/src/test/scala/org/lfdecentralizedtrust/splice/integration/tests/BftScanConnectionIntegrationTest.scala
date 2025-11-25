@@ -89,7 +89,9 @@ class BftScanConnectionIntegrationTest
           .forall(msg =>
             msg
               .contains(s"Failed to connect to scan of ${getSvName(2)} (http://localhost:5112).") ||
-              msg.contains("Encountered 4 consecutive transient failures")
+              msg.contains("Encountered 4 consecutive transient failures") || msg.contains(
+                "Failed to connect to scan of FAILED Seed URL #0 (http://localhost:5112)."
+              )
           ) should be(true)).withClue(s"Actual Logs: $logs"),
     )
 
