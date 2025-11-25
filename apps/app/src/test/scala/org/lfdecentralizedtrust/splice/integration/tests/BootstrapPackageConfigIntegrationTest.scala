@@ -6,10 +6,11 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
   PackageConfig,
@@ -17,7 +18,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.balanceupdatetype
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
@@ -40,33 +40,23 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvPackageVettingTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
-import org.lfdecentralizedtrust.splice.util.SpliceUtil
-import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, SplitwellTestUtil, StandaloneCanton}
+import org.lfdecentralizedtrust.splice.util.{SpliceUtil, SplitwellTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ValidatorPackageVettingTrigger
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.scalatest.time.{Minute, Span}
-import scala.concurrent.duration.DurationInt
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import scala.concurrent.duration.DurationInt
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
-class BootstrapPackageConfigIntegrationTest
-    extends IntegrationTest
-    with ProcessTestUtil
-    with SplitwellTestUtil
-    with StandaloneCanton {
+class BootstrapPackageConfigIntegrationTest extends IntegrationTest with SplitwellTestUtil {
 
   // this test starts up on older version (see initialPackageConfig), which don't define token-standard interfaces
   // and thus everything will show up as raw create/archives.
   override protected lazy val tokenStandardCliBehavior
       : TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior =
     TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior.IgnoreAll
-
-  override def dbsSuffix = "bootstrapdso"
-
-  // Runs against a temporary Canton instance.
-  override lazy val resetRequiredTopologyState = false
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
