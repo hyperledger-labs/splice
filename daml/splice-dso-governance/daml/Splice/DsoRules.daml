@@ -460,9 +460,13 @@ data DsoRulesConfig = DsoRulesConfig with
 getVoteCooldownTime : DsoRulesConfig -> RelTime
 getVoteCooldownTime config = fromOptional (minutes 1) config.voteCooldownTime
 
--- | Read the `voteExecutionInstructionTimeout` from the `DsoRulesConfig` with a default value of 7 days.
+-- | Read the `voteExecutionInstructionTimeout` from the `DsoRulesConfig` with a default value of 1 day.
+-- We choose 1 day as the default to balance the need for prompt cleanup of instructions
+-- that are impossible to execute with the expectation that instructions
+-- are always executed. During normal operations, vote instruction execution
+-- should be prompt and happen within less than a minute after their creation.
 getVoteExecutionInstructionTimeout : DsoRulesConfig -> RelTime
-getVoteExecutionInstructionTimeout config = fromOptional (days 7) config.voteExecutionInstructionTimeout
+getVoteExecutionInstructionTimeout config = fromOptional (days 1) config.voteExecutionInstructionTimeout
 
 data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     time : Time
