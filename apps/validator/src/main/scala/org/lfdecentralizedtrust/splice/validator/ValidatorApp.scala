@@ -214,8 +214,8 @@ class ValidatorApp(
                 clock,
                 retryProvider,
                 loggerFactory,
-                Some(ValidatorScanConnection.persistScanUrlListBuilder(configProvider)),
                 ValidatorScanConnection.getPersistedScanList(configProvider),
+                ValidatorScanConnection.persistScanUrlListBuilder(configProvider),
               )
             }
             domainConnector = new DomainConnector(
@@ -742,8 +742,8 @@ class ValidatorApp(
           clock,
           retryProvider,
           loggerFactory,
-          Some(ValidatorScanConnection.persistScanUrlListBuilder(configProvider)),
           ValidatorScanConnection.getPersistedScanList(configProvider),
+          ValidatorScanConnection.persistScanUrlListBuilder(configProvider),
         )
       }
 
