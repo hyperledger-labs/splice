@@ -1285,7 +1285,7 @@ object BftScanConnection {
         for {
           lastPersistedScans <- lastPersistedScanUrlList
           bootstrapUris: NonEmptyList[Uri] =
-            if (ts.enableInternalStore) {
+            if (ts.useLastKnownConnectionsForInitialization) {
               lastPersistedScans match {
                 case Some(list) if list.nonEmpty =>
                   val urlStrings: List[String] = list.map(_._2)
@@ -1308,7 +1308,7 @@ object BftScanConnection {
             retryProvider,
             loggerFactory,
             builder,
-            if (ts.enableInternalStore) { persistScanUrlsCallback }
+            if (ts.useLastKnownConnectionsForInitialization) { persistScanUrlsCallback }
             else { None },
           )
 
@@ -1350,7 +1350,7 @@ object BftScanConnection {
             connections,
             failed.toMap,
             uri => builder(uri, ts.amuletRulesCacheTimeToLive),
-            if (ts.enableInternalStore) { persistScanUrlsCallback }
+            if (ts.useLastKnownConnectionsForInitialization) { persistScanUrlsCallback }
             else { None },
             Bft.getScansInDsoRules,
             ts.scansRefreshInterval,
@@ -1390,7 +1390,7 @@ object BftScanConnection {
         for {
           lastPersistedScans <- lastPersistedScanUrlList
           bootstrapUris: NonEmptyList[Uri] =
-            if (bft.enableInternalStore) {
+            if (bft.useLastKnownConnectionsForInitialization) {
               lastPersistedScans match {
                 case Some(list) if list.nonEmpty =>
                   val urlStrings: List[String] = list.map(_._2)
@@ -1414,7 +1414,7 @@ object BftScanConnection {
             retryProvider,
             loggerFactory,
             builder,
-            if (bft.enableInternalStore) { persistScanUrlsCallback }
+            if (bft.useLastKnownConnectionsForInitialization) { persistScanUrlsCallback }
             else { None },
           )
           _ <- retryProvider.waitUntil(
@@ -1558,7 +1558,7 @@ object BftScanConnection {
           ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
         scansRefreshInterval: NonNegativeFiniteDuration =
           ScanAppClientConfig.DefaultScansRefreshInterval,
-        enableInternalStore: Boolean = true,
+        useLastKnownConnectionsForInitialization: Boolean = true,
     ) extends BftScanClientConfig {
       def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): BftCustom =
         copy(amuletRulesCacheTimeToLive = ttl)
@@ -1570,7 +1570,7 @@ object BftScanConnection {
           ScanAppClientConfig.DefaultScansRefreshInterval,
         amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
           ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
-        enableInternalStore: Boolean = true,
+        useLastKnownConnectionsForInitialization: Boolean = true,
     ) extends BftScanClientConfig {
       def setAmuletRulesCacheTimeToLive(ttl: NonNegativeFiniteDuration): Bft =
         copy(amuletRulesCacheTimeToLive = ttl)
