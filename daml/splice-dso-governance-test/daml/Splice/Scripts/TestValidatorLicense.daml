@@ -197,33 +197,41 @@ test_ValidatorLivenessWeightInRunNextIssuanceD = do
 
     return ()
 
--- Test multiple validator license weight changes can be done via single vote
-testValidatorLicenseWeightChangeBatch : Script ()
-testValidatorLicenseWeightChangeBatch = do
+-- Test multiple validator license modifications (weight changes and withdrawals) can be done via single vote
+testValidatorLicenseBatchModifications : Script ()
+testValidatorLicenseBatchModifications = do
   (app, _, (sv1, sv2, sv3, sv4)) <- initDevNet
 
   validator1 <- setupValidator app "validator1"
   validator2 <- setupValidator app "validator2"
   validator3 <- setupValidator app "validator3"
+  validator4 <- setupValidator app "validator4"
+  validator5 <- setupValidator app "validator5"
 
   -- Verify all validators have default weight (None)
   [(_, license1)] <- query @ValidatorLicense validator1
   [(_, license2)] <- query @ValidatorLicense validator2
   [(_, license3)] <- query @ValidatorLicense validator3
+  [(_, license4)] <- query @ValidatorLicense validator4
+  [(_, license5)] <- query @ValidatorLicense validator5
   license1.weight === None
   license2.weight === None
   license3.weight === None
+  license4.weight === None
+  license5.weight === None
 
-  -- Change weights for all three validators in a single vote
+  -- Change weights for some validators and withdraw others in a single vote
   initiateAndAcceptVote app [sv1, sv2, sv3, sv4] (ARC_DsoRules (SRARC_ModifyValidatorLicenses
     (ValidatorLicensesModification with
       changes = [VLC_ChangeWeight with validator = validator1; weight = 5.0
                , VLC_ChangeWeight with validator = validator2; weight = 10.0
-               , VLC_ChangeWeight with validator = validator3; weight = 0.0])))
+               , VLC_ChangeWeight with validator = validator3; weight = 0.0
+               , VLC_Withdraw with validator = validator4
+               , VLC_Withdraw with validator = validator5])))
 
   executeAllVoteExecutionInstructions app
 
-  -- Verify all weights are updated correctly
+  -- Verify weights are updated correctly
   [(_, license1)] <- query @ValidatorLicense validator1
   [(_, license2)] <- query @ValidatorLicense validator2
   [(_, license3)] <- query @ValidatorLicense validator3
@@ -231,35 +239,9 @@ testValidatorLicenseWeightChangeBatch = do
   license2.weight === Some 10.0
   license3.weight === Some 0.0
 
-  pure ()
-
--- Test multiple validator license withdrawals can be done via single vote
-testValidatorLicenseWithdrawBatch : Script ()
-testValidatorLicenseWithdrawBatch = do
-  (app, _, (sv1, sv2, sv3, sv4)) <- initDevNet
-
-  validator1 <- setupValidator app "validator1"
-  validator2 <- setupValidator app "validator2"
-  validator3 <- setupValidator app "validator3"
-
-  -- Verify all validator licenses exist
-  [_] <- query @ValidatorLicense validator1
-  [_] <- query @ValidatorLicense validator2
-  [_] <- query @ValidatorLicense validator3
-
-  -- Withdraw all three validator licenses in a single vote
-  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] (ARC_DsoRules (SRARC_ModifyValidatorLicenses
-    (ValidatorLicensesModification with
-      changes = [VLC_Withdraw with validator = validator1
-               , VLC_Withdraw with validator = validator2
-               , VLC_Withdraw with validator = validator3])))
-
-  executeAllVoteExecutionInstructions app
-
-  -- Verify all validator licenses are withdrawn
-  [] <- query @ValidatorLicense validator1
-  [] <- query @ValidatorLicense validator2
-  [] <- query @ValidatorLicense validator3
+  -- Verify licenses are withdrawn
+  [] <- query @ValidatorLicense validator4
+  [] <- query @ValidatorLicense validator5
 
   pure ()
 
