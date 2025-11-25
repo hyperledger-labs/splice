@@ -93,18 +93,26 @@ class PeriodicTopologySnapshotTrigger(
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
       // uses onboardingStateV2 so we don't lose information when exporting
-      storageObject <- sequencerAdminConnection.streamOnboardingState(
-        Right(now),
-        config.location,
-        Paths.get(s"$folderName/genesis-state").toString,
-      )
+      _ = logger.info("Starting onboarding state stream into gcp bucket...")
+      _ <- sequencerAdminConnection
+        .streamOnboardingState(
+          Right(now),
+          config.location,
+          Paths.get(s"$folderName/onboarding-state").toString,
+        )
+        .andThen {
+          case Success(storageObject) =>
+            logger.info(
+              s"Finished streaming with ${storageObject.name} weighting ${storageObject.size / 1000} KB"
+            )
+          case Failure(e) => logger.error("Failed to stream onboarding state.", e)
+        }
       authorizedStore <- sequencerAdminConnection.exportAuthorizedStoreSnapshot(sequencerId.uid)
       // list a summary of the transactions state at the time of the snapshot to validate further imports
       summary <- sequencerAdminConnection.getTopologyTransactionsSummary(
         TopologyStoreId.Synchronizer(synchronizerId),
         clock.now,
       )
-      sequencerId <- sequencerAdminConnection.getSequencerId
       // we create a single metadata file to store the amounts of the different transactions along the sequencerId
       metadata = summary.map(e =>
         (e._1.code, e._2.toString)
@@ -112,8 +120,8 @@ class PeriodicTopologySnapshotTrigger(
       _ <- Future {
         blocking {
           val fileDesc =
-            s"dumping current topology state into gcp bucket"
-          logger.debug(s"Attempting to write $fileDesc")
+            s"authorized store and metadata into gcp bucket"
+          logger.info(s"Attempting to write $fileDesc")
           val paths = Seq(
             BackupDump.writeBytes(
               config.location,
@@ -128,11 +136,11 @@ class PeriodicTopologySnapshotTrigger(
               loggerFactory,
             ),
           )
-          logger.debug(s"Wrote $fileDesc")
+          logger.info(s"Wrote $fileDesc")
           paths
         }
       }
     } yield TaskSuccess(
-      s"Took a new topology snapshot on $utcDate, with ${storageObject.name} weighting ${storageObject.size / 1000} KB"
+      s"Took a new topology snapshot on $utcDate."
     )
 }
