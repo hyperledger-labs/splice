@@ -24,7 +24,7 @@ import monocle.macros.syntax.lens.*
 
 class ReferenceConfigSandboxExampleIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment
+    with SharedEnvironment[CantonConfig, CantonEnvironment]
     with HasExecutionContext {
 
   registerPlugin(
@@ -78,7 +78,7 @@ class ReferenceConfigSandboxExampleIntegrationTest
 // The values from the UsePostgres script are not adopted by the external reference config.
 class ReferenceConfigExampleIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment
+    with SharedEnvironment[CantonConfig, CantonEnvironment]
     with HasExecutionContext {
 
   registerPlugin(new UsePostgres(loggerFactory))

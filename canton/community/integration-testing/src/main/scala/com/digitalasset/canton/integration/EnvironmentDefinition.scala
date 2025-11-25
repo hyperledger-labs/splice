@@ -146,13 +146,18 @@ final case class EnvironmentDefinition(
     copy(staticSynchronizerParametersMap = map)
 
   def createTestConsole(
-      environment: Environment,
+      baseEnvironment: CantonEnvironment,
       loggerFactory: NamedLoggerFactory,
-  ): TestConsoleEnvironment =
-    new ConsoleEnvironment(
-      environment,
+  ): TestConsoleEnvironment[CantonConfig, CantonEnvironment] =
+    new CantonConsoleEnvironment(
+      baseEnvironment,
       new TestConsoleOutput(loggerFactory),
-    ) with TestEnvironment
+    ) with TestEnvironment[CantonConfig] {
+      override val actualConfig: CantonConfig = baseEnvironment.config
+    }
+
+  override lazy val environmentFactory =
+    CommunityEnvironmentFactory
 }
 
 /** Default testing environments for integration tests
@@ -184,7 +189,7 @@ final case class EnvironmentDefinition(
 object EnvironmentDefinition extends LazyLogging {
 
   def defaultStaticSynchronizerParameters(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): StaticSynchronizerParameters =
     StaticSynchronizerParameters.initialValues(
       env.environment.clock,
@@ -260,7 +265,9 @@ object EnvironmentDefinition extends LazyLogging {
   lazy val simpleTopology: EnvironmentDefinition =
     fromResource("examples/01-simple-topology/simple-topology.conf")
 
-  def S1M1(implicit env: TestConsoleEnvironment): NetworkTopologyDescription = {
+  def S1M1(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ): NetworkTopologyDescription = {
     import env.*
 
     NetworkTopologyDescription(
@@ -272,7 +279,9 @@ object EnvironmentDefinition extends LazyLogging {
     )
   }
 
-  private def S2M1(implicit env: TestConsoleEnvironment): NetworkTopologyDescription = {
+  private def S2M1(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ): NetworkTopologyDescription = {
     import env.*
 
     NetworkTopologyDescription(
@@ -284,7 +293,9 @@ object EnvironmentDefinition extends LazyLogging {
     )
   }
 
-  def S2M2(implicit env: TestConsoleEnvironment): NetworkTopologyDescription = {
+  def S2M2(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ): NetworkTopologyDescription = {
     import env.*
 
     NetworkTopologyDescription(
@@ -297,7 +308,7 @@ object EnvironmentDefinition extends LazyLogging {
   }
 
   private def S2M1_S2M1(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Seq[NetworkTopologyDescription] = {
     import env.*
 
@@ -319,7 +330,9 @@ object EnvironmentDefinition extends LazyLogging {
     )
   }
 
-  def S1M1_S1M1(implicit env: TestConsoleEnvironment): Seq[NetworkTopologyDescription] = {
+  def S1M1_S1M1(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ): Seq[NetworkTopologyDescription] = {
     import env.*
 
     Seq(
@@ -341,7 +354,7 @@ object EnvironmentDefinition extends LazyLogging {
   }
 
   private def S1M1_S1M1_S1M1(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Seq[NetworkTopologyDescription] = {
     import env.*
 
@@ -371,7 +384,7 @@ object EnvironmentDefinition extends LazyLogging {
   }
 
   private def S1M1_S1M1_S1M1_S1M1(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Seq[NetworkTopologyDescription] = {
     import env.*
 

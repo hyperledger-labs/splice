@@ -103,7 +103,7 @@ object TraceContextGrpc {
       val traceContext = W3CTraceContext.fromGrpcMetadata(headers)
       val context = GrpcContext
         .current()
-        .withValue(TraceContextKey, traceContext)
+        .withValue(TraceContextThreadLocalKey, traceContext)
       Contexts.interceptCall(context, call, headers, next)
     }
   }

@@ -6,6 +6,7 @@ package com.digitalasset.canton.integration.plugins
 import cats.syntax.functorFilter.*
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.plugins.UseExternalProcess.ShutdownPhase
 import com.digitalasset.canton.integration.util.{BackgroundRunnerHandler, BackgroundRunnerHelpers}
 import com.digitalasset.canton.integration.{EnvironmentSetupPlugin, TestConsoleEnvironment}
@@ -16,7 +17,9 @@ import com.digitalasset.canton.logging.NamedLogging
   * The implementation of this trait that you will likely want to use is
   * [[com.digitalasset.canton.integration.plugins.UseExternalProcess]].
   */
-trait UseExternalProcessBase[Config] extends EnvironmentSetupPlugin with NamedLogging {
+trait UseExternalProcessBase[Config]
+    extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
+    with NamedLogging {
 
   /** A short hint added to the files name to make it easier to identify what they belong to. */
   def fileNameHint: String
@@ -61,7 +64,8 @@ trait UseExternalProcessBase[Config] extends EnvironmentSetupPlugin with NamedLo
     ) ++ extraArgs
 
   override def beforeEnvironmentDestroyed(
-      environment: TestConsoleEnvironment
+      config: CantonConfig,
+      environment: TestConsoleEnvironment[CantonConfig, CantonEnvironment],
   ): Unit =
     if (shutdownPhase == ShutdownPhase.BeforeEnvironment) handler.killAndRemove()
 

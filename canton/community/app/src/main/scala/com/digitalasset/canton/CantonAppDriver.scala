@@ -44,10 +44,12 @@ import scala.util.control.NonFatal
   */
 abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
 
-  protected def environmentFactory: EnvironmentFactory
+  type Config <: SharedCantonConfig[Config]
+  type E <: Environment[Config]
 
-  protected def withManualStart(config: CantonConfig): CantonConfig =
-    config.copy(parameters = config.parameters.copy(manualStart = true))
+  protected def environmentFactory: EnvironmentFactory[Config, E]
+
+  protected def withManualStart(config: Config): Config
 
   protected def additionalVersions: Map[String, String] = Map.empty
 
@@ -60,6 +62,8 @@ abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
     ) ++ additionalVersions) foreach { case (name, version) =>
       Console.out.println(s"$name: $version")
     }
+
+  protected def logAppVersion(): Unit = logger.info(s"Starting Canton version ${BuildInfo.version}")
 
   // BE CAREFUL: Set the environment variables before you touch anything related to
   // logback as otherwise, the logback configuration will be read without these
@@ -97,7 +101,8 @@ abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
       case (None, _) =>
     }
 
-  logger.info(s"Starting Canton version ${ReleaseVersion.current}")
+  logAppVersion()
+
   if (cliOptions.logTruncate) {
     cliOptions.logFileAppender match {
       case LogFileAppender.Rolling =>
@@ -113,7 +118,7 @@ abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
   // Canton does not die on a warning status.
   logbackStatusManager.remove(killingStatusListener)
 
-  private val environmentRef: AtomicReference[Option[Environment]] = new AtomicReference(None)
+  private val environmentRef: AtomicReference[Option[E]] = new AtomicReference(None)
   sys.runtime.addShutdownHook(new Thread(() => {
     try {
       logger.info("Shutting down...")
@@ -157,7 +162,7 @@ abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
 
     def loadConfigFromFiles(
         loggingString: String = "Starting up with resolved config"
-    )(implicit traceContext: TraceContext): Either[CantonConfigError, CantonConfig] = {
+    )(implicit traceContext: TraceContext): Either[CantonConfigError, Config] = {
       val mergedUserConfigsE = NonEmpty.from(configFiles) match {
         case None if cliOptions.configMap.isEmpty =>
           Left(ConfigErrors.NoConfigFiles.Error())
@@ -202,7 +207,7 @@ abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
       sys.exit(1)
     }
 
-    private def writeConfigToTmpFile(mergedUserConfigs: Config) = {
+    private def writeConfigToTmpFile(mergedUserConfigs: com.typesafe.config.Config) = {
       val tmp = File.newTemporaryFile("canton-config-error-", ".conf")
       logger.error(
         s"An error occurred after parsing a config file that was obtained by merging multiple config " +
@@ -238,9 +243,8 @@ abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
     Config.bootstrapFile.map(CantonScriptFromFile.apply)
 
   val environment = environmentFactory.create(Config.startupConfig, loggerFactory)
-  val runner: Runner = cliOptions.command match {
+  val runner: Runner[Config] = cliOptions.command match {
     case Some(Command.Sandbox) =>
-      startupConfigFileMonitoring(environment)
       new ServerRunner(
         bootstrapScript,
         loggerFactory,
@@ -248,14 +252,12 @@ abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
         cliOptions.dars,
       )
     case Some(Command.Daemon) =>
-      startupConfigFileMonitoring(environment)
       new ServerRunner(bootstrapScript, loggerFactory)
     case Some(Command.RunScript(script)) => ConsoleScriptRunner(script, loggerFactory)
     case Some(Command.Generate(target)) =>
       Generate.process(target, Config.startupConfig)
       sys.exit(0)
     case _ =>
-      startupConfigFileMonitoring(environment)
       new ConsoleInteractiveRunner(
         cliOptions.noTty,
         bootstrapScript,

@@ -2133,7 +2133,9 @@ class ExampleTransactionFactory(
             mkMetadata(seeds.filter(_._1 == LfNodeId(4))),
             Map.empty,
           ),
-          Witnesses(NonEmpty(List, transactionViewTree10.informees, transactionViewTree1.informees)),
+          Witnesses(
+            NonEmpty(List, transactionViewTree10.informees, transactionViewTree1.informees)
+          ),
         ),
       )
 
@@ -2643,7 +2645,9 @@ class ExampleTransactionFactory(
             mkMetadata(seeds.filter(_._1 == LfNodeId(6))),
             Map.empty,
           ),
-          Witnesses(NonEmpty(List, transactionViewTree10.informees, transactionViewTree1.informees)),
+          Witnesses(
+            NonEmpty(List, transactionViewTree10.informees, transactionViewTree1.informees)
+          ),
         ),
         (
           transactionViewTree11,
@@ -2652,7 +2656,9 @@ class ExampleTransactionFactory(
             mkMetadata(seeds.filter(seed => Seq(7, 8).map(LfNodeId.apply).contains(seed._1))),
             Map.empty,
           ),
-          Witnesses(NonEmpty(List, transactionViewTree11.informees, transactionViewTree1.informees)),
+          Witnesses(
+            NonEmpty(List, transactionViewTree11.informees, transactionViewTree1.informees)
+          ),
         ),
         (
           transactionViewTree110,
@@ -3284,7 +3290,9 @@ class ExampleTransactionFactory(
             mkMetadata(seeds.filter(seed => Seq(2, 3).map(LfNodeId.apply).contains(seed._1))),
             Map.empty,
           ),
-          Witnesses(NonEmpty(List, transactionViewTree10.informees, transactionViewTree1.informees)),
+          Witnesses(
+            NonEmpty(List, transactionViewTree10.informees, transactionViewTree1.informees)
+          ),
         ),
         (
           transactionViewTree100,
@@ -3309,7 +3317,9 @@ class ExampleTransactionFactory(
             mkMetadata(seeds.filter(seed => Seq(5, 6).map(LfNodeId.apply).contains(seed._1))),
             Map.empty,
           ),
-          Witnesses(NonEmpty(List, transactionViewTree11.informees, transactionViewTree1.informees)),
+          Witnesses(
+            NonEmpty(List, transactionViewTree11.informees, transactionViewTree1.informees)
+          ),
         ),
         (
           transactionViewTree110,
@@ -3712,7 +3722,9 @@ class ExampleTransactionFactory(
             mkMetadata(seeds.filter(seed => Seq(3, 4).map(LfNodeId.apply).contains(seed._1))),
             Map.empty,
           ),
-          Witnesses(NonEmpty(List, transactionViewTree10.informees, transactionViewTree1.informees)),
+          Witnesses(
+            NonEmpty(List, transactionViewTree10.informees, transactionViewTree1.informees)
+          ),
         ),
       )
 

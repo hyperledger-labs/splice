@@ -584,27 +584,6 @@ final case class CantonConfig(
       .mkString(";")
   }
 
-  protected def nodePortsDescription(
-      nodeName: InstanceName,
-      portDescriptions: Seq[String],
-  ): String =
-    s"$nodeName:${portDescriptions.mkString(",")}"
-
-  protected def portDescriptionFromConfig[C](
-      config: C
-  )(apiNamesAndExtractors: Seq[(String, C => ServerConfig)]): Seq[String] = {
-    def server(name: String, config: ServerConfig): Option[String] =
-      Option(config).map(c => s"$name=${c.port}")
-    Option(config)
-      .map(config =>
-        apiNamesAndExtractors.map { case (name, extractor) =>
-          server(name, extractor(config))
-        }
-      )
-      .getOrElse(Seq.empty)
-      .flatMap(_.toList)
-  }
-
   /** reduces the configuration into a single node configuration (used for external testing) */
   def asSingleNode(instanceName: InstanceName): CantonConfig =
     // based on the assumption that clashing instance names would clash in the console
@@ -632,26 +611,11 @@ final case class CantonConfig(
       .focus(_.mediators)
       .modify(mapWithDefaults)
   }
-
-  def mergeDynamicChanges(newConfig: CantonConfig): CantonConfig =
-    copy(participants =
-      participants
-        .map { case (name, config) =>
-          (name, config, newConfig.participants.get(name))
-        }
-        .map {
-          case (name, old, Some(newConfig)) =>
-            (name, old.copy(alphaDynamic = newConfig.alphaDynamic))
-          case (name, old, None) => (name, old)
-        }
-        .toMap
-    )
-
 }
 
 private[canton] object CantonNodeParameterConverter {
 
-  def general(parent: CantonConfig, node: LocalNodeConfig): CantonNodeParameters.General =
+  def general(parent: SharedCantonConfig[_], node: LocalNodeConfig): CantonNodeParameters.General =
     CantonNodeParameters.General.Impl(
       tracing = parent.monitoring.tracing,
       delayLoggingThreshold = parent.monitoring.logging.delayLoggingThreshold.toInternal,
@@ -680,6 +644,8 @@ private[canton] object CantonNodeParameterConverter {
 }
 
 object CantonConfig {
+  implicit val typesafeConfigValidator: CantonConfigValidator[Config] =
+    CantonConfigValidator.validateAll
   implicit val cantonConfigCantonConfigValidator: CantonConfigValidator[CantonConfig] =
     CantonConfigValidatorDerivation[CantonConfig]
 
@@ -2067,7 +2033,7 @@ object CantonConfig {
     * @return
     *   [[scala.Right]] [[com.typesafe.config.Config]] if parsing was successful.
     */
-  private def parseAndMergeConfigs(
+  def parseAndMergeConfigs(
       files: NonEmpty[Seq[File]]
   )(implicit elc: ErrorLoggingContext): Either[CantonConfigError, Config] = {
     val baseConfig = ConfigFactory.load()

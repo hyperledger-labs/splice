@@ -509,7 +509,7 @@ object ProgrammableSequencer {
   /** Extract the list of confirmation responses.
     */
   def confirmationResponsesKind(messages: Map[Member, Seq[SubmissionRequest]])(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Map[Member, Seq[String]] =
     messages.view
       .mapValues(_.mapFilter { submissionRequest =>

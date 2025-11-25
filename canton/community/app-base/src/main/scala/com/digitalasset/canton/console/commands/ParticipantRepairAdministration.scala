@@ -271,7 +271,7 @@ class ParticipantRepairAdministration(
       consoleEnvironment.run {
         runner.adminCommand(
           ParticipantAdminCommands.ParticipantRepairManagement.ImportAcsOld(
-            ByteString.copyFrom(File(inputFile).loadBytes),
+            Seq(ByteString.copyFrom(File(inputFile).loadBytes)),
             if (workflowIdPrefix.nonEmpty) workflowIdPrefix else s"import-${UUID.randomUUID}",
             allowContractIdSuffixRecomputation = allowContractIdSuffixRecomputation,
           )
@@ -451,7 +451,7 @@ class ParticipantRepairAdministration(
       consoleEnvironment.run {
         runner.adminCommand(
           ParticipantAdminCommands.ParticipantRepairManagement.ImportAcsOld(
-            bytes,
+            Seq(bytes),
             workflowIdPrefix = s"import-${UUID.randomUUID}",
             allowContractIdSuffixRecomputation = allowContractIdSuffixRecomputation,
           )

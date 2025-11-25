@@ -54,7 +54,7 @@ final case class ActiveContractOld(
 
 }
 
-private[canton] object ActiveContractOld extends VersioningCompanion[ActiveContractOld] {
+object ActiveContractOld extends VersioningCompanion[ActiveContractOld] {
 
   override def name: String = "ActiveContractOld"
 

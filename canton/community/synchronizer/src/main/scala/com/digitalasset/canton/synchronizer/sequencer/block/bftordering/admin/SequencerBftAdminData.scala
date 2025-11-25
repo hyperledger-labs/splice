@@ -263,6 +263,10 @@ object SequencerBftAdminData {
                     ) =>
                   Right(PeerEndpointHealthStatus.Unauthenticated)
                 case ProtoPeerEndpointHealthStatus(
+                      ProtoPeerEndpointHealthStatus.Status.Disconnected(_)
+                    ) =>
+                  Right(PeerEndpointHealthStatus.Disconnected)
+                case ProtoPeerEndpointHealthStatus(
                       ProtoPeerEndpointHealthStatus.Status.Authenticated(
                         ProtoAuthenticated(sequencerIdString)
                       )
@@ -271,8 +275,8 @@ object SequencerBftAdminData {
                     .fromProtoPrimitive(sequencerIdString, "sequencerId")
                     .leftMap(_.toString)
                     .map(PeerEndpointHealthStatus.Authenticated(_))
-                case _ =>
-                  Left("Health status is empty")
+                case value =>
+                  Left(s"Health status is empty $value")
               }
             } yield PeerConnectionStatus.PeerEndpointStatus(
               endpointId,

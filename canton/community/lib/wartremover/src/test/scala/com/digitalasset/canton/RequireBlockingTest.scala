@@ -8,7 +8,6 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.wartremover.test.WartTestTraverser
 
-import scala.annotation.nowarn
 import scala.concurrent.blocking
 
 class RequireBlockingTest extends AnyWordSpec with Matchers {
@@ -76,22 +75,6 @@ class RequireBlockingTest extends AnyWordSpec with Matchers {
         f()
       }
       assertIsErrorSynchronized(result)
-    }
-
-    "fail to detect renamed synchronized" in {
-      /*
-        Because of https://github.com/scala/scala/blob/2.13.x/src/compiler/scala/tools/nsc/typechecker/Typers.scala#L5757-L5758
-        the import/renaming triggers a warning
-       */
-      @nowarn("msg=synchronized not selected from this instance")
-      val result = WartTestTraverser(RequireBlocking) {
-        val x = new Object()
-        import x.synchronized as foo
-        foo(19)
-      }
-
-      // assertIsErrorSynchronized(result)
-      result.errors shouldBe Seq.empty
     }
 
     "allow synchronized statements inside blocking calls" in {

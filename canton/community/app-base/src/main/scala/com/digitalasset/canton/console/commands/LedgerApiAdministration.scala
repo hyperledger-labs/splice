@@ -124,7 +124,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
   implicit protected[canton] lazy val executionContext: ExecutionContext =
     consoleEnvironment.environment.executionContext
 
-  implicit protected val consoleEnvironment: ConsoleEnvironment
+  implicit val consoleEnvironment: ConsoleEnvironment
 
   protected val name: String
 
@@ -1426,6 +1426,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             |- limit: limit (default set via canton.parameter.console)
             |- verbose: whether the resulting events should contain detailed type information
             |- filterTemplate: list of templates ids to filter for, empty sequence acts as a wildcard
+            |- filterTemplate: list of interface ids to filter for, empty sequence acts as a wildcard
             |- activeAtOffsetO: the offset at which the snapshot of the active contracts will be computed, it
             |  must be no greater than the current ledger end offset and must be greater than or equal to the
             |  last pruning offset. If no offset is specified then the current participant end will be used.
@@ -3018,7 +3019,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 trait LedgerApiAdministration extends BaseLedgerApiAdministration {
   this: LedgerApiCommandRunner & AdminCommandRunner & NamedLogging & FeatureFlagFilter =>
 
-  implicit protected val consoleEnvironment: ConsoleEnvironment
+  implicit val consoleEnvironment: ConsoleEnvironment
   protected val name: String
 
   import com.digitalasset.canton.util.ShowUtil.*
@@ -3153,7 +3154,7 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
     }
   }
 
-  override private[canton] def optionallyAwait[T](
+  override def optionallyAwait[T](
       update: T,
       updateId: String,
       txSynchronizerId: String,

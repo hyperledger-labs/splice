@@ -52,7 +52,7 @@ import scala.jdk.CollectionConverters.*
 @nowarn("msg=match may not be exhaustive")
 abstract class LedgerPruningIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment
+    with SharedEnvironment[CantonConfig, CantonEnvironment]
     with HasCycleUtils
     with HasProgrammableSequencer {
 
