@@ -33,6 +33,7 @@ ErrorBoundary caught an unhandled promise rejection AbortError: The operation wa
 ErrorBoundary caught an unhandled promise rejection AbortError: Aborted
 AbortError: The operation was aborted
 TypeError: NetworkError when attempting to fetch resource
+oidc login error: NetworkError when attempting to fetch resource
 
 # Testcontainers tries to read the configuration file but it's not available on CI
 Attempted to read Testcontainers configuration file at file:

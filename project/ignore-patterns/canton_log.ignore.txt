@@ -91,8 +91,10 @@ INVALID_TRAFFIC_CONTROL_PURCHASED_MESSAGE.* signature threshold not reached
 # The new participant can be both the sender or the counterParticipant in the error message.
 ACS_COMMITMENT_MISMATCH.*aliceValidatorLocalNewForValidatorReonboardingIT
 
-# TODO(#970): figure out why this happens, as in principle the confirmations from three of the mediators and counter-participants should be sufficient
+# TODO(#970): figure out why this happens for SVs, as in principle the confirmations from three of the mediators and counter-participants should be sufficient
 Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=sv
+# TODO(#3162): figure out why this happens also for validators (started on 3.4)
+Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=
 
 # TODO(#936): remove these ignores if possible
 The operation 'insert block' has failed with an exception
@@ -160,5 +162,8 @@ DB_CONNECTION_LOST.*Database health check failed to establish a valid connection
 
 # TODO(#3069): Byproduct of mediator pruning; double-check this is expected (and unavoidable)
 Dynamic synchronizer parameters to compute earliest available pruning timestamp not found
+
+# TODO(#3193): Likely a race in the shutdown of the actor system vs us scheduling something else on it
+java.lang.IllegalStateException: cannot enqueue after timer shutdown
 
 # Make sure to have a trailing newline

@@ -1180,7 +1180,13 @@ paths:
       tags: [deprecated, scan]
       x-jvm-package: scan
       operationId: "getTotalAmuletBalance"
-      description: "**Deprecated**. Get the total balance of Amulet in the network"
+      description: | 
+        **Deprecated**, use /registry/metadata/v1/instruments/Amulet token standard metadata API endpoint, see 
+        https://docs.sync.global/app_dev/token_standard/openapi/token_metadata.html.
+        
+        **This endpoint will be removed in a future release**        
+        
+        Get the total balance of Amulet in the network.
       parameters:
         - in: query
           name: asOfEndOfRound
@@ -1205,7 +1211,11 @@ paths:
       x-jvm-package: scan
       operationId: "getWalletBalance"
       description: |
-        **Deprecated**, use /v0/holdings/summary with /v0/state/acs/snapshot-timestamp instead. Get the Amulet balance for a specific party at the end of a closed round
+        **Deprecated**, use /v0/holdings/summary with /v0/state/acs/snapshot-timestamp instead. 
+        
+        **This endpoint will be removed in a future release**
+        
+        Get the Amulet balance for a specific party at the end of a closed round.
       parameters:
         - in: query
           name: party_id

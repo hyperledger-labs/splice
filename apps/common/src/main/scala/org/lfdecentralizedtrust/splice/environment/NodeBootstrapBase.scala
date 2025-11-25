@@ -14,7 +14,7 @@ import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrap, CantonNodeParameters}
 import com.digitalasset.canton.lifecycle.{HasCloseContext, LifeCycle}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.StorageFactory
+import com.digitalasset.canton.resource.{DbStorage, StorageFactory}
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
@@ -102,7 +102,10 @@ abstract class NodeBootstrapBase[
         nodeMetrics.storageMetrics,
         parameterConfig.processingTimeouts,
         loggerFactory,
-      )
+      ) match {
+      case storage: DbStorage => storage
+      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
+    }
   protected val httpAdminService: HttpAdminService =
     HttpAdminService(
       nodeConfig.nodeTypeName,

@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.store.{
   HistoryMetrics,
   TxLogAppStore,
   TxLogBackfilling,
+  UpdateHistory,
 }
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.PartyId
@@ -23,6 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class TxLogBackfillingTrigger[TXE](
     store: TxLogAppStore[TXE],
+    updateHistory: UpdateHistory,
     batchSize: Int,
     override protected val context: TriggerContext,
 )(implicit
@@ -31,13 +33,13 @@ class TxLogBackfillingTrigger[TXE](
     mat: Materializer,
 ) extends PollingParallelTaskExecutionTrigger[TxLogBackfillingTrigger.Task] {
 
-  private def party: PartyId = store.updateHistory.updateStreamParty
+  private def party: PartyId = updateHistory.updateStreamParty
 
   override protected def extraMetricLabels = Seq(
     "party" -> party.toProtoPrimitive
   )
 
-  private val currentMigrationId = store.updateHistory.domainMigrationInfo.currentMigrationId
+  private val currentMigrationId = updateHistory.domainMigrationInfo.currentMigrationId
 
   private val historyMetrics = new HistoryMetrics(context.metricsFactory)(
     MetricsContext.Empty
@@ -48,7 +50,7 @@ class TxLogBackfillingTrigger[TXE](
   )
   private val backfilling = new TxLogBackfilling(
     store.multiDomainAcsStore,
-    store.updateHistory,
+    updateHistory,
     batchSize,
     context.loggerFactory,
   )
@@ -56,7 +58,7 @@ class TxLogBackfillingTrigger[TXE](
   override def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[TxLogBackfillingTrigger.Task]] = {
-    if (!store.updateHistory.isReady) {
+    if (!updateHistory.isReady) {
       logger.debug("UpdateHistory is not yet ready")
       Future.successful(Seq.empty)
     } else if (!store.multiDomainAcsStore.destinationHistory.isReady) {
@@ -64,7 +66,7 @@ class TxLogBackfillingTrigger[TXE](
       Future.successful(Seq.empty)
     } else {
       for {
-        sourceState <- store.updateHistory.getBackfillingState()
+        sourceState <- updateHistory.getBackfillingState()
         destinationState <- store.multiDomainAcsStore.getTxLogBackfillingState()
       } yield {
         sourceState match {

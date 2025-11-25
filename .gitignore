@@ -1,6 +1,7 @@
 .daml
 *.dar
 !daml/dars/*
+*.iml
 *.log
 *.clog
 .DS_Store

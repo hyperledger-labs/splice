@@ -26,12 +26,12 @@ import org.lfdecentralizedtrust.splice.store.{
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftNode, CometBftRequestSigner}
-import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
+import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig}
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -57,7 +57,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNodeConfigClient {
 
   protected val config: SvAppBackendConfig
-  protected val storage: Storage
+  protected val storage: DbStorage
   protected val retryProvider: RetryProvider
   protected val clock: Clock
   protected val domainTimeSync: DomainTimeSynchronization
@@ -349,6 +349,33 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
         }
     } yield initialRound
   }
+
+  // Ensure OTK mappings contain only signing keys that are signed
+  protected def ensureCantonNodesOTKRotatedIfNeeded(
+      skipSynchronizerInitialization: Boolean,
+      cantonIdentifierConfig: SvCantonIdentifierConfig,
+      localSynchronizerNode: Option[LocalSynchronizerNode],
+      clock: Clock,
+      loggerFactory: NamedLoggerFactory,
+      retryProvider: RetryProvider,
+      decentralizedSynchronizerId: SynchronizerId,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] =
+    localSynchronizerNode match {
+      case Some(synchronizerNode) if !skipSynchronizerInitialization =>
+        SynchronizerNodeInitializer.rotateCantonNodesOTKIfNeeded(
+          cantonIdentifierConfig,
+          synchronizerNode,
+          clock,
+          loggerFactory,
+          retryProvider,
+          decentralizedSynchronizerId,
+        )
+      case _ =>
+        logger.info(
+          "Skipping OTK keys rotation because skipSynchronizerInitialization is enabled"
+        )
+        Future.unit
+    }
 
   private def setInitialRound(connection: BaseLedgerConnection, initialRound: Long)(implicit
       ec: ExecutionContext,

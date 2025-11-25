@@ -24,3 +24,6 @@ P2P connectivity is not ready
 
 # Consequence of shutting down global domain
 .*The sequencer client\'s healthy subscriptions count is under the configured BFT threshold .* Failed sequencer subscriptions for .* Previous state was Ok.*
+
+# TODO(#3163) investigate this
+Authentication token verification caused an unexpected exception

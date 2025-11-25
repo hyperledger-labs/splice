@@ -10,6 +10,12 @@ module Splice.Testing.Utils
     submitWithDisclosures',
     submitWithDisclosuresMustFail',
 
+    submitWithDisclosuresMustFail'',
+    expectErrorId,
+    expectMessageContains,
+    expectUnmetRequirement,
+    expectFailureStatus,
+
     -- * Working with OpenAPI requests and responses
     emptyExtraArgs,
     EnrichedFactoryChoice(..),
@@ -23,10 +29,12 @@ module Splice.Testing.Utils
 
 import qualified DA.Map as Map
 import qualified DA.TextMap as TextMap
+import qualified DA.Text
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 
 import Daml.Script
+import DA.Fail
 
 -- | Use this to construct an empty 'ExtraArgs' record.
 emptyExtraArgs : ExtraArgs
@@ -90,3 +98,73 @@ submitWithDisclosuresMustFail' p (Disclosures' ds) cmds = submitWithDisclosuresM
 -- | Allocate party with a specific name.
 allocatePartyExact : Text -> Script Party
 allocatePartyExact name = allocatePartyByHint (PartyIdHint name)
+
+
+-- Version of 'submitWithDisclosuresMustFail' that checks expected errors
+----------------------------------------------------------------------------
+
+
+-- | Use this to check that commands fail with the expected 'FailureStatus'.
+submitWithDisclosuresMustFail''
+  : Show a => FailureStatusCheck -> Party -> Disclosures' -> Commands a -> Script ()
+submitWithDisclosuresMustFail'' check p (Disclosures' ds) cmds =  do
+  result <- trySubmit (actAs p <> discloseMany (Map.values ds)) cmds
+  case result of
+    Left (FailureStatusError err) ->
+      case check.check err of
+        Some msg -> fail $ "Unexpected FailureStatus: " <> msg
+        None -> pure ()
+    Left err -> fail $ "Unexpected non-failure status error: " <> show err
+    Right val -> fail $ "Expected failure but command succeeded with value: " <> show val
+  pure ()
+
+-- TODO(#3241): polish this approach and use it in all our `xyzMustFail` tests
+
+data FailureStatusCheck = FailureStatusCheck with
+  check : (FailureStatus -> Optional Text)
+
+expectErrorId : Text -> FailureStatusCheck
+expectErrorId expectedErrorId =
+  FailureStatusCheck with
+    check = \fs ->
+      if fs.errorId == expectedErrorId then
+        None
+      else
+        Some $ "Expected errorId: '" <> expectedErrorId <> "', but got: '" <> fs.errorId <> "'"
+
+expectMessageContains : Text -> FailureStatusCheck
+expectMessageContains expectedSubstring =
+  FailureStatusCheck with
+    check = \fs ->
+      if expectedSubstring `DA.Text.isInfixOf` fs.message then
+        None
+      else
+        Some $ "Expected message to contain: \"" <> expectedSubstring <> "', but got: \"" <> fs.message <> "\""
+
+expectUnmetRequirement : Text -> FailureStatusCheck
+expectUnmetRequirement expectedRequirement =
+  let expectedMessage = "The requirement '" <> expectedRequirement <> "' was not met." in
+  FailureStatusCheck with
+    check = \fs ->
+      if expectedMessage == fs.message then
+        None
+      else
+        Some $ "Expected message: \"" <> expectedMessage <> "', but got: \"" <> fs.message <> "\""
+
+expectFailureStatus : (FailureStatus -> Bool) -> FailureStatusCheck
+expectFailureStatus isExpected =
+  FailureStatusCheck with
+    check = \fs ->
+      if isExpected fs then
+        None
+      else
+        Some $ "FailureStatus did not match expected condition: " <> show fs
+
+-- Prefer the first failure
+instance Semigroup FailureStatusCheck where
+  (FailureStatusCheck c1) <> (FailureStatusCheck c2) =
+    FailureStatusCheck with
+      check = \fs ->
+        case c1 fs of
+          None -> c2 fs
+          some -> some

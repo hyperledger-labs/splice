@@ -1,0 +1,175 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: pruning
+    folder: canton-network
+    interval: 10m
+    rules:
+      - uid: ff3sfady2o6bke
+        title: Participant pruning
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              disableTextWrap: false
+              editorMode: builder
+              expr: daml_pruning_max_event_age
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+              useBackend: false
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - $PARTICIPANT_PRUNING_RETENTION_IN_HOURS
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: $NODATA
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          description: The participant in {{ $labels.namespace }} on migration ID {{ $labels.migration_id }} has not been pruned {{ $PARTICIPANT_PRUNING_RETENTION_IN_DAYS }} days.
+          summary: Participant has not pruned ACS.
+        labels:
+          "": ""
+        isPaused: false
+      - uid: df3sfgne49bswb
+        title: Sequencer Pruning
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              disableTextWrap: false
+              editorMode: builder
+              expr: daml_sequencer_max_event_age
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+              useBackend: false
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - $SEQUENCER_PRUNING_RETENTION_IN_HOURS
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: $NODATA
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          description: The sequencer in {{ $labels.namespace }} on migration ID {{ $labels.migration_id }} has not been pruned {{ $SEQUENCER_PRUNING_RETENTION_IN_DAYS }} days.
+          summary: Sequencer has not been pruned.
+        labels:
+          "": ""
+        isPaused: false
+      - uid: ef3sfj563dq0we
+        title: Mediator Pruning
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              disableTextWrap: false
+              editorMode: builder
+              expr: daml_mediator_max_event_age
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+              useBackend: false
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - $MEDIATOR_PRUNING_RETENTION_IN_HOURS
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: $NODATA
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          description: The mediator in {{ $labels.namespace }} on migration ID {{ $labels.migration_id }} has not been pruned {{ $MEDIATOR_PRUNING_RETENTION_IN_DAYS }} days.
+          summary: Mediator has not been pruned.
+        labels:
+          "": ""
+        isPaused: false

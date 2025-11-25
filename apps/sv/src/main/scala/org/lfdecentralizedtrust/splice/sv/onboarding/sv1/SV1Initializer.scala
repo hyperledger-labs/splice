@@ -59,7 +59,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnectionPoolDelays,
@@ -114,7 +114,7 @@ class SV1Initializer(
     override protected val clock: Clock,
     override protected val domainTimeSync: DomainTimeSynchronization,
     override protected val domainUnpausedSync: DomainUnpausedSynchronization,
-    override protected val storage: Storage,
+    override protected val storage: DbStorage,
     override protected val retryProvider: RetryProvider,
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -190,7 +190,7 @@ class SV1Initializer(
               )
             ),
             PositiveInt.one,
-            // TODO(#2110) Rethink this when we enable sequencer connection pools.
+            // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
             config.participantClient.sequencerRequestAmplification,
             // TODO(#2666) Make the delays configurable.
@@ -203,11 +203,22 @@ class SV1Initializer(
             observationLatency = config.timeTrackerObservationLatency,
           ),
         ),
+        newSequencerConnectionPool = config.parameters.enabledFeatures.newSequencerConnectionPool,
         overwriteExistingConnection =
           false, // The validator will manage sequencer connections after initial setup
         retryFor = RetryFor.WaitingOnInitDependency,
       )
       _ = logger.info("Participant connected to domain")
+      _ <- ensureCantonNodesOTKRotatedIfNeeded(
+        config.skipSynchronizerInitialization,
+        cantonIdentifierConfig,
+        Some(localSynchronizerNode),
+        clock,
+        loggerFactory,
+        retryProvider,
+        synchronizerId,
+      )
+      _ = logger.info("Synchronizer rotated OTK keys that were not signed")
       (dsoParty, svParty, _) <- (
         setupDsoParty(synchronizerId, initConnection, namespace),
         SetupUtil.setupSvParty(

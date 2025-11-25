@@ -83,7 +83,7 @@ class MediatorAdminConnection(
         SequencerConnections.tryMany(
           Seq(sequencerConnection),
           PositiveInt.tryCreate(1),
-          // TODO(#2110) Rethink this when we enable sequencer connection pools.
+          // Mediators do not have BFT connections.
           sequencerLivenessMargin = NonNegativeInt.zero,
           submissionRequestAmplification,
           // TODO(#2666) Make the delays configurable.
@@ -121,7 +121,7 @@ class MediatorAdminConnection(
         SequencerConnections.tryMany(
           Seq(sequencerConnection),
           PositiveInt.tryCreate(1),
-          // TODO(#2110) Rethink this when we enable sequencer connection pools.
+          // Mediators do not have BFT connections.
           sequencerLivenessMargin = NonNegativeInt.zero,
           submissionRequestAmplification,
           // TODO(#2666) Make the delays configurable.
