@@ -298,7 +298,10 @@ class AdminWorkflowServices(
   )(
       createService: LedgerClient => S
   ): (FutureUnlessShutdown[ResilientLedgerSubscription[?, ?]], S) = {
-    import TraceContext.Implicits.Empty.*
+
+    implicit val traceContext: TraceContext =
+      TraceContext.createNew("admin_workflow_services_create_service")
+    logger.info(s"Creating admin workflow service $userId")
 
     val client = createLedgerClient(userId)
     val service = createService(client)
@@ -359,11 +362,11 @@ class AdminWorkflowServices(
 object AdminWorkflowServices extends AdminWorkflowServicesErrorGroup {
 
   val PingDarResourceName: String = "canton-builtin-admin-workflow-ping"
-  val PingDarResourceFileName: String = s"$PingDarResourceName.dar"
+  val PingDarResourceFileName: String = s"dar/$PingDarResourceName.dar"
   val PartyReplicationDarResourceName: String =
     "canton-builtin-admin-workflow-party-replication-alpha"
   private val PartyReplicationDarResourceFileName: String =
-    s"$PartyReplicationDarResourceName.dar"
+    s"dar/$PartyReplicationDarResourceName.dar"
   val AdminWorkflowNames: Set[String] = Set(PingDarResourceName, PartyReplicationDarResourceName)
 
   private def getDarInputStream(resourceName: String): InputStream =

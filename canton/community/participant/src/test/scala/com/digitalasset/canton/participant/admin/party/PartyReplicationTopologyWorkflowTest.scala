@@ -4,8 +4,9 @@
 package com.digitalasset.canton.participant.admin.party
 
 import cats.data.EitherT
-import com.digitalasset.canton.config.DefaultProcessingTimeouts
+import cats.syntax.option.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.{DefaultProcessingTimeouts, TopologyConfig}
 import com.digitalasset.canton.crypto.{Fingerprint, Hash, HashAlgorithm, TestHash}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -156,8 +157,7 @@ class PartyReplicationTopologyWorkflowTest
       .update(
         SequencedTime(ts),
         EffectiveTime(ts),
-        removeMapping = if (proposal) Map.empty else Map(mapping.uniqueKey -> serial),
-        removeTxs = Set.empty,
+        removals = if (proposal) Map.empty else Map(mapping.uniqueKey -> (serial.some, Set.empty)),
         additions = Seq(ValidatedTopologyTransaction(signedTx)),
       )
       .map(_ => signedTx)
@@ -228,8 +228,8 @@ class PartyReplicationTopologyWorkflowTest
         )
 
         for {
-          _ <- add(topologyStore)(tsSerialMinusOne, serialBefore, ptpBefore)
-          _ <- add(topologyStore)(tsSerial, serial, ptpProposal, proposal = true)
+          _ <- add(topologyStore)(tsSerialMinusTwo, serialBefore, ptpBefore)
+          _ <- add(topologyStore)(tsSerialMinusOne, serial, ptpProposal, proposal = true)
           effectiveTsBeforeO <- tw
             .authorizeOnboardingTopology(params, topologyManager, topologyStore)
             .valueOrFail("expect authorization to succeed")
@@ -297,6 +297,7 @@ class PartyReplicationTopologyWorkflowTest
           clock,
           store = topologyStore,
           packageDependenciesResolver = StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
+          topologyConfig = TopologyConfig(),
           timeouts = timeouts,
           futureSupervisor = futureSupervisor,
           loggerFactory = loggerFactory,
@@ -335,7 +336,7 @@ class PartyReplicationTopologyWorkflowTest
             SequencerCounter.Genesis,
             Seq.empty,
           )
-          _ <- add(topologyStore)(tsSerialMinusTwo, serialBefore2, ptpBefore)
+          _ <- add(topologyStore)(tsSerialMinusTwo.minusSeconds(1), serialBefore2, ptpBefore)
           _ <- add(topologyStore)(
             tsSerialMinusTwo,
             serialBefore2,
