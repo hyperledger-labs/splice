@@ -236,7 +236,9 @@ class BftScanConnectionIntegrationTest
       },
       logs => {
         val messages = logs.map(_.message)
-        withClue("Validator should bootstrap with 4 scans only during recovery") {
+        withClue(
+          "Validator should bootstrap with all the scan urls persisted to the internal store"
+        ) {
           messages.filter(_.contains(bootstrapsWith1UrlLog)) should have length 0
           messages.filter(_.contains(bootstrapsWith4UrlsLog)) should have length 2
         }
