@@ -19,20 +19,20 @@ import com.digitalasset.canton.config.{
   DefaultPorts,
   GCLoggingConfig,
   Generate,
+  SharedCantonConfig,
 }
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.{Environment, EnvironmentFactory}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.JarResourceUtils
-import com.digitalasset.canton.version.ReleaseVersion
 import com.sun.management.GarbageCollectionNotificationInfo
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import org.slf4j.LoggerFactory
 
 import java.lang.management.ManagementFactory
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
+import java.util.concurrent.atomic.AtomicReference
 import javax.management.openmbean.CompositeData
 import javax.management.{NotificationEmitter, NotificationListener}
 import scala.jdk.CollectionConverters.*
@@ -272,10 +272,7 @@ abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
     case Left(_) => sys.exit(1)
   }
 
-  def loadConfig(
-      config: Config,
-      defaultPorts: Option[DefaultPorts],
-  ): Either[CantonConfigError, CantonConfig]
+  def loadConfig(config: Config): Either[CantonConfigError, CantonConfig]
 
   private def startupConfigFileMonitoring(environment: Environment): Unit =
     TraceContext.withNewTraceContext("config_file_monitoring") { implicit traceContext =>

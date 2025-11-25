@@ -22,12 +22,12 @@ import com.digitalasset.canton.config.{
   TestingConfigInternal,
 }
 import com.digitalasset.canton.console.{
-  ConsoleEnvironment,
+  CantonConsoleEnvironment,
   InstanceReference,
   SequencerReference,
   TestConsoleOutput,
 }
-import com.digitalasset.canton.environment.Environment
+import com.digitalasset.canton.environment.{CantonEnvironment, CommunityEnvironmentFactory}
 import com.digitalasset.canton.integration.bootstrap.{
   InitializedSynchronizer,
   NetworkBootstrapper,
@@ -58,21 +58,20 @@ import monocle.macros.syntax.lens.*
   *   making ports unique or some other specialization for the particular tests you're running)
   */
 final case class EnvironmentDefinition(
-    baseConfig: CantonConfig,
-    testingConfig: TestingConfigInternal =
+    override val baseConfig: CantonConfig,
+    override val testingConfig: TestingConfigInternal =
       TestingConfigInternal(warnOnAcsCommitmentDegradation = false),
-    setups: List[TestConsoleEnvironment => Unit] = Nil,
-    teardown: Unit => Unit = _ => (),
-    configTransforms: Seq[ConfigTransform] = ConfigTransforms.defaults,
+    override val setups: List[TestConsoleEnvironment => Unit] = Nil,
+    override val teardown: Unit => Unit = _ => (),
+    override val configTransforms: Seq[ConfigTransform] = ConfigTransforms.defaults,
     staticSynchronizerParametersMap: Map[String, StaticSynchronizerParameters] = Map.empty,
-) {
-
-  /** Create a canton configuration by applying the configTransforms to the base config. Some
-    * transforms may have side-effects (such as incrementing the next available port number) so only
-    * do before constructing an environment.
-    */
-  def generateConfig: CantonConfig =
-    configTransforms.foldLeft(baseConfig)((config, transform) => transform(config))
+) extends BaseEnvironmentDefinition[CantonConfig, CantonEnvironment](
+      baseConfig,
+      testingConfig,
+      setups,
+      teardown,
+      configTransforms,
+    ) {
 
   def withManualStart: EnvironmentDefinition =
     copy(baseConfig = baseConfig.focus(_.parameters.manualStart).replace(true))
@@ -105,14 +104,19 @@ final case class EnvironmentDefinition(
       }
     }
 
-  def withSetup(setup: TestConsoleEnvironment => Unit): EnvironmentDefinition =
+  def withSetup(
+      setup: TestConsoleEnvironment[CantonConfig, CantonEnvironment] => Unit
+  ): EnvironmentDefinition =
     copy(setups = setups :+ setup)
 
   def withTeardown(teardown: Unit => Unit): EnvironmentDefinition =
     copy(teardown = teardown)
 
   def withNetworkBootstrap(
-      networkBootstrapFactory: TestConsoleEnvironment => NetworkBootstrapper
+      networkBootstrapFactory: TestConsoleEnvironment[
+        CantonConfig,
+        CantonEnvironment,
+      ] => NetworkBootstrapper
   ): EnvironmentDefinition =
     withSetup(env => networkBootstrapFactory(env).bootstrap())
 

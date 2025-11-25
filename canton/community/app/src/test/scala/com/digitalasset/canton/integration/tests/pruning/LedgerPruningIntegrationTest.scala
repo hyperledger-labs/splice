@@ -7,10 +7,11 @@ import com.daml.ledger.api.v2.event_query_service.GetEventsByContractIdResponse
 import com.daml.ledger.api.v2.transaction.Transaction
 import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS
 import com.digitalasset.canton.BigDecimalImplicits.*
-import com.digitalasset.canton.config.DbConfig
+import com.digitalasset.canton.config.{CantonConfig, DbConfig}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{CommandFailure, LocalParticipantReference}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.examples.java.cycle
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
 import com.digitalasset.canton.integration.*

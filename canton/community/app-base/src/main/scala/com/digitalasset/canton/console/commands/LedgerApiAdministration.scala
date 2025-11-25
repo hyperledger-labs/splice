@@ -155,14 +155,14 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       )
     )
 
-  private[canton] def optionallyAwait[Tx](
+  def optionallyAwait[Tx](
       tx: Tx,
       txId: String,
       txSynchronizerId: String,
       optTimeout: Option[config.NonNegativeDuration],
   ): Tx
 
-  private def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
+  def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
 
   protected def defaultLimit: PositiveInt =
     consoleEnvironment.environment.config.parameters.console.defaultLimit
