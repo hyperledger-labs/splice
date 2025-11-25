@@ -43,8 +43,9 @@ template VoteExecutionInstruction
     dso : Party
     instruction : ExecutionInstruction
     expiresAt : Time
-    voteRequest : AnyContractId
-      -- ^ This is the `ContractId VoteRequest` for which this instruction exist.
+    optVoteRequest : Optional AnyContractId
+      -- ^ Optional `ContractId VoteRequest` for which this instruction exists.
+      -- Referenced using `AnyContractId` to break the cyclic dependency to `DsoRules`.
   where
     signatory dso
     ensure validExecutionInstruction instruction

@@ -1578,10 +1578,10 @@ template DsoRules with
            case c of
              VLC_ChangeWeight {validator, weight} -> do
                let instruction = EI_ValidatorLicenseChangeWeight with validator; weight
-               create VoteExecutionInstruction with dso; instruction; expiresAt; voteRequest = voteRequestAny
+               create VoteExecutionInstruction with dso; instruction; expiresAt; optVoteRequest = Some voteRequestAny
              VLC_Withdraw {validator} -> do
                let instruction = EI_ValidatorLicenseWithdraw with validator
-               create VoteExecutionInstruction with dso; instruction; expiresAt; voteRequest = voteRequestAny
+               create VoteExecutionInstruction with dso; instruction; expiresAt; optVoteRequest = Some voteRequestAny
          return DsoRules_ModifyValidatorLicensesResult with instructionCids
 
     nonconsuming choice DsoRules_ExecuteVoteInstruction : DsoRules_ExecuteVoteInstructionResult
