@@ -448,24 +448,6 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[DefaultPorts, Self] { self
       n.unwrap -> c
   }
 
-  /** dump config to string (without sensitive data) */
-  /** renders the config as a string (used for dumping config for diagnostic purposes) */
-  def dumpString: String = CantonConfig.makeConfidentialString(this)
-
-  /** run a validation on the current config and return possible warning messages */
-  private def validate(
-      edition: CantonEdition,
-      ensurePortsSet: Boolean,
-  ): Validated[NonEmpty[Seq[String]], Unit] = {
-    val validator = edition match {
-      case CommunityCantonEdition =>
-        CommunityConfigValidations
-      case EnterpriseCantonEdition =>
-        EnterpriseConfigValidations
-    }
-    validator.validate(this, edition, ensurePortsSet = ensurePortsSet)
-  }
-
   private lazy val participantNodeParameters_ : Map[InstanceName, ParticipantNodeParameters] =
     participants.fmap { participantConfig =>
       val participantParameters = participantConfig.parameters
@@ -618,7 +600,7 @@ final case class CantonConfig(
     features: CantonFeatures = CantonFeatures(),
     pekkoConfig: Option[Config] = None,
 ) extends UniformCantonConfigValidation
-    with ConfigDefaults[DefaultPorts, CantonConfig]
+    with ConfigDefaults[Option[DefaultPorts], CantonConfig]
     with SharedCantonConfig[CantonConfig] {
 
   /** dump config to string (without sensitive data) */
@@ -626,14 +608,17 @@ final case class CantonConfig(
   def dumpString: String = CantonConfig.makeConfidentialString(this)
 
   /** run a validation on the current config and return possible warning messages */
-  def validate(edition: CantonEdition): Validated[NonEmpty[Seq[String]], Unit] = {
+  private def validate(
+      edition: CantonEdition,
+      ensurePortsSet: Boolean,
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
     val validator = edition match {
       case CommunityCantonEdition =>
         CommunityConfigValidations
       case EnterpriseCantonEdition =>
         EnterpriseConfigValidations
     }
-    validator.validate(this, edition)
+    validator.validate(this, edition, ensurePortsSet)
   }
 
 
