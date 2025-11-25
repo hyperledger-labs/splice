@@ -8,7 +8,6 @@ import com.digitalasset.canton.UniquePortGenerator
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.StorageConfig.Memory
 import com.digitalasset.canton.config.{CantonConfig, QueryCostMonitoringConfig, TlsClientConfig}
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.{
   MultiSynchronizer,
@@ -51,7 +50,7 @@ final class UseBftSequencer(
     shouldOverwriteStoredEndpoints: Boolean = false,
     shouldUseMemoryStorageForBftOrderer: Boolean = false,
     shouldBenchmarkBftSequencer: Boolean = false,
-) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment] {
+) extends EnvironmentSetupPlugin {
 
   val sequencerEndpoints
       : SingleUseCell[Map[InstanceName, BftBlockOrdererConfig.P2PEndpointConfig]] =

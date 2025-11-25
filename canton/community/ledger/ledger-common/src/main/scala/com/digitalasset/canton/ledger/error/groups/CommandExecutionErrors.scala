@@ -867,7 +867,13 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
               (ErrorResource.ContractId, err.coid.coid),
               (ErrorResource.TemplateId, err.srcTemplateId.toString),
               (ErrorResource.TemplateId, err.dstTemplateId.toString),
-            ) ++ encodeParties(err.originalSignatories) ++ encodeParties(err.originalObservers) ++ optKeyResources(err.originalKeyOpt) ++ encodeParties(err.recomputedSignatories) ++ encodeParties(err.recomputedObservers) ++ optKeyResources(err.recomputedKeyOpt)
+            )
+              ++ encodeParties(err.originalSignatories)
+              ++ encodeParties(err.originalObservers)
+              ++ optKeyResources(err.originalKeyOpt)
+              ++ encodeParties(err.recomputedSignatories)
+              ++ encodeParties(err.recomputedObservers)
+              ++ optKeyResources(err.recomputedKeyOpt)
           }
         }
       }

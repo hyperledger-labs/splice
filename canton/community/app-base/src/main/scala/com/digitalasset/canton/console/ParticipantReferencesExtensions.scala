@@ -11,7 +11,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, Traced
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
-import com.google.protobuf.ByteString
 
 class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(implicit
     override val consoleEnvironment: ConsoleEnvironment
@@ -38,7 +37,6 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
         synchronizeVetting: Boolean = true,
         expectedMainPackageId: String = "",
         requestHeaders: Map[String, String] = Map(),
-        darDataO: Option[ByteString] = None,
     ): Map[ParticipantReference, String] = {
       val res = ConsoleCommandResult.runAll(participants)(
         ParticipantCommands.dars
@@ -52,7 +50,6 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
             expectedMainPackageId = expectedMainPackageId,
             requestHeaders = requestHeaders,
             logger,
-            darDataO,
           )
       )
       if (synchronizeVetting && vetAllPackages) {

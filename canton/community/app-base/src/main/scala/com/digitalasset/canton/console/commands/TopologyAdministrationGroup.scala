@@ -9,7 +9,6 @@ import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.RpcError
-import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
 import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, TopologyAdminCommands}
 import com.digitalasset.canton.admin.api.client.data.topology.*
@@ -19,11 +18,12 @@ import com.digitalasset.canton.admin.api.client.data.{
 }
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
-import com.digitalasset.canton.console.CommandErrors.GenericCommandError
+import com.digitalasset.canton.console.CommandErrors.{CommandError, GenericCommandError}
 import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
   CommandErrors,
+  CommandSuccessful,
   ConsoleCommandResult,
   ConsoleEnvironment,
   ConsoleMacros,
@@ -67,7 +67,7 @@ import com.digitalasset.canton.{config, networking}
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
-import io.grpc.{Context, Status}
+import io.grpc.Context
 
 import java.net.URI
 import java.time.Duration
@@ -183,7 +183,7 @@ class TopologyAdministrationGroup(
       waitForReady,
     )
 
-  private def getIdCommand(): ConsoleCommandResult[GetIdResult] =
+  private def getIdCommand(): ConsoleCommandResult[UniqueIdentifier] =
     adminCommand(TopologyAdminCommands.Init.GetId())
 
   // small cache to avoid repetitive calls to fetchId (as the id is immutable once set)
@@ -196,13 +196,15 @@ class TopologyAdministrationGroup(
   private[console] def idHelper[T](
       apply: UniqueIdentifier => T
   ): T =
-    maybeIdHelper(apply).getOrElse(
-      throw Status.UNAVAILABLE
-        .withDescription(
-          s"Node does not have an Id assigned yet."
-        )
-        .asRuntimeException()
-    )
+    apply(idCache.get() match {
+      case Some(v) => v
+      case None =>
+        val r = consoleEnvironment.run {
+          getIdCommand()
+        }
+        idCache.set(Some(r))
+        r
+    })
 
   private[console] def maybeIdHelper[T](
       apply: UniqueIdentifier => T
@@ -210,11 +212,14 @@ class TopologyAdministrationGroup(
     (idCache.get() match {
       case Some(v) => Some(v)
       case None =>
-        val r = consoleEnvironment.run {
-          getIdCommand()
+        consoleEnvironment.run {
+          CommandSuccessful(getIdCommand() match {
+            case CommandSuccessful(v) =>
+              idCache.set(Some(v))
+              Some(v)
+            case _: CommandError => None
+          })
         }
-        r.uniqueIdentifier.foreach(id => idCache.set(Some(id)))
-        r.uniqueIdentifier
     }).map(apply)
 
   @Help.Summary("Topology synchronisation helpers", FeatureFlag.Preview)
