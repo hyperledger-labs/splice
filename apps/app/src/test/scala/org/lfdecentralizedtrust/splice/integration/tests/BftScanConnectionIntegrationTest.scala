@@ -194,6 +194,14 @@ class BftScanConnectionIntegrationTest
       sv4ScanBackend,
     )
 
+    eventually() {
+      val allHealthy = Seq(sv1ScanBackend, sv2ScanBackend, sv3ScanBackend, sv4ScanBackend).forall {
+        scan =>
+          scan.httpHealth.successOption.exists(_.active)
+      }
+      allHealthy shouldBe true
+    }
+
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
       {
         aliceValidatorBackend.startSync()
@@ -218,13 +226,7 @@ class BftScanConnectionIntegrationTest
     )
 
     withClue("Persisted state should contain the expected four internal scan configurations") {
-      val maybeActualConfigs: Option[Seq[ScanUrlInternalConfig]] = persistedState.value.futureValue
-
-      maybeActualConfigs.fold {
-        fail("The persisted state for scan URLs was None (not found or not persisted).")
-      } { actualConfigs =>
-        actualConfigs should contain theSameElementsAs expectedConfigs
-      }
+      persistedState.value.futureValue.value should contain theSameElementsAs expectedConfigs
     }
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
