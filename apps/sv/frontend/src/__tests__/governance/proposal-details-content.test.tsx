@@ -755,7 +755,7 @@ describe('Proposal Details > Votes & Voting', () => {
     );
     expect(voteTakesEffectDuration.textContent).toBe('Threshold');
 
-    const voteTakesEffectValue = within(votingInformationSection).getByTestId(
+    const voteTakesEffectValue = within(votingInformationSection).queryByTestId(
       'proposal-details-vote-takes-effect-value'
     );
     expect(voteTakesEffectValue).not.toBeInTheDocument();
@@ -803,7 +803,7 @@ describe('Proposal Details > Votes & Voting', () => {
       </Wrapper>
     );
 
-    expect(screen.getByTestId('your-vote-form')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('your-vote-form')).not.toBeInTheDocument();
   });
 
   test('submit button says Submit if sv has not voted', async () => {
