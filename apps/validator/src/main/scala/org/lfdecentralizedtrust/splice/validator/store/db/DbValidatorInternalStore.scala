@@ -19,12 +19,10 @@ import slick.jdbc.JdbcProfile
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import scala.concurrent.{ExecutionContext, Future}
 import org.lfdecentralizedtrust.splice.store.db.{StoreDescriptor, StoreDescriptorStore}
-import java.util.concurrent.atomic.AtomicReference
 
 class DbValidatorInternalStore private (
-    participant: ParticipantId,
-    validatorParty: PartyId,
     storage: DbStorage,
+    val storeId: Int,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     val ec: ExecutionContext,
@@ -35,46 +33,6 @@ class DbValidatorInternalStore private (
     with NamedLogging {
 
   val profile: JdbcProfile = storage.profile.jdbc
-  private val storeDescriptor = StoreDescriptor(
-    version = 2,
-    name = "DbValidatorInternalConfigStore",
-    party = validatorParty,
-    participant = participant,
-    key = Map(
-      "validatorParty" -> validatorParty.toProtoPrimitive
-    ),
-  )
-
-  private case class ValidatorInternalStoreState(
-      storeId: Option[Int]
-  )
-
-  private object ValidatorInternalStoreState {
-    def empty(): ValidatorInternalStoreState = ValidatorInternalStoreState(
-      storeId = None
-    )
-  }
-
-  private val internalState =
-    new AtomicReference[ValidatorInternalStoreState](ValidatorInternalStoreState.empty())
-
-  def storeId: Int =
-    internalState
-      .get()
-      .storeId
-      .getOrElse(throw new RuntimeException("Using storeId before it was assigned"))
-
-  private def getOrSaveStoreDescriptor()(implicit
-      tc: TraceContext
-  ): Future[DbValidatorInternalStore] = {
-
-    StoreDescriptorStore
-      .getStoreIdForDescriptor(storeDescriptor, storage)
-      .map(registeredStoreId => {
-        internalState.updateAndGet(_.copy(storeId = Some(registeredStoreId)))
-        this
-      })
-  }
 
   override def setConfig[T](key: String, value: T)(implicit
       tc: TraceContext,
@@ -157,12 +115,26 @@ object DbValidatorInternalStore {
       cc: CloseContext,
       tc: TraceContext,
   ): Future[DbValidatorInternalStore] = {
-    val store = new DbValidatorInternalStore(
-      participant,
-      validatorParty,
-      storage,
-      loggerFactory,
-    )
-    store.getOrSaveStoreDescriptor()
+
+    StoreDescriptorStore
+      .getStoreIdForDescriptor(
+        StoreDescriptor(
+          version = 2,
+          name = "DbValidatorInternalConfigStore",
+          party = validatorParty,
+          participant = participant,
+          key = Map(
+            "validatorParty" -> validatorParty.toProtoPrimitive
+          ),
+        ),
+        storage,
+      )
+      .map(storeId => {
+        new DbValidatorInternalStore(
+          storage,
+          storeId,
+          loggerFactory,
+        )
+      })
   }
 }
