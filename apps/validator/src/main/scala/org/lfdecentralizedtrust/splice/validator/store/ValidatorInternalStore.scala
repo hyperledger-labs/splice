@@ -10,10 +10,9 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.{Decoder, Encoder}
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
-
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 
 trait ValidatorInternalStore {
 
@@ -36,7 +35,7 @@ object ValidatorInternalStore {
 
   def apply(
       participant: ParticipantId,
-      key: ValidatorStore.Key,
+      validatorParty: PartyId,
       storage: DbStorage,
       loggerFactory: NamedLoggerFactory,
   )(implicit
@@ -44,17 +43,16 @@ object ValidatorInternalStore {
       lc: ErrorLoggingContext,
       cc: CloseContext,
       tc: TraceContext,
-  ): ValidatorInternalStore = {
+  ): Future[ValidatorInternalStore] = {
     storage match {
       case storage: DbStorage =>
-        val dbStore = new DbValidatorInternalStore(
+        DbValidatorInternalStore(
           participant,
-          key,
+          validatorParty,
           storage,
           loggerFactory,
         )
-        val _ = dbStore.initializeState()
-        dbStore
+
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
   }

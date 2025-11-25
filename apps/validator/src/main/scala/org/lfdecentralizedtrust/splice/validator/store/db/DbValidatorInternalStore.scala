@@ -10,8 +10,8 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
-import com.digitalasset.canton.topology.ParticipantId
-import org.lfdecentralizedtrust.splice.validator.store.{ValidatorInternalStore, ValidatorStore}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorInternalStore
 import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Encoder, Json}
 import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
@@ -19,12 +19,10 @@ import slick.jdbc.JdbcProfile
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import scala.concurrent.{ExecutionContext, Future}
 import org.lfdecentralizedtrust.splice.store.db.{StoreDescriptor, StoreDescriptorStore}
-import java.util.concurrent.atomic.AtomicReference
 
-class DbValidatorInternalStore(
-    participant: ParticipantId,
-    key: ValidatorStore.Key,
+class DbValidatorInternalStore private (
     storage: DbStorage,
+    val storeId: Int,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     val ec: ExecutionContext,
@@ -35,44 +33,6 @@ class DbValidatorInternalStore(
     with NamedLogging {
 
   val profile: JdbcProfile = storage.profile.jdbc
-  private val storeDescriptor = StoreDescriptor(
-    version = 2,
-    name = "DbValidatorInternalConfigStore",
-    party = key.validatorParty,
-    participant = participant,
-    key = Map(
-      "validatorParty" -> key.validatorParty.toProtoPrimitive
-    ),
-  )
-
-  private case class ValidatorInternalStoreState(
-      storeId: Option[Int]
-  )
-
-  private object ValidatorInternalStoreState {
-    def empty(): ValidatorInternalStoreState = ValidatorInternalStoreState(
-      storeId = None
-    )
-  }
-
-  private val internalState =
-    new AtomicReference[ValidatorInternalStoreState](ValidatorInternalStoreState.empty())
-
-  def storeId: Int =
-    internalState
-      .get()
-      .storeId
-      .getOrElse(throw new RuntimeException("Using storeId before it was assigned"))
-
-  def initializeState()(implicit tc: TraceContext): Future[Unit] = {
-    for {
-      result <- StoreDescriptorStore
-        .getStoreIdForDescriptor(storeDescriptor, storage)
-    } yield {
-      internalState.updateAndGet(_.copy(storeId = Some(result)))
-      ()
-    }
-  }
 
   override def setConfig[T](key: String, value: T)(implicit
       tc: TraceContext,
@@ -139,5 +99,42 @@ class DbValidatorInternalStore(
         "delete config key",
       )
       .map(_.discard)
+  }
+}
+
+object DbValidatorInternalStore {
+
+  def apply(
+      participant: ParticipantId,
+      validatorParty: PartyId,
+      storage: DbStorage,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      ec: ExecutionContext,
+      lc: ErrorLoggingContext,
+      cc: CloseContext,
+      tc: TraceContext,
+  ): Future[DbValidatorInternalStore] = {
+
+    StoreDescriptorStore
+      .getStoreIdForDescriptor(
+        StoreDescriptor(
+          version = 2,
+          name = "DbValidatorInternalConfigStore",
+          party = validatorParty,
+          participant = participant,
+          key = Map(
+            "validatorParty" -> validatorParty.toProtoPrimitive
+          ),
+        ),
+        storage,
+      )
+      .map(storeId => {
+        new DbValidatorInternalStore(
+          storage,
+          storeId,
+          loggerFactory,
+        )
+      })
   }
 }
