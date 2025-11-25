@@ -4,6 +4,7 @@ import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.W
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.participant.admin.data.ContractImportMode
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
@@ -87,7 +88,7 @@ class MultiHostValidatorOperatorIntegrationTest
         }
         clue("Import ACS") {
           bobValidatorBackend.participantClient.parties
-            .import_party_acs(acsFile.toString)
+            .import_party_acs(acsFile.toString, contractImportMode = ContractImportMode.Accept)
         }
 
       clue("Reconnect synchronizer and start the validator app again") {
