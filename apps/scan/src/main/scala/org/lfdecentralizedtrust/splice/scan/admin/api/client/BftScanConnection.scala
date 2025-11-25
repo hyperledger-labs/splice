@@ -1251,7 +1251,8 @@ object BftScanConnection {
       clock: Clock,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
-      lastPersistedScanUrlList: Future[Option[List[(String, String)]]],
+      lastPersistedScanUrlList: () => Future[Option[List[(String, String)]]] = () =>
+        Future.successful(None),
       persistScanUrlsCallback: Seq[(String, String)] => Future[Unit] = _ => Future.unit,
   )(implicit
       ec: ExecutionContextExecutor,
@@ -1283,7 +1284,7 @@ object BftScanConnection {
         // Since not all trusted SV seeds are provided (most likely), they will not be used in the initial scan connection checking.
         // In the future, add a new threshold for how many trusted seed-urls should be there.
         for {
-          lastPersistedScans <- lastPersistedScanUrlList
+          lastPersistedScans <- lastPersistedScanUrlList()
           bootstrapUris: NonEmptyList[Uri] =
             if (ts.useLastKnownConnectionsForInitialization) {
               lastPersistedScans match {
@@ -1388,7 +1389,7 @@ object BftScanConnection {
 
       case bft @ BftScanClientConfig.Bft(_, _, _, _) =>
         for {
-          lastPersistedScans <- lastPersistedScanUrlList
+          lastPersistedScans <- lastPersistedScanUrlList()
           bootstrapUris: NonEmptyList[Uri] =
             if (bft.useLastKnownConnectionsForInitialization) {
               lastPersistedScans match {

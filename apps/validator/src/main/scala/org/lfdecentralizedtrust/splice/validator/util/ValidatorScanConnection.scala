@@ -31,15 +31,15 @@ object ValidatorScanConnection {
   )(implicit
       traceContext: TraceContext,
       executionContext: ExecutionContext,
-  ): Future[Option[List[(String, String)]]] = {
+  ): () => Future[Option[List[(String, String)]]] = { () =>
+    {
+      val optionTConfig = validatorConfigProvider.getScanUrlInternalConfig()
 
-    val optionTConfig = validatorConfigProvider.getScanUrlInternalConfig()
-
-    optionTConfig.map { internalConfigs =>
-      internalConfigs.map { internalConfig =>
-        (internalConfig.svName, internalConfig.url)
-      }.toList
-    }.value
-
+      optionTConfig.map { internalConfigs =>
+        internalConfigs.map { internalConfig =>
+          (internalConfig.svName, internalConfig.url)
+        }.toList
+      }.value
+    }
   }
 }
