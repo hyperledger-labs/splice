@@ -200,9 +200,10 @@ class BftScanConnectionIntegrationTest
       },
       logs => {
         val messages = logs.map(_.message)
-        withClue("Validator first bootstraps with 1 scan and then 4 scans") {
-          bootstrapsWith1Url(messages) && bootstrapsWith4Urls(messages)
-        } should be(true).withClue(s"Actual Logs: $logs")
+        withClue("Validator should first bootstrap with 1 and then 4 scans") {
+          messages.filter(_.contains(bootstrapsWith1UrlLog)) should have length 1
+          messages.filter(_.contains(bootstrapsWith4UrlsLog)) should have length 1
+        }
       },
     )
 
@@ -233,9 +234,10 @@ class BftScanConnectionIntegrationTest
       },
       logs => {
         val messages = logs.map(_.message)
-        withClue("Validator should bootstrap with 4 scans only") {
-          !bootstrapsWith1Url(messages) && bootstrapsWith4Urls(messages)
-        } should be(true).withClue(s"Actual Logs: $logs")
+        withClue("Validator should bootstrap with 4 scans only during recovery") {
+          messages.filter(_.contains(bootstrapsWith1UrlLog)) should have length 0
+          messages.filter(_.contains(bootstrapsWith4UrlsLog)) should have length 2
+        }
       },
     )
 
@@ -247,18 +249,10 @@ class BftScanConnectionIntegrationTest
 
   }
 
-  private def bootstrapsWith1Url(messages: Seq[String]) = {
-    messages.exists(
-      _.contains(s"Validator bootstrapping with 1 seed URLs: List(http://127.0.0.1:5012)")
-    )
-  }
+  private val bootstrapsWith1UrlLog =
+    s"Validator bootstrapping with 1 seed URLs: List(http://127.0.0.1:5012)"
 
-  private def bootstrapsWith4Urls(messages: Seq[String]) = {
-    messages.exists(
-      _.contains(
-        s"Validator bootstrapping with 4 seed URLs: List(http://localhost:5012, http://localhost:5112, http://localhost:5212, http://localhost:5312)"
-      )
-    )
-  }
+  private val bootstrapsWith4UrlsLog =
+    s"Validator bootstrapping with 4 seed URLs: List(http://localhost:5012, http://localhost:5112, http://localhost:5212, http://localhost:5312)"
 
 }
