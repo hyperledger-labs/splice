@@ -225,7 +225,7 @@ class BftScanConnectionIntegrationTest
       ScanUrlInternalConfig(getSvName(4), "http://localhost:5312"),
     )
 
-    withClue("Persisted state should contain the expected four internal scan configurations") {
+    withClue("Persisted state should contain the expected internal scan configurations") {
       persistedState.value.futureValue.value should contain theSameElementsAs expectedConfigs
     }
 
