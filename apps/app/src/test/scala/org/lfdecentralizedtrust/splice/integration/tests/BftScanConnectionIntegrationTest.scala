@@ -194,34 +194,19 @@ class BftScanConnectionIntegrationTest
       sv4ScanBackend,
     )
 
-    eventually() {
-      val allHealthy = Seq(
-        sv1Backend,
-        sv1ScanBackend,
-        sv2Backend,
-        sv2ScanBackend,
-        sv3Backend,
-        sv3ScanBackend,
-        sv4Backend,
-        sv4ScanBackend,
-      ).forall { scan =>
-        scan.httpHealth.successOption.exists(_.active)
-      }
-      allHealthy shouldBe true
-    }
-
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
       {
         aliceValidatorBackend.startSync()
       },
       logs => {
-        val messages = logs.map(_.message)
+        val aliceValidatorLogs = logs.filter(_.loggerName.contains("validator=aliceValidator"))
+        val messages = aliceValidatorLogs.map(_.message)
         withClue("Validator should first bootstrap with 1 and then 4 scans") {
           messages.filter(_.contains(bootstrapsWith1UrlLog)) should have length 1
           messages.filter(_.contains(bootstrapsWith4UrlsLog)) should have length 1
         }.withClue(
           s"Actual Logs: \n ${messages.filter(_.contains(bootstrapsWith1UrlLog))} \n ${messages
-              .filter(_.contains(bootstrapsWith4UrlsLog))} "
+              .filter(_.contains(bootstrapsWith4UrlsLog))}"
         )
       },
     )
@@ -246,7 +231,8 @@ class BftScanConnectionIntegrationTest
         aliceValidatorBackend.startSync()
       },
       logs => {
-        val messages = logs.map(_.message)
+        val aliceValidatorLogs = logs.filter(_.loggerName.contains("validator=aliceValidator"))
+        val messages = aliceValidatorLogs.map(_.message)
         withClue(
           "Validator should bootstrap with all the scan urls persisted to the internal store"
         ) {
