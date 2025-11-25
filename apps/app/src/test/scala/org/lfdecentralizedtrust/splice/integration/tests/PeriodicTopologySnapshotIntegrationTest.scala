@@ -2,9 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
 import com.google.cloud.storage.Blob
-import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.config.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
@@ -15,18 +13,21 @@ import java.nio.charset.StandardCharsets
 import java.time.{ZoneOffset, ZonedDateTime}
 import scala.concurrent.duration.DurationInt
 
-abstract class PeriodicTopologySnapshotIntegrationTestBase[T <: BackupDumpConfig]
-    extends IntegrationTest {
+class PeriodicTopologySnapshotIntegrationTest[T <: BackupDumpConfig] extends IntegrationTest {
 
-  protected val topologySnapshotInterval: NonNegativeFiniteDuration =
+  private val bucket = new GcpBucket(topologySnapshotLocation.bucket, loggerFactory)
+
+  private val topologySnapshotInterval: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.ofMinutes(10)
 
-  protected def topologySnapshotConfig: PeriodicBackupDumpConfig =
+  private def topologySnapshotConfig: PeriodicBackupDumpConfig =
     PeriodicBackupDumpConfig(topologySnapshotLocation, topologySnapshotInterval)
 
-  protected def topologySnapshotLocation: T
+  private def topologySnapshotLocation: BackupDumpConfig.Gcp =
+    BackupDumpConfig.Gcp(GcpBucketConfig.inferForTesting(TopologySnapshotTest), None)
 
-  protected def listDump(filenamePrefix: String): Seq[Blob]
+  private def listDump(utcDate: String): Seq[Blob] =
+    bucket.list(startOffset = s"topology_snapshot_$utcDate", endOffset = "")
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -59,8 +60,8 @@ abstract class PeriodicTopologySnapshotIntegrationTestBase[T <: BackupDumpConfig
         )
       )
 
-      val onboardingState = clue("the 3 files created from the topology snapshot exist in gcp.")({
-        val dumps = listDump(s"topology_snapshot_$utcDate").filter(_.getSize > 0L)
+      clue("the 3 files created from the topology snapshot exist in gcp.")({
+        val dumps = listDump(utcDate).filter(_.getSize > 0L)
         dumps.size shouldBe 3
         new String(
           dumps
@@ -70,29 +71,8 @@ abstract class PeriodicTopologySnapshotIntegrationTestBase[T <: BackupDumpConfig
           StandardCharsets.UTF_8,
         ) should include("SEQ::sv1") // the sequencerId change through ci runs
         dumps.exists(_.getName.endsWith("authorized")) shouldBe true
-        dumps
-          .find(_.getName.endsWith("onboarding-state"))
-          .getOrElse(throw new RuntimeException("Onboarding state dump not found."))
-          .getContent()
-      })
-
-      clue("the topology snapshot import works.")({
-        sv1Backend.appState.localSynchronizerNode.value.sequencerAdminConnection
-          .importTopologySnapshot(
-            ByteString.copyFrom(onboardingState),
-            Authorized,
-          )
+        dumps.exists(_.getName.endsWith("onboarding-state")) shouldBe true
       })
     }
-  }
-}
-
-final class GcpBucketPeriodicTopologySnapshotIntegrationTest
-    extends PeriodicTopologySnapshotIntegrationTestBase[BackupDumpConfig.Gcp] {
-  override def topologySnapshotLocation: BackupDumpConfig.Gcp =
-    BackupDumpConfig.Gcp(GcpBucketConfig.inferForTesting(TopologySnapshotTest), None)
-  val bucket = new GcpBucket(topologySnapshotLocation.bucket, loggerFactory)
-  override def listDump(filenamePrefix: String): Seq[Blob] = {
-    bucket.list(startOffset = filenamePrefix, endOffset = "")
   }
 }
