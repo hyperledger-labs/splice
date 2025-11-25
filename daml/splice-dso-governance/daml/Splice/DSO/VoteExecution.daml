@@ -6,7 +6,6 @@
 -- doesn't work well for choices that need to act on contracts that get cycled
 -- frequently, e.g., ValidatorLicense.
 -- The contracts here act as an indirection to handle such scenarios.
-
 module Splice.DSO.VoteExecution where
 
 import DA.Assert (assertDeadlineExceeded)

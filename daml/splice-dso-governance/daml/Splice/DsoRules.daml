@@ -158,6 +158,8 @@ data ValidatorLicenseChange
       validator : Party
   deriving (Eq, Show)
 
+-- | A modification of the set of validator licenses,
+-- which allows for single vote to modify many licenses.
 data ValidatorLicensesModification = ValidatorLicensesModification with
     changes : [ValidatorLicenseChange]
   deriving (Eq, Show)
