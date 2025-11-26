@@ -1,16 +1,20 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.validatorlicensechange.VLC_ChangeWeight
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
-import org.lfdecentralizedtrust.splice.util.{SpliceUtil, TimeTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{SpliceUtil, SvTestUtil, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
 
 import scala.concurrent.duration.DurationInt
+import scala.jdk.OptionConverters.*
 
 class WalletRewardsTimeBasedIntegrationTest
     extends IntegrationTest
     with WalletTestUtil
-    with TimeTestUtil {
+    with TimeTestUtil
+    with SvTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -95,6 +99,185 @@ class WalletRewardsTimeBasedIntegrationTest
           ),
         )
       }
+    }
+
+    // This test verifies that the code creating the OpenMiningRoundSummary
+    // correctly sums ValidatorLivenessActivityRecord weights, and that rewards
+    // are appropriately capped when total weights in a round are high.
+    // See: test_ValidatorLivenessWeightInRunNextIssuance for similar test in daml
+    "OpenMiningRoundSummary calculation uses validator activity record weights" in { implicit env =>
+      val info = sv1Backend.getDsoInfo()
+      val dsoParty = info.dsoParty
+      val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+
+      def getValidatorLicense(party: com.digitalasset.canton.topology.PartyId) = {
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(ValidatorLicense.COMPANION)(
+            dsoParty,
+            c => c.data.validator == party.toProtoPrimitive,
+          )
+      }
+
+      // Change Alice's weight to a very high value
+      // This should cause the per-unit issuance to be less than the default of 2.85
+      val aliceWeight = BigDecimal(15000.0)
+      actAndCheck(
+        "Modify validator licenses",
+        modifyValidatorLicenses(
+          sv1Backend,
+          svsToCastVotes = Seq.empty,
+          Seq(new VLC_ChangeWeight(aliceValidatorParty.toProtoPrimitive, aliceWeight.bigDecimal)),
+        ),
+      )(
+        "validator license modifications have been applied",
+        _ => {
+          val licenses = getValidatorLicense(aliceValidatorParty)
+          licenses should have length 1
+          licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(aliceWeight)
+        },
+      )
+
+      val openRounds = eventually() {
+        import math.Ordering.Implicits.*
+        val openRounds = sv1ScanBackend
+          .getOpenAndIssuingMiningRounds()
+          ._1
+          .filter(_.payload.opensAt <= env.environment.clock.now.toInstant)
+        openRounds should not be empty
+        openRounds
+      }
+
+      advanceTimeForRewardAutomationToRunForCurrentRound
+
+      eventually() {
+        aliceValidatorWalletClient
+          .listValidatorLivenessActivityRecords() should have size openRounds.size.toLong
+        bobValidatorWalletClient
+          .listValidatorLivenessActivityRecords() should have size openRounds.size.toLong
+      }
+
+      // Pause faucet coupon triggers to avoid balance changes during measurement
+      aliceValidatorBackend.validatorAutomation
+        .trigger[ReceiveFaucetCouponTrigger]
+        .pause()
+        .futureValue
+      bobValidatorBackend.validatorAutomation
+        .trigger[ReceiveFaucetCouponTrigger]
+        .pause()
+        .futureValue
+
+      val alicePrevBalance = aliceValidatorWalletClient.balance().unlockedQty
+      val bobPrevBalance = bobValidatorWalletClient.balance().unlockedQty
+
+      // Advance rounds to collect validator faucet rewards
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
+      advanceTimeForRewardAutomationToRunForCurrentRound
+
+      clue("validator faucet coupons have been collected") {
+        eventually() {
+          aliceValidatorWalletClient.listValidatorLivenessActivityRecords() should have size 0
+          bobValidatorWalletClient.listValidatorLivenessActivityRecords() should have size 0
+        }
+      }
+
+      val aliceNewBalance = aliceValidatorWalletClient.balance().unlockedQty
+      val bobNewBalance = bobValidatorWalletClient.balance().unlockedQty
+
+      val aliceReward = aliceNewBalance - alicePrevBalance
+      val bobReward = bobNewBalance - bobPrevBalance
+
+      // the per-unit issuance should be less than 2.85.
+      val expectedBobRewardPerRoundMin = 2.5
+      val expectedBobRewardPerRoundMax = 2.55
+
+      val expectedBobTotalMin = expectedBobRewardPerRoundMin * openRounds.size
+      val expectedBobTotalMax = expectedBobRewardPerRoundMax * openRounds.size
+
+      assertInRange(
+        bobReward,
+        (
+          walletUsdToAmulet(expectedBobTotalMin),
+          walletUsdToAmulet(expectedBobTotalMax),
+        ),
+      )
+
+      val expectedAliceTotalMin = expectedBobTotalMin * aliceWeight.toDouble
+      val expectedAliceTotalMax = expectedBobTotalMax * aliceWeight.toDouble
+
+      assertInRange(
+        aliceReward,
+        (
+          walletUsdToAmulet(expectedAliceTotalMin),
+          walletUsdToAmulet(expectedAliceTotalMax),
+        ),
+      )
+    }
+
+    "validator with weight 0 does not record liveness activity but still reports active" in {
+      implicit env =>
+        val info = sv1Backend.getDsoInfo()
+        val dsoParty = info.dsoParty
+        val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+
+        def getAliceLicense() = {
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(ValidatorLicense.COMPANION)(
+              dsoParty,
+              c => c.data.validator == aliceValidatorParty.toProtoPrimitive,
+            )
+        }
+
+        // Get initial lastActiveAt
+        val initialLicense = eventually() {
+          val licenses = getAliceLicense()
+          licenses should have length 1
+          licenses.head
+        }
+        val initialLastActiveAt = initialLicense.data.lastActiveAt
+
+        // Change validator license weight to 0
+        val zeroWeight = BigDecimal(0.0)
+        actAndCheck(
+          "Modify validator licenses",
+          modifyValidatorLicenses(
+            sv1Backend,
+            svsToCastVotes = Seq.empty,
+            Seq(new VLC_ChangeWeight(aliceValidatorParty.toProtoPrimitive, zeroWeight.bigDecimal)),
+          ),
+        )(
+          "validator license modifications have been applied",
+          _ => {
+            val licenses = getAliceLicense()
+            licenses should have length 1
+            licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(zeroWeight)
+          },
+        )
+
+        advanceTimeForRewardAutomationToRunForCurrentRound
+
+        // Wait for trigger to run and verify no liveness activity records are created for Alice
+        // Bob (with the default weight) should still have activity records
+        eventually() {
+          aliceValidatorWalletClient
+            .listValidatorLivenessActivityRecords() should have size 0
+          bobValidatorWalletClient
+            .listValidatorLivenessActivityRecords() should not be empty
+        }
+
+        // Advance time past activityReportMinInterval (1 hour) to trigger ReportActive
+        actAndCheck(
+          "Advance time past activityReportMinInterval",
+          advanceTime(java.time.Duration.ofHours(2)),
+        )(
+          "lastActiveAt gets updated even with weight 0",
+          _ => {
+            val updatedLicense = getAliceLicense()
+            updatedLicense should have length 1
+            updatedLicense.head.data.lastActiveAt should not be initialLastActiveAt
+          },
+        )
     }
   }
 }
