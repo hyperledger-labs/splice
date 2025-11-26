@@ -61,6 +61,9 @@ export function getDsoRulesConfig(
     voteCooldownTime: {
       microseconds: '60000000', // 1 minute
     },
+    voteExecutionInstructionTimeout: {
+      microseconds: '86400000000', // 1 day
+    },
   };
 }
 
