@@ -101,6 +101,7 @@ object SvOnboardingConfig {
       initialTransferPreapprovalFee: Option[BigDecimal] = None,
       initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = Some(BigDecimal(1.0)),
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
+      voteExecutionInstructionTimeout: Option[NonNegativeFiniteDuration] = None,
       initialRound: Long = 0L,
   ) extends SvOnboardingConfig
 
