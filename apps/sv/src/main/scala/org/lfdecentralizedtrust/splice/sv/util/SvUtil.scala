@@ -66,6 +66,7 @@ object SvUtil {
   // (See #12107).
   val defaultAcsCommitmentReconciliationInterval: PositiveDurationSeconds =
     PositiveDurationSeconds.ofMinutes(30)
+
   val defaultAcsCommitmentsCatchUpParameters: AcsCommitmentsCatchUpParameters =
     AcsCommitmentsCatchUpParameters(
       // With the default reconciliation interval of 30m this corresponds to a catchup interval of 30m * 24 = 12 hours.
