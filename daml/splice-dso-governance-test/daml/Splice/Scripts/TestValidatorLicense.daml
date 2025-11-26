@@ -265,22 +265,22 @@ testVoteExecutionInstructionExpire = do
 
   -- Cannot expire before timeout (default: 1 day)
   submitMultiMustFail [sv1] [app.dso] $
-    exerciseCmd dsoRulesCid DsoRules_ExpireVoteInstruction with
+    exerciseCmd dsoRulesCid DsoRules_ExpireVoteExecutionInstruction with
       instructionCid = instruction1Cid; sv = sv1
 
   submitMultiMustFail [sv1] [app.dso] $
-    exerciseCmd dsoRulesCid DsoRules_ExpireVoteInstruction with
+    exerciseCmd dsoRulesCid DsoRules_ExpireVoteExecutionInstruction with
       instructionCid = instruction2Cid; sv = sv1
 
   passTime (days 1)
 
   -- Can expire after timeout
   submitMulti [sv1] [app.dso] $
-    exerciseCmd dsoRulesCid DsoRules_ExpireVoteInstruction with
+    exerciseCmd dsoRulesCid DsoRules_ExpireVoteExecutionInstruction with
       instructionCid = instruction1Cid; sv = sv1
 
   submitMulti [sv2] [app.dso] $
-    exerciseCmd dsoRulesCid DsoRules_ExpireVoteInstruction with
+    exerciseCmd dsoRulesCid DsoRules_ExpireVoteExecutionInstruction with
       instructionCid = instruction2Cid; sv = sv2
 
   -- Verify all instructions are now expired

@@ -320,11 +320,11 @@ data DsoRules_ModifyValidatorLicensesResult = DsoRules_ModifyValidatorLicensesRe
     instructionCids : [ContractId VoteExecutionInstruction]
   deriving (Show, Eq)
 
-data DsoRules_ExecuteVoteInstructionResult = DsoRules_ExecuteVoteInstructionResult with
+data DsoRules_ExecuteVoteExecutionInstructionResult = DsoRules_ExecuteVoteExecutionInstructionResult with
     dummyUnitField : ()
   deriving (Eq, Show)
 
-data DsoRules_ExpireVoteInstructionResult = DsoRules_ExpireVoteInstructionResult with
+data DsoRules_ExpireVoteExecutionInstructionResult = DsoRules_ExpireVoteExecutionInstructionResult with
     dummyUnitField : ()
   deriving (Eq, Show)
 
@@ -1586,7 +1586,7 @@ template DsoRules with
                create VoteExecutionInstruction with dso; instruction; expiresAt; optVoteRequest = Some voteRequestAny
          return DsoRules_ModifyValidatorLicensesResult with instructionCids
 
-    nonconsuming choice DsoRules_ExecuteVoteInstruction : DsoRules_ExecuteVoteInstructionResult
+    nonconsuming choice DsoRules_ExecuteVoteExecutionInstruction : DsoRules_ExecuteVoteExecutionInstructionResult
       with
         sv : Party
         inputs : ExecutionInstructionInputs
@@ -1594,10 +1594,10 @@ template DsoRules with
       controller sv
       do _ <- getAndValidateSvParty this (Some sv)
          voteInstruction <- fetchAndArchive (ForDso dso) instructionCid
-         executeVoteInstruction dso voteInstruction inputs
-         return DsoRules_ExecuteVoteInstructionResult with dummyUnitField = ()
+         executeVoteExecutionInstruction dso voteInstruction inputs
+         return DsoRules_ExecuteVoteExecutionInstructionResult with dummyUnitField = ()
 
-    nonconsuming choice DsoRules_ExpireVoteInstruction : DsoRules_ExpireVoteInstructionResult
+    nonconsuming choice DsoRules_ExpireVoteExecutionInstruction : DsoRules_ExpireVoteExecutionInstructionResult
       with
         instructionCid : ContractId VoteExecutionInstruction
         sv : Party
@@ -1606,7 +1606,7 @@ template DsoRules with
         _ <- getAndValidateSvParty this (Some sv)
         fetchChecked (ForDso with dso) instructionCid
         exercise instructionCid VoteExecutionInstruction_Expire
-        return DsoRules_ExpireVoteInstructionResult with dummyUnitField = ()
+        return DsoRules_ExpireVoteExecutionInstructionResult with dummyUnitField = ()
 
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)

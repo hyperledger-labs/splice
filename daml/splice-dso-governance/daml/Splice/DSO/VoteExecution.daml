@@ -62,8 +62,8 @@ validExecutionInstruction instruction = case instruction of
   EI_ValidatorLicenseWithdraw {} -> True
 
 -- | Executes a vote instruction with the given inputs.
-executeVoteInstruction : Party -> VoteExecutionInstruction -> ExecutionInstructionInputs -> Update ()
-executeVoteInstruction dso voteInstruction inputs = do
+executeVoteExecutionInstruction : Party -> VoteExecutionInstruction -> ExecutionInstructionInputs -> Update ()
+executeVoteExecutionInstruction dso voteInstruction inputs = do
   case (voteInstruction.instruction, inputs) of
     (EI_ValidatorLicenseChangeWeight {validator, weight}, EII_ValidatorLicense validatorLicenseCid) -> do
       license <- fetchAndArchive (ForOwner with dso; owner = validator) validatorLicenseCid
