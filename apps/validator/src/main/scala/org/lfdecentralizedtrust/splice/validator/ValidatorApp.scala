@@ -68,6 +68,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, HistoryMetrics, UpdateHistory}
 import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.validator.ValidatorApp.OAuthRealms
 import org.lfdecentralizedtrust.splice.validator.admin.http.*
 import org.lfdecentralizedtrust.splice.validator.automation.{
   ValidatorAutomationService,
@@ -1119,7 +1120,7 @@ class ValidatorApp(
                         AuthenticationOnlyAuthExtractor(
                           verifier,
                           loggerFactory,
-                          "splice validator realm",
+                          OAuthRealms.Validator,
                         )(
                           traceContext
                         )(
@@ -1134,7 +1135,7 @@ class ValidatorApp(
                         AuthenticationOnlyAuthExtractor(
                           verifier,
                           loggerFactory,
-                          "splice scan proxy realm",
+                          OAuthRealms.ScanProxy,
                         )(
                           traceContext
                         )(operation)
@@ -1151,7 +1152,7 @@ class ValidatorApp(
                               AuthenticationOnlyAuthExtractor(
                                 verifier,
                                 loggerFactory,
-                                "splice scan proxy realm",
+                                OAuthRealms.ScanProxy,
                               )(
                                 traceContext
                               )(
@@ -1169,7 +1170,7 @@ class ValidatorApp(
                               AuthenticationOnlyAuthExtractor(
                                 verifier,
                                 loggerFactory,
-                                "splice scan proxy realm",
+                                OAuthRealms.ScanProxy,
                               )(
                                 traceContext
                               )(
@@ -1186,7 +1187,7 @@ class ValidatorApp(
                               AuthenticationOnlyAuthExtractor(
                                 verifier,
                                 loggerFactory,
-                                "splice scan proxy realm",
+                                OAuthRealms.ScanProxy,
                               )(
                                 traceContext
                               )(
@@ -1203,7 +1204,7 @@ class ValidatorApp(
                               AuthenticationOnlyAuthExtractor(
                                 verifier,
                                 loggerFactory,
-                                "splice scan proxy realm",
+                                OAuthRealms.ScanProxy,
                               )(
                                 traceContext
                               )(
@@ -1224,7 +1225,7 @@ class ValidatorApp(
                             validatorParty,
                             userRightsProvider,
                             loggerFactory,
-                            "splice validator operator realm",
+                            OAuthRealms.ValidatorOperator,
                           )(traceContext)(operationId)
                         },
                   ),
@@ -1247,7 +1248,7 @@ class ValidatorApp(
                             walletManager,
                             userRightsProvider,
                             loggerFactory,
-                            "splice wallet realm",
+                            OAuthRealms.Wallet,
                           )(
                             traceContext
                           )(operation)
@@ -1265,7 +1266,7 @@ class ValidatorApp(
                             walletManager,
                             userRightsProvider,
                             loggerFactory,
-                            "splice wallet realm",
+                            OAuthRealms.Wallet,
                           )(
                             traceContext
                           )(operation)
@@ -1281,7 +1282,7 @@ class ValidatorApp(
                           AuthenticationOnlyAuthExtractor(
                             verifier,
                             loggerFactory,
-                            "splice wallet realm",
+                            OAuthRealms.Wallet,
                           )(
                             traceContext
                           )(operation)
@@ -1299,7 +1300,7 @@ class ValidatorApp(
                             walletManager,
                             userRightsProvider,
                             loggerFactory,
-                            "splice ans realm",
+                            OAuthRealms.Ans,
                           )(traceContext)(
                             operation
                           )
@@ -1367,4 +1368,13 @@ object ValidatorApp {
         ))*
       )(logger)
   }
+
+  object OAuthRealms {
+    val Validator = "splice validator realm"
+    val ValidatorOperator = "splice validator operator realm"
+    val ScanProxy = "splice scan proxy realm"
+    val Wallet = "splice wallet realm"
+    val Ans = "splice ans realm"
+  }
+
 }
