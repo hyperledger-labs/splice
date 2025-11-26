@@ -99,9 +99,8 @@ object UserWalletAuthExtractor {
 
   /** @param user         The authenticated user name.
     * @param userWallet   The wallet associated with the authenticated user.
-    *                     We need to look up the wallet in the extractor to get the end user party,
-    *                     which is needed for authorization checks. And since we already have it,
-    *                     we might as well pass it to the handler to avoid looking it up again.
+    *                     The user is guaranteed to be authorized to perform operations on behalf of this wallet,
+    *                     i.e., the user has actAs rights for the wallet party.
     * @param traceContext The trace context of the request.
     */
   final case class WalletUserRequest(
