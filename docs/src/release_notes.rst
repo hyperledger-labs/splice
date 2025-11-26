@@ -5,6 +5,8 @@
 
 .. _release_notes:
 
+.. release-notes:: upcoming
+
   - API security
 
     - Tightened authorization checks for all non-public API endpoints.
