@@ -62,6 +62,14 @@ class PruningIntegrationTest
           )(config),
         (_, config) =>
           config.copy(
+            // reduce it so that the test hits 2 acs commitments intervals
+            svApps = config.svApps.updatedWith(InstanceName.tryCreate("sv1")) {
+              _.map { config =>
+                config.copy(acsCommitmentReconciliationInterval =
+                  PositiveDurationSeconds.ofSeconds(60)
+                )
+              }
+            },
             validatorApps =
               config.validatorApps.updatedWith(InstanceName.tryCreate("sv1Validator")) {
                 _.map { config =>
@@ -97,7 +105,7 @@ class PruningIntegrationTest
                         .withPausedTrigger[ReconcileSequencerConnectionsTrigger],
                     )
                 }
-              )
+              ),
           ),
       )
 
@@ -116,7 +124,7 @@ class PruningIntegrationTest
         )
       }
 
-      eventually() {
+      eventually(2.minutes) {
         sv1Backend.svAutomation
           .connection(Low)
           // returns 0 when participant pruning is disabled
