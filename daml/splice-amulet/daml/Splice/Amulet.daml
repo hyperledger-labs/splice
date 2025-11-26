@@ -505,3 +505,6 @@ instance HasCheckedFetch UnclaimedDevelopmentFundCoupon ForDso where
 
 instance HasCheckedFetch DevelopmentFundCoupon ForOwner where
   contractGroupId DevelopmentFundCoupon{..} = ForOwner with dso; owner = beneficiary
+
+instance HasCheckedFetch DevelopmentFundCoupon ForDso where
+  contractGroupId DevelopmentFundCoupon{..} = ForDso with dso

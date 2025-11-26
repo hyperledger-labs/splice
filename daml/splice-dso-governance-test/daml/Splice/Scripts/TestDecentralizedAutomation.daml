@@ -55,6 +55,9 @@ testUnclaimedRewardsMerging = do
   pure ()
 
 
+-- Development Fund
+--------------------
+
 testUnclaimedDevelopmentFundCouponsMerging : Script ()
 testUnclaimedDevelopmentFundCouponsMerging = do
   let
@@ -66,7 +69,7 @@ testUnclaimedDevelopmentFundCouponsMerging = do
             optDevelopmentFundPercentage = Some 0.05
   (app, _, (sv1, _, _, _)) <- initDevNetWithAmuletConfig amuletConfig
 
-  -- Mint 5 development fund coupons
+  -- Mint 5 unclaimed development fund coupons
   replicateA_ 5 $ runNextIssuanceD app 1.0
 
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
@@ -91,6 +94,53 @@ testUnclaimedDevelopmentFundCouponsMerging = do
 
   unclaimedDevelopmentFundCoupons <- query @UnclaimedDevelopmentFundCoupon app.dso
   length unclaimedDevelopmentFundCoupons === 1
+
+  pure ()
+
+testDevelopmentFundCouponExpiry : Script ()
+testDevelopmentFundCouponExpiry = do
+  fundManager <- allocateParty "FundManager"
+  let
+    -- 5% Development Fund
+    amuletConfig =
+      defaultAmuletConfig with
+        issuanceCurve = defaultAmuletConfig.issuanceCurve with
+          initialValue = defaultAmuletConfig.issuanceCurve.initialValue with
+            optDevelopmentFundPercentage = Some 0.05
+            optDevelopmentFundManager = Some fundManager
+  (app, _, (sv1, _, _, _)) <- initDevNetWithAmuletConfig amuletConfig
+  [(dsoRulesCid, _)] <- query @DsoRules app.dso
+
+  -- Mint 1 unclaimed development fund coupon
+  runNextIssuanceD app 1.0
+  [(unclaimedDevelopmentFundCouponCid, unclaimedDevelopmentFundCoupon)] <- query @UnclaimedDevelopmentFundCoupon app.dso
+
+  -- Allocate a development fund coupon
+  now <- getTime
+  let
+    expiresAt = addRelTime now (hours 1)
+    amount = unclaimedDevelopmentFundCoupon.amount
+  alice <- setupUser app "alice" app.dso
+  developmentFundCouponCid <- (.developmentFundCouponCid) <$>
+    allocateDevelopmentFundCoupon app fundManager alice.primaryParty amount expiresAt [unclaimedDevelopmentFundCouponCid]
+
+  -- Unhappy - expiresAt has not been reached
+  submitMultiMustFail [sv1] [app.dso] do
+    exerciseCmd dsoRulesCid DsoRules_ExpireDevelopmentFundCoupon with
+      developmentFundCouponCid
+      sv = sv1
+
+  -- Happy
+  setTime $ addRelTime expiresAt (minutes 1)
+  unclaimedDevelopmentFundCouponCid <- (.unclaimedDevelopmentFundCouponCid) <$>
+    submitMulti [sv1] [app.dso] do
+      exerciseCmd dsoRulesCid DsoRules_ExpireDevelopmentFundCoupon with
+        developmentFundCouponCid
+        sv = sv1
+  Some unclaimedDevelopmentFundCoupon <- queryContractId app.dso unclaimedDevelopmentFundCouponCid
+  unclaimedDevelopmentFundCoupon === UnclaimedDevelopmentFundCoupon with
+    dso = app.dso
+    amount
 
   pure ()
 
