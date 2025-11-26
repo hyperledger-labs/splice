@@ -63,6 +63,7 @@ class PruningIntegrationTest
         (_, config) =>
           config.copy(
             // reduce it so that the test hits 2 acs commitments intervals
+            // as pruning can be done only up to the end of the latest complete acs commitment interval
             svApps = config.svApps.updatedWith(InstanceName.tryCreate("sv1")) {
               _.map { config =>
                 config.copy(acsCommitmentReconciliationInterval =
