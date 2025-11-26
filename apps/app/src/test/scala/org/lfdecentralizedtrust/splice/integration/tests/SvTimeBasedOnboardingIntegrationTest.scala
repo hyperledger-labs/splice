@@ -1,13 +1,16 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import cats.syntax.parallel.*
+import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
 import com.digitalasset.canton.util.FutureInstances.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.voteexecution.VoteExecutionInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_ConfirmSvOnboarding,
   SRARC_SetConfig,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.validatorlicensechange.VLC_ChangeWeight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRulesConfig,
@@ -223,6 +226,58 @@ class SvTimeBasedOnboardingIntegrationTest
           _ => {
             sv1Backend.listVoteRequests() shouldBe empty
           },
+        )
+      }
+
+      clue("expire stale `VoteExecutionInstruction` contracts") {
+        // Create a vote for weight change for a party not having a ValidatorLicense
+        // The VoteExecutionInstruction cannot be run in this case and should be expired
+        val newPartyWithoutLicense = allocateRandomSvParty("test-validator-expiry")
+
+        // Ignore the warnings issued by ExecuteVoteInstructionTrigger
+        loggerFactory.assertLogsUnorderedOptional(
+          {
+            actAndCheck(
+              "Modify validator licenses",
+              modifyValidatorLicenses(
+                sv1Backend,
+                Seq(sv2Backend, sv3Backend),
+                Seq(
+                  new VLC_ChangeWeight(
+                    newPartyWithoutLicense.toProtoPrimitive,
+                    BigDecimal(10.0).bigDecimal,
+                  )
+                ),
+              ),
+            )(
+              "VoteExecutionInstruction is created",
+              _ =>
+                sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+                  .filterJava(VoteExecutionInstruction.COMPANION)(
+                    dsoParty,
+                    _ => true,
+                  ) should have length 1,
+            )
+
+            // Advance time past the default timeout of 1 day
+            val clockSkew = sv1Backend.config.automation.clockSkewAutomationDelay.asJava
+            actAndCheck(
+              "Advance time past the vote execution instruction timeout",
+              advanceTime(JavaDuration.ofDays(2) plus clockSkew),
+            )(
+              "VoteExecutionInstruction is expired",
+              _ => {
+                sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+                  .filterJava(VoteExecutionInstruction.COMPANION)(
+                    dsoParty,
+                    _ => true,
+                  ) shouldBe empty
+              },
+            )
+          },
+          LogEntryOptionality.OptionalMany -> (_.warningMessage should include(
+            "ValidatorLicense not found for validator"
+          )),
         )
       }
   }
