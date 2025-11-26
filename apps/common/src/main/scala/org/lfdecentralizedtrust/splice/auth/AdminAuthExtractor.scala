@@ -20,8 +20,8 @@ import scala.util.{Failure, Success}
   * ==Authorization==
   *
   *  - user must exist on the participant and be active
-  *  - primary party must be set for the user and equal to the app operator party
-  *  - user must have actAs rights for the app operator party
+  *  - primary party must be set for the user and equal to `adminParty`
+  *  - user must have actAs rights for `adminParty`
   *  - user must have ParticipantAdmin rights
   */
 final class AdminAuthExtractor(
