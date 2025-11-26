@@ -392,7 +392,7 @@ object CantonFeatures {
   * @param features
   *   control which features are enabled
   */
-trait SharedCantonConfig[Self] extends ConfigDefaults[DefaultPorts, Self] { self: Self =>
+trait SharedCantonConfig[Self] extends ConfigDefaults[Option[DefaultPorts], Self] { self: Self =>
   def name: Option[String]
   def portDescription: String
   def sequencers: Map[InstanceName, SequencerNodeConfig]
