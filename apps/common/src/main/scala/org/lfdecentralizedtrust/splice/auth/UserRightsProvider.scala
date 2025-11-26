@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.auth
 
 import com.daml.ledger.javaapi.data.User
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 /** Parts of the participant user management API that are relevant for authorization checks.
   *
@@ -14,4 +14,13 @@ import scala.concurrent.Future
 trait UserRightsProvider {
   def listUserRights(userName: String): Future[Set[User.Right]]
   def getUser(userName: String): Future[Option[User]]
+
+  def getUserWithRights(
+      userName: String
+  ): Future[Option[(User, Set[User.Right])]] = {
+    (getUser(userName) zip listUserRights(userName)).map {
+      case (Some(user), rights) => Some((user, rights))
+      case (None, _) => None
+    }(ExecutionContext.parasitic)
+  }
 }

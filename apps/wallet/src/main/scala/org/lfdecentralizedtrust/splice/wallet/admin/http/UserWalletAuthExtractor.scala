@@ -38,20 +38,19 @@ final class UserWalletAuthExtractor(
     authenticateLedgerApiUser(operationId)
       .flatMap { authenticatedUser =>
         onComplete(
-          // Double zip is a bit ugly...
-          rightsProvider.getUser(authenticatedUser) zip rightsProvider.listUserRights(
+          rightsProvider.getUserWithRights(authenticatedUser) zip walletManager.lookupUserWallet(
             authenticatedUser
-          ) zip walletManager.lookupUserWallet(authenticatedUser)
+          )
         ).flatMap {
           case Success((_, None)) =>
             rejectWithWalletNotFoundFailure(authenticatedUser, operationId)
-          case Success(((None, _), _)) =>
+          case Success((None, _)) =>
             rejectWithAuthorizationFailure(
               authenticatedUser,
               operationId,
               "User not found",
             )
-          case Success(((Some(user), rights), Some(wallet))) =>
+          case Success((Some((user, rights)), Some(wallet))) =>
             val walletParty = wallet.store.key.endUserParty
             if (user.isDeactivated) {
               rejectWithAuthorizationFailure(

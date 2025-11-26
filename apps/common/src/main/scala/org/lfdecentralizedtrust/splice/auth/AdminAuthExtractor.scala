@@ -40,11 +40,9 @@ final class AdminAuthExtractor(
     authenticateLedgerApiUser(operationId)
       .flatMap { authenticatedUser =>
         onComplete(
-          rightsProvider.getUser(authenticatedUser) zip rightsProvider.listUserRights(
-            authenticatedUser
-          )
+          rightsProvider.getUserWithRights(authenticatedUser)
         ).flatMap {
-          case Success((Some(user), rights)) =>
+          case Success(Some((user, rights))) =>
             if (user.isDeactivated) {
               rejectWithAuthorizationFailure(
                 authenticatedUser,
@@ -72,7 +70,7 @@ final class AdminAuthExtractor(
             } else {
               provide(AdminAuthExtractor.AdminUserRequest(traceContext))
             }
-          case Success((None, _)) =>
+          case Success(None) =>
             rejectWithAuthorizationFailure(authenticatedUser, operationId, "User not found")
           case Failure(exception) =>
             rejectWithAuthorizationFailure(authenticatedUser, operationId, exception.getMessage)
