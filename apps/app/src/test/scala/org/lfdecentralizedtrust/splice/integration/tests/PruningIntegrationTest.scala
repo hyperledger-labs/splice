@@ -62,13 +62,6 @@ class PruningIntegrationTest
           )(config),
         (_, config) =>
           config.copy(
-            svApps = config.svApps.updatedWith(InstanceName.tryCreate("sv1")) {
-              _.map { config =>
-                config.copy(acsCommitmentReconciliationInterval =
-                  PositiveDurationSeconds.ofSeconds(15)
-                )
-              }
-            },
             validatorApps =
               config.validatorApps.updatedWith(InstanceName.tryCreate("sv1Validator")) {
                 _.map { config =>
@@ -77,8 +70,8 @@ class PruningIntegrationTest
                     participantPruningSchedule = Some(
                       PruningConfig(
                         "0 /1 * * * ?",
-                        PositiveDurationSeconds.tryFromDuration(2.seconds),
-                        PositiveDurationSeconds.tryFromDuration(5.seconds),
+                        PositiveDurationSeconds.tryFromDuration(10.seconds),
+                        PositiveDurationSeconds.tryFromDuration(20.seconds),
                       )
                     )
                   )
@@ -104,7 +97,7 @@ class PruningIntegrationTest
                         .withPausedTrigger[ReconcileSequencerConnectionsTrigger],
                     )
                 }
-              ),
+              )
           ),
       )
 
@@ -117,13 +110,13 @@ class PruningIntegrationTest
         sv1ValidatorBackend.participantClient.pruning.get_schedule() shouldBe Some(
           PruningSchedule(
             "0 /1 * * * ?",
-            PositiveDurationSeconds.tryFromDuration(2.seconds),
-            PositiveDurationSeconds.tryFromDuration(5.seconds),
+            PositiveDurationSeconds.tryFromDuration(10.seconds),
+            PositiveDurationSeconds.tryFromDuration(20.seconds),
           )
         )
       }
 
-      eventually(timeUntilSuccess = 70.seconds) {
+      eventually() {
         sv1Backend.svAutomation
           .connection(Low)
           // returns 0 when participant pruning is disabled
