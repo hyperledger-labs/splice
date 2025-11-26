@@ -233,6 +233,11 @@ export function getExpectedDsoRulesConfigDiffsHTML(
       class="jsondiffpatch-property-name">voteCooldownTime</div><div
       class="jsondiffpatch-value"><pre>{
   "microseconds": "60000000"
+}</pre></div></li><li data-key="voteExecutionInstructionTimeout"
+    class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">voteExecutionInstructionTimeout</div><div
+      class="jsondiffpatch-value"><pre>{
+  "microseconds": "86400000000"
 }</pre></div></li><li data-key="voteRequestTimeout"
     class="jsondiffpatch-unchanged"><div
       class="jsondiffpatch-property-name">voteRequestTimeout</div><div
@@ -329,6 +334,11 @@ export function getExpectedDsoRulesConfigDiffsHTML(
       class="jsondiffpatch-property-name">voteCooldownTime</div><div
       class="jsondiffpatch-value"><pre>{
   "microseconds": "60000000"
+}</pre></div></li><li data-key="voteExecutionInstructionTimeout"
+    class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">voteExecutionInstructionTimeout</div><div
+      class="jsondiffpatch-value"><pre>{
+  "microseconds": "86400000000"
 }</pre></div></li><li data-key="voteRequestTimeout"
     class="jsondiffpatch-unchanged"><div
       class="jsondiffpatch-property-name">voteRequestTimeout</div><div
