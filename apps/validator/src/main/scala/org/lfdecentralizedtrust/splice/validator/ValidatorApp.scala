@@ -980,7 +980,7 @@ class ValidatorApp(
         ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
       }
 
-      userRightsProvider = new UncachedUserRightsProvider(
+      userRightsProvider = new ParticipantUserRightsProvider(
         automation.connection(SpliceLedgerConnectionPriority.Low)
       )
 

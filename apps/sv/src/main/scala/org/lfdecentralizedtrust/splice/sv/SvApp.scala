@@ -44,7 +44,7 @@ import org.lfdecentralizedtrust.splice.auth.{
   AuthConfig,
   HMACVerifier,
   RSAVerifier,
-  UncachedUserRightsProvider,
+  ParticipantUserRightsProvider,
 }
 import org.lfdecentralizedtrust.splice.automation.{
   DomainParamsAutomationService,
@@ -519,7 +519,7 @@ class SvApp(
       trafficBalanceService = newTrafficBalanceService(participantAdminConnection)
       _ = ledgerClient.registerTrafficBalanceService(trafficBalanceService)
 
-      userRightsProvider = new UncachedUserRightsProvider(
+      userRightsProvider = new ParticipantUserRightsProvider(
         svAutomation.connection(SpliceLedgerConnectionPriority.Low)
       )
 

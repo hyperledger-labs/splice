@@ -11,7 +11,8 @@ import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-class UncachedUserRightsProvider(
+/** A UserRightsProvider where each lookup is forwarded to the participant ledger API. */
+class ParticipantUserRightsProvider(
     connection: SpliceLedgerConnection
 )(implicit tc: TraceContext, ec: ExecutionContext)
     extends UserRightsProvider {
