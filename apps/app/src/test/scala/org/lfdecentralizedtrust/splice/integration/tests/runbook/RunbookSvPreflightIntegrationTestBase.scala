@@ -17,7 +17,7 @@ import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import scala.util.{Random, Try}
+import scala.util.Random
 
 abstract class RunbookSvPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
