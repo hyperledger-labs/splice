@@ -846,7 +846,7 @@ class SvFrontendIntegrationTest
             _ => checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress),
           )
 
-          val (_, requestId) = actAndCheck(
+          val (_, reviewButton) = actAndCheck(
             "sv1 operator creates a new vote request with a long expiration time", {
               submitSetDsoConfigRequestViaFrontend(
                 numMemberTrafficContractsThreshold = "42"
@@ -855,16 +855,17 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request in the progress tab",
             _ => {
-              val reviewButton =
-                checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress + 1)
-              reviewButton.underlying.click()
-              val requestId =
-                inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
-                  tb.text
-                }
-              requestId
+              checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress + 1)
             },
           )
+          val requestId = eventually() {
+            reviewButton.underlying.click()
+            val requestId =
+              inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
+                tb.text
+              }
+            requestId
+          }
 
           clue("Resuming vote request expiration automation") {
             sv1Backend.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger].resume()
