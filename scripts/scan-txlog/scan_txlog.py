@@ -843,6 +843,14 @@ class LfValue:
     def get_validator_liveness_activity_record_round(self):
         return self.__get_record_field("round").__get_round_number()
 
+    # template ValidatorLivenessActivityRecord -> weight
+    def get_validator_liveness_activity_record_weight(self):
+        optional = self.__get_record_field("weight").__get_optional()
+        if optional:
+            return optional.__get_numeric()
+        else:
+            return DamlDecimal(1)  # weight defaults to 1.0
+
     # template ValidatorRewardCoupon -> user
     def get_validator_reward_user(self):
         return self.__get_record_field("user").__get_party()
@@ -1513,7 +1521,7 @@ class TransferInputs:
             "validator_faucet_activity_record",
             self.validator_liveness_activity_records,
             lambda r: r.get_issuing_mining_round_issuance_per_validator_faucet(),
-            lambda r: DamlDecimal(1),  # records always have value 1
+            lambda r: r.get_validator_liveness_activity_record_weight(),
         )
         output += validator_liveness_activity_record_outputs
         effective_inputs += validator_liveness_activity_record_inputs
