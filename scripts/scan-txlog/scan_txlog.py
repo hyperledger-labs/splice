@@ -3851,6 +3851,8 @@ class State:
                 return HandleTransactionResult.empty()
             case "DsoRules_GrantValidatorLicense":
                 return HandleTransactionResult.empty()
+            case "DsoRules_ExecuteVoteExecutionInstruction":
+                return HandleTransactionResult.empty()
             case "DsoRules_StartSvOnboarding":
                 return HandleTransactionResult.empty()
             case "DsoRules_ExpireSvOnboardingRequest":
