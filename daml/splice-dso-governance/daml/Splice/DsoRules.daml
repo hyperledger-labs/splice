@@ -256,6 +256,9 @@ data DsoRules_MergeUnclaimedRewardsResult = DsoRules_MergeUnclaimedRewardsResult
 data DsoRules_MergeUnclaimedDevelopmentFundCouponsResult = DsoRules_MergeUnclaimedDevelopmentFundCouponsResult with
     result : AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult
 
+data DsoRules_ExpireDevelopmentFundCouponResult = DsoRules_ExpireDevelopmentFundCouponResult with
+    unclaimedDevelopmentFundCouponCid : ContractId UnclaimedDevelopmentFundCoupon
+
 data DsoRules_MiningRound_CloseResult = DsoRules_MiningRound_CloseResult with
     closedRound : ContractId ClosedMiningRound
 
@@ -1332,6 +1335,20 @@ template DsoRules with
         _ <- getAndValidateSvParty this (Some sv)
         result <- exercise amuletRulesCid choiceArg
         return DsoRules_MergeUnclaimedDevelopmentFundCouponsResult with result
+
+    nonconsuming choice DsoRules_ExpireDevelopmentFundCoupon : DsoRules_ExpireDevelopmentFundCouponResult
+      with
+        developmentFundCouponCid : ContractId DevelopmentFundCoupon
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        developmentFundCoupon <- fetchAndArchive (ForDso with dso) developmentFundCouponCid
+        assertDeadlineExceeded "DevelopmentFundCoupon.expiresAt" developmentFundCoupon.expiresAt
+        unclaimedDevelopmentFundCouponCid <- create UnclaimedDevelopmentFundCoupon with
+          dso
+          amount = developmentFundCoupon.amount
+        pure $ DsoRules_ExpireDevelopmentFundCouponResult with unclaimedDevelopmentFundCouponCid
 
     nonconsuming choice DsoRules_MiningRound_Close : DsoRules_MiningRound_CloseResult
       with
