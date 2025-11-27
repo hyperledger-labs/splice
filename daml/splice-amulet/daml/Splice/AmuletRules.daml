@@ -634,7 +634,8 @@ template AmuletRules
         require "expiresAt is not in the past" (expiresAt > now)
 
         -- Verify fundManager
-        case (getValueAsOf now configSchedule).issuanceCurve.initialValue.optDevelopmentFundManager of
+        configUsd <- getValueAsOfLedgerTime configSchedule
+        case configUsd.issuanceCurve.initialValue.optDevelopmentFundManager of
           None -> abort "DevelopmentFundCoupon cannot be allocated without a Development Fund manager configured"
           Some developmentFundManager ->
             require ("controller is the configured Development Fund manager: " <> show developmentFundManager) $
