@@ -122,6 +122,36 @@ testWithdrawalOfDevelopmentFundCoupon = do
 
   pure ()
 
+testExpiryOfDevelopmentFundCoupon : Script ()
+testExpiryOfDevelopmentFundCoupon = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  now <- getTime
+  let
+    amount = 42.0
+    expiresAt = addRelTime now (days 1)
+    fundManager = alice.primaryParty
+    beneficiary = bob.primaryParty
+
+  developmentFundCouponCid <- createDevelopmentFundCoupon app fundManager beneficiary amount expiresAt
+
+  -- Unhappy - expiresAt has not been reached
+  expiresDevelopmentFundCouponMustFail app.dso developmentFundCouponCid
+
+  setTime $ addRelTime expiresAt (minutes 1)
+
+  -- -- Unhappy - invalid controller
+  expiresDevelopmentFundCouponMustFail fundManager developmentFundCouponCid
+  expiresDevelopmentFundCouponMustFail beneficiary developmentFundCouponCid
+
+  -- Happy
+  unclaimedDevelopmentFundCouponCid <- expiresDevelopmentFundCoupon app.dso developmentFundCouponCid
+  Some unclaimedDevelopmentFundCoupon <- queryContractId app.dso unclaimedDevelopmentFundCouponCid
+  unclaimedDevelopmentFundCoupon === UnclaimedDevelopmentFundCoupon with
+    dso = app.dso
+    amount
+
+  pure ()
+
 
 allocateDevelopmentFundCouponMustFail
   : AmuletApp -> Party -> Party -> Decimal -> Time -> [ContractId UnclaimedDevelopmentFundCoupon]
@@ -155,3 +185,13 @@ withdrawDevelopmentFundCouponMustFail : Party -> Text -> ContractId DevelopmentF
 withdrawDevelopmentFundCouponMustFail actor reason developmentFundCouponCid =
   submitMustFail actor do
     exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_Withdraw with reason
+
+expiresDevelopmentFundCoupon : Party -> ContractId DevelopmentFundCoupon -> Script (ContractId UnclaimedDevelopmentFundCoupon)
+expiresDevelopmentFundCoupon dso developmentFundCouponCid =
+  (.unclaimedDevelopmentFundCouponCid) <$> submit dso do
+    exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_DsoExpire
+
+expiresDevelopmentFundCouponMustFail : Party -> ContractId DevelopmentFundCoupon -> Script ()
+expiresDevelopmentFundCouponMustFail actor developmentFundCouponCid =
+  submitMustFail actor do
+    exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_DsoExpire
