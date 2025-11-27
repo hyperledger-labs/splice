@@ -621,7 +621,6 @@ final case class CantonConfig(
     validator.validate(this, edition, ensurePortsSet)
   }
 
-
   /** Produces a message in the structure
     * "da:admin-api=1,public-api=2;participant1:admin-api=3,ledger-api=4". Helpful for diagnosing
     * port already bound issues during tests. Allows any config value to be null (can happen with
@@ -701,8 +700,8 @@ private[canton] object CantonNodeParameterConverter {
     )
 
   def protocol(
-    parent: SharedCantonConfig[_],
-    config: ProtocolConfig
+      parent: SharedCantonConfig[_],
+      config: ProtocolConfig,
   ): CantonNodeParameters.Protocol =
     CantonNodeParameters.Protocol.Impl(
       alphaVersionSupport = parent.parameters.alphaVersionSupport || config.alphaVersionSupport,
