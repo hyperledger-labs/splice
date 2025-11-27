@@ -422,6 +422,8 @@ template DevelopmentFundCoupon
     observer fundManager
 
     choice DevelopmentFundCoupon_Withdraw : DevelopmentFundCoupon_WithdrawResult
+      with
+        reason : Text -- ^ Reason for withdrawing the coupon.
       controller fundManager
       do
         assertWithinDeadline "DevelopmentFundCoupon.expiresAt" expiresAt
