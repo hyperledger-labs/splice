@@ -166,6 +166,12 @@ svs:
           memory: '2Gi'
         limits:
           memory: '4Gi'
+  sv-1:
+    periodicSnapshots:
+      topology:
+        projectId: 'da-cn-devnet'
+        bucketName: 'da-cn-topology-snapshots'
+        backupInterval: '24h'
 validators:
   validator-runbook:
     namespace: validator

@@ -106,3 +106,35 @@ tests:
               beneficiary = "beneficiary2"
               weight = 25
             }
+
+  - it: "sets topology snapshot configuration"
+    set:
+      periodicTopologySnapshotConfig:
+        location:
+          bucket:
+            projectId: "testProjectId"
+            bucketName: "testBucketName"
+          prefix: "testPrefix"
+        backupInterval: "24h"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_SPLICE_APP_SV_PERIODIC_TOPOLOGY_SNAPSHOT_CONFIG')].value
+          value: |
+            canton.sv-apps.sv.topology-snapshot-config = {
+              location {
+                type = gcp
+                bucket {
+                  project-id = "testProjectId"
+                  bucket-name = "testBucketName"
+                  credentials {
+                    type = service-account
+                    json-credentials = ${SPLICE_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
+                  }
+                }
+                prefix = "testPrefix"
+              }
+              backup-interval = "24h"
+            }
