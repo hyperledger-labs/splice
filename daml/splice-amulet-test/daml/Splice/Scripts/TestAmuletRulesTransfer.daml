@@ -576,6 +576,7 @@ testUnclaimedActivityRecordTransferInput = do
   (_, openRound) <- getLatestActiveOpenRound app
   let createFee = openRound.transferConfigUsd.createFee.fee * openRound.amuletPrice
   transferResult.summary.senderChangeAmount === amountToMint - createFee
+  transferResult.summary.inputUnclaimedActivityRecordAmount === Some amountToMint
 
   pure ()
 
@@ -624,5 +625,6 @@ testInputDevelopmentFundCoupon = do
   (_, openRound) <- getLatestActiveOpenRound app
   let createFee = openRound.transferConfigUsd.createFee.fee * openRound.amuletPrice
   transferResult.summary.senderChangeAmount === totalAmount - createFee
+  transferResult.summary.inputDevelopmentFundAmount === Some totalAmount
 
   pure ()
