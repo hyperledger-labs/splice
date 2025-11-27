@@ -13,8 +13,6 @@ import { merge } from 'lodash';
 import util from 'node:util';
 import { z } from 'zod';
 
-import { GCPBucketSchema } from './config';
-
 const SvCometbftConfigSchema = z
   .object({
     nodeId: z.string().optional(),
@@ -127,7 +125,6 @@ const SingleSvConfigSchema = z
         cometbftExtraLogLevelFlags: z.string().optional(),
       })
       .optional(),
-    periodicSnapshots: z.object({ topology: GCPBucketSchema.optional() }).optional(),
   })
   .strict();
 const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema).and(

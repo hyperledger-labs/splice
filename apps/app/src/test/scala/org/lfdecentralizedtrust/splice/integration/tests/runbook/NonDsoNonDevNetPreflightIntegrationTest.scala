@@ -1,10 +1,9 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
-import org.lfdecentralizedtrust.splice.config.IdentityDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTestWithSharedEnvironment,
   SpliceTestConsoleEnvironment,
+  IntegrationTestWithSharedEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.DataExportTestUtil
 
@@ -42,11 +41,11 @@ final class NonDsoNonDevNetPreflightIntegrationTest
   }
 
   "Check that there is a recent participant identities backup on GCP for validator1" in { _ =>
-    testRecentParticipantIdentitiesDump("validator1", IdentityDump)
+    testRecentParticipantIdentitiesDump("validator1")
   }
 
   "Check that there is a recent participant identities backup on GCP for splitwell validator" in {
     _ =>
-      testRecentParticipantIdentitiesDump("splitwell", IdentityDump)
+      testRecentParticipantIdentitiesDump("splitwell")
   }
 }

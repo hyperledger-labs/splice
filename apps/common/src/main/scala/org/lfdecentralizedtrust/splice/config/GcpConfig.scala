@@ -48,36 +48,16 @@ final case class GcpBucketConfig(
   def description: String = s"GCP bucket $bucketName in project $projectId"
 }
 
-sealed trait BucketName {
-  def value: String
-}
-
-case object IdentityDumpTest extends BucketName {
-  val value: String = "da-splice-identity-dumps"
-}
-
-case object TopologySnapshotTest extends BucketName {
-  val value: String = "da-splice-topology-snapshots"
-}
-
-case object IdentityDump extends BucketName {
-  val value: String = "da-cn-data-dumps"
-}
-
-case object TopologySnapshot extends BucketName {
-  val value: String = "da-cn-topology-snapshots"
-}
-
 object GcpBucketConfig {
-  def inferForTesting(testBucketName: BucketName): GcpBucketConfig =
+  def inferForTesting: GcpBucketConfig =
     infer(
       "GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS",
       "da-cn-splice",
-      testBucketName.value,
+      "da-splice-identity-dumps",
     )
 
-  def inferForCluster(bucketName: BucketName): GcpBucketConfig =
-    infer("GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS", "da-cn-devnet", bucketName.value)
+  def inferForCluster: GcpBucketConfig =
+    infer("GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS", "da-cn-devnet", "da-cn-data-dumps")
 
   def inferForBundles: GcpBucketConfig =
     infer(

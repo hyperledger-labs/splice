@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation
 
-import com.daml.grpc.adapter.ExecutionSequencerFactory
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
@@ -27,8 +26,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.actor.ActorSystem
-import org.lfdecentralizedtrust.splice.config.PeriodicBackupDumpConfig
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import scala.concurrent.ExecutionContextExecutor
@@ -45,14 +42,11 @@ class SvSvAutomationService(
     participantAdminConnection: ParticipantAdminConnection,
     localSynchronizerNode: Option[LocalSynchronizerNode],
     retryProvider: RetryProvider,
-    topologySnapshotConfig: Option[PeriodicBackupDumpConfig],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-    esf: ExecutionSequencerFactory,
-    actorSystem: ActorSystem,
 ) extends SpliceAppAutomationService(
       config.automation,
       clock,
@@ -80,23 +74,6 @@ class SvSvAutomationService(
     SqlIndexInitializationTrigger(
       storage,
       triggerContext,
-    )
-  )
-
-  topologySnapshotConfig.foreach(topologySnapshotConfig =>
-    registerTrigger(
-      new PeriodicTopologySnapshotTrigger(
-        config.domains.global.alias,
-        topologySnapshotConfig,
-        triggerContext,
-        localSynchronizerNode
-          .getOrElse(
-            sys.error("Cannot take topology snapshot with no localSynchronizerNode")
-          )
-          .sequencerAdminConnection,
-        participantAdminConnection,
-        clock,
-      )
     )
   )
 

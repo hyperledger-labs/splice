@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration
 
 import cats.syntax.either.*
-import com.daml.grpc.adapter.ExecutionSequencerFactory
 import org.lfdecentralizedtrust.splice.config.{
   EnabledFeaturesConfig,
   SpliceInstanceNamesConfig,
@@ -69,7 +68,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
@@ -109,8 +107,6 @@ class DomainMigrationInitializer(
     mat: Materializer,
     tc: TraceContext,
     tracer: Tracer,
-    esf: ExecutionSequencerFactory,
-    actorSystem: ActorSystem,
 ) extends NodeInitializerUtil {
 
   private val readOnlyConnection = ledgerClient.readOnlyConnection(

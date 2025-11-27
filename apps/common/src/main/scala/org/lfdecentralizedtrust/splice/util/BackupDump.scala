@@ -7,7 +7,6 @@ import better.files.File
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Decoder
-import io.grpc.Status
 import org.lfdecentralizedtrust.splice.config.BackupDumpConfig
 
 import java.io.FileNotFoundException
@@ -38,28 +37,6 @@ object BackupDump {
         path
     }
 
-  /** Blocking function to write bytes to a file within the given backup dump location.
-    *
-    * Returns the path to the written file as a string.
-    */
-  def writeBytes(
-      config: BackupDumpConfig,
-      filename: Path,
-      content: Array[Byte],
-      loggerFactory: NamedLoggerFactory,
-  )(implicit tc: TraceContext): Path =
-    config match {
-      case BackupDumpConfig.Gcp(bucketConfig, prefix) =>
-        val gcpBucket = new GcpBucket(bucketConfig, loggerFactory)
-        val path = prefix.fold(filename)(prefix => Paths.get(prefix).resolve(filename))
-        gcpBucket.dumpBytesToBucket(content, path.toString)
-        path
-      case _ =>
-        throw Status.UNIMPLEMENTED
-          .withDescription("Writing bytes works only with GCP buckets")
-          .asRuntimeException()
-    }
-
   def writeToPath(path: Path, content: String): File = {
     import better.files.File
     val file = File(path)
@@ -82,22 +59,6 @@ object BackupDump {
   def fileExists(path: Path): Boolean = {
     import better.files.File
     File(path).exists
-  }
-
-  def bucketExists(
-      config: BackupDumpConfig,
-      startOffset: String,
-      loggerFactory: NamedLoggerFactory,
-  ): Boolean = {
-    config match {
-      case conf: BackupDumpConfig.Gcp =>
-        val gcpBucket = new GcpBucket(conf.bucket, loggerFactory)
-        gcpBucket.list(startOffset, "").nonEmpty
-      case _ =>
-        throw Status.UNIMPLEMENTED
-          .withDescription("Topology snapshot works only with GCP buckets")
-          .asRuntimeException()
-    }
   }
 
   def readFromPath[T: Decoder](path: Path): Try[T] = Try {
