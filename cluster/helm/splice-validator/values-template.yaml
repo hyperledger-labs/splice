@@ -35,8 +35,6 @@ persistence:
 
 scanClientConfig:
   useLastKnownConnectionsForInitialization: true
-  threshold: null
-  trustedSvs: [ ]
 
 migration:
   id: 0
