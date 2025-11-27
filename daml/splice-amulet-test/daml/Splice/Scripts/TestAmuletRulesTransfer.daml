@@ -609,6 +609,21 @@ testInputDevelopmentFundCoupon = do
     { developmentFundCouponCid, optUnclaimedDevelopmentFundCouponCid = None } <-
       allocateDevelopmentFundCoupon app alice.primaryParty bob.primaryParty totalAmount expiresAt [cid1, cid2]
 
+  -- Unhappy - expiresAt has been reached
+  setTime $ addRelTime expiresAt (minutes 1)
+  submitMultiMustFail [bob.primaryParty] [app.dso] $
+    exerciseCmd context.amuletRules AmuletRules_Transfer with
+      transfer = Transfer with
+        sender = bob.primaryParty
+        provider = bob.primaryParty
+        inputs = [InputDevelopmentFundCoupon developmentFundCouponCid]
+        outputs = []
+        beneficiaries = None
+      context = context.context
+      expectedDso = Some app.dso
+  setTime now
+
+  -- Happy
   transferResult <-
     checkTransferMetadata app TxKind_MergeSplit bob.primaryParty $
     checkBalanceChanges defaultAppWithUsers $

@@ -1047,6 +1047,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
 
     summarizeAndConsumeInput _round s (InputDevelopmentFundCoupon couponCid) = do
       coupon <- fetchAndArchive forOwner couponCid
+      assertWithinDeadline "DevelopmentFundCoupon.expiresAt" coupon.expiresAt
       return TransferInputsSummary with
         totalAmuletAmount = s.totalAmuletAmount
         totalAppRewardAmount = s.totalAppRewardAmount
