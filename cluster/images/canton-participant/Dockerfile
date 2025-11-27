@@ -17,4 +17,4 @@
 # HEALTHCHECK --start-period=10m \
 #   CMD grpcurl -plaintext localhost:5061 grpc.health.v1.Health/Check || exit 1
 
-FROM: europe-docker.pkg.dev/da-images/public-unstable/docker/canton-participant:3.4.9-snapshot.20251124.17412.0.v0564fd04
+FROM europe-docker.pkg.dev/da-images/public-unstable/docker/canton-participant:3.4.9-snapshot.20251124.17412.0.v0564fd04

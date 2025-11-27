@@ -14,4 +14,4 @@
 
 # COPY app.conf /app/
 
-FROM: europe-docker.pkg.dev/da-images/public-unstable/docker/canton-sequencer:3.4.9-snapshot.20251124.17412.0.v0564fd04
+FROM europe-docker.pkg.dev/da-images/public-unstable/docker/canton-sequencer:3.4.9-snapshot.20251124.17412.0.v0564fd04
