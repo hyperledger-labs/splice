@@ -126,33 +126,33 @@ tests:
       path: kind
       value: Deployment
     asserts:
-      - contains:
+      - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
-          content: canton.validator-apps.validator_backend.scan-client.type = "bft-custom"
-      - contains:
+          pattern: 'canton\.validator-apps\.validator_backend\.scan-client\.type = "bft-custom"'
+      - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
-          content: canton.validator-apps.validator_backend.scan-client.threshold = 2
-      - contains:
+          pattern: 'canton\.validator-apps\.validator_backend\.scan-client\.threshold = 2'
+      - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
-          content: canton.validator-apps.validator_backend.scan-client.trusted-svs = ["sv1", "sv2", "sv3"]
-      - contains:
+          pattern: 'canton\.validator-apps\.validator_backend\.scan-client\.trusted-svs = \["sv1", "sv2", "sv3"\]'
+      - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
-          content: canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = true
+          pattern: 'canton\.validator-apps\.validator_backend\.scan-client\.use-last-known-connections-for-initialization = true'
 
   - it: "defaults to bft when no custom config is provided"
     documentSelector:
       path: kind
       value: Deployment
     asserts:
-      - contains:
+      - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
-          content: canton.validator-apps.validator_backend.scan-client.type = "bft"
-      - notContains:
+          pattern: 'canton\.validator-apps\.validator_backend\.scan-client\.type = "bft"'
+      - notMatchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
-          content: canton.validator-apps.validator_backend.scan-client.threshold
-      - contains:
+          pattern: 'canton\.validator-apps\.validator_backend\.scan-client\.threshold'
+      - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
-          content: canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = true
+          pattern: 'canton\.validator-apps\.validator_backend\.scan-client\.use-last-known-connections-for-initialization = true'
 
   - it: "turns off useLastKnownConnectionsForInitialization when set to false"
     set:
@@ -162,9 +162,9 @@ tests:
       path: kind
       value: Deployment
     asserts:
-      - contains:
+      - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
-          content: canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = false
+          pattern: 'canton\.validator-apps\.validator_backend\.scan-client\.use-last-known-connections-for-initialization = false'
 
   - it: "supports disabling auth"
     set:
