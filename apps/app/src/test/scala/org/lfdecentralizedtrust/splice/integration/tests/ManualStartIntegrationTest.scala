@@ -62,7 +62,7 @@ class ManualStartIntegrationTest
           svApps = conf.svApps.updatedWith(InstanceName.tryCreate("sv1")) {
             _.map { config =>
               config.copy(acsCommitmentReconciliationInterval =
-                PositiveDurationSeconds.ofSeconds(60)
+                PositiveDurationSeconds.ofSeconds(30)
               )
             }
           },
