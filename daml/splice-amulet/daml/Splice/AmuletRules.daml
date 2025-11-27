@@ -630,8 +630,7 @@ template AmuletRules
       controller fundManager
       do
         -- Verify expiry
-        now <- getTime
-        require "expiresAt is not in the past" (expiresAt > now)
+        assertWithinDeadline "DevelopmentFundCoupon.expiresAt" expiresAt
 
         -- Verify fundManager
         configUsd <- getValueAsOfLedgerTime configSchedule
