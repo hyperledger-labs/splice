@@ -119,7 +119,7 @@ Catching Up Before the Migration
 In order for the migration to the new synchronizer to be safe and successful, it is important that the validator node is fully caught up on the existing synchronizer before proceeding to :ref:`validator-upgrades-deploying`.
 
 * To ensure that the validator participant has caught up and the :ref:`migration dump <validator-upgrades-dumps>` has been created as expected, operators can check the logs of the ``validator-app`` pod for ``Wrote domain migration dump`` messages
-  or if they can't find it, they can alternatively go inside the container and check if it has the migration dump with the expected date: ``kubectl exec -it <validator-pod> -- bash;  ls -lha /domain-upgrade-dump``.
+  If you can't find it, you can alternatively go inside the container and check if it has the migration dump with the expected date: ``kubectl exec -it <validator-pod> -- bash;  ls -lha /domain-upgrade-dump``.
 * To ensure that the validator app has caught up, operators can check the logs of the ``validator-app`` pod for the message ``Ingested transaction``.
   If the latest such message is 10 or more minutes old, the validator app has very likely (with a large safety margin) caught up to the state on the participant, and hence to the state of the existing (paused) synchronizer.
 * Note that the sequencers of the existing (old) synchronizer will be kept available by SVs for a limited
