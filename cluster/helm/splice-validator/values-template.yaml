@@ -77,7 +77,7 @@ service:
 # set the poll interval used by the UI in milliseconds (optional)
 # uiPollInterval:
 
-extraInitContainers: [ ]
+extraInitContainers: []
 
 # set if ans-web-ui should be deployed
 ansWebUi:
