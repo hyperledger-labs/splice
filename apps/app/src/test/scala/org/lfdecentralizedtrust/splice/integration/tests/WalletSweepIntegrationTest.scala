@@ -226,7 +226,7 @@ abstract class WalletSweepIntegrationTest
       },
     )(
       "Transfer preapproval is visible in scan",
-      _ => sv1ScanBackend.lookupTransferPreapprovalByParty(alicePartyId) shouldBe a[Some[_]],
+      _ => sv1ScanBackend.lookupTransferPreapprovalByParty(alicePartyId) shouldBe a[Some[?]],
     )
     clue("Sweep no longer errors now that preapproval is created") {
       bobValidatorBackend

@@ -13,7 +13,7 @@ import scala.language.implicitConversions
 
 /** A force flag is used to override specific safety checks in the topology manager.
   */
-sealed abstract class ForceFlag(val toProtoV30: v30.ForceFlag) {
+sealed abstract class ForceFlag(val toProtoV30: v30.ForceFlag) extends Product with Serializable {
   def and(forceFlag: ForceFlag): ForceFlags = ForceFlags(forceFlag)
 }
 
@@ -37,13 +37,13 @@ object ForceFlag {
   case object PreparationTimeRecordTimeToleranceIncrease
       extends ForceFlag(v30.ForceFlag.FORCE_FLAG_PREPARATION_TIME_RECORD_TIME_TOLERANCE_INCREASE)
 
-  case object AllowUnvetPackageWithActiveContracts
-      extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVET_PACKAGE_WITH_ACTIVE_CONTRACTS)
-
   case object AllowUnknownPackage extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNKNOWN_PACKAGE)
 
   case object AllowUnvettedDependencies
       extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVETTED_DEPENDENCIES)
+
+  case object AllowConfirmingThresholdCanBeMet
+      extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_CONFIRMING_THRESHOLD_CANNOT_BE_MET)
 
   case object DisablePartyWithActiveContracts
       extends ForceFlag(v30.ForceFlag.FORCE_FLAG_DISABLE_PARTY_WITH_ACTIVE_CONTRACTS)
@@ -83,12 +83,12 @@ object ForceFlag {
       AllowUnvettedDependencies,
       DisablePartyWithActiveContracts,
       AllowUnvalidatedSigningKeys,
-      AllowUnvetPackageWithActiveContracts,
       PreparationTimeRecordTimeToleranceIncrease,
       AllowInsufficientParticipantPermissionForSignatoryParty,
       AllowInsufficientSignatoryAssigningParticipantsForParty,
       AllowVetIncompatibleUpgrades,
       AllowOutOfBoundsValue,
+      AllowConfirmingThresholdCanBeMet,
     )
       .map(ff => ff.toProtoV30 -> ff)
       .toMap

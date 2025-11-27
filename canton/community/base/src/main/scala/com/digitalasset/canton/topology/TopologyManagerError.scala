@@ -33,14 +33,35 @@ import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyMapping.ReferencedAuthorizations
-import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
+import com.digitalasset.canton.topology.transaction.TopologyTransaction.{
+  PositiveTopologyTransaction,
+  TxHash,
+}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.language.Util
-import com.digitalasset.daml.lf.value.Value.ContractId
 
 sealed trait TopologyManagerError extends ContextualizedCantonError
 
 object TopologyManagerError extends TopologyManagerErrorGroup {
+
+  @Explanation(
+    "This error indicates that currently, too many topology transactions are pending for this node."
+  )
+  @Resolution(
+    """Change the maximum queue size of the synchronizer outbox or retry."""
+  )
+  object TooManyPendingTopologyTransactions
+      extends ErrorCode(
+        "TOPOLOGY_TOO_MANY_PENDING_TOPOLOGY_TRANSACTIONS",
+        ErrorCategory.ContentionOnSharedResources,
+      ) {
+    final case class Backpressure()(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = s"Too many pending topology transactions on this node."
+        )
+        with TopologyManagerError
+  }
 
   @Explanation(
     """This error indicates that there was an internal error within the topology manager."""
@@ -57,6 +78,13 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
     ) extends CantonError.Impl(
           cause = s"Unhandled error: $description",
           throwableO = Some(throwable),
+        )
+        with TopologyManagerError
+
+    final case class Unexpected(description: String)(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = s"Unhandled error: $description"
         )
         with TopologyManagerError
 
@@ -198,10 +226,10 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         id = "TOPOLOGY_SERIAL_MISMATCH",
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
       ) {
-    final case class Failure(expected: PositiveInt, actual: PositiveInt)(implicit
+    final case class Failure(actual: Option[PositiveInt], expected: Option[PositiveInt])(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
-          cause = s"The given serial $actual did not match the expected serial $expected."
+          cause = s"The given serial $expected did not match the actual serial $actual."
         )
         with TopologyManagerError
   }
@@ -301,10 +329,28 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
   )
   object UnauthorizedTransaction extends AlarmErrorCode(id = "TOPOLOGY_UNAUTHORIZED_TRANSACTION") {
 
-    final case class Failure(reason: String)(implicit
+    final case class NoNamespaceAuth()(implicit
         override val loggingContext: ErrorLoggingContext
-    ) extends Alarm(cause = s"Topology transaction is not properly authorized: $reason")
+    ) extends Alarm(cause = s"Topology transaction is not properly authorized by any namespace key")
         with TopologyManagerError
+
+    final case class Missing(referenced: ReferencedAuthorizations)(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends Alarm(
+          cause =
+            s"Topology transaction is missing authorizations by namespaces=${referenced.namespaces} and keys=${referenced.extraKeys}"
+        )
+        with TopologyManagerError
+
+    final case class NoDelegation(keys: Set[Fingerprint])(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends Alarm(
+          cause =
+            s"Topology transaction authorization cannot be verified due to missing namespace delegations for keys ${keys
+                .mkString(", ")}"
+        )
+        with TopologyManagerError
+
   }
 
   @Explanation(
@@ -323,25 +369,6 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
     ) extends CantonError.Impl(
           cause =
             "There is no active topology transaction matching the mapping of the revocation request"
-        )
-        with TopologyManagerError
-  }
-
-  @Explanation(
-    """This error indicates that the attempted key removal would remove the last valid key of the given entity, making the node unusable."""
-  )
-  @Resolution(
-    """Add the `force = true` flag to your command if you are really sure what you are doing."""
-  )
-  object RemovingLastKeyMustBeForced
-      extends ErrorCode(
-        id = "TOPOLOGY_REMOVING_LAST_KEY_MUST_BE_FORCED",
-        ErrorCategory.InvalidGivenCurrentSystemStateOther,
-      ) {
-    final case class Failure(key: Fingerprint, purpose: KeyPurpose)(implicit
-        val loggingContext: ErrorLoggingContext
-    ) extends CantonError.Impl(
-          cause = "Topology transaction would remove the last key of the given entity"
         )
         with TopologyManagerError
   }
@@ -457,7 +484,7 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         override val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause =
-            s"Members ${members.sorted.mkString(", ")} are missing a signing key or an encryption key or both."
+            s"Members ${members.sorted.mkString(", ")} are missing a valid owner to key mapping."
         )
         with TopologyManagerError
   }
@@ -532,6 +559,57 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
     ) extends CantonError.Impl(
           cause =
             s"The $participantId can not join the synchronizer because onboarding restrictions are in place"
+        )
+        with TopologyManagerError
+  }
+
+  @Explanation(
+    """This error indicates the owner to key mapping is still being used by another transaction."""
+  )
+  @Resolution(
+    """Every synchronizer member needs keys before it can be registered. Consequently, the member needs to be removed first before the keys can be removed."""
+  )
+  object InvalidOwnerToKeyMappingRemoval
+      extends ErrorCode(
+        id = "TOPOLOGY_INVALID_REMOVAL_OF_OWNER_TO_KEY_MAPPING",
+        ErrorCategory.InvalidIndependentOfSystemState,
+      ) {
+    final case class Reject(
+        member: Member,
+        inUseBy: PositiveTopologyTransaction,
+    )(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            s"The owner to key mapping of $member cannot be removed as it is referenced by $inUseBy"
+        )
+        with TopologyManagerError
+  }
+
+  @Explanation(
+    """This error indicates that the provided owner to key mapping does not confirm to the requirements of the synchronizer."""
+  )
+  @Resolution(
+    """Each synchronizer defines the valid set of key specs supported. Any member must provide at least one signing key with the valid specs. Participants must provide also an encryption key."""
+  )
+  object InvalidOwnerToKeyMapping
+      extends ErrorCode(
+        id = "TOPOLOGY_INVALID_OWNER_TO_KEY_MAPPING",
+        ErrorCategory.InvalidIndependentOfSystemState,
+      ) {
+    final case class Reject(
+        member: Member,
+        keyType: String,
+        provided: Seq[PublicKey],
+        supported: Seq[String],
+    )(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            if (provided.isEmpty)
+              s"The owner to key mapping for $member was rejected, as no $keyType key was provided. Supported specs are: $supported"
+            else
+              s"The owner to key mapping for $member was rejected, as none of the ${provided.size} $keyType keys supports the valid specs ($supported): $provided"
         )
         with TopologyManagerError
   }
@@ -706,6 +784,63 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         override val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = s"The namespace $namespace is already in use by another entity."
+        )
+        with TopologyManagerError
+  }
+
+  @Explanation(
+    """This error indicates that the namespace has been revoked."""
+  )
+  @Resolution(
+    """Use a different namespace."""
+  )
+  object NamespaceHasBeenRevoked
+      extends ErrorCode(
+        id = "TOPOLOGY_NAMESPACE_HAS_BEEN_REVOKED",
+        ErrorCategory.InvalidGivenCurrentSystemStateResourceExists,
+      ) {
+    final case class Reject(
+        namespace: Namespace
+    )(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = s"The namespace $namespace has been revoked."
+        )
+        with TopologyManagerError
+  }
+
+  @Explanation(
+    "This error indicates that the confirming threshold is higher than the number of hosting nodes, which will result in a non functional party."
+  )
+  @Resolution("Decrease the threshold or increase the number of hosting nodes.")
+  object ConfirmingThresholdCannotBeReached
+      extends ErrorCode(
+        id = "TOPOLOGY_CONFIRMING_THRESHOLD_CANNOT_BE_REACHED",
+        ErrorCategory.InvalidGivenCurrentSystemStateResourceExists,
+      ) {
+    final case class Reject(threshold: PositiveInt, numberOfHostingNodes: Int)(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            s"Tried to set a confirming threshold (${threshold.value}) above the number of hosting nodes ($numberOfHostingNodes)."
+        )
+        with TopologyManagerError
+  }
+
+  @Explanation(
+    "This error indicates that the signing threshold is higher than the number of signing keys, which will result in a non functional party."
+  )
+  @Resolution("Decrease the threshold or increase the number of signing keys.")
+  object SigningThresholdCannotBeReached
+      extends ErrorCode(
+        id = "TOPOLOGY_SIGNING_THRESHOLD_CANNOT_BE_REACHED",
+        ErrorCategory.InvalidGivenCurrentSystemStateResourceExists,
+      ) {
+    final case class Reject(threshold: PositiveInt, numberOfSigningKeys: Int)(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            s"Tried to set a signing threshold (${threshold.value}) above the number of signing keys ($numberOfSigningKeys)."
         )
         with TopologyManagerError
   }
@@ -913,28 +1048,6 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
           with TopologyManagerError
     }
 
-    @Resolution(
-      s"""To unvet the package id, you must archive all contracts using this package id."""
-    )
-    object PackageIdInUse
-        extends ErrorCode(
-          id = "TOPOLOGY_PACKAGE_ID_IN_USE",
-          ErrorCategory.InvalidGivenCurrentSystemStateOther,
-        ) {
-      final case class Reject(
-          used: Ref.PackageId,
-          contract: ContractId,
-          synchronizerId: SynchronizerId,
-      )(implicit
-          val loggingContext: ErrorLoggingContext
-      ) extends CantonError.Impl(
-            cause =
-              s"Cannot unvet package $used as it is still in use by $contract on synchronizer $synchronizerId. " +
-                s"It may also be used by contracts on other synchronizers."
-          )
-          with TopologyManagerError
-    }
-
     @Explanation(
       """This error indicates that a dangerous PartyToParticipant mapping deletion was rejected.
         |If the command is run and there are active contracts where the party is a stakeholder, these contracts
@@ -1109,5 +1222,21 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
           )
           with TopologyManagerError
     }
+  }
+
+  @Explanation(
+    "This error indicates that preview features need to be enabled."
+  )
+  @Resolution("Set flag `enablePreviewFeatures` to true and retry.")
+  object PreviewFeature
+      extends ErrorCode(
+        id = "PREVIEW_FEATURE",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      ) {
+    final case class Error(
+        operation: String
+    )(implicit val loggingContext: ErrorLoggingContext)
+        extends CantonError.Impl(cause = s"Operation $operation is a preview feature.")
+        with TopologyManagerError
   }
 }

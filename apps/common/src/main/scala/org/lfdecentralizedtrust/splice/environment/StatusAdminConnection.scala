@@ -13,7 +13,7 @@ trait StatusAdminConnection {
   this: AppConnection & RetryProvider.Has =>
   protected implicit val ec: ExecutionContextExecutor
   type Status <: NodeStatus.Status
-  protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[Status]]
+  protected def getStatusRequest: GrpcAdminCommand[?, ?, NodeStatus[Status]]
 
   def getStatus(implicit traceContext: TraceContext): Future[NodeStatus[Status]] =
     retryProvider.retryForClientCalls(

@@ -11,41 +11,41 @@ import java.sql.Connection
 import scala.reflect.ClassTag
 
 private[backend] trait Schema[FROM] {
-  def prepareData(in: Vector[FROM], stringInterning: StringInterning): Array[Array[Array[_]]]
-  def executeUpdate(data: Array[Array[Array[_]]], connection: Connection): Unit
+  def prepareData(in: Vector[FROM], stringInterning: StringInterning): Array[Array[Array[?]]]
+  def executeUpdate(data: Array[Array[Array[?]]], connection: Connection): Unit
 }
 
 private[backend] object AppendOnlySchema {
 
-  type Batch = Array[Array[Array[_]]]
+  type Batch = Array[Array[Array[?]]]
 
   private[backend] trait FieldStrategy {
-    def string[FROM](extractor: StringInterning => FROM => String): Field[FROM, String, _] =
+    def string[FROM](extractor: StringInterning => FROM => String): Field[FROM, String, ?] =
       StringField(extractor)
 
     def stringOptional[FROM](
         extractor: StringInterning => FROM => Option[String]
-    ): Field[FROM, Option[String], _] =
+    ): Field[FROM, Option[String], ?] =
       StringOptional(extractor)
 
     def stringArray[FROM](
         extractor: StringInterning => FROM => Iterable[String]
-    ): Field[FROM, Iterable[String], _] =
+    ): Field[FROM, Iterable[String], ?] =
       StringArray(extractor)
 
     def bytea[FROM](
         extractor: StringInterning => FROM => Array[Byte]
-    ): Field[FROM, Array[Byte], _] =
+    ): Field[FROM, Array[Byte], ?] =
       Bytea(extractor)
 
     def byteaOptional[FROM](
         extractor: StringInterning => FROM => Option[Array[Byte]]
-    ): Field[FROM, Option[Array[Byte]], _] =
+    ): Field[FROM, Option[Array[Byte]], ?] =
       ByteaOptional(extractor)
 
     def parties[FROM](
         extractor: FROM => Set[String]
-    ): Field[FROM, Array[Byte], _] =
+    ): Field[FROM, Array[Byte], ?] =
       bytea(stringInterning =>
         from =>
           encodeToByteArray(
@@ -56,7 +56,7 @@ private[backend] object AppendOnlySchema {
 
     def partiesOptional[FROM](
         extractor: FROM => Option[Set[String]]
-    ): Field[FROM, Option[Array[Byte]], _] =
+    ): Field[FROM, Option[Array[Byte]], ?] =
       byteaOptional(stringInterning =>
         from =>
           extractor(from)
@@ -64,43 +64,43 @@ private[backend] object AppendOnlySchema {
             .map(encodeToByteArray)
       )
 
-    def bigint[FROM](extractor: StringInterning => FROM => Long): Field[FROM, Long, _] =
+    def bigint[FROM](extractor: StringInterning => FROM => Long): Field[FROM, Long, ?] =
       Bigint(extractor)
 
     def bigintOptional[FROM](
         extractor: StringInterning => FROM => Option[Long]
-    ): Field[FROM, Option[Long], _] =
+    ): Field[FROM, Option[Long], ?] =
       BigintOptional(extractor)
 
     def smallintOptional[FROM](
         extractor: StringInterning => FROM => Option[Int]
-    ): Field[FROM, Option[Int], _] =
+    ): Field[FROM, Option[Int], ?] =
       SmallintOptional(extractor)
 
     def smallint[FROM](
         extractor: StringInterning => FROM => Int
-    ): Field[FROM, Int, _] =
+    ): Field[FROM, Int, ?] =
       Smallint(extractor)
 
-    def int[FROM](extractor: StringInterning => FROM => Int): Field[FROM, Int, _] =
+    def int[FROM](extractor: StringInterning => FROM => Int): Field[FROM, Int, ?] =
       Integer(extractor)
 
     def intOptional[FROM](
         extractor: StringInterning => FROM => Option[Int]
-    ): Field[FROM, Option[Int], _] =
+    ): Field[FROM, Option[Int], ?] =
       IntOptional(extractor)
 
     def booleanOptional[FROM](
         extractor: StringInterning => FROM => Option[Boolean]
-    ): Field[FROM, Option[Boolean], _] =
+    ): Field[FROM, Option[Boolean], ?] =
       BooleanOptional(extractor)
 
     def boolean[FROM](
         extractor: StringInterning => FROM => Boolean
-    ): Field[FROM, Boolean, _] =
+    ): Field[FROM, Boolean, ?] =
       BooleanMandatory(extractor)
 
-    def insert[FROM](tableName: String)(fields: (String, Field[FROM, _, _])*): Table[FROM]
+    def insert[FROM](tableName: String)(fields: (String, Field[FROM, ?, ?])*): Table[FROM]
   }
 
   def apply(fieldStrategy: FieldStrategy): Schema[DbDto] = {
@@ -284,198 +284,6 @@ private[backend] object AppendOnlySchema {
     val idFilterVariousWitness: Table[DbDto.IdFilterVariousWitness] =
       idFilter("lapi_filter_various_witness")
 
-    // TODO(#28008) remove
-    val eventsCreate: Table[DbDto.EventCreate] =
-      fieldStrategy.insert("lapi_events_create")(
-        "event_offset" -> fieldStrategy.bigint(_ => _.event_offset),
-        "update_id" -> fieldStrategy.bytea(_ => _.update_id),
-        "ledger_effective_time" -> fieldStrategy.bigint(_ => _.ledger_effective_time),
-        "command_id" -> fieldStrategy.stringOptional(_ => _.command_id),
-        "workflow_id" -> fieldStrategy.stringOptional(_ => _.workflow_id),
-        "submitters" -> fieldStrategy.partiesOptional(_.submitters),
-        "node_id" -> fieldStrategy.int(_ => _.node_id),
-        "contract_id" -> fieldStrategy.bytea(_ => _.contract_id.toBytes.toByteArray),
-        "template_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.templateId.unsafe.internalize(dbDto.template_id)
-        ),
-        "package_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.packageId.unsafe.internalize(dbDto.package_id)
-        ),
-        "representative_package_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.packageId.unsafe.internalize(dbDto.representative_package_id)
-        ),
-        "flat_event_witnesses" -> fieldStrategy.parties(_.flat_event_witnesses),
-        "tree_event_witnesses" -> fieldStrategy.parties(_.tree_event_witnesses),
-        "create_argument" -> fieldStrategy.bytea(_ => _.create_argument),
-        "create_signatories" -> fieldStrategy.parties(_.create_signatories),
-        "create_observers" -> fieldStrategy.parties(_.create_observers),
-        "create_key_value" -> fieldStrategy.byteaOptional(_ => _.create_key_value),
-        "create_key_maintainers" -> fieldStrategy.partiesOptional(_.create_key_maintainers),
-        "create_key_hash" -> fieldStrategy.stringOptional(_ => _.create_key_hash),
-        "event_sequential_id" -> fieldStrategy.bigint(_ => _.event_sequential_id),
-        "create_argument_compression" -> fieldStrategy.smallintOptional(_ =>
-          _.create_argument_compression
-        ),
-        "create_key_value_compression" -> fieldStrategy.smallintOptional(_ =>
-          _.create_key_value_compression
-        ),
-        "authentication_data" -> fieldStrategy.bytea(_ => _.authentication_data),
-        "synchronizer_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.synchronizerId.internalize(dbDto.synchronizer_id)
-        ),
-        "trace_context" -> fieldStrategy.bytea(_ => _.trace_context),
-        "record_time" -> fieldStrategy.bigint(_ => _.record_time),
-        "external_transaction_hash" -> fieldStrategy.byteaOptional(_ =>
-          _.external_transaction_hash
-        ),
-        "internal_contract_id" -> fieldStrategy.bigint(_ => _.internal_contract_id),
-      )
-
-    // TODO(#28008) remove
-    val exerciseFields: Vector[(String, Field[DbDto.EventExercise, _, _])] =
-      Vector[(String, Field[DbDto.EventExercise, _, _])](
-        "event_offset" -> fieldStrategy.bigint(_ => _.event_offset),
-        "contract_id" -> fieldStrategy.bytea(_ => _.contract_id.toBytes.toByteArray),
-        "update_id" -> fieldStrategy.bytea(_ => _.update_id),
-        "ledger_effective_time" -> fieldStrategy.bigint(_ => _.ledger_effective_time),
-        "node_id" -> fieldStrategy.int(_ => _.node_id),
-        "command_id" -> fieldStrategy.stringOptional(_ => _.command_id),
-        "workflow_id" -> fieldStrategy.stringOptional(_ => _.workflow_id),
-        "submitters" -> fieldStrategy.partiesOptional(_.submitters),
-        "exercise_choice" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.choiceName.unsafe.internalize(dto.exercise_choice)
-        ),
-        "exercise_choice_interface" -> fieldStrategy.intOptional(stringInterning =>
-          _.exercise_choice_interface_id.map(stringInterning.interfaceId.unsafe.internalize)
-        ),
-        "exercise_argument" -> fieldStrategy.bytea(_ => _.exercise_argument),
-        "exercise_result" -> fieldStrategy.byteaOptional(_ => _.exercise_result),
-        "exercise_actors" -> fieldStrategy.parties(_.exercise_actors),
-        "exercise_last_descendant_node_id" -> fieldStrategy.int(_ =>
-          _.exercise_last_descendant_node_id
-        ),
-        "template_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.templateId.unsafe.internalize(dbDto.template_id)
-        ),
-        "package_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.packageId.unsafe.internalize(dbDto.package_id)
-        ),
-        "tree_event_witnesses" -> fieldStrategy.parties(_.tree_event_witnesses),
-        "event_sequential_id" -> fieldStrategy.bigint(_ => _.event_sequential_id),
-        "exercise_argument_compression" -> fieldStrategy.smallintOptional(_ =>
-          _.exercise_argument_compression
-        ),
-        "exercise_result_compression" -> fieldStrategy.smallintOptional(_ =>
-          _.exercise_result_compression
-        ),
-        "synchronizer_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.synchronizerId.internalize(dbDto.synchronizer_id)
-        ),
-        "trace_context" -> fieldStrategy.bytea(_ => _.trace_context),
-        "record_time" -> fieldStrategy.bigint(_ => _.record_time),
-        "external_transaction_hash" -> fieldStrategy.byteaOptional(_ => _.external_transaction_hash),
-      )
-
-    // TODO(#28008) remove
-    val consumingExerciseFields: Vector[(String, Field[DbDto.EventExercise, _, _])] =
-      exerciseFields ++ Vector[(String, Field[DbDto.EventExercise, _, _])](
-        "flat_event_witnesses" -> fieldStrategy.parties(_.flat_event_witnesses),
-        "deactivated_event_sequential_id" -> fieldStrategy.bigintOptional(_ =>
-          _.deactivated_event_sequential_id
-        ),
-      )
-
-    // TODO(#28008) remove
-    val eventsConsumingExercise: Table[DbDto.EventExercise] =
-      fieldStrategy.insert("lapi_events_consuming_exercise")(consumingExerciseFields*)
-
-    // TODO(#28008) remove
-    val eventsNonConsumingExercise: Table[DbDto.EventExercise] =
-      fieldStrategy.insert("lapi_events_non_consuming_exercise")(exerciseFields*)
-
-    // TODO(#28008) remove
-    val eventsUnassign: Table[DbDto.EventUnassign] =
-      fieldStrategy.insert("lapi_events_unassign")(
-        "event_sequential_id" -> fieldStrategy.bigint(_ => _.event_sequential_id),
-        "event_offset" -> fieldStrategy.bigint(_ => _.event_offset),
-        "update_id" -> fieldStrategy.bytea(_ => _.update_id),
-        "workflow_id" -> fieldStrategy.stringOptional(_ => _.workflow_id),
-        "command_id" -> fieldStrategy.stringOptional(_ => _.command_id),
-        "submitter" -> fieldStrategy.intOptional(stringInterning =>
-          _.submitter.map(stringInterning.party.unsafe.internalize)
-        ),
-        "node_id" -> fieldStrategy.int(_ => _.node_id),
-        "contract_id" -> fieldStrategy.bytea(_ => u => u.contract_id.toBytes.toByteArray),
-        "template_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.templateId.unsafe.internalize(dbDto.template_id)
-        ),
-        "package_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.packageId.unsafe.internalize(dbDto.package_id)
-        ),
-        "flat_event_witnesses" -> fieldStrategy.parties(_.flat_event_witnesses),
-        "source_synchronizer_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.synchronizerId.internalize(dbDto.source_synchronizer_id)
-        ),
-        "target_synchronizer_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.synchronizerId.internalize(dbDto.target_synchronizer_id)
-        ),
-        "reassignment_id" -> fieldStrategy.bytea(_ => _.reassignment_id),
-        "reassignment_counter" -> fieldStrategy.bigint(_ => _.reassignment_counter),
-        "assignment_exclusivity" -> fieldStrategy.bigintOptional(_ => _.assignment_exclusivity),
-        "trace_context" -> fieldStrategy.bytea(_ => _.trace_context),
-        "record_time" -> fieldStrategy.bigint(_ => _.record_time),
-        "deactivated_event_sequential_id" -> fieldStrategy.bigintOptional(_ =>
-          _.deactivated_event_sequential_id
-        ),
-      )
-
-    // TODO(#28008) remove
-    val eventsAssign: Table[DbDto.EventAssign] =
-      fieldStrategy.insert("lapi_events_assign")(
-        "event_sequential_id" -> fieldStrategy.bigint(_ => _.event_sequential_id),
-        "event_offset" -> fieldStrategy.bigint(_ => _.event_offset),
-        "update_id" -> fieldStrategy.bytea(_ => _.update_id),
-        "workflow_id" -> fieldStrategy.stringOptional(_ => _.workflow_id),
-        "command_id" -> fieldStrategy.stringOptional(_ => _.command_id),
-        "submitter" -> fieldStrategy.intOptional(stringInterning =>
-          _.submitter.map(stringInterning.party.unsafe.internalize)
-        ),
-        "node_id" -> fieldStrategy.int(_ => _.node_id),
-        "contract_id" -> fieldStrategy.bytea(_ => _.contract_id.toBytes.toByteArray),
-        "template_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.templateId.unsafe.internalize(dbDto.template_id)
-        ),
-        "package_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.packageId.unsafe.internalize(dbDto.package_id)
-        ),
-        "flat_event_witnesses" -> fieldStrategy.parties(_.flat_event_witnesses),
-        "source_synchronizer_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.synchronizerId.internalize(dbDto.source_synchronizer_id)
-        ),
-        "target_synchronizer_id" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.synchronizerId.internalize(dbDto.target_synchronizer_id)
-        ),
-        "reassignment_id" -> fieldStrategy.bytea(_ => _.reassignment_id),
-        "reassignment_counter" -> fieldStrategy.bigint(_ => _.reassignment_counter),
-        "create_argument" -> fieldStrategy.bytea(_ => _.create_argument),
-        "create_signatories" -> fieldStrategy.parties(_.create_signatories),
-        "create_observers" -> fieldStrategy.parties(_.create_observers),
-        "create_key_value" -> fieldStrategy.byteaOptional(_ => _.create_key_value),
-        "create_key_maintainers" -> fieldStrategy.partiesOptional(_.create_key_maintainers),
-        "create_key_hash" -> fieldStrategy.stringOptional(_ => _.create_key_hash),
-        "create_argument_compression" -> fieldStrategy.smallintOptional(_ =>
-          _.create_argument_compression
-        ),
-        "create_key_value_compression" -> fieldStrategy.smallintOptional(_ =>
-          _.create_key_value_compression
-        ),
-        "ledger_effective_time" -> fieldStrategy.bigint(_ => _.ledger_effective_time),
-        "authentication_data" -> fieldStrategy.bytea(_ => _.authentication_data),
-        "trace_context" -> fieldStrategy.bytea(_ => _.trace_context),
-        "record_time" -> fieldStrategy.bigint(_ => _.record_time),
-        "internal_contract_id" -> fieldStrategy.bigint(_ => _.internal_contract_id),
-      )
-
     val partyEntries: Table[DbDto.PartyEntry] =
       fieldStrategy.insert("lapi_party_entries")(
         "ledger_offset" -> fieldStrategy.bigint(_ => _.ledger_offset),
@@ -548,113 +356,6 @@ private[backend] object AppendOnlySchema {
         "external_string" -> fieldStrategy.string(_ => _.externalString),
       )
 
-    // TODO(#28008) remove
-    val idFilterCreateStakeholderTable: Table[DbDto.IdFilterCreateStakeholder] =
-      fieldStrategy.insert("lapi_pe_create_id_filter_stakeholder")(
-        "event_sequential_id" -> fieldStrategy.bigint(_ => _.event_sequential_id),
-        "template_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.templateId.unsafe.internalize(dto.template_id)
-        ),
-        "party_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.party.unsafe.internalize(dto.party_id)
-        ),
-        "first_per_sequential_id" -> fieldStrategy.booleanOptional(_ =>
-          dto => Option.when(dto.first_per_sequential_id)(true)
-        ),
-      )
-
-    // TODO(#28008) remove
-    val idFilterCreateNonStakeholderInformeeTable
-        : Table[DbDto.IdFilterCreateNonStakeholderInformee] =
-      fieldStrategy.insert("lapi_pe_create_id_filter_non_stakeholder_informee")(
-        "event_sequential_id" -> fieldStrategy.bigint(_ => _.event_sequential_id),
-        "template_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.templateId.unsafe.internalize(dto.template_id)
-        ),
-        "party_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.party.unsafe.internalize(dto.party_id)
-        ),
-        "first_per_sequential_id" -> fieldStrategy.booleanOptional(_ =>
-          dto => Option.when(dto.first_per_sequential_id)(true)
-        ),
-      )
-
-    // TODO(#28008) remove
-    val idFilterConsumingStakeholderTable: Table[DbDto.IdFilterConsumingStakeholder] =
-      fieldStrategy.insert("lapi_pe_consuming_id_filter_stakeholder")(
-        "event_sequential_id" -> fieldStrategy.bigint(_ => _.event_sequential_id),
-        "template_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.templateId.unsafe.internalize(dto.template_id)
-        ),
-        "party_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.party.unsafe.internalize(dto.party_id)
-        ),
-        "first_per_sequential_id" -> fieldStrategy.booleanOptional(_ =>
-          dto => Option.when(dto.first_per_sequential_id)(true)
-        ),
-      )
-
-    // TODO(#28008) remove
-    val idFilterConsumingNonStakeholderInformeeTable
-        : Table[DbDto.IdFilterConsumingNonStakeholderInformee] =
-      fieldStrategy.insert("lapi_pe_consuming_id_filter_non_stakeholder_informee")(
-        "event_sequential_id" -> fieldStrategy.bigint(_ => _.event_sequential_id),
-        "template_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.templateId.unsafe.internalize(dto.template_id)
-        ),
-        "party_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.party.unsafe.internalize(dto.party_id)
-        ),
-        "first_per_sequential_id" -> fieldStrategy.booleanOptional(_ =>
-          dto => Option.when(dto.first_per_sequential_id)(true)
-        ),
-      )
-
-    // TODO(#28008) remove
-    val idFilterNonConsumingInformeeTable: Table[DbDto.IdFilterNonConsumingInformee] =
-      fieldStrategy.insert("lapi_pe_non_consuming_id_filter_informee")(
-        "event_sequential_id" -> fieldStrategy.bigint(_ => _.event_sequential_id),
-        "template_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.templateId.unsafe.internalize(dto.template_id)
-        ),
-        "party_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.party.unsafe.internalize(dto.party_id)
-        ),
-        "first_per_sequential_id" -> fieldStrategy.booleanOptional(_ =>
-          dto => Option.when(dto.first_per_sequential_id)(true)
-        ),
-      )
-
-    // TODO(#28008) remove
-    val idFilterUnassignStakeholderTable: Table[DbDto.IdFilterUnassignStakeholder] =
-      fieldStrategy.insert("lapi_pe_reassignment_id_filter_stakeholder")(
-        "event_sequential_id" -> fieldStrategy.bigint(_ => _.event_sequential_id),
-        "template_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.templateId.unsafe.internalize(dto.template_id)
-        ),
-        "party_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.party.unsafe.internalize(dto.party_id)
-        ),
-        "first_per_sequential_id" -> fieldStrategy.booleanOptional(_ =>
-          dto => Option.when(dto.first_per_sequential_id)(true)
-        ),
-      )
-
-    // TODO(#28008) remove
-    val idFilterAssignStakeholderTable: Table[DbDto.IdFilterAssignStakeholder] =
-      fieldStrategy.insert("lapi_pe_assign_id_filter_stakeholder")(
-        "event_sequential_id" -> fieldStrategy.bigint(_ => _.event_sequential_id),
-        "template_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.templateId.unsafe.internalize(dto.template_id)
-        ),
-        "party_id" -> fieldStrategy.int(stringInterning =>
-          dto => stringInterning.party.unsafe.internalize(dto.party_id)
-        ),
-        "first_per_sequential_id" -> fieldStrategy.booleanOptional(_ =>
-          dto => Option.when(dto.first_per_sequential_id)(true)
-        ),
-      )
-
     val transactionMeta: Table[DbDto.TransactionMeta] =
       fieldStrategy.insert("lapi_update_meta")(
         "update_id" -> fieldStrategy.bytea(_ => _.update_id),
@@ -668,7 +369,7 @@ private[backend] object AppendOnlySchema {
         "event_sequential_id_last" -> fieldStrategy.bigint(_ => _.event_sequential_id_last),
       )
 
-    val executes: Seq[Array[Array[_]] => Connection => Unit] = List(
+    val executes: Seq[Array[Array[?]] => Connection => Unit] = List(
       eventActivate.executeUpdate,
       idFilterActivateStakeholder.executeUpdate,
       idFilterActivateWitness.executeUpdate,
@@ -677,22 +378,10 @@ private[backend] object AppendOnlySchema {
       idFilterDeactivateWitness.executeUpdate,
       eventVariousWitnessed.executeUpdate,
       idFilterVariousWitness.executeUpdate,
-      eventsCreate.executeUpdate,
-      eventsConsumingExercise.executeUpdate,
-      eventsNonConsumingExercise.executeUpdate,
-      eventsUnassign.executeUpdate,
-      eventsAssign.executeUpdate,
       partyEntries.executeUpdate,
       partyToParticipant.executeUpdate,
       commandCompletions.executeUpdate,
       stringInterningTable.executeUpdate,
-      idFilterCreateStakeholderTable.executeUpdate,
-      idFilterCreateNonStakeholderInformeeTable.executeUpdate,
-      idFilterConsumingStakeholderTable.executeUpdate,
-      idFilterConsumingNonStakeholderInformeeTable.executeUpdate,
-      idFilterNonConsumingInformeeTable.executeUpdate,
-      idFilterUnassignStakeholderTable.executeUpdate,
-      idFilterAssignStakeholderTable.executeUpdate,
       transactionMeta.executeUpdate,
     )
 
@@ -700,7 +389,7 @@ private[backend] object AppendOnlySchema {
       override def prepareData(
           in: Vector[DbDto],
           stringInterning: StringInterning,
-      ): Array[Array[Array[_]]] = {
+      ): Array[Array[Array[?]]] = {
         def collectWithFilter[T <: DbDto: ClassTag](filter: T => Boolean): Vector[T] =
           in.collect { case dbDto: T if filter(dbDto) => dbDto }
         def collect[T <: DbDto: ClassTag]: Vector[T] = collectWithFilter[T](_ => true)
@@ -717,36 +406,15 @@ private[backend] object AppendOnlySchema {
             .prepareData(collect[IdFilterDeactivateWitness], stringInterning),
           eventVariousWitnessed.prepareData(collect[EventVariousWitnessed], stringInterning),
           idFilterVariousWitness.prepareData(collect[IdFilterVariousWitness], stringInterning),
-          eventsCreate.prepareData(collect[EventCreate], stringInterning),
-          eventsConsumingExercise
-            .prepareData(collectWithFilter[EventExercise](_.consuming), stringInterning),
-          eventsNonConsumingExercise
-            .prepareData(collectWithFilter[EventExercise](!_.consuming), stringInterning),
-          eventsUnassign.prepareData(collect[EventUnassign], stringInterning),
-          eventsAssign.prepareData(collect[EventAssign], stringInterning),
           partyEntries.prepareData(collect[PartyEntry], stringInterning),
           partyToParticipant.prepareData(collect[EventPartyToParticipant], stringInterning),
           commandCompletions.prepareData(collect[CommandCompletion], stringInterning),
           stringInterningTable.prepareData(collect[StringInterningDto], stringInterning),
-          idFilterCreateStakeholderTable
-            .prepareData(collect[IdFilterCreateStakeholder], stringInterning),
-          idFilterCreateNonStakeholderInformeeTable
-            .prepareData(collect[IdFilterCreateNonStakeholderInformee], stringInterning),
-          idFilterConsumingStakeholderTable
-            .prepareData(collect[IdFilterConsumingStakeholder], stringInterning),
-          idFilterConsumingNonStakeholderInformeeTable
-            .prepareData(collect[IdFilterConsumingNonStakeholderInformee], stringInterning),
-          idFilterNonConsumingInformeeTable
-            .prepareData(collect[IdFilterNonConsumingInformee], stringInterning),
-          idFilterUnassignStakeholderTable
-            .prepareData(collect[IdFilterUnassignStakeholder], stringInterning),
-          idFilterAssignStakeholderTable
-            .prepareData(collect[IdFilterAssignStakeholder], stringInterning),
           transactionMeta.prepareData(collect[TransactionMeta], stringInterning),
         )
       }
 
-      override def executeUpdate(data: Array[Array[Array[_]]], connection: Connection): Unit =
+      override def executeUpdate(data: Array[Array[Array[?]]], connection: Connection): Unit =
         executes.zip(data).foreach { case (execute, data) =>
           execute(data)(connection)
         }

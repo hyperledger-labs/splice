@@ -75,7 +75,7 @@ class RateLimitPreflightIntegrationTest extends IntegrationTestWithSharedEnviron
     )
     // Note: failures are expected due to the Canton rate limiter.
     forAtLeast(1, results) {
-      _ shouldBe a[scala.util.Success[_]]
+      _ shouldBe a[scala.util.Success[?]]
     }
     // This now hits istio rate limit
     assertThrowsAndLogsCommandFailures(

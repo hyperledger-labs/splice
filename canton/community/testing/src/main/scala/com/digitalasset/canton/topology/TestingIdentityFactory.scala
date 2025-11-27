@@ -45,7 +45,10 @@ import com.digitalasset.canton.topology.store.{
   ValidatedTopologyTransaction,
 }
 import com.digitalasset.canton.topology.transaction.*
-import com.digitalasset.canton.topology.transaction.DelegationRestriction.CanSignAllButNamespaceDelegations
+import com.digitalasset.canton.topology.transaction.DelegationRestriction.{
+  CanSignAllButNamespaceDelegations,
+  CanSignAllMappings,
+}
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Remove
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
@@ -591,8 +594,7 @@ class TestingIdentityFactory(
     val updateF = store.update(
       SequencedTime(CantonTimestamp.Epoch.immediatePredecessor),
       EffectiveTime(CantonTimestamp.Epoch.immediatePredecessor),
-      removeMapping = Map.empty,
-      removeTxs = Set.empty,
+      removals = Map.empty,
       additions = transactions,
     )(TraceContext.empty)
     Await.result(
@@ -852,6 +854,13 @@ class TestingOwnerWithKeys(
         CanSignAllButNamespaceDelegations,
       )
     )
+    val ns1k1 = mkAdd(
+      NamespaceDelegation.tryCreate(
+        Namespace(key1.fingerprint),
+        key1,
+        CanSignAllMappings,
+      )
+    )
     val seq_okm_k2 = mkAddMultiKey(
       OwnerToKeyMapping.tryCreate(sequencerId, NonEmpty(Seq, key2)),
       NonEmpty(Set, namespaceKey, key2),
@@ -929,14 +938,6 @@ class TestingOwnerWithKeys(
         ParticipantPermission.Confirmation,
         None,
         None,
-      )
-    )
-
-    val p1p1 = mkAdd(
-      PartyToParticipant.tryCreate(
-        PartyId(UniqueIdentifier.tryCreate("one", key1.id)),
-        PositiveInt.one,
-        Seq(HostingParticipant(participant1, ParticipantPermission.Submission)),
       )
     )
 
