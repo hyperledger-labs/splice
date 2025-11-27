@@ -27,8 +27,6 @@ data IssuanceConfig = IssuanceConfig with
       -- Introduced as part of CIP-3. Defaults to 2.85 USD.
     optDevelopmentFundPercentage : Optional Decimal
       -- ^ Percentage of each mint emission allocated to the Development Fund under CIP-0082.
-    optDevelopmentFundManager : Optional Party
-      -- ^ Party authorized to manage and allocate minting rights from the Development Fund.
   deriving (Eq, Show)
 
 -- | Getter with the right default value for the validator faucet cap.
@@ -194,4 +192,3 @@ instance Patchable IssuanceConfig where
     unfeaturedAppRewardCap = patch new.unfeaturedAppRewardCap base.unfeaturedAppRewardCap current.unfeaturedAppRewardCap
     optValidatorFaucetCap = patch new.optValidatorFaucetCap base.optValidatorFaucetCap current.optValidatorFaucetCap
     optDevelopmentFundPercentage = patch new.optDevelopmentFundPercentage base.optDevelopmentFundPercentage current.optDevelopmentFundPercentage
-    optDevelopmentFundManager = patch new.optDevelopmentFundManager base.optDevelopmentFundManager current.optDevelopmentFundManager
