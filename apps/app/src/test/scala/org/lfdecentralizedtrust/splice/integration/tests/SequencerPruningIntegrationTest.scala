@@ -1,31 +1,21 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.admin.api.client.data.PruningSchedule
-import org.lfdecentralizedtrust.splice.config.{
-  ConfigTransforms,
-  ParticipantClientConfig,
-  PruningConfig,
-}
+import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, ParticipantClientConfig}
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SequencerPruningTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{
-  FullClientConfig,
-  NonNegativeFiniteDuration,
-  PositiveDurationSeconds,
-}
+import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.util.ShowUtil.*
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority.Low
 import org.slf4j.event.Level
 
 import scala.concurrent.duration.*
 
-class PruningIntegrationTest
+class SequencerPruningIntegrationTest
     extends SvIntegrationTestBase
     with WalletTestUtil
     with ProcessTestUtil {
@@ -62,69 +52,30 @@ class PruningIntegrationTest
           )(config),
         (_, config) =>
           config.copy(
-            validatorApps =
-              config.validatorApps.updatedWith(InstanceName.tryCreate("sv1Validator")) {
-                _.map { config =>
-                  config.copy(
-                    // schedule needs to be defined to activate participant pruning
-                    participantPruningSchedule = Some(
-                      PruningConfig(
-                        "0 /1 * * * ?",
-                        PositiveDurationSeconds.tryFromDuration(10.seconds),
-                        PositiveDurationSeconds.tryFromDuration(20.seconds),
-                      )
-                    )
-                  )
-                }
-              } + (
-                InstanceName.tryCreate("bobValidatorLocal") -> {
-                  val bobValidatorConfig = config
-                    .validatorApps(InstanceName.tryCreate("bobValidator"))
-                  bobValidatorConfig
-                    .copy(
-                      participantClient = ParticipantClientConfig(
-                        FullClientConfig(port = Port.tryCreate(5902)),
-                        bobValidatorConfig.participantClient.ledgerApi.copy(
-                          clientConfig =
-                            bobValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
-                              port = Port.tryCreate(5901)
-                            )
-                        ),
+            validatorApps = config.validatorApps + (
+              InstanceName.tryCreate("bobValidatorLocal") -> {
+                val bobValidatorConfig = config
+                  .validatorApps(InstanceName.tryCreate("bobValidator"))
+                bobValidatorConfig
+                  .copy(
+                    participantClient = ParticipantClientConfig(
+                      FullClientConfig(port = Port.tryCreate(5902)),
+                      bobValidatorConfig.participantClient.ledgerApi.copy(
+                        clientConfig =
+                          bobValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
+                            port = Port.tryCreate(5901)
+                          )
                       ),
-                      // We disable the ReconcileSequencerConnectionsTrigger to prevent domain disconnections
-                      // from interfering with traffic top-ups (see #14474)
-                      automation = bobValidatorConfig.automation
-                        .withPausedTrigger[ReconcileSequencerConnectionsTrigger],
-                    )
-                }
-              )
+                    ),
+                    // We disable the ReconcileSequencerConnectionsTrigger to prevent domain disconnections
+                    // from interfering with traffic top-ups (see #14474)
+                    automation = bobValidatorConfig.automation
+                      .withPausedTrigger[ReconcileSequencerConnectionsTrigger],
+                  )
+              }
+            )
           ),
       )
-
-  "participant can be pruned" should {
-
-    "when configured, sv1 participant prunes every minute" in { implicit env =>
-      initDsoWithSv1Only()
-
-      clue("Check sv1 participant has the expected smallest pruning schedule") {
-        sv1ValidatorBackend.participantClient.pruning.get_schedule() shouldBe Some(
-          PruningSchedule(
-            "0 /1 * * * ?",
-            PositiveDurationSeconds.tryFromDuration(10.seconds),
-            PositiveDurationSeconds.tryFromDuration(20.seconds),
-          )
-        )
-      }
-
-      eventually() {
-        sv1Backend.svAutomation
-          .connection(Low)
-          // returns 0 when participant pruning is disabled
-          .latestPrunedOffset()
-          .futureValue should be > 0L
-      }
-    }
-  }
 
   "sequencer can be pruned even if a participant is down" in { implicit env =>
     clue("Initialize DSO with 2 SVs") {
@@ -188,5 +139,4 @@ class PruningIntegrationTest
       timeUntilSuccess = 3.minutes,
     )
   }
-
 }

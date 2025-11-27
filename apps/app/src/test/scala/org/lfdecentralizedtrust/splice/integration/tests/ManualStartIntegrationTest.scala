@@ -23,6 +23,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority.Low
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.util.{StandaloneCanton, TriggerTestUtil, WalletTestUtil}
 
@@ -55,22 +56,46 @@ class ManualStartIntegrationTest
       .addConfigTransforms((_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf))
       // By default, alice validator connects to the splitwell domain. This test doesn't start the splitwell node.
       .addConfigTransform((_, conf) =>
-        conf.copy(validatorApps =
-          conf.validatorApps.updatedWith(InstanceName.tryCreate("aliceValidator")) {
-            _.map { aliceValidatorConfig =>
-              val withoutExtraDomains = aliceValidatorConfig.domains.copy(extra = Seq.empty)
-              aliceValidatorConfig.copy(
-                domains = withoutExtraDomains,
-                participantPruningSchedule = Some(
-                  PruningConfig(
-                    "0 0 * * * ?",
-                    PositiveDurationSeconds.tryFromDuration(1.hours),
-                    PositiveDurationSeconds.tryFromDuration(30.hours),
-                  )
-                ),
+        conf.copy(
+          // reduce it so that the test hits 2 acs commitments intervals
+          // as pruning can be done only up to the end of the latest complete acs commitment interval
+          svApps = conf.svApps.updatedWith(InstanceName.tryCreate("sv1")) {
+            _.map { config =>
+              config.copy(acsCommitmentReconciliationInterval =
+                PositiveDurationSeconds.ofSeconds(30)
               )
             }
-          }
+          },
+          validatorApps = conf.validatorApps
+            .updatedWith(InstanceName.tryCreate("sv1Validator")) {
+              _.map { config =>
+                config.copy(
+                  // schedule needs to be defined to activate participant pruning
+                  participantPruningSchedule = Some(
+                    PruningConfig(
+                      "0 /1 * * * ?",
+                      PositiveDurationSeconds.tryFromDuration(10.seconds),
+                      PositiveDurationSeconds.tryFromDuration(20.seconds),
+                    )
+                  )
+                )
+              }
+            }
+            .updatedWith(InstanceName.tryCreate("aliceValidator")) {
+              _.map { aliceValidatorConfig =>
+                val withoutExtraDomains = aliceValidatorConfig.domains.copy(extra = Seq.empty)
+                aliceValidatorConfig.copy(
+                  domains = withoutExtraDomains,
+                  participantPruningSchedule = Some(
+                    PruningConfig(
+                      "0 0 * * * ?",
+                      PositiveDurationSeconds.tryFromDuration(1.hours),
+                      PositiveDurationSeconds.tryFromDuration(30.hours),
+                    )
+                  ),
+                )
+              }
+            },
         )
       )
       // Add a suffix to the canton identifiers to avoid metric conflicts with the shared canton nodes
@@ -150,6 +175,26 @@ class ManualStartIntegrationTest
 
         clue("Starting all Splice apps") {
           startAllSync(allCnApps*)
+        }
+
+        clue("Check sv1 participant has the expected smallest pruning schedule") {
+          sv1ValidatorBackend.participantClient.pruning.get_schedule() shouldBe Some(
+            PruningSchedule(
+              "0 /1 * * * ?",
+              PositiveDurationSeconds.tryFromDuration(10.seconds),
+              PositiveDurationSeconds.tryFromDuration(20.seconds),
+            )
+          )
+        }
+
+        clue("Check sv1 participant is actively pruning") {
+          eventually(2.minutes) {
+            sv1Backend.svAutomation
+              .connection(Low)
+              // returns 0 when participant pruning is disabled
+              .latestPrunedOffset()
+              .futureValue should be > 0L
+          }
         }
 
         clue(
