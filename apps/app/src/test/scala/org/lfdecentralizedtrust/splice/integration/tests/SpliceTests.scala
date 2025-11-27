@@ -80,7 +80,10 @@ object SpliceTests extends LazyLogging {
   val testRetryProvider = new RetryProvider(
     NamedLoggerFactory.root,
     ProcessingTimeout(),
-    new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds))(testScheduler),
+    new FutureSupervisor.Impl(
+      NonNegativeDuration.tryFromDuration(10.seconds),
+      NamedLoggerFactory.root,
+    )(testScheduler),
     NoOpMetricsFactory,
   )(NoReportingTracerProvider.tracer)
 

@@ -11,16 +11,8 @@ import com.digitalasset.canton.admin.api.client.data.{
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.config.{
-  ApiLoggingConfig,
-  CantonConfig,
-  CantonFeatures,
-  DefaultPorts,
-  EnterpriseCantonEdition,
-  LoggingConfig,
-  MonitoringConfig,
-  TestingConfigInternal,
-}
+import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.auto.genCantonConfigValidator
 import com.digitalasset.canton.console.{
   CantonConsoleEnvironment,
   InstanceReference,
@@ -61,7 +53,8 @@ final case class EnvironmentDefinition(
     override val baseConfig: CantonConfig,
     override val testingConfig: TestingConfigInternal =
       TestingConfigInternal(warnOnAcsCommitmentDegradation = false),
-    override val setups: List[TestConsoleEnvironment => Unit] = Nil,
+    override val setups: List[TestConsoleEnvironment[CantonConfig, CantonEnvironment] => Unit] =
+      Nil,
     override val teardown: Unit => Unit = _ => (),
     override val configTransforms: Seq[ConfigTransform] = ConfigTransforms.defaults,
     staticSynchronizerParametersMap: Map[String, StaticSynchronizerParameters] = Map.empty,

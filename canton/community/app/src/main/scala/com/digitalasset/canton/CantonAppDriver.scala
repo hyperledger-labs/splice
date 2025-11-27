@@ -31,7 +31,6 @@ import com.typesafe.config.ConfigFactory
 import org.slf4j.LoggerFactory
 
 import java.lang.management.ManagementFactory
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import javax.management.openmbean.CompositeData
 import javax.management.{NotificationEmitter, NotificationListener}
@@ -141,17 +140,12 @@ abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
   }))
   logger.debug("Registered shutdown-hook.")
   private object Config {
-    val devConfig =
-      Option.when(cliOptions.devProtocol)(JarResourceUtils.extractFileFromJar("sandbox/dev.conf"))
     val sandboxConfig = JarResourceUtils.extractFileFromJar("sandbox/sandbox.conf")
-    val devPrefix = if (cliOptions.devProtocol) "dev-" else ""
-    val sandboxBotstrap =
-      JarResourceUtils.extractFileFromJar(s"sandbox/${devPrefix}bootstrap.canton")
+    val sandboxBotstrap = JarResourceUtils.extractFileFromJar("sandbox/bootstrap.canton")
     val configFiles = cliOptions.command
       .collect { case Sandbox => sandboxConfig }
       .toList
       .concat(cliOptions.configFiles)
-      .concat(devConfig)
     val bootstrapFile = cliOptions.command
       .collect { case Sandbox => sandboxBotstrap }
       .orElse(cliOptions.bootstrapScriptPath)
@@ -272,48 +266,10 @@ abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
     case Left(_) => sys.exit(1)
   }
 
-  def loadConfig(config: Config): Either[CantonConfigError, CantonConfig]
-
-  private def startupConfigFileMonitoring(environment: Environment): Unit =
-    TraceContext.withNewTraceContext("config_file_monitoring") { implicit traceContext =>
-      def modificationTimestamp(): Long =
-        Config.configFiles.map(_.lastModified()).foldLeft(0L) { case (acc, item) =>
-          Math.max(acc, item)
-        }
-
-      val lastModified = new AtomicLong(modificationTimestamp())
-      def updateDeclarativeApi(): Unit = {
-        val modified = modificationTimestamp()
-        val previous = lastModified.getAndSet(modified)
-        if (modified != previous) {
-          val loaded =
-            Config.loadConfigFromFiles("Reloaded config after file change").leftMap(_.toString)
-          environment.pokeOrUpdateConfig(newConfig = Some(loaded))
-        } else {
-          environment.pokeOrUpdateConfig(newConfig = None)
-        }
-
-      }
-
-      def refresh(update: Boolean, interval: config.NonNegativeFiniteDuration): Unit = {
-        if (update) updateDeclarativeApi()
-        environment.scheduler
-          .schedule(
-            (() => refresh(update = true, interval)): Runnable,
-            interval.duration.toMillis,
-            TimeUnit.MILLISECONDS,
-          )
-          .discard
-      }
-
-      environment.config.parameters.stateRefreshInterval match {
-        case None => ()
-        case Some(interval) =>
-          logger.debug(s"Starting config file monitoring at interval=$interval")
-          refresh(update = false, interval)
-      }
-    }
-
+  def loadConfig(
+      config: com.typesafe.config.Config,
+      defaultPorts: Option[DefaultPorts],
+  ): Either[CantonConfigError, Config]
 }
 
 object CantonAppDriver {

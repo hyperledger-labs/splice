@@ -148,7 +148,7 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
 
       // Once all the plugins and config transformation is done apply the defaults
       val finalConfig =
-        configTransform(pluginConfig).withDefaults(new DefaultPorts(), edition)
+        configTransform(pluginConfig).withDefaults(Some(DefaultPorts.create()), edition)
 
       val scopedMetricsFactory = new ScopedInMemoryMetricsFactory
       val environmentFixture: E =
@@ -294,7 +294,7 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
         /* the block sequencer makes use of its own db so we don't want to create a new one here since that would
          * set a new state and lead to conflicts with the old db.
          */
-        case _: UseH2 | _: UsePostgres | _: UseReferenceBlockSequencer[?] =>
+        case _: UseH2 | _: UsePostgres | _: UseReferenceBlockSequencer[_] =>
           false // to prevent creating a new fresh db, the db is only deleted when the old environment is destroyed.
         case plugin => runPlugins(plugin)
       },

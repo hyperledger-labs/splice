@@ -6,44 +6,19 @@ package org.lfdecentralizedtrust.splice.environment
 import cats.data.EitherT
 import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.admin.api.client.commands.{
-  GrpcAdminCommand,
-  ParticipantAdminCommands,
-  PruningSchedulerCommands,
-}
-import com.digitalasset.canton.admin.api.client.data.{
-  ListConnectedSynchronizersResult,
-  NodeStatus,
-  ParticipantStatus,
-}
+import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, ParticipantAdminCommands, PruningSchedulerCommands}
+import com.digitalasset.canton.admin.api.client.data.{ListConnectedSynchronizersResult, NodeStatus, ParticipantStatus}
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.admin.participant.v30.{ExportAcsOldResponse, PruningServiceGrpc}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
-import com.digitalasset.canton.sequencing.{
-  GrpcSequencerConnection,
-  SequencerConnectionValidation,
-  SequencerConnection,
-  SequencerConnections,
-}
+import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnection, SequencerConnectionValidation, SequencerConnections}
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.transaction.{
-  HostingParticipant,
-  ParticipantPermission,
-  PartyToParticipant,
-  SignedTopologyTransaction,
-  TopologyChangeOp,
-}
-import com.digitalasset.canton.topology.{
-  NodeIdentity,
-  ParticipantId,
-  PartyId,
-  PhysicalSynchronizerId,
-  SynchronizerId,
-}
+import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission, PartyToParticipant, SignedTopologyTransaction, TopologyChangeOp}
+import com.digitalasset.canton.topology.{NodeIdentity, ParticipantId, PartyId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
@@ -51,16 +26,11 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.config.Thresholds
-import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.{
-  HasParticipantId,
-  IMPORT_ACS_WORKFLOW_ID_PREFIX,
-}
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
-  RecreateOnAuthorizedStateChange,
-  TopologyResult,
-}
+import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.{HasParticipantId, IMPORT_ACS_WORKFLOW_ID_PREFIX}
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{RecreateOnAuthorizedStateChange, TopologyResult}
 
 import java.time.Instant
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -310,6 +280,7 @@ class ParticipantAdminConnection(
     )
   }
 
+
   def downloadAcsSnapshot(
       parties: Set[PartyId],
       filterSynchronizerId: Option[SynchronizerId] = None,
@@ -319,6 +290,7 @@ class ParticipantAdminConnection(
     logger.debug(
       show"Downloading ACS snapshot from domain $filterSynchronizerId, for parties $parties at timestamp $timestamp"
     )
+    @nowarn("cat=deprecation")
     val observer = new SeqAccumulatingObserver[ExportAcsOldResponse]
     runCmd(
       ParticipantAdminCommands.ParticipantRepairManagement.ExportAcsOld(
