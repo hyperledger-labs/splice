@@ -105,12 +105,27 @@ spec:
           value: |
             canton.validator-apps.validator_backend.scan-client.type = "trust-single"
             canton.validator-apps.validator_backend.scan-client.url = ${_scan.admin-api.address}
-        {{ else -}}
+        { { - else - } }
         - name: ADDITIONAL_CONFIG_BFT_SCAN
           value: |
+            {{- $config := .Values.scanClientConfig }}
+            {{- if or $config.threshold $config.trustedSvs }}
+            canton.validator-apps.validator_backend.scan-client.type = "bft-custom"
+            canton.validator-apps.validator_backend.scan-client.seed-urls = [ ${_scan.admin-api.address} ]
+            {{- with $config.threshold }}
+            canton.validator-apps.validator_backend.scan-client.threshold = {{ . }}
+            {{- end }}
+            {{- if $config.trustedSvs }}
+            canton.validator-apps.validator_backend.scan-client.trusted-svs = [{{ range $i, $sv := $config.trustedSvs }}{{ if $i }}, {{ end }}{{ $sv | quote }}{{ end }}]
+            {{- end }}
+            {{- else }}
             canton.validator-apps.validator_backend.scan-client.type = "bft"
             canton.validator-apps.validator_backend.scan-client.seed-urls = [ ${_scan.admin-api.address} ]
-        {{ end }}
+            {{- end }}
+            {{- if not ($config.useLastKnownConnectionsForInitialization | default true) }}
+            canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = false
+            {{- end }}
+        { { end } }
         {{ if not .Values.useSequencerConnectionsFromScan }}
         - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
           value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.decentralizedSynchronizerUrl | quote }}

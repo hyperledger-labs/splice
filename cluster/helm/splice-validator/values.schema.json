@@ -9,6 +9,27 @@
       "type": "object",
       "description": "The authentication configuration for the application"
     },
+    "scanClientConfig": {
+      "type": "object",
+      "description": "Configuration parameters for the BFT scan client.",
+      "properties": {
+        "useLastKnownConnectionsForInitialization": {
+          "type": "boolean",
+          "default": true
+        },
+        "threshold": {
+          "type": ["integer", "null"],
+          "description": "Optional BFT threshold for BftCustom config."
+        },
+        "trustedSvs": {
+          "type": "array",
+          "description": "List of trusted super validator scans for BftCustom config.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "svValidator": {
       "type": "boolean",
       "description": "Whether this validator is part of an SV node"
