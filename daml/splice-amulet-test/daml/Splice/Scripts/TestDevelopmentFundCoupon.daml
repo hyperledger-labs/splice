@@ -99,21 +99,22 @@ testWithdrawalOfDevelopmentFundCoupon = do
     expiresAt = addRelTime now (days 1)
     fundManager = alice.primaryParty
     beneficiary = bob.primaryParty
+    reason = "Some reason"
 
   developmentFundCouponCid <- createDevelopmentFundCoupon app fundManager beneficiary amount expiresAt
 
   -- Unhappy - expiresAt has been reached
   setTime $ addRelTime expiresAt (minutes 1)
-  withdrawDevelopmentFundCouponMustFail fundManager developmentFundCouponCid
+  withdrawDevelopmentFundCouponMustFail fundManager reason developmentFundCouponCid
 
   setTime now
 
   -- Unhappy - invalid controller
-  withdrawDevelopmentFundCouponMustFail app.dso developmentFundCouponCid
-  withdrawDevelopmentFundCouponMustFail beneficiary developmentFundCouponCid
+  withdrawDevelopmentFundCouponMustFail app.dso reason developmentFundCouponCid
+  withdrawDevelopmentFundCouponMustFail beneficiary reason developmentFundCouponCid
 
   -- Happy
-  unclaimedDevelopmentFundCouponCid <- withdrawDevelopmentFundCoupon fundManager developmentFundCouponCid
+  unclaimedDevelopmentFundCouponCid <- withdrawDevelopmentFundCoupon fundManager reason developmentFundCouponCid
   Some unclaimedDevelopmentFundCoupon <- queryContractId app.dso unclaimedDevelopmentFundCouponCid
   unclaimedDevelopmentFundCoupon === UnclaimedDevelopmentFundCoupon with
     dso = app.dso
@@ -145,12 +146,12 @@ createDevelopmentFundCoupon app fundManager beneficiary amount expiresAt =
       amount
       expiresAt
 
-withdrawDevelopmentFundCoupon : Party -> ContractId DevelopmentFundCoupon -> Script (ContractId UnclaimedDevelopmentFundCoupon)
-withdrawDevelopmentFundCoupon fundManager developmentFundCouponCid =
+withdrawDevelopmentFundCoupon : Party -> Text -> ContractId DevelopmentFundCoupon -> Script (ContractId UnclaimedDevelopmentFundCoupon)
+withdrawDevelopmentFundCoupon fundManager reason developmentFundCouponCid =
   (.unclaimedDevelopmentFundCouponCid) <$> submit fundManager do
-    exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_Withdraw
+    exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_Withdraw with reason
 
-withdrawDevelopmentFundCouponMustFail : Party -> ContractId DevelopmentFundCoupon -> Script ()
-withdrawDevelopmentFundCouponMustFail actor developmentFundCouponCid =
+withdrawDevelopmentFundCouponMustFail : Party -> Text -> ContractId DevelopmentFundCoupon -> Script ()
+withdrawDevelopmentFundCouponMustFail actor reason developmentFundCouponCid =
   submitMustFail actor do
-    exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_Withdraw
+    exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_Withdraw with reason
