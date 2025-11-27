@@ -105,7 +105,7 @@ spec:
           value: |
             canton.validator-apps.validator_backend.scan-client.type = "trust-single"
             canton.validator-apps.validator_backend.scan-client.url = ${_scan.admin-api.address}
-        { { - else - } }
+        {{- else -}}
         - name: ADDITIONAL_CONFIG_BFT_SCAN
           value: |
             {{- $config := .Values.scanClientConfig }}
@@ -127,7 +127,7 @@ spec:
             {{- if not ($config.useLastKnownConnectionsForInitialization | default true) }}
             canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = false
             {{- end }}
-        { { end } }
+        {{ end }}
         {{ if not .Values.useSequencerConnectionsFromScan }}
         - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
           value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.decentralizedSynchronizerUrl | quote }}
