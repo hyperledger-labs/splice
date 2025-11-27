@@ -92,7 +92,7 @@ class SqlIndexInitializationTriggerStoreTest
         ),
       )
       for {
-        _ <- storage.underlying
+        _ <- rawStorage
           .update(
             sqlu"create index test_index on update_history_creates (record_time)",
             "create test index",
@@ -119,7 +119,7 @@ class SqlIndexInitializationTriggerStoreTest
       )
 
       for {
-        _ <- storage.underlying
+        _ <- rawStorage
           .update(
             sqlu"create index test_index on update_history_creates (record_time)",
             "create test index",
@@ -166,7 +166,7 @@ class SqlIndexInitializationTriggerStoreTest
       )
       for {
         _ <- Future.unit
-        _ <- storage.underlying
+        _ <- rawStorage
           .update(
             DBIOAction
               .seq(
@@ -182,7 +182,7 @@ class SqlIndexInitializationTriggerStoreTest
             "insert test data",
           )
           .failOnShutdown
-        _ <- storage.underlying
+        _ <- rawStorage
           .update(
             sqlu"""
               create or replace function slow_function(text) returns text as $$$$
@@ -195,7 +195,7 @@ class SqlIndexInitializationTriggerStoreTest
             "create slow_function",
           )
           .failOnShutdown
-        _ <- storage.underlying
+        _ <- rawStorage
           .update(
             DBIOAction
               .seq(
@@ -342,7 +342,7 @@ class SqlIndexInitializationTriggerStoreTest
   }
 
   private def listIndexNames(): Future[Seq[String]] = {
-    storage.underlying
+    rawStorage
       .query(
         sql"select indexname from pg_indexes where schemaname = 'public'".as[String],
         "listIndexes",
@@ -370,7 +370,7 @@ class SqlIndexInitializationTriggerStoreTest
   // Dumps information about all indexes in the database to the log.
   // Used during development to verify that the indexes are created correctly.
   private def dumpIndexes(): Future[Unit] = {
-    storage.underlying
+    rawStorage
       .query(
         sql"""
       select
