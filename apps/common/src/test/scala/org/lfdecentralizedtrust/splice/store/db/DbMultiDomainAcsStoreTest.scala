@@ -787,7 +787,7 @@ class DbMultiDomainAcsStoreTest
       extends AcsRowData.AcsRowDataFromContract {
     override def contractExpiresAt: Option[Timestamp] = None
 
-    override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq(
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "ans_entry_name" -> lengthLimited("'); DROP TABLE bobby_tables; --")
     )
   }

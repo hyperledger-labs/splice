@@ -267,7 +267,7 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
 
         // Submit a command that produces a contract id as a result and return that contract.
         // This can be used to get the contract for an exercise that creates a contract in the choice body.
-        def submitWithCreate[TCid <: ContractId[_], T <: javaapi.data.codegen.DamlRecord[_]](
+        def submitWithCreate[TCid <: ContractId[?], T <: javaapi.data.codegen.DamlRecord[?]](
             companion: Contract.Companion.Template[TCid, T]
         )(
             userId: String,

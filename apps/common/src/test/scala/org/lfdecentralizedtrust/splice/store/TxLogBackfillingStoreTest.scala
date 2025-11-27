@@ -505,10 +505,10 @@ class TxLogBackfillingStoreTest
       ),
     )
 
-  case class GenericAcsRowData(contract: Contract[_, _]) extends AcsRowData.AcsRowDataFromContract {
+  case class GenericAcsRowData(contract: Contract[?, ?]) extends AcsRowData.AcsRowDataFromContract {
     override def contractExpiresAt: Option[Time.Timestamp] = None
 
-    override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
   }
   object GenericAcsRowData {
     implicit val hasIndexColumns: HasIndexColumns[GenericAcsRowData] =

@@ -680,7 +680,7 @@ final case class CantonConfig(
 
 private[canton] object CantonNodeParameterConverter {
 
-  def general(parent: SharedCantonConfig[_], node: LocalNodeConfig): CantonNodeParameters.General =
+  def general(parent: SharedCantonConfig[?], node: LocalNodeConfig): CantonNodeParameters.General =
     CantonNodeParameters.General.Impl(
       tracing = parent.monitoring.tracing,
       delayLoggingThreshold = parent.monitoring.logging.delayLoggingThreshold.toInternal,
@@ -700,7 +700,7 @@ private[canton] object CantonNodeParameterConverter {
     )
 
   def protocol(
-      parent: SharedCantonConfig[_],
+      parent: SharedCantonConfig[?],
       config: ProtocolConfig,
   ): CantonNodeParameters.Protocol =
     CantonNodeParameters.Protocol.Impl(

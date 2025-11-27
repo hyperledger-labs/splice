@@ -188,7 +188,7 @@ class GrpcAdminCommandRunner(
 
 object GrpcAdminCommandRunner {
   def apply(
-      environment: Environment[_ <: SharedCantonConfig[_]],
+      environment: Environment[? <: SharedCantonConfig[?]],
       apiName: String,
   ): GrpcAdminCommandRunner =
     new GrpcAdminCommandRunner(

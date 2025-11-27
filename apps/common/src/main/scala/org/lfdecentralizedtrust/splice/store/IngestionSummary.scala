@@ -31,7 +31,7 @@ final case class IngestionSummary(
     addedUnassignEvents: Vector[(ContractId[?], ReassignmentId)],
     numFilteredUnassignEvents: Int,
     removedUnassignEvents: Vector[(ContractId[?], ReassignmentId)],
-    prunedContracts: Vector[ContractId[_]],
+    prunedContracts: Vector[ContractId[?]],
     ingestedTxLogEntries: Seq[(String3, String)],
 )
 

@@ -991,7 +991,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
 
   override protected def cleanDb(
       storage: DbStorage
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[_] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] =
     for {
       _ <- resetAllAppTables(storage)
     } yield ()

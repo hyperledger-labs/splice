@@ -103,7 +103,7 @@ trait FeatureFlagFilter extends NamedLogging {
 
   protected def consoleEnvironment: ConsoleEnvironment
 
-  protected def cantonConfig: SharedCantonConfig[_] = consoleEnvironment.environment.config
+  protected def cantonConfig: SharedCantonConfig[?] = consoleEnvironment.environment.config
 
   protected def check[T](flag: FeatureFlag)(command: => T): T =
     FeatureFlagFilter.checkEnabled(noTracingLogger)(
