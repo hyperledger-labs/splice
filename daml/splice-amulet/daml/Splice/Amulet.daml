@@ -409,7 +409,7 @@ template DevelopmentFundCoupon
       -- ^ The party that executed the assignment of the coupon to the beneficiary
       -- so they can mint from the development fund.
     amount : Decimal -- ^ The total amount of `Amulet` to mint on collection.
-    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the contract.
+    expiresAt : Time -- ^ Until when the minting can be completed.
   where
     ensure amount > 0.0
 
