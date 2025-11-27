@@ -22,14 +22,20 @@ export function readAndParseYaml(
       ...context.pathStack.slice(context.pathStack.lastIndexOf(resolvedPath)),
       resolvedPath,
     ];
-    reportError(`Cyclical dependency detected: [${cycle.join(' -> ')}].`, context);
+    reportError(`Cyclic dependency detected: [${cycle.join(' -> ')}].`, context);
   } else {
     try {
       context.pathStack.push(resolvedPath);
+      // TODO(#3231) The following breaks the config dumper from `make cluster/pulumi/test` but
+      //             according to the design we want it.
+      // console.log(`Loading configuration from [${resolvedPath}].`);
       const config = Yaml.load(readFileSync(resolvedPath, 'utf-8'), { schema: context.schema });
       context.loadedFilesByPath[resolvedPath] = config;
       return config;
     } catch (error) {
+      if (error instanceof ConfigError) {
+        throw error;
+      }
       reportError(`${error}`, context);
     } finally {
       context.pathStack.pop();
@@ -59,8 +65,10 @@ function makeIncludeTagDefinition(context: ConfigLoaderContext): Yaml.Type {
     multi: true,
     construct(data, tag) {
       const { paths } = parseIncludeTag(tag as string, context); // tag cannot be undefined here
-      const configs = paths.map(path => readAndParseYaml(path, context));
-      return mergeWith({}, ...configs, data, mergeStrategy);
+      const configs = paths.map(path => ({ value: readAndParseYaml(path, context) }));
+      // All of the merged configs are wrapped in { value: } because the mergeStrategy does not
+      // apply to the actual arguments of mergeWith, only nested properties.
+      return mergeWith({}, ...configs, { value: data }, mergeStrategy).value;
     },
   });
 }
@@ -77,6 +85,10 @@ type ParsedIncludeTag = {
 };
 
 function mergeStrategy(included: unknown, overrides: unknown): unknown {
+  // includes without overrides get included unchanged
+  if (overrides === null) {
+    return included;
+  }
   if (
     Array.isArray(included) &&
     Array.isArray(overrides) &&
@@ -85,23 +97,33 @@ function mergeStrategy(included: unknown, overrides: unknown): unknown {
   ) {
     return [...included, ...overrides];
   }
-  return undefined; // apply default mergeStrategy
+  // do not merge sequences index-wise
+  if (Array.isArray(included) || Array.isArray(overrides)) {
+    return overrides;
+  }
+  return undefined; // apply default merge strategy
 }
 
 const appendTagDefinition = new Yaml.Type('!append', {
   kind: 'sequence',
   construct(data) {
-    data._append = true;
+    Object.defineProperty(data, '_append', { enumerable: false, value: true });
     return data;
   },
 });
 
 function reportError(message: string, context: ConfigLoaderContext): never {
   const currentPath = context.pathStack[context.pathStack.length - 1];
-  throw new Error(`Config loading failed while loading [${currentPath}]. ${message}`);
+  throw new ConfigError(currentPath, message);
 }
 
-function loadClusterYamlConfig(): unknown {
+class ConfigError extends Error {
+  constructor(path: string, message: string) {
+    super(`Config loading failed while loading [${path}]. ${message}`);
+  }
+}
+
+export function loadClusterYamlConfig(): unknown {
   const baseConfig = readAndParseYaml(
     `${spliceEnvConfig.context.splicePath}/cluster/deployment/config.yaml`
   );
@@ -115,11 +137,4 @@ function loadClusterYamlConfig(): unknown {
     `${spliceEnvConfig.context.clusterPath()}/config.yaml`
   );
   return merge({}, baseConfig, commonOverridesConfig, clusterOverridesConfig);
-}
-
-export const clusterYamlConfig: unknown = loadClusterYamlConfig();
-
-export function clusterSubConfig(key: string): unknown {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (clusterYamlConfig as any)[key] || {};
 }

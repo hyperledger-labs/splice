@@ -30,13 +30,18 @@
     "format:check": "prettier --check -- src",
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
     "lint:check": "eslint --max-warnings=0 -- src",
-    "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts"
+    "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts",
+    "test": "jest"
   },
   "devDependencies": {
+    "@jest/globals": "^30.2.0",
     "@types/js-yaml": "^4.0.5",
     "@types/lodash": "^4.14.189",
     "@types/sinon": "^10.0.15",
     "@types/ws": "^8.18.1",
+    "dedent": "^1.7.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.5",
     "sinon": "^15.0.4"
   }
 }

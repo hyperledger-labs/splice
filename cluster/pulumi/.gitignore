@@ -3,3 +3,4 @@ install
 # IJ typescript language server
 bin
 **/*.js
+!**/jest.config.js
