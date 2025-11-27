@@ -123,7 +123,7 @@ spec:
             {{- else }}
             canton.validator-apps.validator_backend.scan-client.type = "bft"
             canton.validator-apps.validator_backend.scan-client.seed-urls = [ ${_scan.admin-api.address} ]
-            {{- end }}
+            {{ end }}
             {{- if not ($config.useLastKnownConnectionsForInitialization | default true) }}
             canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = false
             {{- end }}
