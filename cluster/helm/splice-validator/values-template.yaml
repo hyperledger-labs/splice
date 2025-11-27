@@ -7,8 +7,8 @@ fixedTokens: false
 
 # Custom annotations and labels for deployed resources
 pod:
-  annotations: { }
-  labels: { }
+  annotations: {}
+  labels: {}
 
 defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.numThreads=8 -XX:ActiveProcessorCount=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data -Dpekko.http.server.idle-timeout=20m -Dpekko.http.client.idle-timeout=20m
 resources:
