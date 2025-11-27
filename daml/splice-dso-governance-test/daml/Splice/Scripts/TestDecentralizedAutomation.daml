@@ -104,10 +104,10 @@ testDevelopmentFundCouponExpiry = do
     -- 5% Development Fund
     amuletConfig =
       defaultAmuletConfig with
+        optDevelopmentFundManager = Some fundManager
         issuanceCurve = defaultAmuletConfig.issuanceCurve with
           initialValue = defaultAmuletConfig.issuanceCurve.initialValue with
             optDevelopmentFundPercentage = Some 0.05
-            optDevelopmentFundManager = Some fundManager
   (app, _, (sv1, _, _, _)) <- initDevNetWithAmuletConfig amuletConfig
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
 

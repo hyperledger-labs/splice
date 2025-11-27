@@ -768,8 +768,6 @@ testAmuletRulesConfigChange = do
         validatorRewardPercentage = 0.05
         appRewardPercentage = 0.15
         optDevelopmentFundPercentage = Some 0.05
-        optDevelopmentFundManager = Some fundManager
-
 
   let defaultIssuanceCurve2 = Schedule with
         initialValue = issuanceConfig_0p5_1p5_2
@@ -782,6 +780,7 @@ testAmuletRulesConfigChange = do
         transferConfig = defaultTransferConfig2
         issuanceCurve = defaultIssuanceCurve2
         tickDuration = seconds 200
+        optDevelopmentFundManager = Some fundManager
 
   -- second config that changes the other half of the parameters
   let newConfig2 = amuletRules.configSchedule.initialValue with

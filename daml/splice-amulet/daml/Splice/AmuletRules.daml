@@ -634,7 +634,7 @@ template AmuletRules
 
         -- Verify fundManager
         configUsd <- getValueAsOfLedgerTime configSchedule
-        case configUsd.issuanceCurve.initialValue.optDevelopmentFundManager of
+        case configUsd.optDevelopmentFundManager of
           None -> abort "DevelopmentFundCoupon cannot be allocated without a Development Fund manager configured"
           Some developmentFundManager ->
             require ("controller is the configured Development Fund manager: " <> show developmentFundManager) $
