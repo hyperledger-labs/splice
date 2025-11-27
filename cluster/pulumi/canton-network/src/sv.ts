@@ -43,6 +43,7 @@ import {
   approvedSvIdentities,
   CantonBftSynchronizerNode,
   CometbftSynchronizerNode,
+  configForSv,
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
   installSvLoopback,
@@ -53,6 +54,7 @@ import { installValidatorApp } from '@lfdecentralizedtrust/splice-pulumi-common-
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { initialAmuletPrice } from '@lfdecentralizedtrust/splice-pulumi-common/src/initialAmuletPrice';
 import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
+import { topologySnapshotConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/topology-snapshot';
 import { Resource } from '@pulumi/pulumi';
 
 import {
@@ -143,6 +145,15 @@ export async function installSvNode(
             `${CLUSTER_BASENAME}/${xns.logicalName}`,
         },
       }
+    : undefined;
+
+  const svConfig = configForSv(baseConfig.nodeName);
+  const periodicTopologySnapshotConfig: BackupConfig | undefined = svConfig.periodicSnapshots
+    ?.topology
+    ? await topologySnapshotConfig(
+        svConfig.periodicSnapshots?.topology,
+        `${CLUSTER_BASENAME}/${xns.logicalName}`
+      )
     : undefined;
 
   const identitiesBackupLocation = {
@@ -240,7 +251,7 @@ export async function installSvNode(
 
   const svApp = installSvApp(
     decentralizedSynchronizerUpgradeConfig,
-    config,
+    { ...config, periodicTopologySnapshotConfig },
     xns,
     dependsOn,
     appsPostgres,
@@ -515,6 +526,7 @@ function installSvApp(
     logAsyncFlush: config.logging?.appsAsync,
     additionalEnvVars,
     resources: config.svApp?.resources,
+    periodicTopologySnapshotConfig: config.periodicTopologySnapshotConfig,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
