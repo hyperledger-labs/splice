@@ -405,7 +405,9 @@ template DevelopmentFundCoupon
   with
     dso : Party
     beneficiary : Party -- ^ The owner of the `Amulet` to be minted.
-    fundManager : Party -- ^ The party authorized to manage and allocate minting rights from the Development Fund.
+    fundManager : Party 
+      -- ^ The party that executed the assignment of the coupon to the beneficiary
+      -- so they can mint from the development fund.
     amount : Decimal -- ^ The total amount of `Amulet` to mint on collection.
     expiresAt : Time -- ^ Selected timestamp defining the lifetime of the contract.
   where
