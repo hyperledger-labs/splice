@@ -108,6 +108,9 @@ spec:
         {{- else -}}
         - name: ADDITIONAL_CONFIG_BFT_SCAN
           value: |
+            {{- if not ($config.useLastKnownConnectionsForInitialization | default true) }}
+            canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = false
+            {{- end }}
             {{- $config := .Values.scanClientConfig }}
             {{- $hasThreshold := $config.threshold }}
             {{- $hasTrustedSvs := $config.trustedSvs }}
@@ -123,9 +126,6 @@ spec:
             {{- else }}
             canton.validator-apps.validator_backend.scan-client.type = "bft"
             canton.validator-apps.validator_backend.scan-client.seed-urls = [ ${_scan.admin-api.address} ]
-            {{ end }}
-            {{- if not ($config.useLastKnownConnectionsForInitialization | default true) }}
-            canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = false
             {{- end }}
         {{ end }}
         {{ if not .Values.useSequencerConnectionsFromScan }}
