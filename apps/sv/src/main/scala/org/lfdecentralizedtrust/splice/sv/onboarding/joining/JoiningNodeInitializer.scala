@@ -8,7 +8,6 @@ import cats.data.OptionT
 import cats.syntax.apply.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
-import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -28,7 +27,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import org.lfdecentralizedtrust.splice.config.{
@@ -74,8 +72,8 @@ import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
-  PackageVetting,
   SynchronizerMigrationUtil,
+  PackageVetting,
   TemplateJsonDecoder,
 }
 
@@ -108,8 +106,6 @@ class JoiningNodeInitializer(
     mat: Materializer,
     tc: TraceContext,
     tracer: Tracer,
-    esf: ExecutionSequencerFactory,
-    actorSystem: ActorSystem,
 ) extends NodeInitializerUtil {
 
   private lazy val svConnection = OptionT(joiningConfig.traverse { conf =>

@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.util
 
-import org.lfdecentralizedtrust.splice.config.{BucketName, GcpBucketConfig}
+import org.lfdecentralizedtrust.splice.config.GcpBucketConfig
 import org.lfdecentralizedtrust.splice.identities.{NodeIdentitiesDump, NodeIdentitiesStore}
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
 import com.digitalasset.canton.topology.ParticipantId
@@ -15,9 +15,8 @@ trait DataExportTestUtil extends TestCommon {
       namespace: String,
       getFileName: Instant => Path,
       decode: String => Either[String, A],
-      bucketName: BucketName,
   ) = {
-    val bucket = new GcpBucket(GcpBucketConfig.inferForCluster(bucketName), loggerFactory)
+    val bucket = new GcpBucket(GcpBucketConfig.inferForCluster, loggerFactory)
     import java.time.Instant
     import java.time.temporal.ChronoUnit
     val cluster = sys.env("GCP_CLUSTER_BASENAME")
@@ -34,11 +33,10 @@ trait DataExportTestUtil extends TestCommon {
     }
   }
 
-  def testRecentParticipantIdentitiesDump(namespace: String, bucketName: BucketName) =
+  def testRecentParticipantIdentitiesDump(namespace: String) =
     testRecentDump(
       namespace,
       NodeIdentitiesStore.dumpFilename(_),
       NodeIdentitiesDump.fromJsonString(ParticipantId.tryFromProtoPrimitive, _),
-      bucketName,
     )
 }

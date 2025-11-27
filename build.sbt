@@ -942,7 +942,6 @@ lazy val `apps-common` =
         spray_json,
         pekko_spray_json,
         Dependencies.parallel_collections,
-        pekko_connectors_google_cloud_storage,
       ),
       BuildCommon.sharedAppSettings,
       buildInfoKeys := Seq[BuildInfoKey](

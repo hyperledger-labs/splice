@@ -1,12 +1,11 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
-import org.lfdecentralizedtrust.splice.config.IdentityDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.util.DataExportTestUtil
-import org.lfdecentralizedtrust.splice.util.FrontendLoginUtil
 
+import org.lfdecentralizedtrust.splice.util.FrontendLoginUtil
 import scala.util.Try
 
 abstract class SvNonDevNetPreflightIntegrationTestBase
@@ -114,7 +113,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
   }
 
   "Check that there is a recent participant identities backup on GCP" in { _ =>
-    testRecentParticipantIdentitiesDump(svNamespace, IdentityDump)
+    testRecentParticipantIdentitiesDump(svNamespace)
   }
 }
 
