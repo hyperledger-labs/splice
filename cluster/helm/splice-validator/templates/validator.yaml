@@ -109,7 +109,7 @@ spec:
         - name: ADDITIONAL_CONFIG_BFT_SCAN
           value: |
             {{- $config := .Values.scanClientConfig }}
-            {{- if not ($config.useLastKnownConnectionsForInitialization | default true) }}
+            {{- if eq ($config.useLastKnownConnectionsForInitialization | default true) false }}
             canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = false
             {{- end }}
             {{- $hasThreshold := $config.threshold }}
