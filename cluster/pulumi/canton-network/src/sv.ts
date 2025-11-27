@@ -388,6 +388,7 @@ async function installValidator(
     sweep: svConfig.sweep,
     nodeIdentifier: svConfig.onboardingName,
     logLevel: svConfig.logging?.appsLogLevel,
+    logAsync: svConfig.logging?.appsAsync,
     additionalEnvVars: [
       ...(bftSequencerConnection
         ? []
@@ -522,6 +523,7 @@ function installSvApp(
       delegatelessAutomationExpiredRewardCouponBatchSize,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: config.logging?.appsLogLevel,
+    logAsyncFlush: config.logging?.appsAsync,
     additionalEnvVars,
     resources: config.svApp?.resources,
     periodicTopologySnapshotConfig: config.periodicTopologySnapshotConfig,
@@ -594,6 +596,7 @@ function installScan(
       : {}),
     enablePostgresMetrics: true,
     logLevel: config.logging?.appsLogLevel,
+    logAsyncFlush: config.logging?.appsAsync,
     additionalEnvVars: config.scanApp?.additionalEnvVars || [],
     resources: config.scanApp?.resources,
   };

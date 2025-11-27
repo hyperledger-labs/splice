@@ -30,7 +30,7 @@ For a more comprehensive overview, please refer to the :ref:`documentation for S
 6. All SVs and validators previously using the now-paused global synchronizer create full backups of their nodes. (Both for disaster recovery and for supporting audit requirements). See :ref:`validator-backups`.
 7. Validators wait until the SVs signal that the migration has been successful.
 8. All validators upgrade theirs deployments. See :ref:`validator-upgrades-deploying`.
-9. Upon (re-)initialization, the validator backend automatically consumes the migration dump and initializes the validator participant based on the contents of this dump. App databases are :ref:`preserved <validator-upgrades-state>`.
+9. Upon (re-)initialization, the validator backend automatically consumes the migration dump and initializes the new validator participant based on the contents of this dump. App databases are :ref:`preserved <validator-upgrades-state>`.
 
 .. note::
   This process creates a new synchronizer instance. Because
@@ -44,7 +44,6 @@ For a more comprehensive overview, please refer to the :ref:`documentation for S
   remaining traffic balance lost due to a synchronizer upgrade with downtime is
   well acceptable and easily amortized across the activity of the validator node
   on the old synchronizer instance.
-
 
 Technical Details
 -----------------
@@ -62,17 +61,36 @@ Synchronizer upgrades with downtime effectively clone the state of the existing 
   This is realized through exporting and importing a :ref:`migration dump <validator-upgrades-dumps>`.
 - Active ledger state is preserved.
   This is realized through exporting and importing a :ref:`migration dump <validator-upgrades-dumps>`.
-- Historical app state in the validator app (such as transaction history) is preserved. Note however, that the transaction history exposed by the participant is not preserved and the participant will only serve history going forward.
+- Historical app state in the validator app (such as transaction history) is preserved.
   This is realized through persisting and reusing the (PostgreSQL) database of the validator app.
+  The transaction history exposed by *the participant*, however, is *not* preserved and the participant will only serve history going forward.
+  See also :ref:`validator-upgrades-apps`.
 
 For avoiding conflicts across migrations, we use the concept of a migration ID:
 
 - The migration ID is 0 during the initial bootstrapping of a network and incremented after each synchronizer upgrade with downtime.
 - The validator app is aware of the migration ID and uses it for ensuring the consistency of its internal stores and avoiding connections to nodes on the "wrong" synchronizer.
 - The validator Canton participant is **not** directly aware of the migration ID.
-  As part of :ref:`validator-upgrades-deploying`, the validator app will initialize a fresh participant
-  (a fresh participant needs to be deployed to upgrade across non-backwards-compatible changes to the Canton software)
-  based on the migration ID configured in the validator app.
+  As part of :ref:`validator-upgrades-deploying`, you will configure the participant to use a fresh (empty) database.
+  The validator app will initialize the participant from a clean slate based on the migration ID configured in the validator app.
+  A fresh participant is needed in order to upgrade across non-backwards-compatible changes to the Canton software.
+
+.. _validator-upgrades-apps:
+
+Implications for Apps and Integrations
+++++++++++++++++++++++++++++++++++++++
+
+This guide focuses on the steps necessary for upgrading the validator node itself.
+Additional considerations may apply for ensuring that custom applications and integrations remain functional and consistent across major upgrades.
+As a consequence of :ref:`validator-upgrades-state`, additional considerations may include the following:
+
+- A major upgrade only preserves the active contracts but not the update history inside the participant.
+  In particular, you will not be able to get transactions from before the major upgrade on the update service on the Ledger API of the newly deployed validator node.
+- Participant offsets on the upgraded validator node start from ``0`` again.
+- The update history will include special import transactions for the contracts imported from the old synchronizer. They all have record time ``0001-01-01T00:00:00.000000Z``, and represent the creation of the imported contracts.
+
+For a representative example runbook covering the migration of a specific integration use-case,
+see the `Rolling out Major Splice Upgrades <https://docs.digitalasset.com/integrate/devnet/exchange-integration/node-operations.html#rolling-out-major-splice-upgrades>`_ section of the Digital Asset `Exchange Integration Guide <https://docs.digitalasset.com/integrate/devnet/exchange-integration/>`_.
 
 .. _validator-upgrades-dumps:
 
@@ -127,13 +145,29 @@ substituting the migration ID (``MIGRATION_ID``) with the target migration ID af
 While doing so, please note the following:
 
 * Please make sure to pick the correct (incremented) ``MIGRATION_ID`` when following the steps.
+  Notably, by consistently following through on updating the ``MIGRATION_ID``,
+  you should (re-)deploy your participant so that is uses a fresh (empty) database.
+  (In case your database setup requires you to create databases manually,
+  for example because you want to limit the permissions of the database user used by the participant deployment,
+  please ensure that you have created the new database as per the updated ``.persistence.databaseName`` value on the participant chart.)
 * Please modify the file ``splice-node/examples/sv-helm/standalone-validator-values.yaml`` so that ``migration.migrating`` is set to ``true``.
   This will ensure that the validator app will consume the migration dump and initialize the participant based on the contents of this dump.
 * You do not need to redeploy the ``postgres`` release.
   The updated Canton participant will use a new database on the PostgreSQL instance,
   whereas the validator app will reuse the existing state (see :ref:`validator-upgrades-state`).
-* Use ``helm upgrade`` in place of ``helm install`` for the ``participant`` and ``validator`` charts.
+* Use ``helm upgrade`` in place of ``helm install`` for the ``validator`` chart.
 * Please make sure that Helm chart deployments are upgraded to the expected Helm chart version; during an actual upgrade this version will be different from the one on your existing deployment.
+
+See :ref:`validator_health` for pointers on determining the status of your validator after the migration.
+In case of issues, check your logs for warnings and errors and consult :ref:`validator-migration-troubleshooting` below.
+
+Once you have confirmed that the migration has been successful:
+
+* Change the ``migration.migrating`` value on the ``validator`` chart back to ``false``
+  (**keep** the incremented ``MIGRATION_ID``!) and perform another ``helm upgrade``.
+* The old participant database (usually ``participant_<OLD_MIGRATION_ID>``) is no longer used and can be pruned.
+  We recommend retaining it (or a current backup thereof) for at least another week after the migration,
+  in case the synchronizer migration needs to be rolled back due to an unexpected major issue.
 
 Deploying the validator App and Participant (Docker-Compose)
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -151,17 +185,46 @@ Once you confirmed that your validator is caught up, as explained above, confirm
 If the migration dump has been created, proceed with the following steps:
 
 * Stop the validator, using ``./stop.sh``.
+* In case of an actual version upgrade (not just a test migration), upgrade your validator to the target version by updating the bundle and adjusting the ``IMAGE_TAG`` as you would during a :ref:`minor upgrade <validator-upgrades>`.
 * Restart the validator, while updating the migration ID in the ``-m <migration ID>`` argument,
-  and also including ``-M`` to instruct the validator to perform the actual migration
-  to the new migration ID. Note that ``-M`` is required only in the first startup after the migration,
-  to instruct the validator to perform the actual migration. Followup restarts should keep the
-  ``-m <migration ID>``, but omit the ``-M``.
+  and also including ``-M`` to instruct the validator to perform the actual migration to the new migration ID.
 
+See :ref:`validator_health` for pointers on determining the status of your validator after the migration.
+In case of issues, check your logs for warnings and errors and consult :ref:`validator-migration-troubleshooting` below.
+
+Once you have confirmed that the migration has been successful:
+
+* Restart the validator app once more, keeping the ``-m <migration ID>`` but omitting the ``-M``.
+  The ``-M`` is required only for the first startup after the migration, to instruct the validator to perform the actual migration.
+* The old participant database (``participant=-<OLD_MIGRATION_ID>``) is no longer used and can be pruned.
+  We recommend retaining it (or a current backup thereof) for at least another week after the migration,
+  in case the synchronizer migration needs to be rolled back due to an unexpected major issue.
+
+.. _validator-migration-troubleshooting:
+
+Troubleshooting
+---------------
+
+Common errors
++++++++++++++
+
+If any of the steps above fail, double check the following:
+
+- The expected versions were deployed, both *before* the migration and *after* the migration.
+- In case that you don't see the ``Wrote domain migration dump`` message in the logs of the validator app despite confirming that your are on the expected version before the migration,
+  your validator might already have taken a dump at an earlier time.
+  You can inspect the contents of the ``domain-migration-validator-pvc`` PVC (Helm) or ``domain-upgrade-dump`` volume (compose).
+  In case a ``domain_migration_dump.json`` exists there and you are unsure about the circumstances of its creation,
+  it is recommended to remove it and restart the validator app (on the older version and migration ID) to trigger the creation of a fresh dump.
+- The Canton participant (re-)deployed as part of the upgrade uses a fresh (empty) database.
+  By correctly setting the migration ID while following the deployment steps above, this should be the case.
+- The correct (incremented) ``MIGRATION_ID`` has been set *after* the upgrade.
+- If you get an error like ``Migration ID was incremented (to 1) but no migration dump for restoring from was specified.`` you are missing the ``migrating: true`` flag (for Helm) or ``-M`` argument (for Docker compose).
 
 .. _validator-upgrade-failure-cleanup:
 
-Cleanup in the event of failure
--------------------------------
+Cleaning up the validator app database in the event of a failed upgrade
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 In rare occasions, where the upgrade is not successful but the validator app manages to start ingesting from the new migration id,
 the app's database might contain data of the failed migration id that should be removed.

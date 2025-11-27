@@ -163,4 +163,7 @@ DB_CONNECTION_LOST.*Database health check failed to establish a valid connection
 # TODO(#3069): Byproduct of mediator pruning; double-check this is expected (and unavoidable)
 Dynamic synchronizer parameters to compute earliest available pruning timestamp not found
 
+# TODO(#3193): Likely a race in the shutdown of the actor system vs us scheduling something else on it
+java.lang.IllegalStateException: cannot enqueue after timer shutdown
+
 # Make sure to have a trailing newline

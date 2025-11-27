@@ -68,6 +68,8 @@ monitoring:
         participantRetentionDays: 30
         sequencerRetentionDays: 30
         mediatorRetentionDays: 30
+      ingestion:
+        thresholdEntriesPerBatch: 80
       delegatelessContention:
         thresholdPerNamespace: 0.05
       trafficWaste:
@@ -142,7 +144,9 @@ svs:
   default:
     logging:
       appsLogLevel: DEBUG
+      appsAsync: false
       cantonLogLevel: DEBUG
+      cantonAsync: false
       cometbftLogLevel: debug
     participant:
       bftSequencerConnection: true

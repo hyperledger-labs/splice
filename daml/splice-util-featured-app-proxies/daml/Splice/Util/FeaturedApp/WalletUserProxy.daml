@@ -114,7 +114,7 @@ template WalletUserProxy with
       do
         exerciseProxyChoice this cid proxyArg $ \cid -> do
           instr <- fetch cid
-          pure (view instr).transfer.receiver
+          pure (view instr).transfer.sender
 
     nonconsuming choice WalletUserProxy_AllocationFactory_Allocate
       : ProxyResult AllocationInstructionResult

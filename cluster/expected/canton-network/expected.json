@@ -1567,6 +1567,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": true,
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
@@ -1761,6 +1762,7 @@
           "readVsWriteScalingFactor": 4
         },
         "isDevNet": false,
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -1883,6 +1885,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -2445,6 +2448,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": false,
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
@@ -2614,6 +2618,7 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -2722,6 +2727,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "maxVettingDelay": "1m",
         "metrics": {

@@ -21,7 +21,6 @@ import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
 
 import java.nio.file.Path
-import scala.concurrent.duration.DurationInt
 
 case class AppInstance(
     serviceUser: String,
@@ -194,14 +193,7 @@ case class ValidatorAppBackendConfig(
       NonNegativeFiniteDuration.ofSeconds(10),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[ValidatorCantonIdentifierConfig] = None,
-    // Participant pruning is enabled by default for all validators and SVs
-    participantPruningSchedule: Option[PruningConfig] = Some(
-      PruningConfig(
-        cron = "0 /10 * * * ?", // Runs every 10 minutes
-        maxDuration = PositiveDurationSeconds.tryFromDuration(5.minutes),
-        retention = PositiveDurationSeconds.tryFromDuration(30.days),
-      )
-    ),
+    participantPruningSchedule: Option[PruningConfig] = None,
     deduplicationDuration: PositiveDurationSeconds = PositiveDurationSeconds.ofHours(24),
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,

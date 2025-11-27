@@ -154,6 +154,81 @@ test_two_step_featured_app_markers = do
   WalletClient.checkBalanceApprox alice registry.instrumentId 990.0
   WalletClient.checkBalance bob registry.instrumentId 10.0
 
+test_transfer_withdraw_and_reject : Script ()
+test_transfer_withdraw_and_reject = do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+
+  -- Setup a wallet provider that will host alice
+  aliceProvider <- setupWalletProvider registry "aliceWalletProvider" None
+  bobProvider <- setupWalletProvider registry "bobWalletProvider" None
+
+  alice <- allocatePartyExact "alice"
+  bob <- allocatePartyExact "bob"
+
+  -- setup alice with 1000 Amulet tokens
+  AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
+
+  let mkTransferOffer = do
+        aliceHoldings <- WalletClient.listHoldingCids alice registry.instrumentId
+        transfer <- mkImmediateTransfer registry alice bob 20.0 aliceHoldings
+
+        -- alice's wallet frontend also gets the WalletProviderData from the wallet provider's backend
+        -- and creates a transaction that creates featured app activity markers for both alice and the wallet provider
+        _ <- submitWithDisclosures' alice (aliceProvider.extraDisclosuresForProxy <> transfer.disclosures) $ exerciseCmd
+          (aliceProvider.proxyCid)
+          WalletUserProxy_TransferFactory_Transfer with
+            cid = transfer.value.factoryCid
+            proxyArg = ProxyArg with
+              user = alice
+              choiceArg = transfer.value.choiceArg
+              featuredAppRightCid = aliceProvider.featuredAppRightCid
+
+        [(bobInstrCid,_)] <- WalletClient.listTransferOffers bob registry.instrumentId
+        pure bobInstrCid
+
+  -- test withdraw by sender
+  offerCid <- mkTransferOffer
+  context <- RegistryApi.getTransferInstruction_RejectContext registry offerCid emptyMetadata
+
+  -- submit via proxy to create featured app markers
+  result0 <- submitWithDisclosures' alice (aliceProvider.extraDisclosuresForProxy <> context.disclosures) $ exerciseCmd
+    (aliceProvider.proxyCid)
+    WalletUserProxy_TransferInstruction_Withdraw with
+      cid = offerCid
+      proxyArg = ProxyArg with
+        user = alice
+        choiceArg = TransferInstruction_Withdraw with
+          extraArgs = ExtraArgs with
+            context = context.choiceContext
+            meta = emptyMetadata
+        featuredAppRightCid = aliceProvider.featuredAppRightCid
+
+  let result = result0.choiceResult
+  TransferInstructionResult_Failed <- pure result.output
+
+  -- test rejection by receiver
+  offerCid <- mkTransferOffer
+  context <- RegistryApi.getTransferInstruction_RejectContext registry offerCid emptyMetadata
+
+  -- submit via proxy to create featured app markers
+  result0 <- submitWithDisclosures' bob (bobProvider.extraDisclosuresForProxy <> context.disclosures) $ exerciseCmd
+    (bobProvider.proxyCid)
+    WalletUserProxy_TransferInstruction_Reject with
+      cid = offerCid
+      proxyArg = ProxyArg with
+        user = bob
+        choiceArg = TransferInstruction_Reject with
+          extraArgs = ExtraArgs with
+            context = context.choiceContext
+            meta = emptyMetadata
+        featuredAppRightCid = bobProvider.featuredAppRightCid
+
+  let result = result0.choiceResult
+  TransferInstructionResult_Failed <- pure result.output
+
+  pure ()
+
 
 -- Testing batch transfer via wallet proxy
 --------------------------------------------

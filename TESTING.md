@@ -97,6 +97,8 @@ It can be stopped via `./stop-canton.sh`.
 There are 3 tmux windows open in the tmux session for Canton in wallclock time, Canton in simtime and
 toxyproxy. You can switch between those with `Ctrl-b w`.
 
+We recommend including a mode flag (`-w` for wallclock tests or `-s` for simtime tests); running `./start-canton.sh` without one will double what is needed. In that case, you will end up with 2 tmux windows.
+
 You should only need to restart it if you change
 `apps/app/src/test/resources/simple-topology-canton.conf`. If you
 encounter an error like the following, there might have been a problem
@@ -133,9 +135,8 @@ You can do so as follows:
 
 Frontend integration tests are either run with _sbt_ against local canton and Splice instances from the repository root directory using:
 - `./start-canton.sh` to start canton,
-- `./scripts/start-backends-for-local-frontend-testing.sh` to start the Splice backends,
 - `./start-frontends.sh` to start the UIs,
-- `sbt testOnly *FrontendIntegrationTest*` to run all Frontend tests, or a more specific selection to run
+- `sbt apps-app/testOnly *FrontendIntegrationTest*` to run all Frontend tests, or a more specific selection to run
   only specific tests (see [SBT commands](DEVELOPMENT.md#sbt-commands)).
 - When done, run `./stop-canton.sh` and `./stop-frontends.sh`.
 
@@ -218,6 +219,8 @@ You can also run them from `sbt` as explained in the section on `sbt` below.
 The logs from test executions are output to `/log/canton_network_test.clog`.
 Use `lnav` to view these logs for debugging failing test cases.
 No installation of `lnav` is required, as it is provided by default by our `direnv`.
+
+If you run integration tests using sbt, we recommend running them within `apps-app`, as this speeds up test execution. For example: `apps-app/testOnly org.lfdecentralizedtrust.splice.integration.tests.AnsIntegrationTest`.
 
 Documentation about common pitfalls when writing new integration tests and debugging existing ones can be found [here](/apps/app/src/test/scala/org/lfdecentralizedtrust/splice/integration/tests/README.md).
 If you wish to extend our testing topology please also consult [this README](/apps/app/src/test/resources/README.md) about name and port allocation.

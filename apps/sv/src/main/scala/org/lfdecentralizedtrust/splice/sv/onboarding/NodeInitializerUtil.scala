@@ -7,7 +7,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.admin.api.client.data.SequencerAdminStatus.implicitPrettyString
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -51,7 +51,7 @@ import scala.jdk.CollectionConverters.*
 trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNodeConfigClient {
 
   protected val config: SvAppBackendConfig
-  protected val storage: Storage
+  protected val storage: DbStorage
   protected val retryProvider: RetryProvider
   protected val clock: Clock
   protected val domainTimeSync: DomainTimeSynchronization

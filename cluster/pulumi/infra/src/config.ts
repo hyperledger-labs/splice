@@ -27,6 +27,9 @@ const MonitoringConfigSchema = z.object({
         sequencerRetentionDays: z.number(),
         mediatorRetentionDays: z.number(),
       }),
+      ingestion: z.object({
+        thresholdEntriesPerBatch: z.number(),
+      }),
       delegatelessContention: z.object({
         thresholdPerNamespace: z.number(),
       }),

@@ -793,10 +793,15 @@ function createGrafanaAlerting(namespace: Input<string>) {
               )
               .replaceAll('$ENABLE_COMETBFT_PRUNING', (!ENABLE_COMETBFT_PRUNING).toString())
               .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
-            'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml').replaceAll(
-              '$CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE',
-              monitoringConfig.alerting.alerts.delegatelessContention.thresholdPerNamespace.toString()
-            ),
+            'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml')
+              .replaceAll(
+                '$CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE',
+                monitoringConfig.alerting.alerts.delegatelessContention.thresholdPerNamespace.toString()
+              )
+              .replaceAll(
+                '$INGESTION_ENTRIES_PER_BATCH_THRESHOLD',
+                monitoringConfig.alerting.alerts.ingestion.thresholdEntriesPerBatch.toString()
+              ),
             'sv-status-report_alerts.yaml': readAndSetAlertRulesGrafanaAlertingFile(
               'sv-status-report_alerts.yaml',
               [

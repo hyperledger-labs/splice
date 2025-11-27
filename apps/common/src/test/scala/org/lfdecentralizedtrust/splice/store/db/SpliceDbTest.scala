@@ -91,7 +91,8 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
                 acs_snapshot_data,
                 acs_snapshot,
                 scan_verdict_store,
-                scan_verdict_transaction_view_store
+                scan_verdict_transaction_view_store,
+                validator_internal_config
             RESTART IDENTITY CASCADE""".asUpdate
           _ <- debugPrintPgActivity()
         } yield (),

@@ -58,7 +58,6 @@ def bootstrapDomainWithUnsignedKeys(
   val mediatorsToSequencers = Seq(mediator).map(_ -> (Seq(sequencer), PositiveInt.one)).toMap
   val synchronizerThreshold = PositiveInt.one
   val staticSynchronizerParameters = staticParameters(sequencer)
-  val mediatorRequestAmplification = SubmissionRequestAmplification.NoAmplification
 
   // second synchronizer method
   val sequencers =
@@ -152,7 +151,11 @@ def bootstrapDomainWithUnsignedKeys(
             .map(s => s.sequencerConnection.withAlias(SequencerAlias.tryCreate(s.name))),
           threshold,
           NonNegativeInt.zero,
-          mediatorRequestAmplification,
+          // This should match the SV app defaults so that the SV app does not try to change the connection.
+          SubmissionRequestAmplification(
+            PositiveInt.tryCreate(5),
+            NonNegativeFiniteDuration.ofSeconds(10),
+          ),
           SequencerConnectionPoolDelays.default
         ),
         // if we run bootstrap ourselves, we should have been able to reach the nodes
