@@ -1343,11 +1343,8 @@ template DsoRules with
       controller sv
       do
         _ <- getAndValidateSvParty this (Some sv)
-        developmentFundCoupon <- fetchAndArchive (ForDso with dso) developmentFundCouponCid
-        assertDeadlineExceeded "DevelopmentFundCoupon.expiresAt" developmentFundCoupon.expiresAt
-        unclaimedDevelopmentFundCouponCid <- create UnclaimedDevelopmentFundCoupon with
-          dso
-          amount = developmentFundCoupon.amount
+        DevelopmentFundCoupon_DsoExpireResult unclaimedDevelopmentFundCouponCid <-
+          exercise developmentFundCouponCid DevelopmentFundCoupon_DsoExpire
         pure $ DsoRules_ExpireDevelopmentFundCouponResult with unclaimedDevelopmentFundCouponCid
 
     nonconsuming choice DsoRules_MiningRound_Close : DsoRules_MiningRound_CloseResult
