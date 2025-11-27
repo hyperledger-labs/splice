@@ -18,10 +18,14 @@ $(dir)/clean:
 $(dir)/format: $(dir)/.build
 	cd $(@D) && npm run format:fix
 
+.PHONY: $(dir)/unit-test
+$(dir)/unit-test:
+	cd $(@D) && npm run test
+
 pulumi_projects ::= operator deployment gcp infra canton-network sv-runbook validator-runbook multi-validator cluster sv-canton validator1 splitwell
 
 .PHONY: $(dir)/test $(dir)/update-expected
-$(dir)/test: $(foreach project,$(pulumi_projects),$(dir)/$(project)/test)
+$(dir)/test: $(dir)/unit-test $(foreach project,$(pulumi_projects),$(dir)/$(project)/test)
 
 .PHONY: $(dir)/update-expected
 $(dir)/update-expected: $(foreach project,$(pulumi_projects),$(dir)/$(project)/update-expected)
