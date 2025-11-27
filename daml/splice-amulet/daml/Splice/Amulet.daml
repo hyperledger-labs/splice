@@ -389,7 +389,8 @@ template SvRewardCoupon with
       do return SvRewardCoupon_ArchiveAsBeneficiaryResult
 
 
--- | A coupon recording an emission for the Unclaimed Development Fund from CIP-0082.
+-- | A coupon recording an emission for the Development Fund from CIP-0082 that
+-- was not yet assigned to a specific beneficiary.
 template UnclaimedDevelopmentFundCoupon
   with
     dso : Party
