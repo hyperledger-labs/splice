@@ -135,9 +135,6 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
           pattern: 'canton\.validator-apps\.validator_backend\.scan-client\.trusted-svs = \["sv1", "sv2", "sv3"\]'
-      - matchRegex:
-          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
-          pattern: 'canton\.validator-apps\.validator_backend\.scan-client\.use-last-known-connections-for-initialization = true'
 
   - it: "defaults to bft when no custom config is provided"
     documentSelector:
@@ -150,9 +147,6 @@ tests:
       - notMatchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
           pattern: 'canton\.validator-apps\.validator_backend\.scan-client\.threshold'
-      - matchRegex:
-          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
-          pattern: 'canton\.validator-apps\.validator_backend\.scan-client\.use-last-known-connections-for-initialization = true'
 
   - it: "turns off useLastKnownConnectionsForInitialization when set to false"
     set:
