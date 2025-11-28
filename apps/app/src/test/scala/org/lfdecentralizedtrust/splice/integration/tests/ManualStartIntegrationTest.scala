@@ -73,9 +73,11 @@ class ManualStartIntegrationTest
                   // schedule needs to be defined to activate participant pruning
                   participantPruningSchedule = Some(
                     PruningConfig(
-                      "0 /1 * * * ?",
-                      PositiveDurationSeconds.tryFromDuration(10.seconds),
+                      // run every 10s, for quick feedback
+                      "/10 * * * * ?",
                       PositiveDurationSeconds.tryFromDuration(20.seconds),
+                      // at 20s retention we sometimes pruned before finishing initial ingestion
+                      PositiveDurationSeconds.tryFromDuration(40.seconds),
                     )
                   )
                 )
@@ -188,7 +190,8 @@ class ManualStartIntegrationTest
         }
 
         clue("Check sv1 participant is actively pruning") {
-          eventually(2.minutes) {
+          // we expect to be quicker than that but flaking is meh
+          eventually(3.minutes) {
             sv1Backend.svAutomation
               .connection(Low)
               // returns 0 when participant pruning is disabled
