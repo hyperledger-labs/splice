@@ -646,7 +646,11 @@ class SV1Initializer(
     private def bootstrapDso(initialRound: Long, packageVersionSupport: PackageVersionSupport)(
         implicit tc: TraceContext
     ): Future[Unit] = {
-      val dsoRulesConfig = SvUtil.defaultDsoRulesConfig(synchronizerId, sv1Config.voteCooldownTime)
+      val dsoRulesConfig = SvUtil.defaultDsoRulesConfig(
+        synchronizerId,
+        sv1Config.voteCooldownTime,
+        sv1Config.voteExecutionInstructionTimeout,
+      )
       for {
         (participantId, trafficStateForAllMembers, amuletRules, dsoRules) <- (
           participantAdminConnection.getParticipantId(),
