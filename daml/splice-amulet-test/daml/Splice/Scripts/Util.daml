@@ -39,7 +39,7 @@ import Splice.Testing.Registries.AmuletRegistry.Parameters
 import Splice.Util
 
 -- Bootstrapping Amulet
--------------------
+------------------------
 
 
 -- | A type to hold the off-ledger information required to interact with the Amulet app.
@@ -83,6 +83,19 @@ genericSetupApp dsoPrefix = do
 
   -- return the off-ledger reference to the app for later script steps
   return app
+
+
+-- Replacing AmuletConfig
+--------------------------
+
+
+replaceDevelopmentFundConfig : AmuletApp -> AmuletConfig Unit.USD -> Optional Party -> Optional Decimal -> Script ()
+replaceDevelopmentFundConfig app baseConfig optDevelopmentFundManager optDevelopmentFundPercentage = do
+  setAmuletConfig app baseConfig baseConfig with
+    optDevelopmentFundManager
+    issuanceCurve = baseConfig.issuanceCurve with
+      initialValue = baseConfig.issuanceCurve.initialValue with
+        optDevelopmentFundPercentage
 
 
 -- AmuletApp users
