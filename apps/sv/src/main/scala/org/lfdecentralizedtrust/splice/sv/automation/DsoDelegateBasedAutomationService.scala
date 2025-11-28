@@ -66,6 +66,7 @@ class DsoDelegateBasedAutomationService(
     registerTrigger(new ExpiredSvOnboardingConfirmedTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpireStaleConfirmationsTrigger(triggerContext, svTaskContext))
+    registerTrigger(new ExpireVoteExecutionInstructionTrigger(triggerContext, svTaskContext))
     registerTrigger(new GarbageCollectAmuletPriceVotesTrigger(triggerContext, svTaskContext))
 
     registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, svTaskContext))
@@ -142,6 +143,7 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[ExpiredSvOnboardingConfirmedTrigger],
     aTrigger[ExpireIssuingMiningRoundTrigger],
     aTrigger[ExpireStaleConfirmationsTrigger],
+    aTrigger[ExpireVoteExecutionInstructionTrigger],
     aTrigger[GarbageCollectAmuletPriceVotesTrigger],
     aTrigger[MergeUnclaimedRewardsTrigger],
     aTrigger[ExpireRewardCouponsTrigger],
