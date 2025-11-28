@@ -400,7 +400,7 @@ template UnclaimedDevelopmentFundCoupon
     ensure amount > 0.0
 
 -- | A coupon recording an emission for the Development Fund under CIP-0082,
---   which can be collected by the designated beneficiary.
+-- which can be collected by the designated beneficiary.
 template DevelopmentFundCoupon
   with
     dso : Party

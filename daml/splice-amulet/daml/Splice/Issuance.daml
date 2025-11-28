@@ -123,8 +123,8 @@ computeIssuingRoundParameters tickDuration amuletPrice config summary =
       intToDecimal (convertRelTimeToMicroseconds tickDuration)
     amuletsToIssueInRound = config.amuletToIssuePerYear / roundsPerYear
 
-    adjustedAmuletsToIssueInRound = amuletsToIssueInRound - amuletsToIssueToDevelopmentFund
     amuletsToIssueToDevelopmentFund = amuletsToIssueInRound * developmentFundPercentage
+    adjustedAmuletsToIssueInRound = amuletsToIssueInRound - amuletsToIssueToDevelopmentFund
 
     validatorRewardIssuance = computeIssuanceTranche
       (adjustedAmuletsToIssueInRound * config.validatorRewardPercentage)
