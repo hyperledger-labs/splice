@@ -913,11 +913,13 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
               (ErrorResource.TemplateId, err.dstTemplateId.toString),
               (ErrorResource.PackageName, err.srcPackageName),
               (ErrorResource.PackageName, err.dstPackageName),
-            ) ++ encodeParties(err.originalSignatories) ++ encodeParties(
-              err.originalObservers
-            ) ++ optKeyResources(err.originalKeyOpt) ++ encodeParties(
-              err.recomputedSignatories
-            ) ++ encodeParties(err.recomputedObservers) ++ optKeyResources(err.recomputedKeyOpt)
+            )
+              ++ encodeParties(err.originalSignatories)
+              ++ encodeParties(err.originalObservers)
+              ++ optKeyResources(err.originalKeyOpt)
+              ++ encodeParties(err.recomputedSignatories)
+              ++ encodeParties(err.recomputedObservers)
+              ++ optKeyResources(err.recomputedKeyOpt)
           }
         }
       }

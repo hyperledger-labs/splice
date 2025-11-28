@@ -124,7 +124,7 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
     }
     def mockParticipant: ParticipantNodeBootstrap = mockParticipantAndNode._1
 
-    val environment = new CantonEnvironment(
+    val environment = new Environment(
       config,
       CommunityCantonEdition,
       TestingConfigInternal(initializeGlobalOpenTelemetry = false),

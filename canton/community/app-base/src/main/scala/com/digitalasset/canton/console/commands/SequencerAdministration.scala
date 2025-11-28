@@ -152,7 +152,7 @@ class SequencerAdministration(node: SequencerReference) extends ConsoleCommandGr
     consoleEnvironment.run {
       runner.adminCommand(
         InitializeFromGenesisStateV2(
-          Seq(genesisState),
+          genesisState,
           synchronizerParameters.toInternal,
         )
       )

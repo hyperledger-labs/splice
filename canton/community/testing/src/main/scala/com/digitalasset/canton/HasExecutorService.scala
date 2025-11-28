@@ -60,7 +60,6 @@ trait HasExecutorServiceGeneric extends NamedLogging {
     val service = Threading.newExecutionContext(
       executionContextName,
       noTracingLogger,
-      None,
       threads,
       exitOnFatal = exitOnFatal,
     )

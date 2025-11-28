@@ -13,7 +13,6 @@ import com.digitalasset.canton.config.{
   NonNegativeFiniteDuration as NonNegativeFiniteDurationConfig,
 }
 import com.digitalasset.canton.console.BufferedProcessLogger
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.plugins.UseLedgerApiTestTool.{
   EnvVarTestOverrides,
   LAPITTVersion,
@@ -57,7 +56,7 @@ class UseLedgerApiTestTool(
     version: LAPITTVersion = LAPITTVersion.Latest,
     javaOpts: String = "-Xmx500m",
     defaultExtraArguments: Map[String, String] = Map("--timeout-scale-factor" -> "4"),
-) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
+) extends EnvironmentSetupPlugin
     with NoTracing
     with EnvVarTestOverrides {
 
@@ -130,7 +129,7 @@ class UseLedgerApiTestTool(
       exclude: Seq[String],
       concurrency: Int,
       kv: (String, String)*
-  )(implicit env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]): String = {
+  )(implicit env: TestConsoleEnvironment): String = {
     val excludeParameter = NonEmpty.from(exclude) match {
       case Some(suitesNE) => Seq("--exclude", suitesNE.mkString(","))
       case None => Nil
@@ -151,7 +150,7 @@ class UseLedgerApiTestTool(
       suites: String, // comma-separated list of suites
       exclude: Seq[String],
       kv: (String, String)*
-  )(implicit env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]): String =
+  )(implicit env: TestConsoleEnvironment): String =
     runSuites(suites = suites, exclude = exclude, concurrency = 1, kv*)
 
   def runShardedSuites(
@@ -160,7 +159,7 @@ class UseLedgerApiTestTool(
       exclude: Seq[String],
       concurrentTestRuns: Int = 4,
   )(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      env: TestConsoleEnvironment
   ): String = {
     val allTests = execTestTool("--list-all").split("\n")
     val listing = allTests
@@ -225,9 +224,7 @@ class UseLedgerApiTestTool(
 
   private def endpointAsString(config: ClientConfig) = s"${config.address}:${config.port.toString}"
 
-  private def testParticipants(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
-  ): Seq[String] =
+  private def testParticipants(implicit env: TestConsoleEnvironment): Seq[String] =
     env.participants.all
       .map { p =>
         val ledgerApiEndpoint = endpointAsString(p.config.clientLedgerApi)

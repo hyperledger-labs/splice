@@ -61,7 +61,7 @@
       <if condition='isDefined("LOG_FORMAT_JSON")'>
         <then>
           <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-            <file>${LOG_FILE_NAME:-log/canton_network.clog}</file>
+            <file>${LOG_FILE_NAME:-log/canton.log}</file>
             <append>${LOG_FILE_APPEND:-true}</append>
             <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
             <immediateFlush>${LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
@@ -76,7 +76,7 @@
         </then>
         <else>
           <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-            <file>${LOG_FILE_NAME:-log/canton_network.clog}</file>
+            <file>${LOG_FILE_NAME:-log/canton.log}</file>
             <append>${LOG_FILE_APPEND:-true}</append>
             <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
             <immediateFlush>${LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
@@ -85,18 +85,6 @@
               <pattern>%date [%thread] %-5level %logger{10} &entityCorrelationIdTrailingSpaceReplace;</pattern>
             </encoder>
             <filter class="${log_last_errors_filter}" />
-          </appender>
-
-          <!-- Appender for KMS logs -->
-          <appender name="KMS-FILE" class="ch.qos.logback.core.FileAppender">
-            <file>${KMS_LOG_FILE_NAME:-log/canton_kms.log}</file>
-            <append>${KMS_LOG_FILE_APPEND:-true}</append>
-            <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
-            <immediateFlush>${KMS_LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
-            <encoder>
-              <!-- attempt to place the correlation-id with a trailing space, however replace with an empty string if it's empty -->
-              <pattern>%date [%thread] %-5level %logger{10} &entityCorrelationIdTrailingSpaceReplace;</pattern>
-            </encoder>
           </appender>
         </else>
       </if>
@@ -107,13 +95,13 @@
           <if condition='isDefined("LOG_FORMAT_JSON")'>
             <then>
               <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-                <file>${LOG_FILE_NAME:-log/canton_network.clog}</file>
+                <file>${LOG_FILE_NAME:-log/canton.log}</file>
                 <append>true</append>
                 <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
                 <immediateFlush>${LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
                 <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
                   <!-- hourly rollover and compress (gz), change pattern if you want different roll-overs -->
-                  <fileNamePattern>${LOG_FILE_NAME:-log/canton_network.clog}.%d{${LOG_FILE_ROLLING_PATTERN:-yyyy-MM-dd}}.gz</fileNamePattern>
+                  <fileNamePattern>${LOG_FILE_NAME:-log/canton.log}.%d{${LOG_FILE_ROLLING_PATTERN:-yyyy-MM-dd}}.gz</fileNamePattern>
                   <!-- keep max 12 archived log files -->
                   <maxHistory>${LOG_FILE_HISTORY:-12}</maxHistory>
                 </rollingPolicy>
@@ -128,13 +116,13 @@
             </then>
             <else>
               <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-                <file>${LOG_FILE_NAME:-log/canton_network.clog}</file>
+                <file>${LOG_FILE_NAME:-log/canton.log}</file>
                 <append>true</append>
                 <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
                 <immediateFlush>${LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
                 <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
                   <!-- hourly rollover and compress (gz), change pattern if you want different roll-overs -->
-                  <fileNamePattern>${LOG_FILE_NAME:-log/canton_network.clog}.%d{${LOG_FILE_ROLLING_PATTERN:-yyyy-MM-dd}}.gz</fileNamePattern>
+                  <fileNamePattern>${LOG_FILE_NAME:-log/canton.log}.%d{${LOG_FILE_ROLLING_PATTERN:-yyyy-MM-dd}}.gz</fileNamePattern>
                   <!-- keep max 12 archived log files -->
                   <maxHistory>${LOG_FILE_HISTORY:-12}</maxHistory>
                 </rollingPolicy>
@@ -143,25 +131,6 @@
                   <pattern>%date [%thread] %-5level %logger{35} &entityCorrelationIdTrailingSpaceReplace;</pattern>
                 </encoder>
                 <filter class="${log_last_errors_filter}" />
-              </appender>
-
-
-              <!-- Appender for KMS logs -->
-              <appender name="KMS-FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-                <file>${KMS_LOG_FILE_NAME:-log/canton_kms.log}</file>
-                <append>true</append>
-                <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
-                <immediateFlush>${KMS_LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
-                <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-                  <!-- hourly rollover and compress (gz), change pattern if you want different roll-overs -->
-                  <fileNamePattern>${KMS_LOG_FILE_NAME:-log/canton_kms.log}.%d{${KMS_LOG_FILE_ROLLING_PATTERN:-yyyy-MM-dd}}.gz</fileNamePattern>
-                  <!-- keep all archived log files by default -->
-                  <maxHistory>${KMS_LOG_FILE_HISTORY:-0}</maxHistory>
-                </rollingPolicy>
-                <encoder>
-                  <!-- attempt to place the correlation-id with a trailing space, however replace with an empty string if it's empty -->
-                  <pattern>%date [%thread] %-5level %logger{35} &entityCorrelationIdTrailingSpaceReplace;</pattern>
-                </encoder>
               </appender>
             </else>
           </if>
@@ -289,7 +258,7 @@
   <if condition='isDefined("LOG_LAST_ERRORS")'>
     <then>
       <appender name="FILE_LAST_ERRORS" class="ch.qos.logback.core.FileAppender">
-        <file>${LOG_LAST_ERRORS_FILE_NAME:-log/canton_network_errors.log}</file>
+        <file>${LOG_LAST_ERRORS_FILE_NAME:-log/canton_errors.log}</file>
         <append>${LOG_FILE_APPEND:-true}</append>
         <encoder>
           <!-- attempt to place the correlation-id with a trailing space, however replace with an empty string if it's empty -->

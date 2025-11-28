@@ -267,7 +267,7 @@ abstract class CliIntegrationTest extends ReleaseArtifactIntegrationTestUtils {
             expectedErrorLines
               .map(expectedErrorLine =>
                 (logEntry: LogEntry) => logEntry.errorMessage should include(expectedErrorLine)
-              )*
+              ) *,
           )
 
           exitCode shouldBe expectedExitCode

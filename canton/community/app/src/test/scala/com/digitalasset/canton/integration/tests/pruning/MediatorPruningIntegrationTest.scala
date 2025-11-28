@@ -3,8 +3,7 @@
 
 package com.digitalasset.canton.integration.tests.pruning
 
-import com.digitalasset.canton.config.{CantonConfig, DbConfig}
-import com.digitalasset.canton.environment.CantonEnvironment
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.integration.plugins.{
   UseBftSequencer,
   UsePostgres,
@@ -21,7 +20,7 @@ import com.digitalasset.canton.protocol.TestSynchronizerParameters
 
 import scala.concurrent.Future
 
-trait MediatorPruningIntegrationTest extends CommunityIntegrationTest with SharedEnvironment[CantonConfig, CantonEnvironment] {
+trait MediatorPruningIntegrationTest extends CommunityIntegrationTest with SharedEnvironment {
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2_S1M1
@@ -78,7 +77,7 @@ trait MediatorPruningIntegrationTest extends CommunityIntegrationTest with Share
   }
 
   private def countFinalizedResponses()(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      env: TestConsoleEnvironment
   ): Future[Long] = {
     val daMediatorStateInspection =
       env.mediator1.underlying

@@ -100,12 +100,9 @@ trait DbTest
     }
   }
 
-  private def cleanup()(implicit tc: TraceContext): Unit = {
+  private def cleanup()(implicit tc: TraceContext): Unit =
     // Use the underlying storage for clean-up operations, so we don't run clean-ups twice
-    // cleanDB is usually implemented by a TRUNCATE statement, which can be very slow,
-    // we therefore use a long timeout.
-    Await.result(cleanDb(storage.underlying), 120.seconds)
-  }
+    Await.result(cleanDb(storage.underlying), 10.seconds)
 }
 
 /** Run db test against h2 */

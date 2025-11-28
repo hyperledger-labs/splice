@@ -59,7 +59,7 @@ class TrafficControlProcessorTest extends AnyWordSpec with BaseTest with HasExec
   private def mkSetTrafficPurchased(
       signatureO: Option[Signature] = None
   ): SignedProtocolMessage[SetTrafficPurchasedMessage] = {
-    val setTrafficPurchased: SetTrafficPurchasedMessage = SetTrafficPurchasedMessage(
+    val setTrafficPurchased = SetTrafficPurchasedMessage(
       participantId,
       PositiveInt.one,
       NonNegativeLong.tryCreate(100),
