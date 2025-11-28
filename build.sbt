@@ -1948,7 +1948,6 @@ lazy val `apps-app`: Project =
       libraryDependencies += kubernetes_client,
       libraryDependencies +=
         "com.google.cloud" % "google-cloud-bigquery" % "2.53.0" % "test",
-      libraryDependencies += pekko_connectors_csv % "test",
       // Force SBT to use the right version of opentelemetry libs.
       dependencyOverrides ++= Seq(
         CantonDependencies.opentelemetry_api,

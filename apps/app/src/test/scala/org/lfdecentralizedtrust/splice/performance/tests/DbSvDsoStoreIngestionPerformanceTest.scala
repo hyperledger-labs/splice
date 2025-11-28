@@ -1,45 +1,33 @@
 package org.lfdecentralizedtrust.splice.performance.tests
 
 import cats.data.NonEmptyList
-import com.daml.ledger.api.v2.TraceContextOuterClass
-import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Transaction}
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import com.google.protobuf.ByteString
 import org.apache.pekko.Done
-import org.apache.pekko.stream.connectors.csv.scaladsl.*
-import org.apache.pekko.stream.scaladsl.{FileIO, Sink}
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
-import org.lfdecentralizedtrust.splice.environment.ledger.api.{
-  TransactionTreeUpdate,
-  TreeUpdateOrOffsetCheckpoint,
-}
+import org.lfdecentralizedtrust.splice.environment.ledger.api.TreeUpdateOrOffsetCheckpoint
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  UpdateHistoryItemV2,
+  UpdateHistoryResponseV2,
+}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.store.StoreTest
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.sv.store.SvStore
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
-import org.lfdecentralizedtrust.splice.util.{
-  PackageQualifiedName,
-  ResourceTemplateDecoder,
-  TemplateJsonDecoder,
-  ValueJsonCodecProtobuf as ProtobufCodec,
-}
+import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import org.scalatest.concurrent.PatienceConfiguration
 
-import java.nio.charset.StandardCharsets
-import java.nio.file.Paths
-import java.util.UUID
+import java.nio.file.{Files, Paths}
 import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
-import scala.jdk.CollectionConverters.*
 
 class DbSvDsoStoreIngestionPerformanceTest
     extends StoreTest
@@ -54,72 +42,47 @@ class DbSvDsoStoreIngestionPerformanceTest
     store.multiDomainAcsStore.ingestionSink.initialize().futureValue
     val timings = mutable.ListBuffer[Long]()
     val ingestionConfig = IngestionConfig()
-    FileIO
-      .fromPath(Paths.get(getClass.getResource("/performance/creates.csv").toURI))
-      .via(CsvParsing.lineScanner(maximumLineLength = Int.MaxValue))
-      .via(CsvToMap.toMapAsStrings(StandardCharsets.UTF_8))
+    val dumpFile = Paths.get("/home/oriolmunoz/mainnetdump/update_history_response.json")
+    val dump = (for {
+      json <- io.circe.parser
+        .parse(
+          Files
+            .readString(dumpFile)
+            .replace( // TODO: maybe just use the store with dsoParty=mainnet's
+              "DSO::1220b1431ef217342db44d516bb9befde802be7d8899637d290895fa58880f19accc",
+              dsoParty.toProtoPrimitive,
+            )
+        )
+      decoded <- UpdateHistoryResponseV2.decodeUpdateHistoryResponseV2.decodeJson(json)
+    } yield decoded)
+      .getOrElse(
+        throw new IllegalArgumentException(
+          "Failed to parse the update history dump provided. It should have the structure of UpdateHistoryResponseV2."
+        )
+      )
+    val txs = dump.transactions.collect {
+      // deliberately ignoring reassignments
+      case UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(update) =>
+        CompactJsonScanHttpEncodings.httpToLapiUpdate(update)
+    }
+
+    Source
+      .fromIterator(() => txs.iterator)
       .batch(ingestionConfig.maxBatchSize.toLong, Vector(_))(_ :+ _)
       .zipWithIndex
-      .runWith(Sink.foreachAsync(parallelism = 1) { case (_batch, index) =>
-        val batch = _batch.map(_.map { case (key, value) =>
-          key -> value.replace(
-            "DSO::12209471e1a52edc2995ad347371597a5872f2704cb2cb4bb330a849e7309598259e",
-            dsoParty.toProtoPrimitive,
-          )
-        })
+      .runWith(Sink.foreachAsync(parallelism = 1) { case (batch, index) =>
         println(s"Ingesting batch $index of ${batch.length} elements")
-        val txs = batch.map { line =>
-          val synchronizerId = SynchronizerId.tryFromString(line("domain_id"))
-          val recordTime = CantonTimestamp.MinValue.plusSeconds(index)
-          val templateId = new Identifier(
-            line("template_id_package_id"),
-            line("template_id_module_name"),
-            line("template_id_entity_name"),
-          )
-          val packageName = PackageQualifiedName.getFromResources(templateId).packageName
-          TreeUpdateOrOffsetCheckpoint.Update(
-            update = TransactionTreeUpdate(
-              new Transaction(
-                UUID.randomUUID().toString, // updateId
-                "canton-network-acs-import-something", // commandId
-                "canton-network-acs-import-something", // workflowId
-                recordTime.toInstant, // effectiveAt
-                java.util.List.of(
-                  new CreatedEvent(
-                    parseArray(line("observers")), // witnessParties
-                    index, // offset
-                    1, // nodeId
-                    templateId, // templateId
-                    packageName, // packageName
-                    line("contract_id"), // contractId
-                    ProtobufCodec
-                      .deserializeValue(line("create_arguments"))
-                      .asRecord()
-                      .get(), // arguments
-                    ByteString.copyFromUtf8(line("create_arguments")), // createdEventBlob
-                    java.util.Map.of(), // interfaceViews
-                    java.util.Map.of(), // failedInterfaceViews
-                    java.util.Optional.empty(), // contractKey
-                    parseArray(line("signatories")), // signatories
-                    parseArray(line("observers")), // observers
-                    recordTime.toInstant, // createdAt
-                    false, // acsDelta
-                    templateId.getPackageId, // representativePackageId
-                  )
-                ), // events
-                index, // offset
-                synchronizerId.toProtoPrimitive,
-                TraceContextOuterClass.TraceContext.newBuilder().build(),
-                recordTime.toInstant,
-              )
-            ),
-            synchronizerId = synchronizerId,
-          )
-        }
-
         val before = System.nanoTime()
         store.multiDomainAcsStore.ingestionSink
-          .ingestUpdateBatch(NonEmptyList.fromListUnsafe(txs.toList))
+          .ingestUpdateBatch(
+            NonEmptyList.fromListUnsafe(
+              txs
+                .map(tx =>
+                  TreeUpdateOrOffsetCheckpoint.Update(tx.update.update, tx.update.synchronizerId)
+                )
+                .toList
+            )
+          )
           .map { _ =>
             val after = System.nanoTime()
             val duration = after - before
@@ -143,18 +106,7 @@ class DbSvDsoStoreIngestionPerformanceTest
       .value
       .failOnShutdown("")
       .futureValue
-      .valueOrFail("count is there") should be >= 500_000
-  }
-
-  private def parseArray(str: String) = {
-    str
-      .stripPrefix("{")
-      .stripSuffix("}")
-      .split(",")
-      .toList
-      .map(_.trim)
-      .filter(_.nonEmpty)
-      .asJava
+      .valueOrFail("count is there") should be >= 30_312
   }
 
   private val storeSvParty = providerParty(42)
