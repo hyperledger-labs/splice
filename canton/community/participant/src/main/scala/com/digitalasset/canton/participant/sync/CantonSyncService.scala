@@ -7,6 +7,7 @@ import cats.Eval
 import cats.data.EitherT
 import cats.implicits.toBifunctorOps
 import cats.syntax.either.*
+import cats.syntax.foldable.*
 import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
@@ -24,13 +25,12 @@ import com.digitalasset.canton.data.{
   ReassignmentSubmitterMetadata,
   SynchronizerSuccessor,
 }
-import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.*
 import com.digitalasset.canton.error.TransactionRoutingError.{
   MalformedInputErrors,
   RoutingInternalError,
 }
-import com.digitalasset.canton.health.MutableHealthComponent
+import com.digitalasset.canton.health.{HealthQuasiComponent, MutableHealthComponent}
 import com.digitalasset.canton.ledger.api.health.HealthStatus
 import com.digitalasset.canton.ledger.api.{
   EnrichedVettedPackages,
@@ -52,7 +52,7 @@ import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors
 import com.digitalasset.canton.participant.*
 import com.digitalasset.canton.participant.Pruning.*
 import com.digitalasset.canton.participant.admin.*
-import com.digitalasset.canton.participant.admin.data.UploadDarData
+import com.digitalasset.canton.participant.admin.data.{ManualLSURequest, UploadDarData}
 import com.digitalasset.canton.participant.admin.grpc.PruningServiceError
 import com.digitalasset.canton.participant.admin.inspection.{
   JournalGarbageCollectorControl,
@@ -75,6 +75,7 @@ import com.digitalasset.canton.participant.protocol.submission.routing.{
   TransactionRoutingProcessor,
 }
 import com.digitalasset.canton.participant.pruning.PruningProcessor
+import com.digitalasset.canton.participant.replica.ParticipantReplicaManager
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore.UnknownAlias
 import com.digitalasset.canton.participant.store.memory.PackageMetadataView
@@ -94,9 +95,9 @@ import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTrack
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.CostEstimationHints
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
+import com.digitalasset.canton.replica.ReplicaState
 import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
 import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.scheduler.Schedulers
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration, SynchronizerTimeTracker}
@@ -155,7 +156,6 @@ class CantonSyncService(
     private[canton] val packageService: PackageService,
     partyOps: PartyOps,
     identityPusher: ParticipantTopologyDispatcher,
-    partyNotifier: LedgerServerPartyNotifier,
     val syncCrypto: SyncCryptoApiParticipantProvider,
     val pruningProcessor: PruningProcessor,
     engine: Engine,
@@ -193,7 +193,6 @@ class CantonSyncService(
     syncPersistentStateManager,
     packageService,
     identityPusher,
-    partyNotifier,
     syncCrypto,
     engine,
     commandProgressTracker,
@@ -203,6 +202,7 @@ class CantonSyncService(
     parameters,
     connectedSynchronizerFactory,
     metrics,
+    sequencerInfoLoader,
     isActive,
     declarativeChangeTrigger,
     futureSupervisor,
@@ -221,6 +221,8 @@ class CantonSyncService(
     connectionsManager.connectedSynchronizerHealth
   def ephemeralHealth: MutableHealthComponent = connectionsManager.ephemeralHealth
   def sequencerClientHealth: MutableHealthComponent = connectionsManager.sequencerClientHealth
+  def sequencerConnectionPoolHealth: () => Seq[HealthQuasiComponent] =
+    () => connectionsManager.sequencerConnectionPoolHealthRef.get.apply()
   def acsCommitmentProcessorHealth: MutableHealthComponent =
     connectionsManager.acsCommitmentProcessorHealth
 
@@ -236,7 +238,6 @@ class CantonSyncService(
   private val partyAllocation = new PartyAllocation(
     participantId,
     partyOps,
-    partyNotifier,
     isActive,
     connectedSynchronizersLookup,
     timeouts,
@@ -377,12 +378,6 @@ class CantonSyncService(
     loggerFactory = loggerFactory,
   )(ec)
 
-  if (isActive()) {
-    TraceContext.withNewTraceContext("initialize_state") { implicit traceContext =>
-      initializeState()
-    }
-  }
-
   private val packageResolver: PackageResolver = packageId =>
     traceContext => packageService.getPackage(packageId)(traceContext)
 
@@ -393,13 +388,14 @@ class CantonSyncService(
   val repairService: RepairService = new RepairService(
     participantId,
     syncCrypto,
-    packageService.packageDependencyResolver,
+    packageService.getPackageMetadataView,
     participantNodePersistentState.map(_.contractStore),
     ledgerApiIndexer.asEval(TraceContext.empty),
     aliasManager,
     parameters,
     syncPersistentStateManager,
     connectedSynchronizersLookup,
+    contractValidator,
     connectionsManager.connectQueue,
     loggerFactory,
   )
@@ -905,28 +901,6 @@ class CantonSyncService(
       errorLoggingContext: ErrorLoggingContext
   ): PackageMetadata = getPackageMetadataView.getSnapshot
 
-  /** Executes ordered sequence of steps to recover any state that might have been lost if the
-    * participant previously crashed. Needs to be invoked after the input stores have been created,
-    * but before they are made available to dependent components.
-    */
-  private def recoverParticipantNodeState()(implicit traceContext: TraceContext): Unit = {
-    // also resume pending party notifications
-    val resumePendingF = partyNotifier.resumePending()
-
-    parameters.processingTimeouts.unbounded
-      .awaitUS(
-        "Wait for party-notifier recovery to finish"
-      )(resumePendingF)
-      .discard
-  }
-
-  def initializeState()(implicit traceContext: TraceContext): Unit = {
-    logger.debug("Invoke crash recovery or initialize active participant")
-
-    // Important to invoke recovery before we do anything else with persisted stores.
-    recoverParticipantNodeState()
-  }
-
   /** Returns the ready synchronizers this sync service is connected to. */
   def readySynchronizers: Map[SynchronizerAlias, (PhysicalSynchronizerId, SubmissionReady)] =
     connectionsManager.readySynchronizers
@@ -1025,14 +999,7 @@ class CantonSyncService(
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncServiceError, Unit] =
-    sequencerInfoLoader // TODO(i27622): use the connection pool to validate the config
-      .validateSequencerConnection(
-        config.synchronizerAlias,
-        config.synchronizerId,
-        config.sequencerConnections,
-        sequencerConnectionValidation,
-      )
-      .leftMap(SyncServiceError.SyncServiceInconsistentConnectivity.Error(_): SyncServiceError)
+    connectionsManager.validateSequencerConnection(config, sequencerConnectionValidation)
 
   /** Modifies the settings of the synchronizer connection
     *
@@ -1067,6 +1034,24 @@ class CantonSyncService(
           SyncServiceError.SyncServiceUnknownSynchronizer
             .Error(config.synchronizerAlias): SyncServiceError
         )
+
+      // Try to retrieve and store missing sequencer ids
+      _ <- connectionIdToUpdate.toOption
+        .traverse_(connectionsManager.retrieveAndStoreMissingSequencerIds)
+        .leftMap(err =>
+          SyncServiceError.SyncServiceInternalError
+            .Failure(
+              config.synchronizerAlias.toString,
+              new RuntimeException(s"Unable to retrieve and store missing sequencer ids: $err"),
+            )
+        )
+
+      // If successor exists, will ensure that connections are updated (e.g., if sequencers are added or removed)
+      _ <- EitherT.liftF(
+        connectionIdToUpdate.toOption
+          .flatMap(connectedSynchronizersLookup.get)
+          .traverse_(_.sequencerConnectionListener.init())
+      )
     } yield ()
 
   /** Migrates contracts from a source synchronizer to target synchronizer by re-associating them in
@@ -1253,6 +1238,11 @@ class CantonSyncService(
       synchronizerAlias: SynchronizerAlias
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SyncServiceError, Unit] =
     connectionsManager.disconnectSynchronizer(synchronizerAlias)
+
+  def manuallyUpgradeSynchronizerTo(
+      request: ManualLSURequest
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] =
+    connectionsManager.manuallyUpgradeSynchronizerTo(request)
 
   def logout(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
@@ -1693,78 +1683,44 @@ class CantonSyncService(
 }
 
 object CantonSyncService {
-  trait Factory[+T <: CantonSyncService] {
-    def create(
-        participantId: ParticipantId,
-        synchronizerRegistry: SynchronizerRegistry,
-        synchronizerConnectionConfigStore: SynchronizerConnectionConfigStore,
-        synchronizerAliasManager: SynchronizerAliasManager,
-        participantNodePersistentState: Eval[ParticipantNodePersistentState],
-        participantNodeEphemeralState: ParticipantNodeEphemeralState,
-        syncPersistentStateManager: SyncPersistentStateManager,
-        packageService: PackageService,
-        partyOps: PartyOps,
-        identityPusher: ParticipantTopologyDispatcher,
-        partyNotifier: LedgerServerPartyNotifier,
-        syncCrypto: SyncCryptoApiParticipantProvider,
-        engine: Engine,
-        commandProgressTracker: CommandProgressTracker,
-        syncEphemeralStateFactory: SyncEphemeralStateFactory,
-        storage: Storage,
-        clock: Clock,
-        resourceManagementService: ResourceManagementService,
-        cantonParameterConfig: ParticipantNodeParameters,
-        pruningProcessor: PruningProcessor,
-        schedulers: Schedulers,
-        metrics: ParticipantMetrics,
-        exitOnFatalFailures: Boolean,
-        sequencerInfoLoader: SequencerInfoLoader,
-        futureSupervisor: FutureSupervisor,
-        loggerFactory: NamedLoggerFactory,
-        testingConfig: TestingConfigInternal,
-        ledgerApiIndexer: LifeCycleContainer[LedgerApiIndexer],
-        connectedSynchronizersLookupContainer: ConnectedSynchronizersLookupContainer,
-        triggerDeclarativeChange: () => Unit,
-    )(implicit ec: ExecutionContextExecutor, mat: Materializer, tracer: Tracer): T
-  }
 
-  object DefaultFactory extends Factory[CantonSyncService] {
-    override def create(
-        participantId: ParticipantId,
-        synchronizerRegistry: SynchronizerRegistry,
-        synchronizerConnectionConfigStore: SynchronizerConnectionConfigStore,
-        synchronizerAliasManager: SynchronizerAliasManager,
-        participantNodePersistentState: Eval[ParticipantNodePersistentState],
-        participantNodeEphemeralState: ParticipantNodeEphemeralState,
-        syncPersistentStateManager: SyncPersistentStateManager,
-        packageService: PackageService,
-        partyOps: PartyOps,
-        identityPusher: ParticipantTopologyDispatcher,
-        partyNotifier: LedgerServerPartyNotifier,
-        syncCrypto: SyncCryptoApiParticipantProvider,
-        engine: Engine,
-        commandProgressTracker: CommandProgressTracker,
-        syncEphemeralStateFactory: SyncEphemeralStateFactory,
-        storage: Storage,
-        clock: Clock,
-        resourceManagementService: ResourceManagementService,
-        cantonParameterConfig: ParticipantNodeParameters,
-        pruningProcessor: PruningProcessor,
-        schedulers: Schedulers,
-        metrics: ParticipantMetrics,
-        exitOnFatalFailures: Boolean,
-        sequencerInfoLoader: SequencerInfoLoader,
-        futureSupervisor: FutureSupervisor,
-        loggerFactory: NamedLoggerFactory,
-        testingConfig: TestingConfigInternal,
-        ledgerApiIndexer: LifeCycleContainer[LedgerApiIndexer],
-        connectedSynchronizersLookupContainer: ConnectedSynchronizersLookupContainer,
-        triggerDeclarativeChange: () => Unit,
-    )(implicit
-        ec: ExecutionContextExecutor,
-        mat: Materializer,
-        tracer: Tracer,
-    ): CantonSyncService =
+  def create(
+      participantId: ParticipantId,
+      synchronizerRegistry: SynchronizerRegistry,
+      synchronizerConnectionConfigStore: SynchronizerConnectionConfigStore,
+      synchronizerAliasManager: SynchronizerAliasManager,
+      participantNodePersistentState: Eval[ParticipantNodePersistentState],
+      participantNodeEphemeralState: ParticipantNodeEphemeralState,
+      syncPersistentStateManager: SyncPersistentStateManager,
+      replicaManager: ParticipantReplicaManager,
+      packageService: PackageService,
+      partyOps: PartyOps,
+      identityPusher: ParticipantTopologyDispatcher,
+      syncCrypto: SyncCryptoApiParticipantProvider,
+      engine: Engine,
+      commandProgressTracker: CommandProgressTracker,
+      syncEphemeralStateFactory: SyncEphemeralStateFactory,
+      storage: Storage,
+      clock: Clock,
+      resourceManagementService: ResourceManagementService,
+      cantonParameterConfig: ParticipantNodeParameters,
+      pruningProcessor: PruningProcessor,
+      metrics: ParticipantMetrics,
+      sequencerInfoLoader: SequencerInfoLoader,
+      futureSupervisor: FutureSupervisor,
+      loggerFactory: NamedLoggerFactory,
+      testingConfig: TestingConfigInternal,
+      ledgerApiIndexer: LifeCycleContainer[LedgerApiIndexer],
+      connectedSynchronizersLookupContainer: ConnectedSynchronizersLookupContainer,
+      triggerDeclarativeChange: () => Unit,
+  )(implicit ec: ExecutionContextExecutor, mat: Materializer, tracer: Tracer): CantonSyncService = {
+
+    // Set initial replica state
+    replicaManager.setInitialState(
+      if (storage.isActive) ReplicaState.Active else ReplicaState.Passive
+    )
+
+    val syncService =
       new CantonSyncService(
         participantId,
         synchronizerRegistry,
@@ -1776,7 +1732,6 @@ object CantonSyncService {
         packageService,
         partyOps,
         identityPusher,
-        partyNotifier,
         syncCrypto,
         pruningProcessor,
         engine,
@@ -1788,7 +1743,7 @@ object CantonSyncService {
         ConnectedSynchronizer.DefaultFactory,
         metrics,
         sequencerInfoLoader,
-        () => storage.isActive,
+        () => storage.isActive && replicaManager.isActive,
         triggerDeclarativeChange,
         futureSupervisor,
         loggerFactory,
@@ -1796,5 +1751,7 @@ object CantonSyncService {
         ledgerApiIndexer,
         connectedSynchronizersLookupContainer,
       )
+    syncService
   }
+
 }

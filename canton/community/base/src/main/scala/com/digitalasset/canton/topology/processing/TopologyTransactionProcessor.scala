@@ -28,7 +28,11 @@ import com.digitalasset.canton.sequencing.protocol.{AllMembersOfSynchronizer, De
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.client.*
 import com.digitalasset.canton.topology.processing.TopologyTransactionProcessor.subscriptionTimestamp
-import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
+import com.digitalasset.canton.topology.store.{
+  NoPackageDependencies,
+  TopologyStore,
+  TopologyStoreId,
+}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.checks.RequiredTopologyMappingChecks
 import com.digitalasset.canton.topology.transaction.{
@@ -183,7 +187,7 @@ class TopologyTransactionProcessor(
       // of the approximate time subsequently
       val maxEffective = clientInitTimes.map { case (effective, _) => effective }.max1
       val minApproximate = clientInitTimes.map { case (_, approximate) => approximate }.min1
-      listenersUpdateHead(sequencedTs, maxEffective, minApproximate, potentialChanges = true)
+      listenersUpdateHead(sequencedTs, maxEffective, minApproximate)
 
       val directExecutionContext = DirectExecutionContext(noTracingLogger)
       clientInitTimes.foreach { case (effective, _approximate) =>
@@ -195,7 +199,6 @@ class TopologyTransactionProcessor(
               sequencedTs,
               effective,
               effective.toApproximate,
-              potentialChanges = true,
             )
           case Some(tickF) =>
             FutureUtil.doNotAwait(
@@ -204,7 +207,6 @@ class TopologyTransactionProcessor(
                   sequencedTs,
                   effective,
                   effective.toApproximate,
-                  potentialChanges = true,
                 )
               )(directExecutionContext),
               "Notifying listeners to the topology processor's head",
@@ -218,15 +220,14 @@ class TopologyTransactionProcessor(
       sequenced: SequencedTime,
       effective: EffectiveTime,
       approximate: ApproximateTime,
-      potentialChanges: Boolean,
   )(implicit traceContext: TraceContext): Unit = {
     logger.debug(
-      s"Updating listener heads to $effective and $approximate. Potential changes: $potentialChanges"
+      s"Updating listener heads to $effective and $approximate."
     )
     listeners
       .get()
       .flatten
-      .foreach(_.updateHead(sequenced, effective, approximate, potentialChanges))
+      .foreach(_.updateHead(sequenced, effective, approximate))
   }
 
   /** Inform the topology manager where the subscription starts when using [[processEnvelopes]]
@@ -301,12 +302,10 @@ class TopologyTransactionProcessor(
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     this.synchronizeWithClosingF(functionFullName) {
       Future {
-        val approximate = ApproximateTime(sequencedTimestamp.value)
         listenersUpdateHead(
           sequencedTimestamp,
           effectiveTimestamp,
-          approximate,
-          potentialChanges = false,
+          sequencedTimestamp.toApproximate,
         )
       }
     }
@@ -560,7 +559,7 @@ object TopologyTransactionProcessor {
       staticSynchronizerParameters,
       topologyStore,
       synchronizerPredecessor,
-      StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
+      NoPackageDependencies,
       parameters.cachingConfigs,
       parameters.batchingConfig,
       topologyConfig,

@@ -264,8 +264,9 @@ abstract class LSUCancellationIntegrationTest extends LSUBase {
 
       // Time offset is applied on the old sequencer
       sequencer1.underlying.value.sequencer.timeTracker
-        .fetchTime()
-        .futureValueUS should be >= upgradeTime2.plus(
+        .fetchTimeProof()
+        .futureValueUS
+        .timestamp should be >= upgradeTime2.plus(
         dynamicSynchronizerParameters.decisionTimeout.asJava
       )
 

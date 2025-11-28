@@ -13,8 +13,8 @@ import com.digitalasset.canton.integration.{
   SharedEnvironment,
 }
 import com.digitalasset.canton.ledger.api.services.CommandSubmissionService
+import com.digitalasset.canton.logging.audit.ApiRequestLogger
 import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
-import com.digitalasset.canton.networking.grpc.ApiRequestLogger
 import com.digitalasset.canton.participant.admin.{AdminWorkflowServices, PingService}
 import com.digitalasset.canton.participant.protocol.TransactionProcessor
 import com.digitalasset.canton.participant.sync.CantonSyncService

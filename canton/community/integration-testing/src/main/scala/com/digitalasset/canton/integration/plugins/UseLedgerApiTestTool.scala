@@ -317,7 +317,11 @@ object UseLedgerApiTestTool {
 
   object LfVersion {
     case object Stable extends LfVersion {
-      override def testToolSuffix: String = "-2.2"
+      override def testToolSuffix: String = "-2.1"
+    }
+
+    case object V21 extends LfVersion {
+      override def testToolSuffix: String = "-2.1"
     }
 
     case object Dev extends LfVersion {

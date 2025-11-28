@@ -351,8 +351,8 @@ final class RateLimitingInterceptorChecksSpec
           fHelloStatus2 = singleHello(channel, logger, cancel = true)
           status2 <- fStatus2
           helloStatus2 <- fHelloStatus2
-          // we need to drop the observer as cancel prevents normal completion
-          _ = waitService.dropObserver()
+          _ = waitService
+            .dropObserver() // we need to drop the observer as cancel prevents normal completion
 
           // but also verify we can do successful calls again
           fStatus3 <- streamHello(channel)

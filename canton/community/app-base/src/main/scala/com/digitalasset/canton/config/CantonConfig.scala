@@ -402,6 +402,13 @@ final case class CantonConfig(
 ) extends UniformCantonConfigValidation
     with ConfigDefaults[Option[DefaultPorts], CantonConfig] {
 
+  /** Names of local nodes in order: sequencers, mediators, participants. Order within each group
+    * may be different between runs, but the list may serve as a single reference order in case we
+    * need to to do some actions in the same order.
+    */
+  def nodeNamesInStartupOrder: Seq[InstanceName] =
+    sequencers.keys.view ++ mediators.keys ++ participants.keys to List
+
   def allLocalNodes: Map[InstanceName, LocalNodeConfig] =
     (participants: Map[InstanceName, LocalNodeConfig]) ++ sequencers ++ mediators
 
@@ -452,15 +459,8 @@ final case class CantonConfig(
   private def validate(
       edition: CantonEdition,
       ensurePortsSet: Boolean,
-  ): Validated[NonEmpty[Seq[String]], Unit] = {
-    val validator = edition match {
-      case CommunityCantonEdition =>
-        CommunityConfigValidations
-      case EnterpriseCantonEdition =>
-        EnterpriseConfigValidations
-    }
-    validator.validate(this, edition, ensurePortsSet = ensurePortsSet)
-  }
+  ): Validated[NonEmpty[Seq[String]], Unit] =
+    CommunityConfigValidations.validate(this, edition, ensurePortsSet = ensurePortsSet)
 
   private lazy val participantNodeParameters_ : Map[InstanceName, ParticipantNodeParameters] =
     participants.fmap { participantConfig =>
@@ -493,9 +493,7 @@ final case class CantonConfig(
           participantParameters.doNotAwaitOnCheckingIncomingCommitments,
         disableOptionalTopologyChecks = participantConfig.topology.disableOptionalTopologyChecks,
         commitmentCheckpointInterval = participantParameters.commitmentCheckpointInterval,
-        commitmentMismatchDebugging = participantParameters.commitmentMismatchDebugging,
-        commitmentProcessorNrAcsChangesBehindToTriggerCatchUp =
-          participantParameters.commitmentProcessorNrAcsChangesBehindToTriggerCatchUp,
+        autoSyncProtocolFeatureFlags = participantParameters.autoSyncProtocolFeatureFlags,
       )
     }
 
@@ -518,6 +516,8 @@ final case class CantonConfig(
         maxConfirmationRequestsBurstFactor =
           sequencerNodeConfig.parameters.maxConfirmationRequestsBurstFactor,
         asyncWriter = sequencerNodeConfig.parameters.asyncWriter.toParameters,
+        sequencingTimeLowerBoundExclusive =
+          sequencerNodeConfig.parameters.sequencingTimeLowerBoundExclusive,
         unsafeEnableOnlinePartyReplication =
           sequencerNodeConfig.parameters.unsafeEnableOnlinePartyReplication,
         requestLimits = sequencerNodeConfig.publicApi.limits,

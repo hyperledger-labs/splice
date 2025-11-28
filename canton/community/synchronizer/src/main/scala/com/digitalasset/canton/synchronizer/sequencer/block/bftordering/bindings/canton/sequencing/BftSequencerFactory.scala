@@ -5,7 +5,6 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.binding
 
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
@@ -41,6 +40,7 @@ import scala.concurrent.ExecutionContext
 class BftSequencerFactory(
     config: BftBlockOrdererConfig,
     blockSequencerConfig: BlockSequencerConfig,
+    useTimeProofsToObserveEffectiveTime: Boolean,
     health: Option[SequencerHealthConfig],
     storage: Storage,
     protocolVersion: ProtocolVersion,
@@ -97,6 +97,7 @@ class BftSequencerFactory(
       metrics.bftOrdering,
       synchronizerLoggerFactory,
       nodeParameters.loggingConfig.queryCost,
+      ec,
     )
   }
 
@@ -113,7 +114,6 @@ class BftSequencerFactory(
       clock: Clock,
       rateLimitManager: SequencerRateLimitManager,
       orderingTimeFixMode: OrderingTimeFixMode,
-      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
       synchronizerLoggerFactory: NamedLoggerFactory,
       runtimeReady: FutureUnlessShutdown[Unit],
   )(implicit
@@ -130,6 +130,7 @@ class BftSequencerFactory(
       store,
       sequencerStore,
       blockSequencerConfig,
+      useTimeProofsToObserveEffectiveTime,
       balanceStore,
       storage,
       futureSupervisor,
@@ -137,7 +138,7 @@ class BftSequencerFactory(
       clock,
       rateLimitManager,
       orderingTimeFixMode,
-      sequencingTimeLowerBoundExclusive,
+      sequencingTimeLowerBoundExclusive = nodeParameters.sequencingTimeLowerBoundExclusive,
       nodeParameters.processingTimeouts,
       nodeParameters.loggingConfig.eventDetails,
       nodeParameters.loggingConfig.api.printer,

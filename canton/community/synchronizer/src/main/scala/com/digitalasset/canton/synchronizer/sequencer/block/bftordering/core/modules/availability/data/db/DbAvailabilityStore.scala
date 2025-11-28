@@ -5,7 +5,6 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mo
 
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.CantonRequireTypes.String68
 import com.digitalasset.canton.config.{BatchAggregatorConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.Pretty
@@ -27,6 +26,7 @@ import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.BatchAggregator
 import slick.jdbc.{GetResult, PositionedParameters, SetParameter}
 
+import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 
 class DbAvailabilityStore(
@@ -55,7 +55,7 @@ class DbAvailabilityStore(
         )(implicit
             traceContext: TraceContext,
             callerCloseContext: CloseContext,
-        ): FutureUnlessShutdown[Iterable[Unit]] =
+        ): FutureUnlessShutdown[immutable.Iterable[Unit]] =
           // Sorting should prevent deadlocks in Postgres when using concurrent clashing batched inserts
           //  with idempotency "on conflict do nothing" clauses.
           runAddBatches(items.sortBy(_.value._1).map(_.value))
@@ -104,8 +104,6 @@ class DbAvailabilityStore(
         batchId
     }
   }
-
-  import String68.setParameterLengthLimitedString
 
   private implicit val setBatchIdParameter: SetParameter[BatchId] =
     (batchId, pp) => pp >> batchId.hash.toLengthLimitedHexString

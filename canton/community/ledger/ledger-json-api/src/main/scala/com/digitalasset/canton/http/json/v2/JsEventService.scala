@@ -9,6 +9,7 @@ import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
 import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInput}
 import com.digitalasset.canton.http.json.v2.JsSchema.{JsCantonError, JsEvent}
 import com.digitalasset.canton.ledger.client.LedgerClient
+import com.digitalasset.canton.logging.audit.ApiRequestLogger
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Codec
@@ -22,6 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class JsEventService(
     ledgerClient: LedgerClient,
     protocolConverters: ProtocolConverters,
+    override protected val requestLogger: ApiRequestLogger,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     val executionContext: ExecutionContext,
@@ -46,8 +48,8 @@ class JsEventService(
   ): TracedInput[event_query_service.GetEventsByContractIdRequest] => Future[
     Either[JsCantonError, JsGetEventsByContractIdResponse]
   ] = req => {
-    implicit val tc = req.traceContext
-    eventServiceClient(callerContext.token())(req.traceContext)
+    implicit val tc = callerContext.traceContext()
+    eventServiceClient(callerContext.token())
       .getEventsByContractId(req.in)
       .flatMap(protocolConverters.GetEventsByContractIdResponse.toJson(_))
       .resultToRight
@@ -77,7 +79,7 @@ object JsEventService extends DocumentationEndpoints {
     .in(sttp.tapir.stringToPath("events-by-contract-id"))
     .in(jsonBody[event_query_service.GetEventsByContractIdRequest])
     .out(jsonBody[JsGetEventsByContractIdResponse])
-    .description("Get events by contract Id")
+    .protoRef(event_query_service.EventQueryServiceGrpc.METHOD_GET_EVENTS_BY_CONTRACT_ID)
 
   override def documentation: Seq[AnyEndpoint] = Seq(
     getEventsByContractIdEndpoint
@@ -96,9 +98,14 @@ object JsEventServiceCodecs {
   implicit val jsGetEventsByContractIdResponseRW: Codec[JsGetEventsByContractIdResponse] =
     deriveConfiguredCodec
 
+  implicit val jsGetEventsByContractIdResponseSchema: Schema[JsGetEventsByContractIdResponse] =
+    Schema.derived
+
   implicit val getEventsByContractIdRequestRW
       : Codec[event_query_service.GetEventsByContractIdRequest] =
     deriveRelaxedCodec
 
-  implicit val jsCreatedSchema: Schema[JsCreated] = Schema.derived
+  implicit val getEventsByContractIdRequestSchema
+      : Schema[event_query_service.GetEventsByContractIdRequest] =
+    Schema.derived
 }

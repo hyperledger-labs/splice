@@ -79,6 +79,7 @@ class BlockSequencer(
     store: SequencerBlockStore,
     dbSequencerStore: SequencerStore,
     blockSequencerConfig: BlockSequencerConfig,
+    useTimeProofsToObserveEffectiveTime: Boolean,
     trafficPurchasedStore: TrafficPurchasedStore,
     storage: Storage,
     futureSupervisor: FutureSupervisor,
@@ -167,6 +168,7 @@ class BlockSequencer(
       blockSequencerConfig.throughputCap,
       clock,
       materializer.system.scheduler,
+      metrics,
       loggerFactory,
     )
 
@@ -181,6 +183,7 @@ class BlockSequencer(
       blockRateLimitManager,
       orderingTimeFixMode,
       sequencingTimeLowerBoundExclusive = sequencingTimeLowerBoundExclusive,
+      useTimeProofsToObserveEffectiveTime,
       metrics,
       loggerFactory,
       memberValidator = memberValidator,
@@ -680,6 +683,7 @@ class BlockSequencer(
       SyncCloseable("blockOrderer.close()", blockOrderer.close()),
       SyncCloseable("cryptoApi.close()", cryptoApi.close()),
       SyncCloseable("circuitBreaker.close()", circuitBreaker.close()),
+      SyncCloseable("throughputCap.close()", throughputCap.close()),
     )
   }
 

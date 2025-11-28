@@ -16,6 +16,7 @@ import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.JsCantonError
 import com.digitalasset.canton.ledger.client.services.admin.PartyManagementClient
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.InvalidArgument
+import com.digitalasset.canton.logging.audit.ApiRequestLogger
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.generic.extras.semiauto.deriveConfiguredCodec
@@ -30,6 +31,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class JsPartyManagementService(
     partyManagementClient: PartyManagementClient,
     protocolConverters: ProtocolConverters,
+    override protected val requestLogger: ApiRequestLogger,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     val executionContext: ExecutionContext,
@@ -72,7 +74,7 @@ class JsPartyManagementService(
   ] = ctx =>
     req =>
       partyManagementClient
-        .serviceStub(ctx.token())(req.traceContext)
+        .serviceStub(ctx.token())(ctx.traceContext())
         .listKnownParties(
           party_management_service.ListKnownPartiesRequest(
             req.in.pageToken.getOrElse(""),
@@ -92,16 +94,16 @@ class JsPartyManagementService(
       identityProviderId = req.in._2.getOrElse(""),
     )
     partyManagementClient
-      .serviceStub(ctx.token())(req.traceContext)
+      .serviceStub(ctx.token())(ctx.traceContext())
       .getParties(partyRequest)
       .resultToRight
   }
 
   private val getParticipantId: CallerContext => TracedInput[Unit] => Future[
     Either[JsCantonError, party_management_service.GetParticipantIdResponse]
-  ] = ctx => { req =>
+  ] = ctx => { _ =>
     partyManagementClient
-      .serviceStub(ctx.token())(req.traceContext)
+      .serviceStub(ctx.token())(ctx.traceContext())
       .getParticipantId(party_management_service.GetParticipantIdRequest())
       .resultToRight
   }
@@ -111,7 +113,7 @@ class JsPartyManagementService(
   ] =
     caller =>
       req => {
-        implicit val traceContext: TraceContext = req.traceContext
+        implicit val traceContext: TraceContext = caller.traceContext()
         for {
 
           request <- protocolConverters.AllocatePartyRequest.fromJson(req.in)
@@ -130,7 +132,7 @@ class JsPartyManagementService(
     caller =>
       req =>
         partyManagementClient
-          .serviceStub(caller.token())(req.traceContext)
+          .serviceStub(caller.token())(caller.traceContext())
           .allocateExternalParty(req.in)
           .resultToRight
 
@@ -141,11 +143,11 @@ class JsPartyManagementService(
       req =>
         if (req.in._2.partyDetails.map(_.party).contains(req.in._1)) {
           partyManagementClient
-            .serviceStub(caller.token())(req.traceContext)
+            .serviceStub(caller.token())(caller.traceContext())
             .updatePartyDetails(req.in._2)
             .resultToRight
         } else {
-          implicit val traceContext: TraceContext = req.traceContext
+          implicit val traceContext: TraceContext = caller.traceContext()
           error(
             JsCantonError.fromErrorCode(
               InvalidArgument.Reject(
@@ -163,7 +165,7 @@ class JsPartyManagementService(
     caller =>
       request => {
         partyManagementClient
-          .serviceStub(caller.token())(request.traceContext)
+          .serviceStub(caller.token())(caller.traceContext())
           .generateExternalPartyTopology(request.in)
           .resultToRight
       }
@@ -182,26 +184,26 @@ object JsPartyManagementService extends DocumentationEndpoints {
   val allocatePartyEndpoint = parties.post
     .in(jsonBody[js.AllocatePartyRequest])
     .out(jsonBody[party_management_service.AllocatePartyResponse])
-    .description("Allocate a new party to the participant node")
+    .protoRef(party_management_service.PartyManagementServiceGrpc.METHOD_ALLOCATE_PARTY)
 
   val allocateExternalPartyEndpoint = parties
     .in(external / sttp.tapir.stringToPath("allocate"))
     .post
     .in(jsonBody[party_management_service.AllocateExternalPartyRequest])
     .out(jsonBody[party_management_service.AllocateExternalPartyResponse])
-    .description("Allocate a new external party")
+    .protoRef(party_management_service.PartyManagementServiceGrpc.METHOD_ALLOCATE_EXTERNAL_PARTY)
 
   val listKnownPartiesEndpoint =
     parties.get
       .out(jsonBody[party_management_service.ListKnownPartiesResponse])
       .inPagedListParams()
-      .description("List all known parties.")
+      .protoRef(party_management_service.PartyManagementServiceGrpc.METHOD_LIST_KNOWN_PARTIES)
 
   val getParticipantIdEndpoint =
     parties.get
       .in(sttp.tapir.stringToPath("participant-id"))
       .out(jsonBody[party_management_service.GetParticipantIdResponse])
-      .description("Get participant id")
+      .protoRef(party_management_service.PartyManagementServiceGrpc.METHOD_GET_PARTICIPANT_ID)
 
   val getPartyEndpoint =
     parties.get
@@ -209,20 +211,22 @@ object JsPartyManagementService extends DocumentationEndpoints {
       .in(query[Option[String]]("identity-provider-id"))
       .in(query[List[String]]("parties"))
       .out(jsonBody[party_management_service.GetPartiesResponse])
-      .description("Get party details")
+      .protoRef(party_management_service.PartyManagementServiceGrpc.METHOD_GET_PARTIES)
 
   val updatePartyEndpoint = parties.patch
     .in(path[String](partyPath))
     .in(jsonBody[party_management_service.UpdatePartyDetailsRequest])
     .out(jsonBody[party_management_service.UpdatePartyDetailsResponse])
-    .description("Allocate a new party to the participant node")
+    .protoRef(party_management_service.PartyManagementServiceGrpc.METHOD_UPDATE_PARTY_DETAILS)
 
   val externalPartyGenerateTopologyEndpoint = parties
     .in(external / sttp.tapir.stringToPath("generate-topology"))
     .post
     .in(jsonBody[party_management_service.GenerateExternalPartyTopologyRequest])
     .out(jsonBody[party_management_service.GenerateExternalPartyTopologyResponse])
-    .description("Generate a topology for an external party")
+    .protoRef(
+      party_management_service.PartyManagementServiceGrpc.METHOD_GENERATE_EXTERNAL_PARTY_TOPOLOGY
+    )
 
   override def documentation: Seq[AnyEndpoint] = Seq(
     listKnownPartiesEndpoint,

@@ -15,6 +15,7 @@ import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.ViewType.TransactionViewType
 import com.digitalasset.canton.ledger.participant.state.SubmitterInfo
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.participant.DefaultParticipantStateValues
 import com.digitalasset.canton.participant.protocol.submission.TransactionConfirmationRequestFactory.{
   ParticipantAuthorizationError,
@@ -34,7 +35,6 @@ import com.digitalasset.canton.protocol.WellFormedTransaction.{
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.messages.EncryptedViewMessage.computeRandomnessLength
 import com.digitalasset.canton.sequencing.protocol.{
-  MaxRequestSizeToDeserialize,
   MediatorGroupRecipient,
   MemberRecipient,
   OpenEnvelope,
@@ -330,9 +330,7 @@ class TransactionConfirmationRequestFactoryTest
             TransactionViewType,
           )(
             ltvt,
-            MaxRequestSizeToDeserialize.Limit(
-              DynamicSynchronizerParameters.defaultMaxRequestSize.value
-            ),
+            defaultMaxBytesToDecompress,
           )
           .valueOr(err => fail(s"fail to encrypt view tree: $err"))
 
@@ -692,6 +690,63 @@ class TransactionConfirmationRequestFactoryTest
             )
         }
       }
+    }
+
+    "participants" when {
+      def runNoKeyTest(name: String, availableKeys: Set[KeyPurpose]): Unit =
+        name must {
+          "be rejected" in {
+            val noKeyCryptoSnapshot =
+              createCryptoSnapshot(defaultTopology, keyPurposes = availableKeys)
+            val factory = confirmationRequestFactory(Right(singleFetch.transactionTree))
+
+            ResourceUtil.withResourceM(
+              new SessionKeyStoreWithInMemoryCache(
+                CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+                timeouts,
+                loggerFactory,
+              )
+            ) { sessionKeyStore =>
+              loggerFactory.assertLoggedWarningsAndErrorsSeq(
+                factory
+                  .createConfirmationRequest(
+                    singleFetch.wellFormedUnsuffixedTransaction,
+                    submitterInfo,
+                    workflowId,
+                    singleFetch.keyResolver,
+                    mediator,
+                    noKeyCryptoSnapshot,
+                    sessionKeyStore,
+                    contractInstanceOfId,
+                    maxSequencingTime,
+                    testedProtocolVersion,
+                  )
+                  .value
+                  .failOnShutdown
+                  .map {
+                    case Left(ParticipantAuthorizationError(message)) =>
+                      message shouldBe s"$submittingParticipant does not host $submitter or is not active."
+                    case otherwise =>
+                      fail(
+                        s"should have failed with a participant authorization error, but returned result: $otherwise"
+                      )
+                  },
+                LogEntry.assertLogSeq(
+                  Seq.empty,
+                  mayContain = Seq(
+                    _.warningMessage should include(
+                      "has a synchronizer trust certificate, but no keys on synchronizer"
+                    )
+                  ),
+                ),
+              )
+            }
+          }
+        }
+
+      runNoKeyTest("they have no public keys", availableKeys = Set.empty)
+      runNoKeyTest("they have no public signing keys", availableKeys = Set(KeyPurpose.Encryption))
+      runNoKeyTest("they have no public encryption keys", availableKeys = Set(KeyPurpose.Signing))
     }
   }
 }

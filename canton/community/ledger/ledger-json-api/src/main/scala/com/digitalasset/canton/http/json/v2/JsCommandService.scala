@@ -31,7 +31,12 @@ import com.daml.ledger.api.v2.{
 import com.digitalasset.canton.auth.AuthInterceptor
 import com.digitalasset.canton.http.WebsocketConfig
 import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
-import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInput, v2Endpoint}
+import com.digitalasset.canton.http.json.v2.Endpoints.{
+  CallerContext,
+  TracedInput,
+  createProtoRef,
+  v2Endpoint,
+}
 import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.{
   JsCantonError,
@@ -42,6 +47,7 @@ import com.digitalasset.canton.http.json.v2.JsSchema.{
 import com.digitalasset.canton.http.json.v2.LegacyDTOs.toTransactionTree
 import com.digitalasset.canton.http.json.v2.damldefinitionsservice.Schema.Codecs.*
 import com.digitalasset.canton.ledger.client.LedgerClient
+import com.digitalasset.canton.logging.audit.ApiRequestLogger
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf
@@ -60,6 +66,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class JsCommandService(
     ledgerClient: LedgerClient,
     protocolConverters: ProtocolConverters,
+    override protected val requestLogger: ApiRequestLogger,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     val executionContext: ExecutionContext,
@@ -127,8 +134,8 @@ class JsCommandService(
     command_completion_service.CompletionStreamRequest,
     command_completion_service.CompletionStreamResponse,
     NotUsed,
-  ] = req => {
-    implicit val tc: TraceContext = req.traceContext
+  ] = _ => {
+    implicit val tc: TraceContext = caller.traceContext()
     prepareSingleWsStream(
       commandCompletionServiceClient(caller.token()).completionStream,
       Future.successful[command_completion_service.CompletionStreamResponse],
@@ -138,7 +145,7 @@ class JsCommandService(
   def submitAndWait(callerContext: CallerContext): TracedInput[JsCommands] => Future[
     Either[JsCantonError, SubmitAndWaitResponse]
   ] = req => {
-    implicit val tc: TraceContext = req.traceContext
+    implicit val tc: TraceContext = callerContext.traceContext()
     for {
       commands <- protocolConverters.Commands.fromJson(req.in)
       submitAndWaitRequest =
@@ -154,9 +161,8 @@ class JsCommandService(
   ): TracedInput[JsCommands] => Future[
     Either[JsCantonError, JsSubmitAndWaitForTransactionTreeResponse]
   ] = req => {
-    implicit val tc: TraceContext = req.traceContext
+    implicit val tc: TraceContext = callerContext.traceContext()
     for {
-
       commands <- protocolConverters.Commands.fromJson(req.in)
       submitAndWaitForTransactionRequest =
         SubmitAndWaitForTransactionRequest(
@@ -205,7 +211,7 @@ class JsCommandService(
   ): TracedInput[JsSubmitAndWaitForTransactionRequest] => Future[
     Either[JsCantonError, JsSubmitAndWaitForTransactionResponse]
   ] = req => {
-    implicit val tc: TraceContext = req.traceContext
+    implicit val tc: TraceContext = callerContext.traceContext()
     for {
       submitAndWaitRequest <- protocolConverters.SubmitAndWaitForTransactionRequest.fromJson(req.in)
       result <- commandServiceClient(callerContext.token())
@@ -220,7 +226,7 @@ class JsCommandService(
   ): TracedInput[command_service.SubmitAndWaitForReassignmentRequest] => Future[
     Either[JsCantonError, JsSubmitAndWaitForReassignmentResponse]
   ] = req => {
-    implicit val tc: TraceContext = req.traceContext
+    implicit val tc: TraceContext = callerContext.traceContext()
     for {
       result <- commandServiceClient(callerContext.token())
         .submitAndWaitForReassignment(req.in)
@@ -232,7 +238,7 @@ class JsCommandService(
   private def submitAsync(callerContext: CallerContext): TracedInput[JsCommands] => Future[
     Either[JsCantonError, command_submission_service.SubmitResponse]
   ] = req => {
-    implicit val tc: TraceContext = req.traceContext
+    implicit val tc: TraceContext = callerContext.traceContext()
     for {
       commands <- protocolConverters.Commands.fromJson(req.in)
       submitRequest =
@@ -248,7 +254,7 @@ class JsCommandService(
   ): TracedInput[command_submission_service.SubmitReassignmentRequest] => Future[
     Either[JsCantonError, command_submission_service.SubmitReassignmentResponse]
   ] = req => {
-    commandSubmissionServiceClient(callerContext.token())(req.traceContext)
+    commandSubmissionServiceClient(callerContext.token())(callerContext.traceContext())
       .submitReassignment(req.in)
       .resultToRight
   }
@@ -327,13 +333,13 @@ object JsCommandService extends DocumentationEndpoints {
     .in(sttp.tapir.stringToPath("submit-and-wait-for-transaction"))
     .in(jsonBody[JsSubmitAndWaitForTransactionRequest])
     .out(jsonBody[JsSubmitAndWaitForTransactionResponse])
-    .description("Submit a batch of commands and wait for the transaction response")
+    .protoRef(command_service.CommandServiceGrpc.METHOD_SUBMIT_AND_WAIT_FOR_TRANSACTION)
 
   val submitAndWaitForReassignmentEndpoint = commands.post
     .in(sttp.tapir.stringToPath("submit-and-wait-for-reassignment"))
     .in(jsonBody[command_service.SubmitAndWaitForReassignmentRequest])
     .out(jsonBody[JsSubmitAndWaitForReassignmentResponse])
-    .description("Submit a batch of reassignment commands and wait for the reassignment response")
+    .protoRef(command_service.CommandServiceGrpc.METHOD_SUBMIT_AND_WAIT_FOR_REASSIGNMENT)
 
   val submitAndWaitForTransactionTree = commands.post
     .in(sttp.tapir.stringToPath("submit-and-wait-for-transaction-tree"))
@@ -348,14 +354,14 @@ object JsCommandService extends DocumentationEndpoints {
     .in(sttp.tapir.stringToPath("submit-and-wait"))
     .in(jsonBody[JsCommands])
     .out(jsonBody[SubmitAndWaitResponse])
-    .description("Submit a batch of commands and wait for the completion details")
+    .protoRef(command_service.CommandServiceGrpc.METHOD_SUBMIT_AND_WAIT)
 
   val submitAsyncEndpoint = commands.post
     .in(sttp.tapir.stringToPath("async"))
     .in(sttp.tapir.stringToPath("submit"))
     .in(jsonBody[JsCommands])
     .out(jsonBody[command_submission_service.SubmitResponse])
-    .description("Submit a command asynchronously")
+    .protoRef(command_submission_service.CommandSubmissionServiceGrpc.METHOD_SUBMIT)
 
   val submitReassignmentAsyncEndpoint =
     commands.post
@@ -363,7 +369,7 @@ object JsCommandService extends DocumentationEndpoints {
       .in(sttp.tapir.stringToPath("submit-reassignment"))
       .in(jsonBody[command_submission_service.SubmitReassignmentRequest])
       .out(jsonBody[command_submission_service.SubmitReassignmentResponse])
-      .description("Submit reassignment command asynchronously")
+      .protoRef(command_submission_service.CommandSubmissionServiceGrpc.METHOD_SUBMIT_REASSIGNMENT)
 
   val completionStreamEndpoint =
     commands.get
@@ -376,14 +382,20 @@ object JsCommandService extends DocumentationEndpoints {
           CodecFormat.Json,
         ](PekkoStreams)
       )
-      .description("Get completions stream")
+      .protoRef(command_completion_service.CommandCompletionServiceGrpc.METHOD_COMPLETION_STREAM)
 
   val completionListEndpoint =
     commands.post
       .in(sttp.tapir.stringToPath("completions"))
       .in(jsonBody[command_completion_service.CompletionStreamRequest])
       .out(jsonBody[Seq[command_completion_service.CompletionStreamResponse]])
-      .description("Query completions list (blocking call)")
+      .description(s"""|
+           |Query completions list (blocking call)
+           |
+           |${createProtoRef(
+          command_completion_service.CommandCompletionServiceGrpc.METHOD_COMPLETION_STREAM
+        )}
+       """.stripMargin.trim)
       .inStreamListParamsAndDescription()
 
   override def documentation: Seq[AnyEndpoint] = Seq(

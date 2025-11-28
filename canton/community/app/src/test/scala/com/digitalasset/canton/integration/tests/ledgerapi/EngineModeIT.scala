@@ -8,7 +8,7 @@ import com.daml.ledger.api.v2.commands.{Command, Commands, CreateCommand}
 import com.daml.ledger.api.v2.value.{Identifier, Record, RecordField, Value}
 import com.daml.ledger.resources.ResourceContext
 import com.daml.ports.Port
-import com.digitalasset.canton.ProtocolVersionChecksFixtureAnyWordSpec
+import com.digitalasset.canton.TestPredicateFiltersFixtureAnyWordSpec
 import com.digitalasset.canton.config.AuthServiceConfig.Wildcard
 import com.digitalasset.canton.config.{CantonConfig, DbConfig}
 import com.digitalasset.canton.integration.ConfigTransforms.{
@@ -29,7 +29,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.testing.utils.TestModels
 import com.digitalasset.canton.util.JarResourceUtils
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.daml.lf.language.{LanguageMajorVersion, LanguageVersion}
+import com.digitalasset.daml.lf.language.LanguageVersion
 import com.google.protobuf
 import monocle.macros.syntax.lens.*
 
@@ -40,7 +40,7 @@ import scala.util.{Failure, Success}
 
 abstract class BaseEngineModeIT(supportDevLanguageVersions: Boolean)
     extends CantonFixtureIsolated
-    with ProtocolVersionChecksFixtureAnyWordSpec {
+    with TestPredicateFiltersFixtureAnyWordSpec {
 
   registerPlugin(EngineModePlugin(loggerFactory))
   registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
@@ -130,9 +130,9 @@ abstract class BaseEngineModeIT(supportDevLanguageVersions: Boolean)
 
     def accept(langVersion: LanguageVersion, version: String, mode: String) = {
       val protocolVersion =
-        if (LanguageVersion.StableVersions(LanguageMajorVersion.V2).contains(langVersion))
+        if (LanguageVersion.stableLfVersions.contains(langVersion))
           ProtocolVersion.latest
-        else if (LanguageVersion.EarlyAccessVersions(LanguageMajorVersion.V2).contains(langVersion))
+        else if (LanguageVersion.earlyAccessLfVersionsRange.contains(langVersion))
           ProtocolVersion.beta.lastOption.getOrElse(ProtocolVersion.dev)
         else if (supportDevLanguageVersions) ProtocolVersion.dev
         else fail(s"Unsupported language version: $langVersion")
@@ -160,17 +160,14 @@ abstract class BaseEngineModeIT(supportDevLanguageVersions: Boolean)
 
     inside(
       List(
-        LanguageVersion.StableVersions(LanguageVersion.Major.V2).max,
-        LanguageVersion.EarlyAccessVersions(LanguageVersion.Major.V2).max,
+        LanguageVersion.stableLfVersionsRange.max,
+        LanguageVersion.earlyAccessLfVersionsRange.max,
         LanguageVersion.v2_dev,
       )
     ) { case List(maxStableVersion, betaVersion, devVersion) =>
       if (!supportDevLanguageVersions) {
         accept(maxStableVersion, "stable", "stable")
-        if (
-          LanguageVersion.EarlyAccessVersions(LanguageVersion.Major.V2) == LanguageVersion
-            .StableVersions(LanguageVersion.Major.V2)
-        )
+        if (LanguageVersion.earlyAccessLfVersionsRange == LanguageVersion.stableLfVersionsRange)
           accept(betaVersion, "beta", "beta")
         else
           reject(betaVersion, "beta", "stable")

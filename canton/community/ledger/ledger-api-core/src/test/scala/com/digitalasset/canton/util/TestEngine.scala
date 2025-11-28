@@ -6,6 +6,8 @@ package com.digitalasset.canton.util
 import cats.implicits.toTraverseOps
 import com.daml.ledger.api.v2.commands.Commands.DeduplicationPeriod.Empty
 import com.daml.logging.LoggingContext
+import com.digitalasset.canton.FutureHelpers
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.crypto.{HashOps, HmacOps, Salt, TestSalt}
 import com.digitalasset.canton.ledger.api.validation.ValidateUpgradingPackageResolutions.ValidatedCommandPackageResolutionsSnapshot
@@ -14,9 +16,11 @@ import com.digitalasset.canton.ledger.api.validation.{
   ValidateUpgradingPackageResolutions,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.logging.NoLogging.noTracingLogger
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NoLogging}
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.TestContractHasher.SyncContractHasher
 import com.digitalasset.canton.util.TestEngine.{InMemoryPackageStore, TxAndMeta}
 import com.digitalasset.daml.lf.archive
 import com.digitalasset.daml.lf.archive.DamlLf
@@ -27,10 +31,10 @@ import com.digitalasset.daml.lf.data.{Ref, Time}
 import com.digitalasset.daml.lf.engine.*
 import com.digitalasset.daml.lf.engine.ResultNeedContract.Response
 import com.digitalasset.daml.lf.language.Ast.Package
-import com.digitalasset.daml.lf.language.{Ast, LanguageMajorVersion, LanguageVersion}
+import com.digitalasset.daml.lf.language.{Ast, LanguageVersion}
 import com.digitalasset.daml.lf.transaction.*
-import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.ContractId
+import com.digitalasset.daml.lf.value.{ContractIdVersion, Value}
 import io.grpc.StatusRuntimeException
 import org.scalatest.{EitherValues, OptionValues}
 
@@ -94,7 +98,7 @@ class TestEngine(
 
   val engine = new Engine(
     EngineConfig(
-      allowedLanguageVersions = LanguageVersion.AllVersions(LanguageMajorVersion.V2),
+      allowedLanguageVersions = LanguageVersion.allLfVersionsRange,
       iterationsBetweenInterruptions = iterationsBetweenInterruptions,
     )
   )
@@ -195,6 +199,7 @@ class TestEngine(
       submissionSeed = randomHash(),
       readAs = Set.empty,
       prefetchKeys = Seq.empty,
+      contractIdVersion = ContractIdVersion.V1,
     )
 
     val contractMap = storedContracts.map(c => c.contractId -> c).toMap
@@ -274,6 +279,7 @@ class TestEngine(
       preparationTime = testTimestamp,
       ledgerEffectiveTime = testTimestamp,
       packageResolution = packageResolution,
+      contractIdVersion = ContractIdVersion.V1,
     )
     consume(result, contracts)
   }
@@ -351,9 +357,20 @@ class TestEngine(
 
 }
 
-object TestEngine {
+object TestEngine extends FutureHelpers with EitherValues {
 
   private type TxAndMeta = (SubmittedTransaction, Transaction.Metadata)
+
+  def syncContractHasher(packagePaths: String*): SyncContractHasher = {
+    val testEngine = new TestEngine(packagePaths)
+    val hasher = ContractHasher(testEngine.engine, testEngine.packageResolver)
+    new TestContractHasher.SyncContractHasher {
+      private val ec =
+        Threading.singleThreadedExecutor("TestEngine.syncContractHasher", noTracingLogger)
+      override def hash(create: LfNodeCreate, hashingMethod: Hash.HashingMethod): LfHash =
+        hasher.hash(create, hashingMethod)(ec, TraceContext.empty).value.futureValueUS.value
+    }
+  }
 
   final case class InMemoryPackageStore(
       packages: Map[PackageId, (DamlLf.Archive, Ast.Package)] = Map.empty

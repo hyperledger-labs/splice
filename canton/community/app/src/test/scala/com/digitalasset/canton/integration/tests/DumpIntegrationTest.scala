@@ -110,7 +110,11 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
         PossiblyIgnoredProtocolEvent,
       ] =
         PossiblyIgnoredSequencedEvent
-          .fromProtoV30(testedProtocolVersion, cryptoPureApi(participant1.config))(
+          .fromProtoV30(
+            defaultMaxBytesToDecompress,
+            testedProtocolVersion,
+            cryptoPureApi(participant1.config),
+          )(
             dumpedLastEventP
           )
 // architecture-handbook-entry-end: DumpLastSequencedEventToFile
@@ -146,6 +150,7 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
       ]] =
         dumpedEventsP.map {
           PossiblyIgnoredSequencedEvent.fromProtoV30(
+            defaultMaxBytesToDecompress,
             testedProtocolVersion,
             cryptoPureApi(participant1.config),
           )(_)
@@ -186,6 +191,7 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
 
       val dumpedEventsOrErr = dumpedEventsP.map {
         PossiblyIgnoredSequencedEvent.fromProtoV30(
+          defaultMaxBytesToDecompress,
           testedProtocolVersion,
           cryptoPureApi(participant1.config),
         )(_)

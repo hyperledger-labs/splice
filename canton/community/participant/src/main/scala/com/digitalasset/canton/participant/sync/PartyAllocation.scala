@@ -14,7 +14,7 @@ import com.digitalasset.canton.ledger.participant.state.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.topology.ParticipantTopologyManagerError.IdentityManagerParentError
-import com.digitalasset.canton.participant.topology.{LedgerServerPartyNotifier, PartyOps}
+import com.digitalasset.canton.participant.topology.PartyOps
 import com.digitalasset.canton.topology.TopologyManagerError.MappingAlreadyExists
 import com.digitalasset.canton.topology.{
   ExternalPartyOnboardingDetails,
@@ -33,7 +33,6 @@ import scala.util.chaining.*
 private[sync] class PartyAllocation(
     participantId: ParticipantId,
     partyOps: PartyOps,
-    partyNotifier: LedgerServerPartyNotifier,
     isActive: () => Boolean,
     connectedSynchronizersLookup: ConnectedSynchronizersLookup,
     timeouts: ProcessingTimeout,
@@ -100,19 +99,6 @@ private[sync] class PartyAllocation(
               .rpcStatus()
           ),
         )
-        _ <-
-          if (externalPartyOnboardingDetails.forall(_.fullyAllocatesParty)) {
-            partyNotifier
-              .expectPartyAllocationForNodes(
-                partyId,
-                participantId,
-                validatedSubmissionId,
-              )
-              .leftMap[SubmissionResult] { err =>
-                reject(err, Some(Code.ABORTED))
-              }
-              .toEitherT[FutureUnlessShutdown]
-          } else EitherT.pure[FutureUnlessShutdown, SubmissionResult](())
         _ <- (externalPartyOnboardingDetails match {
           case Some(details) =>
             partyOps.allocateExternalParty(participantId, details, synchronizerId)
@@ -128,23 +114,19 @@ private[sync] class PartyAllocation(
             case IdentityManagerParentError(e) => reject(e.cause, e.code.category.grpcCode)
             case e => reject(e.cause, e.code.category.grpcCode)
           }
-          .leftMap { x =>
-            partyNotifier.expireExpectedPartyAllocationForNodes(
-              partyId,
-              participantId,
-              validatedSubmissionId,
-            )
-            x
-          }
         // TODO(i25076) remove this waiting logic once topology events are published on the ledger api
-        // wait for parties to be available on the currently connected synchronizers
+        // wait for parties to be available on the specified connected synchronizers
         waitingSuccessful <- EitherT
           .right[SubmissionResult](
             if (externalPartyOnboardingDetails.forall(_.fullyAllocatesParty)) {
               connectedSynchronizersLookup.get(synchronizerId).traverse { connectedSynchronizer =>
                 connectedSynchronizer.topologyClient
                   .awaitUS(
-                    _.hostedOn(Set(partyId.toLf), participantId)
+                    _.inspectKnownParties(
+                      partyId.filterString,
+                      participantId.filterString,
+                      limit = 1,
+                    )
                       .map(_.nonEmpty),
                     timeouts.network.duration,
                   )

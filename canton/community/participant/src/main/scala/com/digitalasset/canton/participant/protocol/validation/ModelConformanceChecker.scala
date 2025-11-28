@@ -43,11 +43,12 @@ import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.PackageConsumer.PackageResolver
 import com.digitalasset.canton.util.collection.MapsUtil
 import com.digitalasset.canton.util.{ContractValidator, ErrorUtil, RoseTree}
 import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
 import com.digitalasset.canton.{LfKeyResolver, LfPartyId, checked}
-import com.digitalasset.daml.lf.data.Ref.{CommandId, Identifier, PackageId, PackageName}
+import com.digitalasset.daml.lf.data.Ref.{CommandId, PackageId, PackageName}
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext
@@ -179,23 +180,12 @@ class ModelConformanceChecker(
     }
 
     val resultFE = findValidSubtransactions(rootViewsWithInfo).map { case (errors, viewsTxs) =>
-      val (views, effects, txs) = viewsTxs.unzip3
+      val (_views, effects, txs) = viewsTxs.unzip3
 
-      val wftxO = NonEmpty.from(txs).flatMap { txsNE =>
-        WellFormedTransaction
-          .merge(txsNE)
-          .leftMap(mergeError =>
-            // TODO(i14473): Handle failures to merge a transaction while preserving transparency
-            ErrorUtil.internalError(
-              new IllegalStateException(
-                s"Model conformance check failure when merging transaction $updateId: $mergeError"
-              )
-            )
-          )
-          .toOption
-      }
+      val (wftxO, mergeErrorOO) = NonEmpty.from(txs).map(WellFormedTransaction.merge(_)).separate
+      val mergeErrorO = mergeErrorOO.flatten.map(MergeError.apply)
 
-      NonEmpty.from(errors) match {
+      NonEmpty.from(errors ++ mergeErrorO) match {
         case None =>
           wftxO match {
             case Some(wftx) => Right(Result(updateId, wftx))
@@ -401,10 +391,7 @@ class ModelConformanceChecker(
 
       informeeParticipants = informeeParticipantsByParty.values.flatten.toSet
       unvetted <- informeeParticipants.toSeq
-        .parTraverse(p =>
-          snapshot
-            .findUnvettedPackagesOrDependencies(p, packageIds, ledgerTime)
-        )
+        .parTraverse(p => snapshot.loadUnvettedPackagesOrDependencies(p, packageIds, ledgerTime))
 
     } yield {
       val combined = unvetted.combineAll.unknownOrUnvetted
@@ -594,23 +581,6 @@ object ModelConformanceChecker {
     )
   }
 
-  final case class InvalidInputContract(
-      contractId: LfContractId,
-      templateId: Identifier,
-      viewHash: ViewHash,
-  ) extends Error {
-
-    def cause =
-      "Details of supplied contract to not match those that result from command reinterpretation"
-
-    override protected def pretty: Pretty[InvalidInputContract] = prettyOfClass(
-      param("cause", _.cause.unquoted),
-      param("contractId", _.contractId),
-      param("templateId", _.templateId),
-      unnamedParam(_.viewHash),
-    )
-  }
-
   final case class UnvettedPackages(
       unvetted: Map[ParticipantId, Set[PackageId]]
   ) extends Error {
@@ -655,6 +625,10 @@ object ModelConformanceChecker {
           .mkShow("\n")
       )
     )
+  }
+
+  final case class MergeError(cause: String) extends Error {
+    override protected def pretty: Pretty[MergeError] = prettyOfParam(_.cause.unquoted)
   }
 
   final case class Result(

@@ -131,7 +131,7 @@ class JsonV2Tests
       val darPath = JarResourceUtils
         .resourceFile(
           TestModels.daml_lf_encoder_test_dar(
-            LanguageVersion.StableVersions(LanguageVersion.Major.V2).max.pretty
+            LanguageVersion.stableLfVersionsRange.max.pretty
           )
         )
         .toPath
@@ -693,15 +693,13 @@ class JsonV2Tests
         )
 
         def generateHex(length: Int): String =
-          RandomStringUtils.random(length, "0123456789abcdef").toLowerCase
+          RandomStringUtils.insecure.next(length, "0123456789abcdef").toLowerCase
 
         val randomTraceId = generateHex(32)
 
         val testContextHeaders =
           extractHeaders(W3CTraceContext(s"00-$randomTraceId-93bb0fa23a8fb53a-01"))
-
         for {
-
           _ <- loggerFactory.assertLogsSeq(SuppressionRule.Level(org.slf4j.event.Level.DEBUG))(
             postJsonRequest(
               uri =

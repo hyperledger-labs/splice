@@ -5,6 +5,7 @@ package com.digitalasset.canton.integration.tests.sequencer.channel
 
 import cats.data.EitherT
 import cats.syntax.either.*
+import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.console.LocalParticipantReference
 import com.digitalasset.canton.crypto.{Encrypted, SymmetricKey, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -18,6 +19,8 @@ import com.digitalasset.canton.sequencing.protocol.channel.{
 import com.digitalasset.canton.serialization.DefaultDeserializationError
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ByteStringUtil
+import org.scalatest.{EitherValues, OptionValues}
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
@@ -29,7 +32,9 @@ private[channel] final class TestRecorder(
     participant: LocalParticipantReference,
     synchronizerId: PhysicalSynchronizerId,
     staticSynchronizerParameters: StaticSynchronizerParameters,
-)(implicit executionContext: ExecutionContext, traceContext: TraceContext) {
+)(implicit executionContext: ExecutionContext, traceContext: TraceContext)
+    extends EitherValues
+    with OptionValues {
 
   private lazy val messages: mutable.Buffer[ConnectToSequencerChannelRequest] = mutable.Buffer.empty
 
@@ -98,7 +103,12 @@ private[channel] final class TestRecorder(
             val encryptedPayload = Encrypted.fromByteString(payload)
             val decrypted = crypto.pureCrypto.decryptWith(encryptedPayload, key)(Right(_))
             val res = decrypted match {
-              case Right(byteString) => byteString.toString("UTF-8")
+              case Right(byteString) =>
+                val decompressed =
+                  ByteStringUtil
+                    .decompressGzip(byteString, BaseTest.defaultMaxBytesToDecompress)
+                    .value
+                decompressed.toString("UTF-8")
               case Left(error) => error.toString
             }
             res
@@ -111,7 +121,7 @@ private[channel] final class TestRecorder(
     participant.testing
       .crypto_api()
       .forSynchronizer(synchronizerId, staticSynchronizerParameters)
-      .getOrElse(throw new RuntimeException("crypto api for synchronizer is unavailable"))
+      .value
 
   private[channel] def timestamp: CantonTimestamp =
     participant.topology.transactions

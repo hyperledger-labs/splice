@@ -8,7 +8,6 @@ import cats.syntax.either.*
 import cats.syntax.foldable.*
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
 import com.digitalasset.canton.admin.participant.v30.{ExportAcsOldResponse, ExportAcsResponse}
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
@@ -19,6 +18,7 @@ import com.digitalasset.canton.console.{
   Help,
   Helpful,
 }
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.grpc.FileStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
@@ -29,6 +29,7 @@ import com.digitalasset.canton.participant.admin.data.{
 }
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.protocol.{ContractInstance, LfContractId}
+import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.topology.{PartyId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.ResourceUtil
@@ -39,6 +40,7 @@ import io.grpc.Context
 
 import java.time.Instant
 import java.util.UUID
+import scala.util.{Failure, Success, Try}
 
 class ParticipantRepairAdministration(
     val consoleEnvironment: ConsoleEnvironment,
@@ -239,41 +241,25 @@ class ParticipantRepairAdministration(
         |
         |The contract IDs of the imported contracts will be checked ahead of starting the
         |process. If any contract ID doesn't match the contract ID scheme associated to the
-        |synchronizer where the contract is assigned to, the whole import process will fail
-        |depending on the value of `allowContractIdSuffixRecomputation`.
+        |synchronizer where the contract is assigned to, the whole import process will fail.
         |
-        |By default `allowContractIdSuffixRecomputation` is set to `false`. If set to `true`, any
-        |contract ID that wouldn't pass the check above will be recomputed. Note that the
-        |recomputation of contract IDs fails under the following circumstances:
-        | - the contract salt used to compute the contract ID is missing
-        | - the contract ID discriminator version is unknown
-        |
-        |Note that only the Canton-specific contract ID suffix will be recomputed. The
-        |discriminator cannot be recomputed and will be left as is.
-        |
-        |The recomputation will not be performed on contract IDs referenced in the payload of some
-        |imported contract but is missing from the import itself (this should mean that the
-        |contract was archived, which makes recomputation unnecessary).
-        |
-        |If the import process succeeds, the mapping from the old contract IDs to the new contract
-        |IDs will be returned. An empty map means that all contract IDs were valid and no contract
-        |ID was recomputed.
-        |
-        |DEPRECATION NOTICE: A future release removes this command, use `export_acs` instead.
+        |DEPRECATION NOTICE: A future release removes this command, use `import_acs` instead.
         """
+  )
+  @deprecated(
+    "Method import_acs_old has been deprecated. Use import_acs instead. For party replication, see participant.parties.import_party_acs",
+    since = "3.4",
   )
   def import_acs_old(
       inputFile: String = ParticipantRepairAdministration.ExportAcsDefaultFile,
       workflowIdPrefix: String = "",
-      allowContractIdSuffixRecomputation: Boolean = false,
-  ): Map[LfContractId, LfContractId] =
+  ): Unit =
     check(FeatureFlag.Repair) {
       consoleEnvironment.run {
         runner.adminCommand(
           ParticipantAdminCommands.ParticipantRepairManagement.ImportAcsOld(
             ByteString.copyFrom(File(inputFile).loadBytes),
             if (workflowIdPrefix.nonEmpty) workflowIdPrefix else s"import-${UUID.randomUUID}",
-            allowContractIdSuffixRecomputation = allowContractIdSuffixRecomputation,
           )
         )
       }
@@ -299,7 +285,7 @@ class ParticipantRepairAdministration(
   )
   def export_acs(
       parties: Set[PartyId],
-      ledgerOffset: NonNegativeLong,
+      ledgerOffset: Long,
       exportFilePath: String = "canton-acs-export.gz",
       excludedStakeholders: Set[PartyId] = Set.empty,
       synchronizerId: Option[SynchronizerId] = None,
@@ -331,6 +317,38 @@ class ParticipantRepairAdministration(
       )
     }
 
+  @Help.Summary("Write active contracts to a file")
+  @Help.Description(
+    """The file can be imported using command `import_acs`.
+      |
+      |The arguments are:
+      |- contracts: Contracts to be written
+      |- protocolVersion: Protocol version of the synchronizer of the contracts
+      |"""
+  )
+  def write_contracts_to_file(
+      contracts: Seq[com.daml.ledger.api.v2.state_service.ActiveContract],
+      protocolVersion: ProtocolVersion,
+      exportFilePath: String = "canton-acs-export.gz",
+  ): Unit = {
+    val output = File(exportFilePath).newGzipOutputStream()
+    val res = contracts.traverse_ { lapiContract =>
+      val contract = com.digitalasset.canton.participant.admin.data.ActiveContract
+        .create(lapiContract)(protocolVersion)
+
+      Try(contract.writeDelimitedTo(output))
+    }
+    output.close()
+
+    res match {
+      case Failure(exception) =>
+        consoleEnvironment.raiseError(
+          s"Unable to write contracts to file $exportFilePath: ${exception.getMessage}"
+        )
+      case Success(()) =>
+    }
+  }
+
   @Help.Summary("Import active contracts from an Active Contract Set (ACS) snapshot file.")
   @Help.Description(
     """This command imports contracts from an ACS snapshot file into the participant's ACS. It
@@ -342,27 +360,11 @@ class ParticipantRepairAdministration(
       |where the contract is assigned to, the whole import process fails depending on the value
       |of `contractImportMode`.
       |
-      |By default `contractImportMode` is set to `ContractImportMode.Validation`. If set to
-      |`ContractImportMode.Recomputation`, any contract ID that wouldn't pass the check above
-      |will be recomputed. Note that the recomputation of contract IDs fails under the following
-      |circumstances:
-      | - the contract salt used to compute the contract ID is missing
-      | - the contract ID discriminator version is unknown
+      |By default `contractImportMode` is set to `ContractImportMode.Validation`.
       |
-      |Note that only the Canton-specific contract ID suffix will be recomputed. The
-      |discriminator cannot be recomputed and will be left as is.
-      |
-      |The recomputation will not be performed on contract IDs referenced in the payload of some
-      |imported contract but is missing from the import itself (this should mean that the
-      |contract was archived, which makes recomputation unnecessary).
-      |
-      |Expert only: As validation or recomputation on contract IDs may lengthen the import
+      |Expert only: As validation of contract IDs may lengthen the import
       |significantly, you have the option to simply accept the contract IDs as they are using
       |`ContractImportMode.Accept`.
-      |
-      |If the import process succeeds, the mapping from the old contract IDs to the new contract
-      |IDs will be returned. An empty map means that all contract IDs were valid, or have been
-      |accept as they are, and no contract ID was recomputed.
       |
       |The arguments are:
       |- importFilePath: The path denoting the file from where the ACS snapshot will be read.
@@ -371,7 +373,7 @@ class ParticipantRepairAdministration(
       |                  transactions generated by this import.
       |                  Defaults to "import-<random_UUID>" when unspecified.
       |- contractImportMode: Governs contract authentication processing on import. Options include
-      |                      Validation (default), [Accept, Recomputation].
+      |                      Validation (default), [Accept].
       |- representativePackageIdOverride: Defines override mappings for assigning
       |                                   representative package IDs to contracts upon ACS import.
       |- excludedStakeholders: When defined, any contract that has one or more of these
@@ -385,7 +387,7 @@ class ParticipantRepairAdministration(
       representativePackageIdOverride: RepresentativePackageIdOverride =
         RepresentativePackageIdOverride.NoOverride,
       excludedStakeholders: Set[PartyId] = Set.empty,
-  ): Map[LfContractId, LfContractId] =
+  ): Unit =
     check(FeatureFlag.Repair) {
       consoleEnvironment.run {
         runner.adminCommand(
@@ -422,8 +424,7 @@ class ParticipantRepairAdministration(
       synchronizerId: SynchronizerId,
       protocolVersion: ProtocolVersion,
       contracts: Seq[RepairContract],
-      allowContractIdSuffixRecomputation: Boolean = false,
-  ): Map[LfContractId, LfContractId] = {
+  ): Unit = {
 
     val temporaryFile = File.newTemporaryFile(suffix = ".gz")
     val outputStream = temporaryFile.newGzipOutputStream()
@@ -453,7 +454,6 @@ class ParticipantRepairAdministration(
           ParticipantAdminCommands.ParticipantRepairManagement.ImportAcsOld(
             bytes,
             workflowIdPrefix = s"import-${UUID.randomUUID}",
-            allowContractIdSuffixRecomputation = allowContractIdSuffixRecomputation,
           )
         )
       }
@@ -553,10 +553,49 @@ class ParticipantRepairAdministration(
       consoleEnvironment.run {
         runner.adminCommand(
           ParticipantAdminCommands.ParticipantRepairManagement
-            .RollbackUnassignment(reassignmentId = reassignmentId, source = source, target = target)
+            .RollbackUnassignment(
+              reassignmentId = reassignmentId,
+              source = source,
+              target = target,
+            )
         )
       }
     }
+
+  // TODO(#28972) Remove preview flag
+  @Help.Summary("Perform a logical synchronizer upgrade")
+  @Help.Description("""This command allows to perform an offline logical synchronizer upgrade.
+       It should only be used if the node was offline at the time of the upgrade and the synchronizer was decommissioned.
+
+       Arguments:
+       - currentPhysicalSynchronizerId - id of the synchronizer that should be upgraded
+       - successorPhysicalSynchronizerId - id of the new synchronizer
+       - announcedUpgradeTime - time at which the upgrade happened
+       - successorConfig - configuration to connect to the new synchronizer
+       - validation - The validations which need to be done to the connection.
+      """)
+  def perform_synchronizer_upgrade(
+      currentPhysicalSynchronizerId: PhysicalSynchronizerId,
+      successorPhysicalSynchronizerId: PhysicalSynchronizerId,
+      announcedUpgradeTime: CantonTimestamp,
+      successorConfig: SynchronizerConnectionConfig,
+      validation: SequencerConnectionValidation = SequencerConnectionValidation.All,
+  ): Unit = check(FeatureFlag.Preview) {
+    check(FeatureFlag.Repair) {
+      consoleEnvironment.run {
+        runner.adminCommand(
+          ParticipantAdminCommands.ParticipantRepairManagement
+            .PerformSynchronizerUpgrade(
+              currentPSId = currentPhysicalSynchronizerId,
+              successorPSId = successorPhysicalSynchronizerId,
+              upgradeTime = announcedUpgradeTime,
+              successorConfig = successorConfig,
+              sequencerConnectionValidation = validation,
+            )
+        )
+      }
+    }
+  }
 }
 
 object ParticipantRepairAdministration {

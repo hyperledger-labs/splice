@@ -9,6 +9,7 @@ import com.daml.metrics.api.MetricsContext
 import com.daml.tracing.NoOpTelemetry
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -137,13 +138,25 @@ final class BftBlockOrderer(
     metrics: BftOrderingMetrics,
     override val loggerFactory: NamedLoggerFactory,
     queryCostMonitoring: Option[QueryCostMonitoringConfig],
-)(implicit executionContext: ExecutionContext, materializer: Materializer, tracer: Tracer)
+    executionContext: ExecutionContext,
+)(implicit materializer: Materializer, tracer: Tracer)
     extends BlockOrderer
     with NamedLogging
     with FlagCloseableAsync
     with HasCloseContext {
 
   import BftBlockOrderer.*
+
+  implicit val ec: ExecutionContext =
+    config.dedicatedExecutionContextDivisor.fold(executionContext) { divisor =>
+      Threading.newExecutionContext(
+        "bft-orderer-dedicated-ec",
+        noTracingLogger,
+        PositiveInt.tryCreate(
+          Threading.detectNumberOfThreads(noTracingLogger).value / divisor
+        ),
+      )
+    }
 
   require(
     sequencerSubscriptionInitialHeight >= BlockNumber.First,
@@ -331,7 +344,7 @@ final class BftBlockOrderer(
           .subscription()
           .map(b =>
             // The server is started earlier if standalone mode is enabled
-            standaloneServiceRef.get.foreach(_.push(b))
+            standaloneServiceRef.get.foreach(_.push(b.value))
           )
           .toMat(Sink.ignore)(Keep.both),
         errorLogMessagePrefix = "Failed to handle state changes",
@@ -608,13 +621,15 @@ final class BftBlockOrderer(
   }
 
   override def subscribe(
-  )(implicit traceContext: TraceContext): Source[RawLedgerBlock, KillSwitch] =
+  )(implicit traceContext: TraceContext): Source[Traced[RawLedgerBlock], KillSwitch] =
     config.standalone.fold(
-      blockSubscription.subscription().map(BlockFormat.blockOrdererBlockToRawLedgerBlock(logger))
+      blockSubscription
+        .subscription()
+        .map(tracedBlock => tracedBlock.map(BlockFormat.blockOrdererBlockToRawLedgerBlock(logger)))
     ) { _ =>
       logger.warn("BFT standalone mode enabled: not subscribing to any blocks")
       Source
-        .empty[RawLedgerBlock]
+        .empty[Traced[RawLedgerBlock]]
         .viaMat(KillSwitches.single)(
           Keep.right
         ) // In non-standalone mode, the block subscription is not used

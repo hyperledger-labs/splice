@@ -111,6 +111,8 @@ final class IssConsensusModule[E <: Env[E]](
 ) extends Consensus[E]
     with HasDelayedInit[Consensus.Message[E]] {
 
+  logger.info(s"Consensus module instantiated with epoch length $epochLength")(TraceContext.empty)
+
   private val thisNode = initialState.topologyInfo.thisNode
 
   // An instance of state transfer manager to be used only in a server role.
@@ -463,41 +465,53 @@ final class IssConsensusModule[E <: Env[E]](
             commitCertificate: CommitCertificate,
             hasCompletedLedSegment,
           ) =>
-        // Note that (hopefully) the below message is the only block-level INFO log in the BFT Orderer.
-        //  We intend to minimize the number of logs on the hot path.
-        logger.info(s"Block ${orderedBlock.metadata} has been ordered")
-        emitConsensusLatencyStats(metrics)
-
-        if (hasCompletedLedSegment)
-          consensusWaitingForEpochCompletionSince = Some(Instant.now())
-
-        epochState.confirmBlockCompleted(orderedBlock.metadata, commitCertificate)
-
-        epochState.epochCompletionStatus match {
-          case EpochState.Complete(commitCertificates) =>
-            emitEpochCompletionWaitLatency()
-            consensusWaitingForEpochStartSince = Some(Instant.now())
-            storeEpochCompletion(commitCertificates).discard
-          case _ => ()
-        }
-
-        // TODO(#16761) - ensure the output module gets and processes the ordered block
-        val epochNumber = epochState.epoch.info.number
+        val epochNumber = orderedBlock.metadata.epochNumber
         val blockNumber = orderedBlock.metadata.blockNumber
-        val blockSegment = epochState.epoch.segments
-          .find(_.slotNumbers.contains(blockNumber))
-          .getOrElse(abort(s"block $blockNumber not part of any segment in epoch $epochNumber"))
-        dependencies.output.asyncSend(
-          Output.BlockOrdered(
-            OrderedBlockForOutput(
-              orderedBlock,
-              commitCertificate.prePrepare.message.viewNumber,
-              blockSegment.originalLeader,
-              blockNumber == epochState.epoch.info.lastBlockNumber,
-              OrderedBlockForOutput.Mode.FromConsensus,
+        val thisNodeEpochNumber = epochState.epoch.info.number
+
+        if (epochNumber < thisNodeEpochNumber) {
+          logger.info(
+            s"$messageType: dropping block completion for old epoch $epochNumber (likely preempted by state transfer)"
+          )
+        } else if (epochNumber > thisNodeEpochNumber) {
+          abort(
+            s"Trying to complete block in future epoch $epochNumber before local epoch $thisNodeEpochNumber has caught up!"
+          )
+        } else {
+          // Note that (hopefully) the below message is the only block-level INFO log in the BFT Orderer.
+          //  We intend to minimize the number of logs on the hot path.
+          logger.info(s"Block ${orderedBlock.metadata} has been ordered")
+          emitConsensusLatencyStats(metrics)
+
+          if (hasCompletedLedSegment)
+            consensusWaitingForEpochCompletionSince = Some(Instant.now())
+
+          epochState.confirmBlockCompleted(orderedBlock.metadata, commitCertificate)
+
+          epochState.epochCompletionStatus match {
+            case EpochState.Complete(commitCertificates) =>
+              emitEpochCompletionWaitLatency()
+              consensusWaitingForEpochStartSince = Some(Instant.now())
+              storeEpochCompletion(commitCertificates).discard
+            case _ => ()
+          }
+
+          // TODO(#16761) - ensure the output module gets and processes the ordered block
+          val blockSegment = epochState.epoch.segments
+            .find(_.slotNumbers.contains(blockNumber))
+            .getOrElse(abort(s"block $blockNumber not part of any segment in epoch $epochNumber"))
+          dependencies.output.asyncSend(
+            Output.BlockOrdered(
+              OrderedBlockForOutput(
+                orderedBlock,
+                commitCertificate.prePrepare.message.viewNumber,
+                blockSegment.originalLeader,
+                blockNumber == epochState.epoch.info.lastBlockNumber,
+                OrderedBlockForOutput.Mode.FromConsensus,
+              )
             )
           )
-        )
+        }
 
       case Consensus.ConsensusMessage.CompleteEpochStored(epoch, commitCertificates) =>
         advanceEpoch(epoch, commitCertificates, Some(messageType))

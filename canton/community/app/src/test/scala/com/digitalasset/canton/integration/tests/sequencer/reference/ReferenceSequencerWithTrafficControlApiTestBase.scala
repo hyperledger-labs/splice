@@ -20,7 +20,7 @@ import com.digitalasset.canton.crypto.{HashPurpose, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.CantonNodeParameters
-import com.digitalasset.canton.integration.tests.sequencer.reference.ReferenceSequencerWithTrafficControlApiTestBase.EnterpriseRateLimitManagerTest
+import com.digitalasset.canton.integration.tests.sequencer.reference.ReferenceSequencerWithTrafficControlApiTestBase.RateLimitManagerImplTest
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{LogEntry, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.{
@@ -42,10 +42,7 @@ import com.digitalasset.canton.store.db.DbTest
 import com.digitalasset.canton.synchronizer.block.AsyncWriterParameters
 import com.digitalasset.canton.synchronizer.metrics.{SequencerHistograms, SequencerMetrics}
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory
-import com.digitalasset.canton.synchronizer.sequencer.config.{
-  SequencerNodeParameterConfig,
-  SequencerNodeParameters,
-}
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameters
 import com.digitalasset.canton.synchronizer.sequencer.store.{DbSequencerStore, DbSequencerStoreTest}
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   SequencerRateLimitError,
@@ -65,7 +62,7 @@ import com.digitalasset.canton.synchronizer.sequencing.traffic.store.{
 }
 import com.digitalasset.canton.synchronizer.sequencing.traffic.{
   DefaultTrafficConsumedManagerFactory,
-  EnterpriseSequencerRateLimitManager,
+  SequencerRateLimitManagerImpl,
   TrafficConsumedManagerFactory,
   TrafficPurchasedManager,
 }
@@ -223,7 +220,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
       availableUpToInclusive: CantonTimestamp = CantonTimestamp.MaxValue,
       sequencerTrafficConfig: SequencerTrafficConfig = SequencerTrafficConfig(),
   )(
-      f: (Sequencer, EnterpriseRateLimitManagerTest) => FutureUnlessShutdown[Unit]
+      f: (Sequencer, RateLimitManagerImplTest) => FutureUnlessShutdown[Unit]
   )(implicit mat: Materializer, env: Env): FutureUnlessShutdown[Assertion] = {
     val (sequencer, rlm) = createSequencer(
       config,
@@ -255,7 +252,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
   )(implicit
       mat: Materializer,
       env: Env,
-  ): (Sequencer, EnterpriseRateLimitManagerTest) = {
+  ): (Sequencer, RateLimitManagerImplTest) = {
     val parameters = List(
       SynchronizerParameters.WithValidity(
         validFrom = CantonTimestamp.Epoch.immediatePredecessor,
@@ -295,6 +292,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         dontWarnOnDeprecatedPV = false,
       ),
       maxConfirmationRequestsBurstFactor = PositiveDouble.tryCreate(1.0),
+      sequencingTimeLowerBoundExclusive = None,
       asyncWriter = AsyncWriterParameters(),
     )
     // Important to create the histograms before the factory, because creating the factory will
@@ -351,7 +349,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
             .getOrElse(None)
         }
     }
-    val rateLimitManager = new EnterpriseRateLimitManagerTest(
+    val rateLimitManager = new RateLimitManagerImplTest(
       trafficPurchasedManager,
       env.trafficConsumedStore,
       loggerFactory,
@@ -419,8 +417,6 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         ),
         FutureSupervisor.Noop,
         SequencerTrafficConfig(),
-        sequencingTimeLowerBoundExclusive =
-          SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
         runtimeReady = FutureUnlessShutdown.unit,
       )
       .futureValueUS
@@ -1180,7 +1176,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
 
 object ReferenceSequencerWithTrafficControlApiTestBase {
   // Test class allowing to override some behaviors of the rate limit manager to test the reaction of the sequencer
-  private[sequencer] class EnterpriseRateLimitManagerTest(
+  private[sequencer] class RateLimitManagerImplTest(
       trafficPurchasedManager: TrafficPurchasedManager,
       trafficConsumedStore: TrafficConsumedStore,
       loggerFactory: NamedLoggerFactory,
@@ -1193,7 +1189,7 @@ object ReferenceSequencerWithTrafficControlApiTestBase {
         DefaultTrafficConsumedManagerFactory,
       eventCostCalculator: EventCostCalculator,
   )(implicit executionContext: ExecutionContext)
-      extends EnterpriseSequencerRateLimitManager(
+      extends SequencerRateLimitManagerImpl(
         trafficPurchasedManager,
         trafficConsumedStore,
         loggerFactory,

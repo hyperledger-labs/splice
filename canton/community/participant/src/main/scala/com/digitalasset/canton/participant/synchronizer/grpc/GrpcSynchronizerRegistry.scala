@@ -29,11 +29,11 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.metrics.ConnectedSynchronizerMetrics
 import com.digitalasset.canton.participant.store.SyncPersistentState
+import com.digitalasset.canton.participant.store.memory.PackageMetadataView
 import com.digitalasset.canton.participant.sync.SyncPersistentStateManager
 import com.digitalasset.canton.participant.synchronizer.*
 import com.digitalasset.canton.participant.synchronizer.SynchronizerRegistryError.SynchronizerRegistryInternalError
 import com.digitalasset.canton.participant.topology.{
-  LedgerServerPartyNotifier,
   ParticipantTopologyDispatcher,
   TopologyComponentFactory,
 }
@@ -53,7 +53,6 @@ import com.digitalasset.canton.sequencing.{
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithInit
-import com.digitalasset.canton.topology.store.PackageDependencyResolver
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterAsyncOps
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
@@ -87,10 +86,9 @@ class GrpcSynchronizerRegistry(
     testingConfig: TestingConfigInternal,
     recordSequencerInteractions: AtomicReference[Option[RecordingConfig]],
     replaySequencerConfig: AtomicReference[Option[ReplayConfig]],
-    packageDependencyResolver: PackageDependencyResolver,
+    packageMetadataView: PackageMetadataView,
     metrics: SynchronizerAlias => ConnectedSynchronizerMetrics,
     sequencerInfoLoader: SequencerInfoLoader,
-    partyNotifier: LedgerServerPartyNotifier,
     override protected val futureSupervisor: FutureSupervisor,
     protected val loggerFactory: NamedLoggerFactory,
 )(
@@ -332,8 +330,7 @@ class GrpcSynchronizerRegistry(
         recordSequencerInteractions,
         replaySequencerConfig,
         topologyDispatcher,
-        packageDependencyResolver,
-        partyNotifier,
+        packageMetadataView,
         metrics,
       )
     } yield {

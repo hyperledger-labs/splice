@@ -17,16 +17,25 @@ import com.digitalasset.canton.auth.*
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeDurationConverter.NonNegativeDurationToMillisConverter
-import com.digitalasset.canton.config.{AdminTokenConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.{AdminTokenConfig, ApiLoggingConfig, ProcessingTimeout}
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.http.metrics.HttpApiMetrics
 import com.digitalasset.canton.http.{HttpApiServer, JsonApiConfig}
 import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher
-import com.digitalasset.canton.ledger.api.*
 import com.digitalasset.canton.ledger.api.health.HealthChecks
 import com.digitalasset.canton.ledger.api.util.TimeProvider
+import com.digitalasset.canton.ledger.api.{
+  CumulativeFilter,
+  EventFormat,
+  IdentityProviderId,
+  ParticipantAuthorizationFormat,
+  TopologyFormat,
+  UpdateFormat,
+  User,
+  UserRight,
+}
 import com.digitalasset.canton.ledger.localstore.*
 import com.digitalasset.canton.ledger.localstore.api.UserManagementStore
 import com.digitalasset.canton.ledger.participant.state.metrics.TimedSyncService
@@ -37,14 +46,15 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.networking.grpc.ratelimiting.ActiveRequestCounterInterceptor
-import com.digitalasset.canton.networking.grpc.{ApiRequestLogger, CantonGrpcUtil}
+import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcRequestLoggingInterceptor}
 import com.digitalasset.canton.participant.config.{
   LedgerApiServerConfig,
   ParticipantNodeConfig,
   TestingTimeServiceConfig,
 }
 import com.digitalasset.canton.participant.store.{
-  ContractStore,
+  LedgerApiContractStore,
+  LedgerApiContractStoreImpl,
   ParticipantNodePersistentState,
   ParticipantPruningStore,
   PruningOffsetServiceImpl,
@@ -109,7 +119,7 @@ class LedgerApiServer(
     cantonParameterConfig: ParticipantNodeParameters,
     testingTimeService: Option[TimeServiceBackend],
     adminTokenDispenser: CantonAdminTokenDispenser,
-    participantContractStore: Eval[ContractStore],
+    participantContractStore: Eval[LedgerApiContractStore],
     participantPruningStore: Eval[ParticipantPruningStore],
     enableCommandInspection: Boolean,
     tracerProvider: TracerProvider,
@@ -395,8 +405,14 @@ class LedgerApiServer(
         interactiveSubmissionEnricher = interactiveSubmissionEnricher,
         keepAlive = serverConfig.keepAliveServer,
         packagePreferenceBackend = packagePreferenceBackend,
+        apiLoggingConfig = cantonParameterConfig.loggingConfig.api,
       )
-      _ <- startHttpApiIfEnabled(timedSyncService, authInterceptor, packagePreferenceBackend)
+      _ <- startHttpApiIfEnabled(
+        timedSyncService,
+        authInterceptor,
+        packagePreferenceBackend,
+        cantonParameterConfig.loggingConfig.api,
+      )
       _ <- serverConfig.userManagementService.additionalAdminUserId
         .fold(ResourceOwner.unit) { rawUserId =>
           ResourceOwner.forFuture { () =>
@@ -461,49 +477,48 @@ class LedgerApiServer(
 
   private def getInterceptors(
       indexDbExecutor: QueueAwareExecutor & NamedExecutor
-  ): List[ServerInterceptor] =
-    List(
-      new ApiRequestLogger(
-        loggerFactory,
-        cantonParameterConfig.loggingConfig.api,
-      ),
-      GrpcTelemetry
-        .builder(tracerProvider.openTelemetry)
-        .build()
-        .newServerInterceptor(),
-    ) ::: serverConfig.rateLimit
-      .map(rateLimit =>
-        RateLimitingInterceptorFactory.create(
-          loggerFactory = loggerFactory,
-          config = rateLimit,
-          additionalChecks = List(
-            ThreadpoolCheck(
-              name = "Environment Execution Threadpool",
-              limit = rateLimit.maxApiServicesQueueSize,
-              queue = executionContext,
-              loggerFactory = loggerFactory,
-            ),
-            ThreadpoolCheck(
-              name = "Index DB Threadpool",
-              limit = rateLimit.maxApiServicesIndexDbQueueSize,
-              queue = indexDbExecutor,
-              loggerFactory = loggerFactory,
-            ),
+  ): List[ServerInterceptor] = List(
+    new GrpcRequestLoggingInterceptor(
+      loggerFactory,
+      cantonParameterConfig.loggingConfig.api,
+    ),
+    GrpcTelemetry
+      .builder(tracerProvider.openTelemetry)
+      .build()
+      .newServerInterceptor(),
+  ) ::: (serverConfig.rateLimit
+    .map(rateLimit =>
+      RateLimitingInterceptorFactory.create(
+        loggerFactory = loggerFactory,
+        config = rateLimit,
+        additionalChecks = List(
+          ThreadpoolCheck(
+            name = "Environment Execution Threadpool",
+            limit = rateLimit.maxApiServicesQueueSize,
+            queue = executionContext,
+            loggerFactory = loggerFactory,
           ),
-        )
+          ThreadpoolCheck(
+            name = "Index DB Threadpool",
+            limit = rateLimit.maxApiServicesIndexDbQueueSize,
+            queue = indexDbExecutor,
+            loggerFactory = loggerFactory,
+          ),
+        ),
       )
-      .toList ::: serverConfig.limits
-      .map(cfg =>
-        new ActiveRequestCounterInterceptor(
-          "ledger-api",
-          cfg.active,
-          cfg.warnOnUndefinedLimits,
-          cfg.throttleLoggingRatePerSecond,
-          grpcApiMetrics.requests,
-          loggerFactory,
-        )
+    )
+    .toList) ::: (serverConfig.limits
+    .map(cfg =>
+      new ActiveRequestCounterInterceptor(
+        "ledger-api",
+        cfg.active,
+        cfg.warnOnUndefinedLimits,
+        cfg.throttleLoggingRatePerSecond,
+        grpcApiMetrics.requests,
+        loggerFactory,
       )
-      .toList
+    )
+    .toList)
 
   private def getLedgerFeatures: LedgerFeatures = LedgerFeatures(
     staticTime = testingTimeService.isDefined,
@@ -521,6 +536,7 @@ class LedgerApiServer(
       packageSyncService: PackageSyncService,
       authInterceptor: AuthInterceptor,
       packagePreferenceBackend: PackagePreferenceBackend,
+      apiLoggingConfig: ApiLoggingConfig,
   ): ResourceOwner[Unit] =
     if (!jsonApiConfig.enabled)
       ResourceOwner.unit
@@ -546,6 +562,7 @@ class LedgerApiServer(
           loggerFactory,
           authInterceptor,
           packagePreferenceBackend = packagePreferenceBackend,
+          apiLoggingConfig,
         )(
           jsonApiMetrics
         ).afterReleased(noTracingLogger.info("JSON-API HTTP Server is released"))
@@ -603,7 +620,9 @@ object LedgerApiServer {
       cantonParameterConfig = parameters,
       testingTimeService = ledgerTestingTimeService,
       adminTokenDispenser = adminTokenDispenser,
-      participantContractStore = participantNodePersistentState.map(_.contractStore),
+      participantContractStore = participantNodePersistentState.map(state =>
+        LedgerApiContractStoreImpl(state.contractStore, loggerFactory)
+      ),
       participantPruningStore = participantNodePersistentState.map(_.pruningStore),
       enableCommandInspection = config.ledgerApi.enableCommandInspection,
       tracerProvider = tracerProvider,

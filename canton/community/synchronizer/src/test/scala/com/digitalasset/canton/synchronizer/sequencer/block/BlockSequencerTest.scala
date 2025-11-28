@@ -52,8 +52,8 @@ import com.digitalasset.canton.topology.processing.{
   TopologyTransactionTestFactory,
 }
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
-import com.digitalasset.canton.topology.store.ValidatedTopologyTransaction
 import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
+import com.digitalasset.canton.topology.store.{NoPackageDependencies, ValidatedTopologyTransaction}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import org.apache.pekko.NotUsed
@@ -121,7 +121,7 @@ class BlockSequencerTest
       mock[Clock],
       defaultStaticSynchronizerParameters,
       topologyStore,
-      StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
+      NoPackageDependencies,
       topologyConfig = TopologyConfig(),
       DefaultProcessingTimeouts.testing,
       FutureSupervisor.Noop,
@@ -131,7 +131,6 @@ class BlockSequencerTest
       SequencedTime(CantonTimestamp.Epoch),
       EffectiveTime(CantonTimestamp.Epoch),
       ApproximateTime(CantonTimestamp.Epoch),
-      potentialTopologyChange = true,
     )
     private val cryptoApi = SynchronizerCryptoClient.create(
       member = sequencer1,
@@ -180,6 +179,7 @@ class BlockSequencerTest
         store,
         dbSequencerStore = fakeDbSequencerStore,
         BlockSequencerConfig(),
+        useTimeProofsToObserveEffectiveTime = true,
         balanceStore,
         storage,
         FutureSupervisor.Noop,
@@ -217,7 +217,7 @@ class BlockSequencerTest
 
     override def subscribe()(implicit
         traceContext: TraceContext
-    ): Source[RawLedgerBlock, KillSwitch] =
+    ): Source[Traced[RawLedgerBlock], KillSwitch] =
       Source
         .fromIterator { () =>
           LazyList
@@ -226,7 +226,14 @@ class BlockSequencerTest
             .map { i =>
               if (n == i + 1)
                 completed.success(())
-              RawLedgerBlock(i.toLong, Seq.empty)
+              Traced(
+                RawLedgerBlock(
+                  blockHeight = i.toLong,
+                  baseSequencingTimeMicrosFromEpoch =
+                    CantonTimestamp.Epoch.toMicros, // Not relevant for the test
+                  Seq.empty,
+                )
+              )
             }
             .iterator
         }
@@ -260,8 +267,8 @@ class BlockSequencerTest
   class FakeBlockSequencerStateManager extends BlockSequencerStateManagerBase {
     override def processBlock(
         bug: BlockUpdateGenerator
-    ): Flow[BlockEvents, Traced[OrderedBlockUpdate], NotUsed] =
-      Flow[BlockEvents].mapConcat(_ => Seq.empty)
+    ): Flow[Traced[BlockEvents], Traced[OrderedBlockUpdate], NotUsed] =
+      Flow[Traced[BlockEvents]].mapConcat(_ => Seq.empty)
 
     override def applyBlockUpdate(
         dbSequencerIntegration: SequencerIntegration

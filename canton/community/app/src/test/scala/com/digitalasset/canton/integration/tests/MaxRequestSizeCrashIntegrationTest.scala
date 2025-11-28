@@ -99,8 +99,8 @@ sealed abstract class MaxRequestSizeCrashIntegrationTest
 
   // High request size
   private val overrideMaxRequestSize = NonNegativeInt.tryCreate(30_000)
-  // Request size chosen so that even TimeProof requests are rejected
-  private val lowMaxRequestSize = NonNegativeInt.zero
+  // Too low to allow create command to succeed. High enough for parameters to be updatable.
+  private val lowMaxRequestSize = NonNegativeInt.tryCreate(500)
 
   "Canton" should {
     "recover from failure due to too small request size " in { implicit env =>
@@ -146,7 +146,7 @@ sealed abstract class MaxRequestSizeCrashIntegrationTest
           }
 
           val matchError =
-            s"MaxViewSizeExceeded\\(view size = .*, max request size configured = .*\\)."
+            s"MaxViewSizeExceeded\\(view size .bytes. = .*, max request size configured .bytes. = .*\\)."
 
           val (commandId, _) = submitCommand(env.participant1)
 

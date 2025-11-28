@@ -1,9 +1,13 @@
-sdk-version: 3.4.4
+override-components: 
+  damlc: 
+    version: $DAML_VERSION
+  daml-script: 
+    version: $DAML_VERSION
 build-options: 
-- --target=2.2
+- --target=2.1
 name: CantonExamples
 source: .
-version: 3.4.8
+version: 3.5.0
 dependencies: 
 - daml-prim
 - daml-stdlib
