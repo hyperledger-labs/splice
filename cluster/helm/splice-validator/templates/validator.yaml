@@ -109,11 +109,11 @@ spec:
         - name: ADDITIONAL_CONFIG_BFT_SCAN
           value: |
             {{- $config := .Values.scanClientConfig }}
-            {{- with .Values.scanClientConfig.useLastKnownConnectionsForInitialization -}}
+            {{- with .Values.scanClientConfig.useLastKnownConnectionsForInitialization}}
             {{- if not . }}
             canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = false
-            {{- end -}}
-            {{- end -}}
+            {{- end}}
+            {{- end}}
             {{- $hasThreshold := $config.threshold }}
             {{- $hasTrustedSvs := $config.trustedSvs }}
             {{- if and $hasThreshold $hasTrustedSvs (ge (len $hasTrustedSvs) ($hasThreshold | int)) }}
