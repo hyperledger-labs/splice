@@ -19,7 +19,7 @@ $(dir)/format: $(dir)/.build
 	cd $(@D) && npm run format:fix
 
 .PHONY: $(dir)/unit-test
-$(dir)/unit-test:
+$(dir)/unit-test: $(dir)/.build
 	cd $(@D) && npm run test
 
 pulumi_projects ::= operator deployment gcp infra canton-network sv-runbook validator-runbook multi-validator cluster sv-canton validator1 splitwell

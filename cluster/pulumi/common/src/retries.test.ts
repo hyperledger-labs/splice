@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import { afterAll, expect, jest, test } from '@jest/globals';
 
 import { retry } from './retries';
@@ -8,7 +10,7 @@ afterAll(() => {
   consoleErrorMock.mockRestore();
 });
 
-test('retry runs the action again if it fails', async () => {
+test('retry runs the action again if it fails with an exception', async () => {
   let executionIndex = 0;
   async function unreliableAction(): Promise<void> {
     try {
