@@ -741,6 +741,13 @@ trait SvDsoStore
   ] =
     multiDomainAcsStore.listExpiredFromPayloadExpiry(splice.dsorules.Confirmation.COMPANION)
 
+  /** List stale vote execution instructions past their expiresAt */
+  def listStaleVoteExecutionInstructions: ListExpiredContracts[
+    VoteExecutionInstruction.ContractId,
+    VoteExecutionInstruction,
+  ] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(VoteExecutionInstruction.COMPANION)
+
   /** List all the current amulet price votes. */
   final def listAllAmuletPriceVotes(
       limit: Limit = Limit.DefaultLimit
