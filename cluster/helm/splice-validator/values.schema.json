@@ -11,24 +11,76 @@
     },
     "scanClientConfig": {
       "type": "object",
-      "description": "Configuration parameters for the BFT scan client.",
+      "description": "Configuration parameters for the scan client.",
+      "required": [
+        "scan-type",
+        "seedUrls"
+      ],
       "properties": {
+        "scan-type": {
+          "type": "string",
+          "enum": [
+            "trust-single",
+            "bft",
+            "bft-custom"
+          ],
+          "description": "The type of scan client configuration."
+        },
         "useLastKnownConnectionsForInitialization": {
           "type": "boolean",
-          "default": true
+          "default": true,
+          "description": "Whether to use last known connections for initialization."
         },
         "threshold": {
-          "type": ["integer", "null"],
-          "description": "Optional BFT threshold for BftCustom config."
+          "type": "integer",
+          "default": 0,
+          "description": "BFT custom threshold. Optional unless scan-type is bft-custom."
         },
         "trustedSvs": {
           "type": "array",
-          "description": "List of trusted super validator scans for BftCustom config.",
           "items": {
             "type": "string"
+          },
+          "default": [],
+          "description": "List of trusted scans. Optional unless scan-type is bft-custom."
+        },
+        "seedUrls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of seed URLs for the scan client."
+        }
+      },
+      "allOf": [
+        {
+          "description": "seedUrls must have at least one item.",
+          "properties": {
+            "seedUrls": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "description": "Rule 2: If scan-type is bft-custom, both threshold and trustedSvs must be set.",
+          "if": {
+            "properties": {
+              "scan-type": {
+                "const": "bft-custom"
+              }
+            },
+            "required": [
+              "scan-type"
+            ]
+          },
+          "then": {
+            "required": [
+              "threshold",
+              "trustedSvs"
+            ]
           }
         }
-      }
+      ]
     },
     "svValidator": {
       "type": "boolean",
