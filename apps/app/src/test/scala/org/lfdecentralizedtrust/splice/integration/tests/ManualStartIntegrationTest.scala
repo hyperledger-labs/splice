@@ -43,6 +43,14 @@ class ManualStartIntegrationTest
 
   override lazy val dbsSuffix = "manual_start_2_" + UUID.randomUUID.toString.substring(0, 4)
 
+  val sv1PruningScheduleOverride = PruningConfig(
+    // run every 10s, for quick feedback
+    "/10 * * * * ?",
+    PositiveDurationSeconds.tryFromDuration(20.seconds),
+    // at 20s retention we sometimes pruned before finishing initial ingestion
+    PositiveDurationSeconds.tryFromDuration(40.seconds),
+  )
+
   override def environmentDefinition: SpliceEnvironmentDefinition = {
     EnvironmentDefinition
       // Do not use `simpleTopology4Svs`, because that one waits for shared canton nodes to be initialized
@@ -71,15 +79,7 @@ class ManualStartIntegrationTest
               _.map { config =>
                 config.copy(
                   // schedule needs to be defined to activate participant pruning
-                  participantPruningSchedule = Some(
-                    PruningConfig(
-                      // run every 10s, for quick feedback
-                      "/10 * * * * ?",
-                      PositiveDurationSeconds.tryFromDuration(20.seconds),
-                      // at 20s retention we sometimes pruned before finishing initial ingestion
-                      PositiveDurationSeconds.tryFromDuration(40.seconds),
-                    )
-                  )
+                  participantPruningSchedule = Some(sv1PruningScheduleOverride)
                 )
               }
             }
@@ -181,11 +181,7 @@ class ManualStartIntegrationTest
 
         clue("Check sv1 participant has the expected smallest pruning schedule") {
           sv1ValidatorBackend.participantClient.pruning.get_schedule() shouldBe Some(
-            PruningSchedule(
-              "0 /1 * * * ?",
-              PositiveDurationSeconds.tryFromDuration(10.seconds),
-              PositiveDurationSeconds.tryFromDuration(20.seconds),
-            )
+            sv1PruningScheduleOverride.toSchedule
           )
         }
 
