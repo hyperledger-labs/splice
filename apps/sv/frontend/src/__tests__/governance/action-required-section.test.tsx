@@ -38,10 +38,10 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('Action Required')).toBeDefined();
+    expect(await screen.findByText('Action Required')).toBeInTheDocument();
 
     const badge = screen.getByTestId('action-required-badge-count');
-    expect(badge).toBeDefined();
+    expect(badge).toBeInTheDocument();
     expect(badge.textContent).toBe(`${requests.length}`);
 
     expect(true).toBe(true);
@@ -54,7 +54,7 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('No Action Required items available')).toBeDefined();
+    expect(screen.getByText('No Action Required items available')).toBeInTheDocument();
   });
 
   test('should render all action required requests', () => {
@@ -86,23 +86,23 @@ describe('Action Required', () => {
     );
 
     const action = screen.getByTestId('action-required-action-content');
-    expect(action).toBeDefined();
+    expect(action).toBeInTheDocument();
     expect(action.textContent).toBe(actionRequired.actionName);
 
     const createdAt = screen.getByTestId('action-required-created-at-content');
-    expect(createdAt).toBeDefined();
+    expect(createdAt).toBeInTheDocument();
     expect(createdAt.textContent).toBe(actionRequired.createdAt);
 
     const votingCloses = screen.getByTestId('action-required-voting-closes-content');
-    expect(votingCloses).toBeDefined();
+    expect(votingCloses).toBeInTheDocument();
     expect(votingCloses.textContent).toBe('10 days');
 
-    const requester = screen.getByTestId('action-required-requester-identifier-party-id');
-    expect(requester).toBeDefined();
+    const requester = screen.getByTestId('action-required-requester-identifier-value');
+    expect(requester).toBeInTheDocument();
     expect(requester.textContent).toBe(actionRequired.requester);
 
     const viewDetails = screen.getByTestId('action-required-view-details');
-    expect(viewDetails).toBeDefined();
+    expect(viewDetails).toBeInTheDocument();
   });
 
   test('should render isYou badge for requests created by viewing sv', () => {
@@ -121,8 +121,8 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    const isYou = screen.getByTestId('action-required-requester-identifier-you');
-    expect(isYou).toBeDefined();
+    const isYou = screen.getByTestId('action-required-requester-identifier-badge');
+    expect(isYou).toBeInTheDocument();
   });
 
   test('should not render isYou badge for requests created by other svs', () => {
@@ -140,8 +140,8 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    expect(() => screen.getByTestId('action-required-requester-identifier-you')).toThrowError(
-      /Unable to find an element/
-    );
+    const isYou = screen.queryByTestId('action-required-requester-identifier-badge');
+
+    expect(isYou).not.toBeInTheDocument();
   });
 });

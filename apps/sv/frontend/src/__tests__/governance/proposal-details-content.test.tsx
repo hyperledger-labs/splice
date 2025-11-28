@@ -152,7 +152,7 @@ describe('Proposal Details Content', () => {
     expect(offboardSection).toBeInTheDocument();
 
     const memberInput = within(offboardSection).getByTestId(
-      'proposal-details-member-party-id-party-id'
+      'proposal-details-member-party-id-value'
     );
     expect(memberInput).toBeInTheDocument();
     expect(memberInput.textContent).toBe('sv2');
@@ -167,7 +167,7 @@ describe('Proposal Details Content', () => {
     expect(votingInformationSection).toBeInTheDocument();
 
     const requesterInput = within(votingInformationSection).getByTestId(
-      'proposal-details-requester-party-id-party-id'
+      'proposal-details-requester-party-id-value'
     );
     expect(requesterInput).toBeInTheDocument();
     expect(requesterInput.textContent).toBe('sv1');
@@ -222,7 +222,7 @@ describe('Proposal Details Content', () => {
     const action = screen.getByTestId('proposal-details-action-value');
     expect(action.textContent).toMatch(/Feature App/);
 
-    const contractId = screen.getByTestId('proposal-details-contractid-value-party-id');
+    const contractId = screen.getByTestId('proposal-details-contractid-id-value');
     expect(contractId.textContent).toBe(voteRequest.contractId);
 
     const featuredAppSection = screen.getByTestId('proposal-details-feature-app-section');

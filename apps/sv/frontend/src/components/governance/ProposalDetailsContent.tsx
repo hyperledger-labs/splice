@@ -194,7 +194,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
                 <CopyableIdentifier
                   value={contractId}
                   size="large"
-                  data-testid="proposal-details-contractid-value"
+                  data-testid="proposal-details-contractid-id"
                 />
               }
               labelId="proposal-details-contractid-label"

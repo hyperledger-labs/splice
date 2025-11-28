@@ -36,7 +36,7 @@ const CopyableIdentifier: React.FC<CopyableIdentifierProps> = ({
     >
       <ContentCopy sx={{ fontSize: size === 'small' ? '14px' : '18px' }} />
     </IconButton>
-    {badge !== undefined && <Chip label={badge} size="small" data-testid={`${testId}-badges`} />}
+    {badge !== undefined && <Chip label={badge} size="small" data-testid={`${testId}-badge`} />}
   </Box>
 );
 
