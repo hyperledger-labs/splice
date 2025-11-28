@@ -2145,7 +2145,7 @@ components:
       type: object
       required:
       - synchronizer
-      - identityProviderId
+      - onboardingTransactions
       properties:
         synchronizer:
           description: |-
@@ -2195,11 +2195,6 @@ components:
       title: AllocatePartyRequest
       description: 'Required authorization: ``HasRight(ParticipantAdmin) OR IsAuthenticatedIdentityProviderAdmin(identity_provider_id)``'
       type: object
-      required:
-      - partyIdHint
-      - identityProviderId
-      - synchronizerId
-      - userId
       properties:
         partyIdHint:
           description: |-
@@ -2250,6 +2245,7 @@ components:
       - contractId
       - templateId
       - packageName
+      - witnessParties
       properties:
         offset:
           description: |-
@@ -2489,10 +2485,9 @@ components:
       required:
       - commandId
       - updateId
-      - userId
-      - submissionId
       - deduplicationPeriod
       - offset
+      - synchronizerTime
       properties:
         commandId:
           description: |-
@@ -2593,6 +2588,7 @@ components:
       required:
       - userId
       - beginExclusive
+      - parties
       properties:
         userId:
           description: |-
@@ -2763,6 +2759,8 @@ components:
         identityProviderConfig:
           $ref: '#/components/schemas/IdentityProviderConfig'
           description: Required
+      required:
+      - identityProviderConfig
     CreateIdentityProviderConfigResponse:
       title: CreateIdentityProviderConfigResponse
       type: object
@@ -2791,6 +2789,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Right'
+      required:
+      - user
     CreateUserResponse:
       title: CreateUserResponse
       type: object
@@ -2808,11 +2808,13 @@ components:
       - nodeId
       - contractId
       - templateId
-      - createdEventBlob
       - createdAt
       - packageName
       - representativePackageId
       - acsDelta
+      - witnessParties
+      - signatories
+      - observers
       properties:
         offset:
           description: |-
@@ -3098,9 +3100,7 @@ components:
         contract & contract key lookups.
       type: object
       required:
-      - contractId
       - createdEventBlob
-      - synchronizerId
       properties:
         templateId:
           description: |-
@@ -3219,9 +3219,6 @@ components:
         Note that some of the filtering behavior depends on the `TransactionShape`,
         which is expected to be specified alongside usages of `EventFormat`.
       type: object
-      required:
-      - filtersByParty
-      - verbose
       properties:
         filtersByParty:
           $ref: '#/components/schemas/Map_Filters'
@@ -3352,6 +3349,8 @@ components:
       - exerciseResult
       - packageName
       - acsDelta
+      - actingParties
+      - witnessParties
       properties:
         offset:
           description: |-
@@ -3605,8 +3604,7 @@ components:
       required:
       - synchronizer
       - partyHint
-      - localParticipantObservationOnly
-      - confirmationThreshold
+      - publicKey
       properties:
         synchronizer:
           description: |-
@@ -3678,7 +3676,6 @@ components:
         migration is not concerned with incomplete (un)assignments.
       type: object
       required:
-      - verbose
       - activeAtOffset
       properties:
         filter:
@@ -3727,6 +3724,7 @@ components:
       type: object
       required:
       - contractId
+      - eventFormat
       properties:
         contractId:
           description: |-
@@ -3839,6 +3837,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PartyDetails'
+      required:
+      - partyDetails
     GetPreferredPackageVersionResponse:
       title: GetPreferredPackageVersionResponse
       type: object
@@ -3852,7 +3852,7 @@ components:
       title: GetPreferredPackagesRequest
       type: object
       required:
-      - synchronizerId
+      - packageVettingRequirements
       properties:
         packageVettingRequirements:
           description: |-
@@ -3884,6 +3884,7 @@ components:
       type: object
       required:
       - synchronizerId
+      - packageReferences
       properties:
         packageReferences:
           description: |-
@@ -3979,6 +3980,7 @@ components:
       type: object
       required:
       - updateId
+      - updateFormat
       properties:
         updateId:
           description: |-
@@ -3996,6 +3998,7 @@ components:
       type: object
       required:
       - offset
+      - updateFormat
       properties:
         offset:
           description: |-
@@ -4014,7 +4017,6 @@ components:
       type: object
       required:
       - beginExclusive
-      - verbose
       properties:
         beginExclusive:
           description: |-
@@ -4077,7 +4079,6 @@ components:
       type: object
       required:
       - userId
-      - identityProviderId
       properties:
         userId:
           description: |-
@@ -4162,10 +4163,8 @@ components:
       type: object
       required:
       - identityProviderId
-      - isDeactivated
       - issuer
       - jwksUrl
-      - audience
       properties:
         identityProviderId:
           description: |-
@@ -4218,8 +4217,7 @@ components:
       description: This filter matches contracts that implement a specific interface.
       type: object
       required:
-      - includeInterfaceView
-      - includeCreatedEventBlob
+      - interfaceId
       properties:
         interfaceId:
           description: |-
@@ -4300,7 +4298,6 @@ components:
       - source
       - target
       - reassignmentId
-      - submitter
       - reassignmentCounter
       - createdEvent
       properties:
@@ -4407,6 +4404,8 @@ components:
       type: object
       required:
       - commandId
+      - commands
+      - actAs
       properties:
         commands:
           description: |-
@@ -4578,8 +4577,9 @@ components:
       required:
       - deduplicationPeriod
       - submissionId
-      - userId
       - hashingSchemeVersion
+      - preparedTransaction
+      - partySignatures
       properties:
         preparedTransaction:
           description: |-
@@ -4653,8 +4653,9 @@ components:
       required:
       - deduplicationPeriod
       - submissionId
-      - userId
       - hashingSchemeVersion
+      - preparedTransaction
+      - partySignatures
       properties:
         preparedTransaction:
           description: |-
@@ -4707,8 +4708,9 @@ components:
       required:
       - deduplicationPeriod
       - submissionId
-      - userId
       - hashingSchemeVersion
+      - preparedTransaction
+      - partySignatures
       properties:
         preparedTransaction:
           description: |-
@@ -4759,7 +4761,6 @@ components:
       title: JsGetActiveContractsResponse
       type: object
       required:
-      - workflowId
       - contractEntry
       properties:
         workflowId:
@@ -4896,10 +4897,9 @@ components:
       title: JsPrepareSubmissionRequest
       type: object
       required:
-      - userId
       - commandId
-      - synchronizerId
-      - verboseHashing
+      - commands
+      - actAs
       properties:
         userId:
           description: |-
@@ -5056,11 +5056,10 @@ components:
       type: object
       required:
       - updateId
-      - commandId
-      - workflowId
       - offset
       - recordTime
       - synchronizerId
+      - events
       properties:
         updateId:
           description: |-
@@ -5206,6 +5205,8 @@ components:
       - updateId
       - offset
       - synchronizerId
+      - recordTime
+      - events
       properties:
         updateId:
           description: |-
@@ -5258,12 +5259,11 @@ components:
       type: object
       required:
       - updateId
-      - commandId
-      - workflowId
       - effectiveAt
       - offset
       - synchronizerId
       - recordTime
+      - events
       properties:
         updateId:
           description: |-
@@ -5344,12 +5344,11 @@ components:
       type: object
       required:
       - updateId
-      - commandId
-      - workflowId
       - offset
       - eventsById
       - synchronizerId
       - recordTime
+      - effectiveAt
       properties:
         updateId:
           description: |-
@@ -5486,6 +5485,7 @@ components:
       type: object
       required:
       - nextPageToken
+      - partyDetails
       properties:
         partyDetails:
           description: |-
@@ -5511,6 +5511,8 @@ components:
           type: array
           items:
             type: string
+      required:
+      - packageIds
     ListUserRightsResponse:
       title: ListUserRightsResponse
       type: object
@@ -5540,9 +5542,6 @@ components:
     ListVettedPackagesRequest:
       title: ListVettedPackagesRequest
       type: object
-      required:
-      - pageToken
-      - pageSize
       properties:
         packageMetadataFilter:
           $ref: '#/components/schemas/PackageMetadataFilter'
@@ -5660,9 +5659,6 @@ components:
         Based on ``ObjectMeta`` meta used in Kubernetes API.
         See https://github.com/kubernetes/apimachinery/blob/master/pkg/apis/meta/v1/generated.proto#L640
       type: object
-      required:
-      - resourceVersion
-      - annotations
       properties:
         resourceVersion:
           description: |-
@@ -5837,6 +5833,7 @@ components:
       type: object
       required:
       - synchronizerId
+      - packageReference
       properties:
         packageReference:
           $ref: '#/components/schemas/PackageReference'
@@ -5873,6 +5870,7 @@ components:
       type: object
       required:
       - packageName
+      - parties
       properties:
         parties:
           description: |-
@@ -5996,8 +5994,6 @@ components:
       type: object
       required:
       - party
-      - isLocal
-      - identityProviderId
       properties:
         party:
           description: |-
@@ -6048,12 +6044,15 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SinglePartySignatures'
+      required:
+      - signatures
     PrefetchContractKey:
       title: PrefetchContractKey
       description: Preload contracts
       type: object
       required:
       - contractKey
+      - templateId
       properties:
         templateId:
           description: |-
@@ -6133,11 +6132,9 @@ components:
       title: ReassignmentCommands
       type: object
       required:
-      - workflowId
       - userId
       - commandId
       - submitter
-      - submissionId
       properties:
         workflowId:
           description: |-
@@ -6192,7 +6189,6 @@ components:
       type: object
       required:
       - userId
-      - identityProviderId
       properties:
         userId:
           description: |-
@@ -6309,6 +6305,7 @@ components:
       type: object
       required:
       - party
+      - signatures
       properties:
         party:
           description: |-
@@ -6338,6 +6335,8 @@ components:
             Optional
             If no event_format provided, the result will contain no events.
             The events in the result, will take shape TRANSACTION_SHAPE_ACS_DELTA.
+      required:
+      - reassignmentCommands
     SubmitAndWaitResponse:
       title: SubmitAndWaitResponse
       type: object
@@ -6366,6 +6365,8 @@ components:
           description: |-
             The reassignment command to be submitted.
             Required
+      required:
+      - reassignmentCommands
     SubmitReassignmentResponse:
       title: SubmitReassignmentResponse
       type: object
@@ -6377,6 +6378,7 @@ components:
       type: object
       required:
       - synchronizerId
+      - recordTime
       properties:
         synchronizerId:
           description: |-
@@ -6402,7 +6404,7 @@ components:
       description: This filter matches contracts of a specific template.
       type: object
       required:
-      - includeCreatedEventBlob
+      - templateId
       properties:
         templateId:
           description: |-
@@ -6583,6 +6585,7 @@ components:
       type: object
       required:
       - transactionShape
+      - eventFormat
       properties:
         eventFormat:
           $ref: '#/components/schemas/EventFormat'
@@ -6684,11 +6687,12 @@ components:
       - contractId
       - source
       - target
-      - submitter
       - reassignmentCounter
       - packageName
       - offset
       - nodeId
+      - templateId
+      - witnessParties
       properties:
         reassignmentId:
           description: |-
@@ -6888,6 +6892,9 @@ components:
             Fields that can be updated are marked as ``Modifiable``.
             For additional information see the documentation for standard protobuf3's ``google.protobuf.FieldMask``.
             Required
+      required:
+      - identityProviderConfig
+      - updateMask
     UpdateIdentityProviderConfigResponse:
       title: UpdateIdentityProviderConfigResponse
       type: object
@@ -6930,6 +6937,9 @@ components:
             For additional information see the documentation for standard protobuf3's ``google.protobuf.FieldMask``.
             For similar Ledger API see ``com.daml.ledger.api.v2.admin.UpdateUserRequest``.
             Required
+      required:
+      - partyDetails
+      - updateMask
     UpdatePartyDetailsResponse:
       title: UpdatePartyDetailsResponse
       type: object
@@ -6991,6 +7001,9 @@ components:
             For additional information see the documentation for standard protobuf3's ``google.protobuf.FieldMask``.
             For similar Ledger API see ``com.daml.ledger.api.v2.admin.UpdatePartyDetailsRequest``.
             Required
+      required:
+      - user
+      - updateMask
     UpdateUserResponse:
       title: UpdateUserResponse
       type: object
@@ -7003,7 +7016,6 @@ components:
       type: object
       required:
       - dryRun
-      - synchronizerId
       properties:
         changes:
           description: |-
@@ -7084,9 +7096,6 @@ components:
       type: object
       required:
       - id
-      - primaryParty
-      - isDeactivated
-      - identityProviderId
       properties:
         id:
           description: |-
@@ -7263,10 +7272,6 @@ components:
         If a reference does not match any package, the reference is considered
         unresolved and the entire update request is rejected.
       type: object
-      required:
-      - packageId
-      - packageName
-      - packageVersion
       properties:
         packageId:
           description: |-
@@ -7296,8 +7301,6 @@ components:
       title: WildcardFilter
       description: This filter matches all templates.
       type: object
-      required:
-      - includeCreatedEventBlob
       properties:
         includeCreatedEventBlob:
           description: |-
