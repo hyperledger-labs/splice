@@ -1,11 +1,21 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ModifyValidatorLicenses
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  ValidatorLicenseChange,
+  ValidatorLicensesModification,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.validatorlicensechange.VLC_ChangeWeight
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{SpliceUtil, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
 
 import scala.concurrent.duration.DurationInt
+import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 class WalletRewardsTimeBasedIntegrationTest
     extends IntegrationTest
@@ -95,6 +105,233 @@ class WalletRewardsTimeBasedIntegrationTest
           ),
         )
       }
+    }
+
+    "validator gets rewards proportional to license weight" in { implicit env =>
+      val info = sv1Backend.getDsoInfo()
+      val dsoParty = info.dsoParty
+      val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+
+      def getAliceLicense() = {
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(ValidatorLicense.COMPANION)(
+            dsoParty,
+            c => c.data.validator == aliceValidatorParty.toProtoPrimitive,
+          )
+      }
+
+      // Change validator license weight to 10.0
+      val newWeight = BigDecimal(10.0)
+      val action = new ARC_DsoRules(
+        new SRARC_ModifyValidatorLicenses(
+          new ValidatorLicensesModification(
+            List[ValidatorLicenseChange](
+              new VLC_ChangeWeight(
+                aliceValidatorParty.toProtoPrimitive,
+                newWeight.bigDecimal,
+              )
+            ).asJava
+          )
+        )
+      )
+
+      actAndCheck(
+        "Create and execute vote to change weight",
+        sv1Backend.createVoteRequest(
+          info.svParty.toProtoPrimitive,
+          action,
+          "url",
+          "description",
+          info.dsoRules.payload.config.voteRequestTimeout,
+          None,
+        ),
+      )(
+        "license weight is updated",
+        _ => {
+          val licenses = getAliceLicense()
+          licenses should have length 1
+          licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(newWeight)
+        },
+      )
+
+      val openRounds = eventually() {
+        import math.Ordering.Implicits.*
+        val openRounds = sv1ScanBackend
+          .getOpenAndIssuingMiningRounds()
+          ._1
+          .filter(_.payload.opensAt <= env.environment.clock.now.toInstant)
+        openRounds should not be empty
+        openRounds
+      }
+
+      advanceTimeForRewardAutomationToRunForCurrentRound
+
+      // Verify liveness activity records are created
+      eventually() {
+        aliceValidatorWalletClient
+          .listValidatorLivenessActivityRecords() should have size openRounds.size.toLong
+      }
+
+      // Pause to avoid balance changes during measurement
+      aliceValidatorBackend.validatorAutomation
+        .trigger[ReceiveFaucetCouponTrigger]
+        .pause()
+        .futureValue
+
+      val prevBalance = aliceValidatorWalletClient.balance().unlockedQty
+
+      // Advance rounds to collect validator faucet rewards
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
+      advanceTimeForRewardAutomationToRunForCurrentRound
+
+      clue("validator faucet coupons have been collected") {
+        eventually() {
+          aliceValidatorWalletClient.listValidatorLivenessActivityRecords() should have size 0
+        }
+      }
+
+      val newBalance = aliceValidatorWalletClient.balance().unlockedQty
+
+      val faucetCouponAmountUsd = 2.85 * newWeight.toDouble * openRounds.size
+      assertInRange(
+        newBalance - prevBalance,
+        (
+          walletUsdToAmulet(-0.1 + faucetCouponAmountUsd),
+          walletUsdToAmulet(0.5 + faucetCouponAmountUsd),
+        ),
+      )
+    }
+
+    // This test verifies that the OpenMiningRoundSummary correctly sums
+    // ValidatorLivenessActivityRecord weights and that rewards are
+    // appropriately capped when total weights in a round are high.
+    // See: test_ValidatorLivenessWeightInRunNextIssuance for similar test in daml
+    "OpenMiningRoundSummary calculation uses validator activity record weights" in { implicit env =>
+      val info = sv1Backend.getDsoInfo()
+      val dsoParty = info.dsoParty
+      val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+
+      def getValidatorLicense(party: com.digitalasset.canton.topology.PartyId) = {
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(ValidatorLicense.COMPANION)(
+            dsoParty,
+            c => c.data.validator == party.toProtoPrimitive,
+          )
+      }
+
+      // Change Alice's weight to a very high value
+      // This should cause the per-unit issuance to be less than the default of 2.85
+      val aliceWeight = BigDecimal(15000.0)
+      val aliceAction = new ARC_DsoRules(
+        new SRARC_ModifyValidatorLicenses(
+          new ValidatorLicensesModification(
+            List[ValidatorLicenseChange](
+              new VLC_ChangeWeight(
+                aliceValidatorParty.toProtoPrimitive,
+                aliceWeight.bigDecimal,
+              )
+            ).asJava
+          )
+        )
+      )
+
+      actAndCheck(
+        "Create and execute vote to change weight",
+        sv1Backend.createVoteRequest(
+          info.svParty.toProtoPrimitive,
+          aliceAction,
+          "url",
+          "description",
+          info.dsoRules.payload.config.voteRequestTimeout,
+          None,
+        ),
+      )(
+        "license weight is updated",
+        _ => {
+          val licenses = getValidatorLicense(aliceValidatorParty)
+          licenses should have length 1
+          licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(aliceWeight)
+        },
+      )
+
+      val openRounds = eventually() {
+        import math.Ordering.Implicits.*
+        val openRounds = sv1ScanBackend
+          .getOpenAndIssuingMiningRounds()
+          ._1
+          .filter(_.payload.opensAt <= env.environment.clock.now.toInstant)
+        openRounds should not be empty
+        openRounds
+      }
+
+      advanceTimeForRewardAutomationToRunForCurrentRound
+
+      eventually() {
+        aliceValidatorWalletClient
+          .listValidatorLivenessActivityRecords() should have size openRounds.size.toLong
+        bobValidatorWalletClient
+          .listValidatorLivenessActivityRecords() should have size openRounds.size.toLong
+      }
+
+      // Pause faucet coupon triggers to avoid balance changes during measurement
+      aliceValidatorBackend.validatorAutomation
+        .trigger[ReceiveFaucetCouponTrigger]
+        .pause()
+        .futureValue
+      bobValidatorBackend.validatorAutomation
+        .trigger[ReceiveFaucetCouponTrigger]
+        .pause()
+        .futureValue
+
+      val alicePrevBalance = aliceValidatorWalletClient.balance().unlockedQty
+      val bobPrevBalance = bobValidatorWalletClient.balance().unlockedQty
+
+      // Advance rounds to collect validator faucet rewards
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
+      advanceTimeForRewardAutomationToRunForCurrentRound
+
+      clue("validator faucet coupons have been collected") {
+        eventually() {
+          aliceValidatorWalletClient.listValidatorLivenessActivityRecords() should have size 0
+          bobValidatorWalletClient.listValidatorLivenessActivityRecords() should have size 0
+        }
+      }
+
+      val aliceNewBalance = aliceValidatorWalletClient.balance().unlockedQty
+      val bobNewBalance = bobValidatorWalletClient.balance().unlockedQty
+
+      val aliceReward = aliceNewBalance - alicePrevBalance
+      val bobReward = bobNewBalance - bobPrevBalance
+
+      // the per-unit issuance should be less than 2.85.
+      val expectedBobRewardPerRoundMin = 2.5
+      val expectedBobRewardPerRoundMax = 2.55
+
+      val expectedBobTotalMin = expectedBobRewardPerRoundMin * openRounds.size
+      val expectedBobTotalMax = expectedBobRewardPerRoundMax * openRounds.size
+
+      assertInRange(
+        bobReward,
+        (
+          walletUsdToAmulet(expectedBobTotalMin),
+          walletUsdToAmulet(expectedBobTotalMax),
+        ),
+      )
+
+      val expectedAliceTotalMin = expectedBobTotalMin * aliceWeight.toDouble
+      val expectedAliceTotalMax = expectedBobTotalMax * aliceWeight.toDouble
+
+      assertInRange(
+        aliceReward,
+        (
+          walletUsdToAmulet(expectedAliceTotalMin),
+          walletUsdToAmulet(expectedAliceTotalMax),
+        ),
+      )
     }
   }
 }
