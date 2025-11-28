@@ -88,6 +88,8 @@ defaultAmuletConfig = AmuletConfig with
   -- Amount of the AppRewardCoupon contract that a FeaturedAppActivityMarker is converted to.
   featuredAppActivityMarkerAmount = Some defaultFeaturedAppActivityMarkerAmount
 
+  optDevelopmentFundManager = None
+
 -- | Default configuration schedule with single current amulet config
 defaultAmuletConfigSchedule : Schedule Time (AmuletConfig USD)
 defaultAmuletConfigSchedule = Schedule with
@@ -131,6 +133,7 @@ issuanceConfig_10plus = IssuanceConfig with
   featuredAppRewardCap = 100.0
   unfeaturedAppRewardCap = 0.6
   optValidatorFaucetCap = None -- We use the default of 2.85 USD introduced in the upgrade for CIP-3
+  optDevelopmentFundPercentage = None
 
 
 defaultIssuanceCurve : Schedule RelTime IssuanceConfig
