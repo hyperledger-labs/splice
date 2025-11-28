@@ -34,7 +34,7 @@ import { JsonDiffAccordion } from './JsonDiffAccordion';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { DetailItem } from './proposal-details/DetailItem';
 import { CreateUnallocatedUnclaimedActivityRecordSection } from './proposal-details/CreateUnallocatedUnclaimedActivityRecordSection';
-import { MemberIdentifier } from '../beta';
+import { CopyableIdentifier, MemberIdentifier } from '../beta';
 
 dayjs.extend(relativeTime);
 
@@ -179,7 +179,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
           </Button>
         </Stack>
 
-        <Stack sx={{ bgcolor: '#1b1b1b', p: 6 }} alignItems="center" gap={8}>
+        <Stack sx={{ bgcolor: 'colors.neutral.10', p: 6 }} alignItems="center" gap={8}>
           <VoteSection title="Proposal Details" data-testid="proposal-details-proposal-details">
             <DetailItem
               label="Action"
@@ -191,9 +191,8 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             <DetailItem
               label="Contract ID"
               value={
-                <MemberIdentifier
-                  partyId={contractId}
-                  isYou={false}
+                <CopyableIdentifier
+                  value={contractId}
                   size="large"
                   data-testid="proposal-details-contractid-value"
                 />
@@ -420,19 +419,11 @@ interface VoteSectionProps extends PropsWithChildren {
 
 const VoteSection: React.FC<VoteSectionProps> = ({ title, children, 'data-testid': testId }) => (
   <Box sx={{ width: '100%', maxWidth: '800px' }} data-testid={testId}>
-    <VoteSectionHeader content={title} />
-    <Stack gap={'24px'}>{children}</Stack>
+    <Typography component="h2" fontSize={18} fontWeight={700} fontFamily="lato" mb={3}>
+      {title}
+    </Typography>
+    <Stack gap={3}>{children}</Stack>
   </Box>
-);
-
-interface VoteSectionHeaderProps {
-  content: string;
-}
-
-const VoteSectionHeader: React.FC<VoteSectionHeaderProps> = ({ content }) => (
-  <Typography component="h2" fontSize={18} fontWeight={700} fontFamily="lato" mb={3}>
-    {content}
-  </Typography>
 );
 
 interface VoteItemProps {

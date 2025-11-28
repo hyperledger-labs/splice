@@ -78,7 +78,7 @@ const ActionCard = (props: ActionCardProps) => {
     <RouterLink to={`/governance-beta/proposals/${contractId}`} style={{ textDecoration: 'none' }}>
       <Box
         sx={{
-          bgcolor: '#1B1B1B',
+          bgcolor: 'colors.neutral.10',
           p: 2,
           borderRadius: '4px',
           '&:hover': { backgroundColor: '#363636' },
