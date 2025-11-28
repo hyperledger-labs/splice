@@ -3,16 +3,21 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import cats.syntax.parallel.*
 import com.digitalasset.canton.util.FutureInstances.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.voteexecution.VoteExecutionInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_ConfirmSvOnboarding,
+  SRARC_ModifyValidatorLicenses,
   SRARC_SetConfig,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.validatorlicensechange.VLC_ChangeWeight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRulesConfig,
   DsoRules_ConfirmSvOnboarding,
   DsoRules_SetConfig,
+  ValidatorLicenseChange,
+  ValidatorLicensesModification,
 }
 import org.lfdecentralizedtrust.splice.console.AppBackendReference
 import org.lfdecentralizedtrust.splice.sv.automation.confirmation.SvOnboardingRequestTrigger
@@ -222,6 +227,72 @@ class SvTimeBasedOnboardingIntegrationTest
           "the vote request is not displayed anymore",
           _ => {
             sv1Backend.listVoteRequests() shouldBe empty
+          },
+        )
+      }
+
+      clue("expire stale `VoteExecutionInstruction` contracts") {
+        // Create a vote for weight change for a party not having a ValidatorLicense
+        // The VoteExecutionInstruction cannot be run in this case and should be expired
+        val newPartyWithoutLicense = allocateRandomSvParty("test-validator-expiry")
+
+        val action = new ARC_DsoRules(
+          new SRARC_ModifyValidatorLicenses(
+            new ValidatorLicensesModification(
+              List[ValidatorLicenseChange](
+                new VLC_ChangeWeight(
+                  newPartyWithoutLicense.toProtoPrimitive,
+                  BigDecimal(10.0).bigDecimal,
+                )
+              ).asJava
+            )
+          )
+        )
+
+        actAndCheck(
+          "Create vote for weight change",
+          sv1Backend.createVoteRequest(
+            sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+            action,
+            "url",
+            "description",
+            sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+            None,
+          ),
+        )(
+          "Vote request is created",
+          _ => {
+            sv1Backend.listVoteRequests() should have length 1
+          },
+        )
+
+        val voteRequest = sv1Backend.listVoteRequests().head
+        Seq(sv2Backend, sv3Backend).foreach { sv =>
+          sv.castVote(voteRequest.contractId, true, "url", "description")
+        }
+
+        // Wait for the instruction to be created
+        eventually() {
+          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(VoteExecutionInstruction.COMPANION)(
+              dsoParty,
+              _ => true,
+            ) should have length 1
+        }
+
+        // Advance time past the default timeout of 1 day
+        val clockSkew = sv1Backend.config.automation.clockSkewAutomationDelay.asJava
+        actAndCheck(
+          "Advance time past the vote execution instruction timeout",
+          advanceTime(JavaDuration.ofDays(2) plus clockSkew),
+        )(
+          "VoteExecutionInstruction is expired",
+          _ => {
+            sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+              .filterJava(VoteExecutionInstruction.COMPANION)(
+                dsoParty,
+                _ => true,
+              ) shouldBe empty
           },
         )
       }
