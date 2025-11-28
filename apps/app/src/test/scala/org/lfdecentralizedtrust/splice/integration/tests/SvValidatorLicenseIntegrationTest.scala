@@ -6,6 +6,16 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ModifyValidatorLicenses
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  ValidatorLicenseChange,
+  ValidatorLicensesModification,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.validatorlicensechange.{
+  VLC_ChangeWeight,
+  VLC_Withdraw,
+}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.MergeValidatorLicenseContractsTrigger
 import org.lfdecentralizedtrust.splice.util.TriggerTestUtil
@@ -14,6 +24,7 @@ import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.{
   resumeAllDsoDelegateTriggers,
 }
 import org.slf4j.event.Level
+import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 class SvValidatorLicenseIntegrationTest
@@ -110,5 +121,88 @@ class SvValidatorLicenseIntegrationTest
         )
       ),
     )
+  }
+
+  "can do batch modification of validator licenses" in { implicit env =>
+    val info = sv1Backend.getDsoInfo()
+    val dsoParty = info.dsoParty
+
+    def getLicenses(p: PartyId) = {
+      aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+        .filterJava(ValidatorLicense.COMPANION)(
+          dsoParty,
+          c => c.data.validator == p.toProtoPrimitive,
+        )
+    }
+
+    // Allocate two external parties on aliceValidator
+    val OnboardingResult(newParty1, _, _) =
+      onboardExternalParty(aliceValidatorBackend, Some("alice-test-party-1"))
+    val OnboardingResult(newParty2, _, _) =
+      onboardExternalParty(aliceValidatorBackend, Some("alice-test-party-2"))
+
+    // Grant licenses to both validators
+    actAndCheck(
+      "Grant validator license to first validator",
+      sv1Backend.grantValidatorLicense(newParty1),
+    )(
+      "ValidatorLicense granted with default weight",
+      _ => {
+        val licenses = getLicenses(newParty1)
+        licenses should have length 1
+        licenses.head.data.weight.toScala shouldBe None
+      },
+    )
+
+    actAndCheck(
+      "Grant validator license to second validator",
+      sv1Backend.grantValidatorLicense(newParty2),
+    )(
+      "ValidatorLicense granted",
+      _ => {
+        val licenses = getLicenses(newParty2)
+        licenses should have length 1
+        licenses.head.data.weight.toScala shouldBe None
+      },
+    )
+
+    // Create a vote for batch modification, with both weight change and withdrawal
+    val action = new ARC_DsoRules(
+      new SRARC_ModifyValidatorLicenses(
+        new ValidatorLicensesModification(
+          List[ValidatorLicenseChange](
+            new VLC_ChangeWeight(
+              newParty1.toProtoPrimitive,
+              BigDecimal(10.0).bigDecimal,
+            ),
+            new VLC_Withdraw(newParty2.toProtoPrimitive),
+          ).asJava
+        )
+      )
+    )
+
+    sv1Backend.createVoteRequest(
+      info.svParty.toProtoPrimitive,
+      action,
+      "url",
+      "description",
+      info.dsoRules.payload.config.voteRequestTimeout,
+      None,
+    )
+
+    clue("Weight of first license was updated") {
+      eventually() {
+        val licenses = getLicenses(newParty1)
+        licenses should have length 1
+        licenses.head.data.weight.toScala shouldBe Some(BigDecimal("10.0000000000").bigDecimal)
+      }
+    }
+
+    clue("Second license was withdrawn") {
+      eventually() {
+        val licenses = getLicenses(newParty2)
+        licenses shouldBe empty
+      }
+    }
   }
 }
