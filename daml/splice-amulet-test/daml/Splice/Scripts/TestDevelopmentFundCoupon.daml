@@ -19,10 +19,7 @@ testAllocateDevelopmentFundCoupon = do
   -- No Fund manager configured.
   -- This configuration applies to the next open round.
   baseConfig <- getAmuletConfig app
-  setAmuletConfig app baseConfig baseConfig with
-    issuanceCurve = baseConfig.issuanceCurve with
-      initialValue = baseConfig.issuanceCurve.initialValue with
-        optDevelopmentFundPercentage = Some 0.05
+  replaceDevelopmentFundConfig app baseConfig None (Some 0.05)
 
   -- Run 3 issuances for the already open rounds without the development fund configuration.
   -- No development fund coupons are minted.
@@ -43,12 +40,8 @@ testAllocateDevelopmentFundCoupon = do
   allocateDevelopmentFundCouponMustFail app alice.primaryParty bob.primaryParty firstAllocationAmount
     expiresAt unclaimedDevelopmentFundCouponCids
 
-  -- Set alice as the fund manager
-  setAmuletConfig app baseConfig baseConfig with
-    optDevelopmentFundManager = Some alice.primaryParty
-    issuanceCurve = baseConfig.issuanceCurve with
-      initialValue = baseConfig.issuanceCurve.initialValue with
-        optDevelopmentFundPercentage = Some 0.05
+  -- Set 5% and Alice as the fund manager
+  replaceDevelopmentFundConfig app baseConfig (Some alice.primaryParty) (Some 0.05)
 
   -- Unhappy - expiresAt is in the past
   let invalidExpiresAt = addRelTime now (minutes (-1))
