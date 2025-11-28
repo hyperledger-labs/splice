@@ -46,9 +46,8 @@ class ManualStartIntegrationTest
   val sv1PruningScheduleOverride = PruningConfig(
     // run every 10s, for quick feedback
     "/10 * * * * ?",
+    PositiveDurationSeconds.tryFromDuration(10.seconds),
     PositiveDurationSeconds.tryFromDuration(20.seconds),
-    // at 20s retention we sometimes pruned before finishing initial ingestion
-    PositiveDurationSeconds.tryFromDuration(40.seconds),
   )
 
   override def environmentDefinition: SpliceEnvironmentDefinition = {
@@ -75,14 +74,6 @@ class ManualStartIntegrationTest
             }
           },
           validatorApps = conf.validatorApps
-            .updatedWith(InstanceName.tryCreate("sv1Validator")) {
-              _.map { config =>
-                config.copy(
-                  // schedule needs to be defined to activate participant pruning
-                  participantPruningSchedule = Some(sv1PruningScheduleOverride)
-                )
-              }
-            }
             .updatedWith(InstanceName.tryCreate("aliceValidator")) {
               _.map { aliceValidatorConfig =>
                 val withoutExtraDomains = aliceValidatorConfig.domains.copy(extra = Seq.empty)
@@ -97,7 +88,13 @@ class ManualStartIntegrationTest
                   ),
                 )
               }
-            },
+            }
+            + (InstanceName.tryCreate("sv1ValidatorWithPruning") ->
+              conf
+                .validatorApps(InstanceName.tryCreate("sv1Validator"))
+                .copy(
+                  participantPruningSchedule = Some(sv1PruningScheduleOverride)
+                )),
         )
       )
       // Add a suffix to the canton identifiers to avoid metric conflicts with the shared canton nodes
@@ -140,15 +137,16 @@ class ManualStartIntegrationTest
           "EXTRA_PARTICIPANT_DB" -> ("participant_extra_" + dbsSuffix),
         ),
       )() {
-        val allCnApps = Seq[AppBackendReference](
+        val allCnAppsBase = Seq[AppBackendReference](
           sv1Backend,
           sv1ScanBackend,
-          sv1ValidatorBackend,
           sv2Backend,
           sv2ScanBackend,
           sv2ValidatorBackend,
           aliceValidatorBackend,
         )
+        val allCnAppsAtStart = allCnAppsBase ++ Seq(sv1ValidatorBackend)
+        val allCnApps = allCnAppsBase ++ Seq(sv1ValidatorWithPruningBackend)
 
         val allTopologyConnections
             : Seq[(TopologyAdminConnection, UniqueIdentifier => Member & NodeIdentity)] = Seq(
@@ -176,18 +174,23 @@ class ManualStartIntegrationTest
         }
 
         clue("Starting all Splice apps") {
-          startAllSync(allCnApps*)
+          startAllSync(allCnAppsAtStart*)
         }
 
-        clue("Check sv1 participant has the expected smallest pruning schedule") {
+        // We want to set pruning a bit later so it doesn't break init
+        clue("Restart sv1 validator with pruning enabled") {
+          sv1ValidatorBackend.stop()
+          sv1ValidatorWithPruningBackend.startSync()
+        }
+
+        clue("Check sv1 participant has the expected pruning schedule") {
           sv1ValidatorBackend.participantClient.pruning.get_schedule() shouldBe Some(
             sv1PruningScheduleOverride.toSchedule
           )
         }
 
         clue("Check sv1 participant is actively pruning") {
-          // we expect to be quicker than that but flaking is meh
-          eventually(3.minutes) {
+          eventually() {
             sv1Backend.svAutomation
               .connection(Low)
               // returns 0 when participant pruning is disabled
