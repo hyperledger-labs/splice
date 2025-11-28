@@ -11,7 +11,8 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import scala.util.{Failure, Success}
 
-/** Auth extractor for APIs that perform administrative actions on the participant
+/** Auth extractor for APIs that are only available for authenticated users
+  * that represent a known, active user on the participant.
   *
   * ==Authentication==
   *
@@ -20,14 +21,13 @@ import scala.util.{Failure, Success}
   * ==Authorization==
   *
   *  - user must exist on the participant and be active
-  *  - primary party must be set for the user and equal to `adminParty`
-  *  - user must have actAs rights for `adminParty`
-  *  - user must have ParticipantAdmin rights
+  *  - primary party must be set for the user and equal to the app operator party
+  *  - user must have actAs rights for the app operator party
   */
-final class AdminAuthExtractor(
+final class ActAsKnownPartyAuthExtractor(
     verifier: SignatureVerifier,
-    adminParty: PartyId,
     rightsProvider: UserRightsProvider,
+    party: PartyId,
     override protected val loggerFactory: NamedLoggerFactory,
     realm: String,
 )(implicit
@@ -36,7 +36,7 @@ final class AdminAuthExtractor(
 
   def directiveForOperationId(
       operationId: String
-  ): Directive1[AdminAuthExtractor.AdminUserRequest] = {
+  ): Directive1[ActAsKnownPartyAuthExtractor.ActAsKnownUserRequest] = {
     authenticateLedgerApiUser(operationId)
       .flatMap { authenticatedUser =>
         onComplete(
@@ -49,26 +49,20 @@ final class AdminAuthExtractor(
                 operationId,
                 "User is deactivated",
               )
-            } else if (!hasPrimaryParty(user, adminParty)) {
+            } else if (!hasPrimaryParty(user, party)) {
               rejectWithAuthorizationFailure(
                 authenticatedUser,
                 operationId,
-                s"Primary party of user ${user.getPrimaryParty} is not equal to the operator party ${adminParty}",
+                s"Primary party of user ${user.getPrimaryParty} is not equal to the party ${party}",
               )
-            } else if (!canActAs(rights, adminParty)) {
+            } else if (!canActAs(rights, party)) {
               rejectWithAuthorizationFailure(
                 authenticatedUser,
                 operationId,
-                s"User may not act as the operator party ${adminParty}",
-              )
-            } else if (!isParticipantAdmin(rights)) {
-              rejectWithAuthorizationFailure(
-                authenticatedUser,
-                operationId,
-                s"User is not a participant administrator",
+                s"User may not act as the party ${party}",
               )
             } else {
-              provide(AdminAuthExtractor.AdminUserRequest(traceContext))
+              provide(ActAsKnownPartyAuthExtractor.ActAsKnownUserRequest(traceContext))
             }
           case Success(None) =>
             rejectWithAuthorizationFailure(authenticatedUser, operationId, "User not found")
@@ -79,20 +73,20 @@ final class AdminAuthExtractor(
   }
 }
 
-object AdminAuthExtractor {
-  final case class AdminUserRequest(traceContext: TraceContext)
+object ActAsKnownPartyAuthExtractor {
+  final case class ActAsKnownUserRequest(traceContext: TraceContext)
 
   def apply(
       verifier: SignatureVerifier,
-      adminParty: PartyId,
       rightsProvider: UserRightsProvider,
+      party: PartyId,
       loggerFactory: NamedLoggerFactory,
       realm: String,
-  )(implicit traceContext: TraceContext): String => Directive1[AdminUserRequest] = {
-    new AdminAuthExtractor(
+  )(implicit traceContext: TraceContext): String => Directive1[ActAsKnownUserRequest] = {
+    new ActAsKnownPartyAuthExtractor(
       verifier,
-      adminParty,
       rightsProvider,
+      party,
       loggerFactory,
       realm,
     ).directiveForOperationId
