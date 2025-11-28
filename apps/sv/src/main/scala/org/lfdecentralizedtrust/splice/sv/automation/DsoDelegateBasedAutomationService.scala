@@ -116,6 +116,12 @@ class DsoDelegateBasedAutomationService(
         svTaskContext,
       )
     )
+    registerTrigger(
+      new ExecuteVoteInstructionTrigger(
+        triggerContext,
+        svTaskContext,
+      )
+    )
   }
 
 }
@@ -127,6 +133,7 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[AdvanceOpenMiningRoundTrigger],
     aTrigger[CompletedSvOnboardingTrigger],
     aTrigger[ExecuteConfirmedActionTrigger],
+    aTrigger[ExecuteVoteInstructionTrigger],
     aTrigger[MergeMemberTrafficContractsTrigger],
     aTrigger[ExpiredAmuletTrigger],
     aTrigger[ExpiredLockedAmuletTrigger],
