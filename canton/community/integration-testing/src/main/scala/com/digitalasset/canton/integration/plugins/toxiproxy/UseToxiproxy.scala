@@ -43,7 +43,7 @@ import scala.concurrent.duration.*
   */
 @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.Null"))
 final case class UseToxiproxy(toxiproxyConfig: ToxiproxyConfig)
-    extends EnvironmentSetupPlugin
+    extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
     with BaseTest {
   private val TOXIPROXY_CONTROL_PORT: Int = 8474
   var runningToxiproxy: RunningToxiproxy = _

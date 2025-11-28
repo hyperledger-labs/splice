@@ -7,8 +7,10 @@ import com.daml.ledger.api.v2 as proto
 import com.daml.ledger.api.v2.completion.Completion
 import com.daml.ledger.api.v2.transaction_filter.Filters
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.UpdateWrapper
+import com.digitalasset.canton.config.CantonConfig
 import com.digitalasset.canton.console.LocalParticipantReference
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.TestConsoleEnvironment
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.{
@@ -36,7 +38,7 @@ private[integration] trait HasCommandRunnersHelpers {
       submittingParty: PartyId,
       participantOverride: Option[LocalParticipantReference] = None,
   )(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): (T, UpdateWrapper, Completion) = {
 
     import env.*
@@ -129,7 +131,7 @@ private[integration] trait HasCommandRunnersHelpers {
       submittingParty: PartyId,
       participantOverrideO: Option[LocalParticipantReference],
   )(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Completion = {
     import env.*
 

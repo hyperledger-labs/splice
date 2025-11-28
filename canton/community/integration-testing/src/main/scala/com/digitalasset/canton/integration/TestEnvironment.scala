@@ -12,7 +12,7 @@ import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
 }
-import com.digitalasset.canton.config.{CachingConfigs, CantonConfig, CryptoConfig}
+import com.digitalasset.canton.config.{CachingConfigs, SharedCantonConfig, CryptoConfig}
 import com.digitalasset.canton.console.commands.GlobalSecretKeyAdministration
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
@@ -34,7 +34,7 @@ import scala.collection.mutable
 import scala.concurrent.Await
 
 /** Type including all environment macros and utilities to appear as you're using canton console */
-trait TestEnvironment
+trait TestEnvironment[C <: SharedCantonConfig[C]]
     extends ConsoleEnvironmentTestHelpers
     with ConsoleMacros
     with ConsoleEnvironment.Implicits
@@ -44,11 +44,11 @@ trait TestEnvironment
 
   implicit val executionContext: ExecutionContextIdlenessExecutorService =
     environment.executionContext
-  implicit val actorSystem: ActorSystem = environment.actorSystem
+  implicit def actorSystem: ActorSystem = environment.actorSystem
   implicit val executionSequencerFactory: ExecutionSequencerFactory =
     environment.executionSequencerFactory
 
-  def actualConfig: CantonConfig = environment.config
+  def actualConfig: C
 
   private lazy val storage =
     new MemoryStorage(loggerFactory, environmentTimeouts)

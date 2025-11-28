@@ -19,7 +19,7 @@ trait EntitySyntax {
   val defaultParticipant: String = "participant1"
 
   implicit class ParticipantReferenceSyntax(participantReference: ParticipantReference)(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ) {
 
     def ownParties(filterSynchronizerId: Option[SynchronizerId] = None): Set[PartyId] =
@@ -58,7 +58,9 @@ trait EntitySyntax {
     }
   }
 
-  implicit class PartyIdSyntax(partyId: PartyId)(implicit env: TestConsoleEnvironment) {
+  implicit class PartyIdSyntax(partyId: PartyId)(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ) {
     def participants(
         requestingParticipant: LocalParticipantReference,
         synchronizerId: Option[SynchronizerId] = None,
@@ -69,7 +71,9 @@ trait EntitySyntax {
         .toSet
   }
 
-  implicit class StringConversions(name: String)(implicit env: TestConsoleEnvironment) {
+  implicit class StringConversions(name: String)(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ) {
     import env.*
 
     def toPartyId(

@@ -521,8 +521,7 @@ final class BlockChunkProcessor(
 
         // Intentionally use the previous block's last timestamp
         // such that the criterion does not depend on how the block events are chunked up.
-        tracedSignedAck.value.content.timestamp <= state.lastBlockTs
-        || allowFutureAcksAfterSynchronizerUpgrade
+        tracedSignedAck.value.content.timestamp <= state.lastBlockTs || allowFutureAcksAfterSynchronizerUpgrade
       }
       invalidTsAcks = futureAcks.map(_.withTraceContext { implicit traceContext => signedAck =>
         val ack = signedAck.content

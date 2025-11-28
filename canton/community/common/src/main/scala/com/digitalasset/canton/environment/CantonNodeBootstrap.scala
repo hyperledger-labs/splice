@@ -181,7 +181,7 @@ trait BaseMetrics {
 
   def healthMetrics: HealthMetrics
   def storageMetrics: DbStorageMetrics
-  val declarativeApiMetrics: DeclarativeApiMetrics
+  def declarativeApiMetrics: DeclarativeApiMetrics
 
 }
 
