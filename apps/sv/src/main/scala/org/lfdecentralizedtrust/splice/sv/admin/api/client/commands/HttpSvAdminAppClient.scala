@@ -113,6 +113,25 @@ object HttpSvAdminAppClient {
     }
   }
 
+  case class GrantValidatorLicense(partyId: PartyId)
+      extends BaseCommand[http.GrantValidatorLicenseResponse, Unit] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GrantValidatorLicenseResponse] =
+      client.grantValidatorLicense(
+        body = definitions.GrantValidatorLicenseRequest(partyId.toProtoPrimitive),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GrantValidatorLicenseResponse.OK =>
+      Right(())
+    }
+  }
+
   case object ListAmuletPriceVotes
       extends BaseCommand[http.ListAmuletPriceVotesResponse, Seq[
         Contract[AmuletPriceVote.ContractId, AmuletPriceVote]

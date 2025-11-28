@@ -1,0 +1,55 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.DsoRules.Utils where
+
+import DA.List (dedup, maximumOn)
+import qualified DA.List.Total
+import DA.Optional (catOptionals)
+
+import Splice.ValidatorLicense
+import Splice.Types (Round(..))
+
+-- | Merges a list of `ValidatorLicense` contracts into a single license.
+-- The merged license will have the following properties:
+-- - faucetState: Uses the `faucetState` from the license with the highest `lastReceivedFor` round
+-- - weight: Use the minimum weight among all licenses, `None` if all weights are `None`.
+--     Since weight with `Some` values can only happen via SV vote, they are
+--     preferred over `None`. We don't want any single SV to overwrite the
+--     weight of a `ValidatorLicense` by simply granting a new one with weight
+--     `None`. Therefore we select the minimum value among the `Some` values
+--     even if that happens to be higher than the default value of 1.0 of `None`
+-- - kind: `OperatorLicense` if any license has `None` or `Some OperatorLicense`, otherwise `NonOperatorLicense`
+mergeValidatorLicenses : [ValidatorLicense] -> Either Text ValidatorLicense
+mergeValidatorLicenses licenses = do
+  if length licenses < 2
+    then Left "Number of validatorLicense contracts to merge is >= 2"
+    else pure ()
+
+  let validators = dedup (map (.validator) licenses)
+  if length validators /= 1
+    then Left "All validatorLicenses map to the same validator"
+    else pure ()
+
+  -- Select base license: the one with max lastReceivedFor in faucetState
+  let baseLicense = maximumOn (\license ->
+        case license.faucetState of
+          None -> Round 0
+          Some fs -> fs.lastReceivedFor) licenses
+
+  -- Calculate merged weight: minimum of all non-None weights, or None if all are None
+  let nonNoneWeights = catOptionals $ map (.weight) licenses
+  let mergedWeight = DA.List.Total.minimumOn identity nonNoneWeights
+
+  -- Calculate merged kind: OperatorLicense if any license has None or Some OperatorLicense
+  let hasOperatorLicense kind = case kind of
+        None -> True
+        Some OperatorLicense -> True
+        Some _ -> False
+  let mergedKind = if any hasOperatorLicense (map (.kind) licenses)
+                   then Some OperatorLicense
+                   else Some NonOperatorLicense
+
+  pure $ baseLicense with
+    weight = mergedWeight
+    kind = mergedKind
