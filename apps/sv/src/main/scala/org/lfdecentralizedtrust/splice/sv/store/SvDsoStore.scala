@@ -15,6 +15,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as vl
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.amuletprice as cp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvRewardState
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.voteexecution.VoteExecutionInstruction
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.voteexecution.executioninstruction.{
+  EI_ValidatorLicenseChangeWeight,
+  EI_ValidatorLicenseWithdraw,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AmuletRules,
   ARC_DsoRules,
@@ -1224,6 +1229,21 @@ object SvDsoStore {
         DsoAcsStoreRowData(
           contract,
           validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
+        )
+      },
+      mkFilter(VoteExecutionInstruction.COMPANION)(vi => vi.payload.dso == dso) { contract =>
+        val validatorParty = contract.payload.instruction match {
+          case changeWeight: EI_ValidatorLicenseChangeWeight =>
+            Some(PartyId.tryFromProtoPrimitive(changeWeight.validator))
+          case withdraw: EI_ValidatorLicenseWithdraw =>
+            Some(PartyId.tryFromProtoPrimitive(withdraw.validator))
+          case _ =>
+            None
+        }
+        DsoAcsStoreRowData(
+          contract,
+          validator = validatorParty,
+          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
         )
       },
       mkFilter(splice.decentralizedsynchronizer.MemberTraffic.COMPANION)(vt =>
