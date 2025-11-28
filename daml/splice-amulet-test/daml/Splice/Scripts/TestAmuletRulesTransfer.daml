@@ -586,11 +586,7 @@ testInputDevelopmentFundCoupon = do
   baseConfig <- getAmuletConfig app
   -- Replace the default AmuletConfig with a 0.05% allocation for the development fund.
   -- This configuration applies to the next open round.
-  setAmuletConfig app baseConfig baseConfig with
-    optDevelopmentFundManager = Some alice.primaryParty
-    issuanceCurve = baseConfig.issuanceCurve with
-      initialValue = baseConfig.issuanceCurve.initialValue with
-        optDevelopmentFundPercentage = Some 0.05
+  replaceDevelopmentFundConfig app baseConfig (Some alice.primaryParty) (Some 0.05)
 
   -- Run 3 issuances for the already open rounds without the development fund configuration.
   -- No development fund coupons are minted.
