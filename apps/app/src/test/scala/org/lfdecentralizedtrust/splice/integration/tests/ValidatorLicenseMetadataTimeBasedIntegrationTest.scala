@@ -1,6 +1,13 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedReward
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ModifyValidatorLicenses
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  ValidatorLicenseChange,
+  ValidatorLicensesModification,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.validatorlicensechange.VLC_ChangeWeight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.*
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
@@ -14,6 +21,7 @@ import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponT
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 
+import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 class ValidatorLicenseMetadataTimeBasedIntegrationTest
@@ -196,5 +204,122 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
       )
       succeed
     }
+  }
+
+  "expired ValidatorLivenessActivityRecord creates UnclaimedReward with correct weight" in {
+    implicit env =>
+      startAllSync(
+        sv1Backend,
+        sv1ScanBackend,
+        aliceValidatorBackend,
+      )
+
+      val info = sv1Backend.getDsoInfo()
+      val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+
+      // Change Alice's validator license weight to 10.0
+      val aliceNewWeight = BigDecimal(10.0)
+      val aliceAction = new ARC_DsoRules(
+        new SRARC_ModifyValidatorLicenses(
+          new ValidatorLicensesModification(
+            List[ValidatorLicenseChange](
+              new VLC_ChangeWeight(
+                aliceValidatorParty.toProtoPrimitive,
+                aliceNewWeight.bigDecimal,
+              )
+            ).asJava
+          )
+        )
+      )
+
+      actAndCheck(
+        "Create and execute vote to change weight",
+        sv1Backend.createVoteRequest(
+          info.svParty.toProtoPrimitive,
+          aliceAction,
+          "url",
+          "description",
+          info.dsoRules.payload.config.voteRequestTimeout,
+          None,
+        ),
+      )(
+        "Alice's license weight is updated",
+        _ => {
+          val licenses =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+              .filterJava(ValidatorLicense.COMPANION)(
+                dsoParty,
+                c => c.data.validator == aliceValidatorParty.toProtoPrimitive,
+              )
+          licenses should have length 1
+          licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(aliceNewWeight)
+        },
+      )
+
+      advanceTimeForRewardAutomationToRunForCurrentRound
+
+      // Verify liveness activity records are created for with correct weight
+      val aliceActivityRecords = eventually() {
+        val records = sv1Backend.participantClient.ledger_api_extensions.acs
+          .filterJava(ValidatorLivenessActivityRecord.COMPANION)(
+            dsoParty,
+            c => c.data.validator == aliceValidatorParty.toProtoPrimitive,
+          )
+        records.map(_.data.round.number).toSet shouldBe Set(0L, 1L)
+        records
+      }
+
+      aliceActivityRecords.foreach { record =>
+        record.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(aliceNewWeight)
+      }
+
+      val recordRounds = aliceActivityRecords.map(_.data.round.number).toSet
+
+      // pause the trigger to avoid collecting further rewards
+      setTriggersWithin(
+        triggersToResumeAtStart = Seq.empty,
+        triggersToPauseAtStart = Seq(
+          aliceValidatorBackend.validatorAutomation.trigger[ReceiveFaucetCouponTrigger]
+        ),
+      ) {
+        actAndCheck(
+          "Advance rounds so that issuing rounds 0 and 1 no longer exist",
+          (1 to 5).foreach { _ =>
+            advanceRoundsToNextRoundOpening
+          },
+        )(
+          "ValidatorLivenessActivityRecord contracts for round 0 and 1 should be expired",
+          _ => {
+            // Verify activity records are expired
+            val allValidatorLivenessActivityRecord =
+              sv1Backend.participantClient.ledger_api_extensions.acs
+                .filterJava(ValidatorLivenessActivityRecord.COMPANION)(
+                  dsoParty
+                )
+            allValidatorLivenessActivityRecord shouldBe empty
+
+            // Get issuance value from issuing rounds
+            val issuingRounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._2
+            issuingRounds should not be empty
+
+            val issuancePerValidatorFaucetCoupon =
+              issuingRounds.headOption.value.payload.optIssuancePerValidatorFaucetCoupon.toScala.value
+
+            // Expected amount per record is weight * issuance
+            val expectedAmountPerRecord =
+              aliceNewWeight.bigDecimal.multiply(issuancePerValidatorFaucetCoupon)
+
+            val unclaimedRewards = sv1Backend.participantClient.ledger_api_extensions.acs
+              .filterJava(UnclaimedReward.COMPANION)(dsoParty)
+              .map(_.data.amount)
+
+            // Should have unclaimed rewards with the weighted amount for each round
+            unclaimedRewards.count(
+              _.compareTo(expectedAmountPerRecord) == 0
+            ) shouldBe recordRounds.size
+          },
+        )
+        succeed
+      }
   }
 }
