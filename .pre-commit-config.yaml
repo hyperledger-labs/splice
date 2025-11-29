@@ -50,7 +50,7 @@ repos:
         language: system
         entry: "scripts/fix-ts.py"
         types_or: [javascript, jsx, ts, tsx]
-        exclude: "/[.]prettierrc[.]cjs$"
+        exclude: "(/[.]prettierrc[.]cjs$|jest.config.ts$)"
       - id: pulumi_config
         name: check pulumi configs
         language: system
