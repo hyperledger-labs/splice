@@ -103,6 +103,11 @@ spec:
         {{ else if .Values.nonSvValidatorTrustSingleScan | default false -}}
         - name: ADDITIONAL_CONFIG_NON_VALIDATOR_TRUST_SINGLE_SCAN
           value: |
+            canton.validator-apps.validator_backend.scan-client.type = "trust-single"
+            canton.validator-apps.validator_backend.scan-client.url = ${_scan.admin-api.address}
+        {{ else -}}
+        - name: ADDITIONAL_CONFIG_BFT_SCAN
+          value: |
             {{- if .Values.scanClientConfig }}
               {{- if eq .Values.scanClientConfig.scanType "trust-single" }}
             canton.validator-apps.validator_backend.scan-client.type = "trust-single"
@@ -125,11 +130,6 @@ spec:
             canton.validator-apps.validator_backend.scan-client.type = "bft"
             canton.validator-apps.validator_backend.scan-client.seed-urls = [ ${_scan.admin-api.address} ]
             {{- end }}
-        {{ else -}}
-        - name: ADDITIONAL_CONFIG_BFT_SCAN
-          value: |
-            canton.validator-apps.validator_backend.scan-client.type = "bft"
-            canton.validator-apps.validator_backend.scan-client.seed-urls = [ ${_scan.admin-api.address} ]
         {{ end }}
         {{ if not .Values.useSequencerConnectionsFromScan }}
         - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
