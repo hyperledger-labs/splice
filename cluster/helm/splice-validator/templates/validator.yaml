@@ -100,33 +100,34 @@ spec:
           value: |
             canton.validator-apps.validator_backend.scan-client.type = "trust-single"
             canton.validator-apps.validator_backend.scan-client.url = ${_scan.admin-api.address}
-        {{ else if .Values.nonSvValidatorTrustSingleScan | default false -}}
+        {{ else if .Values.scanClientConfig }}
+        - name: ADDITIONAL_CONFIG_SCAN_CLIENT
+          value: |
+            {{- if or (eq .Values.scanClientConfig.scan-type "trust-single") ( .Values.nonSvValidatorTrustSingleScan) }}
+            canton.validator-apps.validator_backend.scan-client.type = "trust-single"
+            canton.validator-apps.validator_backend.scan-client.url = {{ (index .Values.scanClientConfig.seedUrls 0) | quote }}
+            {{- else if and (eq .Values.scanClientConfig.scan-type "bft-custom") (hasKey .Values.scanClientConfig "threshold") (hasKey .Values.scanClientConfig "trustedSvs") }}
+            canton.validator-apps.validator_backend.scan-client.type = "bft-custom"
+            canton.validator-apps.validator_backend.scan-client.threshold = {{ .Values.scanClientConfig.threshold }}
+            canton.validator-apps.validator_backend.scan-client.trusted-svs = [{{ range $i, $sv := .Values.scanClientConfig.trustedSvs }}{{ if $i }}, {{ end }}{{ $sv | quote }}{{ end }}]
+            canton.validator-apps.validator_backend.scan-client.seed-urls = [{{ range $i, $sv := .Values.scanClientConfig.seedUrls }}{{ if $i }}, {{ end }}{{ $sv | quote }}{{ end }}]
+            {{- else }}
+            canton.validator-apps.validator_backend.scan-client.type = "bft"
+            canton.validator-apps.validator_backend.scan-client.seed-urls = [{{ range $i, $sv := .Values.scanClientConfig.seedUrls }}{{ if $i }}, {{ end }}{{ $sv | quote }}{{ end }}]
+            {{- end }}
+            {{- if and $config (hasKey .Values.scanClientConfig "useLastKnownConnectionsForInitialization") (not .Values.scanClientConfig.useLastKnownConnectionsForInitialization)}}
+            canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = false
+            {{- end }}
+        {{- else if .Values.nonSvValidatorTrustSingleScan | default false }}
         - name: ADDITIONAL_CONFIG_NON_VALIDATOR_TRUST_SINGLE_SCAN
           value: |
             canton.validator-apps.validator_backend.scan-client.type = "trust-single"
-            canton.validator-apps.validator_backend.scan-client.url = ${_scan.admin-api.address}
-        {{- else -}}
-        - name: ADDITIONAL_CONFIG_BFT_SCAN
+            canton.validator-apps.validator_backend.scan-client.url = {{ (index .Values.scanClientConfig.seedUrls 0) | quote }}
+        {{- else }}
+        - name: ADDITIONAL_CONFIG_BFT_SCAN_DEFAULT
           value: |
-            {{- $config := .Values.scanClientConfig }}
-            {{- if and $config (hasKey $config "useLastKnownConnectionsForInitialization") (not $config.useLastKnownConnectionsForInitialization)}}
-            canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = false
-            {{- end}}
-            {{- $hasThreshold := $config.threshold }}
-            {{- $hasTrustedSvs := $config.trustedSvs }}
-            {{- if and $hasThreshold $hasTrustedSvs (ge (len $hasTrustedSvs) ($hasThreshold | int)) }}
-            canton.validator-apps.validator_backend.scan-client.type = "bft-custom"
-            canton.validator-apps.validator_backend.scan-client.seed-urls = [ ${_scan.admin-api.address} ]
-            {{- with $config.threshold }}
-            canton.validator-apps.validator_backend.scan-client.threshold = {{ . }}
-            {{- end }}
-            {{- if $config.trustedSvs }}
-            canton.validator-apps.validator_backend.scan-client.trusted-svs = [{{ range $i, $sv := $config.trustedSvs }}{{ if $i }}, {{ end }}{{ $sv | quote }}{{ end }}]
-            {{- end }}
-            {{- else }}
             canton.validator-apps.validator_backend.scan-client.type = "bft"
             canton.validator-apps.validator_backend.scan-client.seed-urls = [ ${_scan.admin-api.address} ]
-            {{- end }}
         {{ end }}
         {{ if not .Values.useSequencerConnectionsFromScan }}
         - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
