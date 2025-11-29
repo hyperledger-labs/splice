@@ -193,3 +193,17 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_NON_VALIDATOR_TRUST_SINGLE_SCAN')].value
           pattern: "canton.validator-apps.validator_backend.scan-client.type = \"trust-single\""
+
+  - it: "configures scan-client to not use useLastKnownConnectionsForInitialization"
+    set:
+      scanClientConfig:
+        scanType: "bft"
+        seedUrls: [ "https://bft-node-1.url:5003" ]
+        useLastKnownConnectionsForInitialization: false
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = false"
