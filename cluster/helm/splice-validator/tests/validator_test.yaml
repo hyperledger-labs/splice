@@ -126,3 +126,19 @@ tests:
           value: ledger-api-user
       - exists:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_DISABLE_AUTH')].value
+
+  - it: "configures scan-client for trust-single mode"
+    set:
+      scanClientConfig:
+        scanType: "trust-single"
+        seedUrls: [ "https://single.scan.url:5003", "https://extra.url:5003" ]
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"trust-single\""
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: 'canton.validator-apps.validator_backend.scan-client.url = "https://single.scan.url:5003"'
