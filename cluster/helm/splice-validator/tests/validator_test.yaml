@@ -182,3 +182,14 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
           pattern: "canton.validator-apps.validator_backend.scan-client.threshold = 2"
+
+  - it: "configures scan-client for trust-single when nonSvValidatorTrustSingleScan is true"
+    set:
+      nonSvValidatorTrustSingleScan: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_NON_VALIDATOR_TRUST_SINGLE_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"trust-single\""
