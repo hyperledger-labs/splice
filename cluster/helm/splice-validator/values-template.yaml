@@ -33,9 +33,6 @@ persistence:
   secretName: "postgres-secrets"
   enablePgInitContainer: true
 
-scanClientConfig:
-  useLastKnownConnectionsForInitialization: true
-
 migration:
   id: 0
   migrating: false
