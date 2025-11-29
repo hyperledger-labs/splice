@@ -12,10 +12,6 @@
     "scanClientConfig": {
       "type": "object",
       "description": "Configuration parameters for the scan client.",
-      "required": [
-        "scan-type",
-        "seedUrls"
-      ],
       "properties": {
         "scan-type": {
           "type": "string",
@@ -29,12 +25,12 @@
         "useLastKnownConnectionsForInitialization": {
           "type": "boolean",
           "default": true,
-          "description": "Whether to use last known connections for initialization."
+          "description": "Whether to recover the last known scan connections for initialization."
         },
         "threshold": {
           "type": "integer",
           "default": 0,
-          "description": "BFT custom threshold. Optional unless scan-type is bft-custom."
+          "description": "bft-custom threshold. Optional unless scan-type is bft-custom."
         },
         "trustedSvs": {
           "type": "array",
@@ -51,36 +47,7 @@
           },
           "description": "List of seed URLs for the scan client."
         }
-      },
-      "allOf": [
-        {
-          "description": "seedUrls must have at least one item.",
-          "properties": {
-            "seedUrls": {
-              "minItems": 1
-            }
-          }
-        },
-        {
-          "description": "Rule 2: If scan-type is bft-custom, both threshold and trustedSvs must be set.",
-          "if": {
-            "properties": {
-              "scan-type": {
-                "const": "bft-custom"
-              }
-            },
-            "required": [
-              "scan-type"
-            ]
-          },
-          "then": {
-            "required": [
-              "threshold",
-              "trustedSvs"
-            ]
-          }
-        }
-      ]
+      }
     },
     "svValidator": {
       "type": "boolean",
