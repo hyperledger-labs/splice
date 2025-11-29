@@ -89,6 +89,29 @@
     {
       "if": {
         "properties": {
+          "scanClientConfig": {
+            "type": "object",
+            "properties": {
+              "scan-type": {
+                "const": "bft-custom"
+              }
+            },
+            "required": ["scan-type"]
+          }
+        },
+        "required": ["scanClientConfig"]
+      },
+      "then": {
+        "properties": {
+          "scanClientConfig": {
+            "required": ["threshold", "trustedSvs"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
           "svValidator": {
             "const": false
           }
