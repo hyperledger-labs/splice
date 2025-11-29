@@ -107,14 +107,19 @@ spec:
               {{- if eq .Values.scanClientConfig.scanType "trust-single" }}
             canton.validator-apps.validator_backend.scan-client.type = "trust-single"
             canton.validator-apps.validator_backend.scan-client.url = {{ index .Values.scanClientConfig.seedUrls 0 | quote }}
-              {{- else if eq .Values.scanClientConfig.scanType "bft"}}
+              {{- else}}
+                {{- if and (hasKey .Values.scanClientConfig "useLastKnownConnectionsForInitialization") (not .Values.scanClientConfig.useLastKnownConnectionsForInitialization)}}
+            canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = false
+                {{- end }}
+                {{- if eq .Values.scanClientConfig.scanType "bft"}}
             canton.validator-apps.validator_backend.scan-client.type = "bft"
             canton.validator-apps.validator_backend.scan-client.seed-urls = {{ .Values.scanClientConfig.seedUrls | toJson }}
-              {{- else if eq .Values.scanClientConfig.scanType "bft-custom"}}
+                {{- else if eq .Values.scanClientConfig.scanType "bft-custom"}}
             canton.validator-apps.validator_backend.scan-client.type = "bft-custom"
             canton.validator-apps.validator_backend.scan-client.seed-urls = {{ .Values.scanClientConfig.seedUrls | toJson }}
             canton.validator-apps.validator_backend.scan-client.trusted-svs = {{ .Values.scanClientConfig.trustedSvs | toJson }}
             canton.validator-apps.validator_backend.scan-client.threshold = {{ .Values.scanClientConfig.threshold }}
+                {{- end }}
               {{- end }}
             {{- else }}
             canton.validator-apps.validator_backend.scan-client.type = "bft"
