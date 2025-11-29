@@ -158,3 +158,27 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
           pattern: 'canton.validator-apps.validator_backend.scan-client.seed-urls = \["https://bft-node-1.url:5003","https://bft-node-2.url:5003"\]'
+
+  - it: "configures scan-client for bft-custom mode, including trustedSvs and threshold"
+    set:
+      scanClientConfig:
+        scanType: "bft-custom"
+        seedUrls: [ "https://custom-node-A.com", "https://custom-node-B.com" ]
+        trustedSvs: [ "custom-sv-1", "custom-sv-2", "custom-sv-3" ]
+        threshold: 2
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"bft-custom\""
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: 'canton.validator-apps.validator_backend.scan-client.seed-urls = \["https://custom-node-A.com","https://custom-node-B.com"\]'
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: 'canton.validator-apps.validator_backend.scan-client.trusted-svs = \["custom-sv-1","custom-sv-2","custom-sv-3"\]'
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.threshold = 2"
