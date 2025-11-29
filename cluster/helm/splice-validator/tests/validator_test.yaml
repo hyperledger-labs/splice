@@ -126,3 +126,100 @@ tests:
           value: ledger-api-user
       - exists:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_DISABLE_AUTH')].value
+
+  - it: "configures scan-client for trust-single mode"
+    set:
+      scanClientConfig:
+        scanType: "trust-single"
+        seedUrls: [ "https://single.scan.url:5003", "https://extra.url:5003" ]
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"trust-single\""
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: 'canton.validator-apps.validator_backend.scan-client.url = "https://single.scan.url:5003"'
+
+  - it: "configures scan-client for standard bft mode, including multiple seedUrls"
+    set:
+      scanClientConfig:
+        scanType: "bft"
+        seedUrls: [ "https://bft-node-1.url:5003", "https://bft-node-2.url:5003" ]
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"bft\""
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: 'canton.validator-apps.validator_backend.scan-client.seed-urls = \["https://bft-node-1.url:5003","https://bft-node-2.url:5003"\]'
+
+  - it: "configures scan-client for bft-custom mode, including trustedSvs and threshold"
+    set:
+      scanClientConfig:
+        scanType: "bft-custom"
+        seedUrls: [ "https://custom-node-A.com", "https://custom-node-B.com" ]
+        trustedSvs: [ "custom-sv-1", "custom-sv-2", "custom-sv-3" ]
+        threshold: 2
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"bft-custom\""
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: 'canton.validator-apps.validator_backend.scan-client.seed-urls = \["https://custom-node-A.com","https://custom-node-B.com"\]'
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: 'canton.validator-apps.validator_backend.scan-client.trusted-svs = \["custom-sv-1","custom-sv-2","custom-sv-3"\]'
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.threshold = 2"
+
+  - it: "configures scan-client for trust-single when nonSvValidatorTrustSingleScan is true"
+    set:
+      nonSvValidatorTrustSingleScan: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_NON_VALIDATOR_TRUST_SINGLE_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"trust-single\""
+
+  - it: "configures scan-client to not use useLastKnownConnectionsForInitialization"
+    set:
+      scanClientConfig:
+        scanType: "bft"
+        seedUrls: [ "https://bft-node-1.url:5003" ]
+        useLastKnownConnectionsForInitialization: false
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = false"
+
+  - it: "defaults to BFT scan client with internal scan address if no config is set"
+    set:
+      svValidator: false
+      nonSvValidatorTrustSingleScan: false
+      scanClientConfig: null
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"bft\""
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton\\.validator-apps\\.validator_backend\\.scan-client\\.seed-urls = \\[\\s*\\$\\{_scan\\.admin-api\\.address\\}\\s*\\]"

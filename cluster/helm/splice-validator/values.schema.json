@@ -9,6 +9,46 @@
       "type": "object",
       "description": "The authentication configuration for the application"
     },
+    "scanClientConfig": {
+      "type": "object",
+      "description": "Configuration parameters for the scan client.",
+      "properties": {
+        "scanType": {
+          "type": "string",
+          "enum": [
+            "trust-single",
+            "bft",
+            "bft-custom"
+          ],
+          "description": "The type of scan client configuration."
+        },
+        "useLastKnownConnectionsForInitialization": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to recover the last known scan connections for initialization."
+        },
+        "threshold": {
+          "type": "integer",
+          "default": 0,
+          "description": "bft-custom threshold. Optional unless scan-type is bft-custom."
+        },
+        "trustedSvs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of trusted scans. Optional unless scan-type is bft-custom."
+        },
+        "seedUrls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of seed URLs for the scan client."
+        }
+      }
+    },
     "svValidator": {
       "type": "boolean",
       "description": "Whether this validator is part of an SV node"
@@ -23,6 +63,52 @@
     }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": {
+          "scanClientConfig": {
+            "type": "object"
+          }
+        },
+        "required": ["scanClientConfig"]
+      },
+      "then": {
+        "properties": {
+          "scanClientConfig": {
+            "properties": {
+              "seedUrls": {
+                "type": "array",
+                "minItems": 1,
+                "description": "List of seed URLs for the scan client. Must be non-empty if scanClientConfig is set."
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scanClientConfig": {
+            "type": "object",
+            "properties": {
+              "scanType": {
+                "const": "bft-custom"
+              }
+            },
+            "required": ["scanType"]
+          }
+        },
+        "required": ["scanClientConfig"]
+      },
+      "then": {
+        "properties": {
+          "scanClientConfig": {
+            "required": ["threshold", "trustedSvs"]
+          }
+        }
+      }
+    },
     {
       "if": {
         "properties": {
