@@ -13,7 +13,7 @@
       "type": "object",
       "description": "Configuration parameters for the scan client.",
       "properties": {
-        "scan-type": {
+        "scanType": {
           "type": "string",
           "enum": [
             "trust-single",
@@ -92,11 +92,11 @@
           "scanClientConfig": {
             "type": "object",
             "properties": {
-              "scan-type": {
+              "scanType": {
                 "const": "bft-custom"
               }
             },
-            "required": ["scan-type"]
+            "required": ["scanType"]
           }
         },
         "required": ["scanClientConfig"]
