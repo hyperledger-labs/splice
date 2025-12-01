@@ -111,7 +111,7 @@ spec:
             {{- if .Values.scanClientConfig }}
               {{- if eq .Values.scanClientConfig.scanType "trust-single" }}
             canton.validator-apps.validator_backend.scan-client.type = "trust-single"
-            canton.validator-apps.validator_backend.scan-client.url = {{ index .Values.scanClientConfig.seedUrls 0 | quote }}
+            canton.validator-apps.validator_backend.scan-client.url = {{ .Values.scanClientConfig.scanAddress | quote }}
               {{- else}}
                 {{- if and (hasKey .Values.scanClientConfig "useLastKnownConnectionsForInitialization") (not .Values.scanClientConfig.useLastKnownConnectionsForInitialization)}}
             canton.validator-apps.validator_backend.scan-client.use-last-known-connections-for-initialization = false

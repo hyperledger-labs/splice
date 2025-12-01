@@ -131,7 +131,7 @@ tests:
     set:
       scanClientConfig:
         scanType: "trust-single"
-        seedUrls: [ "https://single.scan.url:5003", "https://extra.url:5003" ]
+        scanAddress: "https://single.scan.url:5003"
     documentSelector:
       path: kind
       value: Deployment
