@@ -7,6 +7,14 @@
 
 .. release-notes:: upcoming
 
+  - Scan
+
+    - Removed the non-existing `command_id` field from the OpenAPI spec of all
+      scan endpoints that return transactions.
+      The field was included in the "required" section without being a property
+      of the returned transaction object. This is only a bugfix in the OpenAPI spec
+      and has no impact on the actual API behavior.
+
   - API security
 
     - Tightened authorization checks for all non-public API endpoints.
