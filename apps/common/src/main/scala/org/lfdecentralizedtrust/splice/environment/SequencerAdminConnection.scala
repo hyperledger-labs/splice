@@ -142,9 +142,15 @@ class SequencerAdminConnection(
       actorSystem: ActorSystem,
   ): Future[StorageObject] = {
 
-    val bucketConfig = backupDumConfig match {
-      case BackupDumpConfig.Gcp(bucketConfig, _) =>
-        bucketConfig
+    val (bucketConfig, prefix) = backupDumConfig match {
+      case BackupDumpConfig.Gcp(bucketConfig, prefix) =>
+        (
+          bucketConfig,
+          prefix match {
+            case Some(p) => s"$p/"
+            case None => ""
+          },
+        )
       case _ =>
         throw Status.UNIMPLEMENTED
           .withDescription("Stream genesis state works only with GCP buckets.")
@@ -154,7 +160,7 @@ class SequencerAdminConnection(
     val sink = GCStorage
       .resumableUpload(
         bucketConfig.bucketName,
-        fileName,
+        s"$prefix$fileName",
         contentType = ContentTypes.`application/octet-stream`,
         chunkSize = 256 * 1024, // Upload it in 256KB chunks
       )

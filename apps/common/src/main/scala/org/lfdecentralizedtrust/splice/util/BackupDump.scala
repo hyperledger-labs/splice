@@ -86,13 +86,17 @@ object BackupDump {
 
   def bucketExists(
       config: BackupDumpConfig,
-      startOffset: String,
+      offset: String,
       loggerFactory: NamedLoggerFactory,
   ): Boolean = {
     config match {
-      case conf: BackupDumpConfig.Gcp =>
-        val gcpBucket = new GcpBucket(conf.bucket, loggerFactory)
-        gcpBucket.list(startOffset, "").nonEmpty
+      case BackupDumpConfig.Gcp(bucketConfig, prefix) =>
+        val gcpBucket = new GcpBucket(bucketConfig, loggerFactory)
+        val pref = prefix match {
+          case Some(p) => s"$p/"
+          case None => ""
+        }
+        gcpBucket.list(s"$pref$offset", "").nonEmpty
       case _ =>
         throw Status.UNIMPLEMENTED
           .withDescription("Topology snapshot works only with GCP buckets")
