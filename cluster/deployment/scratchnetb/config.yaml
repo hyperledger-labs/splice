@@ -58,6 +58,11 @@ svs:
         requests:
           memory: 2Gi
   sv-da-1:
+    periodicSnapshots:
+      topology:
+        projectId: 'da-cn-devnet'
+        bucketName: 'da-cn-topology-snapshots'
+        backupInterval: '24h'
     publicName: Digital-Asset-1
     subdomain: sv-1
     cometbft:
