@@ -103,10 +103,7 @@ class MultiHostValidatorOperatorIntegrationTest
           )
       }
       clue(s"Import ACS for $party") {
-        // FIXME: bump the fork, and use bobParticipant.parties.import_party_acs()
-        // instead (as documented in Canton docs). ATM, that console command in our fork does not
-        // set the ContractImportMode, so we use the repair.import_acs command instead.
-        bobParticipant.repair.import_acs(
+        bobParticipant.parties.import_party_acs(
           importFilePath = acsFile.toString
         )
       }
