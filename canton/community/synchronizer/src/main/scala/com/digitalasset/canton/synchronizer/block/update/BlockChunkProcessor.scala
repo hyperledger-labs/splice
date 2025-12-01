@@ -334,7 +334,7 @@ final class BlockChunkProcessor(
       // assigned a sequencing time that corresponds to an actual (i.e. `Send`) event and that is also surely
       // at or after the acknowledged timestamp. This has no effect whatsoever on transaction processing.
       chunk.forgetNE.foldLeft[
-        (CantonTimestamp, Seq[(CantonTimestamp, Traced[LedgerBlockEvent])]),
+        (CantonTimestamp, Seq[(CantonTimestamp, Traced[LedgerBlockEvent])])
       ]((state.lastChunkTs, Seq.empty)) { case ((lastTs, events), event) =>
         event.value match {
           case send: Send =>

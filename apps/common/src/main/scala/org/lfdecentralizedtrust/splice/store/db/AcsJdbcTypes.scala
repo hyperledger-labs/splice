@@ -320,8 +320,6 @@ trait AcsJdbcTypes {
   implicit val setParameterSynchronizerIdO: SetParameter[Option[SynchronizerId]] =
     (d: Option[SynchronizerId], pp: PositionedParameters) => pp >> d.map(_.toLengthLimitedString)
 
-
-
   protected def payloadJsonFromDefinedDataType(
       data: DefinedDataType[?]
   ): Json = AcsJdbcTypes.payloadJsonFromDefinedDataType(data)
