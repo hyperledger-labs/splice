@@ -17,7 +17,6 @@ set:
   nodeIdentifier: "helm-mock-1-validator"
   validatorPartyHint: "helm-mock-1"
   validatorWalletUser: "mock-wallet-user-id"
-  scanAddress: "trusted.scan.mock.com"
   spliceInstanceNames:
     networkName: MockNet
     networkFaviconUrl: https://mock.net/favicon.ico
@@ -186,6 +185,7 @@ tests:
   - it: "configures scan-client for trust-single when nonSvValidatorTrustSingleScan is true"
     set:
       nonSvValidatorTrustSingleScan: true
+      scanClientConfig: null
     documentSelector:
       path: kind
       value: Deployment
@@ -211,7 +211,6 @@ tests:
   - it: "defaults to BFT scan client with internal scan address if no config is set"
     set:
       svValidator: false
-      nonSvValidatorTrustSingleScan: false
       scanClientConfig: null
     documentSelector:
       path: kind

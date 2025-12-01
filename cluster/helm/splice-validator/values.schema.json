@@ -177,7 +177,6 @@
         "migration",
         "nodeIdentifier",
         "persistence",
-        "scanAddress",
         "spliceInstanceNames"
       ],
       "properties": {
@@ -542,6 +541,29 @@
           "not": { "required": ["validatorWalletUser"] }
         }
       ]
+    },
+    {
+      "if": {
+        "properties": {
+          "scanClientConfig": {
+            "type": "object"
+          }
+        },
+        "required": ["scanClientConfig"]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": ["scanAddress"]
+            },
+            {
+              "required": ["nonSvValidatorTrustSingleScan"]
+            }
+          ]
+        },
+        "errorMessage": "If 'scanClientConfig' is set, 'scanAddress' and 'nonSvValidatorTrustSingleScan' must not be set."
+      }
     }
   ]
 }
