@@ -8,7 +8,6 @@ import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TriggerDomainMigrationDumpRequest
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin.TriggerDomainMigrationDumpResponse
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin as http
@@ -38,25 +37,6 @@ object HttpSvAdminAppClient {
         HttpClientBuilder().buildClient(),
         host,
       )
-  }
-
-  case class GrantValidatorLicense(partyId: PartyId)
-      extends BaseCommand[http.GrantValidatorLicenseResponse, Unit] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GrantValidatorLicenseResponse] =
-      client.grantValidatorLicense(
-        body = definitions.GrantValidatorLicenseRequest(partyId.toProtoPrimitive),
-        headers = headers,
-      )
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = { case http.GrantValidatorLicenseResponse.OK =>
-      Right(())
-    }
   }
 
   case class PauseDecentralizedSynchronizer()
