@@ -168,6 +168,10 @@ export async function installSvNode(
     config.identitiesBackupLocation.bucket
   );
 
+  const topologySnapshotConfigSecret = periodicTopologySnapshotConfig
+    ? installBootstrapDataBucketSecret(xns, periodicTopologySnapshotConfig.location.bucket)
+    : undefined;
+
   const backupConfigSecret: pulumi.Resource | undefined = config.periodicBackupConfig
     ? config.periodicBackupConfig.location.bucket != config.identitiesBackupLocation.bucket
       ? installBootstrapDataBucketSecret(xns, config.periodicBackupConfig.location.bucket)
@@ -198,6 +202,7 @@ export async function installSvNode(
     )
     .concat([identitiesBackupConfigSecret])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
+    .concat(topologySnapshotConfigSecret ? [topologySnapshotConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
     .concat(loopback)
     .concat(imagePullDeps)

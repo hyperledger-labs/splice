@@ -51,6 +51,28 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "postgresPassword": ""
         }
       },
@@ -1778,6 +1800,18 @@
         "onboardingRoundZeroDuration": "2 h",
         "onboardingType": "found-dso",
         "participantAddress": "participant-3",
+        "periodicTopologySnapshotConfig": {
+          "backupInterval": "24h",
+          "location": {
+            "bucket": {
+              "bucketName": "da-cn-topology-snapshots",
+              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+              "projectId": "da-cn-test",
+              "secretName": "cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots"
+            },
+            "prefix": "mock/sv-1"
+          }
+        },
         "persistence": {
           "databaseName": "sv_sv_1",
           "port": 5432,
