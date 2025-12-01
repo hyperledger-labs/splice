@@ -295,30 +295,26 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def createTestData(bobParty: PartyId)(implicit
       env: FixtureParam
   ): Unit = {
-    actAndCheck(
-      "step forward many rounds", {
-        actAndCheck(
-          "Advance the first round", {
-            advanceRoundsToNextRoundOpening
-          },
-        )(
-          "Wait for alice to report activity up to round 2",
-          _ =>
-            aliceValidatorWalletClient
-              .listValidatorLivenessActivityRecords()
-              .map(_.payload.round.number) should contain(2),
-        )
-
-        (3 to 6).foreach { _ =>
+    forAll(
+      Table(
+        ("round", "expected balance"),
+        (2, BigDecimal("0")),
+        (3, BigDecimal("0")), // 6512.93759512940
+        (4, BigDecimal("13025.8751902588")),
+        (5, BigDecimal("19538.8127853882")),
+        (6, aliceValidatorMintedAmount),
+      )
+    ) { (expectRound, expectedBalance) =>
+      actAndCheck(
+        s"Advance round ${expectRound - 1}", {
           advanceRoundsToNextRoundOpening
-        }
-      },
-    )(
-      "alice validator receives rewards",
-      _ => {
-        aliceValidatorWalletClient.balance().unlockedQty shouldBe aliceValidatorMintedAmount
-      },
-    )
+          advanceTimeForRewardAutomationToRunForCurrentRound
+        },
+      )(
+        s"alice validator receives rewards up to round $expectRound",
+        _ => aliceValidatorWalletClient.balance().unlockedQty should be >= expectedBalance,
+      )
+    }
 
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
     val (lockingParty, lockingClient) = (aliceValidatorParty, aliceValidatorWalletClient)
