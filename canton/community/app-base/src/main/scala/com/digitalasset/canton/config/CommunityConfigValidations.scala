@@ -176,7 +176,6 @@ object CommunityConfigValidations extends ConfigValidations with NamedLogging {
       _,
       _,
       _,
-      _,
     ) =
       config
     Validated.cond(
@@ -598,6 +597,7 @@ object CommunityConfigValidations extends ConfigValidations with NamedLogging {
       config: CantonConfig
   ): Validated[NonEmpty[Seq[String]], Unit] = {
     val CantonConfig(
+      _,
       sequencers,
       mediators,
       participants,

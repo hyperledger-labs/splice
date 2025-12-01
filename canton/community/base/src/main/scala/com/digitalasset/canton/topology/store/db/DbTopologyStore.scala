@@ -405,12 +405,11 @@ class DbTopologyStore[StoreId <: TopologyStoreId](
 
     // PartyToParticipant filtering
     val ptpFilter: SQLActionBuilder =
-      sql"(transaction_type = ${PartyToParticipant.code}"
-        ++ conditionalAppend(
-          filterParty,
-          filterPartyIdentifier,
-          filterPartyNamespaceO,
-        ).toList ++ sql")"
+      sql"(transaction_type = ${PartyToParticipant.code}" ++ conditionalAppend(
+        filterParty,
+        filterPartyIdentifier,
+        filterPartyNamespaceO,
+      ).toList ++ sql")"
 
     val adminPartyConditions =
       // SynchronizerTrustCertificate filtering for admin parties party

@@ -5,6 +5,7 @@ package com.digitalasset.canton.integration.plugins.toxiproxy
 
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.ConfigTransforms.*
 import com.digitalasset.canton.integration.plugins.toxiproxy.ProxyConfig.postgresConfig
 import com.digitalasset.canton.integration.plugins.toxiproxy.UseToxiproxy.*

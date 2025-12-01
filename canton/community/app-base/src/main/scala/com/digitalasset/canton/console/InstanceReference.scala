@@ -1290,7 +1290,7 @@ class LocalSequencerReference(
     config.publicApi.clientConfig
       .asSequencerConnection(sequencerAlias = SequencerAlias.tryCreate(name), sequencerId = None)
 
-  private[console] val nodes: SequencerNodes =
+  val nodes: SequencerNodes =
     consoleEnvironment.environment.sequencers
 
   override protected[console] def runningNode: Option[SequencerNodeBootstrap] =

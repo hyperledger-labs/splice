@@ -28,8 +28,7 @@ trait DbTest
     with FlagCloseable
     with HasCloseContext // not used here, but required by most tests. So extending it for convenience.
     with HasExecutionContext
-    with NamedLogging
-    with DbStorage.Implicits {
+    with NamedLogging {
   this: Suite =>
 
   /** Flag to define the migration mode for the schemas */

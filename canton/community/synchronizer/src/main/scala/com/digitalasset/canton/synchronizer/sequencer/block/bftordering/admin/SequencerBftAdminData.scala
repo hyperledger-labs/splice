@@ -263,10 +263,6 @@ object SequencerBftAdminData {
                     ) =>
                   Right(PeerEndpointHealthStatus.Unauthenticated)
                 case ProtoPeerEndpointHealthStatus(
-                      ProtoPeerEndpointHealthStatus.Status.Disconnected(_)
-                    ) =>
-                  Right(PeerEndpointHealthStatus.Disconnected)
-                case ProtoPeerEndpointHealthStatus(
                       ProtoPeerEndpointHealthStatus.Status.Authenticated(
                         ProtoAuthenticated(sequencerIdString)
                       )

@@ -152,6 +152,7 @@ final class BftBlockOrderer(
       Threading.newExecutionContext(
         "bft-orderer-dedicated-ec",
         noTracingLogger,
+        None,
         PositiveInt.tryCreate(
           Threading.detectNumberOfThreads(noTracingLogger).value / divisor
         ),
