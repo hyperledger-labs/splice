@@ -22,6 +22,10 @@
           ],
           "description": "The type of scan client configuration."
         },
+        "scanAddress": {
+          "type": "string",
+          "description": "scan address for trust single type."
+        },
         "useLastKnownConnectionsForInitialization": {
           "type": "boolean",
           "default": true,
