@@ -333,5 +333,86 @@ class WalletRewardsTimeBasedIntegrationTest
         ),
       )
     }
+
+    "validator with weight 0 does not record liveness activity but still reports active" in {
+      implicit env =>
+        val info = sv1Backend.getDsoInfo()
+        val dsoParty = info.dsoParty
+        val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+
+        def getAliceLicense() = {
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(ValidatorLicense.COMPANION)(
+              dsoParty,
+              c => c.data.validator == aliceValidatorParty.toProtoPrimitive,
+            )
+        }
+
+        // Get initial lastActiveAt
+        val initialLicense = eventually() {
+          val licenses = getAliceLicense()
+          licenses should have length 1
+          licenses.head
+        }
+        val initialLastActiveAt = initialLicense.data.lastActiveAt
+
+        // Change validator license weight to 0
+        val zeroWeight = BigDecimal(0.0)
+        val action = new ARC_DsoRules(
+          new SRARC_ModifyValidatorLicenses(
+            new ValidatorLicensesModification(
+              List[ValidatorLicenseChange](
+                new VLC_ChangeWeight(
+                  aliceValidatorParty.toProtoPrimitive,
+                  zeroWeight.bigDecimal,
+                )
+              ).asJava
+            )
+          )
+        )
+
+        actAndCheck(
+          "Create and execute vote to change weight",
+          sv1Backend.createVoteRequest(
+            info.svParty.toProtoPrimitive,
+            action,
+            "url",
+            "description",
+            info.dsoRules.payload.config.voteRequestTimeout,
+            None,
+          ),
+        )(
+          "license weight is updated",
+          _ => {
+            val licenses = getAliceLicense()
+            licenses should have length 1
+            licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(zeroWeight)
+          },
+        )
+
+        advanceTimeForRewardAutomationToRunForCurrentRound
+
+        // Wait for trigger to run and verify no liveness activity records are created for Alice
+        // Bob (with the default weight) should still have activity records
+        eventually() {
+          aliceValidatorWalletClient
+            .listValidatorLivenessActivityRecords() should have size 0
+          bobValidatorWalletClient
+            .listValidatorLivenessActivityRecords() should not be empty
+        }
+
+        // Advance time past activityReportMinInterval (1 hour) to trigger ReportActive
+        actAndCheck(
+          "Advance time past activityReportMinInterval",
+          advanceTime(java.time.Duration.ofHours(2)),
+        )(
+          "lastActiveAt gets updated even with weight 0",
+          _ => {
+            val updatedLicense = getAliceLicense()
+            updatedLicense should have length 1
+            updatedLicense.head.data.lastActiveAt should not be initialLastActiveAt
+          },
+        )
+    }
   }
 }
