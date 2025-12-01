@@ -10,7 +10,7 @@ paths:
   /v0/wallet/user-status:
     get:
       tags: [wallet]
-      x-jvm-package: status.wallet
+      x-jvm-package: wallet
       operationId: "userStatus"
       responses:
         "200":
@@ -756,7 +756,7 @@ paths:
   /v0/feature-support:
     get:
       tags: [ wallet ]
-      x-jvm-package: status.wallet
+      x-jvm-package: wallet
       operationId: "featureSupport"
       responses:
         "200":

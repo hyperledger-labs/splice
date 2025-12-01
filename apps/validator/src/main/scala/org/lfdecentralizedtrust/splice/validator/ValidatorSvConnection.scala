@@ -7,7 +7,8 @@ import cats.data.EitherT
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.{BuildInfo, HttpAppConnection, RetryProvider}
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_public as httpPublic}
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv as http}
+import org.lfdecentralizedtrust.splice.sv.http.SvHttpClient.BaseCommand
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import org.lfdecentralizedtrust.splice.validator.ValidatorSvConnection.OnboardValidator
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -15,7 +16,6 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.sv.http.SvHttpClient.BaseCommandPublic
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
@@ -63,11 +63,11 @@ object ValidatorSvConnection {
     )
 
   case class OnboardValidator(candidate: PartyId, secret: String, contactPoint: String)
-      extends BaseCommandPublic[httpPublic.OnboardValidatorResponse, Unit] {
+      extends BaseCommand[http.OnboardValidatorResponse, Unit] {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], httpPublic.OnboardValidatorResponse] =
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardValidatorResponse] =
       client.onboardValidator(
         body = definitions.OnboardValidatorRequest(
           candidate.toProtoPrimitive,
@@ -80,7 +80,7 @@ object ValidatorSvConnection {
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case httpPublic.OnboardValidatorResponse.OK =>
+    ) = { case http.OnboardValidatorResponse.OK =>
       Right(())
     }
   }

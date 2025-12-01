@@ -265,20 +265,12 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
         .futureValue
     }
 
-    val validatorParty =
-      aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
-        .get(aliceValidatorBackend.config.ledgerApiUser)
-        .primaryParty
-        .value
-
-    def assertRejectedAsUnauthorized(userId: String) = {
+    clue("Invalid user id gets rejected") {
       loggerFactory.assertLogs(
         {
-          val response = makeRequest(userId)
-          response.status should be(StatusCodes.Forbidden)
-          response.entity.getContentType().toString should be(
-            "application/json"
-          )
+          val responseForInvalidUser = makeRequest("wrong_user")
+          responseForInvalidUser.status should be(StatusCodes.Forbidden)
+          responseForInvalidUser.entity.getContentType().toString should be("application/json")
         },
         _.warningMessage should include(
           "Authorization Failed"
@@ -286,90 +278,64 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
       )
     }
 
-    def assertAccepted(userId: String) = {
-      val response = makeRequest(userId)
-      response.status should be(StatusCodes.OK)
-    }
-
-    clue("Invalid user id gets rejected") {
-      val userId = "wrong_user"
-      assertRejectedAsUnauthorized(userId)
-    }
-
     clue("User without actAs permissions for validator party gets rejected") {
-      val userId = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
-        .create(
-          s"testUser-${Random.nextInt()}",
-          actAs = Set.empty[PartyId],
-          primaryParty = Some(validatorParty),
-          participantAdmin = true,
-          isDeactivated = false,
-        )
-        .id
-      assertRejectedAsUnauthorized(userId)
+      loggerFactory.assertLogs(
+        {
+          val validatorParty =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+              .get(aliceValidatorBackend.config.ledgerApiUser)
+              .primaryParty
+              .value
+          val testUser =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.create(
+              s"testUser-${Random.nextInt()}",
+              actAs = Set.empty[PartyId],
+              primaryParty = Some(validatorParty),
+            )
+          val response = makeRequest(testUser.id)
+          response.status should be(StatusCodes.Forbidden)
+        },
+        _.warningMessage should include(
+          "Authorization Failed"
+        ),
+      )
     }
 
     clue("User without validator party as primaryParty gets rejected") {
-      val userId = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
-        .create(
-          s"testUser-${Random.nextInt()}",
-          actAs = Set(validatorParty),
-          primaryParty = None,
-          participantAdmin = true,
-          isDeactivated = false,
-        )
-        .id
-      assertRejectedAsUnauthorized(userId)
-    }
-
-    clue("User without participant admin gets rejected") {
-      val userId = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
-        .create(
-          s"testUser-${Random.nextInt()}",
-          actAs = Set(validatorParty),
-          primaryParty = Some(validatorParty),
-          participantAdmin = false,
-          isDeactivated = false,
-        )
-        .id
-      assertRejectedAsUnauthorized(userId)
-    }
-
-    clue("Deactivated user with correct authorization gets rejected") {
-      val userId = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
-        .create(
-          s"testUser-${Random.nextInt()}",
-          actAs = Set(validatorParty),
-          primaryParty = Some(validatorParty),
-          participantAdmin = true,
-          isDeactivated = true,
-        )
-        .id
-      assertRejectedAsUnauthorized(userId)
-    }
-
-    clue(
-      "User with correct authorization (actAs, primary party, participant admin) gets accepted"
-    ) {
-      val userId = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
-        .create(
-          s"testUser-${Random.nextInt()}",
-          actAs = Set(validatorParty),
-          primaryParty = Some(validatorParty),
-          participantAdmin = true,
-          isDeactivated = false,
-        )
-        .id
-      assertAccepted(userId)
-
-      actAndCheck(
-        "Revoke access by deactivating user in the participant user management",
-        aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
-          .update(userId, user => user.copy(isDeactivated = true)),
-      )(
-        "Check that user is now rejected",
-        _ => assertRejectedAsUnauthorized(userId),
+      loggerFactory.assertLogs(
+        {
+          val validatorParty =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+              .get(aliceValidatorBackend.config.ledgerApiUser)
+              .primaryParty
+              .value
+          val testUser =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.create(
+              s"testUser-${Random.nextInt()}",
+              actAs = Set(validatorParty),
+              primaryParty = None,
+            )
+          val response = makeRequest(testUser.id)
+          response.status should be(StatusCodes.Forbidden)
+        },
+        _.warningMessage should include(
+          "Authorization Failed"
+        ),
       )
+    }
+
+    clue("User with actas rights and primaryParty gets accepted") {
+      val validatorParty = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+        .get(aliceValidatorBackend.config.ledgerApiUser)
+        .primaryParty
+        .value
+      val testUser = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.create(
+        s"testUser-${Random.nextInt()}",
+        actAs = Set(validatorParty),
+        primaryParty = Some(validatorParty),
+      )
+      val response = makeRequest(testUser.id)
+      response.status should be(StatusCodes.OK)
     }
   }
 

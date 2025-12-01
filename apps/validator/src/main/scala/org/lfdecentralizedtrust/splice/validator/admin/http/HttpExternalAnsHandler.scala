@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.validator.admin.http
 
+import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.http.v0.external.ans.AnsResource as r0
 import org.lfdecentralizedtrust.splice.http.v0.{external, definitions as d0}
@@ -13,7 +14,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.wallet.admin.http.UserWalletAuthExtractor.WalletUserRequest
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -26,7 +26,7 @@ class HttpExternalAnsHandler(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends external.ans.AnsHandler[WalletUserRequest]
+) extends external.ans.AnsHandler[TracedUser]
     with HttpWalletHandlerUtil {
 
   protected val workflowId = this.getClass.getSimpleName
@@ -35,14 +35,16 @@ class HttpExternalAnsHandler(
       respond: r0.CreateAnsEntryResponse.type
   )(
       body: d0.CreateAnsEntryRequest
-  )(tuser: WalletUserRequest): Future[r0.CreateAnsEntryResponse] = {
-    implicit val WalletUserRequest(user, endUserWallet, traceContext) = tuser
-    val partyId = endUserWallet.store.key.endUserParty
+  )(tuser: TracedUser): Future[r0.CreateAnsEntryResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.createAnsEntry") { implicit traceContext => _ =>
       retryProvider.retryForClientCalls(
         "createAnsEntry",
         "create ANS entry",
         for {
+          endUserWallet <- getUserWallet(user)
+          connection = endUserWallet.connection
+          partyId <- connection.getPrimaryParty(user)
           ansRules <- scanConnection.getAnsRules()
           ansRulesCt = ansRules.toAssignedContract.getOrElse(
             throw Status.Code.FAILED_PRECONDITION.toStatus
@@ -70,9 +72,9 @@ class HttpExternalAnsHandler(
                 )
               }
           )
-          res <- endUserWallet.connection
+          res <- connection
             .submit(Seq(partyId), Seq(partyId), update)
-            .withDisclosedContracts(endUserWallet.connection.disclosedContracts(ansRules))
+            .withDisclosedContracts(connection.disclosedContracts(ansRules))
             .noDedup
             .yieldResult()
         } yield res,
@@ -83,11 +85,11 @@ class HttpExternalAnsHandler(
 
   override def listAnsEntries(
       respond: r0.ListAnsEntriesResponse.type
-  )()(tuser: WalletUserRequest): Future[r0.ListAnsEntriesResponse] = {
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+  )()(tuser: TracedUser): Future[r0.ListAnsEntriesResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.listAnsEntries") { implicit traceContext => _ =>
       for {
-        entriesWithPayData <- userWallet.store.listAnsEntries(walletManager.clock.now)
+        entriesWithPayData <- getUserStore(user).flatMap(_.listAnsEntries(walletManager.clock.now))
         res <- Future.successful {
           r0.ListAnsEntriesResponse.OK(
             d0.ListAnsEntriesResponse(entries =
