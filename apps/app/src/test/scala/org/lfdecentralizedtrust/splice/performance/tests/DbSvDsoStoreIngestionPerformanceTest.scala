@@ -60,29 +60,28 @@ class DbSvDsoStoreIngestionPerformanceTest
           "Failed to parse the update history dump provided. It should have the structure of UpdateHistoryResponseV2."
         )
       )
-    val txs = dump.transactions.collect {
+    val txs = dump.transactions.zipWithIndex.collect {
       // deliberately ignoring reassignments
-      case UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(update) =>
-        CompactJsonScanHttpEncodings.httpToLapiUpdate(update)
+      case (UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(update), index) =>
+        CompactJsonScanHttpEncodings.httpToLapiTransaction(update, index.toLong)
     }
 
     Source
       .fromIterator(() => txs.iterator)
       .batch(ingestionConfig.maxBatchSize.toLong, Vector(_))(_ :+ _)
+      .map(batch =>
+        batch
+          .map(tx =>
+            TreeUpdateOrOffsetCheckpoint.Update(tx.update.update, tx.update.synchronizerId)
+          )
+          .toList
+      )
       .zipWithIndex
       .runWith(Sink.foreachAsync(parallelism = 1) { case (batch, index) =>
         println(s"Ingesting batch $index of ${batch.length} elements")
         val before = System.nanoTime()
         store.multiDomainAcsStore.ingestionSink
-          .ingestUpdateBatch(
-            NonEmptyList.fromListUnsafe(
-              txs
-                .map(tx =>
-                  TreeUpdateOrOffsetCheckpoint.Update(tx.update.update, tx.update.synchronizerId)
-                )
-                .toList
-            )
-          )
+          .ingestUpdateBatch(NonEmptyList.fromListUnsafe(batch))
           .map { _ =>
             val after = System.nanoTime()
             val duration = after - before
@@ -121,7 +120,7 @@ class DbSvDsoStoreIngestionPerformanceTest
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
     new DbSvDsoStore(
       SvStore.Key(storeSvParty, dsoParty),
-      storage,
+      storage.underlying, // not testing idempotency
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       DomainMigrationInfo(
