@@ -75,7 +75,7 @@ paths:
   /v0/admin/validator/licenses/grant:
     post:
       tags: [sv]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "grantValidatorLicense"
       requestBody:
         required: true

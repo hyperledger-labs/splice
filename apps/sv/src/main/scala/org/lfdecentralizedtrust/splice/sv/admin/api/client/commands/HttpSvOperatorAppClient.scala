@@ -24,6 +24,7 @@ import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_operator as http
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboarding
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.tracing.TraceContext
@@ -96,6 +97,25 @@ object HttpSvOperatorAppClient {
             definitions.PrepareValidatorOnboardingResponse(secret)
           ) =>
         Right(secret)
+    }
+  }
+
+  case class GrantValidatorLicense(partyId: PartyId)
+      extends BaseCommand[http.GrantValidatorLicenseResponse, Unit] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GrantValidatorLicenseResponse] =
+      client.grantValidatorLicense(
+        body = definitions.GrantValidatorLicenseRequest(partyId.toProtoPrimitive),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GrantValidatorLicenseResponse.OK =>
+      Right(())
     }
   }
 
