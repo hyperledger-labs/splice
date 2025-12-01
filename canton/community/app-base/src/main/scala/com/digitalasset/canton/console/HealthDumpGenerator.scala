@@ -38,7 +38,7 @@ import java.time.Instant
   * the core of the implementation of the HealthDump gRPC endpoint.
   */
 class HealthDumpGenerator(
-    val environment: Environment[_ <: SharedCantonConfig[_]],
+    val environment: Environment[? <: SharedCantonConfig[?]],
     val grpcAdminCommandRunner: GrpcAdminCommandRunner,
     override val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {

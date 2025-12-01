@@ -206,7 +206,7 @@ class SpliceConsoleEnvironment(
   private def createRemoteSplitwellReference(name: String): SplitwellAppClientReference =
     new SplitwellAppClientReference(this, name, environment.config.splitwellClientsByString(name))
 
-  override protected def topLevelValues: Seq[TopLevelValue[_]] = {
+  override protected def topLevelValues: Seq[TopLevelValue[?]] = {
 
     super.topLevelValues ++
       validators.local.map(v =>

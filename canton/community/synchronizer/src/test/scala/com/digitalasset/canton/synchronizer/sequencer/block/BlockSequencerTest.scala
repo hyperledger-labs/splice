@@ -11,6 +11,7 @@ import com.digitalasset.canton.config.{
   CachingConfigs,
   DefaultProcessingTimeouts,
   ProcessingTimeout,
+  TopologyConfig,
 }
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.data.CantonTimestamp
@@ -106,8 +107,7 @@ class BlockSequencerTest
       .update(
         SequencedTime(CantonTimestamp.Epoch),
         EffectiveTime(CantonTimestamp.Epoch),
-        removeMapping = Map.empty,
-        removeTxs = Set.empty,
+        removals = Map.empty,
         additions = Seq(
           topologyTransactionFactory.ns1k1_k1,
           topologyTransactionFactory.okmS1k7_k1,
@@ -122,6 +122,7 @@ class BlockSequencerTest
       defaultStaticSynchronizerParameters,
       topologyStore,
       StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
+      topologyConfig = TopologyConfig(),
       DefaultProcessingTimeouts.testing,
       FutureSupervisor.Noop,
       loggerFactory,

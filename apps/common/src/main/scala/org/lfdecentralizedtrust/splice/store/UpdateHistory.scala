@@ -1419,7 +1419,7 @@ class UpdateHistory(
     }
   }
 
-  def lookupContractById[TCId <: ContractId[_], T <: DamlRecord[_]](
+  def lookupContractById[TCId <: ContractId[?], T <: DamlRecord[?]](
       companion: Contract.Companion.Template[TCId, T]
   )(contractId: TCId)(implicit tc: TraceContext): Future[Option[Contract[TCId, T]]] = {
     for {
@@ -2428,7 +2428,7 @@ object UpdateHistory {
       contractKey: Option[String],
   ) {
 
-    def toContract[TCId <: ContractId[_], T <: DamlRecord[_]](
+    def toContract[TCId <: ContractId[?], T <: DamlRecord[?]](
         companion: Contract.Companion.Template[TCId, T]
     ): Contract[TCId, T] = {
       Contract

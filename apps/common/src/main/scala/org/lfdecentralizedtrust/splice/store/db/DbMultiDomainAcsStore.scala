@@ -88,8 +88,8 @@ final class DbMultiDomainAcsStore[TXE](
     txLogStoreDescriptor: Option[StoreDescriptor],
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: MultiDomainAcsStore.ContractFilter[
-      _ <: AcsRowData,
-      _ <: AcsInterfaceViewRowData,
+      ? <: AcsRowData,
+      ? <: AcsInterfaceViewRowData,
     ],
     txLogConfig: TxLogStore.Config[TXE],
     domainMigrationInfo: DomainMigrationInfo,
@@ -169,7 +169,7 @@ final class DbMultiDomainAcsStore[TXE](
           .asRuntimeException()
       }
 
-  override def lookupContractById[C, TCid <: ContractId[_], T](companion: C)(id: ContractId[_])(
+  override def lookupContractById[C, TCid <: ContractId[?], T](companion: C)(id: ContractId[?])(
       implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -191,7 +191,7 @@ final class DbMultiDomainAcsStore[TXE](
 
   /** Returns any contract of the same template as the passed companion.
     */
-  override def findAnyContractWithOffset[C, TCid <: ContractId[_], T](companion: C)(implicit
+  override def findAnyContractWithOffset[C, TCid <: ContractId[?], T](companion: C)(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[QueryResult[Option[ContractWithState[TCid, T]]]] = waitUntilAcsIngested {
@@ -262,7 +262,7 @@ final class DbMultiDomainAcsStore[TXE](
     }
   }
 
-  override def listContracts[C, TCid <: ContractId[_], T](
+  override def listContracts[C, TCid <: ContractId[?], T](
       companion: C,
       limit: Limit,
   )(implicit
@@ -272,7 +272,7 @@ final class DbMultiDomainAcsStore[TXE](
     listContractsPaginated(companion, None, limit, SortOrder.Ascending).map(_.resultsInPage)
   }
 
-  override def listContractsPaginated[C, TCid <: ContractId[_], T](
+  override def listContractsPaginated[C, TCid <: ContractId[?], T](
       companion: C,
       after: Option[Long],
       limit: Limit,
@@ -305,7 +305,7 @@ final class DbMultiDomainAcsStore[TXE](
     } yield ResultsPage(withState, afterToken)
   }
 
-  override def listAssignedContracts[C, TCid <: ContractId[_], T](
+  override def listAssignedContracts[C, TCid <: ContractId[?], T](
       companion: C,
       limit: Limit,
   )(implicit
@@ -354,7 +354,7 @@ final class DbMultiDomainAcsStore[TXE](
     } yield assigned
   }
 
-  override def listContractsOnDomain[C, TCid <: ContractId[_], T](
+  override def listContractsOnDomain[C, TCid <: ContractId[?], T](
       companion: C,
       domain: SynchronizerId,
       limit: Limit,
@@ -379,7 +379,7 @@ final class DbMultiDomainAcsStore[TXE](
     } yield contracts
   }
 
-  override def streamAssignedContracts[C, TCid <: ContractId[_], T](companion: C)(implicit
+  override def streamAssignedContracts[C, TCid <: ContractId[?], T](companion: C)(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Source[AssignedContract[TCid, T], NotUsed] = {
@@ -708,7 +708,7 @@ final class DbMultiDomainAcsStore[TXE](
       .map(reassignmentEventUnassignFromRow)
   }
 
-  override def isReadyForAssign(contractId: ContractId[_], out: ReassignmentId)(implicit
+  override def isReadyForAssign(contractId: ContractId[?], out: ReassignmentId)(implicit
       tc: TraceContext
   ): Future[Boolean] = {
     waitUntilAcsIngested {
@@ -781,7 +781,7 @@ final class DbMultiDomainAcsStore[TXE](
     }
   }
 
-  override def findInterfaceViewByContractId[C, ICid <: ContractId[_], View <: DamlRecord[View]](
+  override def findInterfaceViewByContractId[C, ICid <: ContractId[?], View <: DamlRecord[View]](
       companion: C
   )(contractId: ICid)(implicit
       companionClass: ContractCompanion[C, ICid, View],
@@ -833,7 +833,7 @@ final class DbMultiDomainAcsStore[TXE](
 
   override private[store] def listIncompleteReassignments()(implicit
       tc: TraceContext
-  ): Future[Map[ContractId[_], NonEmpty[Set[ReassignmentId]]]] = {
+  ): Future[Map[ContractId[?], NonEmpty[Set[ReassignmentId]]]] = {
     for {
       rows <- storage
         .query(

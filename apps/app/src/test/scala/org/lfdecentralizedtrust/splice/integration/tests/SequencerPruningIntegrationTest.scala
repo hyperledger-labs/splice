@@ -139,5 +139,4 @@ class SequencerPruningIntegrationTest
       timeUntilSuccess = 3.minutes,
     )
   }
-
 }

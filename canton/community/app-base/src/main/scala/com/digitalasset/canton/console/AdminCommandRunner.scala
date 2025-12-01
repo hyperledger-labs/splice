@@ -23,7 +23,7 @@ trait AdminCommandRunner {
     * configured with an HTTP interface.
     */
   protected[console] def adminCommand[Result](
-      grpcCommand: GrpcAdminCommand[_, _, Result]
+      grpcCommand: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result]
 
   protected[console] def tracedLogger: TracedLogger
@@ -58,7 +58,7 @@ object AdminCommandRunner {
 trait LedgerApiCommandRunner {
 
   def ledgerApiCommand[Result](
-      command: GrpcAdminCommand[_, _, Result]
+      command: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result]
 
   protected[console] def token: Option[String]
@@ -66,7 +66,7 @@ trait LedgerApiCommandRunner {
 
 trait PublicApiCommandRunner {
   protected[console] def publicApiCommand[Result](
-      command: GrpcAdminCommand[_, _, Result]
+      command: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result]
 }
 
@@ -103,7 +103,7 @@ trait FeatureFlagFilter extends NamedLogging {
 
   protected def consoleEnvironment: ConsoleEnvironment
 
-  protected def cantonConfig: SharedCantonConfig[_] = consoleEnvironment.environment.config
+  protected def cantonConfig: SharedCantonConfig[?] = consoleEnvironment.environment.config
 
   protected def check[T](flag: FeatureFlag)(command: => T): T =
     FeatureFlagFilter.checkEnabled(noTracingLogger)(

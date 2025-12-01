@@ -39,10 +39,12 @@ import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
 import org.lfdecentralizedtrust.splice.admin.http.{AdminRoutes, HttpErrorHandler}
 import org.lfdecentralizedtrust.splice.auth.{
+  ActAsKnownPartyAuthExtractor,
   AdminAuthExtractor,
   AuthConfig,
   HMACVerifier,
   RSAVerifier,
+  ParticipantUserRightsProvider,
 }
 import org.lfdecentralizedtrust.splice.automation.{
   DomainParamsAutomationService,
@@ -54,15 +56,20 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.*
 import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
-import org.lfdecentralizedtrust.splice.http.v0.sv.SvResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin.SvAdminResource
+import org.lfdecentralizedtrust.splice.http.v0.sv_operator.SvOperatorResource
+import org.lfdecentralizedtrust.splice.http.v0.sv_public.SvPublicResource
 import org.lfdecentralizedtrust.splice.http.{HttpClient, HttpRateLimiter}
 import org.lfdecentralizedtrust.splice.migration.AcsExporter
 import org.lfdecentralizedtrust.splice.setup.{NodeInitializer, ParticipantInitializer}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, UpdateHistory}
-import org.lfdecentralizedtrust.splice.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
+import org.lfdecentralizedtrust.splice.sv.admin.http.{
+  HttpSvAdminHandler,
+  HttpSvOperatorHandler,
+  HttpSvPublicHandler,
+}
 import org.lfdecentralizedtrust.splice.sv.automation.{
   DsoDelegateBasedAutomationService,
   SvDsoAutomationService,
@@ -512,6 +519,10 @@ class SvApp(
       trafficBalanceService = newTrafficBalanceService(participantAdminConnection)
       _ = ledgerClient.registerTrafficBalanceService(trafficBalanceService)
 
+      userRightsProvider = new ParticipantUserRightsProvider(
+        svAutomation.connection(SpliceLedgerConnectionPriority.Low)
+      )
+
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl, connectionTimeout, readTimeout) =>
@@ -534,7 +545,7 @@ class SvApp(
             throw new IllegalStateException("No initial round specified in user's metadata")
         }
 
-      handler = new HttpSvHandler(
+      publicHandler = new HttpSvPublicHandler(
         config.ledgerApiUser,
         svAutomation,
         dsoAutomation,
@@ -558,13 +569,25 @@ class SvApp(
         initialRound,
       )
 
+      operatorHandler = new HttpSvOperatorHandler(
+        svAutomation,
+        dsoAutomation,
+        config,
+        clock,
+        localSynchronizerNode,
+        retryProvider,
+        cometBftClient,
+        packageVersionSupport,
+        timeouts,
+        loggerFactory,
+        amuletAppParameters.upgradesConfig,
+      )
+
       adminHandler = new HttpSvAdminHandler(
         config,
         config.domainMigrationDumpPath,
-        amuletAppParameters.upgradesConfig,
         svAutomation,
         dsoAutomation,
-        cometBftClient,
         localSynchronizerNode,
         participantAdminConnection,
         new DomainDataSnapshotGenerator(
@@ -584,10 +607,6 @@ class SvApp(
           retryProvider,
           loggerFactory,
         ),
-        clock,
-        retryProvider,
-        packageVersionSupport,
-        timeouts,
         loggerFactory,
       )
       httpRateLimiter = new HttpRateLimiter(
@@ -632,11 +651,25 @@ class SvApp(
 
             errorHandler.directive(traceContext) {
               concat(
-                SvResource.routes(
-                  handler,
+                SvPublicResource.routes(
+                  publicHandler,
                   operation =>
-                    buildOperation("sv", operation)
+                    buildOperation("svPublic", operation)
                       .tflatMap(_ => provide(traceContext)),
+                ),
+                SvOperatorResource.routes(
+                  operatorHandler,
+                  operation =>
+                    buildOperation("svOperator", operation)
+                      .tflatMap(_ =>
+                        ActAsKnownPartyAuthExtractor(
+                          verifier,
+                          userRightsProvider,
+                          svStore.key.svParty,
+                          loggerFactory,
+                          "splice sv realm",
+                        )(traceContext)(operation)
+                      ),
                 ),
                 SvAdminResource.routes(
                   adminHandler,
@@ -646,7 +679,7 @@ class SvApp(
                         AdminAuthExtractor(
                           verifier,
                           svStore.key.svParty,
-                          svAutomation.connection(SpliceLedgerConnectionPriority.Low),
+                          userRightsProvider,
                           loggerFactory,
                           "splice sv admin realm",
                         )(traceContext)(operation)
@@ -670,7 +703,7 @@ class SvApp(
         dsoStore,
         svAutomation,
         dsoAutomation,
-        adminHandler,
+        operatorHandler,
         logger,
         timeouts,
         httpClient,
@@ -813,7 +846,7 @@ object SvApp {
       dsoStore: SvDsoStore,
       svAutomation: SvSvAutomationService,
       dsoAutomation: SvDsoAutomationService,
-      svAdminHandler: HttpSvAdminHandler,
+      svOperatorHandler: HttpSvOperatorHandler,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
       httpClient: HttpClient,
@@ -840,7 +873,7 @@ object SvApp {
         SyncCloseable("dso store", dsoStore.close()),
         SyncCloseable("domain time automation", domainTimeAutomationService.close()),
         SyncCloseable("domain params automation", domainParamsAutomationService.close()),
-        SyncCloseable("admin handler", svAdminHandler.close()),
+        SyncCloseable("operator handler", svOperatorHandler.close()),
         SyncCloseable("storage", storage.close()),
         SyncCloseable("http rate limiter", httpRateLimiter.close()),
       )

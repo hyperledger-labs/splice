@@ -921,7 +921,7 @@ class DbScanStore(
   ): Future[Option[ContractWithState[SvNodeState.ContractId, SvNodeState]]] =
     lookupContractBySvParty(SvNodeState.COMPANION, svPartyId)
 
-  private def lookupContractBySvParty[C, TCId <: ContractId[_], T](
+  private def lookupContractBySvParty[C, TCId <: ContractId[?], T](
       companion: C,
       svPartyId: PartyId,
   )(implicit
@@ -1055,7 +1055,7 @@ class DbScanStore(
     }
 
   // TODO (#934): this method probably belongs in UpdateHistory instead
-  override def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
+  override def lookupContractByRecordTime[C, TCId <: ContractId[?], T](
       companion: C,
       updateHistory: UpdateHistory,
       recordTime: CantonTimestamp,
