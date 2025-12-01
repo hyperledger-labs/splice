@@ -29,7 +29,7 @@ const VoteStats: React.FC<VoteStatsProps> = ({
           data-testid={`${testId}-accepted-icon`}
         />
         <Typography {...typography} data-testid={`${testId}-value`}>
-          {count} Accepted
+          {count !== undefined && `${count} `}Accepted
         </Typography>
       </Stack>
     );
@@ -44,14 +44,14 @@ const VoteStats: React.FC<VoteStatsProps> = ({
           data-testid={`${testId}-rejected-icon`}
         />
         <Typography {...typography} data-testid={`${testId}-value`}>
-          {count} Rejected
+          {count !== undefined && `${count} `}Rejected
         </Typography>
       </Stack>
     );
   }
 
   return (
-    <Typography {...typography} data-testid={testId}>
+    <Typography {...typography} data-testid={`${testId}-value`}>
       {noVoteMessage}
     </Typography>
   );
