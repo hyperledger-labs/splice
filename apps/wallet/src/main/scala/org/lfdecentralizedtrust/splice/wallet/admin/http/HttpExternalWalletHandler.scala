@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.wallet.admin.http
 
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
+import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.{Unit, PaymentAmount}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferoffer as transferOffersCodegen
 import org.lfdecentralizedtrust.splice.environment.{
@@ -25,7 +26,6 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import cats.syntax.either.*
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
-import org.lfdecentralizedtrust.splice.wallet.admin.http.UserWalletAuthExtractor.WalletUserRequest
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -38,88 +38,89 @@ class HttpExternalWalletHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends external.wallet.WalletHandler[WalletUserRequest]
+) extends external.wallet.WalletHandler[TracedUser]
     with HttpWalletHandlerUtil {
 
   protected val workflowId = this.getClass.getSimpleName
 
   override def createTransferOffer(respond: r0.CreateTransferOfferResponse.type)(
       request: d0.CreateTransferOfferRequest
-  )(tuser: WalletUserRequest): Future[r0.CreateTransferOfferResponse] = {
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+  )(tuser: TracedUser): Future[r0.CreateTransferOfferResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.createTransferOffer") { _ => _ =>
-      userWallet.store
-        .getLatestTransferOfferEventByTrackingId(request.trackingId)
-        .flatMap {
-          case QueryResult(_, Some(_)) =>
-            Future.failed(
-              io.grpc.Status.ALREADY_EXISTS
-                .withDescription(
-                  s"Transfer offer with trackingId ${request.trackingId} already exists."
-                )
-                .asRuntimeException()
-            )
-          case QueryResult(dedupOffset, None) =>
-            val sender = userWallet.store.key.endUserParty
-            // TODO(#979) revisit if we want to retry here.
-            retryProvider.retryForClientCalls(
-              "createTransferOffer",
-              "createTransferOffer",
-              exerciseWalletAction((installCid, _) => {
-                val receiver = Codec.tryDecode(Codec.Party)(request.receiverPartyId)
-                val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
-                val expiresAt = Codec.tryDecode(Codec.Timestamp)(request.expiresAt)
-                Future.successful(
-                  installCid
-                    .exerciseWalletAppInstall_CreateTransferOffer(
-                      receiver.toProtoPrimitive,
-                      new PaymentAmount(amount, Unit.AMULETUNIT),
-                      request.description,
-                      expiresAt.toInstant,
-                      request.trackingId,
-                    )
-                    .map { cid =>
-                      r0.CreateTransferOfferResponse.OK(
-                        d0.CreateTransferOfferResponse(
-                          Codec.encodeContractId(cid.exerciseResult.transferOffer)
-                        )
-                      )
-                    }
-                )
-              })(
-                userWallet,
-                dedup = Some(
-                  (
-                    SpliceLedgerConnection.CommandId(
-                      "org.lfdecentralizedtrust.splice.wallet.createTransferOffer",
-                      Seq(
-                        sender,
-                        Codec.tryDecode(Codec.Party)(request.receiverPartyId),
-                      ),
-                      request.trackingId,
-                    ),
-                    DedupOffset(dedupOffset),
+      getUserStore(user).flatMap(userWalletStore =>
+        userWalletStore
+          .getLatestTransferOfferEventByTrackingId(request.trackingId)
+          .flatMap {
+            case QueryResult(_, Some(_)) =>
+              Future.failed(
+                io.grpc.Status.ALREADY_EXISTS
+                  .withDescription(
+                    s"Transfer offer with trackingId ${request.trackingId} already exists."
                   )
+                  .asRuntimeException()
+              )
+            case QueryResult(dedupOffset, None) =>
+              val sender = userWalletStore.key.endUserParty
+              // TODO(#979) revisit if we want to retry here.
+              retryProvider.retryForClientCalls(
+                "createTransferOffer",
+                "createTransferOffer",
+                exerciseWalletAction((installCid, _) => {
+                  val receiver = Codec.tryDecode(Codec.Party)(request.receiverPartyId)
+                  val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
+                  val expiresAt = Codec.tryDecode(Codec.Timestamp)(request.expiresAt)
+                  Future.successful(
+                    installCid
+                      .exerciseWalletAppInstall_CreateTransferOffer(
+                        receiver.toProtoPrimitive,
+                        new PaymentAmount(amount, Unit.AMULETUNIT),
+                        request.description,
+                        expiresAt.toInstant,
+                        request.trackingId,
+                      )
+                      .map { cid =>
+                        r0.CreateTransferOfferResponse.OK(
+                          d0.CreateTransferOfferResponse(
+                            Codec.encodeContractId(cid.exerciseResult.transferOffer)
+                          )
+                        )
+                      }
+                  )
+                })(
+                  user,
+                  dedup = Some(
+                    (
+                      SpliceLedgerConnection.CommandId(
+                        "org.lfdecentralizedtrust.splice.wallet.createTransferOffer",
+                        Seq(
+                          sender,
+                          Codec.tryDecode(Codec.Party)(request.receiverPartyId),
+                        ),
+                        request.trackingId,
+                      ),
+                      DedupOffset(dedupOffset),
+                    )
+                  ),
                 ),
-              ),
-              logger,
-              HttpExternalWalletHandler.CreateTransferOfferRetryable(_),
-            )
-        }
-        .transform(HttpErrorHandler.onGrpcAlreadyExists("CreateTransferOffer duplicate command"))
-
+                logger,
+                HttpExternalWalletHandler.CreateTransferOfferRetryable(_),
+              )
+          }
+          .transform(HttpErrorHandler.onGrpcAlreadyExists("CreateTransferOffer duplicate command"))
+      )
     }
   }
 
   override def listTransferOffers(
       respond: r0.ListTransferOffersResponse.type
   )()(
-      tuser: WalletUserRequest
+      tuser: TracedUser
   ): Future[r0.ListTransferOffersResponse] = {
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+    implicit val TracedUser(user, traceContext) = tuser
     listContracts(
       transferOffersCodegen.TransferOffer.COMPANION,
-      userWallet.store,
+      user,
       d0.ListTransferOffersResponse(_),
     )
   }
@@ -128,11 +129,12 @@ class HttpExternalWalletHandler(
       respond: r0.GetTransferOfferStatusResponse.type
   )(
       trackingId: String
-  )(tuser: WalletUserRequest): Future[r0.GetTransferOfferStatusResponse] = {
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+  )(tuser: TracedUser): Future[r0.GetTransferOfferStatusResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.getTransferOfferStatus") { _ => _ =>
       for {
-        txLogEntry <- userWallet.store.getLatestTransferOfferEventByTrackingId(trackingId)
+        userStore <- getUserStore(user)
+        txLogEntry <- userStore.getLatestTransferOfferEventByTrackingId(trackingId)
       } yield {
         txLogEntry.value
           .map(_.status)
@@ -147,8 +149,8 @@ class HttpExternalWalletHandler(
 
   override def createBuyTrafficRequest(respond: r0.CreateBuyTrafficRequestResponse.type)(
       request: d0.CreateBuyTrafficRequest
-  )(tuser: WalletUserRequest): Future[r0.CreateBuyTrafficRequestResponse] = {
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+  )(tuser: TracedUser): Future[r0.CreateBuyTrafficRequestResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.createBuyTrafficRequest") { _ => _ =>
       val synchronizerId = Codec.tryDecode(Codec.SynchronizerId)(request.domainId)
       val receivingValidator = Codec.tryDecode(Codec.Party)(request.receivingValidatorPartyId)
@@ -160,6 +162,7 @@ class HttpExternalWalletHandler(
             .asRuntimeException()
         )
       for {
+        userWalletStore <- getUserStore(user)
         participantId <- participantAdminConnection
           .getPartyToParticipant(
             synchronizerId,
@@ -195,7 +198,7 @@ class HttpExternalWalletHandler(
                 )
                 .asRuntimeException()
           }
-        result <- userWallet.store
+        result <- userWalletStore
           .getLatestBuyTrafficRequestEventByTrackingId(request.trackingId)
           .flatMap {
             case QueryResult(_, Some(_)) =>
@@ -207,7 +210,7 @@ class HttpExternalWalletHandler(
                   .asRuntimeException()
               )
             case QueryResult(dedupOffset, None) =>
-              val buyer = userWallet.store.key.endUserParty
+              val buyer = userWalletStore.key.endUserParty
               // TODO(#979) revisit if we want to retry here.
               retryProvider
                 .retryForClientCalls(
@@ -234,7 +237,7 @@ class HttpExternalWalletHandler(
                         }
                     )
                   })(
-                    userWallet,
+                    user,
                     dedup = Some(
                       (
                         SpliceLedgerConnection.CommandId(
@@ -262,12 +265,13 @@ class HttpExternalWalletHandler(
 
   override def getBuyTrafficRequestStatus(
       respond: r0.GetBuyTrafficRequestStatusResponse.type
-  )(trackingId: String)(tuser: WalletUserRequest): Future[r0.GetBuyTrafficRequestStatusResponse] = {
+  )(trackingId: String)(tuser: TracedUser): Future[r0.GetBuyTrafficRequestStatusResponse] = {
 
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+    implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.getBuyTrafficRequestStatus") { _ => _ =>
       for {
-        txLogEntry <- userWallet.store.getLatestBuyTrafficRequestEventByTrackingId(trackingId)
+        userStore <- getUserStore(user)
+        txLogEntry <- userStore.getLatestBuyTrafficRequestEventByTrackingId(trackingId)
       } yield {
         txLogEntry.value
           .map(_.status)

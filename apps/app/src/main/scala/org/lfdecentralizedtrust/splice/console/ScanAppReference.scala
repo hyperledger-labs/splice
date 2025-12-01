@@ -59,7 +59,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
 }
-import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvOperatorAppClient
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvAdminAppClient
 
 import scala.jdk.OptionConverters.*
 import java.time.Instant
@@ -674,7 +674,7 @@ abstract class ScanAppReference(
   ): Contract[VoteRequest.ContractId, VoteRequest] = {
     consoleEnvironment.run {
       httpCommand(
-        HttpSvOperatorAppClient.LookupVoteRequest(trackingCid)()
+        HttpSvAdminAppClient.LookupVoteRequest(trackingCid)()
       )
     }
   }

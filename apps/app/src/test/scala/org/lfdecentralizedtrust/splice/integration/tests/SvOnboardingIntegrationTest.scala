@@ -58,9 +58,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
           .singleRequest(registerGet.withHeaders(tokenHeader(invalidUserToken)))
           .futureValue
         responseForInvalidUser.status should be(StatusCodes.Forbidden)
-        responseForInvalidUser.entity.getContentType().toString should be(
-          "application/json"
-        )
+        responseForInvalidUser.entity.getContentType().toString should be("application/json")
       },
       _.warningMessage should include(
         "Authorization Failed"

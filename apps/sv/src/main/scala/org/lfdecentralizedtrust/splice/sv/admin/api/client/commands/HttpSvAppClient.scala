@@ -25,14 +25,14 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{
 }
 import org.lfdecentralizedtrust.splice.environment.RetryProvider.QuietNonRetryableException
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_public as http}
-import org.lfdecentralizedtrust.splice.sv.http.SvHttpClient.BaseCommandPublic
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv as http}
+import org.lfdecentralizedtrust.splice.sv.http.SvHttpClient.BaseCommand
 import org.lfdecentralizedtrust.splice.util.{Codec, ContractWithState, TemplateJsonDecoder}
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 
-object HttpSvPublicAppClient {
+object HttpSvAppClient {
   final case class DsoInfo(
       svUser: String,
       svParty: PartyId,
@@ -69,7 +69,7 @@ object HttpSvPublicAppClient {
       secret: String,
       version: String,
       contactPoint: String,
-  ) extends BaseCommandPublic[http.OnboardValidatorResponse, Unit] {
+  ) extends BaseCommand[http.OnboardValidatorResponse, Unit] {
 
     override def submitRequest(
         client: Client,
@@ -93,7 +93,7 @@ object HttpSvPublicAppClient {
   }
 
   case class StartSvOnboarding(token: String)
-      extends BaseCommandPublic[http.StartSvOnboardingResponse, Unit] {
+      extends BaseCommand[http.StartSvOnboardingResponse, Unit] {
 
     override def submitRequest(
         client: Client,
@@ -112,7 +112,7 @@ object HttpSvPublicAppClient {
   }
 
   case class getSvOnboardingStatus(candidate: String)
-      extends BaseCommandPublic[http.GetSvOnboardingStatusResponse, SvOnboardingStatus] {
+      extends BaseCommand[http.GetSvOnboardingStatusResponse, SvOnboardingStatus] {
 
     override def submitRequest(
         client: Client,
@@ -163,7 +163,7 @@ object HttpSvPublicAppClient {
   }
 
   case class DevNetOnboardValidatorPrepare()
-      extends BaseCommandPublic[http.DevNetOnboardValidatorPrepareResponse, String] {
+      extends BaseCommand[http.DevNetOnboardValidatorPrepareResponse, String] {
 
     override def submitRequest(
         client: Client,
@@ -181,7 +181,7 @@ object HttpSvPublicAppClient {
     }
   }
 
-  case object GetDsoInfo extends BaseCommandPublic[http.GetDsoInfoResponse, DsoInfo] {
+  case object GetDsoInfo extends BaseCommand[http.GetDsoInfoResponse, DsoInfo] {
 
     override def submitRequest(
         client: Client,
@@ -256,7 +256,7 @@ object HttpSvPublicAppClient {
   case class OnboardSvPartyMigrationAuthorize(
       participantId: ParticipantId,
       candidate: PartyId,
-  ) extends BaseCommandPublic[
+  ) extends BaseCommand[
         http.OnboardSvPartyMigrationAuthorizeResponse,
         Either[
           OnboardSvPartyMigrationAuthorizeProposalNotFound,
@@ -269,8 +269,8 @@ object HttpSvPublicAppClient {
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
-    ): http.SvPublicClient =
-      http.SvPublicClient.httpClient(
+    ): http.SvClient =
+      http.SvClient.httpClient(
         HttpClientBuilder().buildClient(Set(StatusCodes.BadRequest)),
         host,
       )
@@ -329,7 +329,7 @@ object HttpSvPublicAppClient {
 
   case class OnboardSvSequencer(
       sequencerId: SequencerId
-  ) extends BaseCommandPublic[
+  ) extends BaseCommand[
         http.OnboardSvSequencerResponse,
         ByteString,
       ] {
@@ -357,7 +357,7 @@ object HttpSvPublicAppClient {
   }
 
   case class GetCometBftNodeStatus()
-      extends BaseCommandPublic[
+      extends BaseCommand[
         http.GetCometBftNodeStatusResponse,
         definitions.CometBftNodeStatusResponse,
       ] {
@@ -392,7 +392,7 @@ object HttpSvPublicAppClient {
       id: definitions.CometBftJsonRpcRequestId,
       method: definitions.CometBftJsonRpcRequest.Method,
       params: Map[String, io.circe.Json],
-  ) extends BaseCommandPublic[
+  ) extends BaseCommand[
         http.CometBftJsonRpcRequestResponse,
         definitions.CometBftJsonRpcResponse,
       ] {

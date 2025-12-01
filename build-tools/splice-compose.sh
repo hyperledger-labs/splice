@@ -677,7 +677,7 @@ function subcmd_identities_dump {
   VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
   export VALIDATOR_AUTH_AUDIENCE
 
-  token=$("${VALIDATOR_DIR}/get-token.py" ledger-api-user)
+  token=$("${VALIDATOR_DIR}/get-token.py" administrator)
   curl -sSLf 'http://wallet.localhost/api/validator/v0/admin/participant/identities' -H "authorization: Bearer $token" > "$output_file"
 }
 

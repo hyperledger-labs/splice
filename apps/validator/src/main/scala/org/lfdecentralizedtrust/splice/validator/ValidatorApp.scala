@@ -39,7 +39,6 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
-import org.lfdecentralizedtrust.splice.http.v0.status.wallet.WalletResource as StatusWalletResource
 import org.lfdecentralizedtrust.splice.http.v0.external.ans.AnsResource
 import org.lfdecentralizedtrust.splice.http.v0.external.wallet.WalletResource as ExternalWalletResource
 import org.lfdecentralizedtrust.splice.http.v0.scanproxy.ScanproxyResource
@@ -68,7 +67,6 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, HistoryMetrics, UpdateHistory}
 import org.lfdecentralizedtrust.splice.util.*
-import org.lfdecentralizedtrust.splice.validator.ValidatorApp.OAuthRealms
 import org.lfdecentralizedtrust.splice.validator.admin.http.*
 import org.lfdecentralizedtrust.splice.validator.automation.{
   ValidatorAutomationService,
@@ -89,9 +87,7 @@ import org.lfdecentralizedtrust.splice.validator.store.{
 import org.lfdecentralizedtrust.splice.validator.util.{ValidatorScanConnection, ValidatorUtil}
 import org.lfdecentralizedtrust.splice.wallet.admin.http.{
   HttpExternalWalletHandler,
-  HttpStatusWalletHandler,
   HttpWalletHandler,
-  UserWalletAuthExtractor,
 }
 import org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
@@ -986,10 +982,6 @@ class ValidatorApp(
         ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
       }
 
-      userRightsProvider = new ParticipantUserRightsProvider(
-        automation.connection(SpliceLedgerConnectionPriority.Low)
-      )
-
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl, connectionTimeout, readTimeout) =>
@@ -1034,53 +1026,33 @@ class ValidatorApp(
         )
 
       walletInternalHandler = walletManagerOpt.map(walletManager =>
-        (
-          new HttpWalletHandler(
-            walletManager,
-            scanConnection,
-            loggerFactory,
-            retryProvider,
-            validatorTopupConfig,
-            dedupDuration,
-            packageVersionSupport,
-          ),
+        new HttpWalletHandler(
           walletManager,
+          scanConnection,
+          loggerFactory,
+          retryProvider,
+          validatorTopupConfig,
+          dedupDuration,
+          packageVersionSupport,
         )
       )
 
       walletExternalHandler = walletManagerOpt.map(walletManager =>
-        (
-          new HttpExternalWalletHandler(
-            walletManager,
-            loggerFactory,
-            retryProvider,
-            participantAdminConnection,
-            config.domainMigrationId,
-          ),
+        new HttpExternalWalletHandler(
           walletManager,
-        )
-      )
-
-      walletStatusHandler = walletManagerOpt.map(walletManager =>
-        (
-          new HttpStatusWalletHandler(
-            walletManager,
-            loggerFactory,
-            packageVersionSupport,
-          ),
-          walletManager,
+          loggerFactory,
+          retryProvider,
+          participantAdminConnection,
+          config.domainMigrationId,
         )
       )
 
       ansExternalHandler = walletManagerOpt.map(walletManager =>
-        (
-          new HttpExternalAnsHandler(
-            walletManager,
-            scanConnection,
-            loggerFactory,
-            retryProvider,
-          ),
+        new HttpExternalAnsHandler(
           walletManager,
+          scanConnection,
+          loggerFactory,
+          retryProvider,
         )
       )
 
@@ -1122,11 +1094,7 @@ class ValidatorApp(
                     handler,
                     operation =>
                       metrics.httpServerMetrics.withMetrics("validator")(operation).tflatMap { _ =>
-                        AuthenticationOnlyAuthExtractor(
-                          verifier,
-                          loggerFactory,
-                          OAuthRealms.Validator,
-                        )(
+                        AuthExtractor(verifier, loggerFactory, "splice validator realm")(
                           traceContext
                         )(
                           operation
@@ -1137,11 +1105,7 @@ class ValidatorApp(
                     scanProxyHandler,
                     operation =>
                       metrics.httpServerMetrics.withMetrics("scanProxy")(operation).tflatMap { _ =>
-                        AuthenticationOnlyAuthExtractor(
-                          verifier,
-                          loggerFactory,
-                          OAuthRealms.ScanProxy,
-                        )(
+                        AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
                           traceContext
                         )(operation)
                       },
@@ -1154,11 +1118,7 @@ class ValidatorApp(
                           metrics.httpServerMetrics
                             .withMetrics("tokenStandardMetadata")(operation)
                             .tflatMap { _ =>
-                              AuthenticationOnlyAuthExtractor(
-                                verifier,
-                                loggerFactory,
-                                OAuthRealms.ScanProxy,
-                              )(
+                              AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
                                 traceContext
                               )(
                                 operation
@@ -1172,11 +1132,7 @@ class ValidatorApp(
                           metrics.httpServerMetrics
                             .withMetrics("tokenStandardTransfer")(operation)
                             .tflatMap { _ =>
-                              AuthenticationOnlyAuthExtractor(
-                                verifier,
-                                loggerFactory,
-                                OAuthRealms.ScanProxy,
-                              )(
+                              AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
                                 traceContext
                               )(
                                 operation
@@ -1189,11 +1145,7 @@ class ValidatorApp(
                           metrics.httpServerMetrics
                             .withMetrics("tokenStandardAllocationInstruction")(operation)
                             .tflatMap { _ =>
-                              AuthenticationOnlyAuthExtractor(
-                                verifier,
-                                loggerFactory,
-                                OAuthRealms.ScanProxy,
-                              )(
+                              AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
                                 traceContext
                               )(
                                 operation
@@ -1206,11 +1158,7 @@ class ValidatorApp(
                           metrics.httpServerMetrics
                             .withMetrics("tokenStandardAllocation")(operation)
                             .tflatMap { _ =>
-                              AuthenticationOnlyAuthExtractor(
-                                verifier,
-                                loggerFactory,
-                                OAuthRealms.ScanProxy,
-                              )(
+                              AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
                                 traceContext
                               )(
                                 operation
@@ -1228,9 +1176,9 @@ class ValidatorApp(
                           AdminAuthExtractor(
                             verifier,
                             validatorParty,
-                            userRightsProvider,
+                            automation.connection(SpliceLedgerConnectionPriority.Medium),
                             loggerFactory,
-                            OAuthRealms.ValidatorOperator,
+                            "splice validator operator realm",
                           )(traceContext)(operationId)
                         },
                   ),
@@ -1241,72 +1189,38 @@ class ValidatorApp(
                         .withMetrics("public")(operation)
                         .tflatMap { _ => provide(()) },
                   ),
-                ) ++ walletInternalHandler.toList.map { case (walletHandler, walletManager) =>
+                ) ++ walletInternalHandler.toList.map { walletHandler =>
                   InternalWalletResource.routes(
                     walletHandler,
                     operation =>
                       metrics.httpServerMetrics
                         .withMetrics("walletInternal")(operation)
                         .tflatMap { _ =>
-                          UserWalletAuthExtractor(
-                            verifier,
-                            walletManager,
-                            userRightsProvider,
-                            loggerFactory,
-                            OAuthRealms.Wallet,
-                          )(
+                          AuthExtractor(verifier, loggerFactory, "splice wallet realm")(
                             traceContext
                           )(operation)
                         },
                   )
-                } ++ walletExternalHandler.toList.map { case (walletHandler, walletManager) =>
+                } ++ walletExternalHandler.toList.map { walletHandler =>
                   ExternalWalletResource.routes(
                     walletHandler,
                     operation =>
                       metrics.httpServerMetrics
                         .withMetrics("walletExternal")(operation)
                         .tflatMap { _ =>
-                          UserWalletAuthExtractor(
-                            verifier,
-                            walletManager,
-                            userRightsProvider,
-                            loggerFactory,
-                            OAuthRealms.Wallet,
-                          )(
+                          AuthExtractor(verifier, loggerFactory, "splice wallet realm")(
                             traceContext
                           )(operation)
                         },
                   )
-                } ++ walletStatusHandler.toList.map { case (walletHandler, walletManager) =>
-                  StatusWalletResource.routes(
-                    walletHandler,
-                    operation =>
-                      metrics.httpServerMetrics
-                        .withMetrics("walletStatus")(operation)
-                        .tflatMap { _ =>
-                          AuthenticationOnlyAuthExtractor(
-                            verifier,
-                            loggerFactory,
-                            OAuthRealms.Wallet,
-                          )(
-                            traceContext
-                          )(operation)
-                        },
-                  )
-                } ++ ansExternalHandler.toList.map { case (ansHandler, walletManager) =>
+                } ++ ansExternalHandler.toList.map { ansHandler =>
                   AnsResource.routes(
                     ansHandler,
                     operation =>
                       metrics.httpServerMetrics
                         .withMetrics("ans")(operation)
                         .tflatMap { _ =>
-                          UserWalletAuthExtractor(
-                            verifier,
-                            walletManager,
-                            userRightsProvider,
-                            loggerFactory,
-                            OAuthRealms.Ans,
-                          )(traceContext)(
+                          AuthExtractor(verifier, loggerFactory, "splice ans realm")(traceContext)(
                             operation
                           )
                         },
@@ -1373,13 +1287,4 @@ object ValidatorApp {
         ))*
       )(logger)
   }
-
-  object OAuthRealms {
-    val Validator = "splice validator realm"
-    val ValidatorOperator = "splice validator operator realm"
-    val ScanProxy = "splice scan proxy realm"
-    val Wallet = "splice wallet realm"
-    val Ans = "splice ans realm"
-  }
-
 }
