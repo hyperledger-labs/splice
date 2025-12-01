@@ -26,11 +26,6 @@
           "type": "string",
           "description": "scan address for trust single type."
         },
-        "useLastKnownConnectionsForInitialization": {
-          "type": "boolean",
-          "default": true,
-          "description": "Whether to recover the last known scan connections for initialization."
-        },
         "threshold": {
           "type": "integer",
           "default": 0,

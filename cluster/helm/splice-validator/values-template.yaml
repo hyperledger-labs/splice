@@ -34,7 +34,6 @@ persistence:
   enablePgInitContainer: true
 
 scanClientConfig:
-  useLastKnownConnectionsForInitialization: true
   scan-type: "bft"
   seedUrls: ["scan.splice.network:443"]
 
