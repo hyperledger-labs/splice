@@ -124,16 +124,22 @@ class MultiHostValidatorOperatorIntegrationTest
               store = synchronizerId,
             )
             .transaction
-            .operation
+            .operationd
         )
       },
     )(
       "Alice sees the transaction",
-      // FIXME: in the docs, this is "wait for decision timeout". Can we safely replace it with "alice sees the topology tx"?
-      _.foreach(op =>
-        aliceParticipant.topology.party_to_participant_mappings
-          .list(synchronizerId, operation = Some(op)) should not be empty
-      ),
+      _ =>
+        multiHostedParties.foreach { party =>
+          aliceParticipant.topology.party_to_participant_mappings
+            .list(synchronizerId, filterParty = party.toString.split("::")(0))
+            .last
+            .item
+            .participants
+            .filter(_.participantId == bobParticipantId)
+            .last
+            .onboarding shouldBe false
+        },
     )
 
     multiHostedParties.foreach(party =>
