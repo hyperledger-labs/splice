@@ -473,7 +473,7 @@ class SV1Initializer(
             namespace,
           )
         )
-        val initialValues = DynamicSynchronizerParameters.initialValues(ProtocolVersion.v34)
+        val initialValues = DynamicSynchronizerParameters.initialValues(ProtocolVersion.v35)
         val values = initialValues.tryUpdate(
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =

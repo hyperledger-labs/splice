@@ -677,7 +677,7 @@ object BuildCommon {
           scalaVersion,
           sbtVersion,
           BuildInfoKey("damlLibrariesVersion" -> CantonDependencies.daml_libraries_version),
-          BuildInfoKey("stableProtocolVersions" -> List("34")),
+          BuildInfoKey("stableProtocolVersions" -> List("35")),
           BuildInfoKey("betaProtocolVersions" -> List()),
         ),
         buildInfoPackage := "com.digitalasset.canton.buildinfo",
@@ -876,16 +876,16 @@ object BuildCommon {
         //        |com\.digitalasset\.canton\.protobuf\..*
         //      """
         //    ),
-        Compile / damlCodeGeneration := {
-          val Seq(darFile, _) = (Compile / damlBuild).value
-          Seq(
-            (
-              (Compile / baseDirectory).value,
-              darFile,
-              "com.digitalasset.canton.examples",
-            )
-          )
-        },
+        //        Compile / damlCodeGeneration := {
+        //          val Seq(darFile, _) = (Compile / damlBuild).value
+        //          Seq(
+        //            (
+        //              (Compile / baseDirectory).value,
+        //              darFile,
+        //              "com.digitalasset.canton.examples",
+        //            )
+        //          )
+        //        },
         Test / damlTest := Seq(),
         Compile / damlEnableJavaCodegen := true,
         Compile / damlCodegenUseProject := false,
@@ -1453,7 +1453,6 @@ object BuildCommon {
         `canton-ledger-api-core`,
         `canton-ledger-common` % "test->test",
         `canton-community-testing` % Test,
-        `canton-transcode`,
       )
       .disablePlugins(
         ScalafixPlugin,
@@ -1462,6 +1461,7 @@ object BuildCommon {
       ) // to accommodate different daml repo coding style
       .enablePlugins(DamlPlugin)
       .settings(
+        scalacOptions += "-Ytasty-reader",
         sharedCantonSettings,
         removeTestSources,
         sharedSettings,
@@ -1491,6 +1491,10 @@ object BuildCommon {
           scalatestScalacheck % Test,
           ujson_circe,
           upickle,
+          fastparse % Runtime, // transcode dependency
+          transcode_daml_lf,
+          transcode_codec_json,
+          transcode_codec_proto_scala,
         ),
         Test / damlCodeGeneration := Seq(
           (
@@ -1499,25 +1503,6 @@ object BuildCommon {
             "com.digitalasset.canton.http.json.encoding",
           )
         ),
-      )
-  }
-
-  lazy val `canton-transcode` = {
-    import CantonDependencies._
-    sbt.Project
-      .apply("canton-transcode", file("canton/community/ledger/transcode/"))
-      .settings(
-        sharedSettings,
-        scalacOptions --= removeCompileFlagsForDaml,
-        libraryDependencies ++= Seq(
-          daml_lf_language,
-          "com.lihaoyi" %% "ujson" % "4.0.2",
-        ),
-      )
-      .dependsOn(
-        `canton-ledger-api`,
-        `canton-community-testing` % Test,
-        `canton-community-common` % Test,
       )
   }
 

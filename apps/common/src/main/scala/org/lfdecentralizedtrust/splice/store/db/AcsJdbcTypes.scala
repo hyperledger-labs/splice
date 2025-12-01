@@ -314,6 +314,14 @@ trait AcsJdbcTypes {
         case None => pp.setNull(java.sql.Types.OTHER)
       }
 
+  implicit val setParameterSynchronizerId: SetParameter[SynchronizerId] =
+    (d: SynchronizerId, pp: PositionedParameters) => pp >> d.toLengthLimitedString
+
+  implicit val setParameterSynchronizerIdO: SetParameter[Option[SynchronizerId]] =
+    (d: Option[SynchronizerId], pp: PositionedParameters) => pp >> d.map(_.toLengthLimitedString)
+
+
+
   protected def payloadJsonFromDefinedDataType(
       data: DefinedDataType[?]
   ): Json = AcsJdbcTypes.payloadJsonFromDefinedDataType(data)

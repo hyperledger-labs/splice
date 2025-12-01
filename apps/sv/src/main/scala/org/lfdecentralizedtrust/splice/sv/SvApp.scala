@@ -220,7 +220,7 @@ class SvApp(
           svSynchronizerConfig.parameters
             .toStaticSynchronizerParameters(
               CryptoConfig(provider = CryptoProvider.Jce),
-              ProtocolVersion.v34,
+              ProtocolVersion.v35,
               // TODO(#456) Use the proper serial
               NonNegativeInt.zero,
             )

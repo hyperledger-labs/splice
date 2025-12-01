@@ -142,7 +142,7 @@ abstract class TopologyAdminConnection(
     runCmd(
       SynchronizerTimeCommands.FetchTime(
         // TODO(#456) Use the proper serial and protocol version
-        Some(PhysicalSynchronizerId(synchronizerId, ProtocolVersion.v34, NonNegativeInt.zero)),
+        Some(PhysicalSynchronizerId(synchronizerId, ProtocolVersion.v35, NonNegativeInt.zero)),
         freshnessBound =
           com.digitalasset.canton.time.NonNegativeFiniteDuration.fromConfig(maxDomainTimeLag),
         timeout = timeout,

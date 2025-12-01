@@ -1,7 +1,7 @@
 {
-  "version": "3.4.9-snapshot.20251126.17423.0.v5228cfd3",
+  "version": "3.5.0-snapshot.20251128.17545.0.vfb2f2833",
   "tooling_sdk_version": "3.3.0-snapshot.20250415.13756.0.vafc5c867",
   "daml_release": "v3.3.0-snapshot.20250417.0",
-  "enterprise_sha256": "sha256:1dndjajba4c0db8mv16rnn9nkgi8xx08ijbhgakck9712x5v8yg2",
-  "oss_sha256": "sha256:0s98hy9m46lb30yvkhijinlvh23nzhl7z3w6cxc3c0nzqiviqmm4"
+  "enterprise_sha256": "sha256:0bp2slw84crprgdjaqx4lr1dh79syr7jlkvdgffqpvyffknman5z",
+  "oss_sha256": "sha256:0bp2slw84crprgdjaqx4lr1dh79syr7jlkvdgffqpvyffknman5z"
 }

@@ -227,23 +227,6 @@ case class EnvironmentDefinition(
       )(config)
     )
 
-  def withHttpSettingsForHigherThroughput: EnvironmentDefinition =
-    addConfigTransform((_, config) =>
-      config.copy(pekkoConfig =
-        Some(
-          ConfigFactory.parseString(
-            """
-              |pekko.http.host-connection-pool {
-              |  max-connections = 1000
-              |  min-connections = 20
-              |  max-open-requests = 1024
-              |}
-              |""".stripMargin
-          )
-        )
-      )
-    )
-
   def withTrafficTopupsEnabled: EnvironmentDefinition =
     addConfigTransform((_, config) =>
       ConfigTransforms.updateAllValidatorConfigs { case (name, validatorConfig) =>

@@ -1,13 +1,10 @@
-override-components: 
-  damlc: 
-    version: $DAML_VERSION
-  daml-script: 
-    version: $DAML_VERSION
-build-options: 
-- --enable-interfaces=yes
+sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
+build-options:
+  - --target=2.1
+  - --enable-interfaces=yes
 name: benchtool-tests
 source: .
 version: 3.5.0
-dependencies: 
+dependencies:
 - daml-prim
 - daml-stdlib

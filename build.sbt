@@ -53,7 +53,6 @@ lazy val `canton-google-common-protos-scala` = BuildCommon.`canton-google-common
 lazy val `canton-sequencer-driver-api` = BuildCommon.`canton-sequencer-driver-api`
 lazy val `canton-kms-driver-api` = BuildCommon.`canton-kms-driver-api`
 lazy val `canton-community-reference-driver` = BuildCommon.`canton-community-reference-driver`
-lazy val `canton-transcode` = BuildCommon.`canton-transcode`
 
 lazy val `splice-wartremover-extension` = Wartremover.`splice-wartremover-extension`
 
