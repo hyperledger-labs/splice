@@ -363,7 +363,7 @@ class SvAppBackendReference(
   def grantValidatorLicense(partyId: PartyId): Unit =
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.GrantValidatorLicense(partyId)
+        HttpSvOperatorAppClient.GrantValidatorLicense(partyId)
       )
     }
 
