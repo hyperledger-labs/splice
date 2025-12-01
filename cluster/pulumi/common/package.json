@@ -30,8 +30,7 @@
     "format:check": "prettier --check -- src",
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
     "lint:check": "eslint --max-warnings=0 -- src",
-    "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts",
-    "test": "jest"
+    "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts"
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",

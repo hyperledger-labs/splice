@@ -64,6 +64,9 @@ inThisBuild(
 //    semanticdbIncludeInJar := true, // cache it in the remote cache
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
+    // slows down just the non integration tests which is a really small subset
+    // this helps us get actual realistic times for how long a test takes to run
+    Test / parallelExecution := false,
   )
 )
 

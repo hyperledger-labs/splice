@@ -86,13 +86,14 @@ class SvDsoAutomationService(
       ledgerClient,
       retryProvider,
       config.ingestFromParticipantBegin,
-      config.ingestUpdateHistoryFromParticipantBegin,
       config.parameters,
     ) {
 
   override def companion
       : org.lfdecentralizedtrust.splice.sv.automation.SvDsoAutomationService.type =
     SvDsoAutomationService
+
+  // notice the absence of UpdateHistory: the history for the dso party is duplicate with Scan
 
   private[splice] val restartDsoDelegateBasedAutomationTrigger =
     new RestartDsoDelegateBasedAutomationTrigger(
@@ -378,17 +379,15 @@ class SvDsoAutomationService(
       )
     )
 
-    config.scan.foreach { scan =>
-      registerTrigger(
-        new PublishScanConfigTrigger(
-          triggerContext,
-          dsoStore,
-          connection(SpliceLedgerConnectionPriority.Low),
-          scan,
-          upgradesConfig,
-        )
+    registerTrigger(
+      new PublishScanConfigTrigger(
+        triggerContext,
+        dsoStore,
+        connection(SpliceLedgerConnectionPriority.Low),
+        config.scan,
+        upgradesConfig,
       )
-    }
+    )
 
     config.followAmuletConversionRateFeed.foreach { c =>
       registerTrigger(
@@ -450,6 +449,8 @@ class SvDsoAutomationService(
         new SequencerPruningTrigger(
           contextWithSpecificPolling,
           dsoStore,
+          config.scan,
+          upgradesConfig,
           sequencerContext.sequencerAdminConnection,
           sequencerContext.mediatorAdminConnection,
           clock,

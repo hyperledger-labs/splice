@@ -209,6 +209,7 @@ class BftScanConnectionTest
         initialConnections,
         initialFailedConnections,
         connectionBuilder,
+        _ => Future.unit,
         Bft.getScansInDsoRules,
         NonNegativeFiniteDuration.ofSeconds(refreshSeconds),
         retryProvider,

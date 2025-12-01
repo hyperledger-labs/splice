@@ -23,7 +23,7 @@ import scala.reflect.ClassTag
 
 /** Shared base class for running ingestion and task-handler automation in applications. */
 abstract class AutomationService(
-    private val automationConfig: AutomationConfig,
+    protected val automationConfig: AutomationConfig,
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
