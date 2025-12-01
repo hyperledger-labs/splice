@@ -124,7 +124,7 @@ class MultiHostValidatorOperatorIntegrationTest
               store = synchronizerId,
             )
             .transaction
-            .operationd
+            .operation
         )
       },
     )(
