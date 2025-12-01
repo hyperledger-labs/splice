@@ -787,10 +787,10 @@ object ParticipantAdminCommands {
     // TODO(#24610) - Remove, replaced by ImportAcs
     @nowarn("cat=deprecation")
     final case class ImportAcsOld(
-        acsChunk: ByteString,
+        acsChunk: Seq[ByteString],
         workflowIdPrefix: String,
     ) extends GrpcAdminCommand[
-          v30.ImportAcsOldRequest,
+          Seq[v30.ImportAcsOldRequest],
           v30.ImportAcsOldResponse,
           Unit,
         ] {
@@ -800,26 +800,23 @@ object ParticipantAdminCommands {
       override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
         v30.ParticipantRepairServiceGrpc.stub(channel)
 
-      override protected def createRequest(): Either[String, v30.ImportAcsOldRequest] =
+      override protected def createRequest(): Either[String, Seq[v30.ImportAcsOldRequest]] =
         Right(
-          v30.ImportAcsOldRequest(
-            acsChunk,
-            workflowIdPrefix,
+          acsChunk.map(bytes =>
+            v30.ImportAcsOldRequest(
+              bytes,
+              workflowIdPrefix,
+            )
           )
         )
 
       override protected def submitRequest(
           service: ParticipantRepairServiceStub,
-          request: v30.ImportAcsOldRequest,
+          request: Seq[v30.ImportAcsOldRequest],
       ): Future[v30.ImportAcsOldResponse] =
-        GrpcStreamingUtils.streamToServer(
+        GrpcStreamingUtils.streamToServerChunked(
           service.importAcsOld,
-          (bytes: Array[Byte]) =>
-            v30.ImportAcsOldRequest(
-              ByteString.copyFrom(bytes),
-              workflowIdPrefix,
-            ),
-          request.acsSnapshot,
+          request,
         )
 
       override protected def handleResponse(

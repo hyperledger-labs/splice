@@ -25,7 +25,7 @@ object CantonDependencies {
 
   lazy val anorm = "org.playframework.anorm" %% "anorm" % "2.7.0"
   lazy val apispec_version = "0.11.7"
-  lazy val pekko_version = "1.2.0"
+  lazy val pekko_version = "1.2.1"
   lazy val pekko_http_version = "1.2.0"
   lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
   lazy val auth0_jwks = "com.auth0" % "jwks-rsa" % "0.21.2"

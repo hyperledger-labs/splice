@@ -360,7 +360,7 @@ class ParticipantAdminConnection(
       runCmd(
         ParticipantAdminCommands.ParticipantRepairManagement
           .ImportAcsOld(
-            ByteString.copyFrom(chunkedAcsBytes.asJava),
+            chunkedAcsBytes,
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
           ),
         timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
