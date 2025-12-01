@@ -81,6 +81,20 @@ class ReceiveFaucetCouponTrigger(
       tc: TraceContext
   ): Future[TaskOutcome] = {
     val ReceiveFaucetCouponTrigger.Task(license, unclaimedRound) = task
+    license.payload.weight.toScala match {
+      case Some(x) if x == 0 =>
+        // weight is zero; don't exercise RecordValidatorLivenessActivity
+        Future.successful(TaskSuccess("weight is 0, liveness activity not recorded"))
+      case _ =>
+        // Weight is unspecified or non-zero; exercise RecordValidatorLivenessActivity
+        recordLivenessActivity(task)
+    }
+  }
+
+  private def recordLivenessActivity(task: ReceiveFaucetCouponTrigger.Task)(implicit
+      tc: TraceContext
+  ): Future[TaskOutcome] = {
+    val ReceiveFaucetCouponTrigger.Task(license, unclaimedRound) = task
     license.payload.faucetState.toScala
       .map(_.lastReceivedFor.number.longValue()) match {
       case None =>
