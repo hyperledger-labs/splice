@@ -12,15 +12,24 @@ public final class User {
 
   private final String id;
   private final Optional<String> primaryParty;
+  private final boolean isDeactivated;
 
   public User(@NonNull String id) {
     this.id = id;
     this.primaryParty = Optional.empty();
+    this.isDeactivated = false;
   }
 
   public User(@NonNull String id, @NonNull String primaryParty) {
     this.id = id;
     this.primaryParty = Optional.of(primaryParty);
+    this.isDeactivated = false;
+  }
+
+  public User(@NonNull String id, @NonNull Optional<String> primaryParty, boolean isDeactivated) {
+    this.id = id;
+    this.primaryParty = primaryParty;
+    this.isDeactivated = isDeactivated;
   }
 
   public UserManagementServiceOuterClass.User toProto() {
@@ -37,11 +46,10 @@ public final class User {
   public static User fromProto(UserManagementServiceOuterClass.User proto) {
     String id = proto.getId();
     String primaryParty = proto.getPrimaryParty();
-    if (primaryParty == null || primaryParty.isEmpty()) {
-      return new User(id);
-    } else {
-      return new User(id, primaryParty);
-    }
+    Optional<String> primaryPartyOpt =
+            (primaryParty == null || primaryParty.isEmpty()) ? Optional.empty() : Optional.of(primaryParty);
+    boolean isDeactivated = proto.getIsDeactivated();
+    return new User(id, primaryPartyOpt, isDeactivated);
   }
 
   @NonNull
@@ -52,6 +60,8 @@ public final class User {
   public Optional<String> getPrimaryParty() {
     return primaryParty;
   }
+
+  public boolean isDeactivated() { return isDeactivated; }
 
   @Override
   public String toString() {
@@ -68,12 +78,14 @@ public final class User {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
     User user = (User) o;
-    return Objects.equals(id, user.id) && Objects.equals(primaryParty, user.primaryParty);
+    return Objects.equals(id, user.id) &&
+            Objects.equals(primaryParty, user.primaryParty) &&
+            Objects.equals(isDeactivated, user.isDeactivated);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, primaryParty);
+    return Objects.hash(id, primaryParty, isDeactivated);
   }
 
   public abstract static class Right {
