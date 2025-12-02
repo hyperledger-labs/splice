@@ -84,7 +84,7 @@ class ReceiveFaucetCouponTrigger(
     license.payload.weight.toScala match {
       case Some(x) if x == 0 =>
         // weight is zero; don't exercise RecordValidatorLivenessActivity
-        Future.successful(TaskSuccess("weight is 0, liveness activity not recorded"))
+        Future.successful(TaskSuccess("weight is 0, skipping the recording of liveness activity"))
       case _ =>
         // Weight is unspecified or non-zero; exercise RecordValidatorLivenessActivity
         recordLivenessActivity(task)
