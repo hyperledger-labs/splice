@@ -132,5 +132,6 @@ in pkgs.mkShell {
   PROTOC = "${pkgs.protobuf_25}";
 
   PULUMI_VERSION="${pkgs.pulumi-bin.version}";
+  KUBECTL_VERSION="${pkgs.kubectl.version}";
   GECKODRIVER="${pkgs.geckodriver}/bin/geckodriver";
 }
