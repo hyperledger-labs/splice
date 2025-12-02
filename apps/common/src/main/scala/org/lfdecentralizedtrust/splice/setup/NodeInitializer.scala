@@ -404,7 +404,7 @@ class NodeInitializer(
     val toRotate = currentKeys.map(_.id).filterNot(allOtkSignatures.contains)
     if (toRotate.nonEmpty) {
       logger.info(
-        s"The following keys with missing signature need to be rotated: $toRotate, this is expected for nodes that joined MainNet before version 0.3.1."
+        s"Checking whether the following keys (likely created on a version before 0.3.1) need to be rotated because of missing signatures: $toRotate"
       )
       for {
         newKeys <- Future.traverse(currentKeys) {
@@ -427,9 +427,7 @@ class NodeInitializer(
           keys = newKeysNE,
           retryFor = RetryFor.Automation,
         )
-      } yield logger.info(
-        s"Rotating OTK mapping keys that did not sign the OTK topology transaction."
-      )
+      } yield ()
     } else {
       Future.unit
     }
