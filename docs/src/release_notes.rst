@@ -55,7 +55,6 @@
     - Fix a performance regression in participants that causes the processing of events to pause for multiple minutes at random times,
       due to a bad database query plan on the critical part of the indexer pipeline.
 
-
   - Scan
 
     - Removed the non-existing `command_id` field from the OpenAPI spec of all
