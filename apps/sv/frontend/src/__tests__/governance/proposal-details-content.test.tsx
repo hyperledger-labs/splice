@@ -115,7 +115,7 @@ describe('SV user can', () => {
       </SvConfigProvider>
     );
 
-    expect(await screen.findByText('Log In')).toBeDefined();
+    expect(await screen.findByText('Log In')).toBeInTheDocument();
 
     const input = screen.getByRole('textbox');
     await user.type(input, 'sv1');
@@ -123,7 +123,8 @@ describe('SV user can', () => {
     const button = screen.getByRole('button', { name: 'Log In' });
     user.click(button);
 
-    expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
+    const svParties = await screen.findAllByDisplayValue(svPartyId);
+    svParties.forEach(party => expect(party).toBeInTheDocument());
   });
 });
 
@@ -148,13 +149,13 @@ describe('Proposal Details Content', () => {
     expect(action.textContent).toMatch(/Offboard Member/);
 
     const offboardSection = screen.getByTestId('proposal-details-offboard-member-section');
-    expect(offboardSection).toBeDefined();
+    expect(offboardSection).toBeInTheDocument();
 
     const memberInput = within(offboardSection).getByTestId(
-      'proposal-details-member-party-id-input'
+      'proposal-details-member-party-id-value'
     );
-    expect(memberInput).toBeDefined();
-    expect(memberInput.getAttribute('value')).toBe('sv2');
+    expect(memberInput).toBeInTheDocument();
+    expect(memberInput.textContent).toBe('sv2');
 
     const summary = screen.getByTestId('proposal-details-summary-value');
     expect(summary.textContent).toMatch(/Summary of the proposal/);
@@ -163,13 +164,13 @@ describe('Proposal Details Content', () => {
     expect(url.textContent).toMatch(/https:\/\/example.com/);
 
     const votingInformationSection = screen.getByTestId('proposal-details-voting-information');
-    expect(votingInformationSection).toBeDefined();
+    expect(votingInformationSection).toBeInTheDocument();
 
     const requesterInput = within(votingInformationSection).getByTestId(
-      'proposal-details-requester-party-id-input'
+      'proposal-details-requester-party-id-value'
     );
-    expect(requesterInput).toBeDefined();
-    expect(requesterInput.getAttribute('value')).toBe('sv1');
+    expect(requesterInput).toBeInTheDocument();
+    expect(requesterInput.textContent).toBe('sv1');
 
     const votingClosesIso = within(votingInformationSection).getByTestId(
       'proposal-details-voting-closes-value'
@@ -184,17 +185,17 @@ describe('Proposal Details Content', () => {
     const status = screen.getByTestId('proposal-details-status-value');
     expect(status.textContent).toMatch(/Accepted/);
 
-    const votesSection = screen.getByTestId('proposal-details-votes');
-    expect(votesSection).toBeDefined();
+    const votesSection = screen.getByTestId('proposal-details-votes-list');
+    expect(votesSection).toBeInTheDocument();
 
     const votes = within(votesSection).getAllByTestId('proposal-details-vote');
     expect(votes.length).toBe(2);
 
-    expect(screen.getByTestId('your-vote-form')).toBeDefined();
-    expect(screen.getByTestId('your-vote-url-input')).toBeDefined();
-    expect(screen.getByTestId('your-vote-reason-input')).toBeDefined();
-    expect(screen.getByTestId('your-vote-accept')).toBeDefined();
-    expect(screen.getByTestId('your-vote-reject')).toBeDefined();
+    expect(screen.getByTestId('your-vote-form')).toBeInTheDocument();
+    expect(screen.getByTestId('your-vote-url-input')).toBeInTheDocument();
+    expect(screen.getByTestId('your-vote-reason-input')).toBeInTheDocument();
+    expect(screen.getByTestId('your-vote-accept')).toBeInTheDocument();
+    expect(screen.getByTestId('your-vote-reject')).toBeInTheDocument();
   });
 
   test('should render featured app proposal details', () => {
@@ -221,11 +222,11 @@ describe('Proposal Details Content', () => {
     const action = screen.getByTestId('proposal-details-action-value');
     expect(action.textContent).toMatch(/Feature App/);
 
-    const contractId = screen.getByTestId('proposal-details-contractid-value-input');
-    expect(contractId.getAttribute('value')).toBe(voteRequest.contractId);
+    const contractId = screen.getByTestId('proposal-details-contractid-id-value');
+    expect(contractId.textContent).toBe(voteRequest.contractId);
 
     const featuredAppSection = screen.getByTestId('proposal-details-feature-app-section');
-    expect(featuredAppSection).toBeDefined();
+    expect(featuredAppSection).toBeInTheDocument();
 
     const provider = screen.getByTestId('proposal-details-feature-app-label');
     expect(provider.textContent).toMatch(/Provider ID/);
@@ -259,7 +260,7 @@ describe('Proposal Details Content', () => {
     expect(action.textContent).toMatch(/Unfeature App/);
 
     const unfeaturedAppSection = screen.getByTestId('proposal-details-unfeature-app-section');
-    expect(unfeaturedAppSection).toBeDefined();
+    expect(unfeaturedAppSection).toBeInTheDocument();
 
     const rightContractId = screen.getByTestId('proposal-details-unfeature-app-label');
     expect(rightContractId.textContent).toMatch(/Contract ID/);
@@ -377,7 +378,7 @@ describe('Proposal Details Content', () => {
     expect(action.textContent).toMatch(/Set Amulet Rules Config/);
 
     const amuletRulesConfigSection = screen.getByTestId('proposal-details-config-changes-section');
-    expect(amuletRulesConfigSection).toBeDefined();
+    expect(amuletRulesConfigSection).toBeInTheDocument();
 
     const configChangeContainer = screen.getByTestId('proposal-details-config-changes-section');
 
@@ -442,7 +443,7 @@ describe('Proposal Details Content', () => {
     expect(action.textContent).toMatch(/Set DSO Rules Configuration/);
 
     const dsoRulesConfigSection = screen.getByTestId('proposal-details-config-changes-section');
-    expect(dsoRulesConfigSection).toBeDefined();
+    expect(dsoRulesConfigSection).toBeInTheDocument();
 
     const configChangeContainer = screen.getByTestId('proposal-details-config-changes-section');
 
@@ -550,10 +551,10 @@ describe('Proposal Details > Votes & Voting', () => {
     const rejectedVotesTab = screen.getByTestId('rejected-votes-tab');
     const noVoteVotesTab = screen.getByTestId('no-vote-votes-tab');
 
-    expect(allVotesTab).toBeDefined();
-    expect(acceptedVotesTab).toBeDefined();
-    expect(rejectedVotesTab).toBeDefined();
-    expect(noVoteVotesTab).toBeDefined();
+    expect(allVotesTab).toBeInTheDocument();
+    expect(acceptedVotesTab).toBeInTheDocument();
+    expect(rejectedVotesTab).toBeInTheDocument();
+    expect(noVoteVotesTab).toBeInTheDocument();
 
     // Show all votes by default
     expect(allVotesTab.getAttribute('aria-selected')).toBe('true');
@@ -611,8 +612,8 @@ describe('Proposal Details > Votes & Voting', () => {
       </Wrapper>
     );
 
-    const yourVoteBadge = screen.getByTestId('proposal-details-your-vote-chip');
-    expect(yourVoteBadge).toBeDefined();
+    const yourVoteBadge = screen.getByTestId('proposal-details-voter-party-id-badge');
+    expect(yourVoteBadge).toBeInTheDocument();
   });
 
   test('should not render your vote badge in votes list if you have not voted', () => {
@@ -628,9 +629,7 @@ describe('Proposal Details > Votes & Voting', () => {
       </Wrapper>
     );
 
-    expect(() => screen.getByTestId('proposal-details-your-vote-chip')).toThrowError(
-      /Unable to find an element/
-    );
+    expect(screen.queryByTestId('proposal-details-voter-party-id-badge')).not.toBeInTheDocument();
   });
 
   test('should render status badge in votes list', async () => {
@@ -747,16 +746,17 @@ describe('Proposal Details > Votes & Voting', () => {
     );
 
     const votingInformationSection = screen.getByTestId('proposal-details-voting-information');
-    expect(votingInformationSection).toBeDefined();
+    expect(votingInformationSection).toBeInTheDocument();
 
     const voteTakesEffectDuration = within(votingInformationSection).getByTestId(
       'proposal-details-vote-takes-effect-duration'
     );
     expect(voteTakesEffectDuration.textContent).toBe('Threshold');
 
-    expect(() =>
-      within(votingInformationSection).getByTestId('proposal-details-vote-takes-effect-value')
-    ).toThrowError(/Unable to find an element/);
+    const voteTakesEffectValue = within(votingInformationSection).queryByTestId(
+      'proposal-details-vote-takes-effect-value'
+    );
+    expect(voteTakesEffectValue).not.toBeInTheDocument();
   });
 
   test('should render voting form for vote request when voting has not closed', () => {
@@ -773,19 +773,19 @@ describe('Proposal Details > Votes & Voting', () => {
     );
 
     const votingForm = screen.getByTestId('your-vote-form');
-    expect(votingForm).toBeDefined();
+    expect(votingForm).toBeInTheDocument();
 
     const votingFormUrlInput = within(votingForm).getByTestId('your-vote-url-input');
-    expect(votingFormUrlInput).toBeDefined();
+    expect(votingFormUrlInput).toBeInTheDocument();
 
     const votingFormReasonInput = within(votingForm).getByTestId('your-vote-reason-input');
-    expect(votingFormReasonInput).toBeDefined();
+    expect(votingFormReasonInput).toBeInTheDocument();
 
     const votingFormAccept = within(votingForm).getByTestId('your-vote-accept');
-    expect(votingFormAccept).toBeDefined();
+    expect(votingFormAccept).toBeInTheDocument();
 
     const votingFormReject = within(votingForm).getByTestId('your-vote-reject');
-    expect(votingFormReject).toBeDefined();
+    expect(votingFormReject).toBeInTheDocument();
   });
 
   test('should not render voting form for vote result', () => {
@@ -801,7 +801,7 @@ describe('Proposal Details > Votes & Voting', () => {
       </Wrapper>
     );
 
-    expect(() => screen.getByTestId('your-vote-form')).toThrowError(/Unable to find an element/);
+    expect(screen.queryByTestId('your-vote-form')).not.toBeInTheDocument();
   });
 
   test('submit button says Submit if sv has not voted', async () => {
@@ -825,7 +825,7 @@ describe('Proposal Details > Votes & Voting', () => {
     const votingForm = screen.getByTestId('your-vote-form');
     const submitButton = within(votingForm).getByTestId('submit-vote-button');
 
-    expect(submitButton).toBeDefined();
+    expect(submitButton).toBeInTheDocument();
     expect(submitButton.textContent).toMatch(/Submit/);
   });
 
@@ -854,7 +854,7 @@ describe('Proposal Details > Votes & Voting', () => {
     const votingForm = screen.getByTestId('your-vote-form');
     const submitButton = within(votingForm).getByTestId('submit-vote-button');
 
-    expect(submitButton).toBeDefined();
+    expect(submitButton).toBeInTheDocument();
     expect(submitButton.textContent).toMatch(/Update/);
   });
 
@@ -893,21 +893,21 @@ describe('Proposal Details > Votes & Voting', () => {
     );
 
     const votingForm = screen.getByTestId('your-vote-form');
-    expect(votingForm).toBeDefined();
+    expect(votingForm).toBeInTheDocument();
 
     const urlInput = within(votingForm).getByTestId('your-vote-url-input');
-    expect(urlInput).toBeDefined();
+    expect(urlInput).toBeInTheDocument();
 
     const reasonInput = within(votingForm).getByTestId('your-vote-reason-input');
-    expect(reasonInput).toBeDefined();
+    expect(reasonInput).toBeInTheDocument();
 
     const acceptRadio = within(votingForm).getByTestId('your-vote-accept');
-    expect(acceptRadio).toBeDefined();
+    expect(acceptRadio).toBeInTheDocument();
 
     await user.click(acceptRadio);
 
     const submitButton = within(votingForm).getByTestId('submit-vote-button');
-    expect(submitButton).toBeDefined();
+    expect(submitButton).toBeInTheDocument();
 
     // It's usually a good idea to await this click action. However this happens to be one where we shouldn't
     // This is because awaiting the button click makes it very difficult for the test runner to see the loading state
@@ -918,7 +918,7 @@ describe('Proposal Details > Votes & Voting', () => {
     });
 
     const submissionMessage = await screen.findByTestId('submission-message');
-    expect(submissionMessage).toBeDefined();
+    expect(submissionMessage).toBeInTheDocument();
 
     const successMessage = await screen.findByTestId('vote-submission-success');
 
@@ -960,21 +960,21 @@ describe('Proposal Details > Votes & Voting', () => {
     );
 
     const votingForm = screen.getByTestId('your-vote-form');
-    expect(votingForm).toBeDefined();
+    expect(votingForm).toBeInTheDocument();
 
     const urlInput = within(votingForm).getByTestId('your-vote-url-input');
-    expect(urlInput).toBeDefined();
+    expect(urlInput).toBeInTheDocument();
 
     const reasonInput = within(votingForm).getByTestId('your-vote-reason-input');
-    expect(reasonInput).toBeDefined();
+    expect(reasonInput).toBeInTheDocument();
 
     const acceptRadio = within(votingForm).getByTestId('your-vote-accept');
-    expect(acceptRadio).toBeDefined();
+    expect(acceptRadio).toBeInTheDocument();
 
     await user.click(acceptRadio);
 
     const submitButton = within(votingForm).getByTestId('submit-vote-button');
-    expect(submitButton).toBeDefined();
+    expect(submitButton).toBeInTheDocument();
 
     // It's usually a good idea to await this click action. However this happens to be one where we shouldn't
     // This is because awaiting the button click makes it very difficult for the test runner to see the loading state
@@ -985,7 +985,7 @@ describe('Proposal Details > Votes & Voting', () => {
     });
 
     const submissionMessage = await screen.findByTestId('submission-message');
-    expect(submissionMessage).toBeDefined();
+    expect(submissionMessage).toBeInTheDocument();
 
     const errorMessage = await screen.findByTestId('vote-submission-error');
 
@@ -1021,10 +1021,10 @@ describe('Proposal Details > Votes & Voting', () => {
     );
 
     const votingForm = screen.getByTestId('your-vote-form');
-    expect(votingForm).toBeDefined();
+    expect(votingForm).toBeInTheDocument();
 
     const urlInput = within(votingForm).getByTestId('your-vote-url-input');
-    expect(urlInput).toBeDefined();
+    expect(urlInput).toBeInTheDocument();
 
     await user.type(urlInput, 'invalid_url');
 
@@ -1067,7 +1067,7 @@ describe('Proposal Details > Votes & Voting', () => {
     );
 
     const votingForm = screen.getByTestId('your-vote-form');
-    expect(votingForm).toBeDefined();
+    expect(votingForm).toBeInTheDocument();
 
     const submitButton = screen.getByTestId('submit-vote-button');
     expect(submitButton.getAttribute('disabled')?.valueOf()).toBe('');

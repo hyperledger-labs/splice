@@ -753,6 +753,10 @@ function createGrafanaAlerting(namespace: Input<string>) {
               }
             : {}),
           ...{
+            'acs-stores_alerts.yaml': readGrafanaAlertingFile('acs-stores_alerts.yaml').replaceAll(
+              '$NODATA',
+              loadTesterConfig?.enable ? 'Alerting' : 'OK'
+            ),
             'pruning_alerts.yaml': readGrafanaAlertingFile('pruning_alerts.yaml')
               .replaceAll('$NODATA', loadTesterConfig?.enable ? 'Alerting' : 'OK')
               .replaceAll(
