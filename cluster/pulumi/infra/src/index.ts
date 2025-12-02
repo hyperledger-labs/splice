@@ -15,7 +15,7 @@ import {
   installClusterMaintenanceUpdateAlerts,
 } from './gcpAlerts';
 import { configureIstio, istioMonitoring } from './istio';
-// import { installPodCleanupCronJob } from './maintenance';
+import { deployGCPodReaper } from './maintenance';
 import { configureNetwork } from './network';
 import { configureObservability } from './observability';
 import { configureStorage } from './storage';
@@ -43,9 +43,9 @@ if (enableAlerts && !clusterIsResetPeriodically) {
 }
 istioMonitoring(network.ingressNs, []);
 
-configureStorage();
+deployGCPodReaper('cluster-pod-reaper', { parent: network.ingressNs.ns });
 
-// installPodCleanupCronJob(network.ingressNs.ns.metadata.name);
+configureStorage();
 
 configureCloudArmorPolicy(cloudArmorConfig);
 
