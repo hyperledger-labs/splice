@@ -12,10 +12,49 @@ const schedule = '0 3 * * *'; // Run once daily at 03:00 AM UTC
 const deleteBadPodsCommand = [
   '/bin/sh',
   '-c',
-  `kubectl get pods -A --field-selector=status.phase!=Running -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,STATUS:.status.phase,REASON:.status.containerStatuses[*].state.waiting.reason | \\
-  grep -E "Error|Unknown|CrashLoopBackOff|Terminating" | \\
-  awk '{print $1, $2}' | \\
-  xargs -n 2 sh -c 'kubectl delete pod -n "$0" "$1"' _ || true`,
+  `
+    LOG_FILE="/tmp/pod-reaper-$(date +%Y%m%d%H%M%S).log";
+    echo "--- $(date) Starting Pod Reaper ---" >> $LOG_FILE;
+    echo "Processing pods for deletion..." >> $LOG_FILE;
+
+    TARGET_PODS=$(
+      kubectl get pods -A -o json | \\
+      jq -r '.items[] |
+          # Check if the Pod status is "ContainerStatusUnknown"
+          (select(.status.phase == "Unknown" and .status.reason == "ContainerStatusUnknown") |
+              .metadata.namespace + " " + .metadata.name) //
+
+          # Check for Terminated container with reason "Error" and exit code 137
+          (select(.status.containerStatuses[]?.state.terminated? |
+              .reason == "Error" and .exitCode == 137) |
+              .metadata.namespace + " " + .metadata.name)'
+    );
+
+    echo "Found pods for deletion:" >> $LOG_FILE;
+    echo "$TARGET_PODS" >> $LOG_FILE;
+
+    if [ -z "$TARGET_PODS" ]; then
+        echo "No target pods found. Exiting." >> $LOG_FILE;
+        exit 0
+    fi
+
+    echo "--- Deleting Target Pods ---" >> $LOG_FILE;
+
+    echo "$TARGET_PODS" | while read -r NAMESPACE NAME; do
+        if [ -n "$NAMESPACE" ] && [ -n "$NAME" ]; then
+            echo "Deleting pod $NAMESPACE/$NAME" >> $LOG_FILE;
+            kubectl delete pod -n "$NAMESPACE" "$NAME" >> $LOG_FILE 2>&1
+            if [ $? -eq 0 ]; then
+                echo "Successfully deleted $NAMESPACE/$NAME" >> $LOG_FILE;
+            else
+                echo "Failed to delete $NAMESPACE/$NAME" >> $LOG_FILE;
+            fi
+        fi
+    done
+
+    echo "--- $(date) Pod Reaper Finished ---" >> $LOG_FILE;
+    true
+  `,
 ];
 
 export function deployGCPodReaper(
