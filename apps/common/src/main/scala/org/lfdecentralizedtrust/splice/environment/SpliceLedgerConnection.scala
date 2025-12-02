@@ -481,6 +481,15 @@ class BaseLedgerConnection(
     }.toSet
   }
 
+  def listUserRights(
+      username: String
+  )(implicit tc: TraceContext): Future[Set[User.Right]] = {
+    val userId = Ref.UserId.assertFromString(username)
+    for {
+      userRights <- client.listUserRights(userId)
+    } yield userRights.toSet
+  }
+
   def grantUserRights(
       user: String,
       actAsParties: Seq[PartyId],
