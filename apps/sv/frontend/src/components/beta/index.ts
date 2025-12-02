@@ -5,5 +5,6 @@ import CopyableIdentifier from './CopyableIdentifier';
 import MemberIdentifier from './MemberIdentifier';
 import PageHeader from './PageHeader';
 import PageSectionHeader from './PageSectionHeader';
+import VoteStats from './VoteStats';
 
-export { CopyableIdentifier, MemberIdentifier, PageHeader, PageSectionHeader };
+export { CopyableIdentifier, MemberIdentifier, PageHeader, PageSectionHeader, VoteStats };

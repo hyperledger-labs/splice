@@ -27,6 +27,7 @@ declare module '@mui/material/styles' {
       neutral: Record<string, string>;
       primary: Record<string, string>;
       secondary: string;
+      tertiary: string;
       mainnet: string;
       testnet: string;
       devnet: string;
@@ -39,6 +40,7 @@ declare module '@mui/material/styles' {
       neutral?: Record<string, string>;
       primary?: Record<string, string>;
       secondary?: string;
+      tertiary?: string;
       mainnet: string;
       testnet: string;
       devnet: string;
@@ -78,6 +80,7 @@ let theme = createTheme({
       neutral: generateHslPalette(0, 0, [0, 10, 15, 25, 30, 40, 50, 60, 70, 80]),
       primary: generateHslPalette(195, 96, [79, 89]),
       secondary: '#F3FF97',
+      tertiary: '#875CFF',
       mainnet: '#F8FDCD',
       testnet: '#C8F1FE',
       devnet: '#C6B2FF',
@@ -100,6 +103,9 @@ theme = createTheme(theme, {
     },
     secondary: {
       main: '#F3FF97',
+    },
+    tertiary: {
+      main: '#875CFF',
     },
     warning: {
       main: '#FD8575',
