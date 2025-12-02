@@ -12,6 +12,7 @@ import com.digitalasset.daml.lf.data.Time.Timestamp as LfTimestamp
 import com.google.cloud.bigquery as bq
 import bq.{Field, FieldValueList, JobInfo, Schema, TableId, TableResult}
 import bq.storage.v1.{JsonStreamWriter, TableSchema}
+import org.scalatest.concurrent.TimeLimits.failAfter
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.*
 import slick.jdbc.GetResult
 
@@ -62,6 +63,11 @@ class ScanTotalSupplyBigQueryIntegrationTest
   }
   private val functionsDatasetName = s"functions_$uuid"
   private val dashboardsDatasetName = s"dashboards_$uuid"
+  private val allDatasetNames = Seq(
+    datasetName,
+    functionsDatasetName,
+    dashboardsDatasetName,
+  )
 
   // Test data parameters
   private val mintedAppRewardsAmount = BigDecimal(0)
@@ -127,12 +133,31 @@ class ScanTotalSupplyBigQueryIntegrationTest
   }
 
   override def afterAll() = {
-    logger.info(s"Cleaning up BigQuery dataset: $datasetName")
+    val singleDeleteTryTime = 13.seconds
 
-    // Delete the temporary BigQuery datasets after tests
-    bigquery.delete(datasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
-    bigquery.delete(functionsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
-    bigquery.delete(dashboardsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+    Future
+      .traverse(allDatasetNames) { dsName =>
+        val logMsg = s"Cleaning up BigQuery dataset: $dsName"
+        Future {
+          logger.info(logMsg)
+          // afterAll only has 60s to complete before its thread gets
+          // interrupted
+          eventuallySucceeds(timeUntilSuccess = 45.seconds, suppressErrors = false) {
+            failAfter(singleDeleteTryTime) {
+              // can hang, so we force retry after singleDeleteTryTime;
+              // even when it hangs it's still likely to succeed, and delete
+              // just succeeds with `false` if already deleted
+              bigquery.delete(dsName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+            }
+          }
+          logger.info(s"Finished $logMsg")
+        }.recoverWith { case util.control.NonFatal(e) =>
+          logger.warn(s"Failed $logMsg")
+          Future failed e
+        }
+      }
+      .futureValue
+
     super.afterAll()
   }
 
