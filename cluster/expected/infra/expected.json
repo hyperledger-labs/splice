@@ -708,6 +708,23 @@
     "id": "",
     "inputs": {
       "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "labels": {
+          "app.kubernetes.io/name": "gc-pod-reaper"
+        },
+        "name": "gc-pod-reaper"
+      }
+    },
+    "name": "cluster-pod-reaper",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
@@ -1030,6 +1047,72 @@
     "name": "dns01-sa-key-secret",
     "provider": "",
     "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "batch/v1",
+      "kind": "CronJob",
+      "metadata": {
+        "annotations": {
+          "pulumi.com/description": "Scheduled job to automatically clean up error/stuck pods"
+        },
+        "name": "gc-pod-reaper-job",
+        "namespace": "gc-pod-reaper"
+      },
+      "spec": {
+        "concurrencyPolicy": "Forbid",
+        "failedJobsHistoryLimit": 2,
+        "jobTemplate": {
+          "metadata": {
+            "labels": {
+              "app": "gc-pod-reaper"
+            }
+          },
+          "spec": {
+            "template": {
+              "spec": {
+                "containers": [
+                  {
+                    "command": [
+                      "/bin/sh",
+                      "-c",
+                      "kubectl get pods -A --field-selector=status.phase!=Running -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,STATUS:.status.phase,REASON:.status.containerStatuses[*].state.waiting.reason | \\\n  grep -E \"Error|Unknown|CrashLoopBackOff|Terminating\" | \\\n  awk '{print $1, $2}' | \\\n  xargs -n 2 sh -c 'kubectl delete pod -n \"$0\" \"$1\"' _ || true"
+                    ],
+                    "image": "bitnami/kubectl:latest",
+                    "imagePullPolicy": "IfNotPresent",
+                    "name": "gc-pod-reaper-job"
+                  }
+                ],
+                "restartPolicy": "OnFailure",
+                "serviceAccountName": "gc-pod-reaper-service-account"
+              }
+            }
+          }
+        },
+        "schedule": "0 3 * * *",
+        "successfulJobsHistoryLimit": 2
+      }
+    },
+    "name": "gc-pod-reaper-job",
+    "provider": "",
+    "type": "kubernetes:batch/v1:CronJob"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "gc-pod-reaper-service-account",
+        "namespace": "gc-pod-reaper"
+      }
+    },
+    "name": "gc-pod-reaper-service-account",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
   },
   {
     "custom": true,
