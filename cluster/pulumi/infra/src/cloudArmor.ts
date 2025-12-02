@@ -1,9 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as gcp from '@pulumi/gcp';
+import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
-import { CLUSTER_BASENAME } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CLUSTER_BASENAME, ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import * as config from './config';
 
@@ -42,8 +43,14 @@ export interface PredefinedWafRule {
  */
 export function configureCloudArmorPolicy(
   cac: CloudArmorConfig,
+  ingressNs: ExactNamespace,
   opts?: pulumi.ComponentResourceOptions
-): gcp.compute.SecurityPolicy | undefined {
+):
+  | {
+      securityPolicy: gcp.compute.SecurityPolicy;
+      backendConfig: k8s.apiextensions.CustomResource;
+    }
+  | undefined {
   if (!cac.enabled) {
     return undefined;
   }
@@ -61,6 +68,25 @@ export function configureCloudArmorPolicy(
       // making those changes harder to review than with the separate resources
     },
     opts
+  );
+
+  const configName = `waf-ca-backend-config-${CLUSTER_BASENAME}`;
+  const backendConfig = new k8s.apiextensions.CustomResource(
+    configName,
+    {
+      apiVersion: 'cloud.google.com/v1',
+      kind: 'BackendConfig',
+      metadata: {
+        name: configName,
+        namespace: ingressNs.ns.metadata.name,
+      },
+      spec: {
+        securityPolicy: {
+          name: securityPolicy.name,
+        },
+      },
+    },
+    { parent: securityPolicy, dependsOn: [securityPolicy] }
   );
 
   const ruleOpts = { ...opts, parent: securityPolicy, deletedWith: securityPolicy };
@@ -81,7 +107,7 @@ export function configureCloudArmorPolicy(
   // Step 5: Add default deny rule
   addDefaultDenyRule(securityPolicy, cac.allRulesPreviewOnly, ruleOpts);
 
-  return securityPolicy;
+  return { securityPolicy, backendConfig };
 }
 
 /**
