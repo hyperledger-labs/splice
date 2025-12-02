@@ -15,7 +15,7 @@ import {
   installClusterMaintenanceUpdateAlerts,
 } from './gcpAlerts';
 import { configureIstio, istioMonitoring } from './istio';
-import { installPodCleanupCronJob } from './maintenance';
+// import { installPodCleanupCronJob } from './maintenance';
 import { configureNetwork } from './network';
 import { configureObservability } from './observability';
 import { configureStorage } from './storage';
@@ -45,7 +45,7 @@ istioMonitoring(network.ingressNs, []);
 
 configureStorage();
 
-installPodCleanupCronJob(network.ingressNs.ns.metadata.name);
+// installPodCleanupCronJob(network.ingressNs.ns.metadata.name);
 
 configureCloudArmorPolicy(cloudArmorConfig);
 
