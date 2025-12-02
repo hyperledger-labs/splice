@@ -6,7 +6,7 @@ import * as pulumi from '@pulumi/pulumi';
 const cronJobName = 'gc-pod-reaper-job';
 const targetNamespace = 'gc-pod-reaper';
 const serviceAccountName = 'gc-pod-reaper-service-account';
-const reaperImage = 'bitnami/kubectl:latest';
+const reaperImage = 'rancher/kubectl:latest';
 const schedule = '0 3 * * *'; // Run once daily at 03:00 AM UTC
 
 const deleteBadPodsCommand = [
@@ -107,6 +107,13 @@ export function deployGCPodReaper(
               spec: {
                 serviceAccountName: serviceAccountName,
                 restartPolicy: 'OnFailure',
+                initContainers: [
+                  {
+                    name: 'install-dependencies',
+                    image: reaperImage,
+                    command: ['/bin/sh', '-c', 'apk add --no-cache jq'],
+                  },
+                ],
                 containers: [
                   {
                     name: cronJobName,
