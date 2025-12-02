@@ -33,6 +33,9 @@ class MultiHostValidatorOperatorIntegrationTest
     // Multi-host operatorParty (the operator of aliceValidator), and aliceUser also on bobValidator,
     // per the Canton docs [here](https://docs.digitalasset.com/operate/3.4/howtos/operate/parties/party_replication.html#permission-change-replication-procedure)
 
+    aliceParticipant.topology.party_to_participant_mappings
+      .list_hosting_proposals(synchronizerId, bobParticipantId) shouldBe empty
+
     val multiHostedParties = Seq(operatorParty, aliceUserParty)
     actAndCheck(
       "BobValidator proposes to host the parties",
@@ -52,16 +55,11 @@ class MultiHostValidatorOperatorIntegrationTest
           .length shouldBe 2,
     )
 
-    actAndCheck(
-      "Disconnect bobValidator", {
-        // We first stop the validator app so it doesn't fail due to the synchronizer being disconnected
-        bobValidatorBackend.stop()
-        bobParticipant.synchronizers.disconnect_all()
-      },
-    )(
-      "bobValidator is disconnected",
-      _ => bobParticipant.synchronizers.list_connected() shouldBe empty,
-    )
+    clue("Disconnect bobValidator") {
+      // We first stop the validator app so it doesn't fail due to the synchronizer being disconnected
+      bobValidatorBackend.stop()
+      bobParticipant.synchronizers.disconnect_all()
+    }
 
     val beforeActivationOffset = aliceParticipant.ledger_api.state.end()
     actAndCheck(timeUntilSuccess = 5.minutes)(
@@ -81,11 +79,11 @@ class MultiHostValidatorOperatorIntegrationTest
       _ => {
         multiHostedParties.foreach(party =>
           aliceParticipant.topology.party_to_participant_mappings
-            .list(synchronizerId, filterParty = party.toString.split("::")(0))
-            .last
-            .item
-            .participants
-            .filter(_.participantId == bobParticipantId) should not be empty
+            .list(
+              synchronizerId,
+              filterParty = party.toProtoPrimitive,
+              filterParticipant = bobParticipantId.toProtoPrimitive,
+            ) should not be empty
         )
       },
     )
@@ -109,8 +107,7 @@ class MultiHostValidatorOperatorIntegrationTest
       }
     })
 
-    clue("Reconnect synchronizer and start the validator app again") {
-      bobParticipant.synchronizers.reconnect_all()
+    clue("start the validator app again (which will also reconnect the participant)") {
       bobValidatorBackend.startSync()
     }
 
@@ -123,38 +120,49 @@ class MultiHostValidatorOperatorIntegrationTest
               adds = Seq((bobParticipantId, ParticipantPermission.Observation)),
               store = synchronizerId,
             )
-            .transaction
-            .operation
         )
       },
     )(
       "Alice sees the transaction",
       _ =>
         multiHostedParties.foreach { party =>
-          aliceParticipant.topology.party_to_participant_mappings
-            .list(synchronizerId, filterParty = party.toString.split("::")(0))
-            .last
-            .item
-            .participants
-            .filter(_.participantId == bobParticipantId)
-            .last
-            .onboarding shouldBe false
+          val mappings = aliceParticipant.topology.party_to_participant_mappings
+            .list(
+              synchronizerId,
+              filterParty = party.toProtoPrimitive,
+              filterParticipant = bobParticipantId.toProtoPrimitive,
+            )
+          mappings should not be empty
+          mappings.last.item.participants.last.onboarding shouldBe false
         },
     )
 
-    multiHostedParties.foreach(party =>
-      clue(s"Set permission to confirmation for $party") {
-        Seq(aliceValidatorBackend, bobValidatorBackend).map(
+    actAndCheck(
+      "Grant confirmation rights",
+      multiHostedParties.foreach(party =>
+        Seq(aliceValidatorBackend, bobValidatorBackend).foreach(
           _.participantClient.topology.party_to_participant_mappings
             .propose_delta(
               party,
               adds = Seq((bobParticipantId, ParticipantPermission.Confirmation)),
               store = synchronizerId,
             )
-            .transaction
-            .operation
         )
-      }
+      ),
+    )(
+      "Wait for confirmation rights",
+      _ =>
+        multiHostedParties.foreach(party => {
+          val mapping =
+            aliceValidatorBackend.participantClient.topology.party_to_participant_mappings
+              .list(
+                synchronizerId,
+                filterParty = party.toProtoPrimitive,
+                filterParticipant = bobParticipantId.toProtoPrimitive,
+              )
+          mapping should not be empty
+          mapping.last.item.participants.last.permission shouldBe ParticipantPermission.Confirmation
+        }),
     )
 
     clue("Setup transfer preapproval") {
@@ -164,15 +172,10 @@ class MultiHostValidatorOperatorIntegrationTest
     }
 
     aliceWalletClient.balance().unlockedQty should beAround(0.0)
-    actAndCheck(
-      "Stop alice validator app, and disconnect its participant", {
-        aliceValidatorBackend.stop()
-        aliceParticipant.synchronizers.disconnect_all()
-      },
-    )(
-      "The participant is disconnected",
-      _ => aliceParticipant.synchronizers.list_connected() shouldBe empty,
-    )
+    clue("Stop alice validator app, and disconnect its participant") {
+      aliceValidatorBackend.stop()
+      aliceParticipant.synchronizers.disconnect_all()
+    }
 
     splitwellWalletClient.tap(walletAmuletToUsd(100))
     splitwellWalletClient.balance().unlockedQty should beAround(100.0)
