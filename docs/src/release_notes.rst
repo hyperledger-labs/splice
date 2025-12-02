@@ -5,12 +5,15 @@
 
 .. _release_notes:
 
-.. release-notes:: upcoming
+.. release-notes:: 0.5.4
 
-  - Validator
+  - Participant
 
     - Fix a bug introduced in 0.5.0/0.5.1 that could cause participant pruning to prune active data.
       The bug only manifests in a rare edge case involving a manual ACS import on a participant that was already running for some time.
+
+    - Fix a performance regression in participants that causes the processing of events to pause for multiple minutes at random times,
+      due to a bad database query plan on the critical part of the indexer pipeline.
 
   - Scan
 
@@ -19,44 +22,6 @@
       The field was included in the "required" section without being a property
       of the returned transaction object. This is only a bugfix in the OpenAPI spec
       and has no impact on the actual API behavior.
-
-  - API security
-
-    - Tightened authorization checks for all non-public API endpoints.
-
-      All non-public endpoints now properly respect the current user rights
-      defined in the participant user management service.
-      Revoking user rights on the participant will revoke access to the corresponding API endpoints.
-
-      In general, endpoints that required authentication before will now check that the authenticated user
-      is not deactivated on the participant has ``actAs`` rights for the relevant party
-      (wallet party for the wallet app API, SV operator party for the SV app API, etc).
-
-    - Administrative SV app endpoints now require participant admin rights.
-
-      The following SV app endpoints now require the user to have participant admin rights in
-      the participant user management service.
-
-        - ``/v0/admin/domain/pause``
-        - ``/v0/admin/domain/unpause``
-        - ``/v0/admin/domain/migration-dump``
-        - ``/v0/admin/domain/migration-dump``
-        - ``/v0/admin/domain/identities-dump``
-        - ``/v0/admin/domain/data-snapshot``
-
-      This allows for finer grained access control
-      where users with ``actAs`` rights for the SV operator party but without participant admin
-      rights may use the SV or wallet UIs, but may not perform administrative actions like
-      hard synchronizer migrations.
-
-      Note that only the service users of the SV and validator apps should automatically have participant admin rights.
-      If you are using other users to access the above endpoints, check their rights.
-
-    - Some endpoints will have changed authorization rules in an upcoming release.
-
-        - SV app ``/v0/dso`` is currently public, but will require authorization as SV operator,
-          similar to most other SV app endpoints.
-          Use the public ``/v0/dso`` endpoint in the scan app if you need to fetch DSO info.
 
 .. release-notes:: 0.5.3
 
