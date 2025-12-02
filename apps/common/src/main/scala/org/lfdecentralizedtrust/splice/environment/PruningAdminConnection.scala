@@ -14,7 +14,7 @@ trait PruningAdminConnection {
   this: AppConnection & RetryProvider.Has =>
   protected implicit val ec: ExecutionContextExecutor
   type Status <: NodeStatus.Status
-  protected val pruningCommands: PruningSchedulerCommands[_]
+  protected val pruningCommands: PruningSchedulerCommands[?]
 
   private def setPruningSchedule(
       config: PruningConfig

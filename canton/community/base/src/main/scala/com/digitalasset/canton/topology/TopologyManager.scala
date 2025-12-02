@@ -11,7 +11,7 @@ import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -29,6 +29,7 @@ import com.digitalasset.canton.topology.TopologyManagerError.{
   DangerousCommandRequiresForce,
   IncreaseOfPreparationTimeRecordTimeTolerance,
   InvalidSynchronizerSuccessor,
+  TooManyPendingTopologyTransactions,
   ValueOutOfBounds,
 }
 import com.digitalasset.canton.topology.processing.{
@@ -87,6 +88,7 @@ class SynchronizerTopologyManager(
     staticSynchronizerParameters: StaticSynchronizerParameters,
     override val store: TopologyStore[SynchronizerStore],
     val outboxQueue: SynchronizerOutboxQueue,
+    dispatchQueueBackpressureLimit: NonNegativeInt,
     disableOptionalTopologyChecks: Boolean,
     exitOnFatalFailures: Boolean,
     timeouts: ProcessingTimeout,
@@ -106,9 +108,13 @@ class SynchronizerTopologyManager(
     ) {
   def psid: PhysicalSynchronizerId = store.storeId.psid
 
+  override def noBackpressure(): Boolean =
+    outboxQueue.numUnsentTransactions < dispatchQueueBackpressureLimit.value
+
   override protected val processor: TopologyStateProcessor = {
 
-    val required = new RequiredTopologyMappingChecks(store, loggerFactory)
+    val required =
+      RequiredTopologyMappingChecks(store, Some(staticSynchronizerParameters), loggerFactory)
     val checks =
       if (!disableOptionalTopologyChecks)
         new TopologyMappingChecks.All(
@@ -156,9 +162,9 @@ class SynchronizerTopologyManager(
         EffectiveTime(ts),
         transactions,
         expectFullAuthorization = expectFullAuthorization,
-        // the synchronizer topology manager does not permit missing signing key signatures,
+        // the synchronizer topology manager does not permit weaker validation checks,
         // because these transactions would be rejected during the validating after sequencing.
-        transactionMayHaveMissingSigningKeySignatures = false,
+        relaxChecksForBackwardsCompatibility = false,
       )
   } yield {
     val (txs, asyncResult) = validationResult
@@ -184,7 +190,10 @@ class TemporaryTopologyManager(
       timeouts,
       futureSupervisor,
       loggerFactory,
-    )
+    ) {
+  override def noBackpressure(): Boolean = true
+
+}
 
 class AuthorizedTopologyManager(
     nodeId: UniqueIdentifier,
@@ -208,6 +217,8 @@ class AuthorizedTopologyManager(
     ) {
   def initialize(implicit @unused traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     FutureUnlessShutdown.unit
+
+  override def noBackpressure(): Boolean = true
 }
 
 abstract class LocalTopologyManager[StoreId <: TopologyStoreId](
@@ -267,9 +278,9 @@ abstract class LocalTopologyManager[StoreId <: TopologyStoreId](
               EffectiveTime(ts),
               Seq(transaction),
               expectFullAuthorization = expectFullAuthorization,
-              // we allow importing OwnerToKeyMappings with missing signing key signatures into a temporary topology store,
+              // we allow importing older topology state such as OTK with missing signing key signatures into a temporary topology store,
               // so that we can import legacy OTKs for debugging/investigation purposes
-              transactionMayHaveMissingSigningKeySignatures = store.storeId.isTemporaryStore,
+              relaxChecksForBackwardsCompatibility = store.storeId.isTemporaryStore,
             )
 
         } yield {
@@ -320,6 +331,8 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
     crashOnFailure = exitOnFatalFailures,
   )
 
+  /** must return true if this topology manager should be backpressured */
+  protected def noBackpressure(): Boolean
   protected val processor: TopologyStateProcessor
 
   override def queueSize: Int = sequentialQueue.queueSize
@@ -357,6 +370,21 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
     traceContext.discard
     EitherT.rightT(())
   }
+
+  private def checkConfirmingThresholdIsNotAboveNumberOfHostingNodes(
+      threshold: PositiveInt,
+      numberOfHostingNodes: Int,
+      forceFlags: ForceFlags,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TopologyManagerError, Unit] =
+    EitherTUtil.condUnitET[FutureUnlessShutdown][TopologyManagerError](
+      (numberOfHostingNodes == 0 || threshold.value <= numberOfHostingNodes || forceFlags.permits(
+        ForceFlag.AllowConfirmingThresholdCanBeMet
+      )),
+      TopologyManagerError.ConfirmingThresholdCannotBeReached
+        .Reject(threshold, numberOfHostingNodes),
+    )
 
   def checkInsufficientSignatoryAssigningParticipantsForParty(
       @unused partyId: PartyId,
@@ -534,7 +562,7 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
           EitherT.cond[FutureUnlessShutdown][TopologyManagerError, PositiveInt](
             proposed == PositiveInt.one,
             PositiveInt.one,
-            TopologyManagerError.SerialMismatch.Failure(PositiveInt.one, proposed),
+            TopologyManagerError.SerialMismatch.Failure(Some(PositiveInt.one), Some(proposed)),
           )
         // The stored mapping and the proposed mapping are the same. This likely only adds an additional signature.
         // If not, then duplicates will be filtered out down the line.
@@ -558,7 +586,7 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
           EitherT.cond[FutureUnlessShutdown](
             next == proposed,
             next,
-            TopologyManagerError.SerialMismatch.Failure(next, proposed),
+            TopologyManagerError.SerialMismatch.Failure(Some(next), Some(proposed)),
           )
       }): EitherT[FutureUnlessShutdown, TopologyManagerError, PositiveInt]
     } yield TopologyTransaction(op, theSerial, mapping, protocolVersion)
@@ -748,6 +776,10 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
   ): EitherT[FutureUnlessShutdown, TopologyManagerError, AsyncResult[Unit]] =
     sequentialQueue.executeEUS(
       for {
+        _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
+          noBackpressure(),
+          TooManyPendingTopologyTransactions.Backpressure(),
+        )
         _ <- MonadUtil.sequentialTraverse_(transactions)(
           transactionIsNotDangerous(_, forceChanges)
         )
@@ -855,11 +887,18 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
         transaction.mapping.code,
       )
 
-    case PartyToParticipant(partyId, threshold, participants) =>
+    case PartyToKeyMapping(_, SigningKeysWithThreshold(keys, threshold)) =>
+      checkSigningThresholdCanBeReached(
+        threshold,
+        keys,
+      )
+
+    case PartyToParticipant(partyId, threshold, participants, signingKeysWithThreholdO) =>
       checkPartyToParticipantIsNotDangerous(
         partyId,
         threshold,
         participants,
+        signingKeysWithThreholdO,
         forceChanges,
         transaction.transaction.operation,
       )
@@ -1022,10 +1061,22 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
     EitherT(resF)
   }
 
+  private def checkSigningThresholdCanBeReached(
+      threshold: PositiveInt,
+      keys: NonEmpty[Set[SigningPublicKey]],
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TopologyManagerError, Unit] =
+    EitherTUtil.condUnitET[FutureUnlessShutdown][TopologyManagerError](
+      keys.sizeIs >= threshold.value,
+      TopologyManagerError.SigningThresholdCannotBeReached.Reject(threshold, keys.size),
+    )
+
   private def checkPartyToParticipantIsNotDangerous(
       partyId: PartyId,
       threshold: PositiveInt,
       nextParticipants: Seq[HostingParticipant],
+      signingKeysWithThresholdO: Option[SigningKeysWithThreshold],
       forceChanges: ForceFlags,
       operation: TopologyChangeOp,
   )(implicit
@@ -1045,13 +1096,22 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
         .map {
           _.collectOfMapping[PartyToParticipant].collectLatestByUniqueKey.toTopologyState
             .collectFirst {
-              case PartyToParticipant(_, currentThreshold, currentHostingParticipants) =>
+              case PartyToParticipant(_, currentThreshold, currentHostingParticipants, _) =>
                 Some(currentThreshold) -> currentHostingParticipants
             }
             .getOrElse(None -> Nil)
         }
 
     for {
+      _ <- signingKeysWithThresholdO.traverse_ { case SigningKeysWithThreshold(keys, threshold) =>
+        checkSigningThresholdCanBeReached(threshold, keys)
+      }
+      _ <- checkConfirmingThresholdIsNotAboveNumberOfHostingNodes(
+        threshold,
+        nextParticipants.length,
+        forceChanges: ForceFlags,
+      )
+
       currentThresholdAndHostingParticipants <- EitherT.right(
         currentThresholdAndHostingParticipants
       )
@@ -1160,19 +1220,21 @@ object TopologyManager {
       forSigning: Boolean,
   ): NonEmpty[Map[Fingerprint, NonEmpty[Set[SigningKeyUsage]]]] = {
 
-    def onlyNamespaceAuth(auth: RequiredAuth): Boolean = auth match {
-      case RequiredAuth.RequiredNamespaces(_, extraKeys) => extraKeys.isEmpty
-      case RequiredAuth.Or(first, second) => onlyNamespaceAuth(first) && onlyNamespaceAuth(second)
-    }
+    def onlyNamespaceAuth(auth: RequiredAuth): Boolean = auth.referenced.isEmpty
 
     // True if the mapping must be signed only by a namespace key but not extra keys
     val strictNamespaceAuth = onlyNamespaceAuth(mapping.requiredAuth(None))
 
     mapping match {
-      // The following topology mapping requires to prove the ownership of the mapped keys, used by OwnerToKeyMapping and PartyToKeyMapping
+      // Keys defined in Keymappings must prove the ownership of the mapped keys
       case keyMapping: KeyMapping if !strictNamespaceAuth =>
-        val mappedKeyIds = keyMapping.mappedKeys.toSet.map(_.id)
+        val mappedKeyIds = keyMapping.mappedKeys.map[Fingerprint](_.id)
+        val namespaceKeyForSelfAuthorization =
+          keyMapping.namespaceKeyForSelfAuthorization.map(_.fingerprint)
         signingKeys.map {
+          case keyId if namespaceKeyForSelfAuthorization.contains(keyId) =>
+            // the key specified for self-authorization must be a namespace key
+            keyId -> SigningKeyUsage.NamespaceOnly
           case keyId if mappedKeyIds.contains(keyId) =>
             if (forSigning)
               // the mapped keys need to prove ownership

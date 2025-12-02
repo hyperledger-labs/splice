@@ -49,10 +49,10 @@ abstract class MultiDomainAcsStoreTest[
     id
   }
 
-  case class GenericAcsRowData(contract: Contract[_, _]) extends AcsRowData.AcsRowDataFromContract {
+  case class GenericAcsRowData(contract: Contract[?, ?]) extends AcsRowData.AcsRowDataFromContract {
     override def contractExpiresAt: Option[Time.Timestamp] = None
 
-    override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
   }
   object GenericAcsRowData {
     implicit val hasIndexColumns: HasIndexColumns[GenericAcsRowData] =
@@ -126,7 +126,7 @@ abstract class MultiDomainAcsStoreTest[
   protected type CReady = AssignedContract[AppRewardCoupon.ContractId, AppRewardCoupon]
 
   protected def assertIncompleteReassignments(
-      incompleteReassignmentsById: Map[ContractId[_], NonEmpty[Set[ReassignmentId]]] = Map.empty
+      incompleteReassignmentsById: Map[ContractId[?], NonEmpty[Set[ReassignmentId]]] = Map.empty
   )(implicit store: Store) =
     for {
       actualIncompleteReassignmentsById <- store.listIncompleteReassignments()
@@ -166,7 +166,7 @@ abstract class MultiDomainAcsStoreTest[
     store.lookupContractById(AppRewardCoupon.COMPANION)(c.contractId)
 
   protected def assertReadyForAssign(
-      contractId: ContractId[_],
+      contractId: ContractId[?],
       reassignmentId: ReassignmentId,
       expected: Boolean,
   )(implicit

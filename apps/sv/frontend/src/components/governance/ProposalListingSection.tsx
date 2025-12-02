@@ -11,13 +11,12 @@ import {
   TableHead,
   TableRow,
   Stack,
+  TypographyProps,
 } from '@mui/material';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { Link as RouterLink } from 'react-router-dom';
-import { PageSectionHeader } from '../../components/beta';
+import { PageSectionHeader, VoteStats } from '../../components/beta';
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 import { InfoOutlined } from '@mui/icons-material';
 
@@ -225,7 +224,11 @@ const VoteRow: React.FC<VoteRowProps> = props => {
         )}
 
         <TableCell data-testid={`${uniqueId}-row-your-vote`}>
-          <VoteStats vote={yourVote} data-testid={`${uniqueId}-row-your-vote-stats`} />
+          <VoteStats
+            vote={yourVote}
+            typography={tableBodyTypography}
+            data-testid={`${uniqueId}-row-your-vote-stats`}
+          />
         </TableCell>
       </TableRow>
     </RouterLink>
@@ -245,50 +248,29 @@ const AllVotes: React.FC<AllVotesProps> = ({
 }) => {
   return (
     <Stack>
-      <VoteStats vote="accepted" count={acceptedVotes} data-testid={`${testId}-accepted`} />
-      <VoteStats vote="rejected" count={rejectedVotes} data-testid={`${testId}-rejected`} />
+      <VoteStats
+        vote="accepted"
+        count={acceptedVotes}
+        typography={tableBodyTypography}
+        data-testid={`${testId}-accepted`}
+      />
+      <VoteStats
+        vote="rejected"
+        count={rejectedVotes}
+        typography={tableBodyTypography}
+        data-testid={`${testId}-rejected`}
+      />
     </Stack>
   );
 };
 
-interface VoteStatsProps {
-  vote: YourVoteStatus;
-  count?: number;
-  'data-testid': string;
-}
-
-const VoteStats: React.FC<VoteStatsProps> = ({ vote, count, 'data-testid': testId }) => {
-  if (vote === 'accepted') {
-    return (
-      <Stack direction="row" gap="4px" alignItems="center" data-testid={testId}>
-        <CheckCircleOutlineIcon
-          fontSize="small"
-          color="success"
-          data-testid={`${testId}-accepted-icon`}
-        />
-        <TableBodyTypography>{count} Accepted</TableBodyTypography>
-      </Stack>
-    );
-  }
-
-  if (vote === 'rejected') {
-    return (
-      <Stack direction="row" gap="4px" alignItems="center" data-testid={testId}>
-        <CancelOutlinedIcon
-          fontSize="small"
-          color="error"
-          data-testid={`${testId}-rejected-icon`}
-        />
-        <TableBodyTypography>{count} Rejected</TableBodyTypography>
-      </Stack>
-    );
-  }
-
-  return <TableBodyTypography data-testid={testId}>No Vote</TableBodyTypography>;
+const tableBodyTypography: TypographyProps = {
+  fontFamily: 'lato',
+  fontSize: 14,
+  lineHeight: 2,
+  color: 'text.light',
 };
 
 const TableBodyTypography: React.FC<React.PropsWithChildren> = ({ children }) => (
-  <Typography fontFamily="lato" fontSize={14} lineHeight={2} color="text.light">
-    {children}
-  </Typography>
+  <Typography {...tableBodyTypography}>{children}</Typography>
 );

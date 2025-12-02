@@ -4,6 +4,7 @@
 package com.digitalasset.canton.integration.plugins
 
 import cats.implicits.catsSyntaxOptionId
+import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.daml.metrics.grpc.DamlGrpcServerMetrics
 import com.daml.tracing.NoOpTelemetry
@@ -19,6 +20,7 @@ import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{EnvironmentSetupPlugin, TestConsoleEnvironment}
 import com.digitalasset.canton.lifecycle.LifeCycle.{CloseableServer, toCloseableServer}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.metrics.ActiveRequestsMetrics
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.tracing.TracingConfig.{BatchSpanProcessor, Exporter}
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
@@ -146,7 +148,10 @@ class UseOtlp(
         loggerFactory,
         apiLoggingConfig = ApiLoggingConfig(messagePayloads = false),
         TracingConfig(),
-        new DamlGrpcServerMetrics(NoOpMetricsFactory, "test"),
+        (
+          new DamlGrpcServerMetrics(NoOpMetricsFactory, "test"),
+          new ActiveRequestsMetrics(NoOpMetricsFactory, "test")(MetricsContext.Empty),
+        ),
         NoOpTelemetry,
         Seq(new HeaderPrinter(loggerFactory)),
       )

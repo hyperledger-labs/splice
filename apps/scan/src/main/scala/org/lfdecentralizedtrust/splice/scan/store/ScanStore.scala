@@ -283,7 +283,7 @@ trait ScanStore
       tc: TraceContext
   ): Future[Map[TransferCommand.ContractId, TransferCommandTxLogEntry]]
 
-  def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
+  def lookupContractByRecordTime[C, TCId <: ContractId[?], T](
       companion: C,
       updateHistory: UpdateHistory,
       recordTime: CantonTimestamp = CantonTimestamp.MinValue,

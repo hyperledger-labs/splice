@@ -24,8 +24,8 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
-  SequencerConnectionValidation,
   SequencerConnection,
+  SequencerConnectionValidation,
   SequencerConnections,
 }
 import com.digitalasset.canton.sequencing.protocol.TrafficState
@@ -61,6 +61,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
 }
 
 import java.time.Instant
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -319,6 +320,7 @@ class ParticipantAdminConnection(
     logger.debug(
       show"Downloading ACS snapshot from domain $filterSynchronizerId, for parties $parties at timestamp $timestamp"
     )
+    @nowarn("cat=deprecation")
     val observer = new SeqAccumulatingObserver[ExportAcsOldResponse]
     runCmd(
       ParticipantAdminCommands.ParticipantRepairManagement.ExportAcsOld(

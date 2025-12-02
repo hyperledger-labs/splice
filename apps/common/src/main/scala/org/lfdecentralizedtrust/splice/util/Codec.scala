@@ -73,7 +73,7 @@ object Codec {
   )(e: String): TCid =
     decodeJavaContractId(companion)(e)
       .fold(err => failedToDecode(err), identity)
-  def encodeContractId[TCid <: JavaContractId[_]](d: TCid): String = d.contractId
+  def encodeContractId[TCid <: JavaContractId[?]](d: TCid): String = d.contractId
 
   def decodeJavaContractIdInterface[I, Id, View](companion: InterfaceCompanion[I, Id, View])(
       e: String
