@@ -7,7 +7,7 @@
 
 .. release-notes:: 0.5.4
 
-  - Validator
+  - Participant
 
     - Fix a bug introduced in 0.5.0/0.5.1 that could cause participant pruning to prune active data.
       The bug only manifests in a rare edge case involving a manual ACS import on a participant that was already running for some time.
