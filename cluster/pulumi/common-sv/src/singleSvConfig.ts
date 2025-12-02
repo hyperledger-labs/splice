@@ -8,7 +8,7 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { ValidatorAppConfigSchema } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/config';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
-import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
+import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { merge } from 'lodash';
 import util from 'node:util';
 import { z } from 'zod';
