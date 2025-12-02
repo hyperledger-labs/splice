@@ -107,9 +107,9 @@ class WalletRewardsTimeBasedIntegrationTest
       }
     }
 
-    // This test verifies that the OpenMiningRoundSummary correctly sums
-    // ValidatorLivenessActivityRecord weights and that rewards are
-    // appropriately capped when total weights in a round are high.
+    // This test verifies that the code creating the OpenMiningRoundSummary
+    // correctly sums ValidatorLivenessActivityRecord weights, and that rewards
+    // are appropriately capped when total weights in a round are high.
     // See: test_ValidatorLivenessWeightInRunNextIssuance for similar test in daml
     "OpenMiningRoundSummary calculation uses validator activity record weights" in { implicit env =>
       val info = sv1Backend.getDsoInfo()
