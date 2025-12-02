@@ -1,12 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedReward
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ModifyValidatorLicenses
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
-  ValidatorLicenseChange,
-  ValidatorLicensesModification,
-}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.validatorlicensechange.VLC_ChangeWeight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.*
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
@@ -16,19 +10,24 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 import org.lfdecentralizedtrust.splice.environment.BuildInfo
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
-import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, TriggerTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{
+  SvTestUtil,
+  TimeTestUtil,
+  TriggerTestUtil,
+  WalletTestUtil,
+}
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 
-import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 class ValidatorLicenseMetadataTimeBasedIntegrationTest
     extends IntegrationTest
     with WalletTestUtil
     with TimeTestUtil
-    with TriggerTestUtil {
+    with TriggerTestUtil
+    with SvTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -150,47 +149,25 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
         aliceValidatorBackend,
       )
 
-      val info = sv1Backend.getDsoInfo()
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
 
       // Change Alice's validator license weight to 10.0
+      import env.executionContext
       val aliceNewWeight = BigDecimal(10.0)
-      val aliceAction = new ARC_DsoRules(
-        new SRARC_ModifyValidatorLicenses(
-          new ValidatorLicensesModification(
-            List[ValidatorLicenseChange](
-              new VLC_ChangeWeight(
-                aliceValidatorParty.toProtoPrimitive,
-                aliceNewWeight.bigDecimal,
-              )
-            ).asJava
-          )
-        )
-      )
-
-      actAndCheck(
-        "Create and execute vote to change weight",
-        sv1Backend.createVoteRequest(
-          info.svParty.toProtoPrimitive,
-          aliceAction,
-          "url",
-          "description",
-          info.dsoRules.payload.config.voteRequestTimeout,
-          None,
-        ),
-      )(
-        "Alice's license weight is updated",
-        _ => {
-          val licenses =
-            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-              .filterJava(ValidatorLicense.COMPANION)(
-                dsoParty,
-                c => c.data.validator == aliceValidatorParty.toProtoPrimitive,
-              )
-          licenses should have length 1
-          licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(aliceNewWeight)
-        },
-      )
+      modifyValidatorLicensesWithVoting(
+        sv1Backend,
+        svsToCastVotes = Seq.empty,
+        Seq(new VLC_ChangeWeight(aliceValidatorParty.toProtoPrimitive, aliceNewWeight.bigDecimal)),
+      ) {
+        val licenses =
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(ValidatorLicense.COMPANION)(
+              dsoParty,
+              c => c.data.validator == aliceValidatorParty.toProtoPrimitive,
+            )
+        licenses should have length 1
+        licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(aliceNewWeight)
+      }
 
       advanceTimeForRewardAutomationToRunForCurrentRound
 

@@ -7,7 +7,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.voteexecution.Vot
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_ConfirmSvOnboarding,
-  SRARC_ModifyValidatorLicenses,
   SRARC_SetConfig,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.validatorlicensechange.VLC_ChangeWeight
@@ -16,8 +15,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRulesConfig,
   DsoRules_ConfirmSvOnboarding,
   DsoRules_SetConfig,
-  ValidatorLicenseChange,
-  ValidatorLicensesModification,
 }
 import org.lfdecentralizedtrust.splice.console.AppBackendReference
 import org.lfdecentralizedtrust.splice.sv.automation.confirmation.SvOnboardingRequestTrigger
@@ -236,43 +233,17 @@ class SvTimeBasedOnboardingIntegrationTest
         // The VoteExecutionInstruction cannot be run in this case and should be expired
         val newPartyWithoutLicense = allocateRandomSvParty("test-validator-expiry")
 
-        val action = new ARC_DsoRules(
-          new SRARC_ModifyValidatorLicenses(
-            new ValidatorLicensesModification(
-              List[ValidatorLicenseChange](
-                new VLC_ChangeWeight(
-                  newPartyWithoutLicense.toProtoPrimitive,
-                  BigDecimal(10.0).bigDecimal,
-                )
-              ).asJava
+        modifyValidatorLicensesWithVoting(
+          sv1Backend,
+          Seq(sv2Backend, sv3Backend),
+          Seq(
+            new VLC_ChangeWeight(
+              newPartyWithoutLicense.toProtoPrimitive,
+              BigDecimal(10.0).bigDecimal,
             )
-          )
-        )
-
-        actAndCheck(
-          "Create vote for weight change",
-          sv1Backend.createVoteRequest(
-            sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
-            action,
-            "url",
-            "description",
-            sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-            None,
           ),
-        )(
-          "Vote request is created",
-          _ => {
-            sv1Backend.listVoteRequests() should have length 1
-          },
-        )
-
-        val voteRequest = sv1Backend.listVoteRequests().head
-        Seq(sv2Backend, sv3Backend).foreach { sv =>
-          sv.castVote(voteRequest.contractId, true, "url", "description")
-        }
-
-        // Wait for the instruction to be created
-        eventually() {
+          checkClue = "VoteExecutionInstruction is created",
+        ) {
           sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(VoteExecutionInstruction.COMPANION)(
               dsoParty,

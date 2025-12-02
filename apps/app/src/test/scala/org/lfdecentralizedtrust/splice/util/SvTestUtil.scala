@@ -5,12 +5,17 @@ import com.daml.ledger.javaapi.data.Transaction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.issuance.IssuanceConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
+  SRARC_ModifyValidatorLicenses,
+  SRARC_SetConfig,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRulesConfig,
   DsoRules_SetConfig,
   SynchronizerUpgradeSchedule,
+  ValidatorLicenseChange,
+  ValidatorLicensesModification,
   VoteRequest,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
@@ -188,6 +193,93 @@ trait SvTestUtil extends TestCommon {
         val newDsoRules = svToCreateVoteRequest.getDsoInfo().dsoRules
         newDsoRules.payload.config.nextScheduledSynchronizerUpgrade.toScala shouldBe domainUpgradeSchedule
       },
+    )
+  }
+
+  def modifyValidatorLicensesWithVoting(
+      svToCreateVoteRequest: SvAppBackendReference,
+      svsToCastVotes: Seq[SvAppBackendReference],
+      changes: Seq[ValidatorLicenseChange],
+      checkClue: String = "validator license modifications have been applied",
+  )(
+      verifyResult: => Unit
+  )(implicit
+      ec: ExecutionContextExecutor
+  ): Unit = {
+    val action = new ARC_DsoRules(
+      new SRARC_ModifyValidatorLicenses(
+        new ValidatorLicensesModification(changes.asJava)
+      )
+    )
+
+    def onlyModifyValidatorLicensesVoteRequests(
+        voteRequests: Seq[Contract[VoteRequest.ContractId, VoteRequest]]
+    ) =
+      voteRequests.filter {
+        _.payload.action match {
+          case arc: ARC_DsoRules =>
+            arc.dsoAction match {
+              case _: SRARC_ModifyValidatorLicenses => true
+              case _ => false
+            }
+          case _ => false
+        }
+      }
+
+    actAndCheck(timeUntilSuccess = 60.seconds)(
+      "Voting on validator license modification", {
+        val (_, voteRequest) = actAndCheck(
+          "Creating vote request",
+          eventuallySucceeds() {
+            svToCreateVoteRequest.createVoteRequest(
+              svToCreateVoteRequest.getDsoInfo().svParty.toProtoPrimitive,
+              action,
+              "url",
+              "description",
+              svToCreateVoteRequest.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+              None,
+            )
+          },
+        )(
+          "vote request has been created",
+          _ =>
+            onlyModifyValidatorLicensesVoteRequests(
+              svToCreateVoteRequest.listVoteRequests()
+            ).loneElement,
+        )
+
+        if (svsToCastVotes.nonEmpty) {
+          loggerFactory.suppressErrors {
+            svsToCastVotes.parTraverse { sv =>
+              Future {
+                clue(s"${sv.name} sees the vote request") {
+                  val svVoteRequest = eventually() {
+                    onlyModifyValidatorLicensesVoteRequests(sv.listVoteRequests()).loneElement
+                  }
+                  getTrackingId(svVoteRequest) shouldBe voteRequest.contractId
+                }
+                clue(s"${sv.name} accepts vote") {
+                  eventually() {
+                    try {
+                      sv.castVote(
+                        voteRequest.contractId,
+                        true,
+                        "url",
+                        "description",
+                      )
+                    } catch {
+                      case NonFatal(e) => fail(e)
+                    }
+                  }
+                }
+              }
+            }.futureValue
+          }
+        }
+      },
+    )(
+      checkClue,
+      _ => verifyResult,
     )
   }
 

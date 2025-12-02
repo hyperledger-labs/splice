@@ -1,26 +1,20 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ModifyValidatorLicenses
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
-  ValidatorLicenseChange,
-  ValidatorLicensesModification,
-}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.validatorlicensechange.VLC_ChangeWeight
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
-import org.lfdecentralizedtrust.splice.util.{SpliceUtil, TimeTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{SpliceUtil, SvTestUtil, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
 
 import scala.concurrent.duration.DurationInt
-import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 class WalletRewardsTimeBasedIntegrationTest
     extends IntegrationTest
     with WalletTestUtil
-    with TimeTestUtil {
+    with TimeTestUtil
+    with SvTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -126,38 +120,17 @@ class WalletRewardsTimeBasedIntegrationTest
 
       // Change Alice's weight to a very high value
       // This should cause the per-unit issuance to be less than the default of 2.85
+      import env.executionContext
       val aliceWeight = BigDecimal(15000.0)
-      val aliceAction = new ARC_DsoRules(
-        new SRARC_ModifyValidatorLicenses(
-          new ValidatorLicensesModification(
-            List[ValidatorLicenseChange](
-              new VLC_ChangeWeight(
-                aliceValidatorParty.toProtoPrimitive,
-                aliceWeight.bigDecimal,
-              )
-            ).asJava
-          )
-        )
-      )
-
-      actAndCheck(
-        "Create and execute vote to change weight",
-        sv1Backend.createVoteRequest(
-          info.svParty.toProtoPrimitive,
-          aliceAction,
-          "url",
-          "description",
-          info.dsoRules.payload.config.voteRequestTimeout,
-          None,
-        ),
-      )(
-        "license weight is updated",
-        _ => {
-          val licenses = getValidatorLicense(aliceValidatorParty)
-          licenses should have length 1
-          licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(aliceWeight)
-        },
-      )
+      modifyValidatorLicensesWithVoting(
+        sv1Backend,
+        svsToCastVotes = Seq.empty,
+        Seq(new VLC_ChangeWeight(aliceValidatorParty.toProtoPrimitive, aliceWeight.bigDecimal)),
+      ) {
+        val licenses = getValidatorLicense(aliceValidatorParty)
+        licenses should have length 1
+        licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(aliceWeight)
+      }
 
       val openRounds = eventually() {
         import math.Ordering.Implicits.*
@@ -260,38 +233,17 @@ class WalletRewardsTimeBasedIntegrationTest
         val initialLastActiveAt = initialLicense.data.lastActiveAt
 
         // Change validator license weight to 0
+        import env.executionContext
         val zeroWeight = BigDecimal(0.0)
-        val action = new ARC_DsoRules(
-          new SRARC_ModifyValidatorLicenses(
-            new ValidatorLicensesModification(
-              List[ValidatorLicenseChange](
-                new VLC_ChangeWeight(
-                  aliceValidatorParty.toProtoPrimitive,
-                  zeroWeight.bigDecimal,
-                )
-              ).asJava
-            )
-          )
-        )
-
-        actAndCheck(
-          "Create and execute vote to change weight",
-          sv1Backend.createVoteRequest(
-            info.svParty.toProtoPrimitive,
-            action,
-            "url",
-            "description",
-            info.dsoRules.payload.config.voteRequestTimeout,
-            None,
-          ),
-        )(
-          "license weight is updated",
-          _ => {
-            val licenses = getAliceLicense()
-            licenses should have length 1
-            licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(zeroWeight)
-          },
-        )
+        modifyValidatorLicensesWithVoting(
+          sv1Backend,
+          svsToCastVotes = Seq.empty,
+          Seq(new VLC_ChangeWeight(aliceValidatorParty.toProtoPrimitive, zeroWeight.bigDecimal)),
+        ) {
+          val licenses = getAliceLicense()
+          licenses should have length 1
+          licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(zeroWeight)
+        }
 
         advanceTimeForRewardAutomationToRunForCurrentRound
 
