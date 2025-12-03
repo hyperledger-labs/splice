@@ -9,7 +9,7 @@ import {
   mustInstallSplitwell,
   mustInstallValidator1,
 } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
-import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
+import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { merge } from 'lodash';
 import { z } from 'zod';
 

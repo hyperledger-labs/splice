@@ -14,7 +14,7 @@ import {
   RateLimitSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
-import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
+import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { z } from 'zod';
 
 import { SingleSvConfiguration } from './singleSvConfig';
