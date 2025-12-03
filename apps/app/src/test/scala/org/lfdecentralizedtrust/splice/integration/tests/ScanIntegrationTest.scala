@@ -791,7 +791,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     )
   }
 
-  "accept invalid user-agent and authorization headers" in { implicit env =>
+  "accept invalid headers" in { implicit env =>
     import env.actorSystem
     registerHttpConnectionPoolsCleanup(env)
 
@@ -799,6 +799,8 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     val invalidHeaders = Seq(
       ("User-Agent", "OpenAPI-Generator/0.0.1/java"),
       ("Authorization", "Bearer Bearer exxxxxxxxxx"),
+      ("Cookie", "foo=bar baz"),
+      ("Proxy-Authorization", "Basic dXNlcjpwYXNz,"), // "user:pass" in base64
     ).map { case (name, value) =>
       val header = RawHeader(name, value)
       // using `User-Agent` (non-RawHeaders in general) fails the following check;
