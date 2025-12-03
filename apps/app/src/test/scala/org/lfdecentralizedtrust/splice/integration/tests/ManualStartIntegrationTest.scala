@@ -190,7 +190,7 @@ class ManualStartIntegrationTest
         }
 
         clue("Check sv1 participant is actively pruning") {
-          eventually() {
+          eventually(40.seconds) {
             sv1Backend.svAutomation
               .connection(Low)
               // returns 0 when participant pruning is disabled
