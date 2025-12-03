@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{AcsStoreId, SelectFromAcsTableResult}
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
@@ -188,7 +188,7 @@ class DbUserWalletStore(
       ccValue = sql"rti.issuance * acs.reward_coupon_weight",
     )
 
-  private def listSortedRewardCoupons[C, TCid <: ContractId[_], T](
+  private def listSortedRewardCoupons[C, TCid <: ContractId[?], T](
       companion: C,
       issuingRoundsMap: Map[Round, IssuingMiningRound],
       roundToIssuance: IssuingMiningRound => Option[BigDecimal],

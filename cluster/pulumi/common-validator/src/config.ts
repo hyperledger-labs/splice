@@ -6,7 +6,7 @@ import {
   KmsConfigSchema,
   LogLevelSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
-import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
+import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { z } from 'zod';
 
 export const ValidatorAppConfigSchema = z.object({
@@ -23,6 +23,7 @@ export const ValidatorNodeConfigSchema = z.object({
   logging: z
     .object({
       level: LogLevelSchema.optional(),
+      async: z.boolean().optional(),
     })
     .default({}),
   kms: KmsConfigSchema.optional(),

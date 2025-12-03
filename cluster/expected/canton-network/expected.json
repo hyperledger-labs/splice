@@ -51,6 +51,28 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "postgresPassword": ""
         }
       },
@@ -1567,6 +1589,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": true,
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
@@ -1761,6 +1784,7 @@
           "readVsWriteScalingFactor": 4
         },
         "isDevNet": false,
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -1776,6 +1800,18 @@
         "onboardingRoundZeroDuration": "2 h",
         "onboardingType": "found-dso",
         "participantAddress": "participant-3",
+        "periodicTopologySnapshotConfig": {
+          "backupInterval": "24h",
+          "location": {
+            "bucket": {
+              "bucketName": "da-cn-topology-snapshots",
+              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+              "projectId": "da-cn-test",
+              "secretName": "cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots"
+            },
+            "prefix": "mock/sv-1"
+          }
+        },
         "persistence": {
           "databaseName": "sv_sv_1",
           "port": 5432,
@@ -1871,6 +1907,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -2433,6 +2470,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": false,
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
@@ -2602,6 +2640,7 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -2710,6 +2749,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "maxVettingDelay": "1m",
         "metrics": {

@@ -14,7 +14,7 @@ import slick.jdbc.canton.SQLActionBuilder
 
 trait UpdateHistoryQueries extends AcsJdbcTypes {
 
-  protected def contractFromEvent[C, TCId <: ContractId[_], T](companion: C)(
+  protected def contractFromEvent[C, TCId <: ContractId[?], T](companion: C)(
       row: SelectFromCreateEvents
   )(implicit
       companionClass: ContractCompanion[C, TCId, T]

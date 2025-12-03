@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.splitwell.config.SplitwellSynchronizerConfig
 import org.lfdecentralizedtrust.splice.splitwell.store.SplitwellStore
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.{LimitHelpers, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsInterfaceViewRowData,
@@ -383,8 +383,8 @@ class DbSplitwellStore(
   }
 
   private def listLaggingContracts[LeaderC, LeaderTCid <: ContractId[
-    _
-  ], LeaderT, FollowerC, FollowerTCid <: ContractId[_], FollowerT, Id](
+    ?
+  ], LeaderT, FollowerC, FollowerTCid <: ContractId[?], FollowerT, Id](
       leaderCompanion: LeaderC,
       followerCompanion: FollowerC,
       getLeaderId: LeaderT => Id,

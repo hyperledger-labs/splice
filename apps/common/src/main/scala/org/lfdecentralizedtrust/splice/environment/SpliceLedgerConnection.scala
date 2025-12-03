@@ -481,6 +481,15 @@ class BaseLedgerConnection(
     }.toSet
   }
 
+  def listUserRights(
+      username: String
+  )(implicit tc: TraceContext): Future[Set[User.Right]] = {
+    val userId = Ref.UserId.assertFromString(username)
+    for {
+      userRights <- client.listUserRights(userId)
+    } yield userRights.toSet
+  }
+
   def grantUserRights(
       user: String,
       actAsParties: Seq[PartyId],
@@ -1262,7 +1271,7 @@ class SpliceLedgerConnection(
 
   // run in connected to out first, *then start* fb
   // but proactively cancel the in->out graph if fb fails
-  private[this] def cancelIfFailed[A, E, B](in: Source[E, _])(out: Sink[E, Future[A]])(
+  private[this] def cancelIfFailed[A, E, B](in: Source[E, ?])(out: Sink[E, Future[A]])(
       fb: => Future[B]
   ): (KillSwitch, Future[(A, B)]) = {
     val (ks, fa) = in.viaMat(KillSwitches.single)(Keep.right).toMat(out)(Keep.both).run()

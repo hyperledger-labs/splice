@@ -10,20 +10,20 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Alert,
   Stack,
+  TypographyProps,
 } from '@mui/material';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { Link as RouterLink } from 'react-router-dom';
-import { PageSectionHeader } from '../../components/beta';
+import { PageSectionHeader, VoteStats } from '../../components/beta';
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
+import { InfoOutlined } from '@mui/icons-material';
 
 interface ProposalListingSectionProps {
   sectionTitle: string;
   data: ProposalListingData[];
+  noDataMessage: string;
   uniqueId: string;
   showThresholdDeadline?: boolean;
   showVoteStats?: boolean;
@@ -39,6 +39,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
   const {
     sectionTitle,
     data,
+    noDataMessage,
     uniqueId,
     showThresholdDeadline,
     showVoteStats,
@@ -59,9 +60,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
       <PageSectionHeader title={sectionTitle} data-testid={`${uniqueId}-section`} />
 
       {data.length === 0 ? (
-        <Alert severity="info" data-testid={`${uniqueId}-section-info`}>
-          No {sectionTitle} available
-        </Alert>
+        <InfoBox info={noDataMessage} data-testid={`${uniqueId}-section-info`} />
       ) : (
         <TableContainer data-testid={`${uniqueId}-section-table`}>
           <Table>
@@ -103,6 +102,35 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
         </TableContainer>
       )}
     </Box>
+  );
+};
+
+interface InfoBoxProps {
+  info: string;
+  'data-testid': string;
+}
+
+const InfoBox: React.FC<InfoBoxProps> = ({ info, 'data-testid': testId }) => {
+  return (
+    <Stack
+      gap={1}
+      direction="row"
+      alignItems="center"
+      sx={{
+        width: 'max-content',
+        borderColor: 'secondary.main',
+        borderWidth: '2px',
+        borderStyle: 'solid',
+        borderRadius: '4px',
+        p: 2,
+      }}
+      data-testid={testId}
+    >
+      <InfoOutlined color="secondary" fontSize="small" />
+      <Typography fontWeight="bold" fontSize={14}>
+        {info}
+      </Typography>
+    </Stack>
   );
 };
 
@@ -157,7 +185,7 @@ const VoteRow: React.FC<VoteRowProps> = props => {
           borderRadius: '4px',
           border: '1px solid #4F4F4F',
           paddingBlock: '10px',
-          '&:hover': { backgroundColor: '#1B1B1B' },
+          '&:hover': { backgroundColor: '#363636' },
         }}
         data-testid={`${uniqueId}-row`}
       >
@@ -196,7 +224,11 @@ const VoteRow: React.FC<VoteRowProps> = props => {
         )}
 
         <TableCell data-testid={`${uniqueId}-row-your-vote`}>
-          <VoteStats vote={yourVote} data-testid={`${uniqueId}-row-your-vote-stats`} />
+          <VoteStats
+            vote={yourVote}
+            typography={tableBodyTypography}
+            data-testid={`${uniqueId}-row-your-vote-stats`}
+          />
         </TableCell>
       </TableRow>
     </RouterLink>
@@ -216,50 +248,29 @@ const AllVotes: React.FC<AllVotesProps> = ({
 }) => {
   return (
     <Stack>
-      <VoteStats vote="accepted" count={acceptedVotes} data-testid={`${testId}-accepted`} />
-      <VoteStats vote="rejected" count={rejectedVotes} data-testid={`${testId}-rejected`} />
+      <VoteStats
+        vote="accepted"
+        count={acceptedVotes}
+        typography={tableBodyTypography}
+        data-testid={`${testId}-accepted`}
+      />
+      <VoteStats
+        vote="rejected"
+        count={rejectedVotes}
+        typography={tableBodyTypography}
+        data-testid={`${testId}-rejected`}
+      />
     </Stack>
   );
 };
 
-interface VoteStatsProps {
-  vote: YourVoteStatus;
-  count?: number;
-  'data-testid': string;
-}
-
-const VoteStats: React.FC<VoteStatsProps> = ({ vote, count, 'data-testid': testId }) => {
-  if (vote === 'accepted') {
-    return (
-      <Stack direction="row" gap="4px" alignItems="center" data-testid={testId}>
-        <CheckCircleOutlineIcon
-          fontSize="small"
-          color="success"
-          data-testid={`${testId}-accepted-icon`}
-        />
-        <TableBodyTypography>{count} Accepted</TableBodyTypography>
-      </Stack>
-    );
-  }
-
-  if (vote === 'rejected') {
-    return (
-      <Stack direction="row" gap="4px" alignItems="center" data-testid={testId}>
-        <CancelOutlinedIcon
-          fontSize="small"
-          color="error"
-          data-testid={`${testId}-rejected-icon`}
-        />
-        <TableBodyTypography>{count} Rejected</TableBodyTypography>
-      </Stack>
-    );
-  }
-
-  return <TableBodyTypography data-testid={testId}>No Vote</TableBodyTypography>;
+const tableBodyTypography: TypographyProps = {
+  fontFamily: 'lato',
+  fontSize: 14,
+  lineHeight: 2,
+  color: 'text.light',
 };
 
 const TableBodyTypography: React.FC<React.PropsWithChildren> = ({ children }) => (
-  <Typography fontFamily="lato" fontSize={14} lineHeight={2} color="text.light">
-    {children}
-  </Typography>
+  <Typography {...tableBodyTypography}>{children}</Typography>
 );

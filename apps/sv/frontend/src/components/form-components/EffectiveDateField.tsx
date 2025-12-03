@@ -62,7 +62,7 @@ export const EffectiveDateField: React.FC<EffectiveDateFieldProps> = props => {
         <FormControlLabel
           value="custom"
           control={<Radio />}
-          label={<Typography>Custom</Typography>}
+          label={<Typography>Date</Typography>}
         />
 
         {currentType === 'custom' && (
@@ -107,7 +107,7 @@ export const EffectiveDateField: React.FC<EffectiveDateFieldProps> = props => {
             <Box>
               <Typography>Make effective at threshold</Typography>
               <Typography variant="body2" color="text.secondary">
-                This will allow the vote proposal to take effect immediately when 2/3 vote in favor
+                Allow the vote proposal to take effect immediately when 2/3 vote in favor
               </Typography>
             </Box>
           }

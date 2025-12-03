@@ -31,7 +31,7 @@ class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLogger
   def readStringFromBucket(fileName: Path): String =
     new String(readBytesFromBucket(fileName.toString), StandardCharsets.UTF_8)
 
-  private def dumpBytesToBucket(data: Array[Byte], fileName: String)(implicit
+  def dumpBytesToBucket(data: Array[Byte], fileName: String)(implicit
       traceContext: TraceContext
   ): Unit = {
     val blobId = BlobId.of(config.bucketName, fileName)
@@ -60,5 +60,13 @@ class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLogger
     val blobId = BlobId.of(config.bucketName, fileName)
     val blob = storage.get(blobId)
     blob.getContent()
+  }
+
+  def fileExists(fileName: String): Boolean = {
+    val blobId = BlobId.of(config.bucketName, fileName)
+    storage.get(blobId) match {
+      case blob: Blob => blob.exists()
+      case _ => false
+    }
   }
 }

@@ -6,7 +6,7 @@ package com.digitalasset.canton.topology.store
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.crypto.{Fingerprint, SignatureCheckError}
+import com.digitalasset.canton.crypto.{Fingerprint, PublicKey, SignatureCheckError}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -14,7 +14,11 @@ import com.digitalasset.canton.protocol.OnboardingRestriction
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.EffectiveTime
 import com.digitalasset.canton.topology.transaction.TopologyMapping
-import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
+import com.digitalasset.canton.topology.transaction.TopologyMapping.ReferencedAuthorizations
+import com.digitalasset.canton.topology.transaction.TopologyTransaction.{
+  PositiveTopologyTransaction,
+  TxHash,
+}
 
 sealed trait TopologyTransactionRejection extends PrettyPrinting with Product with Serializable {
   def asString: String
@@ -29,25 +33,50 @@ object TopologyTransactionRejection {
 
   /** list of rejections produced by state processor */
   object Processor {
-    final case class SerialMismatch(expected: PositiveInt, actual: PositiveInt)
+    final case class SerialMismatch(actual: PositiveInt, expected: PositiveInt)
         extends TopologyTransactionRejection {
       override def asString: String =
-        show"The given serial $actual does not match the expected serial $expected"
+        show"The given serial $expected does not match the actual serial $expected"
       override protected def pretty: Pretty[SerialMismatch] =
         prettyOfClass(param("expected", _.expected), param("actual", _.actual))
       override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-        TopologyManagerError.SerialMismatch.Failure(expected, actual)
+        TopologyManagerError.SerialMismatch.Failure(Some(actual), Some(expected))
+    }
+    final case class InternalError(message: String) extends TopologyTransactionRejection {
+      override def asString: String = message
+      override protected def pretty: Pretty[InternalError] =
+        prettyOfClass(param("message", _.message.singleQuoted))
+      override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+        TopologyManagerError.InternalError.Unexpected(message)
     }
   }
 
   /** list of rejections which are created due to authorization checks */
   object Authorization {
 
-    case object NotAuthorized extends TopologyTransactionRejection {
-      override def asString: String = "Not authorized"
+    /** Internal error, indicating a violation of the invariant that a signed transaction needs at
+      * least one signature
+      */
+    case object NoSignatureProvided extends TopologyTransactionRejection {
+      override def asString: String = "No signature provided to authentication check"
 
       override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-        TopologyManagerError.UnauthorizedTransaction.Failure(asString)
+        TopologyManagerError.InternalError.Unexpected(asString)
+    }
+
+    case object NotAuthorizedByNamespaceKey extends TopologyTransactionRejection {
+      override def asString: String = "Not authorized by any namespace key"
+
+      override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+        TopologyManagerError.UnauthorizedTransaction.NoNamespaceAuth()
+    }
+
+    final case class NotFullyAuthorized(missing: ReferencedAuthorizations)
+        extends TopologyTransactionRejection {
+      override def asString: String = "Not fully authorized"
+
+      override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+        TopologyManagerError.UnauthorizedTransaction.Missing(missing)
     }
 
     final case class NoDelegationFoundForKeys(keys: Set[Fingerprint])
@@ -55,7 +84,7 @@ object TopologyTransactionRejection {
       override def asString: String = s"No delegation found for keys ${keys.mkString(", ")}"
 
       override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
-        TopologyManagerError.UnauthorizedTransaction.Failure(asString)
+        TopologyManagerError.UnauthorizedTransaction.NoDelegation(keys)
 
     }
     final case class MultiTransactionHashMismatch(
@@ -113,6 +142,33 @@ object TopologyTransactionRejection {
         TopologyManagerError.NoCorrespondingActiveTxToRevoke.Mapping(mapping)
     }
 
+    final case class InvalidOwnerToKeyMapping(
+        member: Member,
+        keyType: String,
+        provided: Seq[PublicKey],
+        supported: Seq[String],
+    ) extends TopologyTransactionRejection {
+      override def asString: String = if (provided.isEmpty)
+        s"No $keyType keys provided for $member, at least one is required. Supported key schemes: ${supported
+            .mkString(",")}"
+      else
+        s"None of the ${provided.size} $keyType keys for $member supports the required key schemes (${supported
+            .mkString(",")}): ${provided.mkString(",")}"
+
+      override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+        TopologyManagerError.InvalidOwnerToKeyMapping.Reject(member, keyType, provided, supported)
+    }
+
+    final case class InvalidOwnerToKeyMappingRemoval(
+        member: Member,
+        inUseBy: PositiveTopologyTransaction,
+    ) extends TopologyTransactionRejection {
+      override def asString: String =
+        s"Cannot remove owner to key mapping for $member as it is being used by $inUseBy"
+      override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+        TopologyManagerError.InvalidOwnerToKeyMappingRemoval.Reject(member, inUseBy)
+    }
+
     final case class InvalidTopologyMapping(err: String) extends TopologyTransactionRejection {
       override def asString: String = s"Invalid mapping: $err"
       override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
@@ -137,7 +193,7 @@ object TopologyTransactionRejection {
 
     final case class InsufficientKeys(members: Seq[Member]) extends TopologyTransactionRejection {
       override def asString: String =
-        s"Members ${members.sorted.mkString(", ")} are missing a signing key or an encryption key or both."
+        s"Members ${members.sorted.mkString(", ")} are missing a valid owner to key mapping."
 
       override protected def pretty: Pretty[InsufficientKeys] = prettyOfClass(
         param("members", _.members)
@@ -164,6 +220,18 @@ object TopologyTransactionRejection {
 
       override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
         TopologyManagerError.MissingTopologyMapping.MissingSynchronizerParameters(effective)
+    }
+
+    final case class NamespaceHasBeenRevoked(namespace: Namespace)
+        extends TopologyTransactionRejection {
+      override def asString: String = s"The namespace $namespace has previously been revoked."
+
+      override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+        TopologyManagerError.NamespaceHasBeenRevoked.Reject(namespace)
+
+      override protected def pretty: Pretty[NamespaceHasBeenRevoked.this.type] = prettyOfClass(
+        param("namespace", _.namespace)
+      )
     }
 
     final case class NamespaceAlreadyInUse(namespace: Namespace)

@@ -28,8 +28,8 @@ import com.digitalasset.canton.participant.admin.data.{
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
-  SequencerConnectionValidation,
   SequencerConnection,
+  SequencerConnectionValidation,
   SequencerConnections,
 }
 import com.digitalasset.canton.sequencing.protocol.TrafficState

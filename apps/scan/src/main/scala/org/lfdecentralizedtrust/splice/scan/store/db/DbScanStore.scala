@@ -50,6 +50,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   VoteRequestTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
+import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
@@ -77,7 +78,6 @@ import io.grpc.Status
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 
 import java.time.Instant
@@ -921,7 +921,7 @@ class DbScanStore(
   ): Future[Option[ContractWithState[SvNodeState.ContractId, SvNodeState]]] =
     lookupContractBySvParty(SvNodeState.COMPANION, svPartyId)
 
-  private def lookupContractBySvParty[C, TCId <: ContractId[_], T](
+  private def lookupContractBySvParty[C, TCId <: ContractId[?], T](
       companion: C,
       svPartyId: PartyId,
   )(implicit
@@ -1055,7 +1055,7 @@ class DbScanStore(
     }
 
   // TODO (#934): this method probably belongs in UpdateHistory instead
-  override def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
+  override def lookupContractByRecordTime[C, TCId <: ContractId[?], T](
       companion: C,
       updateHistory: UpdateHistory,
       recordTime: CantonTimestamp,

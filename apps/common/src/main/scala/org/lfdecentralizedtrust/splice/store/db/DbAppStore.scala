@@ -19,8 +19,8 @@ abstract class DbTxLogAppStore[TXE](
     acsTableName: String,
     txLogTableName: String,
     interfaceViewsTableNameOpt: Option[String],
-    acsStoreDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
-    txLogStoreDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
+    acsStoreDescriptor: StoreDescriptor,
+    txLogStoreDescriptor: StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
     ingestionConfig: IngestionConfig,
 )(implicit
@@ -59,7 +59,7 @@ abstract class DbAppStore(
     storage: DbStorage,
     acsTableName: String,
     interfaceViewsTableNameOpt: Option[String],
-    acsStoreDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
+    acsStoreDescriptor: StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
     ingestionConfig: IngestionConfig,
 )(implicit

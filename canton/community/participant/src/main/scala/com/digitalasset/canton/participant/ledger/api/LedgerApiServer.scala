@@ -36,6 +36,7 @@ import com.digitalasset.canton.lifecycle.LifeCycle.FastCloseableChannel
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.networking.grpc.ratelimiting.ActiveRequestCounterInterceptor
 import com.digitalasset.canton.networking.grpc.{ApiRequestLogger, CantonGrpcUtil}
 import com.digitalasset.canton.participant.config.{
   LedgerApiServerConfig,
@@ -199,6 +200,7 @@ class LedgerApiServer(
         import cantonParameterConfig.ledgerApiServerParameters.contractLoader.*
         ContractLoader
           .create(
+            participantContractStore = participantContractStore.value,
             contractStorageBackend = dbSupport.storageBackendFactory.createContractStorageBackend(
               inMemoryState.stringInterningView,
               inMemoryState.ledgerEndCache,
@@ -276,7 +278,8 @@ class LedgerApiServer(
             eventFormat = EventFormat(
               filtersByParty =
                 partyIds.view.map(_ -> CumulativeFilter.templateWildcardFilter(true)).toMap,
-              filtersForAnyParty = None,
+              filtersForAnyParty =
+                Option.when(partyIds.isEmpty)(CumulativeFilter.templateWildcardFilter(true)),
               verbose = false,
             ),
             activeAt = validAt,
@@ -355,6 +358,7 @@ class LedgerApiServer(
         managementServiceTimeout = serverConfig.managementServiceTimeout,
         userManagement = serverConfig.userManagementService,
         partyManagementServiceConfig = serverConfig.partyManagementService,
+        packageServiceConfig = serverConfig.packageService,
         tls = serverConfig.tls,
         address = Some(serverConfig.address),
         maxInboundMessageSize = serverConfig.maxInboundMessageSize.unwrap,
@@ -449,7 +453,7 @@ class LedgerApiServer(
           logger.info(
             s"Creating admin user with id $userId failed. User with this id already exists"
           )
-          Future.successful(())
+          Future.unit
         case other =>
           Utils.handleResult("creating extra admin user")(other).map(_ => ())
       }
@@ -457,38 +461,49 @@ class LedgerApiServer(
 
   private def getInterceptors(
       indexDbExecutor: QueueAwareExecutor & NamedExecutor
-  ): List[ServerInterceptor] = List(
-    new ApiRequestLogger(
-      loggerFactory,
-      cantonParameterConfig.loggingConfig.api,
-    ),
-    GrpcTelemetry
-      .builder(tracerProvider.openTelemetry)
-      .build()
-      .newServerInterceptor(),
-  ) ::: serverConfig.rateLimit
-    .map(rateLimit =>
-      RateLimitingInterceptorFactory.create(
-        loggerFactory = loggerFactory,
-        metrics = grpcApiMetrics,
-        config = rateLimit,
-        additionalChecks = List(
-          ThreadpoolCheck(
-            name = "Environment Execution Threadpool",
-            limit = rateLimit.maxApiServicesQueueSize,
-            queue = executionContext,
-            loggerFactory = loggerFactory,
+  ): List[ServerInterceptor] =
+    List(
+      new ApiRequestLogger(
+        loggerFactory,
+        cantonParameterConfig.loggingConfig.api,
+      ),
+      GrpcTelemetry
+        .builder(tracerProvider.openTelemetry)
+        .build()
+        .newServerInterceptor(),
+    ) ::: serverConfig.rateLimit
+      .map(rateLimit =>
+        RateLimitingInterceptorFactory.create(
+          loggerFactory = loggerFactory,
+          config = rateLimit,
+          additionalChecks = List(
+            ThreadpoolCheck(
+              name = "Environment Execution Threadpool",
+              limit = rateLimit.maxApiServicesQueueSize,
+              queue = executionContext,
+              loggerFactory = loggerFactory,
+            ),
+            ThreadpoolCheck(
+              name = "Index DB Threadpool",
+              limit = rateLimit.maxApiServicesIndexDbQueueSize,
+              queue = indexDbExecutor,
+              loggerFactory = loggerFactory,
+            ),
           ),
-          ThreadpoolCheck(
-            name = "Index DB Threadpool",
-            limit = rateLimit.maxApiServicesIndexDbQueueSize,
-            queue = indexDbExecutor,
-            loggerFactory = loggerFactory,
-          ),
-        ),
+        )
       )
-    )
-    .toList
+      .toList ::: serverConfig.limits
+      .map(cfg =>
+        new ActiveRequestCounterInterceptor(
+          "ledger-api",
+          cfg.active,
+          cfg.warnOnUndefinedLimits,
+          cfg.throttleLoggingRatePerSecond,
+          grpcApiMetrics.requests,
+          loggerFactory,
+        )
+      )
+      .toList
 
   private def getLedgerFeatures: LedgerFeatures = LedgerFeatures(
     staticTime = testingTimeService.isDefined,
