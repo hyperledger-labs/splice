@@ -9,7 +9,7 @@
       "type": "object",
       "description": "The authentication configuration for the application"
     },
-    "scanClientConfig": {
+    "scanClient": {
       "type": "object",
       "description": "Configuration parameters for the scan client.",
       "properties": {
@@ -65,20 +65,20 @@
     {
       "if": {
         "properties": {
-          "scanClientConfig": {
+          "scanClient": {
             "type": "object"
           }
         },
-        "required": ["scanClientConfig"]
+        "required": ["scanClient"]
       },
       "then": {
         "properties": {
-          "scanClientConfig": {
+          "scanClient": {
             "properties": {
               "seedUrls": {
                 "type": "array",
                 "minItems": 1,
-                "description": "List of seed URLs for the scan client. Must be non-empty if scanClientConfig is set."
+                "description": "List of seed URLs for the scan client. Must be non-empty if scanClient is set."
               }
             }
           }
@@ -88,7 +88,7 @@
     {
       "if": {
         "properties": {
-          "scanClientConfig": {
+          "scanClient": {
             "type": "object",
             "properties": {
               "scanType": {
@@ -98,11 +98,11 @@
             "required": ["scanType"]
           }
         },
-        "required": ["scanClientConfig"]
+        "required": ["scanClient"]
       },
       "then": {
         "properties": {
-          "scanClientConfig": {
+          "scanClient": {
             "required": ["threshold", "trustedSvs"]
           }
         }
@@ -540,11 +540,11 @@
     {
       "if": {
         "properties": {
-          "scanClientConfig": {
+          "scanClient": {
             "type": "object"
           }
         },
-        "required": ["scanClientConfig"]
+        "required": ["scanClient"]
       },
       "then": {
         "not": {
@@ -557,7 +557,7 @@
             }
           ]
         },
-        "errorMessage": "If 'scanClientConfig' is set, 'scanAddress' and 'nonSvValidatorTrustSingleScan' must not be set."
+        "errorMessage": "If 'scanClient' is set, 'scanAddress' and 'nonSvValidatorTrustSingleScan' must not be set."
       }
     }
   ]

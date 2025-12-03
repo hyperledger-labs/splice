@@ -33,7 +33,7 @@ persistence:
   secretName: "postgres-secrets"
   enablePgInitContainer: true
 
-scanClientConfig:
+scanClient:
   scan-type: "bft"
   seedUrls: ["scan.splice.network:443"]
 

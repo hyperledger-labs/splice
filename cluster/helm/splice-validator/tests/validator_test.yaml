@@ -128,7 +128,7 @@ tests:
 
   - it: "configures scan-client for trust-single mode"
     set:
-      scanClientConfig:
+      scanClient:
         scanType: "trust-single"
         scanAddress: "https://single.scan.url:5003"
     documentSelector:
@@ -144,7 +144,7 @@ tests:
 
   - it: "configures scan-client for standard bft mode, including multiple seedUrls"
     set:
-      scanClientConfig:
+      scanClient:
         scanType: "bft"
         seedUrls: [ "https://bft-node-1.url:5003", "https://bft-node-2.url:5003" ]
     documentSelector:
@@ -160,7 +160,7 @@ tests:
 
   - it: "configures scan-client for bft-custom mode, including trustedSvs and threshold"
     set:
-      scanClientConfig:
+      scanClient:
         scanType: "bft-custom"
         seedUrls: [ "https://custom-node-A.com", "https://custom-node-B.com" ]
         trustedSvs: [ "custom-sv-1", "custom-sv-2", "custom-sv-3" ]
@@ -185,7 +185,7 @@ tests:
   - it: "configures scan-client for trust-single when nonSvValidatorTrustSingleScan is true"
     set:
       nonSvValidatorTrustSingleScan: true
-      scanClientConfig: null
+      scanClient: null
     documentSelector:
       path: kind
       value: Deployment
@@ -197,7 +197,7 @@ tests:
   - it: "defaults to BFT scan client with internal scan address if no config is set"
     set:
       svValidator: false
-      scanClientConfig: null
+      scanClient: null
     documentSelector:
       path: kind
       value: Deployment
