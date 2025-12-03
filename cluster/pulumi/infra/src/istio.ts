@@ -93,6 +93,7 @@ function configureIstiod(
             excludeOutboundPorts: '5432,26657',
             resources: {
               limits: {
+                cpu: null,
                 memory: '4096Mi',
               },
             },
