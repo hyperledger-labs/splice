@@ -792,21 +792,33 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
   }
 
   "accept invalid headers" in { implicit env =>
+    import org.apache.pekko.http.scaladsl.model.headers as h
     import env.actorSystem
     registerHttpConnectionPoolsCleanup(env)
 
     // see pekko.http.server.parsing.ignore-illegal-header-for in application.conf
-    val invalidHeaders = Seq(
-      ("User-Agent", "OpenAPI-Generator/0.0.1/java"),
-      ("Authorization", "Bearer Bearer exxxxxxxxxx"),
-      ("Cookie", "foo=bar baz"),
-      ("Proxy-Authorization", "Basic dXNlcjpwYXNz,"), // "user:pass" in base64
-    ).map { case (name, value) =>
-      val header = RawHeader(name, value)
+    // if pekko-http doesn't have a ModeledCompanion, it doesn't have a special parser,
+    // so there is no need to suppress warnings for it
+    val invalidHeaders = Seq[(h.ModeledCompanion[?], String)](
+      (h.Authorization, "Bearer Bearer exxxxxxxxxx"),
+      (h.Cookie, "foo=bar baz"),
+      (h.Origin, "http://foo bar"),
+      (h.`Proxy-Authorization`, "Basic dXNlcjpwYXNz,"), // "user:pass" with trailing comma
+      (h.Referer, "http://foo bar"),
+      (h.`User-Agent`, "OpenAPI-Generator/0.0.1/java"),
+      (h.`X-Forwarded-For`, "1.2.3.4,"),
+      (h.`X-Forwarded-Host`, "a b"),
+      (h.`X-Real-Ip`, "1.2.3.4,"),
+    ).map { case (companion, value) =>
+      val header = RawHeader(companion.name, value)
       // using `User-Agent` (non-RawHeaders in general) fails the following check;
       // it cleans away the invalid part of the header,
       // so we have to use RawHeader to simulate the actual client case
       header.value shouldBe value
+      import language.existentials
+      companion.parseFromValueString(value) shouldBe a[
+        Left[?, ?]
+      ] withClue s"actual bad value for ${companion.name}"
       header
     }
 
