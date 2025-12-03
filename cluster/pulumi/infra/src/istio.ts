@@ -84,6 +84,17 @@ function configureIstiod(
         autoscaleMin: 2,
         autoscaleMax: 30,
         ...infraAffinityAndTolerations,
+        defaults: {
+          global: {
+            proxy: {
+              resources: {
+                limits: {
+                  cpu: null,
+                },
+              },
+            },
+          },
+        },
         global: {
           istioNamespace: ingressNs.metadata.name,
           logAsJson: true,
@@ -93,7 +104,6 @@ function configureIstiod(
             excludeOutboundPorts: '5432,26657',
             resources: {
               limits: {
-                cpu: null,
                 memory: '4096Mi',
               },
             },

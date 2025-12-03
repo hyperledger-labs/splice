@@ -2269,6 +2269,17 @@
         },
         "autoscaleMax": 30,
         "autoscaleMin": 2,
+        "defaults": {
+          "global": {
+            "proxy": {
+              "resources": {
+                "limits": {
+                  "cpu": null
+                }
+              }
+            }
+          }
+        },
         "global": {
           "istioNamespace": "cluster-ingress",
           "logAsJson": true,
@@ -2277,7 +2288,6 @@
             "excludeOutboundPorts": "5432,26657",
             "resources": {
               "limits": {
-                "cpu": null,
                 "memory": "4096Mi"
               }
             }
