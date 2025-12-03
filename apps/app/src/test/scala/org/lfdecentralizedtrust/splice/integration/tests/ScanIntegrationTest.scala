@@ -791,14 +791,22 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     )
   }
 
-  "accept invalid user-agent headers" in { implicit env =>
+  "accept invalid user-agent and authorization headers" in { implicit env =>
     import env.actorSystem
     registerHttpConnectionPoolsCleanup(env)
 
-    val invalidUserAgentHeader = RawHeader("User-Agent", "OpenAPI-Generator/0.0.1/java")
-    // using `User-Agent` fails the following check, it cleans away the /java
-    // so we have to use RawHeader to simulate the actual client case
-    invalidUserAgentHeader.value shouldBe "OpenAPI-Generator/0.0.1/java"
+    // see pekko.http.server.parsing.ignore-illegal-header-for in application.conf
+    val invalidHeaders = Seq(
+      ("User-Agent", "OpenAPI-Generator/0.0.1/java"),
+      ("Authorization", "Bearer Bearer exxxxxxxxxx"),
+    ).map { case (name, value) =>
+      val header = RawHeader(name, value)
+      // using `User-Agent` (non-RawHeaders in general) fails the following check;
+      // it cleans away the invalid part of the header,
+      // so we have to use RawHeader to simulate the actual client case
+      header.value shouldBe value
+      header
+    }
 
     // SuppressingLogger does not catch the warning (from pekko-http)
     // if present, it's seen in checkErrors instead
@@ -806,7 +814,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       .singleRequest(
         Get(
           s"${sv1ScanBackend.httpClientConfig.url}/api/scan/v0/splice-instance-names"
-        ).withHeaders(invalidUserAgentHeader)
+        ).withHeaders(invalidHeaders)
       )
       .futureValue
     response.status shouldBe StatusCodes.OK
