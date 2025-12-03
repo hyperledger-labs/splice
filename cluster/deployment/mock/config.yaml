@@ -168,6 +168,11 @@ svs:
     participant:
       bftSequencerConnection: false
   sv-1:
+    periodicSnapshots:
+      topology:
+        projectId: 'da-cn-test'
+        bucketName: 'da-cn-topology-snapshots'
+        backupInterval: '24h'
     logging:
       appsLogLevel: WARN
       cantonLogLevel: INFO
