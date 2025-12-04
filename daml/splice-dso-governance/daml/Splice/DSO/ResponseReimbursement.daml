@@ -47,7 +47,7 @@ template ReimbursementWorkflowState
     signatory dso
 
     -- Only called from DsoRules. We keep it as its own choice to simplify reasoning about the logic.
-    nonconsuming choice ReimbursementWorkflowState_AddReimbursementInterval
+    choice ReimbursementWorkflowState_AddReimbursementInterval
       : ReimbursementWorkflowState_AddReimbursementIntervalResult
       with
         minIntervalDuration : RelTime

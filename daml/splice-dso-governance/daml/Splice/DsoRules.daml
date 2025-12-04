@@ -1525,8 +1525,6 @@ template DsoRules with
     ----------------------------------------------
 
     nonconsuming choice DsoRules_StartResponseTrafficReimbursement : DsoRules_StartResponseTrafficReimbursementResult
-      with
-        sv : Party
       controller dso
       do
         now <- getTime
