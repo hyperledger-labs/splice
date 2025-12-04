@@ -2064,7 +2064,7 @@ updateTestConfigForParallelRuns := {
     (
       "Scan Bulk Storage PoC",
       "test-full-class-names-bulk-storage-poc.log",
-      (t: String) => t.contains("ScanBulkStoragePoC"),
+      (t: String) => t.contains("ScanBulkStoragePoc"),
     ),
     (
       "manual tests with custom canton instance",
