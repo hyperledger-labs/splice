@@ -861,38 +861,9 @@ object BuildCommon {
           scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
         ),
         Compile / PB.protoSources ++= (Test / PB.protoSources).value,
-        // commented out from Canton OS repo as we don't have code coverage (yet)
-        //    // excluded generated protobuf classes from code coverage
-        //    coverageExcludedPackages := formatCoverageExcludes(
-
-        //      """
-        //        |<empty>
-        //        |com\.digitalasset\.canton\.protocol\.v0\..*
-        //        |com\.digitalasset\.canton\.domain\.v0\..*
-        //        |com\.digitalasset\.canton\.identity\.v0\..*
-        //        |com\.digitalasset\.canton\.identity\.admin\.v0\..*
-        //        |com\.digitalasset\.canton\.domain\.api\.v0\..*
-        //        |com\.digitalasset\.canton\.v0\..*
-        //        |com\.digitalasset\.canton\.protobuf\..*
-        //      """
-        //    ),
-        //        Compile / damlCodeGeneration := {
-        //          val Seq(darFile, _) = (Compile / damlBuild).value
-        //          Seq(
-        //            (
-        //              (Compile / baseDirectory).value,
-        //              darFile,
-        //              "com.digitalasset.canton.examples",
-        //            )
-        //          )
-        //        },
         Test / damlTest := Seq(),
         Compile / damlEnableJavaCodegen := true,
         Compile / damlCodegenUseProject := false,
-        // commented out from Canton OS repo as settings don't apply to us (yet)
-        //    addProtobufFilesToHeaderCheck(Compile),
-        //    addFilesToHeaderCheck("*.daml", "daml", Compile),
-        //    JvmRulesPlugin.damlRepoHeaderSettings
       )
   }
 
@@ -926,16 +897,6 @@ object BuildCommon {
         Compile / PB.targets := Seq(
           scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
         ),
-        // commented out from Canton OS repo as we don't have code coverage tests (yet)
-        //      // excluded generated protobuf classes from code coverage
-        //      coverageExcludedPackages := formatCoverageExcludes(
-        //        """
-        //          |<empty>
-        //          |com\.digitalasset\.canton\.domain\.admin\.v0\..*
-        //      """
-        //      ),
-        //      addProtobufFilesToHeaderCheck(Compile),
-        //      JvmRulesPlugin.damlRepoHeaderSettings,
       )
   }
 
