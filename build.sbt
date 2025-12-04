@@ -2057,6 +2057,8 @@ updateTestConfigForParallelRuns := {
     name contains "CometBft"
   def isRecordTimeToleranceTest(name: String): Boolean =
     name contains "RecordTimeToleranceTimeBasedIntegrationTest"
+  def isLSUTest(name: String): Boolean =
+    name contains "LogicalSynchronizerUpgradeIntegrationTest"
 
   val allTestNames =
     definedTests
@@ -2176,6 +2178,11 @@ updateTestConfigForParallelRuns := {
       "tests requiring Canton Enterprise",
       "test-full-class-names-canton-enterprise.log",
       (t: String) => isEnterpriseIntegrationTest(t),
+    ),
+    (
+      "tests to check logical sync upgrade",
+      "test-full-class-names-lsu.log",
+      (t: String) => isLSUTest(t),
     ),
     (
       "tests with wall clock time",
