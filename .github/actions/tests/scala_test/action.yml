@@ -90,6 +90,19 @@ inputs:
     description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)"
     required: false
     default: "false"
+  bulk_storage_poc_storage_key:
+    description: ""
+    required: false
+    default: ""
+  bulk_storage_poc_storage_secret:
+    description: ""
+    required: false
+    default: ""
+  bulk_storage_poc_db_pwd:
+    description: ""
+    required: false
+    default: ""
+
 
 runs:
   using: "composite"
@@ -268,6 +281,9 @@ runs:
           if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
             ./start-frontends.sh -d -s
           fi
+          export COLD_STORAGE_ACCESS_KEY='${{ inputs.bulk_storage_poc_storage_key }}'
+          export COLD_STORAGE_SECRET='${{ inputs.bulk_storage_poc_storage_secret }}'
+          export SPLICE_TEST_DB_CNADMIN_PWD='${{ inputs.bulk_storage_poc_db_pwd }}'
           ${{ inputs.pre_sbt_cmd }}
         post_sbt_cmd: |
           if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
