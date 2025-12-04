@@ -263,6 +263,11 @@ svs:
       appsLogLevel: 'WARN'
       cantonLogLevel: 'INFO'
       cantonStdoutLogLevel: 'DEBUG'
+    periodicSnapshots:
+      topology:
+        backupInterval: '24h'
+        bucketName: 'da-cn-topology-snapshots'
+        projectId: 'da-cn-test'
     scanApp:
       bigQuery:
         dataset: 'mock_da2_scan'
