@@ -11,7 +11,7 @@ import { z } from 'zod';
 
 export const ScanClientConfigSchema = z.object({
   scanType: z.enum(['trust-single', 'bft', 'bft-custom']),
-  scanAddress: z.string().optional(),
+  scanAddress: z.string().optional(), // redundant with seedUrls
   threshold: z.number().default(0),
   trustedSvs: z.array(z.string()).default([]),
   seedUrls: z.array(z.string()).optional(),
