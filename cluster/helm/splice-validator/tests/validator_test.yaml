@@ -185,7 +185,6 @@ tests:
   - it: "configures scan-client for trust-single when nonSvValidatorTrustSingleScan is true"
     set:
       nonSvValidatorTrustSingleScan: true
-      scanClient: null
     documentSelector:
       path: kind
       value: Deployment
@@ -197,7 +196,6 @@ tests:
   - it: "defaults to BFT scan client with internal scan address if no config is set"
     set:
       svValidator: false
-      scanClient: null
     documentSelector:
       path: kind
       value: Deployment
