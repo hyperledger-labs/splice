@@ -94,7 +94,7 @@ class ExecuteVoteInstructionTrigger(
             .yieldUnit()
             .map { _ =>
               TaskSuccess(
-                show"Executed VoteExecutionInstruction for validator: $validatorParty"
+                show"Executed vote instruction affecting validator: $validatorParty"
               )
             }
         case None =>
