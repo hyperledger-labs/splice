@@ -2,6 +2,9 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- | All the response reimbursement workflows code that does not depend on `DsoRules`.
+--
+-- FIXME: the names in this module are not yet as clean as they could be. Make a pass.
+-- In particular "Confirmation" may be confusing, and "Traffic" is missing from some names.
 module Splice.DSO.ResponseReimbursement where
 
 import DA.Action
@@ -66,18 +69,34 @@ template ReimbursementWorkflowState
             startExclusive = nextIntervalStart
             endInclusive = nextIntervalEnd
           reimbursementConfirmation = None
+          reimbursementComplete = False
         workflowStateCid <- create this with
           nextIntervalStart = nextIntervalEnd
         pure ReimbursementWorkflowState_AddReimbursementIntervalResult with
           intervalStateCid
           workflowStateCid
 
+    choice ReimbursementWorkflowState_RecordCompletedInterval
+      : ReimbursementWorkflowState_RecordCompletedIntervalResult
+      with
+        intervalStateCid : ContractId ReimbursementIntervalState
+      controller dso
+      do
+        intervalState <- fetchAndArchive (ForDso dso) intervalStateCid
+        require "Interval must be reimbursed" (intervalState.reimbursementComplete)
+        require "Interval must be the earliest" (intervalState.interval.startExclusive == earliestIntervalStart)
+        workflowStateCid <- create this with
+          earliestIntervalStart = intervalState.interval.endInclusive
+        pure ReimbursementWorkflowState_RecordCompletedIntervalResult with
+          workflowStateCid
+
 
 data ReimbursementWorkflowState_AddReimbursementIntervalResult = ReimbursementWorkflowState_AddReimbursementIntervalResult with
     intervalStateCid : ContractId ReimbursementIntervalState
     workflowStateCid : ContractId ReimbursementWorkflowState
-  deriving (Eq, Show)
 
+data ReimbursementWorkflowState_RecordCompletedIntervalResult = ReimbursementWorkflowState_RecordCompletedIntervalResult with
+    workflowStateCid : ContractId ReimbursementWorkflowState
 
 
 -- State of reimbursing responses for a given interval.
@@ -104,6 +123,9 @@ template ReimbursementIntervalState
     dso: Party
     interval: ReimbursementInterval
     reimbursementConfirmation : Optional ReimbursementConfirmation
+      -- ^ The confirmation of the reimbursement data hash for this interval.
+    reimbursementComplete : Bool
+      -- ^ Whether the response traffic for this interval has been reimbursed.
   where
     signatory dso
 
@@ -147,26 +169,15 @@ template ReimbursementIntervalState
 
             -- Note: we intentionally do not return the created MemberTraffic contract IDs here
             -- to avoid bloating the transaction size on the Ledger API.
+            intervalStateCid <- create this with reimbursementComplete = True
             pure ReimbursementIntervalState_ReimburseResponsesResult with
-              dummy = ()
+              intervalStateCid
 
 data ReimbursementIntervalState_ConfirmReimbursementResult = ReimbursementIntervalState_ConfirmReimbursementResult with
     intervalStateCid : ContractId ReimbursementIntervalState
-  deriving (Eq, Show)
 
 data ReimbursementIntervalState_ReimburseResponsesResult = ReimbursementIntervalState_ReimburseResponsesResult with
-    dummy : ()
-  deriving (Eq, Show)
-
-
-{-
-confirmResponseTrafficReimbursement : Party -> ReimbursementConfirmation -> ContractId ReimbursementIntervalState -> Update (ContractId ReimbursementIntervalState)
-confirmResponseTrafficReimbursement dso reimbursementConfirmation intervalStateCid = do
-  require "Not yet confirmed" (isNone this.reimbursementConfirmation)
-  intervalStateCid <- create this with reimbursementConfirmation = Some reimbursementConfirmation
-  pure ReimbursementIntervalState_ConfirmReimbursementResult with
-    intervalStateCid
--}
+    intervalStateCid : ContractId ReimbursementIntervalState
 
 
 -- Checked fetch

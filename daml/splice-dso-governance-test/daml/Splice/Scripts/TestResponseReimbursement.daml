@@ -4,39 +4,23 @@
 module Splice.Scripts.TestResponseReimbursement where
 
 import DA.Assert
-import DA.Foldable (forA_)
 import DA.List
-import qualified DA.Map as Map
-import qualified DA.Set as Set
 import Daml.Script
 import DA.Time
 
-import Splice.Amulet
-import Splice.AmuletRules
-import Splice.Round
-import Splice.Schedule
-import Splice.DSO.DecentralizedSynchronizer
-import Splice.Fees
-import Splice.Issuance()
-
-
 import Splice.DsoRules
-import Splice.DSO.AmuletPrice
 import Splice.DSO.ResponseReimbursement -- FIXME: add Traffic to name
 import Splice.DSO.CryptoHash
-import Splice.AmuletConfig
-import Splice.CometBft
 import Splice.DecentralizedSynchronizer
 
 import Splice.Scripts.Util
 import Splice.Scripts.DsoTestUtils
-import Splice.Testing.Registries.AmuletRegistry.Parameters
 
 
 -- | Tests that reimbursement works.
 test_confirmation_response_traffic_reimbursement : Script ()
 test_confirmation_response_traffic_reimbursement = do
-  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+  (app, dso, (sv1, _, _, _)) <- initMainNet
 
   setTime demoTime
 
@@ -64,15 +48,15 @@ test_confirmation_response_traffic_reimbursement = do
 
   -- add a new interval
   now <- getTime
+  let testIntervalEnd = now `addRelTime` hours 1
   [(workflowStateCid, _)] <- query @ReimbursementWorkflowState dso
   confirmAndExecutionAction app ARC_DsoRules with
     dsoAction = SRARC_AddResponseTrafficReimbursementInterval
       DsoRules_AddResponseTrafficReimbursementInterval with
-        nextIntervalEnd = now `addRelTime` hours 1
+        nextIntervalEnd = testIntervalEnd
         workflowStateCid
 
   -- confirm data
-  [(workflowStateCid, _)] <- query @ReimbursementWorkflowState dso
   [(intervalStateCid, _)] <- query @ReimbursementIntervalState dso
   confirmAndExecutionAction app ARC_DsoRules with
     dsoAction = SRARC_ConfirmResponseTrafficReimbursement
@@ -85,7 +69,6 @@ test_confirmation_response_traffic_reimbursement = do
 
   -- reimburse responses
   [(intervalStateCid, _)] <- query @ReimbursementIntervalState dso
-  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
   submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ReimburseResponseTraffic with
     intervalStateCid
     responseTrafficData
@@ -107,5 +90,19 @@ test_confirmation_response_traffic_reimbursement = do
           numPurchases = 0
   sortOn (.memberId) (map snd actualMemberTrafficContracts) ===
     expectedMemberTrafficContracts
+
+  -- record the completion
+  [(intervalStateCid, _)] <- query @ReimbursementIntervalState dso
+  [(workflowStateCid, _)] <- query @ReimbursementWorkflowState dso
+  submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_RecordCompletedResponseTrafficReimbursement with
+    intervalStateCid
+    workflowStateCid
+    sv = sv1
+
+  [] <- query @ReimbursementIntervalState dso
+  [(_, workflowState)] <- query @ReimbursementWorkflowState dso
+  (workflowState.earliestIntervalStart, workflowState.nextIntervalStart) ===
+    (testIntervalEnd, testIntervalEnd)
+
 
   pure ()

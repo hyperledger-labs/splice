@@ -313,6 +313,8 @@ data DsoRules_ConfirmResponseTrafficReimbursementResult = DsoRules_ConfirmRespon
 data DsoRules_ReimburseResponsesResult = DsoRules_ReimburseResponsesResult with
     result : ReimbursementIntervalState_ReimburseResponsesResult
 
+data DsoRules_RecordCompletedResponseTrafficReimbursementIntervalResult = DsoRules_RecordCompletedResponseTrafficReimbursementIntervalResult with
+  result : ReimbursementWorkflowState_RecordCompletedIntervalResult
 
 -- Workflow templates
 ---------------------
@@ -1574,6 +1576,19 @@ template DsoRules with
         result <- exercise intervalStateCid ReimbursementIntervalState_ReimburseResponses with
           responseTrafficData
         pure DsoRules_ReimburseResponsesResult with result
+
+    nonconsuming choice DsoRules_RecordCompletedResponseTrafficReimbursement
+      : DsoRules_RecordCompletedResponseTrafficReimbursementIntervalResult
+      with
+        workflowStateCid : ContractId ReimbursementWorkflowState
+        intervalStateCid : ContractId ReimbursementIntervalState
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        result <- exercise workflowStateCid ReimbursementWorkflowState_RecordCompletedInterval with
+          intervalStateCid
+        pure DsoRules_RecordCompletedResponseTrafficReimbursementIntervalResult with result
 
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
