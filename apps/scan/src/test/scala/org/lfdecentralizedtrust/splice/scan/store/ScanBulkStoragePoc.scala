@@ -251,7 +251,7 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
 //      succeed
 
       // Fail the test so that logs are uploaded
-      fail
+      fail()
     }
   }
 
