@@ -161,20 +161,26 @@ class SvValidatorLicenseIntegrationTest
 
     // Create a vote for batch modification, with both weight change and withdrawal
     import env.executionContext
-    modifyValidatorLicensesWithVoting(
-      sv1Backend,
-      svsToCastVotes = Seq.empty,
-      Seq(
-        new VLC_ChangeWeight(newParty1.toProtoPrimitive, BigDecimal(10.0).bigDecimal),
-        new VLC_Withdraw(newParty2.toProtoPrimitive),
+    actAndCheck(
+      "Modify validator licenses",
+      modifyValidatorLicenses(
+        sv1Backend,
+        svsToCastVotes = Seq.empty,
+        Seq(
+          new VLC_ChangeWeight(newParty1.toProtoPrimitive, BigDecimal(10.0).bigDecimal),
+          new VLC_Withdraw(newParty2.toProtoPrimitive),
+        ),
       ),
-    ) {
-      val licenses1 = getLicenses(newParty1)
-      licenses1 should have length 1
-      licenses1.head.data.weight.toScala shouldBe Some(BigDecimal("10.0000000000").bigDecimal)
+    )(
+      "validator license modifications have been applied",
+      _ => {
+        val licenses1 = getLicenses(newParty1)
+        licenses1 should have length 1
+        licenses1.head.data.weight.toScala shouldBe Some(BigDecimal("10.0000000000").bigDecimal)
 
-      val licenses2 = getLicenses(newParty2)
-      licenses2 shouldBe empty
-    }
+        val licenses2 = getLicenses(newParty2)
+        licenses2 shouldBe empty
+      },
+    )
   }
 }

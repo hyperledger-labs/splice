@@ -233,23 +233,27 @@ class SvTimeBasedOnboardingIntegrationTest
         // The VoteExecutionInstruction cannot be run in this case and should be expired
         val newPartyWithoutLicense = allocateRandomSvParty("test-validator-expiry")
 
-        modifyValidatorLicensesWithVoting(
-          sv1Backend,
-          Seq(sv2Backend, sv3Backend),
-          Seq(
-            new VLC_ChangeWeight(
-              newPartyWithoutLicense.toProtoPrimitive,
-              BigDecimal(10.0).bigDecimal,
-            )
+        actAndCheck(
+          "Modify validator licenses",
+          modifyValidatorLicenses(
+            sv1Backend,
+            Seq(sv2Backend, sv3Backend),
+            Seq(
+              new VLC_ChangeWeight(
+                newPartyWithoutLicense.toProtoPrimitive,
+                BigDecimal(10.0).bigDecimal,
+              )
+            ),
           ),
-          checkClue = "VoteExecutionInstruction is created",
-        ) {
-          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-            .filterJava(VoteExecutionInstruction.COMPANION)(
-              dsoParty,
-              _ => true,
-            ) should have length 1
-        }
+        )(
+          "VoteExecutionInstruction is created",
+          _ =>
+            sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+              .filterJava(VoteExecutionInstruction.COMPANION)(
+                dsoParty,
+                _ => true,
+              ) should have length 1,
+        )
 
         // Advance time past the default timeout of 1 day
         val clockSkew = sv1Backend.config.automation.clockSkewAutomationDelay.asJava

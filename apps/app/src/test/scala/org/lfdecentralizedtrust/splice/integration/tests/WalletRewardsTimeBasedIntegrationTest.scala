@@ -122,15 +122,21 @@ class WalletRewardsTimeBasedIntegrationTest
       // This should cause the per-unit issuance to be less than the default of 2.85
       import env.executionContext
       val aliceWeight = BigDecimal(15000.0)
-      modifyValidatorLicensesWithVoting(
-        sv1Backend,
-        svsToCastVotes = Seq.empty,
-        Seq(new VLC_ChangeWeight(aliceValidatorParty.toProtoPrimitive, aliceWeight.bigDecimal)),
-      ) {
-        val licenses = getValidatorLicense(aliceValidatorParty)
-        licenses should have length 1
-        licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(aliceWeight)
-      }
+      actAndCheck(
+        "Modify validator licenses",
+        modifyValidatorLicenses(
+          sv1Backend,
+          svsToCastVotes = Seq.empty,
+          Seq(new VLC_ChangeWeight(aliceValidatorParty.toProtoPrimitive, aliceWeight.bigDecimal)),
+        ),
+      )(
+        "validator license modifications have been applied",
+        _ => {
+          val licenses = getValidatorLicense(aliceValidatorParty)
+          licenses should have length 1
+          licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(aliceWeight)
+        },
+      )
 
       val openRounds = eventually() {
         import math.Ordering.Implicits.*
@@ -235,15 +241,21 @@ class WalletRewardsTimeBasedIntegrationTest
         // Change validator license weight to 0
         import env.executionContext
         val zeroWeight = BigDecimal(0.0)
-        modifyValidatorLicensesWithVoting(
-          sv1Backend,
-          svsToCastVotes = Seq.empty,
-          Seq(new VLC_ChangeWeight(aliceValidatorParty.toProtoPrimitive, zeroWeight.bigDecimal)),
-        ) {
-          val licenses = getAliceLicense()
-          licenses should have length 1
-          licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(zeroWeight)
-        }
+        actAndCheck(
+          "Modify validator licenses",
+          modifyValidatorLicenses(
+            sv1Backend,
+            svsToCastVotes = Seq.empty,
+            Seq(new VLC_ChangeWeight(aliceValidatorParty.toProtoPrimitive, zeroWeight.bigDecimal)),
+          ),
+        )(
+          "validator license modifications have been applied",
+          _ => {
+            val licenses = getAliceLicense()
+            licenses should have length 1
+            licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(zeroWeight)
+          },
+        )
 
         advanceTimeForRewardAutomationToRunForCurrentRound
 

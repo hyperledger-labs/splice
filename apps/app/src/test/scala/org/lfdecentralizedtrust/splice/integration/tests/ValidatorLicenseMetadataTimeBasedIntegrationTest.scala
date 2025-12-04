@@ -154,20 +154,26 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
       // Change Alice's validator license weight to 10.0
       import env.executionContext
       val aliceNewWeight = BigDecimal(10.0)
-      modifyValidatorLicensesWithVoting(
-        sv1Backend,
-        svsToCastVotes = Seq.empty,
-        Seq(new VLC_ChangeWeight(aliceValidatorParty.toProtoPrimitive, aliceNewWeight.bigDecimal)),
-      ) {
-        val licenses =
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-            .filterJava(ValidatorLicense.COMPANION)(
-              dsoParty,
-              c => c.data.validator == aliceValidatorParty.toProtoPrimitive,
-            )
-        licenses should have length 1
-        licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(aliceNewWeight)
-      }
+      actAndCheck(
+        "Modify validator licenses",
+        modifyValidatorLicenses(
+          sv1Backend,
+          svsToCastVotes = Seq.empty,
+          Seq(new VLC_ChangeWeight(aliceValidatorParty.toProtoPrimitive, aliceNewWeight.bigDecimal)),
+        ),
+      )(
+        "validator license modifications have been applied",
+        _ => {
+          val licenses =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+              .filterJava(ValidatorLicense.COMPANION)(
+                dsoParty,
+                c => c.data.validator == aliceValidatorParty.toProtoPrimitive,
+              )
+          licenses should have length 1
+          licenses.head.data.weight.toScala.map(BigDecimal(_)) shouldBe Some(aliceNewWeight)
+        },
+      )
 
       advanceTimeForRewardAutomationToRunForCurrentRound
 

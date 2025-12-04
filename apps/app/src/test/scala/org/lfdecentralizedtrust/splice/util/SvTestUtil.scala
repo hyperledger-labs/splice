@@ -196,13 +196,10 @@ trait SvTestUtil extends TestCommon {
     )
   }
 
-  def modifyValidatorLicensesWithVoting(
+  def modifyValidatorLicenses(
       svToCreateVoteRequest: SvAppBackendReference,
       svsToCastVotes: Seq[SvAppBackendReference],
       changes: Seq[ValidatorLicenseChange],
-      checkClue: String = "validator license modifications have been applied",
-  )(
-      verifyResult: => Unit
   )(implicit
       ec: ExecutionContextExecutor
   ): Unit = {
@@ -226,61 +223,42 @@ trait SvTestUtil extends TestCommon {
         }
       }
 
-    actAndCheck(timeUntilSuccess = 60.seconds)(
-      "Voting on validator license modification", {
-        val (_, voteRequest) = actAndCheck(
-          "Creating vote request",
-          eventuallySucceeds() {
-            svToCreateVoteRequest.createVoteRequest(
-              svToCreateVoteRequest.getDsoInfo().svParty.toProtoPrimitive,
-              action,
-              "url",
-              "description",
-              svToCreateVoteRequest.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-              None,
-            )
-          },
-        )(
-          "vote request has been created",
-          _ =>
-            onlyModifyValidatorLicensesVoteRequests(
-              svToCreateVoteRequest.listVoteRequests()
-            ).loneElement,
-        )
-
-        if (svsToCastVotes.nonEmpty) {
-          loggerFactory.suppressErrors {
-            svsToCastVotes.parTraverse { sv =>
-              Future {
-                clue(s"${sv.name} sees the vote request") {
-                  val svVoteRequest = eventually() {
-                    onlyModifyValidatorLicensesVoteRequests(sv.listVoteRequests()).loneElement
-                  }
-                  getTrackingId(svVoteRequest) shouldBe voteRequest.contractId
-                }
-                clue(s"${sv.name} accepts vote") {
-                  eventually() {
-                    try {
-                      sv.castVote(
-                        voteRequest.contractId,
-                        true,
-                        "url",
-                        "description",
-                      )
-                    } catch {
-                      case NonFatal(e) => fail(e)
-                    }
-                  }
-                }
-              }
-            }.futureValue
-          }
-        }
-      },
+    val (_, voteRequest) = actAndCheck(
+      "Creating vote request",
+      svToCreateVoteRequest.createVoteRequest(
+        svToCreateVoteRequest.getDsoInfo().svParty.toProtoPrimitive,
+        action,
+        "url",
+        "description",
+        svToCreateVoteRequest.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+        None,
+      ),
     )(
-      checkClue,
-      _ => verifyResult,
+      "vote request has been created",
+      _ =>
+        onlyModifyValidatorLicensesVoteRequests(
+          svToCreateVoteRequest.listVoteRequests()
+        ).loneElement,
     )
+
+    if (svsToCastVotes.nonEmpty) {
+      svsToCastVotes.parTraverse { sv =>
+        Future {
+          clue(s"${sv.name} sees the vote request") {
+            val svVoteRequest = eventually() {
+              onlyModifyValidatorLicensesVoteRequests(sv.listVoteRequests()).loneElement
+            }
+            getTrackingId(svVoteRequest) shouldBe voteRequest.contractId
+          }
+          sv.castVote(
+            voteRequest.contractId,
+            true,
+            "url",
+            "description",
+          )
+        }
+      }.futureValue
+    }
   }
 
   private def confirmAction(
