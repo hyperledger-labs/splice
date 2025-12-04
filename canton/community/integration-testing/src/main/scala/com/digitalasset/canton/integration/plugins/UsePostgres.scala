@@ -18,6 +18,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{ConfigTransforms, EnvironmentSetupPlugin}
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.parallelInstanceFutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.CommonMockMetrics
 import com.digitalasset.canton.resource.{DbStorage, DbStorageSingle}
@@ -154,7 +155,6 @@ class UsePostgres(
   }
 
   override def beforeEnvironmentCreated(config: CantonConfig): CantonConfig = {
-    implicit val ec: ExecutionContext = dbSetupExecutionContext
     val transformedConfig = {
       val storageChange = ConfigTransforms.modifyAllStorageConfigs((_, name, storage) =>
         generateDbConfig(name, storage.parameters, storage.config)
@@ -169,10 +169,7 @@ class UsePostgres(
     }
 
     Await.result(
-      nodeNamesOfConfig(transformedConfig)
-        .map(generateDbName)
-        .distinct
-        .parTraverse_(dbName => recreateDatabase(dbName)),
+      recreateDatabases(transformedConfig),
       config.parameters.timeouts.processing.io.duration,
     )
     transformedConfig
@@ -199,6 +196,9 @@ class UsePostgres(
       }
   }
 
+  def dropDatabases(config: CantonConfig): FutureUnlessShutdown[Unit] =
+    dropDatabases(nodeNamesOfConfig(config))
+
   def dropDatabases(nodes: Seq[String]): FutureUnlessShutdown[Unit] = {
     implicit val ec = dbSetupExecutionContext
     val dbNames = nodes.map(generateDbName).distinct
@@ -221,6 +221,14 @@ class UsePostgres(
         logOpenQueries(storage).discard
         UnlessShutdown.Outcome(())
       }
+  }
+
+  def recreateDatabases(config: CantonConfig): FutureUnlessShutdown[Unit] = {
+    implicit val ec = dbSetupExecutionContext
+    nodeNamesOfConfig(config)
+      .map(generateDbName)
+      .distinct
+      .parTraverse_(dbName => recreateDatabase(dbName))
   }
 
   def recreateDatabase(node: InstanceReference): FutureUnlessShutdown[Unit] =

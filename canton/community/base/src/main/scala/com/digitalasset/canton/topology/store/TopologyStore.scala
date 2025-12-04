@@ -4,8 +4,6 @@
 package com.digitalasset.canton.topology.store
 
 import cats.Monoid
-import cats.data.EitherT
-import cats.implicits.catsSyntaxParallelTraverse1
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
@@ -15,8 +13,6 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdownImpl.parallelInstanceFutureUnlessShutdown
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -277,10 +273,24 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
     *
     * @param includeRejected
     *   whether to include rejected transactions
+    * @param isProposal
+    *   whether to additionally filter for proposals
     */
-  def maxTimestamp(sequencedTime: SequencedTime, includeRejected: Boolean)(implicit
+  def maxTimestamp(
+      sequencedTime: SequencedTime,
+      includeRejected: Boolean,
+  )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]]
+
+  /** Returns the closest effective time before exclusive and after inclusive the provided
+    * timestamp.
+    */
+  def findTopologyIntervalForTimestamp(
+      timestamp: CantonTimestamp
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[(EffectiveTime, Option[EffectiveTime])]]
 
   /** returns the current dispatching watermark
     *
@@ -327,6 +337,7 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
       types: Seq[TopologyMapping.Code],
       filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]],
       filterNamespace: Option[NonEmpty[Seq[Namespace]]],
+      pagination: Option[(Option[UniqueIdentifier], Int)] = None,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[PositiveStoredTopologyTransactions]
@@ -403,6 +414,7 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
       asOfExclusive: CantonTimestamp,
       filterParty: String,
       filterParticipant: String,
+      limit: Int,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PartyId]]
 
   /** Finds the topology transaction that first onboarded the sequencer with ID `sequencerId`
@@ -597,7 +609,8 @@ object TopologyStore {
       }
     }
 
-  lazy val initialParticipantDispatchingSet: Set[TopologyMapping.Code] = Set(
+  lazy val initialParticipantDispatchingSet: NonEmpty[Set[TopologyMapping.Code]] = NonEmpty(
+    Set,
     TopologyMapping.Code.SynchronizerTrustCertificate,
     TopologyMapping.Code.OwnerToKeyMapping,
     TopologyMapping.Code.NamespaceDelegation,
@@ -606,9 +619,9 @@ object TopologyStore {
   def filterInitialParticipantDispatchingTransactions(
       participantId: ParticipantId,
       synchronizerId: SynchronizerId,
-      transactions: Seq[GenericStoredTopologyTransaction],
+      transactions: Seq[GenericSignedTopologyTransaction],
   ): Seq[GenericSignedTopologyTransaction] =
-    transactions.map(_.transaction).filter { signedTx =>
+    transactions.filter { signedTx =>
       initialParticipantDispatchingSet.contains(signedTx.mapping.code) &&
       signedTx.mapping.maybeUid.forall(_ == participantId.uid) &&
       signedTx.mapping.namespace == participantId.namespace &&
@@ -649,41 +662,35 @@ object TopologyStore {
       mappings: Seq[TopologyMapping],
       filterParty: String,
       filterParticipant: String,
+      limit: Int,
   ): Set[PartyId] = {
     val (filterPartyIdentifier, filterPartyNamespaceO) =
       UniqueIdentifier.splitFilter(filterParty)
     val (
       filterParticipantIdentifier,
       filterParticipantNamespaceO,
-    ) =
-      UniqueIdentifier.splitFilter(filterParticipant)
-    val validParticipants = mappings.collect { case SynchronizerTrustCertificate(pid, _, _) =>
-      pid
-    }.toSet
-    val validParties = mutable.HashSet[PartyId]()
-    mappings.foreach {
-      case ptp: PartyToParticipant
-          if (filterParty.isEmpty || ptp.partyId.uid
-            .matchesFilters(filterPartyIdentifier, filterPartyNamespaceO)) &&
-            (filterParticipant.isEmpty || ptp.participants
-              .exists(
-                _.participantId.uid
-                  .matchesFilters(filterParticipantIdentifier, filterParticipantNamespaceO)
-              )) && ptp.participants.exists(h => validParticipants.contains(h.participantId)) =>
-        validParties.add(ptp.partyId).discard
-      case cert: SynchronizerTrustCertificate
-          if (filterParty.isEmpty || cert.participantId.adminParty.uid
-            .matchesFilters(filterPartyIdentifier, filterPartyNamespaceO))
-            && (filterParticipant.isEmpty || cert.participantId.adminParty.uid.matchesFilters(
-              filterParticipantIdentifier,
-              filterParticipantNamespaceO,
-            ))
-            && validParticipants
-              .contains(cert.participantId) =>
-        validParties.add(cert.participantId.adminParty).discard
-      case _ => ()
-    }
-    validParties.toSet
+    ) = UniqueIdentifier.splitFilter(filterParticipant)
+
+    val validParties = mappings.view
+      .collect {
+        case ptp: PartyToParticipant => (ptp.partyId, ptp.participantIds)
+        case cert: SynchronizerTrustCertificate =>
+          (cert.participantId.adminParty, Seq(cert.participantId))
+      }
+      .filter { case (partyId, participants) =>
+        lazy val matchesPartyFilter =
+          partyId.uid.matchesFilters(filterPartyIdentifier, filterPartyNamespaceO)
+        lazy val matchesParticipantFilter = participants.exists(
+          _.uid.matchesFilters(filterParticipantIdentifier, filterParticipantNamespaceO)
+        )
+
+        (filterParty.isEmpty || matchesPartyFilter) && (filterParticipant.isEmpty || matchesParticipantFilter)
+      }
+      .map { case (partyId, _) => partyId }
+      // use LinkedHashSet so that in the end we can return a result that is limited and stable, based on the order
+      // of appearance in mappings
+      .to(mutable.LinkedHashSet)
+    validParties.take(limit).toSet
   }
 
 }
@@ -746,10 +753,6 @@ object UnknownOrUnvettedPackages {
 
     }
 
-  def unknown(participantId: ParticipantId, packageId: PackageId): UnknownOrUnvettedPackages =
-    empty.copy(unknown = Map(participantId -> Set(packageId)))
-  def unvetted(participantId: ParticipantId, packageId: PackageId): UnknownOrUnvettedPackages =
-    empty.copy(unvetted = Map(participantId -> Set(packageId)))
   def unvetted(
       participantId: ParticipantId,
       packageIds: Set[PackageId],
@@ -767,17 +770,13 @@ final case class UnknownOrUnvettedPackages(
 }
 
 trait PackageDependencyResolver {
-
-  def packageDependencies(packageId: PackageId)(implicit
+  def packageDependencies(packages: Set[PackageId])(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, (PackageId, ParticipantId), Set[PackageId]]
+  ): Either[(ParticipantId, Set[PackageId]), Set[PackageId]]
+}
 
-  def packageDependencies(packages: List[PackageId])(implicit
-      traceContext: TraceContext,
-      ec: ExecutionContext,
-  ): EitherT[FutureUnlessShutdown, (PackageId, ParticipantId), Set[PackageId]] =
-    packages
-      .parTraverse(packageDependencies)
-      .map(_.flatten.toSet -- packages)
-
+object NoPackageDependencies extends PackageDependencyResolver {
+  override def packageDependencies(packages: Set[PackageId])(implicit
+      traceContext: TraceContext
+  ): Either[(ParticipantId, Set[PackageId]), Set[PackageId]] = Right(Set.empty[PackageId])
 }

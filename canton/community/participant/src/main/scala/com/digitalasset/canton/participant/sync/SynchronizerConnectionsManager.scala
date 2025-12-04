@@ -12,6 +12,9 @@ import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.RpcError
 import com.digitalasset.canton.*
+import com.digitalasset.canton.common.sequencer.SequencerConnectClient
+import com.digitalasset.canton.common.sequencer.SequencerConnectClient.SynchronizerClientBootstrapInfo
+import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
 import com.digitalasset.canton.crypto.SyncCryptoApiParticipantProvider
@@ -22,7 +25,7 @@ import com.digitalasset.canton.data.{
 }
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.*
-import com.digitalasset.canton.health.MutableHealthComponent
+import com.digitalasset.canton.health.{HealthQuasiComponent, MutableHealthComponent}
 import com.digitalasset.canton.ledger.api.health.HealthStatus
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.*
@@ -31,6 +34,11 @@ import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.*
 import com.digitalasset.canton.participant.admin.*
+import com.digitalasset.canton.participant.admin.data.ManualLSURequest
+import com.digitalasset.canton.participant.admin.party.{
+  OnboardingClearanceScheduler,
+  PartyReplicationTopologyWorkflow,
+}
 import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentCoordination
@@ -57,6 +65,7 @@ import com.digitalasset.canton.participant.topology.client.MissingKeysAlerter
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.sequencing.client.SequencerClient
 import com.digitalasset.canton.sequencing.client.SequencerClient.CloseReason
+import com.digitalasset.canton.sequencing.{SequencerConnection, SequencerConnectionValidation}
 import com.digitalasset.canton.store.SequencedEventStore.SearchCriterion
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.*
@@ -78,6 +87,7 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
+import scala.util.chaining.*
 import scala.util.{Failure, Right, Success, Try}
 
 /** The Canton-based synchronization service.
@@ -107,7 +117,6 @@ private[sync] class SynchronizerConnectionsManager(
     syncPersistentStateManager: SyncPersistentStateManager,
     packageService: PackageService,
     identityPusher: ParticipantTopologyDispatcher,
-    partyNotifier: LedgerServerPartyNotifier,
     syncCrypto: SyncCryptoApiParticipantProvider,
     engine: Engine,
     commandProgressTracker: CommandProgressTracker,
@@ -117,6 +126,7 @@ private[sync] class SynchronizerConnectionsManager(
     parameters: ParticipantNodeParameters,
     connectedSynchronizerFactory: ConnectedSynchronizer.Factory[ConnectedSynchronizer],
     metrics: ParticipantMetrics,
+    sequencerInfoLoader: SequencerInfoLoader,
     isActive: () => Boolean,
     declarativeChangeTrigger: () => Unit,
     futureSupervisor: FutureSupervisor,
@@ -138,6 +148,8 @@ private[sync] class SynchronizerConnectionsManager(
     MutableHealthComponent(loggerFactory, SyncEphemeralState.healthName, timeouts)
   val sequencerClientHealth: MutableHealthComponent =
     MutableHealthComponent(loggerFactory, SequencerClient.healthName, timeouts)
+  val sequencerConnectionPoolHealthRef =
+    new AtomicReference[() => Seq[HealthQuasiComponent]](() => Seq.empty)
   val acsCommitmentProcessorHealth: MutableHealthComponent =
     MutableHealthComponent(loggerFactory, AcsCommitmentProcessor.healthName, timeouts)
 
@@ -177,24 +189,6 @@ private[sync] class SynchronizerConnectionsManager(
       crashOnFailure = parameters.exitOnFatalFailures,
     )
   }
-
-  private val logicalSynchronizerUpgrade = new LogicalSynchronizerUpgrade(
-    synchronizerConnectionConfigStore,
-    ledgerApiIndexer,
-    syncPersistentStateManager,
-    connectQueue,
-    connectedSynchronizers,
-    connectSynchronizer = (alias: Traced[SynchronizerAlias]) =>
-      connectSynchronizer(
-        alias.value,
-        keepRetrying = true,
-        connectSynchronizer = ConnectSynchronizer.Connect,
-      )(alias.traceContext),
-    disconnectSynchronizer = (alias: Traced[SynchronizerAlias]) =>
-      disconnectSynchronizer(alias.value)(alias.traceContext),
-    timeouts,
-    loggerFactory,
-  )
 
   // Track synchronizers we would like to "keep on reconnecting until available"
   private val attemptReconnect: TrieMap[SynchronizerAlias, AttemptReconnect] = TrieMap.empty
@@ -249,6 +243,21 @@ private[sync] class SynchronizerConnectionsManager(
       psid: PhysicalSynchronizerId
   ): Option[SynchronizerTopologyClientWithInit] =
     connectedSynchronizers.get(psid).map(_.topologyClient)
+
+  def validateSequencerConnection(
+      config: SynchronizerConnectionConfig,
+      sequencerConnectionValidation: SequencerConnectionValidation,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SyncServiceError, Unit] =
+    sequencerInfoLoader // TODO(i27622): use the connection pool to validate the config
+      .validateSequencerConnection(
+        config.synchronizerAlias,
+        config.synchronizerId,
+        config.sequencerConnections,
+        sequencerConnectionValidation,
+      )
+      .leftMap(SyncServiceError.SyncServiceInconsistentConnectivity.Error(_): SyncServiceError)
 
   /** Reconnect configured synchronizers
     *
@@ -613,6 +622,7 @@ private[sync] class SynchronizerConnectionsManager(
         filteredConfigs.map(_.maxBy1(_.configuredPSId))
     }
 
+  // TODO(#28724) Use subsumeMerge instead of replace
   private def updateSynchronizerConnectionConfig(
       psid: PhysicalSynchronizerId,
       config: SynchronizerConnectionConfig,
@@ -711,6 +721,9 @@ private[sync] class SynchronizerConnectionsManager(
 
           _ <- updateSynchronizerConnectionConfig(psid, updatedConfig)
 
+          // Attempt to grab and store *all* the sequencer ids to increase chances to have them all
+          _ <- retrieveAndStoreMissingSequencerIds(psid)
+
           _ = syncCrypto.remove(psid)
           _ = synchronizerHandle.close()
         } yield psid
@@ -766,6 +779,79 @@ private[sync] class SynchronizerConnectionsManager(
       },
       s"handshake with physical synchronizer $psid",
     )
+
+  /** Try to retrieve and store the missing sequencer IDs for the synchronizer:
+    *   - IDs that can be retrieved will be stored.
+    *   - Failure for a sequencer does not interrupt the process.
+    *
+    * This method is "best effort" and network errors are converted to success. Therefore, failures
+    * can be logged and reported.
+    *
+    * @return
+    *   - Failed future for failed DB operations
+    *   - Left if (1) the config cannot be found or (2) if synchronizer config cannot be stored or
+    *     (3) if ids cannot be stored
+    *   - Right in case of success
+    */
+  def retrieveAndStoreMissingSequencerIds(
+      psid: PhysicalSynchronizerId
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SyncServiceError, Unit] = {
+    // Turn Left and failed future into a None
+    def recoverFromFailures(
+        conn: SequencerConnection,
+        res: EitherT[FutureUnlessShutdown, String, SynchronizerClientBootstrapInfo],
+    ): FutureUnlessShutdown[Option[(SequencerAlias, SequencerId)]] = res
+      .fold(
+        err => {
+          logger.info(s"Unable to get sequencer id for sequencer ${conn.sequencerAlias}: $err")
+          None
+        },
+        info => Some((conn.sequencerAlias, info.sequencerId)),
+      )
+      .recover { case ex =>
+        logger.info(s"Unable to get sequencer id for sequencer ${conn.sequencerAlias}", ex)
+        UnlessShutdown.Outcome(None)
+      }
+
+    for {
+      storedConfig <- EitherT
+        .fromEither[FutureUnlessShutdown](synchronizerConnectionConfigStore.get(psid))
+        .leftMap(err =>
+          SyncServiceError.SyncServiceInternalError
+            .SynchronizerIsMissingInternally(psid.toProtoPrimitive, err.message)
+        )
+
+      alias = storedConfig.config.synchronizerAlias
+      sequencerConnectionsWithoutId = storedConfig.config.sequencerConnections.connections
+        .filter(_.sequencerId.isEmpty)
+
+      retrievedSequencerIds <- EitherT.liftF(
+        sequencerConnectionsWithoutId
+          .map(conn =>
+            SequencerConnectClient(
+              alias,
+              conn,
+              timeouts,
+              parameters.tracing.propagation,
+              loggerFactory,
+            ).getSynchronizerClientBootstrapInfo()
+              .leftMap(_.message)
+              .pipe(recoverFromFailures(conn, _))
+          )
+          .parSequenceFilter
+      )
+
+      _ <- synchronizerConnectionConfigStore
+        .setSequencerIds(psid, retrievedSequencerIds.toMap)
+        .leftMap[SyncServiceError](err =>
+          SyncServiceError.SyncServiceInternalError
+            .Failure(
+              psid.toString,
+              new RuntimeException(s"Unable to store missing sequencer ids: $err"),
+            )
+        )
+    } yield ()
+  }
 
   /** Connect the sync service to the given synchronizer. */
   private def performSynchronizerConnection(
@@ -837,6 +923,9 @@ private[sync] class SynchronizerConnectionsManager(
             )
           _ <- updateSynchronizerConnectionConfig(psid, updatedConfig)
 
+          // Attempt to grab and store *all* the sequencer ids to increase chances to have them all
+          _ <- retrieveAndStoreMissingSequencerIds(psid)
+
           synchronizerLoggerFactory = loggerFactory.append(
             "psid",
             psid.toString,
@@ -853,6 +942,18 @@ private[sync] class SynchronizerConnectionsManager(
           promiseUSFactory: DefaultPromiseUnlessShutdownFactory =
             new DefaultPromiseUnlessShutdownFactory(timeouts, loggerFactory)
 
+          onboardingClearanceScheduler = new OnboardingClearanceScheduler(
+            participantId,
+            psid,
+            () => this.readyConnectedSynchronizerById(psid.logical),
+            loggerFactory,
+            new PartyReplicationTopologyWorkflow(
+              participantId,
+              parameters.processingTimeouts,
+              loggerFactory,
+            ),
+          )
+
           ephemeral <- EitherT.right[SyncServiceError](
             syncEphemeralStateFactory
               .createFromPersistent(
@@ -861,7 +962,6 @@ private[sync] class SynchronizerConnectionsManager(
                 ledgerApiIndexer.asEval,
                 participantNodePersistentState.map(_.contractStore),
                 participantNodeEphemeralState,
-                synchronizerConnectionConfig.predecessor,
                 () => {
                   val tracker = SynchronizerTimeTracker(
                     synchronizerConnectionConfig.config.timeTracker,
@@ -876,6 +976,7 @@ private[sync] class SynchronizerConnectionsManager(
                 promiseUSFactory,
                 connectedSynchronizerMetrics,
                 parameters.cachingConfigs.sessionEncryptionKeyCache,
+                onboardingClearanceScheduler,
                 participantId,
               )
           )
@@ -929,12 +1030,14 @@ private[sync] class SynchronizerConnectionsManager(
               identityPusher,
               synchronizerHandle.topologyFactory
                 .createTopologyProcessorFactory(
-                  partyNotifier,
                   missingKeysAlerter,
                   sequencerConnectionSuccessorListener,
+                  onboardingClearanceScheduler,
                   synchronizerHandle.topologyClient,
                   ephemeral.recordOrderPublisher,
-                  lsuCallback,
+                  lsuCallback = lsuCallback,
+                  retrieveAndStoreMissingSequencerIds = traceContext =>
+                    retrieveAndStoreMissingSequencerIds(psid)(traceContext).leftMap(_.toString),
                   synchronizerHandle.syncPersistentState.sequencedEventStore,
                   synchronizerConnectionConfig.predecessor,
                   ledgerApiIndexer.asEval.value.ledgerApiStore.value,
@@ -952,9 +1055,14 @@ private[sync] class SynchronizerConnectionsManager(
             )
           )
 
+          // TODO(i23328): Aggregate the health of all connected synchronizers
           _ = connectedSynchronizerHealth.set(connectedSynchronizer)
           _ = ephemeralHealth.set(connectedSynchronizer.ephemeral)
           _ = sequencerClientHealth.set(connectedSynchronizer.sequencerClient.healthComponent)
+          _ = sequencerConnectionPoolHealthRef.set(() =>
+            connectedSynchronizer.sequencerClient.getConnectionPoolHealthStatus
+          )
+
           _ = acsCommitmentProcessorHealth.set(
             connectedSynchronizer.acsCommitmentProcessor.healthComponent
           )
@@ -1005,8 +1113,11 @@ private[sync] class SynchronizerConnectionsManager(
                 )
               ).discard
             case Success(UnlessShutdown.Outcome(CloseReason.ClientShutdown)) =>
-              logger.info(s"$synchronizerAlias disconnected because sequencer client was closed")
-              disconnectSynchronizer(synchronizerAlias).discard
+              if (!connectedSynchronizer.isClosing) {
+                logger.info(s"$synchronizerAlias disconnected because sequencer client was closed.")
+                // Only disconnect from the synchronizer, if the client wasn't shut down because of an explicit disconnect from the synchronizer.
+                disconnectSynchronizer(synchronizerAlias).discard
+              }
             case Success(UnlessShutdown.AbortedDueToShutdown) =>
               logger.info(s"$synchronizerAlias disconnected because of shutdown")
               disconnectSynchronizer(synchronizerAlias).discard
@@ -1062,13 +1173,14 @@ private[sync] class SynchronizerConnectionsManager(
   /** Disconnect the given synchronizer from the sync service. */
   def disconnectSynchronizer(
       synchronizerAlias: SynchronizerAlias
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SyncServiceError, Unit] = {
-    resolveReconnectAttempts(synchronizerAlias)
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SyncServiceError, Unit] =
     connectQueue.executeE(
-      EitherT.fromEither(performSynchronizerDisconnect(synchronizerAlias)),
+      {
+        resolveReconnectAttempts(synchronizerAlias)
+        EitherT.fromEither(performSynchronizerDisconnect(synchronizerAlias))
+      },
       s"disconnect from $synchronizerAlias",
     )
-  }
 
   def logout(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
@@ -1129,7 +1241,7 @@ private[sync] class SynchronizerConnectionsManager(
       .distinct
       .parTraverse_(disconnectSynchronizer)
 
-  /** Start the upgrade of the participant to the successor.
+  /** Start the upgrade of the participant to the successor (automatic workflow).
     *
     * Prerequisite:
     *   - Time on the current synchronizer has reached the upgrade time.
@@ -1168,14 +1280,55 @@ private[sync] class SynchronizerConnectionsManager(
         s"Upgrade time ${synchronizerSuccessor.upgradeTime} not reached: last event in the sequenced event store has timestamp ${event.timestamp}",
       )
 
-      _ <- logicalSynchronizerUpgrade.upgrade(
-        alias,
-        currentPSId,
-        synchronizerSuccessor,
-      )
+      _ <- new AutomaticLogicalSynchronizerUpgrade(
+        synchronizerConnectionConfigStore,
+        ledgerApiIndexer,
+        syncPersistentStateManager,
+        connectQueue,
+        connectedSynchronizers,
+        connectSynchronizer = (alias: Traced[SynchronizerAlias]) =>
+          connectSynchronizer(
+            alias.value,
+            keepRetrying = true,
+            connectSynchronizer = ConnectSynchronizer.Connect,
+          )(alias.traceContext),
+        disconnectSynchronizer = (alias: Traced[SynchronizerAlias]) =>
+          disconnectSynchronizer(alias.value)(alias.traceContext),
+        timeouts,
+        loggerFactory,
+      ).upgrade(alias, currentPSId, synchronizerSuccessor)
 
     } yield ()
   }
+
+  /** Perform a manual LSU. This method should ONLY be used when the following two conditions are
+    * met:
+    *   - The participant node missed the upgrade on the old synchronizer, and
+    *   - The old synchronizer has been decommissioned in the meantime.
+    *
+    * After the upgrade has been done, other repair operations might need to be done. This includes
+    * manually repairing the ACS to account for missed activity on both the old and new
+    * synchronizer.
+    */
+  def manuallyUpgradeSynchronizerTo(
+      request: ManualLSURequest
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] =
+    for {
+      _ <- validateSequencerConnection(
+        request.successorConfig,
+        request.successorConnectionValidation,
+      ).leftMap(_.toString)
+      _ <-
+        new ManualLogicalSynchronizerUpgrade(
+          synchronizerConnectionConfigStore,
+          connectQueue,
+          connectedSynchronizers,
+          disconnectSynchronizer = (alias: Traced[SynchronizerAlias]) =>
+            disconnectSynchronizer(alias.value)(alias.traceContext),
+          timeouts,
+          loggerFactory,
+        ).upgrade(request)
+    } yield ()
 
   // Write health requires the ability to transact, i.e. connectivity to at least one synchronizer and HA-activeness.
   def currentWriteHealth(): HealthStatus = {

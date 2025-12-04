@@ -4,6 +4,7 @@
 package com.digitalasset.canton.integration.plugins.toxiproxy
 
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.ConfigTransforms.*
 import com.digitalasset.canton.integration.plugins.toxiproxy.ProxyConfig.postgresConfig
@@ -11,8 +12,11 @@ import com.digitalasset.canton.integration.plugins.toxiproxy.UseToxiproxy.*
 import com.digitalasset.canton.integration.{ConfigTransform, EnvironmentSetupPlugin}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
+import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig.BftSequencer
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.P2PNetworkConfig
 import com.digitalasset.canton.{BaseTest, SequencerAlias, UniquePortGenerator}
 import eu.rekawek.toxiproxy.ToxiproxyClient
+import monocle.macros.GenLens
 import monocle.macros.syntax.lens.*
 import org.testcontainers.Testcontainers
 import org.testcontainers.containers.GenericContainer
@@ -28,7 +32,15 @@ import scala.concurrent.duration.*
   *
   * If you want to use this alongside the `UsePostgres` plugin, make sure you register the
   * `UseToxiproxy` plugin second so that it can use the transformations from the `UsePostgres`
-  * plugin
+  * plugin.
+  *
+  * The plugin uses the same `CI` and `MACHINE` environment variables as `UsePostgres`. This means
+  * that if you use a non-docker Postgres instance, you also must use a non-docker Toxiproxy (for
+  * example from Homebrew).
+  *
+  * @see
+  *   [[https://github.com/Shopify/toxiproxy?tab=readme-ov-file#1-installing-toxiproxy]] for
+  *   installation and running instructions
   */
 @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.Null"))
 final case class UseToxiproxy(toxiproxyConfig: ToxiproxyConfig)
@@ -253,6 +265,41 @@ final case class UseToxiproxy(toxiproxyConfig: ToxiproxyConfig)
               postgresConfig(dbName, proxy, dbTimeoutMillis, postgres)
             }
           )
+        )
+
+      case BftSequencerPeerToPeerInstanceConfig(
+            name,
+            upstreamHost,
+            upstreamPort,
+            from,
+          ) =>
+        val proxy = tryProxy(proxies, name)
+        List(
+          updateAllSequencerConfigs { case (_, cfg) =>
+            val updatedSequencerConfig = cfg.sequencer match {
+              case BftSequencer(blockSequencerConfig, bftOrdererConfig) =>
+                val updatedOrdererConfig = bftOrdererConfig
+                  .focus(_.initialNetwork)
+                  .some
+                  .andThen(GenLens[P2PNetworkConfig](_.peerEndpoints))
+                  .modify { peerEndpoints =>
+                    peerEndpoints.map {
+                      case peerEndpoint
+                          if peerEndpoint.address == upstreamHost && peerEndpoint.port == upstreamPort =>
+                        peerEndpoint
+                          .copy(
+                            address = proxy.ipFromHost,
+                            port = Port.tryCreate(proxy.portFromHost),
+                          )
+                      case x => x
+                    }
+                  }
+                BftSequencer(blockSequencerConfig, updatedOrdererConfig)
+
+              case x => x
+            }
+            cfg.focus(_.sequencer).replace(updatedSequencerConfig)
+          }
         )
 
       case _: BasicProxyInstanceConfig => List.empty

@@ -386,17 +386,9 @@ object TestingTimeServiceConfig {
   *   Checkpoint interval for commitments. Smaller intervals lead to less resource-intensive crash
   *   recovery, at the cost of more frequent DB writing of checkpoints. Regardless of this
   *   checkpoint interval, checkpointing is also performed at reconciliation interval boundaries.
-  * @param commitmentMismatchDebugging
-  *   Enables fine-grained logs of the changes the ACS commitment processor applies. It also enables
-  *   consistency checks in the ACS commitment processor. Should only be enabled for debugging
-  *   purposes, and never in prod.
-  * @param commitmentProcessorNrAcsChangesBehindToTriggerCatchUp
-  *   Optional parameter tuning how aggressively the participant's ACS commitment processor can
-  *   catch up when it needs to process many ACS changes. If None, the standard catch-up settings
-  *   apply, i.e., the processor catches up if it's behind in processing incoming commitments and
-  *   commitment computation is slow. If set, the participant triggers catch-up if it's behind in
-  *   processing incoming commitments, and it's behind in processing ACS changes, regardless of
-  *   whether its commitment computation is slow or not.
+  * @param autoSyncProtocolFeatureFlags
+  *   When true (default), protocol feature flags will be automatically updated when the node
+  *   connects to a synchronizer.
   */
 final case class ParticipantNodeParameterConfig(
     adminWorkflow: AdminWorkflowConfig = AdminWorkflowConfig(),
@@ -433,13 +425,11 @@ final case class ParticipantNodeParameterConfig(
     doNotAwaitOnCheckingIncomingCommitments: Boolean = false,
     commitmentCheckpointInterval: config.PositiveDurationSeconds =
       config.PositiveDurationSeconds.ofMinutes(1),
-    commitmentMismatchDebugging: Boolean = false,
-    commitmentProcessorNrAcsChangesBehindToTriggerCatchUp: Option[PositiveInt] = None,
+    autoSyncProtocolFeatureFlags: Boolean = true,
 ) extends LocalNodeParametersConfig
     with UniformCantonConfigValidation
 
 object ParticipantNodeParameterConfig {
-  import CantonConfigValidatorInstances.*
   implicit val participantNodeParameterConfigCantonConfigValidator
       : CantonConfigValidator[ParticipantNodeParameterConfig] =
     CantonConfigValidatorDerivation[ParticipantNodeParameterConfig]

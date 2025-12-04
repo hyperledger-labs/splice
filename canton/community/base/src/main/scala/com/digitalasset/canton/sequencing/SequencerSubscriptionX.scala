@@ -7,8 +7,9 @@ import com.digitalasset.canton.SequencerAlias
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.HasUnlessClosing
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.health.{AtomicHealthComponent, ComponentHealthState}
+import com.digitalasset.canton.lifecycle.{HasRunOnClosing, HasUnlessClosing}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.sequencing.client.SequencerClientSubscriptionError.{
   ApplicationHandlerException,
   ApplicationHandlerPassive,
@@ -59,6 +60,17 @@ class SequencerSubscriptionX[HandlerError] private[sequencing] (
     with NamedLogging {
   private val retryPolicy = connection.subscriptionRetryPolicy
 
+  private[sequencing] val health: AtomicHealthComponent = new AtomicHealthComponent() {
+    override def name: String = s"subscription-${connection.name}"
+
+    override protected def initialHealthState: ComponentHealthState =
+      ComponentHealthState.Failed()
+
+    override protected def associatedHasRunOnClosing: HasRunOnClosing = SequencerSubscriptionX.this
+
+    override protected def logger: TracedLogger = SequencerSubscriptionX.this.logger
+  }
+
   def start()(implicit traceContext: TraceContext): Either[String, Unit] = {
     val startingTimestampStringO = startingTimestampO
       .map(timestamp => s"the timestamp $timestamp")
@@ -72,11 +84,14 @@ class SequencerSubscriptionX[HandlerError] private[sequencing] (
 
     connection
       .subscribe(request, wrappedHandler, timeouts.network.duration)
-      .map(newSubscription =>
+      .map { newSubscription =>
         newSubscription.closeReason.onComplete {
           case Success(SubscriptionCloseReason.TransportChange) =>
             ErrorUtil
               .invalidState(s"Close reason 'TransportChange' cannot happen on a pool connection")
+
+          case reason @ Success(SubscriptionCloseReason.TokenExpiration) =>
+            giveUp(reason)
 
           case Success(_: SubscriptionCloseReason.SubscriptionError) if parent.isClosing =>
             giveUp(Success(SubscriptionCloseReason.Shutdown))
@@ -113,7 +128,9 @@ class SequencerSubscriptionX[HandlerError] private[sequencing] (
             // Permanently close the connection to this sequencer
             giveUp(unrecoverableReason)
         }
-      )
+
+        health.resolveUnhealthy()
+      }
   }
 
   private def restartConnection(connection: SequencerConnectionX, reason: String)(implicit
@@ -124,7 +141,7 @@ class SequencerSubscriptionX[HandlerError] private[sequencing] (
   // TODO(i28761): Warn after some delay or number of failures
   // LostSequencerSubscription.Warn(connection.attributes.sequencerId).discard
 
-  // stop the current subscription, do not retry, and propagate the failure upstream
+  // stop the current subscription, do not retry, and propagate the reason upstream
   private def giveUp(
       reason: Try[SubscriptionCloseReason[HandlerError]]
   )(implicit traceContext: TraceContext): Unit = {
@@ -151,6 +168,9 @@ class SequencerSubscriptionX[HandlerError] private[sequencing] (
         logger.info("Closing sequencer subscription due to handler shutdown")
       // If we reach here, it is due to a concurrent closing of the subscription (see above) and a subscription
       // error. Again, we don't need to explicitly close the connection.
+
+      case Success(SubscriptionCloseReason.TokenExpiration) =>
+        logger.debug("Sequencer subscription was closed by the server due to a token expiration")
 
       case Success(SubscriptionCloseReason.HandlerError(exception: ApplicationHandlerException)) =>
         logger.error(

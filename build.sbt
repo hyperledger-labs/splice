@@ -53,7 +53,6 @@ lazy val `canton-google-common-protos-scala` = BuildCommon.`canton-google-common
 lazy val `canton-sequencer-driver-api` = BuildCommon.`canton-sequencer-driver-api`
 lazy val `canton-kms-driver-api` = BuildCommon.`canton-kms-driver-api`
 lazy val `canton-community-reference-driver` = BuildCommon.`canton-community-reference-driver`
-lazy val `canton-transcode` = BuildCommon.`canton-transcode`
 
 lazy val `splice-wartremover-extension` = Wartremover.`splice-wartremover-extension`
 
@@ -1667,6 +1666,8 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case PathList("buf.yaml") => MergeStrategy.discard
     case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.first
     case "reflect.properties" => MergeStrategy.first
+    case PathList("scala", "reflect", "Selectable.class" | "Selectable$.class") =>
+      MergeStrategy.last
     case PathList("org", "checkerframework", _ @_*) => MergeStrategy.first
     case PathList("google", "protobuf", _*) => MergeStrategy.first
     case PathList("org", "apache", "logging", _*) => MergeStrategy.first

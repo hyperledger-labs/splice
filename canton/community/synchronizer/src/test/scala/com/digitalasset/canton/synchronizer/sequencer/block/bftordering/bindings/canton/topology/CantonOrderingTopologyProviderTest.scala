@@ -20,7 +20,6 @@ import com.digitalasset.canton.protocol.{
   DynamicSynchronizerParameters,
   DynamicSynchronizerParametersWithValidity,
 }
-import com.digitalasset.canton.sequencing.protocol.MaxRequestSizeToDeserialize
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.crypto.FingerprintKeyId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider.BftOrderingSigningKeyUsage
@@ -136,10 +135,7 @@ class CantonOrderingTopologyProviderTest
                     keyIds = Set(FingerprintKeyId.toBftKeyId(pk.id)),
                   )
                 )
-              orderingTopology.maxRequestSizeToDeserialize shouldBe
-                MaxRequestSizeToDeserialize.Limit(
-                  DynamicSynchronizerParameters.defaultMaxRequestSize.value
-                )
+              orderingTopology.maxBytesToDecompress shouldBe defaultMaxBytesToDecompress
             }
       }
     }

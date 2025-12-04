@@ -9,7 +9,7 @@ import com.digitalasset.canton.config as cantonConfig
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.health.HealthListener
+import com.digitalasset.canton.health.{HealthListener, HealthQuasiComponent}
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.SequencerConnectionPoolMetrics
@@ -108,6 +108,9 @@ final class SequencerSubscriptionPoolImpl private[sequencing] (
     logger = logger,
   )
 
+  override def getSubscriptionsHealthStatus: Seq[HealthQuasiComponent] =
+    subscriptions.view.map(_.health).toSeq
+
   /** Examine the current number of subscriptions in comparison to the configured trust threshold
     * with liveness margin. If we are under, we request additional connections, and if we can't
     * obtain enough, we reschedule the check later after
@@ -172,6 +175,7 @@ final class SequencerSubscriptionPoolImpl private[sequencing] (
               // will register on the connection health, which will immediately trigger a `poke`. If the connection
               // has meanwhile gone bad (state != `Validated`), we will remove the connection from the subscription
               // pool (as this runs in the same thread and the lock is reentrant) and call back here to adjust.
+              // Similarly, a subscription that closes immediately could call back here to adjust.
               // This should however not interfere with our processing, and obtain a new connection.
               newSubscriptions.foreach(_.register())
 
@@ -215,17 +219,13 @@ final class SequencerSubscriptionPoolImpl private[sequencing] (
     val preSubscriptionEventO =
       subscriptionStartProvider.getLatestProcessedEventO.orElse(initialSubscriptionEventO)
 
-    val subscription = sequencerSubscriptionFactory.create(
+    sequencerSubscriptionFactory.create(
       connection,
       member,
       preSubscriptionEventO,
       subscriptionHandlerFactory,
       parent = this,
     )
-
-    subscription.closeReason.onComplete(closeWithSubscriptionReason(connection))
-
-    subscription
   }
 
   private val closeReasonPromise = Promise[SequencerClient.CloseReason]()
@@ -258,12 +258,12 @@ final class SequencerSubscriptionPoolImpl private[sequencing] (
       closeReasonPromise.tryComplete(reason).discard
     }
 
-  private def closeWithSubscriptionReason(connection: SequencerConnectionX)(
+  private def closeWithSubscriptionReason(manager: SubscriptionManager)(
       subscriptionCloseReason: Try[SubscriptionCloseReason[SequencerClientSubscriptionError]]
   )(implicit traceContext: TraceContext): Unit = {
     def isThresholdStillReachable(ignoreCurrent: Boolean): Boolean = blocking(lock.synchronized {
       val ignored: Set[ConnectionX.ConnectionXConfig] =
-        if (ignoreCurrent) Set(connection.config) else Set.empty
+        if (ignoreCurrent) Set(manager.connection.config) else Set.empty
       val trustThreshold = currentConfigWithThreshold.trustThreshold
       val result = pool.isThresholdStillReachable(trustThreshold, ignored)
       logger.debug(s"isThresholdStillReachable(ignored = $ignored) = $result")
@@ -278,6 +278,9 @@ final class SequencerSubscriptionPoolImpl private[sequencing] (
     }
 
     subscriptionCloseReason match {
+      case Success(SubscriptionCloseReason.TokenExpiration) =>
+        removeSubscriptionsFromPool(manager)
+
       case Success(SubscriptionCloseReason.HandlerException(ex)) =>
         complete(Success(SequencerClient.CloseReason.UnrecoverableException(ex)))
 
@@ -342,15 +345,17 @@ final class SequencerSubscriptionPoolImpl private[sequencing] (
           case SequencerConnectionXState.Validated =>
 
           case SequencerConnectionXState.Initial | SequencerConnectionXState.Started |
-              SequencerConnectionXState.Starting | SequencerConnectionXState.Stopping |
-              SequencerConnectionXState.Stopped | SequencerConnectionXState.Fatal =>
+              SequencerConnectionXState.Starting | SequencerConnectionXState.Stopping(_) |
+              SequencerConnectionXState.Stopped(_) | SequencerConnectionXState.Fatal(_) =>
             removeSubscriptionsFromPool(SubscriptionManager.this)
         }
       }
     }
 
-    def register(): Unit =
+    def register()(implicit traceContext: TraceContext): Unit = {
       connection.health.registerOnHealthChange(connectionListener).discard[Boolean]
+      subscription.closeReason.onComplete(closeWithSubscriptionReason(this))
+    }
 
     def close(): Unit = {
       // If the connection comes back, the listener will be a different instance,

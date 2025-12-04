@@ -15,7 +15,11 @@ import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.*
 import com.digitalasset.canton.topology.admin.v30
 import com.digitalasset.canton.topology.client.*
-import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
+import com.digitalasset.canton.topology.store.{
+  NoPackageDependencies,
+  TopologyStore,
+  TopologyStoreId,
+}
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{
   MemberCode,
@@ -42,12 +46,7 @@ class GrpcTopologyAggregationService(
       asOf: CantonTimestamp,
       store: TopologyStore[TopologyStoreId.SynchronizerStore],
   ): TopologySnapshotLoader =
-    new StoreBasedTopologySnapshot(
-      asOf,
-      store,
-      StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
-      loggerFactory,
-    )
+    new StoreBasedTopologySnapshot(asOf, store, NoPackageDependencies, loggerFactory)
 
   private def snapshots(
       synchronizerIds: Set[SynchronizerId],
@@ -99,7 +98,7 @@ class GrpcTopologyAggregationService(
     .foldLeftM((Set.empty[PartyId], false), clients) { case ((res, isDone), (_, client)) =>
       if (isDone) FutureUnlessShutdown.pure((res, true))
       else
-        client.inspectKnownParties(filterParty, filterParticipant).map { found =>
+        client.inspectKnownParties(filterParty, filterParticipant, limit = limit).map { found =>
           val tmp = found ++ res
           if (tmp.sizeIs >= limit) (tmp.take(limit), true) else (tmp, false)
         }

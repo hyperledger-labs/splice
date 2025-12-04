@@ -847,14 +847,6 @@ class TransactionProcessingSteps(
     //   Also, check that all the view's informees received the derived randomness
     Right(parsedRequest.usedAndCreated.activenessSet)
 
-  override def authenticateInputContracts(
-      parsedRequest: ParsedTransactionRequest
-  )(implicit
-      traceContext: TraceContext
-  ): EitherT[Future, TransactionProcessorError, Unit] =
-    // For transaction processing contract authentication is done as part of model conformance
-    EitherT.pure(())
-
   override def constructPendingDataAndResponse(
       parsedRequest: ParsedTransactionRequest,
       reassignmentLookup: ReassignmentLookup,
@@ -968,13 +960,6 @@ class TransactionProcessingSteps(
             commonData,
             getEngineAbortStatus = () => engineController.abortStatus,
             reInterpretedTopLevelViews,
-          )
-
-        globalKeyHostedParties <-
-          InternalConsistencyChecker.hostedGlobalKeyParties(
-            parsedRequest.rootViewTrees,
-            participantId,
-            snapshot.ipsSnapshot,
           )
 
         internalConsistencyResultE = internalConsistencyChecker.check(

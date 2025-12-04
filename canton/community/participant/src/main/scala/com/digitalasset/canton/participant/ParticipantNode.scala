@@ -48,6 +48,7 @@ import com.digitalasset.canton.participant.protocol.submission.{
   InFlightSubmissionTracker,
 }
 import com.digitalasset.canton.participant.pruning.{AcsCommitmentProcessor, PruningProcessor}
+import com.digitalasset.canton.participant.replica.ParticipantReplicaManager
 import com.digitalasset.canton.participant.scheduler.ParticipantPruningScheduler
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore.Active
@@ -72,7 +73,7 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.PSIdLookup
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClient
 import com.digitalasset.canton.topology.store.TopologyStoreId.{AuthorizedStore, SynchronizerStore}
-import com.digitalasset.canton.topology.store.{PartyMetadataStore, TopologyStore, TopologyStoreId}
+import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.HostingParticipant
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherTUtil, SingleUseCell}
@@ -96,8 +97,8 @@ class ParticipantNodeBootstrap(
       ParticipantNodeParameters,
       ParticipantMetrics,
     ],
+    replicaManager: ParticipantReplicaManager,
     engine: Engine,
-    cantonSyncServiceFactory: CantonSyncService.Factory[CantonSyncService],
     resourceManagementServiceFactory: Eval[ParticipantSettingsStore] => ResourceManagementService,
     replicationServiceFactory: Storage => ServerServiceDefinition,
     ledgerApiServerBootstrapUtils: LedgerApiServerBootstrapUtils,
@@ -116,11 +117,6 @@ class ParticipantNodeBootstrap(
 
   private val cantonSyncService = new SingleUseCell[CantonSyncService]
   private val mutablePackageMetadataView = new SingleUseCell[MutablePackageMetadataViewImpl]
-  private val packageDependencyResolver = new SingleUseCell[PackageDependencyResolver.Impl]
-  private val packageUpgradeValidator = new PackageUpgradeValidator(
-    arguments.parameterConfig.general.cachingConfigs.packageUpgradeCache,
-    loggerFactory,
-  )
   override def metrics: ParticipantMetrics = arguments.metrics
 
   override protected val adminTokenConfig: AdminTokenConfig =
@@ -129,11 +125,6 @@ class ParticipantNodeBootstrap(
   private def tryGetMutablePackageMetadataView(): MutablePackageMetadataViewImpl =
     mutablePackageMetadataView.getOrElse(
       sys.error("mutablePackageMetadataView should be defined")
-    )
-
-  private def tryGetPackageDependencyResolver(): PackageDependencyResolver.Impl =
-    packageDependencyResolver.getOrElse(
-      sys.error("packageDependencyResolver should be defined")
     )
 
   override protected def sequencedTopologyStores: Seq[TopologyStore[SynchronizerStore]] =
@@ -193,6 +184,10 @@ class ParticipantNodeBootstrap(
       exitOnFatalFailures = parameters.exitOnFatalFailures,
       loggerFactory,
     )
+    val packageUpgradeValidator = new PackageUpgradeValidator(
+      arguments.parameterConfig.general.cachingConfigs.packageUpgradeCache,
+      loggerFactory,
+    )
 
     val packageMetadataView = new MutablePackageMetadataViewImpl(
       clock,
@@ -204,26 +199,7 @@ class ParticipantNodeBootstrap(
       arguments.futureSupervisor,
       exitOnFatalFailures = parameters.exitOnFatalFailures,
     )
-
     mutablePackageMetadataView.putIfAbsent(packageMetadataView).discard
-
-    val resolver = new PackageDependencyResolver.Impl(
-      participantId = ParticipantId(nodeId),
-      damlPackageStore = DamlPackageStore(
-        storage,
-        arguments.futureSupervisor,
-        arguments.parameterConfig,
-        exitOnFatalFailures = parameters.exitOnFatalFailures,
-        loggerFactory,
-      ),
-      timeouts = arguments.parameterConfig.processingTimeouts,
-      loggerFactory = loggerFactory,
-      fetchPackageParallelism = arguments.parameterConfig.general.batchingConfig.parallelism,
-      packageDependencyCacheConfig =
-        arguments.parameterConfig.general.cachingConfigs.packageDependencyCache,
-    )
-
-    packageDependencyResolver.putIfAbsent(resolver).discard
 
     def acsInspectionPerSynchronizer(): Map[SynchronizerId, AcsInspection] =
       cantonSyncService.get
@@ -345,7 +321,6 @@ class ParticipantNodeBootstrap(
         storage,
         engine,
         topologyManager,
-        tryGetPackageDependencyResolver(),
       ).map { participantServices =>
         if (cantonSyncService.putIfAbsent(participantServices.cantonSyncService).nonEmpty) {
           sys.error("should not happen")
@@ -399,7 +374,6 @@ class ParticipantNodeBootstrap(
         storage: Storage,
         engine: Engine,
         authorizedTopologyManager: AuthorizedTopologyManager,
-        packageDependencyResolver: PackageDependencyResolver.Impl,
     )(implicit executionSequencerFactory: ExecutionSequencerFactory): EitherT[
       FutureUnlessShutdown,
       String,
@@ -534,7 +508,9 @@ class ParticipantNodeBootstrap(
                 clock = clock,
                 commandProgressTracker = commandProgressTracker,
                 ledgerApiStore = persistentState.map(_.ledgerApiStore),
-                contractStore = persistentState.map(_.contractStore),
+                contractStore = persistentState.map(state =>
+                  LedgerApiContractStoreImpl(state.contractStore, loggerFactory)
+                ),
                 ledgerApiIndexerConfig = LedgerApiIndexerConfig(
                   storageConfig = config.storage,
                   processingTimeout = parameters.processingTimeouts,
@@ -584,7 +560,6 @@ class ParticipantNodeBootstrap(
           clock = clock,
           engine = engine,
           mutablePackageMetadataView = mutablePackageMetadataView,
-          packageDependencyResolver = packageDependencyResolver,
           enableStrictDarValidation = parameters.enableStrictDarValidation,
           loggerFactory = loggerFactory,
           metrics = arguments.metrics,
@@ -601,22 +576,6 @@ class ParticipantNodeBootstrap(
           loggerFactory,
         )
 
-        partyMetadataStore =
-          PartyMetadataStore(storage, parameters.processingTimeouts, loggerFactory)
-
-        partyNotifier = new LedgerServerPartyNotifier(
-          participantId,
-          ephemeralState.participantEventPublisher,
-          partyMetadataStore,
-          clock,
-          arguments.futureSupervisor,
-          mustTrackSubmissionIds = true,
-          exitOnFatalFailures = parameters.exitOnFatalFailures,
-          parameters.batchingConfig.maxItemsInBatch,
-          parameters.processingTimeouts,
-          loggerFactory,
-        )
-
         synchronizerRegistry = new GrpcSynchronizerRegistry(
           participantId,
           syncPersistentStateManager,
@@ -630,10 +589,9 @@ class ParticipantNodeBootstrap(
           arguments.testingConfig,
           recordSequencerInteractions,
           replaySequencerConfig,
-          packageDependencyResolver,
+          mutablePackageMetadataView,
           arguments.metrics.connectedSynchronizerMetrics,
           sequencerInfoLoader,
-          partyNotifier,
           futureSupervisor,
           loggerFactory,
         )
@@ -713,7 +671,7 @@ class ParticipantNodeBootstrap(
             .map(_.topologyManager)
 
         // Sync Service
-        sync = cantonSyncServiceFactory.create(
+        sync = CantonSyncService.create(
           participantId,
           synchronizerRegistry,
           synchronizerConnectionConfigStore,
@@ -721,10 +679,10 @@ class ParticipantNodeBootstrap(
           persistentState,
           ephemeralState,
           syncPersistentStateManager,
+          replicaManager,
           packageService,
           new PartyOps(activeTopologyManagerGetter, loggerFactory),
           topologyDispatcher,
-          partyNotifier,
           syncCryptoSignerWithSessionKeys,
           engine,
           commandProgressTracker,
@@ -734,9 +692,7 @@ class ParticipantNodeBootstrap(
           resourceManagementService,
           parameters,
           pruningProcessor,
-          schedulers,
           arguments.metrics,
-          exitOnFatalFailures = arguments.parameterConfig.exitOnFatalFailures,
           sequencerInfoLoader,
           arguments.futureSupervisor,
           loggerFactory,
@@ -750,6 +706,9 @@ class ParticipantNodeBootstrap(
           connectedSynchronizerHealth.set(sync.connectedSynchronizerHealth)
           connectedSynchronizerEphemeralHealth.set(sync.ephemeralHealth)
           connectedSynchronizerSequencerClientHealth.set(sync.sequencerClientHealth)
+          connectedSynchronizerSequencerConnectionPoolHealthRef.set(
+            sync.sequencerConnectionPoolHealth
+          )
           connectedSynchronizerAcsCommitmentProcessorHealth.set(sync.acsCommitmentProcessorHealth)
         }
 
@@ -881,11 +840,9 @@ class ParticipantNodeBootstrap(
         addCloseable(syncPersistentStateManager)
         addCloseable(synchronizerRegistry)
         addCloseable(resourceManagementService)
-        addCloseable(partyMetadataStore)
         persistentState.map(addCloseable).discard
         addCloseable(packageService)
         addCloseable(indexedStringStore)
-        addCloseable(partyNotifier)
         addCloseable(ephemeralState.participantEventPublisher)
         addCloseable(topologyDispatcher)
         addCloseable(schedulers)
@@ -902,7 +859,6 @@ class ParticipantNodeBootstrap(
             ).foreach(_.closeAcquired())
         })
         addCloseable(ledgerApiDependentServices)
-        addCloseable(packageDependencyResolver)
         addCloseable(mutablePackageMetadataView)
 
         // return values
@@ -925,6 +881,13 @@ class ParticipantNodeBootstrap(
   override protected def mkNodeHealthService(
       storage: Storage
   ): (DependenciesHealthService, LivenessHealthService) = {
+    val constantSoftDependencies = Seq(
+      connectedSynchronizerHealth,
+      connectedSynchronizerEphemeralHealth,
+      connectedSynchronizerSequencerClientHealth,
+      connectedSynchronizerAcsCommitmentProcessorHealth,
+    )
+
     val readiness = DependenciesHealthService(
       "participant",
       logger,
@@ -932,11 +895,9 @@ class ParticipantNodeBootstrap(
       criticalDependencies = storage +: crypto.toList,
       // The sync service won't be reporting Ok until the node is initialized, but that shouldn't prevent traffic from
       // reaching the node
-      Seq(
-        connectedSynchronizerHealth,
-        connectedSynchronizerEphemeralHealth,
-        connectedSynchronizerSequencerClientHealth,
-        connectedSynchronizerAcsCommitmentProcessorHealth,
+      softDependencies = Eval.always(
+        constantSoftDependencies ++
+          connectedSynchronizerSequencerConnectionPoolHealthRef.get.apply()
       ),
     )
     val liveness = LivenessHealthService.alwaysAlive(logger, timeouts)
@@ -977,6 +938,9 @@ class ParticipantNodeBootstrap(
       SequencerClient.healthName,
       timeouts,
     )
+
+  private val connectedSynchronizerSequencerConnectionPoolHealthRef =
+    new AtomicReference[() => Seq[HealthQuasiComponent]](() => Seq.empty)
 
   private lazy val connectedSynchronizerAcsCommitmentProcessorHealth: MutableHealthComponent =
     MutableHealthComponent(

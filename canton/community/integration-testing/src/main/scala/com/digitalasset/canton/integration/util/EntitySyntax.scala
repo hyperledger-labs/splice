@@ -9,6 +9,7 @@ import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.console.{LocalParticipantReference, ParticipantReference}
 import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.TestConsoleEnvironment
+import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 
@@ -94,6 +95,8 @@ trait EntitySyntax {
     }
 
     def toParticipantRef: LocalParticipantReference = lp(name)
+
+    def toLfContractId: LfContractId = LfContractId.assertFromString(name)
   }
 
 }

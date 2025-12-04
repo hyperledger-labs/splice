@@ -4,10 +4,8 @@
 package com.digitalasset.canton.topology.client
 
 import cats.data.EitherT
-import cats.implicits.toFoldableOps
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
-import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.HasFutureSupervision
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -128,9 +126,7 @@ trait TopologyClientApi[+T] { this: HasFutureSupervision =>
     * currentSnapshotApproximation instead. A head snapshot can be useful, however, for producing
     * new topology changes, e.g., for picking the correct serial.
     */
-  def headSnapshot(implicit traceContext: TraceContext): T = checked(
-    trySnapshot(topologyKnownUntilTimestamp)
-  )
+  def headSnapshot(implicit traceContext: TraceContext): T
 
   /** The approximate timestamp
     *
@@ -195,31 +191,6 @@ trait TopologyClientApi[+T] { this: HasFutureSupervision =>
   ): FutureUnlessShutdown[T] =
     supervisedUS(description, warnAfter)(awaitSnapshot(timestamp)(loggingContext.traceContext))
 
-  /** Returns the topology information at a certain point in time
-    *
-    * Fails with an exception if the state is not yet known.
-    *
-    * The snapshot returned by this method should be used for validating transaction and
-    * reassignment requests (Phase 2 - 7). Use the request timestamp as parameter for this method.
-    * Do not use a response or result timestamp, because all validation steps must use the same
-    * topology snapshot.
-    */
-  def trySnapshot(timestamp: CantonTimestamp)(implicit traceContext: TraceContext): T
-
-  /** Returns the topology information at the `timestamp` point in time, but using
-    * `desiredTimestamp` as the actual "forwarded" timestamp.
-    *
-    * Fails with an exception if the state is not yet known.
-    *
-    * The snapshot returned by this method should ONLY BE USED when computing the timestamp for
-    * signature validation (i.e.
-    * [[com.digitalasset.canton.crypto.SyncCryptoClient.getSnapshotForTimestamp]]).
-    */
-  def tryHypotheticalSnapshot(
-      timestamp: CantonTimestamp,
-      desiredTimestamp: CantonTimestamp,
-  )(implicit traceContext: TraceContext): T
-
   /** Returns an optional future which will complete when the effective timestamp has been observed
     *
     * If the timestamp is already observed, returns None.
@@ -250,6 +221,19 @@ trait TopologyClientApi[+T] { this: HasFutureSupervision =>
 trait SynchronizerTopologyClient extends TopologyClientApi[TopologySnapshot] with AutoCloseable {
   this: HasFutureSupervision =>
 
+  /** Returns the topology information at a certain point in time
+    *
+    * Fails with an exception if the state is not yet known.
+    *
+    * The snapshot returned by this method should be used for validating transaction and
+    * reassignment requests (Phase 2 - 7). Use the request timestamp as parameter for this method.
+    * Do not use a response or result timestamp, because all validation steps must use the same
+    * topology snapshot.
+    */
+  protected[topology] def trySnapshot(timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): TopologySnapshotLoader
+
   /** Wait for a condition to become true according to the current snapshot approximation
     *
     * @return
@@ -262,7 +246,6 @@ trait SynchronizerTopologyClient extends TopologyClientApi[TopologySnapshot] wit
   def awaitUS(condition: TopologySnapshot => FutureUnlessShutdown[Boolean], timeout: Duration)(
       implicit traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean]
-
 }
 
 trait BaseTopologySnapshotClient {
@@ -369,6 +352,7 @@ trait PartyTopologySnapshotClient {
   def inspectKnownParties(
       filterParty: String,
       filterParticipant: String,
+      limit: Int,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PartyId]]
 }
 
@@ -571,7 +555,7 @@ trait VettedPackagesSnapshotClient {
     *   package is missing locally such that we can not verify the vetting state of the package
     *   dependencies
     */
-  def findUnvettedPackagesOrDependencies(
+  def loadUnvettedPackagesOrDependencies(
       participantId: ParticipantId,
       packages: Set[PackageId],
       ledgerTime: CantonTimestamp,
@@ -712,6 +696,17 @@ trait SynchronizerTopologyClientWithInit
     with HasFutureSupervision
     with NamedLogging {
 
+  def initialize()(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Unit] =
+    for {
+      // Here we initialize `snapshots` intervals in the `CachingSynchronizerTopologyClient`
+      // for the `headSnapshot` and `currentSnapshotApproximation`
+      // NB: first inserted interval must be the head interval, so the order here matters!
+      _ <- snapshot(topologyKnownUntilTimestamp)
+      _ <- snapshot(approximateTimestamp)
+    } yield ()
+
   implicit override protected def executionContext: ExecutionContext
 
   protected val synchronizerTimeTracker: SingleUseCell[SynchronizerTimeTracker] =
@@ -729,18 +724,7 @@ trait SynchronizerTopologyClientWithInit
   ): TopologySnapshotLoader =
     trySnapshot(approximateTimestamp)
 
-  override def trySnapshot(timestamp: CantonTimestamp)(implicit
-      traceContext: TraceContext
-  ): TopologySnapshotLoader
-
-  override def tryHypotheticalSnapshot(
-      timestamp: CantonTimestamp,
-      desiredTimestamp: CantonTimestamp,
-  )(implicit
-      traceContext: TraceContext
-  ): TopologySnapshotLoader
-
-  private def waitForTimestampWithLogging(
+  protected def waitForTimestampWithLogging(
       timestamp: CantonTimestamp
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     // Keep current value, in case we need it in the log entry below
@@ -763,27 +747,16 @@ trait SynchronizerTopologyClientWithInit
     }
   }
 
-  /** Overloaded snapshot returning derived type */
-  override def snapshot(
-      timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[TopologySnapshotLoader] =
-    waitForTimestampWithLogging(timestamp).map(_ => trySnapshot(timestamp))
-
-  /** Overloaded hypotheticalSnapshot returning derived type */
-  override def hypotheticalSnapshot(
-      timestamp: CantonTimestamp,
-      desiredTimestamp: CantonTimestamp,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[TopologySnapshotLoader] =
-    waitForTimestampWithLogging(timestamp).map(_ =>
-      tryHypotheticalSnapshot(timestamp, desiredTimestamp)
-    )
-
-  override def awaitSnapshot(timestamp: CantonTimestamp)(implicit
+  override final def awaitSnapshot(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[TopologySnapshot] =
     awaitTimestamp(timestamp)
       .getOrElse(FutureUnlessShutdown.unit)
-      .map(_ => trySnapshot(timestamp))
+      .flatMap(_ => snapshot(timestamp))
+
+  override def headSnapshot(implicit traceContext: TraceContext): TopologySnapshotLoader = checked(
+    trySnapshot(topologyKnownUntilTimestamp)
+  )
 
   /** internal await implementation used to schedule state evaluations after topology updates */
   private[topology] def scheduleAwait(
@@ -1083,23 +1056,20 @@ trait VettedPackagesLoader {
 trait VettedPackagesSnapshotLoader extends VettedPackagesSnapshotClient with VettedPackagesLoader {
   this: BaseTopologySnapshotClient & PartyTopologySnapshotLoader =>
 
-  private[client] def loadUnvettedPackagesOrDependenciesUsingLoader(
+  private[client] def findUnvettedPackagesOrDependencies(
       participant: ParticipantId,
-      packageId: PackageId,
+      packages: Set[PackageId],
       ledgerTime: CantonTimestamp,
-      vettedPackagesLoader: VettedPackagesLoader,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[UnknownOrUnvettedPackages]
+      vettedPackages: Map[PackageId, VettedPackage],
+  )(implicit traceContext: TraceContext): UnknownOrUnvettedPackages
 
-  override final def findUnvettedPackagesOrDependencies(
+  override final def loadUnvettedPackagesOrDependencies(
       participantId: ParticipantId,
       packages: Set[PackageId],
       ledgerTime: CantonTimestamp,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[UnknownOrUnvettedPackages] =
-    packages.toList
-      .parTraverse(packageId =>
-        loadUnvettedPackagesOrDependenciesUsingLoader(participantId, packageId, ledgerTime, this)
-      )
-      .map(_.combineAll)
+    for (vettedPackages <- loadVettedPackages(participantId))
+      yield findUnvettedPackagesOrDependencies(participantId, packages, ledgerTime, vettedPackages)
 
   override final def determinePackagesWithNoVettingEntry(
       participantId: ParticipantId,

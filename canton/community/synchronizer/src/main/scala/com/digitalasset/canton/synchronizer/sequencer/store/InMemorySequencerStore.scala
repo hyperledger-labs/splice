@@ -194,6 +194,7 @@ class InMemorySequencerStore(
 
   override protected def readEventsInternal(
       memberId: SequencerMemberId,
+      memberRegisteredFrom: CantonTimestamp,
       fromExclusiveO: Option[CantonTimestamp] = None,
       limit: Int = 100,
   )(implicit
@@ -207,6 +208,7 @@ class InMemorySequencerStore(
     watermarkO.fold[ReadEvents](SafeWatermark(watermarkO)) { watermark =>
       val payloads =
         fromExclusiveO
+          .map(_ max memberRegisteredFrom)
           .fold(events.tailMap(CantonTimestamp.MinValue, true))(events.tailMap(_, false))
           .entrySet()
           .iterator()
@@ -256,7 +258,9 @@ class InMemorySequencerStore(
             )
             .toList
         case payload: BytesPayload =>
-          List(payload.id -> payload.decodeBatchAndTrim(protocolVersion, member))
+          List(
+            payload.id -> payload.decodeBatchAndTrim(protocolVersion, member)
+          )
       }.toMap
     )
 

@@ -25,15 +25,15 @@ import com.digitalasset.canton.participant.util.DAMLe
 import com.digitalasset.canton.participant.util.DAMLe.{
   EngineError,
   HasReinterpret,
-  PackageResolver,
   ReInterpretationResult,
 }
-import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.ContractAuthenticatorFn
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.ExampleTransactionFactory.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ContractValidator.ContractAuthenticatorFn
 import com.digitalasset.canton.util.FutureInstances.*
+import com.digitalasset.canton.util.PackageConsumer.PackageResolver
 import com.digitalasset.canton.util.{ContractValidator, TestContractHasher}
 import com.digitalasset.canton.{
   BaseTest,
@@ -70,7 +70,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
     GenPackage(
       modules = Map.empty,
       directDeps = Set.empty,
-      languageVersion = LanguageVersion.default,
+      languageVersion = LanguageVersion.defaultLfVersion,
       metadata = packageMetadata,
       imports = DeclaredImports(Set.empty),
       isUtilityPackage = true,

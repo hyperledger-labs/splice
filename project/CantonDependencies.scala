@@ -1,14 +1,15 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import sbt._
+import sbt.*
 
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.4.4"
+  val version: String = "3.5.0-snapshot.20251121.14446.0.vb91b8238"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
+  val transcode_version = "0.1.1-main.20251112.144.829.v5cc568a"
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
   // the non-sbt based docker build.
   val daml_compiler_version = sys.env("DAML_COMPILER_VERSION")
@@ -24,7 +25,7 @@ object CantonDependencies {
 
   lazy val anorm = "org.playframework.anorm" %% "anorm" % "2.7.0"
   lazy val apispec_version = "0.11.7"
-  lazy val pekko_version = "1.2.0"
+  lazy val pekko_version = "1.2.1"
   lazy val pekko_http_version = "1.2.0"
   lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
   lazy val auth0_jwks = "com.auth0" % "jwks-rsa" % "0.21.2"
@@ -98,6 +99,22 @@ object CantonDependencies {
     "com.daml" %% "daml-lf-api-type-signature" % daml_libraries_version
   lazy val daml_libs_scala_grpc_test_utils =
     "com.daml" %% "grpc-test-utils" % daml_libraries_version
+
+  lazy val fastparse = "com.lihaoyi" %% "fastparse" % "3.1.1"
+  lazy val transcode_daml_lf =
+    ("com.daml" %% "transcode-daml-lf-daml3.5" % transcode_version)
+      .cross(CrossVersion.for2_13Use3)
+      .exclude("com.lihaoyi", "fastparse_3")
+  lazy val transcode_codec_json =
+    ("com.daml" %% "transcode-codec-json" % transcode_version)
+      .cross(CrossVersion.for2_13Use3)
+      .exclude("com.lihaoyi", "ujson_3")
+      .exclude("com.lihaoyi", "upickle-core_3")
+      .exclude("com.lihaoyi", "fastparse_3")
+  lazy val transcode_codec_proto_scala =
+    ("com.daml" %% "transcode-codec-proto-scala-daml3.5" % transcode_version)
+      .cross(CrossVersion.for2_13Use3)
+      .exclude("com.lihaoyi", "fastparse_3")
 
   lazy val daml_nonempty = "com.daml" %% "nonempty" % daml_libraries_version
   lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version

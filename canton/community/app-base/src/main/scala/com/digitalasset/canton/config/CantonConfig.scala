@@ -371,27 +371,6 @@ object CantonFeatures {
     CantonConfigValidatorDerivation[CantonFeatures]
 }
 
-/** Root configuration parameters for a single Canton process.
-  *
-  * @param participants
-  *   All locally running participants that this Canton process can connect and operate on.
-  * @param remoteParticipants
-  *   All remotely running participants to which the console can connect and operate on.
-  * @param sequencers
-  *   All locally running sequencers that this Canton process can connect and operate on.
-  * @param remoteSequencers
-  *   All remotely running sequencers that this Canton process can connect and operate on.
-  * @param mediators
-  *   All locally running mediators that this Canton process can connect and operate on.
-  * @param remoteMediators
-  *   All remotely running mediators that this Canton process can connect and operate on.
-  * @param monitoring
-  *   determines how this Canton process can be monitored
-  * @param parameters
-  *   per-environment parameters to control enabled features and set testing parameters
-  * @param features
-  *   control which features are enabled
-  */
 trait SharedCantonConfig[Self] extends ConfigDefaults[Option[DefaultPorts], Self] { self: Self =>
   def name: Option[String]
   def portDescription: String
@@ -404,7 +383,13 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[Option[DefaultPorts], Self
   def monitoring: MonitoringConfig
   def parameters: CantonParameters
   def features: CantonFeatures
-  def pekkoConfig: Option[Config]
+
+  /** Names of local nodes in order: sequencers, mediators, participants. Order within each group
+    * may be different between runs, but the list may serve as a single reference order in case we
+    * need to to do some actions in the same order.
+    */
+  def nodeNamesInStartupOrder: Seq[InstanceName] =
+    sequencers.keys.view ++ mediators.keys ++ participants.keys to List
 
   def allLocalNodes: Map[InstanceName, LocalNodeConfig] =
     (participants: Map[InstanceName, LocalNodeConfig]) ++ sequencers ++ mediators
@@ -479,9 +464,7 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[Option[DefaultPorts], Self
           participantParameters.doNotAwaitOnCheckingIncomingCommitments,
         disableOptionalTopologyChecks = participantConfig.topology.disableOptionalTopologyChecks,
         commitmentCheckpointInterval = participantParameters.commitmentCheckpointInterval,
-        commitmentMismatchDebugging = participantParameters.commitmentMismatchDebugging,
-        commitmentProcessorNrAcsChangesBehindToTriggerCatchUp =
-          participantParameters.commitmentProcessorNrAcsChangesBehindToTriggerCatchUp,
+        autoSyncProtocolFeatureFlags = participantParameters.autoSyncProtocolFeatureFlags,
       )
     }
 
@@ -504,6 +487,8 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[Option[DefaultPorts], Self
         maxConfirmationRequestsBurstFactor =
           sequencerNodeConfig.parameters.maxConfirmationRequestsBurstFactor,
         asyncWriter = sequencerNodeConfig.parameters.asyncWriter.toParameters,
+        sequencingTimeLowerBoundExclusive =
+          sequencerNodeConfig.parameters.sequencingTimeLowerBoundExclusive,
         unsafeEnableOnlinePartyReplication =
           sequencerNodeConfig.parameters.unsafeEnableOnlinePartyReplication,
         requestLimits = sequencerNodeConfig.publicApi.limits,
@@ -598,7 +583,6 @@ final case class CantonConfig(
     monitoring: MonitoringConfig = MonitoringConfig(),
     parameters: CantonParameters = CantonParameters(),
     features: CantonFeatures = CantonFeatures(),
-    pekkoConfig: Option[Config] = None,
 ) extends UniformCantonConfigValidation
     with ConfigDefaults[Option[DefaultPorts], CantonConfig]
     with SharedCantonConfig[CantonConfig] {
@@ -612,13 +596,7 @@ final case class CantonConfig(
       edition: CantonEdition,
       ensurePortsSet: Boolean,
   ): Validated[NonEmpty[Seq[String]], Unit] = {
-    val validator = edition match {
-      case CommunityCantonEdition =>
-        CommunityConfigValidations
-      case EnterpriseCantonEdition =>
-        EnterpriseConfigValidations
-    }
-    validator.validate(this, edition, ensurePortsSet)
+    CommunityConfigValidations.validate(this, edition, ensurePortsSet = ensurePortsSet)
   }
 
   /** Produces a message in the structure

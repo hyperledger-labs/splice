@@ -5,12 +5,13 @@ package com.digitalasset.canton.topology.store
 
 import cats.syntax.option.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.CantonRequireTypes.{String255, String300}
+import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.topology.TopologyStateHash
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.SuppressionRule.LevelAndAbove
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.{
   EffectiveTime,
   InitialTopologySnapshotValidator,
@@ -22,12 +23,6 @@ import com.digitalasset.canton.topology.store.db.DbTopologyStore
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
 import com.digitalasset.canton.topology.transaction.{TopologyMapping, *}
-import com.digitalasset.canton.topology.{
-  DefaultTestIdentities,
-  ParticipantId,
-  PartyId,
-  PhysicalSynchronizerId,
-}
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{FailOnShutdown, HasActorSystem}
@@ -44,137 +39,6 @@ trait TopologyStoreTest
 
   val testData = new TopologyStoreTestData(testedProtocolVersion, loggerFactory, executionContext)
   import testData.*
-
-  private lazy val submissionId = String255.tryCreate("submissionId")
-  private lazy val submissionId2 = String255.tryCreate("submissionId2")
-  private lazy val submissionId3 = String255.tryCreate("submissionId3")
-
-  protected def partyMetadataStore(mk: () => PartyMetadataStore): Unit = {
-    import DefaultTestIdentities.*
-    "inserting new succeeds" in {
-      val store = mk()
-      for {
-        _ <- insertOrUpdatePartyMetadata(store)(
-          party1,
-          Some(participant1),
-          CantonTimestamp.Epoch,
-          submissionId,
-        )
-        fetch <- store.metadataForParties(Seq(party1))
-      } yield {
-        fetch shouldBe NonEmpty(
-          Seq,
-          Some(PartyMetadata(party1, Some(participant1))(CantonTimestamp.Epoch, submissionId)),
-        )
-      }
-    }
-
-    "updating existing succeeds" in {
-      val store = mk()
-      for {
-        _ <- insertOrUpdatePartyMetadata(store)(
-          party1,
-          None,
-          CantonTimestamp.Epoch,
-          submissionId,
-        )
-        _ <- insertOrUpdatePartyMetadata(store)(
-          party2,
-          None,
-          CantonTimestamp.Epoch,
-          submissionId,
-        )
-        _ <- insertOrUpdatePartyMetadata(store)(
-          party1,
-          Some(participant1),
-          CantonTimestamp.Epoch,
-          submissionId,
-        )
-        _ <- insertOrUpdatePartyMetadata(store)(
-          party2,
-          Some(participant3),
-          CantonTimestamp.Epoch,
-          submissionId,
-        )
-        metadata <- store.metadataForParties(Seq(party1, party2))
-      } yield {
-        metadata shouldBe NonEmpty(
-          Seq,
-          Some(
-            PartyMetadata(party1, Some(participant1))(
-              CantonTimestamp.Epoch,
-              String255.empty,
-            )
-          ),
-          Some(
-            PartyMetadata(party2, Some(participant3))(
-              CantonTimestamp.Epoch,
-              String255.empty,
-            )
-          ),
-        )
-      }
-    }
-
-    "updating existing succeeds via batch" in {
-      val store = mk()
-      for {
-        _ <- store.insertOrUpdatePartyMetadata(
-          Seq(
-            PartyMetadata(party1, None)(CantonTimestamp.Epoch, submissionId),
-            PartyMetadata(party2, None)(CantonTimestamp.Epoch, submissionId),
-            PartyMetadata(party1, Some(participant1))(CantonTimestamp.Epoch, submissionId),
-            PartyMetadata(party2, Some(participant3))(CantonTimestamp.Epoch, submissionId),
-          )
-        )
-        metadata <- store.metadataForParties(Seq(party1, party3, party2))
-      } yield {
-        metadata shouldBe NonEmpty(
-          Seq,
-          Some(
-            PartyMetadata(party1, Some(participant1))(CantonTimestamp.Epoch, String255.empty)
-          ),
-          None, // checking that unknown party appears in the matching slot
-          Some(
-            PartyMetadata(party2, Some(participant3))(CantonTimestamp.Epoch, String255.empty)
-          ),
-        )
-      }
-    }
-
-    "deal with delayed notifications" in {
-      val store = mk()
-      val rec1 =
-        PartyMetadata(party1, Some(participant1))(CantonTimestamp.Epoch, submissionId)
-      val rec2 =
-        PartyMetadata(party2, Some(participant3))(CantonTimestamp.Epoch, submissionId2)
-      val rec3 =
-        PartyMetadata(party2, Some(participant1))(
-          CantonTimestamp.Epoch.immediateSuccessor,
-          submissionId3,
-        )
-      val rec4 =
-        PartyMetadata(party3, Some(participant2))(CantonTimestamp.Epoch, submissionId3)
-      for {
-        _ <- store.insertOrUpdatePartyMetadata(Seq(rec1, rec2, rec3, rec4))
-        _ <- store.markNotified(rec2.effectiveTimestamp, Seq(rec2.partyId, rec4.partyId))
-        notNotified <- store.fetchNotNotified().map(_.toSet)
-      } yield {
-        notNotified shouldBe Set(rec1, rec3)
-      }
-    }
-
-  }
-
-  private def insertOrUpdatePartyMetadata(store: PartyMetadataStore)(
-      partyId: PartyId,
-      participantId: Option[ParticipantId],
-      effectiveTimestamp: CantonTimestamp,
-      submissionId: String255,
-  ) =
-    store.insertOrUpdatePartyMetadata(
-      Seq(PartyMetadata(partyId, participantId)(effectiveTimestamp, submissionId))
-    )
 
   // TODO(#14066): Test coverage is rudimentary - enough to convince ourselves that queries basically seem to work.
   //  Increase coverage.
@@ -624,6 +488,16 @@ trait TopologyStoreTest
               filterParty = `fred::p2Namepsace`.uid.toProtoPrimitive,
               filterParticipant = p1Id.uid.toProtoPrimitive,
             )
+            onlyParticipant2ViaParticipantFilter <- inspectKnownParties(
+              store,
+              ts6,
+              filterParticipant = "participant2",
+            )
+            onlyParticipant2ViaPartyFilter <- inspectKnownParties(
+              store,
+              ts6,
+              filterParty = "participant2",
+            )
             onlyParticipant3 <- inspectKnownParties(store, ts6, filterParticipant = "participant3")
             neitherParty <- inspectKnownParties(store, ts6, "fred::canton", "participant3")
           } yield {
@@ -688,6 +562,12 @@ trait TopologyStoreTest
             )
             onlyFred shouldBe Set(ptp_fred_p1.mapping.partyId)
             fredFullySpecified shouldBe Set(ptp_fred_p1.mapping.partyId)
+            onlyParticipant2ViaParticipantFilter shouldBe Set(
+              dtc_p2_synchronizer1.mapping.participantId.adminParty
+            )
+            onlyParticipant2ViaPartyFilter shouldBe Set(
+              dtc_p2_synchronizer1.mapping.participantId.adminParty
+            )
             onlyParticipant3 shouldBe Set() // p3 cannot appear as OTK3 is only a proposal
             neitherParty shouldBe Set.empty
           }
@@ -811,6 +691,119 @@ trait TopologyStoreTest
             initialHash shouldBe expectedInitialHash
             ts1Hash shouldBe expectedTs1Hash
           }
+        }
+
+        "able to find latest vetted packages changes in order" in {
+          val store = mk(da_vp123_physicalSynchronizerId, "case9a")
+
+          def toParticipantIds(
+              vps: StoredTopologyTransactions[TopologyChangeOp, VettedPackages]
+          ): Seq[ParticipantId] =
+            vps.result.map(_.mapping.participantId)
+
+          def isNotSortedNaively(
+              vps: StoredTopologyTransactions[TopologyChangeOp, VettedPackages]
+          ): Assertion = {
+            val naiveKeys = toParticipantIds(vps).map(id => id.uid.toProtoPrimitive)
+            val keys = toParticipantIds(vps).map(id =>
+              id.uid.identifier.toProtoPrimitive
+                -> id.uid.namespace.toProtoPrimitive
+            )
+            naiveKeys.sorted should not equal keys.sorted
+          }
+
+          def isSorted(
+              vps: StoredTopologyTransactions[TopologyChangeOp, VettedPackages]
+          ): Assertion = {
+            val keys = toParticipantIds(vps).map(id =>
+              id.uid.identifier.toProtoPrimitive
+                -> id.uid.namespace.toProtoPrimitive
+            )
+            keys.sorted should equal(keys)
+          }
+
+          def findLatestPagedVettingChanges(
+              store: TopologyStore[TopologyStoreId.SynchronizerStore],
+              participantsFilter: Option[NonEmpty[Set[ParticipantId]]],
+              participantStartExclusive: Option[ParticipantId],
+              pageLimit: Int,
+          ): FutureUnlessShutdown[
+            StoredTopologyTransactions[TopologyChangeOp.Replace, VettedPackages]
+          ] =
+            store
+              .findPositiveTransactions(
+                asOf = CantonTimestamp.MaxValue,
+                asOfInclusive = true,
+                isProposal = false,
+                types = Seq(VettedPackages.code),
+                filterUid = participantsFilter.map(_.toSeq.map(_.uid)),
+                filterNamespace = None,
+                pagination = Some((participantStartExclusive.map(_.uid), pageLimit)),
+              )
+              .map(_.collectOfMapping[VettedPackages])
+
+          for {
+            _ <- update(
+              store,
+              ts1,
+              add = Seq(vp_vp3_synchronizer1, vp_vp2_synchronizer1, vp_vp1_synchronizer1),
+            )
+
+            vettedPackagesAll <- findLatestPagedVettingChanges(
+              store = store,
+              participantsFilter = None,
+              participantStartExclusive = None,
+              pageLimit = 1000,
+            )
+
+            vettedPackagesOnly2 <- findLatestPagedVettingChanges(
+              store = store,
+              participantsFilter = None,
+              participantStartExclusive = None,
+              pageLimit = 2,
+            )
+
+            vettedPackagesBounded <- findLatestPagedVettingChanges(
+              store = store,
+              participantsFilter = None,
+              participantStartExclusive = Some(vp3Id),
+              pageLimit = 1000,
+            )
+
+            vettedPackagesUserSpecified <- findLatestPagedVettingChanges(
+              store = store,
+              participantsFilter = Some(NonEmpty(Set, vp2Id, vp3Id)),
+              participantStartExclusive = None,
+              pageLimit = 1000,
+            )
+
+            vettedPackagesUserSpecifiedBounded <- findLatestPagedVettingChanges(
+              store = store,
+              participantsFilter = Some(NonEmpty(Set, vp2Id, vp3Id)),
+              participantStartExclusive = Some(vp3Id),
+              pageLimit = 1000,
+            )
+          } yield {
+            vettedPackagesAll.result should have length 3
+            isSorted(vettedPackagesAll)
+            isNotSortedNaively(vettedPackagesAll)
+
+            vettedPackagesOnly2.result should have length 2
+            isSorted(vettedPackagesOnly2)
+            toParticipantIds(vettedPackagesOnly2) should equal(Seq(vp3Id, vp2Id))
+
+            vettedPackagesBounded.result should have length 2
+            isSorted(vettedPackagesBounded)
+            toParticipantIds(vettedPackagesBounded) should equal(Seq(vp2Id, vp1Id))
+
+            vettedPackagesUserSpecified.result should have length 2
+            isSorted(vettedPackagesUserSpecified)
+            toParticipantIds(vettedPackagesUserSpecified) should equal(Seq(vp3Id, vp2Id))
+
+            vettedPackagesUserSpecifiedBounded.result should have length 1
+            toParticipantIds(vettedPackagesUserSpecifiedBounded) should equal(Seq(vp2Id))
+          }
+
         }
 
         "able to find positive transactions" in {

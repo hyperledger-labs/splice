@@ -4,15 +4,15 @@
 package com.digitalasset.canton.participant.sync
 
 import cats.Eval
-import cats.syntax.apply.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, SessionEncryptionKeyCacheConfig}
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
-import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.participant.state.SynchronizerIndex
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, PromiseUnlessShutdownFactory}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.admin.party.OnboardingClearanceScheduler
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
 import com.digitalasset.canton.participant.metrics.ConnectedSynchronizerMetrics
@@ -42,11 +42,11 @@ trait SyncEphemeralStateFactory {
       ledgerApiIndexer: Eval[LedgerApiIndexer],
       contractStore: Eval[ContractStore],
       participantNodeEphemeralState: ParticipantNodeEphemeralState,
-      synchronizerPredecessor: Option[SynchronizerPredecessor],
       createTimeTracker: () => SynchronizerTimeTracker,
       promiseUSFactory: PromiseUnlessShutdownFactory,
       metrics: ConnectedSynchronizerMetrics,
       sessionKeyCacheConfig: SessionEncryptionKeyCacheConfig,
+      onboardingClearanceScheduler: OnboardingClearanceScheduler,
       participantId: ParticipantId,
   )(implicit
       traceContext: TraceContext
@@ -69,11 +69,11 @@ class SyncEphemeralStateFactoryImpl(
       ledgerApiIndexer: Eval[LedgerApiIndexer],
       contractStore: Eval[ContractStore],
       participantNodeEphemeralState: ParticipantNodeEphemeralState,
-      synchronizerPredecessor: Option[SynchronizerPredecessor],
       createTimeTracker: () => SynchronizerTimeTracker,
       promiseUSFactory: PromiseUnlessShutdownFactory,
       metrics: ConnectedSynchronizerMetrics,
       sessionKeyCacheConfig: SessionEncryptionKeyCacheConfig,
+      onboardingClearanceScheduler: OnboardingClearanceScheduler,
       participantId: ParticipantId,
   )(implicit
       traceContext: TraceContext
@@ -88,7 +88,6 @@ class SyncEphemeralStateFactoryImpl(
         persistentState.requestJournalStore,
         persistentState.sequencedEventStore,
         synchronizerIndex,
-        synchronizerPredecessor,
       )
 
       _ <- SyncEphemeralStateFactory.cleanupPersistentState(persistentState, synchronizerIndex)
@@ -134,6 +133,7 @@ class SyncEphemeralStateFactoryImpl(
         recordOrderPublisher,
         timeTracker,
         inFlightSubmissionSynchronizerTracker,
+        onboardingClearanceScheduler,
         persistentState,
         ledgerApiIndexer.value,
         contractStore.value,
@@ -182,7 +182,6 @@ object SyncEphemeralStateFactory {
       requestJournalStore: RequestJournalStore,
       sequencedEventStore: SequencedEventStore,
       synchronizerIndexO: Option[SynchronizerIndex],
-      synchronizerPredecessor: Option[SynchronizerPredecessor],
   )(implicit
       ec: ExecutionContext,
       loggingContext: ErrorLoggingContext,
@@ -191,35 +190,28 @@ object SyncEphemeralStateFactory {
     for {
       isSequencedEventStoreEmpty <- sequencedEventStore.sequencedEvents(Some(1)).map(_.isEmpty)
 
-      isAcrossUpgrade = (synchronizerIndexO, synchronizerPredecessor).tupled.exists {
-        case (synchronizerIndex, synchronizerPredecessor) =>
-          isSequencedEventStoreEmpty && synchronizerIndex.recordTime == synchronizerPredecessor.upgradeTime
-      }
-
-      messageProcessingStartingPoint <-
-        if (isAcrossUpgrade) {
-          FutureUnlessShutdown.pure(MessageProcessingStartingPoint.default)
-        } else {
-          for {
-            tocO <- synchronizerIndexO
-              .flatTraverse(si =>
-                requestJournalStore.lastRequestTimeWithRequestTimestampBeforeOrAt(si.recordTime)
-              )
-            sequencerCounterO <- sequencerCounterFromSynchronizerIndex(
-              sequencedEventStore,
-              synchronizerIndexO,
+      requestCounterO <-
+        if (!isSequencedEventStoreEmpty)
+          synchronizerIndexO
+            .flatTraverse(si =>
+              requestJournalStore.lastRequestTimeWithRequestTimestampBeforeOrAt(si.recordTime)
             )
-          } yield MessageProcessingStartingPoint(
-            nextRequestCounter = tocO.map(_.rc + 1).getOrElse(RequestCounter.Genesis),
-            nextSequencerCounter = sequencerCounterO
-              .map(_ + 1)
-              .getOrElse(SequencerCounter.Genesis),
-            lastSequencerTimestamp = lastSequencerTimestamp(synchronizerIndexO),
-            currentRecordTime = currentRecordTime(synchronizerIndexO),
-            nextRepairCounter = nextRepairCounter(synchronizerIndexO),
-          )
-        }
+        else FutureUnlessShutdown.pure(None)
 
+      sequencerCounterO <-
+        if (!isSequencedEventStoreEmpty)
+          sequencerCounterFromSynchronizerIndex(sequencedEventStore, synchronizerIndexO)
+        else FutureUnlessShutdown.pure(None)
+
+      messageProcessingStartingPoint = MessageProcessingStartingPoint(
+        nextRequestCounter = requestCounterO.map(_.rc + 1).getOrElse(RequestCounter.Genesis),
+        nextSequencerCounter = sequencerCounterO
+          .map(_ + 1)
+          .getOrElse(SequencerCounter.Genesis),
+        lastSequencerTimestamp = lastSequencerTimestamp(synchronizerIndexO),
+        currentRecordTime = currentRecordTime(synchronizerIndexO),
+        nextRepairCounter = nextRepairCounter(synchronizerIndexO),
+      )
       replayOpt <- requestJournalStore
         .firstRequestWithCommitTimeAfter(
           // We need to follow the repair requests which might come between sequencer timestamps hence we

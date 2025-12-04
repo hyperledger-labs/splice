@@ -12,8 +12,8 @@ import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.{
   BaseTest,
-  ProtocolVersionChecksFixtureAnyWordSpec,
   RepeatableTestSuiteTest,
+  TestPredicateFiltersFixtureAnyWordSpec,
   config,
 }
 import org.scalactic.source
@@ -61,7 +61,7 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
     extends FixtureAnyWordSpec
     with BaseTest
     with RepeatableTestSuiteTest
-    with ProtocolVersionChecksFixtureAnyWordSpec
+    with TestPredicateFiltersFixtureAnyWordSpec
     with IntegrationTestMetrics {
   this: EnvironmentSetup[C, E] =>
 

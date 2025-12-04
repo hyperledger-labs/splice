@@ -45,9 +45,9 @@ object ArbitraryConfig {
     duration.map(NonNegativeFiniteDuration.tryFromJavaDuration)
 
   val versionRange: Gen[VersionRange[LanguageVersion]] = for {
-    min <- Gen.oneOf(LanguageVersion.AllV2)
-    max <- Gen.oneOf(LanguageVersion.AllV2)
-    if LanguageVersion.Ordering.compare(max, min) >= 0
+    min <- Gen.oneOf(LanguageVersion.allLfVersions)
+    max <- Gen.oneOf(LanguageVersion.allLfVersions)
+    if max >= min
   } yield VersionRange[LanguageVersion](min, max)
 
   val limits: Gen[Limits] = for {

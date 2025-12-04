@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.participant.topology
 
+import cats.data.EitherT
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
   BatchingConfig,
@@ -14,6 +15,7 @@ import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.participant.admin.party.OnboardingClearanceScheduler
 import com.digitalasset.canton.participant.config.UnsafeOnlinePartyReplicationConfig
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.ledger.api.LedgerApiStore
@@ -29,7 +31,11 @@ import com.digitalasset.canton.topology.processing.{
   TopologyTransactionProcessor,
 }
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
-import com.digitalasset.canton.topology.store.{PackageDependencyResolver, TopologyStore}
+import com.digitalasset.canton.topology.store.{
+  NoPackageDependencies,
+  PackageDependencyResolver,
+  TopologyStore,
+}
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import org.apache.pekko.stream.Materializer
@@ -52,12 +58,17 @@ class TopologyComponentFactory(
     loggerFactory: NamedLoggerFactory,
 ) {
   def createTopologyProcessorFactory(
-      partyNotifier: LedgerServerPartyNotifier,
       missingKeysAlerter: MissingKeysAlerter,
       sequencerConnectionSuccessorListener: SequencerConnectionSuccessorListener,
+      onboardingClearanceScheduler: OnboardingClearanceScheduler,
       topologyClient: SynchronizerTopologyClientWithInit,
       recordOrderPublisher: RecordOrderPublisher,
       lsuCallback: LogicalSynchronizerUpgradeCallback,
+      retrieveAndStoreMissingSequencerIds: TraceContext => EitherT[
+        FutureUnlessShutdown,
+        String,
+        Unit,
+      ],
       sequencedEventStore: SequencedEventStore,
       synchronizerPredecessor: Option[SynchronizerPredecessor],
       ledgerApiStore: LedgerApiStore,
@@ -76,7 +87,8 @@ class TopologyComponentFactory(
         participantId,
         pauseSynchronizerIndexingDuringPartyReplication = unsafeOnlinePartyReplication.nonEmpty,
         synchronizerPredecessor = synchronizerPredecessor,
-        lsuCallback,
+        lsuCallback = lsuCallback,
+        retrieveAndStoreMissingSequencerIds = retrieveAndStoreMissingSequencerIds,
         loggerFactory,
       )
       val terminateTopologyProcessingFUS =
@@ -107,10 +119,9 @@ class TopologyComponentFactory(
           timeouts,
           loggerFactory,
         )
-        // subscribe party notifier to topology processor
-        processor.subscribe(partyNotifier.attachToTopologyProcessor())
         processor.subscribe(missingKeysAlerter.attachToTopologyProcessor())
         processor.subscribe(sequencerConnectionSuccessorListener)
+        processor.subscribe(onboardingClearanceScheduler)
         processor.subscribe(topologyClient)
         processor
       }
@@ -172,9 +183,5 @@ class TopologyComponentFactory(
   def createHeadTopologySnapshot()(implicit
       executionContext: ExecutionContext
   ): TopologySnapshot =
-    createTopologySnapshot(
-      CantonTimestamp.MaxValue,
-      StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
-      preferCaching = false,
-    )
+    createTopologySnapshot(CantonTimestamp.MaxValue, NoPackageDependencies, preferCaching = false)
 }

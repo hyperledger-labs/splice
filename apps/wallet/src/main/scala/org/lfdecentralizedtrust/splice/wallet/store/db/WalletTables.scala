@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
   TransferOfferTxLogEntry,
   TxLogEntry,
 }
-import com.digitalasset.canton.config.CantonRequireTypes.{LengthLimitedString, String3}
+import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 
@@ -92,11 +92,12 @@ object WalletTables extends AcsTables {
       eventId: Option[String] = None,
       trackingId: Option[String] = None,
   ) extends TxLogRowData {
-    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
-      "tx_log_id" -> IndexColumnValue[LengthLimitedString](txLogId),
-      "event_id" -> IndexColumnValue(eventId.map(lengthLimited)),
-      "tracking_id" -> IndexColumnValue(trackingId.map(lengthLimited)),
-    )
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] =
+      Seq[(String, IndexColumnValue[?])](
+        "tx_log_id" -> IndexColumnValue(txLogId),
+        "event_id" -> IndexColumnValue(eventId.map(lengthLimited)),
+        "tracking_id" -> IndexColumnValue(trackingId.map(lengthLimited)),
+      )
   }
 
   object UserWalletTxLogStoreRowData {

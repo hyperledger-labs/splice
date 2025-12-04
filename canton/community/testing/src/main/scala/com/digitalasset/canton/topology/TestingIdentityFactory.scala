@@ -40,6 +40,7 @@ import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.Party
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
 import com.digitalasset.canton.topology.store.{
+  NoPackageDependencies,
   PackageDependencyResolver,
   TopologyStoreId,
   ValidatedTopologyTransaction,
@@ -411,31 +412,14 @@ class TestingIdentityFactory(
 
         override def psid: PhysicalSynchronizerId = dId
 
-        override def trySnapshot(timestamp: CantonTimestamp)(implicit
+        override protected[topology] def trySnapshot(timestamp: CantonTimestamp)(implicit
             traceContext: TraceContext
-        ): TopologySnapshot = {
+        ): TopologySnapshotLoader = {
           require(
             timestamp <= upToInclusive,
             s"Topology information not yet available for $timestamp, known until $upToInclusive",
           )
           topologySnapshot(synchronizerId, timestampForSynchronizerParameters = timestamp)
-        }
-
-        override def tryHypotheticalSnapshot(
-            timestamp: CantonTimestamp,
-            desiredTimestamp: CantonTimestamp,
-        )(implicit
-            traceContext: TraceContext
-        ): TopologySnapshot = {
-          require(
-            timestamp <= upToInclusive,
-            s"Topology information not yet available for $timestamp",
-          )
-          topologySnapshot(
-            synchronizerId,
-            timestampForSynchronizerParameters = timestamp,
-            timestampOfSnapshot = desiredTimestamp,
-          )
         }
 
         override def currentSnapshotApproximation(implicit
@@ -491,16 +475,29 @@ class TestingIdentityFactory(
 
         override def hypotheticalSnapshot(
             timestamp: CantonTimestamp,
-            desiredSnapshot: CantonTimestamp,
+            desiredTimestamp: CantonTimestamp,
         )(implicit
             traceContext: TraceContext
         ): FutureUnlessShutdown[TopologySnapshot] =
-          FutureUnlessShutdown.fromTry(Try(tryHypotheticalSnapshot(timestamp, desiredSnapshot)))
+          FutureUnlessShutdown.fromTry(Try {
+            require(
+              timestamp <= upToInclusive,
+              s"Topology information not yet available for $timestamp",
+            )
+            topologySnapshot(
+              synchronizerId,
+              timestampForSynchronizerParameters = timestamp,
+              timestampOfSnapshot = desiredTimestamp,
+            )
+          })
 
         override def awaitMaxTimestamp(sequencedTime: SequencedTime)(implicit
             traceContext: TraceContext
         ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]] =
           FutureUnlessShutdown.pure(None)
+
+        override def headSnapshot(implicit traceContext: TraceContext): TopologySnapshot =
+          trySnapshot(topologyKnownUntilTimestamp)
       })(TraceContext.empty)
     )
     ips
@@ -512,8 +509,7 @@ class TestingIdentityFactory(
 
   def topologySnapshot(
       synchronizerId: SynchronizerId = DefaultTestIdentities.synchronizerId,
-      packageDependencyResolver: PackageDependencyResolver =
-        StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
+      packageDependencyResolver: PackageDependencyResolver = NoPackageDependencies,
       timestampForSynchronizerParameters: CantonTimestamp = CantonTimestamp.Epoch,
       timestampOfSnapshot: CantonTimestamp = CantonTimestamp.Epoch,
   ): TopologySnapshotLoader = {

@@ -362,7 +362,6 @@ class ParticipantAdminConnection(
           .ImportAcsOld(
             chunkedAcsBytes,
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
-            allowContractIdSuffixRecomputation = false,
           ),
         timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
       ).map(_ => ()),

@@ -9,7 +9,6 @@ import com.daml.ledger.api.v2.topology_transaction.TopologyTransaction as LapiTo
 import com.digitalasset.canton.ProtoDeserializationError.OtherError
 import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.admin.participant.v30.*
-import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.participant.state.{InternalIndexService, SynchronizerIndex}
@@ -20,31 +19,19 @@ import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.mapErrNewEUS
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.admin.data.{
   ContractImportMode,
+  PartyOnboardingFlagStatus,
   RepresentativePackageIdOverride,
 }
+import com.digitalasset.canton.participant.admin.party.*
 import com.digitalasset.canton.participant.admin.party.PartyReplicationAdminWorkflow.PartyReplicationArguments
-import com.digitalasset.canton.participant.admin.party.{
-  PartyManagementServiceError,
-  PartyOnboardingCompletion,
-  PartyParticipantPermission,
-  PartyReplicationAdminWorkflow,
-}
 import com.digitalasset.canton.participant.sync.CantonSyncService
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SynchronizerOffset
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
 import com.digitalasset.canton.serialization.ProtoConverter
-import com.digitalasset.canton.time.{NonNegativeFiniteDuration, SynchronizerTimeTracker}
+import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithInit
-import com.digitalasset.canton.topology.store.TopologyStore
-import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
-import com.digitalasset.canton.topology.{
-  ParticipantId,
-  PartyId,
-  SynchronizerId,
-  SynchronizerTopologyManager,
-  UniqueIdentifier,
-}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterAsyncOps
 import com.digitalasset.canton.util.{EitherTUtil, GrpcStreamingUtils}
@@ -66,7 +53,6 @@ import scala.util.{Failure, Success, Try}
 class GrpcPartyManagementService(
     participantId: ParticipantId,
     adminWorkflowO: Option[PartyReplicationAdminWorkflow],
-    processingTimeout: ProcessingTimeout,
     sync: CantonSyncService,
     parameters: ParticipantNodeParameters,
     protected val loggerFactory: NamedLoggerFactory,
@@ -75,8 +61,6 @@ class GrpcPartyManagementService(
     actorSystem: ActorSystem,
 ) extends v30.PartyManagementServiceGrpc.PartyManagementService
     with NamedLogging {
-
-  private val batching: BatchingConfig = parameters.batchingConfig
 
   override def addPartyAsync(
       request: v30.AddPartyAsyncRequest
@@ -193,7 +177,7 @@ class GrpcPartyManagementService(
       (out: OutputStream) => processExportPartyAcsRequest(request, new GZIPOutputStream(out)),
       responseObserver,
       byteString => v30.ExportPartyAcsResponse(byteString),
-      processingTimeout.unbounded.duration,
+      parameters.processingTimeouts.unbounded.duration,
       chunkSizeO = None,
     )
   }
@@ -277,6 +261,8 @@ class GrpcPartyManagementService(
             snapshot.inspectKnownParties(
               filterParty = "",
               filterParticipant = targetParticipant.filterString,
+              // we cannot filter by participant in the db, therefore we also cannot impose a limit.
+              limit = Int.MaxValue,
             )
           )
       )
@@ -416,28 +402,6 @@ class GrpcPartyManagementService(
       topoClient <- sync.lookupTopologyClient(psid).toRight("Absent topology client")
     } yield topoClient
 
-  private def findTopologyServices(
-      synchronizerId: SynchronizerId,
-      sync: CantonSyncService,
-  ): Either[
-    String,
-    (SynchronizerTopologyManager, TopologyStore[SynchronizerStore], SynchronizerTimeTracker),
-  ] =
-    for {
-      psid <- sync.syncPersistentStateManager
-        .latestKnownPSId(synchronizerId)
-        .toRight(s"Undefined physical synchronizer ID for given $synchronizerId")
-      topologyStore <- sync.syncPersistentStateManager
-        .get(psid)
-        .map(_.topologyStore)
-        .toRight("Cannot get topology store")
-      topologyManager <- sync.syncPersistentStateManager
-        .get(psid)
-        .map(_.topologyManager)
-        .toRight("Cannot get topology manager")
-      timeTracker <- sync.lookupSynchronizerTimeTracker(synchronizerId)
-    } yield (topologyManager, topologyStore, timeTracker)
-
   /*
  Note that `responseObserver` originates from `GrpcStreamingUtils.streamToServer` which is
  a wrapper that turns the responses into a promise/future. This is not a true bidirectional stream.
@@ -526,7 +490,7 @@ class GrpcPartyManagementService(
 
       override def onCompleted(): Unit = {
         // Synchronously try to get the snapshot and start the import
-        val result: EitherT[Future, Throwable, Map[String, String]] = for {
+        val result: EitherT[Future, Throwable, Unit] = for {
 
           argsTuple <- EitherT.fromEither[Future](
             recordedArgs.leftMap(new IllegalStateException(_))
@@ -535,24 +499,21 @@ class GrpcPartyManagementService(
           acsSnapshot <- EitherT.fromEither[Future](
             Try(ByteString.copyFrom(outputStream.toByteArray)).toEither
           )
-          contractIdRemapping <- EitherT.liftF[Future, Throwable, Map[String, String]](
+          _ <- EitherT.liftF[Future, Throwable, Unit](
             ParticipantCommon.importAcsNewSnapshot(
               acsSnapshot = acsSnapshot,
-              batching = batching,
+              batching = parameters.batchingConfig,
               contractImportMode = contractImportMode,
               excludedStakeholders = Set.empty,
-              loggerFactory = loggerFactory,
               representativePackageIdOverride = representativePackageIdOverride,
               sync = sync,
               workflowIdPrefix = workflowIdPrefix,
             )
           )
-        } yield contractIdRemapping
+        } yield ()
 
         result
-          .thereafter { _ =>
-            outputStream.close()
-          }
+          .thereafter(_ => outputStream.close())
           .value
           .onComplete {
             case Failure(exception) =>
@@ -658,21 +619,21 @@ class GrpcPartyManagementService(
       request: v30.ClearPartyOnboardingFlagRequest
   ): Future[v30.ClearPartyOnboardingFlagResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
-    val res = for {
-      r <- processPartyOnboardingFlagRequest(request)
-      (onboarded, safeTime) = r
-    } yield v30.ClearPartyOnboardingFlagResponse(onboarded, safeTime.map(x => x.toProtoTimestamp))
+    val res = processClearPartyOnboardingFlagRequest(request).map { status =>
+      val (onboarded, timestamp) = PartyOnboardingFlagStatus.toProtoV30(status)
+      v30.ClearPartyOnboardingFlagResponse(onboarded, timestamp)
+    }
     mapErrNewEUS(res.leftMap(_.toCantonRpcError))
   }
 
-  private def processPartyOnboardingFlagRequest(
+  private def processClearPartyOnboardingFlagRequest(
       request: v30.ClearPartyOnboardingFlagRequest
   )(implicit
       traceContext: TraceContext
   ): EitherT[
     FutureUnlessShutdown,
     PartyManagementServiceError,
-    (Boolean, Option[CantonTimestamp]),
+    PartyOnboardingFlagStatus,
   ] =
     for {
       ledgerEnd <- EitherT
@@ -691,6 +652,13 @@ class GrpcPartyManagementService(
         beginOffsetExclusive,
         waitForActivationTimeout,
       ) = validRequest
+
+      connectedSynchronizer <- EitherT.fromOption[FutureUnlessShutdown](
+        sync.readyConnectedSynchronizerById(synchronizerId),
+        PartyManagementServiceError.InvalidState.Error(
+          s"A connection to synchronizer $synchronizerId is required to perform this operation."
+        ),
+      )
 
       indexService <- EitherT.fromOption[FutureUnlessShutdown](
         sync.internalIndexService,
@@ -732,28 +700,15 @@ class GrpcPartyManagementService(
         ): PartyManagementServiceError,
       )
 
-      topoServices <- EitherT
-        .fromEither[FutureUnlessShutdown](findTopologyServices(synchronizerId, sync))
-        .leftMap(PartyManagementServiceError.InvalidState.Error(_): PartyManagementServiceError)
+      onboardingFlagClearanceOutcome <-
+        connectedSynchronizer.ephemeral.onboardingClearanceScheduler
+          .requestClearance(
+            party,
+            activationTimestamp,
+          )
+          .leftMap(PartyManagementServiceError.InvalidState.Error(_): PartyManagementServiceError)
 
-      (topologyManager, topologyStore, timeTracker) = topoServices
-
-      onboarding = new PartyOnboardingCompletion(
-        party,
-        synchronizerId,
-        participantId,
-        timeTracker,
-        topologyManager,
-        topologyStore,
-        client,
-        loggerFactory,
-      )
-
-      onboardingCompletionOutcome <- onboarding
-        .attemptCompletion(activationTimestamp)
-        .leftMap(PartyManagementServiceError.InvalidState.Error(_): PartyManagementServiceError)
-
-    } yield (onboardingCompletionOutcome)
+    } yield (onboardingFlagClearanceOutcome)
 
   private def validateClearPartyOnboardingFlagRequest(
       request: v30.ClearPartyOnboardingFlagRequest,

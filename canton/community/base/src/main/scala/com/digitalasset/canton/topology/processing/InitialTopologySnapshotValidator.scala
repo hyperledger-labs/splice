@@ -194,7 +194,6 @@ class InitialTopologySnapshotValidator(
     val previous = mutable.Map.empty[TxHash, MergeTx]
     initialSnapshot.result.zipWithIndex
       .filter { case (tx, idx) =>
-        // TODO should we clean this up?
         if (tx.transaction.isProposal && tx.validUntil.nonEmpty) {
           logger.info(s"Dropping completed proposal at idx=$idx $tx")
           false

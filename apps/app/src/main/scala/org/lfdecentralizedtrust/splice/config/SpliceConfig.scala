@@ -104,7 +104,6 @@ case class SpliceConfig(
       )
     ),
     features: CantonFeatures = CantonFeatures(),
-    override val pekkoConfig: Option[Config] = None,
 ) extends ConfigDefaults[Option[DefaultPorts], SpliceConfig]
     with SharedCantonConfig[SpliceConfig] {
 
