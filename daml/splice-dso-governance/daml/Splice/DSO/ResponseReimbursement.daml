@@ -5,13 +5,16 @@
 module Splice.DSO.ResponseReimbursement where
 
 import DA.Action
+import DA.Assert
 import DA.Foldable (forA_)
 import DA.Optional
 import DA.Text qualified as T
+import DA.Time
 
 import Splice.DecentralizedSynchronizer
 import Splice.Util
 import Splice.DSO.CryptoHash
+import Splice.Types
 
 
 
@@ -43,32 +46,37 @@ template ReimbursementWorkflowState
   where
     signatory dso
 
+    -- Only called from DsoRules. We keep it as its own choice to simplify reasoning about the logic.
+    nonconsuming choice ReimbursementWorkflowState_AddReimbursementInterval
+      : ReimbursementWorkflowState_AddReimbursementIntervalResult
+      with
+        minIntervalDuration : RelTime
+        nextIntervalEnd : Time
+      controller dso
+      do
+        -- ensure minimal duration
+        let intervalDuration = nextIntervalEnd `subTime` nextIntervalStart
+        require "Minimal interval duration" (intervalDuration >= minIntervalDuration)
+        -- ensure that intervals are added at most `minIntervalDuration` ahead of time
+        let backdatedStart = nextIntervalStart `addRelTime` (negate minIntervalDuration)
+        assertDeadlineExceeded "nextIntervalStart - minIntervalDuration" backdatedStart
+        intervalStateCid <- create ReimbursementIntervalState with
+          dso = dso
+          interval = ReimbursementInterval with
+            startExclusive = nextIntervalStart
+            endInclusive = nextIntervalEnd
+          reimbursementConfirmation = None
+        workflowStateCid <- create this with
+          nextIntervalStart = nextIntervalEnd
+        pure ReimbursementWorkflowState_AddReimbursementIntervalResult with
+          intervalStateCid
+          workflowStateCid
+
 
 data ReimbursementWorkflowState_AddReimbursementIntervalResult = ReimbursementWorkflowState_AddReimbursementIntervalResult with
     intervalStateCid : ContractId ReimbursementIntervalState
     workflowStateCid : ContractId ReimbursementWorkflowState
   deriving (Eq, Show)
-
-
-addReimbursementInterval : Party -> RelTime -> ContractId ReimbursementWorkflowState -> Time -> Update (ContractId ReimbursementIntervalState, ContractId ReimbursementWorkflowState)
-addReimbursementInterval dso minIntervalDuration workflowStateCid nextIntervalEnd = do
-  workflowState <- fetchAndArchive (ForDso dso) workflowStateCid
-  -- ensure minimal duration
-  let intervalDuration = nextIntervalEnd `subTime` workflowState.nextIntervalStart
-  require "Minimal interval duration" (intervalDuration >= minIntervalDuration)
-  -- ensure that intervals are added at most `minIntervalDuration` ahead of time
-  let backdatedStart = workflowState.nextIntervalStart `addRelTime` (negate minIntervalDuration)
-  assertDeadlineExceeded "nextIntervalStart - minIntervalDuration" backdatedStart
-
-  intervalStateCid <- create ReimbursementIntervalState with
-    dso = dso
-    interval = ReimbursementInterval with
-      startExclusive = workflowState.nextIntervalStart
-      endInclusive = nextIntervalEnd
-    reimbursementConfirmation = None
-  workflowStateCid <- create workflowState with
-    nextIntervalStart = nextIntervalEnd
-  pure (intervalStateCid, workflowStateCid)
 
 
 
@@ -151,12 +159,24 @@ data ReimbursementIntervalState_ReimburseResponsesResult = ReimbursementInterval
   deriving (Eq, Show)
 
 
+{-
 confirmResponseTrafficReimbursement : Party -> ReimbursementConfirmation -> ContractId ReimbursementIntervalState -> Update (ContractId ReimbursementIntervalState)
 confirmResponseTrafficReimbursement dso reimbursementConfirmation intervalStateCid = do
   require "Not yet confirmed" (isNone this.reimbursementConfirmation)
   intervalStateCid <- create this with reimbursementConfirmation = Some reimbursementConfirmation
   pure ReimbursementIntervalState_ConfirmReimbursementResult with
     intervalStateCid
+-}
+
+
+-- Checked fetch
+----------------
+
+instance HasCheckedFetch ReimbursementWorkflowState ForDso where
+  contractGroupId ReimbursementWorkflowState {..} = ForDso with dso
+
+instance HasCheckedFetch ReimbursementIntervalState ForDso where
+  contractGroupId ReimbursementIntervalState {..} = ForDso with dso
 
 
 -- Hashing instances

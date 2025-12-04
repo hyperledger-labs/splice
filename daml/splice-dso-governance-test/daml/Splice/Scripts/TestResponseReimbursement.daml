@@ -22,6 +22,8 @@ import Splice.Issuance()
 
 import Splice.DsoRules
 import Splice.DSO.AmuletPrice
+import Splice.DSO.ResponseReimbursement -- FIXME: add Traffic to name
+import Splice.DSO.CryptoHash
 import Splice.AmuletConfig
 import Splice.CometBft
 import Splice.DecentralizedSynchronizer
@@ -48,11 +50,13 @@ test_confirmation_response_traffic_reimbursement = do
         responseTrafficTotals = map (uncurry ResponseTrafficTotal) responseTrafficDataRaw
   let responseTrafficDataHash = hash responseTrafficData
   let reimbursementConfirmation = ReimbursementConfirmation with
-        synchronizerId = dsoRules.decentralizedSynchronizer.activeSynchronizerId
+        synchronizerId = dsoRules.config.decentralizedSynchronizer.activeSynchronizerId
         migrationId = 0
         responseTrafficDataHash
 
   -- setup reimbursement workflow state
+
+
   -- add a new interval
   -- confirm
 

@@ -119,7 +119,8 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Automated action to start reimbursing responses for a given interval.
   | SRARC_AddResponseTrafficReimbursementInterval DsoRules_AddResponseTrafficReimbursementInterval
     -- ^ Automated action to add a new confirmation response traffic reimbursement interval.
-  | SRARC_ConfirmResponseTrafficReimbursement DsoRules_ConfirmResponseTrafficReimbursement
+  -- FIXME
+  -- | SRARC_ConfirmResponseTrafficReimbursement DsoRules_ConfirmResponseTrafficReimbursement
     -- ^ Automated action to confirm the response traffic reimbursement data for a reimbursement interval.
   deriving (Eq, Show)
 
@@ -300,6 +301,12 @@ data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUn
 
 data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult with
     unclaimedRewardCid : ContractId UnclaimedReward
+
+data DsoRules_AddResponseTrafficReimbursementIntervalResult = DsoRules_AddResponseTrafficReimbursementIntervalResult with
+  result : ReimbursementWorkflowState_AddReimbursementIntervalResult
+
+data DsoRules_StartResponseTrafficReimbursementResult = DsoRules_StartResponseTrafficReimbursementResult with
+  workflowStateCid : ContractId ReimbursementWorkflowState
 
 data DsoRules_ReimburseResponsesResult = DsoRules_ReimburseResponsesResult with
     result : ReimbursementIntervalState_ReimburseResponsesResult
@@ -1530,7 +1537,6 @@ template DsoRules with
         pure DsoRules_StartResponseTrafficReimbursementResult with
           workflowStateCid = workflowStateCid
 
-
     nonconsuming choice DsoRules_AddResponseTrafficReimbursementInterval
       : DsoRules_AddResponseTrafficReimbursementIntervalResult
       with
@@ -1538,10 +1544,13 @@ template DsoRules with
         nextIntervalEnd : Time
       controller dso
       do
-        let minIntervalDuration = config.responseReimbursementMinIntervalDuration
-        (intervalStateCid, workflowStateCid) <-
-          ResponseReimbursement.addReimbursementInterval dso minIntervalDuration workflowStateCid nextIntervalEnd
+        _ <- fetchChecked (ForDso with dso) workflowStateCid
+        result <- exercise workflowStateCid ReimbursementWorkflowState_AddReimbursementInterval with
+          minIntervalDuration = hours 1   -- FIXME: config.responseReimbursementMinIntervalDuration
+          nextIntervalEnd
+        pure DsoRules_AddResponseTrafficReimbursementIntervalResult with result
 
+{-
     nonconsuming choice DsoRules_ConfirmResponseTrafficReimbursement
       : DsoRules_ConfirmResponseTrafficReimbursementResult
       with
@@ -1565,14 +1574,8 @@ template DsoRules with
           responseTrafficData
         pure DsoRules_ReimburseResponsesResult with result
 
+-}
 
-
-  | SRARC_StartResponseTrafficReimbursement DsoRules_StartResponseTrafficReimbursement
-    -- ^ Automated action to start reimbursing responses for a given interval.
-  | SRARC_AddResponseTrafficReimbursementInterval DsoRules_AddResponseTrafficReimbursementInterval
-    -- ^ Automated action to add a new confirmation response traffic reimbursement interval.
-  | SRARC_ConfirmResponseTrafficReimbursement DsoRules_ConfirmResponseTrafficReimbursement
-    -- ^ Automated action to confirm the response traffic reimbursement data for a reimbursement interval.
 
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
@@ -1633,6 +1636,8 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_StartResponseTrafficReimbursement choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_AddResponseTrafficReimbursementInterval choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
