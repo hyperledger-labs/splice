@@ -172,8 +172,9 @@ validators:
     nodeIdentifier: 'validator-runbook'
     partyHint: 'digitalasset-testValidator-1'
     onboardingSecret: 'validatorsecret'
-    scanClient:
-      scanType: "bft-custom"
-      seedUrls: [ "https://scan.sv-2-eng.scratchb.network.canton.global","https://scan.sv-3-eng.scratchb.network.canton.global" ]
-      threshold: 2
-      trustedSvs: ["Digital-Asset-Eng-2","Digital-Asset-Eng-3"]
+    validatorApp:
+      scanClient:
+        scanType: "bft-custom"
+        seedUrls: [ "https://scan.sv-2-eng.scratchb.network.canton.global","https://scan.sv-3-eng.scratchb.network.canton.global" ]
+        threshold: 2
+        trustedSvs: ["Digital-Asset-Eng-2","Digital-Asset-Eng-3"]

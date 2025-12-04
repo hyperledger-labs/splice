@@ -213,6 +213,7 @@ async function installValidator(
         ? true
         : validatorValuesFromYamlFiles.migration.migrating,
     },
+    scanClient: validatorConfig.validatorApp?.scanClient,
     metrics: {
       enable: true,
     },

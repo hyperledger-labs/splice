@@ -9,9 +9,18 @@ import {
 import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
+export const ScanClientConfigSchema = z.object({
+  scanType: z.enum(['trust-single', 'bft', 'bft-custom']),
+  scanAddress: z.string().optional(),
+  threshold: z.number().default(0),
+  trustedSvs: z.array(z.string()).default([]),
+  seedUrls: z.array(z.string()).optional(),
+});
+
 export const ValidatorAppConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
   additionalJvmOptions: z.string().optional(),
+  scanClient: ScanClientConfigSchema.optional(),
 });
 
 export const ParticipantConfigSchema = z.object({
