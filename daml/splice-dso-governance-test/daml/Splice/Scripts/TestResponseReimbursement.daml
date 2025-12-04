@@ -71,8 +71,14 @@ test_confirmation_response_traffic_reimbursement = do
         nextIntervalEnd = now `addRelTime` hours 1
         workflowStateCid
 
-
   -- confirm data
+  [(workflowStateCid, _)] <- query @ReimbursementWorkflowState dso
+  [(intervalStateCid, _)] <- query @ReimbursementIntervalState dso
+  confirmAndExecutionAction app ARC_DsoRules with
+    dsoAction = SRARC_ConfirmResponseTrafficReimbursement
+      DsoRules_ConfirmResponseTrafficReimbursement with
+        intervalStateCid
+        reimbursementConfirmation
 
   -- check that there are no member traffic contracts yet
   [] <- query @MemberTraffic dso
