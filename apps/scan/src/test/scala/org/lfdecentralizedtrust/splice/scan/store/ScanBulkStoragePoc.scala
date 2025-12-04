@@ -77,7 +77,7 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
   var total = 0
 
   val db_ip = "10.42.0.4"
-  val db_pwd = sys.env("PG_CNADMIN_PWD")
+  val db_pwd = sys.env("SPLICE_TEST_DB_CNADMIN_PWD")
   val participantId = ParticipantId.tryFromProtoPrimitive("PAR::Digital-Asset-Eng-13::122069aae5c6f757c6cbd2be3c9e001c1c3d8a85eaa791b97a0b11b7fbff96e04ed7")
   val partyId = PartyId.tryFromProtoPrimitive("DSO::12209471e1a52edc2995ad347371597a5872f2704cb2cb4bb330a849e7309598259e")
   val dbConfig = mkDbConfig(DbBasicConfig("cnadmin", db_pwd, "scan_sv_13", db_ip, 5432, false, Some("scan_sv_13")))
