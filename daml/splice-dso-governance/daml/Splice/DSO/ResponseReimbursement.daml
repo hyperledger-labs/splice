@@ -32,7 +32,8 @@ data ReimbursementInterval = ReimbursementInterval with
     endInclusive : Time
   deriving (Eq, Show)
 
-
+-- | The top-level state of the reimbursement workflow. We expect there to be exactly one
+-- such contract per DSO.
 template ReimbursementWorkflowState
   with
     dso: Party

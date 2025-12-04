@@ -32,6 +32,7 @@ import Splice.Ans
 import Splice.SvOnboarding
 import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
+import Splice.DSO.ResponseReimbursement
 import Splice.DSO.SvState
 import Splice.Schedule
 import Splice.Util
@@ -114,6 +115,12 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
     -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract.
+  | SRARC_StartResponseTrafficReimbursement DsoRules_StartResponseTrafficReimbursement
+    -- ^ Automated action to start reimbursing responses for a given interval.
+  | SRARC_AddResponseTrafficReimbursementInterval DsoRules_AddResponseTrafficReimbursementInterval
+    -- ^ Automated action to add a new confirmation response traffic reimbursement interval.
+  | SRARC_ConfirmResponseTrafficReimbursement DsoRules_ConfirmResponseTrafficReimbursement
+    -- ^ Automated action to confirm the response traffic reimbursement data for a reimbursement interval.
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -293,6 +300,9 @@ data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUn
 
 data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult with
     unclaimedRewardCid : ContractId UnclaimedReward
+
+data DsoRules_ReimburseResponsesResult = DsoRules_ReimburseResponsesResult with
+    result : ReimbursementIntervalState_ReimburseResponsesResult
 
 
 -- Workflow templates
@@ -1502,6 +1512,21 @@ template DsoRules with
         UnclaimedActivityRecord_DsoExpireResult unclaimedRewardCid <-
           exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
+
+
+    -- confirmation response reimbursement
+    nonconsuming choice DsoRules_ReimburseResponses : DsoRules_ReimburseResponsesResult
+      with
+        intervalStateCid : ContractId ReimbursementIntervalState
+        responseTrafficData : ResponseTrafficData
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        result <- exercise intervalStateCid ReimbursementIntervalState_ReimburseResponses with
+          responseTrafficData
+        pure DsoRules_ReimburseResponsesResult with result
+
 
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
