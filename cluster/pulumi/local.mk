@@ -24,10 +24,12 @@ $(dir)/unit-test: $(dir)/.build
 
 pulumi_projects ::= operator deployment gcp infra canton-network sv-runbook validator-runbook multi-validator cluster sv-canton validator1 splitwell
 
+deployment_dir := $(shell dirname $(dir))/deployment
+
 .PHONY: $(dir)/test $(dir)/update-expected
-$(dir)/test: $(dir)/unit-test $(foreach project,$(pulumi_projects),$(dir)/$(project)/test)
+$(dir)/test: $(dir)/unit-test $(deployment_dir)/check-resolved-config $(foreach project,$(pulumi_projects),$(dir)/$(project)/test)
 
 .PHONY: $(dir)/update-expected
-$(dir)/update-expected: $(foreach project,$(pulumi_projects),$(dir)/$(project)/update-expected)
+$(dir)/update-expected: $(deployment_dir)/update-resolved-config $(foreach project,$(pulumi_projects),$(dir)/$(project)/update-expected)
 
 include $(pulumi_projects:%=$(dir)/%/local.mk)
