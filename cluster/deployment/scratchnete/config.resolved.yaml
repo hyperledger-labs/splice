@@ -1,0 +1,206 @@
+# This file is generated for preview. Do not edit directly.
+cloudArmor:
+  allRulesPreviewOnly: true
+  enabled: false
+  publicEndpoints:
+    publicScan:
+      hostname: 'scan.sv-2.scratcha.global.canton.network.digitalasset.com'
+      pathPrefix: '/api/scan'
+      throttleAcrossAllEndpointsAllIps:
+        maxRequestsBeforeHttp429: 0
+        withinIntervalSeconds: 60
+cluster:
+  nodePools:
+    apps:
+      maxNodes: 20
+      minNodes: 0
+      nodeType: 'e2-standard-16'
+    infra:
+      maxNodes: 3
+      minNodes: 1
+      nodeType: 'e2-standard-8'
+infra:
+  istio:
+    enableIngressAccessLogging: true
+  prometheus:
+    retentionDuration: '30d'
+    retentionSize: '200GB'
+    storageSize: '600Gi'
+initialRound: 0
+monitoring:
+  alerting:
+    alerts:
+      cloudSql:
+        maintenance: false
+      cometbft:
+        expectedMaxBlocksPerSecond: 3.5
+      confirmationRequests:
+        perMember:
+          overMinutes: 5
+          rate: 3
+        total:
+          overMinutes: 5
+          rate: 15
+      delegatelessContention:
+        thresholdPerNamespace: 0.05
+      ingestion:
+        thresholdEntriesPerBatch: 80
+      loadTester:
+        minRate: 0.95
+      mediators:
+        acknowledgementLagSeconds: 900
+      pruning:
+        mediatorRetentionDays: 30
+        participantRetentionDays: 30
+        sequencerRetentionDays: 30
+      trafficWaste:
+        kilobytes: 1
+        overMinutes: 5
+        quantile: 0.95
+    enableNoDataAlerts: false
+multiValidator:
+  postgresPvcSize: '100Gi'
+  resources:
+    participant:
+      limits:
+        memory: '16Gi'
+      requests:
+        cpu: '1'
+        memory: '8Gi'
+    postgres:
+      limits:
+        memory: '12Gi'
+      requests:
+        memory: '5Gi'
+    validator:
+      limits:
+        memory: '8Gi'
+      requests:
+        cpu: '0.5'
+        memory: '2400Mi'
+pulumiProjectConfig:
+  default:
+    allowDowngrade: true
+    cloudSql:
+      enabled: false
+      enterprisePlus: false
+      protected: false
+      tier: 'db-custom-2-7680'
+    hasPublicInfo: false
+    installDataOnly: false
+    interAppsDependencies: true
+    isExternalCluster: false
+    skipSynchronizerInitialization: true
+  sv-runbook:
+    cloudSql:
+      enabled: false
+pulumiStacks:
+  default:
+    parallelism: 64
+  multi-validator:
+    parallelism: 10
+sv:
+  scan:
+    externalRateLimits:
+      globalLimits:
+        fillInterval: '60s'
+        maxTokens: 2147483647
+        tokensPerFill: 2147483647
+      rateLimits:
+        - actions:
+            - name: 'acs'
+              pathPrefix: '/api/scan/v0/acs'
+            - clientIp: true
+              name: 'client_ip'
+          limits:
+            fillInterval: '60s'
+            maxTokens: 10
+            tokensPerFill: 5
+svs:
+  default:
+    cometbft:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+    logging:
+      appsAsync: false
+      appsLogLevel: 'DEBUG'
+      cantonAsync: false
+      cantonLogLevel: 'DEBUG'
+      cometbftLogLevel: 'debug'
+    mediator:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    participant:
+      bftSequencerConnection: true
+      resources:
+        limits:
+          memory: '18Gi'
+        requests:
+          cpu: '1'
+          memory: '12Gi'
+    scanApp:
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          cpu: '2'
+          memory: '2Gi'
+    sequencer:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    svApp:
+      resources:
+        limits:
+          cpu: '3'
+          memory: '4Gi'
+        requests:
+          cpu: '1'
+          memory: '2Gi'
+    validatorApp:
+      additionalEnvVars:
+        - name: 'ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT'
+          value: "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+      resources:
+        limits:
+          memory: '4Gi'
+        requests:
+          memory: '2Gi'
+  sv-da-1:
+    cometbft:
+      nodeId: 'd825622358065aea3cb3b3479cf64d172675037e'
+      validatorKeyAddress: '2D21D8AB2306770E9F93E8BD0E0F07B3E86817D7'
+    publicName: 'Digital-Asset-1'
+    subdomain: 'sv-1'
+    svApp:
+      auth0:
+        clientId: 'bxjt0vzLyRG2rk2fapXfOzH5lzK4mrl7'
+    validatorApp:
+      auth0:
+        clientId: 'fBFpzZSRuufk9ueV2pSEkOXNYXuQtVmY'
+      walletUser: 'auth0|68c2c41e6470184569e4521e'
+validator1:
+  deduplicationDuration: '30m'
+  logging:
+    level: 'DEBUG'
+  participantPruningSchedule:
+    cron: '0 /10 * * * ?'
+    maxDuration: '5m'
+    retention: '1h'
+validators:
+  validator-runbook:
+    namespace: 'validator'
+    nodeIdentifier: 'validator-runbook'
+    onboardingSecret: 'validatorsecret'
+    partyHint: 'digitalasset-testValidator-1'

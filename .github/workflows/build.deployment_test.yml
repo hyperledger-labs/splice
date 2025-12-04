@@ -32,6 +32,13 @@ jobs:
         with:
           cmd: make cluster/helm/test
 
+      - name: Cluster resolved configs
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd_retry_count: 5 # Retry in case of dependency download errors
+          cmd: make cluster/deployment/check-resolved-config
+          cmd_before_retry: git reset --hard # revert changes before retrying because make cluster/deployment/check-resolved-config actually updates resolved configs
+
       - name: Pulumi tests
         uses: ./.github/actions/nix/run_bash_command_in_nix
         with:
