@@ -106,7 +106,7 @@ data AllocationView = AllocationView with
     -- registry can make it to the settlementInfo's settlementDeadline.
   deriving (Show, Eq)
 
--- | View of a delegated authority from the signer to the execurot to settle given transfer legs.
+-- | View of a delegated authority from the signer to the executor to settle given transfer legs.
 -- authorizers are always the signatories so not made available in the viewtype.
 data AllocationTransferAuthorizationView = AllocationTransferAuthorizationView with
   allocation : AllocationSpecification
@@ -202,7 +202,7 @@ interface Allocation where
 -- AllocationTransferAuthorization
 ----------------------------------
 
--- | A contract representing a delegated authority from the signatories to the execuror to settle 
+-- | A contract representing a delegated authority from the signatories to the executor to settle 
 -- given transfer legs.
 interface AllocationTransferAuthorization where
   viewtype AllocationTransferAuthorizationView

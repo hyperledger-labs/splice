@@ -9,6 +9,7 @@ import DA.Map qualified as Map
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV2
 import Splice.Api.Token.AllocationV2
+import DA.Optional (optionalToList)
 
 
 -- AllocationInstruction
@@ -34,7 +35,7 @@ data AllocationInstructionView = AllocationInstructionView with
       -- ^ The holdings to be used to fund the allocation.
       --
       -- MAY be empty for registries that do not represent their holdings on-ledger.
-    senders : [Party]
+    senders : [Account]
       -- ^ The senders of the allocation - who typically instructed the allocation instruction
       -- and later appear on the Allocation as senders.
     meta : Metadata
@@ -60,7 +61,7 @@ interface AllocationInstruction where
     with
       extraArgs : ExtraArgs
         -- ^ Additional context required in order to exercise the choice.
-    controller (view this).senders
+    controller concatMap (\acc -> acc.owner :: optionalToList acc.provider) (view this).senders
     do allocationInstruction_withdrawImpl this self arg
 
   choice AllocationInstruction_Update : AllocationInstructionResult

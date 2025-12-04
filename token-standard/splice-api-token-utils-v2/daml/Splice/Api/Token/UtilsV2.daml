@@ -20,6 +20,7 @@ import DA.Time
 import DA.Date
 import DA.Text (parseInt)
 import DA.Optional (fromSome, fromOptional)
+import Splice.Api.Token.HoldingV2 (basicAccount)
 
 -- Utils
 --------
@@ -323,9 +324,20 @@ allocation_instruction_view_v1_to_v2 AllocationInstructionV1.AllocationInstructi
     senders
     meta
   where
-    senders = case TextMap.lookup "canton.network/senders" meta.values of
-      None -> [allocation.transferLeg.sender]
-      Some ol -> [allocation.transferLeg.sender] -- TODO: Parse extra auth list.
+    numExtraSenders = TextMap.lookup "canton.network/numExtraSenders" meta.values >>= parseInt
+    sender = HoldingV2.Account with
+      owner = allocation.transferLeg.sender
+      provider = TextMap.lookup "canton.network/sender.provider" meta.values >>= partyFromText
+      id = TextMap.lookup "canton.network/sender.id" meta.values
+    extraSenders = case numExtraSenders of 
+      None -> []
+      Some num -> map
+        (\n -> HoldingV2.Account with
+          owner = fromSome $ TextMap.lookup ("canton.network/sender[" <> show n <> "].owner") meta.values >>= partyFromText
+          provider = TextMap.lookup ("canton.network/sender[" <> show n <> "].provider") meta.values >>= partyFromText
+          id = TextMap.lookup ("canton.network/sender[" <> show n <> "].id") meta.values)
+        [1..num]
+    senders = sender::extraSenders
 
 -- Downcast
 allocation_instruction_view_v2_to_v1 : AllocationInstructionV2.AllocationInstructionView -> AllocationInstructionV1.AllocationInstructionView
@@ -336,7 +348,25 @@ allocation_instruction_view_v2_to_v1 AllocationInstructionV2.AllocationInstructi
     pendingActions
     requestedAt
     inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
-    meta
+    meta = meta'
+  where 
+    sender::extraSenders = senders
+    meta0 = Metadata with
+      values =
+        TextMap.insert "canton.network/version" "v2" $
+        insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $ 
+        insertOptional "canton.network/sender.id" (sender.id) $
+        meta.values
+    meta' = Metadata with
+      values = foldl
+        (\acc (s, n) ->
+          TextMap.insert ("canton.network/sender[" <> show n <> "].owner") (partyToText s.owner) $
+          insertOptional ("canton.network/sender[" <> show n <> "].provider") (partyToText <$> s.provider) $
+          insertOptional ("canton.network/sender[" <> show n <> "].id") (s.id) $
+          acc
+        )
+        meta0.values
+        (zip extraSenders [1..(length extraSenders)])
 
 -- Choices
 
