@@ -11,6 +11,7 @@ import DA.Text qualified as T
 
 import Splice.DecentralizedSynchronizer
 import Splice.Util
+import Splice.DSO.CryptoHash
 
 data ReimbursementInterval = ReimbursementInterval with
     startExclusive : Time
@@ -119,30 +120,11 @@ data ResponseTrafficTotal = ResponseTrafficTotal with
   deriving (Eq, Show)
 
 
--- TODO: move into Splice.DSO.CryptoHash
+-- Hashing instances
 
-data Hash = Hash with value : Text
-  deriving (Eq, Show)
+instance Hashable ResponseTrafficData where
+  hash = hashRecord [hash responseTrafficTotals]
 
-hashInt : Int -> Hash
-hashInt n = Hash $ T.sha256 (show n)
-
-hashText : Text -> Hash
-hashText = Hash . T.sha256
-
-hashListInternal : [Text] -> Hash
-hashListInternal ts = Hash $ T.sha256 $ mconcat (show (length ts) :: "|" :: ts)
-
-hashRecord : [Hash] -> Hash
-hashRecord = hashListInternal . map (.value)
-
-hashList : (a -> Hash) -> [a] -> Hash
-hashList hashElem xs = hashListInternal [ (hashElem x).value | x <- xs ]
-
-hashResponseTrafficData : ResponseTrafficData -> Hash
-hashResponseTrafficData (ResponseTrafficData with responseTrafficTotals) =
-  hashRecord [hashList hashResponseTrafficTotal responseTrafficTotals]
-
-hashResponseTrafficTotal : ResponseTrafficTotal -> Hash
-hashResponseTrafficTotal (ResponseTrafficTotal with memberId, totalTraffic) =
-  hashRecord [hashText memberId, hashInt totalTraffic]
+instance Hashable ResponseTrafficTotal where
+  hash (ResponseTrafficTotal with memberId, totalTraffic) =
+    hashRecord [hashText memberId, hashInt totalTraffic]

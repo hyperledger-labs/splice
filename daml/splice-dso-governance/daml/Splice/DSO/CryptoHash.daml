@@ -1,0 +1,104 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Utilities to compute cryptographic hashes of Daml data structures.
+-- We use this for example for computing compact commitments for moving
+-- off-ledger data shared by the SV nodes on-ledger.
+module Splice.DSO.CryptoHash
+  (
+    Hash(..),
+    Hashable(..),
+    hashRecord,
+    hashUpgradedRecord,
+    hashVariant,
+    hashUpgradedVariant,
+  ) where
+
+import DA.Optional (isNone)
+import DA.Text qualified as T
+
+data Hash = Hash with value : Text
+  deriving (Eq, Show)
+
+-- | Compute the hash of a record.
+hashRecord : [Hash] -> Hash
+hashRecord = hashListInternal . map (.value)
+
+-- | Compute the hash of an upgraded record so that it agrees with the old record hash
+-- when ignoring trailing None fields.
+hashUpgradedRecord : [Hash] -> [Optional Hash] -> Hash
+hashUpgradedRecord oldFieldHashes newFieldHashes =
+  hashListInternal $
+    [ h.value | h <- oldFieldHashes ] ++
+    [ (hashOptionalInternal optField).value | optField <- dropTrailingNones newFieldHashes ]
+
+-- | Compute the hash of a variant.
+hashVariant : Text -> [Hash] -> Hash
+hashVariant tag fieldHashes = hashVariantInternal tag [ h.value | h <- fieldHashes ]
+
+-- | Compute the hash of an upgraded variant so that it agrees with the old variant hash
+-- when ignoring trailing None fields.
+hashUpgradedVariant : Text -> [Hash] -> [Optional Hash] -> Hash
+hashUpgradedVariant tag oldFieldHashes newFieldHashes =
+  hashVariantInternal tag $
+    [ h.value | h <- oldFieldHashes ] ++
+    [ (hashOptionalInternal optField).value | optField <- dropTrailingNones newFieldHashes ]
+
+class Hashable a where
+  hash : a -> Hash
+
+instance Hashable Int where
+  hash = hashInt
+
+instance Hashable Text where
+  hash = hashText
+
+instance Hashable a => Hashable (Optional a) where
+  hash = hashOptionalInternal . fmap hash
+
+instance Hashable a => Hashable [a] where
+  hash = hashList hash
+
+
+-- internal helper functions
+----------------------------
+
+-- Design Note: we want these hashes to be easy to compute in many systems.
+-- Therefore we essentially encode the data structure as an S-expression and hash that
+-- one recursively. Concretely, we use the following rules:
+--
+--   - hash scalars by hashing their string rendering
+--   - hash lists by hashing the concatenation of the length and the element hashes
+--   - hash records by hashing the list of field hashes
+--   - hash variants by hashing the list of fields prefixed with tag for the variant constructor
+--
+-- The length prefix on lists also serves as a tag to distinguish different tree structures.
+-- We include the number of fields in the hash of a record, as the number of fields
+-- can change as part of a Smart Contract Upgrades.
+--
+-- Tags for variants must be unique within the scope where the hashes are used.
+
+
+hashList : (a -> Hash) -> [a] -> Hash
+hashList hashElem xs = hashListInternal [ (hashElem x).value | x <- xs ]
+
+hashInt : Int -> Hash
+hashInt n = Hash $ T.sha256 (show n)
+
+hashText : Text -> Hash
+hashText = Hash . T.sha256
+
+hashListInternal : [Text] -> Hash
+hashListInternal ts = Hash $ T.sha256 $ mconcat (show (length ts) :: "|" :: ts)
+
+hashVariantInternal : Text -> [Text] -> Hash
+hashVariantInternal tag fieldValues =
+  Hash $ T.sha256 $ mconcat (tag :: "|" :: show (length fieldValues) :: "|" :: fieldValues)
+
+-- we view optionals as lists of length 0 or 1 to simplify the encoding in other systems
+hashOptionalInternal : Optional Hash -> Hash
+hashOptionalInternal None = hashListInternal []
+hashOptionalInternal (Some h) = hashListInternal [h.value]
+
+dropTrailingNones : [Optional Hash] -> [Optional Hash]
+dropTrailingNones = reverse . dropWhile isNone . reverse
