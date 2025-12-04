@@ -50,8 +50,8 @@ repos:
         language: system
         entry: "scripts/fix-ts.py"
         types_or: [javascript, jsx, ts, tsx]
-        # FIXME: The current implementation of fix-ts.py makes it impossible to format files in
-        #        the top level pulumi package.
+        # TODO(#3334): The current implementation of fix-ts.py makes it impossible to format files
+        #              in the top level pulumi package.
         exclude: "(/[.]prettierrc[.]cjs$|/pulumi/[^/]+.ts$)"
       - id: cluster_resolved_configs
         name: check cluster resolved configs

@@ -6,7 +6,7 @@ import { dump } from 'js-yaml';
 import { dirname, resolve } from 'path';
 
 const config = loadClusterYamlConfig();
-const header = '# This file is generated for preview. Do not edit directly.\n';
+const header = '# This file is generated automatically. Do not edit directly.\n';
 const resolvedConfigYaml = dump(config, {
   sortKeys: true,
   lineWidth: -1,
