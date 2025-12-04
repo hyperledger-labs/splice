@@ -146,6 +146,19 @@ jobs:
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
+  scala_test_logical_sync_upgrade:
+    uses: ./.github/workflows/build.scala_test.yml
+    with:
+      runs_on: self-hosted-k8s-x-large
+      test_names_file: 'test-full-class-names-lsu.log'
+      start_canton_options: -s
+      parallelism: 1
+      test_name: logical-sync-upgrade
+      commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
+      oss_only: ${{ inputs.oss_only }}
+    secrets: inherit
+
   scala_test_with_cometbft:
     uses: ./.github/workflows/build.scala_test_with_cometbft.yml
     if: ${{ ! inputs.oss_only }}
