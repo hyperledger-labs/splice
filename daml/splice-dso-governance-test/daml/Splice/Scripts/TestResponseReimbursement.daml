@@ -1,0 +1,79 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestResponseReimbursement where
+
+import DA.Assert
+import DA.Foldable (forA_)
+import DA.List
+import qualified DA.Map as Map
+import qualified DA.Set as Set
+import Daml.Script
+import DA.Time
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Round
+import Splice.Schedule
+import Splice.DSO.DecentralizedSynchronizer
+import Splice.Fees
+import Splice.Issuance()
+
+
+import Splice.DsoRules
+import Splice.DSO.AmuletPrice
+import Splice.AmuletConfig
+import Splice.CometBft
+import Splice.DecentralizedSynchronizer
+
+import Splice.Scripts.DsoTestUtils
+import Splice.Testing.Registries.AmuletRegistry.Parameters
+
+
+-- | Tests that reimbursement works.
+test_confirmation_response_traffic_reimbursement : Script ()
+test_confirmation_response_traffic_reimbursement = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
+
+  -- setup demo data
+  let responseTrafficDataRaw = sortOn fst
+        [ ("PAR::1", 1000)
+        , ("PAR::2", 2000)
+        , ("PAR::3", 3000)
+        , ("PAR::4", 4000)
+        ]
+  let responseTrafficData = ResponseTrafficData with
+        responseTrafficTotals = map (uncurry ResponseTrafficTotal) responseTrafficDataRaw
+  let responseTrafficDataHash = hash responseTrafficData
+  let reimbursementConfirmation = ReimbursementConfirmation with
+        synchronizerId = dsoRules.decentralizedSynchronizer.activeSynchronizerId
+        migrationId = 0
+        responseTrafficDataHash
+
+  -- setup reimbursement workflow state
+  -- add a new interval
+  -- confirm
+
+  -- check that there are no member traffic contracts yet
+  [] <- query @MemberTraffic dso
+
+  -- reimburse responses
+
+  -- check that the expected member traffic contracts were created
+  actualMemberTrafficContracts <- query @MemberTraffic dso
+  let expectedMemberTrafficContracts = do
+        (memberId, totalTraffic) <- responseTrafficDataRaw
+        pure MemberTraffic with
+          dso = dso
+          memberId
+          synchronizerId = reimbursementConfirmation.synchronizerId
+          migrationId = reimbursementConfirmation.migrationId
+          totalReimbursed = Some totalTraffic
+          totalPurchased = 0
+          amuletSpent = 0.0
+          usdSpent = 0.0
+          numPurchases = 0
+  sortOn (.memberId) (map snd actualMemberTrafficContracts) ===
+    expectedMemberTrafficContracts

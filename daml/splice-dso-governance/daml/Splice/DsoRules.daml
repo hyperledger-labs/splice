@@ -1514,8 +1514,46 @@ template DsoRules with
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
 
 
-    -- confirmation response reimbursement
-    nonconsuming choice DsoRules_ReimburseResponses : DsoRules_ReimburseResponsesResult
+    -- confirmation response traffic reimbursement
+    ----------------------------------------------
+
+    nonconsuming choice DsoRules_StartResponseTrafficReimbursement : DsoRules_StartResponseTrafficReimbursementResult
+      with
+        sv : Party
+      controller dso
+      do
+        now <- getTime
+        workflowStateCid <- create ReimbursementWorkflowState with
+          dso
+          earliestIntervalStart = now
+          nextIntervalStart = now
+        pure DsoRules_StartResponseTrafficReimbursementResult with
+          workflowStateCid = workflowStateCid
+
+
+    nonconsuming choice DsoRules_AddResponseTrafficReimbursementInterval
+      : DsoRules_AddResponseTrafficReimbursementIntervalResult
+      with
+        workflowStateCid : ContractId ReimbursementWorkflowState
+        nextIntervalEnd : Time
+      controller dso
+      do
+        let minIntervalDuration = config.responseReimbursementMinIntervalDuration
+        (intervalStateCid, workflowStateCid) <-
+          ResponseReimbursement.addReimbursementInterval dso minIntervalDuration workflowStateCid nextIntervalEnd
+
+    nonconsuming choice DsoRules_ConfirmResponseTrafficReimbursement
+      : DsoRules_ConfirmResponseTrafficReimbursementResult
+      with
+        intervalStateCid : ContractId ReimbursementIntervalState
+        confirmedResponseTrafficData : ReimbursementConfirmation
+      controller dso
+      do
+        result <- exercise intervalStateCid ReimbursementIntervalState_ConfirmResponses with
+          confirmedResponseTrafficData
+        pure DsoRules_ConfirmResponseTrafficReimbursementResult with result
+
+    nonconsuming choice DsoRules_ReimburseResponseTraffic : DsoRules_ReimburseResponsesResult
       with
         intervalStateCid : ContractId ReimbursementIntervalState
         responseTrafficData : ResponseTrafficData
@@ -1527,6 +1565,14 @@ template DsoRules with
           responseTrafficData
         pure DsoRules_ReimburseResponsesResult with result
 
+
+
+  | SRARC_StartResponseTrafficReimbursement DsoRules_StartResponseTrafficReimbursement
+    -- ^ Automated action to start reimbursing responses for a given interval.
+  | SRARC_AddResponseTrafficReimbursementInterval DsoRules_AddResponseTrafficReimbursementInterval
+    -- ^ Automated action to add a new confirmation response traffic reimbursement interval.
+  | SRARC_ConfirmResponseTrafficReimbursement DsoRules_ConfirmResponseTrafficReimbursement
+    -- ^ Automated action to confirm the response traffic reimbursement data for a reimbursement interval.
 
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)

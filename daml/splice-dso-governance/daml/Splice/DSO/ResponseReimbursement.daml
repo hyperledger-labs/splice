@@ -21,7 +21,7 @@ import Splice.DSO.CryptoHash
 -- configurable.
 
 
-
+-- TODO: add contract that makes it easy to test the hashing of the responseTrafficDataHash
 
 
 -- State of the overall reimbursement workflow.
@@ -37,37 +37,39 @@ data ReimbursementInterval = ReimbursementInterval with
 template ReimbursementWorkflowState
   with
     dso: Party
+    earliestIntervalStart: Time
+      -- ^ The start time of the earliest interval that is still being processed.
     nextIntervalStart: Time
   where
     signatory dso
-
-    choice ReimbursementWorkflowState_AddReimbursementInterval
-      : ReimbursementWorkflowState_AddReimbursementIntervalResult
-      with
-        nextIntervalEnd : Time
-      controller dso
-      do
-        require "Positive interval" (this.nextIntervalStart < nextIntervalEnd)
-        -- Note: additional constraints to ensure that the intervals are large
-        -- enough, and do not advance too quickly are enforced as part of the
-        -- DsoRules.
-        intervalStateCid <- create ReimbursementIntervalState with
-          dso = dso
-          interval = ReimbursementInterval with
-            startExclusive = this.nextIntervalStart
-            endInclusive = nextIntervalEnd
-          reimbursementConfirmation = None
-        workflowStateCid <- create this with
-          nextIntervalStart = nextIntervalEnd
-        pure ReimbursementWorkflowState_AddReimbursementIntervalResult with
-          intervalStateCid
-          workflowStateCid
 
 
 data ReimbursementWorkflowState_AddReimbursementIntervalResult = ReimbursementWorkflowState_AddReimbursementIntervalResult with
     intervalStateCid : ContractId ReimbursementIntervalState
     workflowStateCid : ContractId ReimbursementWorkflowState
   deriving (Eq, Show)
+
+
+addReimbursementInterval : Party -> RelTime -> ContractId ReimbursementWorkflowState -> Time -> Update (ContractId ReimbursementIntervalState, ContractId ReimbursementWorkflowState)
+addReimbursementInterval dso minIntervalDuration workflowStateCid nextIntervalEnd = do
+  workflowState <- fetchAndArchive (ForDso dso) workflowStateCid
+  -- ensure minimal duration
+  let intervalDuration = nextIntervalEnd `subTime` workflowState.nextIntervalStart
+  require "Minimal interval duration" (intervalDuration >= minIntervalDuration)
+  -- ensure that intervals are added at most `minIntervalDuration` ahead of time
+  let backdatedStart = workflowState.nextIntervalStart `addRelTime` (negate minIntervalDuration)
+  assertDeadlineExceeded "nextIntervalStart - minIntervalDuration" backdatedStart
+
+  intervalStateCid <- create ReimbursementIntervalState with
+    dso = dso
+    interval = ReimbursementInterval with
+      startExclusive = workflowState.nextIntervalStart
+      endInclusive = nextIntervalEnd
+    reimbursementConfirmation = None
+  workflowStateCid <- create workflowState with
+    nextIntervalStart = nextIntervalEnd
+  pure (intervalStateCid, workflowStateCid)
+
 
 
 -- State of reimbursing responses for a given interval.
@@ -149,6 +151,12 @@ data ReimbursementIntervalState_ReimburseResponsesResult = ReimbursementInterval
   deriving (Eq, Show)
 
 
+confirmResponseTrafficReimbursement : Party -> ReimbursementConfirmation -> ContractId ReimbursementIntervalState -> Update (ContractId ReimbursementIntervalState)
+confirmResponseTrafficReimbursement dso reimbursementConfirmation intervalStateCid = do
+  require "Not yet confirmed" (isNone this.reimbursementConfirmation)
+  intervalStateCid <- create this with reimbursementConfirmation = Some reimbursementConfirmation
+  pure ReimbursementIntervalState_ConfirmReimbursementResult with
+    intervalStateCid
 
 
 -- Hashing instances
