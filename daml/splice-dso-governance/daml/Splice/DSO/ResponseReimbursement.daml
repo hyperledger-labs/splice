@@ -13,12 +13,25 @@ import Splice.DecentralizedSynchronizer
 import Splice.Util
 import Splice.DSO.CryptoHash
 
+
+
+
+-- TODO: consider using a fixed one nibble sharding prefix as that gives a 16x
+-- tx size reduction while being cheap to implement due to not being
+-- configurable.
+
+
+
+
+
+-- State of the overall reimbursement workflow.
+-----------------------------------------------
+
 data ReimbursementInterval = ReimbursementInterval with
     startExclusive : Time
     endInclusive : Time
   deriving (Eq, Show)
 
--- TODO: consider using a fixed one nibble sharding prefix as that gives a 16x tx size reduction while being cheap to implement due to not being configurable.
 
 template ReimbursementWorkflowState
   with
@@ -33,6 +46,10 @@ template ReimbursementWorkflowState
         nextIntervalEnd : Time
       controller dso
       do
+        require "Positive interval" (this.nextIntervalStart < nextIntervalEnd)
+        -- Note: additional constraints to ensure that the intervals are large
+        -- enough, and do not advance too quickly are enforced as part of the
+        -- DsoRules.
         intervalStateCid <- create ReimbursementIntervalState with
           dso = dso
           interval = ReimbursementInterval with
@@ -52,57 +69,8 @@ data ReimbursementWorkflowState_AddReimbursementIntervalResult = ReimbursementWo
   deriving (Eq, Show)
 
 
-template ReimbursementIntervalState
-  with
-    dso: Party
-    interval: ReimbursementInterval
-    reimbursementConfirmation : Optional ReimbursementConfirmation
-  where
-    signatory dso
-
-    choice ReimbursementIntervalState_ConfirmReimbursement
-      : ContractId ReimbursementIntervalState -- FIXME
-      with
-        reimbursementConfirmation : ReimbursementConfirmation
-      controller dso
-      do
-        require "Not yet confirmed" (isNone this.responseTrafficDataHash)
-        create this with responseTrafficDataHash = Some responseTrafficDataHash
-
-    choice ReimbursementIntervalState_ReimburseResponses
-      : ReimbursementIntervalState_ReimburseResponsesResult
-      with
-        responseTrafficData : ResponseTrafficData
-      controller dso
-      do
-        case reimbursementConfirmation of
-          None -> abort "Response traffic reimbursement hash not yet been confirmed"
-          Some confirmation -> do
-            let actualHash = hashResponseTrafficData responseTrafficData
-            let expectedHash = confirmation.responseTrafficDataHash
-            unless (actualHash == expectedHash) $
-                abort $ T.unwords ["Response traffic data hash", actualHash.value, "does not match expected hash", expectedHash.value]
-            forA_ responseTrafficData.responseTrafficTotals \(ResponseTrafficTotal with memberId, totalTraffic) ->
-              create MemberTraffic with
-                dso = dso
-                memberId
-                synchronizerId = confirmation.synchronizerId
-                migrationId = confirmation.migrationId
-                totalReimbursed = Some totalTraffic
-                -- Set these fields to reflect that this reimbursement is not a traffic purchase.
-                -- Thereby the aggregation in AmuletRules_MergeMemberTrafficContracts works correctly.
-                totalPurchased = 0
-                amuletSpent = 0.0
-                usdSpent = 0.0
-                numPurchases = 0
-
-
-
-data ReimbursementIntervalState_ReimburseResponsesResult = ReimbursementIntervalState_ReimburseResponsesResult with
-    intervalStateCid : ContractId ReimbursementIntervalState
-    workflowStateCid : ContractId ReimbursementWorkflowState
-  deriving (Eq, Show)
-
+-- State of reimbursing responses for a given interval.
+-------------------------------------------------------
 
 data ReimbursementConfirmation = ReimbursementConfirmation with
     synchronizerId : Text -- ^ Synchronizer on which the responses should be reimbursed. Always set to the global synchronizer-id.
@@ -120,11 +88,75 @@ data ResponseTrafficTotal = ResponseTrafficTotal with
   deriving (Eq, Show)
 
 
+template ReimbursementIntervalState
+  with
+    dso: Party
+    interval: ReimbursementInterval
+    reimbursementConfirmation : Optional ReimbursementConfirmation
+  where
+    signatory dso
+
+    choice ReimbursementIntervalState_ConfirmReimbursement
+      : ReimbursementIntervalState_ConfirmReimbursementResult
+      with
+        reimbursementConfirmation : ReimbursementConfirmation
+      controller dso
+      do
+        require "Not yet confirmed" (isNone this.reimbursementConfirmation)
+        intervalStateCid <- create this with reimbursementConfirmation = Some reimbursementConfirmation
+        pure ReimbursementIntervalState_ConfirmReimbursementResult with
+          intervalStateCid
+
+    choice ReimbursementIntervalState_ReimburseResponses
+      : ReimbursementIntervalState_ReimburseResponsesResult
+      with
+        responseTrafficData : ResponseTrafficData
+      controller dso
+      do
+        case reimbursementConfirmation of
+          None -> abort "Response traffic reimbursement hash not yet been confirmed"
+          Some confirmation -> do
+            let actualHash = hash responseTrafficData
+            let expectedHash = confirmation.responseTrafficDataHash
+            unless (actualHash == expectedHash) $
+                abort $ T.unwords ["Response traffic data hash", actualHash.value, "does not match expected hash", expectedHash.value]
+            forA_ responseTrafficData.responseTrafficTotals \(ResponseTrafficTotal with memberId, totalTraffic) ->
+              create MemberTraffic with
+                dso = dso
+                memberId
+                synchronizerId = confirmation.synchronizerId
+                migrationId = confirmation.migrationId
+                totalReimbursed = Some totalTraffic
+                -- Set these fields to reflect that this reimbursement is not a traffic purchase.
+                -- Thereby the aggregation in AmuletRules_MergeMemberTrafficContracts works correctly.
+                totalPurchased = 0
+                amuletSpent = 0.0
+                usdSpent = 0.0
+                numPurchases = 0
+
+            -- Note: we intentionally do not return the created MemberTraffic contract IDs here
+            -- to avoid bloating the transaction size on the Ledger API.
+            pure ReimbursementIntervalState_ReimburseResponsesResult with
+              dummy = ()
+
+data ReimbursementIntervalState_ConfirmReimbursementResult = ReimbursementIntervalState_ConfirmReimbursementResult with
+    intervalStateCid : ContractId ReimbursementIntervalState
+  deriving (Eq, Show)
+
+data ReimbursementIntervalState_ReimburseResponsesResult = ReimbursementIntervalState_ReimburseResponsesResult with
+    dummy : ()
+  deriving (Eq, Show)
+
+
+
+
 -- Hashing instances
+--------------------
 
 instance Hashable ResponseTrafficData where
-  hash = hashRecord [hash responseTrafficTotals]
+  hash (ResponseTrafficData with responseTrafficTotals) =
+    hashRecord [hash responseTrafficTotals]
 
 instance Hashable ResponseTrafficTotal where
   hash (ResponseTrafficTotal with memberId, totalTraffic) =
-    hashRecord [hashText memberId, hashInt totalTraffic]
+    hashRecord [hash memberId, hash totalTraffic]

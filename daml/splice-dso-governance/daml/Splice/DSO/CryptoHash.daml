@@ -47,6 +47,10 @@ hashUpgradedVariant tag oldFieldHashes newFieldHashes =
 class Hashable a where
   hash : a -> Hash
 
+-- | Identity instance for Hash, which is useful for hash types like [Hash].
+instance Hashable Hash where
+  hash h = h
+
 instance Hashable Int where
   hash = hashInt
 
