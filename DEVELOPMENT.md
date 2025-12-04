@@ -470,3 +470,14 @@ Caused by: java.lang.NullPointerException: Cannot invoke "jdk.internal.platform.
         at java.base/jdk.internal.platform.cgroupv2.CgroupV2Subsystem.getInstance(CgroupV2Subsystem.java:80)
 ```
 in start-canton.sh, try adding: `export ADDITIONAL_JAVA_TOOLS_OPTIONS="-XX:-UseContainerSupport"` to .envrc.private
+
+## Docker version issues when running tests
+
+
+If you are encountering an exception like the following when running tests
+
+```
+[info]   java.lang.IllegalStateException: Could not find a valid Docker environment. Please see logs and check configuration
+```
+
+then downgrade your docker version to ```27.5.1-1```.
