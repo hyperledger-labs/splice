@@ -57,4 +57,7 @@ object Dependencies {
 
   lazy val parallel_collections = "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4"
 
+  lazy val zstd = "com.github.luben" % "zstd-jni" % "1.5.7-6"
+
+  lazy val aws_s3 = "software.amazon.awssdk" % "s3" % CantonDependencies.aws_version
 }

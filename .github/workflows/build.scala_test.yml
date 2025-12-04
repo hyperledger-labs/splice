@@ -144,3 +144,6 @@ jobs:
           oss_only: ${{ inputs.oss_only }}
           artifactory_user: ${{ inputs.oss_only && '' || vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ inputs.oss_only && '' || secrets.ARTIFACTORY_PASSWORD }}
+          bulk_storage_poc_storage_key: ${{ secrets.BULK_STORAGE_POC_STORAGE_ACCESS_KEY }}
+          bulk_storage_poc_storage_secret: ${{ secrets.BULK_STORAGE_POC_STORAGE_SECRET_KEY }}
+          bulk_storage_poc_db_pwd: ${{ secrets.BULK_STORAGE_POC_DB_PASSWORD }}

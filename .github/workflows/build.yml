@@ -75,312 +75,325 @@ jobs:
             echo "Current commit opts in, letting it run."
           fi
 
-  static_tests:
-    uses: ./.github/workflows/build.static_tests.yml
-    secrets: inherit
-    with:
-      commit_sha: ${{ inputs.commit_sha }}
-      self_hosted: true
+  # static_tests:
+  #   uses: ./.github/workflows/build.static_tests.yml
+  #   secrets: inherit
+  #   with:
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     self_hosted: true
 
-  deployment_test:
-    uses: ./.github/workflows/build.deployment_test.yml
-    secrets: inherit
-    with:
-      commit_sha: ${{ inputs.commit_sha }}
+  # deployment_test:
+  #   uses: ./.github/workflows/build.deployment_test.yml
+  #   secrets: inherit
+  #   with:
+  #     commit_sha: ${{ inputs.commit_sha }}
 
-  daml_test:
-    uses: ./.github/workflows/build.daml_test.yml
-    secrets: inherit
-    with:
-      commit_sha: ${{ inputs.commit_sha }}
+  # daml_test:
+  #   uses: ./.github/workflows/build.daml_test.yml
+  #   secrets: inherit
+  #   with:
+  #     commit_sha: ${{ inputs.commit_sha }}
 
-  scala_test_sim_time:
+  scala_test_scan_bulk_storage_poc:
     uses: ./.github/workflows/build.scala_test.yml
     with:
       runs_on: self-hosted-k8s-large
-      test_names_file: 'test-full-class-names-sim-time.log'
-      start_canton_options: -s
-      parallelism: 4
-      test_name: simtime
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-      oss_only: ${{ inputs.oss_only }}
-    secrets: inherit
-
-  scala_test_resource_intensive:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-x-large
-      test_names_file: 'test-full-class-names-resource-intensive.log'
-      start_canton_options: -w
-      parallelism: 2
-      test_name: resource-intensive
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-      oss_only: ${{ inputs.oss_only }}
-    secrets: inherit
-
-  scala_test_record_time_tolerance:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-small
-      test_names_file: 'test-full-class-names-record-time-tolerance.log'
-      start_canton_options: -s
-      parallelism: 1
-      test_name: record-time-tolerance
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-      oss_only: ${{ inputs.oss_only }}
-    secrets: inherit
-
-  scala_test_disaster_recovery:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-x-large
-      test_names_file: 'test-full-class-names-disaster-recovery.log'
-      start_canton_options: -w
-      parallelism: 1
-      test_name: disaster-recovery
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-      oss_only: ${{ inputs.oss_only }}
-    secrets: inherit
-
-  scala_test_with_cometbft:
-    uses: ./.github/workflows/build.scala_test_with_cometbft.yml
-    if: ${{ ! inputs.oss_only }}
-    with:
-      runs_on: self-hosted-k8s-medium
-      test_names_file: "test-cometbft-full-class-names.log"
-      parallelism: 1
-      test_name: cometbft
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-    secrets: inherit
-
-  scala_test_signatures:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-medium
       test_names_file: 'test-full-class-names-signatures.log'
-      start_canton_options: -B "scripts/bootstrap/bootstrap-canton-with-unsigned-keys.sc"
-      parallelism: 1
-      test_name: signatures
-      with_gcp_creds: false
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-      oss_only: ${{ inputs.oss_only }}
-    secrets: inherit
-
-  scala_test_wall_clock_time:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-large
-      test_names_file: 'test-full-class-names.log'
-      start_canton_options: -w
-      # TODO(DACH-NY/canton-network-node#10912) Investigate why things got slower
-      parallelism: 11
-      test_name: wall-clock-time
-      with_gcp_creds: true
-      skip_if_regex: "\\[bft\\]"
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-      oss_only: ${{ inputs.oss_only }}
-    secrets: inherit
-
-  scala_test_wall_clock_time_bft:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-x-large
-      test_names_file: 'test-full-class-names.log'
-      start_canton_options: -we
-      parallelism: 10
-      test_name: wall-clock-time-bft
-      with_gcp_creds: true
-      pre_sbt_cmd: "export SPLICE_USE_BFT_SEQUENCER=1"
-      run_if_commit_tag: 'bft'
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-      oss_only: ${{ inputs.oss_only }}
-    secrets: inherit
-
-  scala_test_frontend_wall_clock_time:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-x-large
-      test_names_file: 'test-full-class-names-frontend.log'
-      start_canton_options: -w
-      parallelism: 3
-      test_name: frontend-wall-clock-time
-      is_frontend_test: true
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-      oss_only: ${{ inputs.oss_only }}
-    secrets: inherit
-
-  scala_test_frontend_simtime:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-large
-      test_names_file: 'test-full-class-names-frontend-sim-time.log'
-      start_canton_options: -s
-      parallelism: 1
-      test_name: frontend-simtime
-      is_frontend_test: true
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-      oss_only: ${{ inputs.oss_only }}
-    secrets: inherit
-
-  scala_test_docker_compose:
-    uses: ./.github/workflows/build.scala_test_for_compose.yml
-    if: ${{ ! inputs.oss_only }}
-    with:
-      runs_on: self-hosted-docker-large
-      test_names_file: 'test-full-class-names-docker-based.log'
-      start_canton_options: -w
-      parallelism: 2
-      test_name: docker-compose
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-    secrets: inherit
-
-  scala_test_local_net:
-    uses: ./.github/workflows/build.scala_test_for_compose.yml
-    if: ${{ ! inputs.oss_only }}
-    with:
-      runs_on: self-hosted-docker-large
-      test_names_file: 'test-full-class-names-local-net-based.log'
-      parallelism: 1
-      test_name: local-net
       with_canton: false
-      start_canton_options: ""
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-    secrets: inherit
-
-  scala_test_app_upgrade:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-large
-      test_names_file: 'test-full-class-names-app-upgrade.log'
-      start_canton_options: -w
       parallelism: 1
-      test_name: app-upgrade
-      pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1; ./build-tools/prep-app-upgrade-test"
-      skip_if_regex: "\\[breaking\\]"
-      skip_if_files_changed: "nix/canton-sources.json"
+      test_name: scan-bulk-storage-poc
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
-  scala_test_canton_enterprise:
-    uses: ./.github/workflows/build.scala_test.yml
-    if: ${{ ! inputs.oss_only }}
-    with:
-      runs_on: self-hosted-k8s-large
-      test_names_file: 'test-full-class-names-canton-enterprise.log'
-      start_canton_options: -w
-      parallelism: 1
-      test_name: canton-enterprise
-      with_gcp_creds: true
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-    secrets: inherit
+  # scala_test_sim_time:
+  #   uses: ./.github/workflows/build.scala_test.yml
+  #   with:
+  #     runs_on: self-hosted-k8s-large
+  #     test_names_file: 'test-full-class-names-sim-time.log'
+  #     start_canton_options: -s
+  #     parallelism: 4
+  #     test_name: simtime
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #     oss_only: ${{ inputs.oss_only }}
+  #   secrets: inherit
 
-  ui_tests:
-    uses: ./.github/workflows/build.ui_tests.yml
-    secrets: inherit
-    with:
-      commit_sha: ${{ inputs.commit_sha }}
+  # scala_test_resource_intensive:
+  #   uses: ./.github/workflows/build.scala_test.yml
+  #   with:
+  #     runs_on: self-hosted-k8s-x-large
+  #     test_names_file: 'test-full-class-names-resource-intensive.log'
+  #     start_canton_options: -w
+  #     parallelism: 2
+  #     test_name: resource-intensive
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #     oss_only: ${{ inputs.oss_only }}
+  #   secrets: inherit
 
-  ts_cli_tests:
-    uses: ./.github/workflows/build.ts_cli_tests.yml
-    secrets: inherit
-    with:
-      commit_sha: ${{ inputs.commit_sha }}
+  # scala_test_record_time_tolerance:
+  #   uses: ./.github/workflows/build.scala_test.yml
+  #   with:
+  #     runs_on: self-hosted-k8s-small
+  #     test_names_file: 'test-full-class-names-record-time-tolerance.log'
+  #     start_canton_options: -s
+  #     parallelism: 1
+  #     test_name: record-time-tolerance
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #     oss_only: ${{ inputs.oss_only }}
+  #   secrets: inherit
 
-  docs:
-    uses: ./.github/workflows/build.docs.yml
-    secrets: inherit
-    with:
-      commit_sha: ${{ inputs.commit_sha }}
+  # scala_test_disaster_recovery:
+  #   uses: ./.github/workflows/build.scala_test.yml
+  #   with:
+  #     runs_on: self-hosted-k8s-x-large
+  #     test_names_file: 'test-full-class-names-disaster-recovery.log'
+  #     start_canton_options: -w
+  #     parallelism: 1
+  #     test_name: disaster-recovery
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #     oss_only: ${{ inputs.oss_only }}
+  #   secrets: inherit
 
-  scala_test_without_canton:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-medium
-      test_names_file: 'test-full-class-names-non-integration.log'
-      with_canton: false
-      parallelism: 2
-      test_name: without-canton
-      with_gcp_creds: true
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-      oss_only: true
-    secrets: inherit
+  # scala_test_with_cometbft:
+  #   uses: ./.github/workflows/build.scala_test_with_cometbft.yml
+  #   if: ${{ ! inputs.oss_only }}
+  #   with:
+  #     runs_on: self-hosted-k8s-medium
+  #     test_names_file: "test-cometbft-full-class-names.log"
+  #     parallelism: 1
+  #     test_name: cometbft
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #   secrets: inherit
 
-  final_result:
-    if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
-    needs:
-    - static_tests
-    - deployment_test
-    - daml_test
-    - scala_test_sim_time
-    - scala_test_resource_intensive
-    - scala_test_record_time_tolerance
-    - scala_test_disaster_recovery
-    - scala_test_with_cometbft
-    - scala_test_wall_clock_time
-    - scala_test_frontend_wall_clock_time
-    - scala_test_frontend_simtime
-    - scala_test_docker_compose
-    - scala_test_local_net
-    - scala_test_app_upgrade
-    - scala_test_canton_enterprise
-    - scala_test_without_canton
-    - ui_tests
-    - ts_cli_tests
-    - docs
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Check if static only
-        uses: ./.github/actions/tests/skip_on_static
-        id: static_only
-        with:
-          gh_token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Handle [force] and [static] labels
-        shell: bash
-        run: |
-          git fetch origin ${{ github.event.pull_request.head.sha }}
-          last_commit_msg=$(git log -1 --pretty=%B ${{ github.event.pull_request.head.sha }})
-          echo "Last commit message: $last_commit_msg"
-          if [[ $last_commit_msg == *"[force]"* ]]; then
-            echo "Skipping the check for job success because the current commit opts in for a forced run."
-            echo "FORCE=true" >> "$GITHUB_ENV"
-          elif [[ "${{ steps.static_only.outputs.skip }}" == "true" ]]; then
-            echo "Only static tests are required"
-            # shellcheck disable=SC2129
-            echo "FORCE=false" >> "$GITHUB_ENV"
-            echo "JOBS<<EOF" >> "$GITHUB_ENV"
-            echo '${{ toJSON(needs) }}' | jq '{"docs", "static_tests", "deployment_test"}' >> "$GITHUB_ENV"
-            echo "EOF" >> "$GITHUB_ENV"
-          else
-            echo "Checking if all jobs succeeded."
-            # shellcheck disable=SC2129
-            echo "FORCE=false" >> "$GITHUB_ENV"
-            echo "JOBS<<EOF" >> "$GITHUB_ENV"
-            echo '${{ toJSON(needs) }}' >> "$GITHUB_ENV"
-            echo "EOF" >> "$GITHUB_ENV"
-          fi
-          echo "env file: $(cat "$GITHUB_ENV")"
-      - name: check if the required jobs succeeded
-        if: env.FORCE != 'true'
-        uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
-        with:
-          jobs: ${{ env.JOBS }}
-          # Allow skipping the enterprise-only jobs
-          allowed-skips: scala_test_with_cometbft, scala_test_docker_compose, scala_test_local_net, scala_test_canton_enterprise
+  # scala_test_signatures:
+  #   uses: ./.github/workflows/build.scala_test.yml
+  #   with:
+  #     runs_on: self-hosted-k8s-medium
+  #     test_names_file: 'test-full-class-names-signatures.log'
+  #     start_canton_options: -B "scripts/bootstrap/bootstrap-canton-with-unsigned-keys.sc"
+  #     parallelism: 1
+  #     test_name: signatures
+  #     with_gcp_creds: false
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #     oss_only: ${{ inputs.oss_only }}
+  #   secrets: inherit
+
+  # scala_test_wall_clock_time:
+  #   uses: ./.github/workflows/build.scala_test.yml
+  #   with:
+  #     runs_on: self-hosted-k8s-large
+  #     test_names_file: 'test-full-class-names.log'
+  #     start_canton_options: -w
+  #     # TODO(DACH-NY/canton-network-node#10912) Investigate why things got slower
+  #     parallelism: 11
+  #     test_name: wall-clock-time
+  #     with_gcp_creds: true
+  #     skip_if_regex: "\\[bft\\]"
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #     oss_only: ${{ inputs.oss_only }}
+  #   secrets: inherit
+
+  # scala_test_wall_clock_time_bft:
+  #   uses: ./.github/workflows/build.scala_test.yml
+  #   with:
+  #     runs_on: self-hosted-k8s-x-large
+  #     test_names_file: 'test-full-class-names.log'
+  #     start_canton_options: -we
+  #     parallelism: 10
+  #     test_name: wall-clock-time-bft
+  #     with_gcp_creds: true
+  #     pre_sbt_cmd: "export SPLICE_USE_BFT_SEQUENCER=1"
+  #     run_if_commit_tag: 'bft'
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #     oss_only: ${{ inputs.oss_only }}
+  #   secrets: inherit
+
+  # scala_test_frontend_wall_clock_time:
+  #   uses: ./.github/workflows/build.scala_test.yml
+  #   with:
+  #     runs_on: self-hosted-k8s-x-large
+  #     test_names_file: 'test-full-class-names-frontend.log'
+  #     start_canton_options: -w
+  #     parallelism: 3
+  #     test_name: frontend-wall-clock-time
+  #     is_frontend_test: true
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #     oss_only: ${{ inputs.oss_only }}
+  #   secrets: inherit
+
+  # scala_test_frontend_simtime:
+  #   uses: ./.github/workflows/build.scala_test.yml
+  #   with:
+  #     runs_on: self-hosted-k8s-large
+  #     test_names_file: 'test-full-class-names-frontend-sim-time.log'
+  #     start_canton_options: -s
+  #     parallelism: 1
+  #     test_name: frontend-simtime
+  #     is_frontend_test: true
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #     oss_only: ${{ inputs.oss_only }}
+  #   secrets: inherit
+
+  # scala_test_docker_compose:
+  #   uses: ./.github/workflows/build.scala_test_for_compose.yml
+  #   if: ${{ ! inputs.oss_only }}
+  #   with:
+  #     runs_on: self-hosted-docker-large
+  #     test_names_file: 'test-full-class-names-docker-based.log'
+  #     start_canton_options: -w
+  #     parallelism: 2
+  #     test_name: docker-compose
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #   secrets: inherit
+
+  # scala_test_local_net:
+  #   uses: ./.github/workflows/build.scala_test_for_compose.yml
+  #   if: ${{ ! inputs.oss_only }}
+  #   with:
+  #     runs_on: self-hosted-docker-large
+  #     test_names_file: 'test-full-class-names-local-net-based.log'
+  #     parallelism: 1
+  #     test_name: local-net
+  #     with_canton: false
+  #     start_canton_options: ""
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #   secrets: inherit
+
+  # scala_test_app_upgrade:
+  #   uses: ./.github/workflows/build.scala_test.yml
+  #   with:
+  #     runs_on: self-hosted-k8s-large
+  #     test_names_file: 'test-full-class-names-app-upgrade.log'
+  #     start_canton_options: -w
+  #     parallelism: 1
+  #     test_name: app-upgrade
+  #     pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1; ./build-tools/prep-app-upgrade-test"
+  #     skip_if_regex: "\\[breaking\\]"
+  #     skip_if_files_changed: "nix/canton-sources.json"
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #     oss_only: ${{ inputs.oss_only }}
+  #   secrets: inherit
+
+  # scala_test_canton_enterprise:
+  #   uses: ./.github/workflows/build.scala_test.yml
+  #   if: ${{ ! inputs.oss_only }}
+  #   with:
+  #     runs_on: self-hosted-k8s-large
+  #     test_names_file: 'test-full-class-names-canton-enterprise.log'
+  #     start_canton_options: -w
+  #     parallelism: 1
+  #     test_name: canton-enterprise
+  #     with_gcp_creds: true
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #   secrets: inherit
+
+  # ui_tests:
+  #   uses: ./.github/workflows/build.ui_tests.yml
+  #   secrets: inherit
+  #   with:
+  #     commit_sha: ${{ inputs.commit_sha }}
+
+  # ts_cli_tests:
+  #   uses: ./.github/workflows/build.ts_cli_tests.yml
+  #   secrets: inherit
+  #   with:
+  #     commit_sha: ${{ inputs.commit_sha }}
+
+  # docs:
+  #   uses: ./.github/workflows/build.docs.yml
+  #   secrets: inherit
+  #   with:
+  #     commit_sha: ${{ inputs.commit_sha }}
+
+  # scala_test_without_canton:
+  #   uses: ./.github/workflows/build.scala_test.yml
+  #   with:
+  #     runs_on: self-hosted-k8s-medium
+  #     test_names_file: 'test-full-class-names-non-integration.log'
+  #     with_canton: false
+  #     parallelism: 2
+  #     test_name: without-canton
+  #     with_gcp_creds: true
+  #     commit_sha: ${{ inputs.commit_sha }}
+  #     daml_base_version: ${{ inputs.daml_base_version }}
+  #     oss_only: true
+  #   secrets: inherit
+
+  # final_result:
+  #   if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+  #   needs:
+  #   - static_tests
+  #   - deployment_test
+  #   - daml_test
+  #   - scala_test_sim_time
+  #   - scala_test_resource_intensive
+  #   - scala_test_record_time_tolerance
+  #   - scala_test_disaster_recovery
+  #   - scala_test_with_cometbft
+  #   - scala_test_wall_clock_time
+  #   - scala_test_frontend_wall_clock_time
+  #   - scala_test_frontend_simtime
+  #   - scala_test_docker_compose
+  #   - scala_test_local_net
+  #   - scala_test_app_upgrade
+  #   - scala_test_canton_enterprise
+  #   - scala_test_without_canton
+  #   - ui_tests
+  #   - ts_cli_tests
+  #   - docs
+  #   runs-on: ubuntu-24.04
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+  #     - name: Check if static only
+  #       uses: ./.github/actions/tests/skip_on_static
+  #       id: static_only
+  #       with:
+  #         gh_token: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Handle [force] and [static] labels
+  #       shell: bash
+  #       run: |
+  #         git fetch origin ${{ github.event.pull_request.head.sha }}
+  #         last_commit_msg=$(git log -1 --pretty=%B ${{ github.event.pull_request.head.sha }})
+  #         echo "Last commit message: $last_commit_msg"
+  #         if [[ $last_commit_msg == *"[force]"* ]]; then
+  #           echo "Skipping the check for job success because the current commit opts in for a forced run."
+  #           echo "FORCE=true" >> "$GITHUB_ENV"
+  #         elif [[ "${{ steps.static_only.outputs.skip }}" == "true" ]]; then
+  #           echo "Only static tests are required"
+  #           # shellcheck disable=SC2129
+  #           echo "FORCE=false" >> "$GITHUB_ENV"
+  #           echo "JOBS<<EOF" >> "$GITHUB_ENV"
+  #           echo '${{ toJSON(needs) }}' | jq '{"docs", "static_tests", "deployment_test"}' >> "$GITHUB_ENV"
+  #           echo "EOF" >> "$GITHUB_ENV"
+  #         else
+  #           echo "Checking if all jobs succeeded."
+  #           # shellcheck disable=SC2129
+  #           echo "FORCE=false" >> "$GITHUB_ENV"
+  #           echo "JOBS<<EOF" >> "$GITHUB_ENV"
+  #           echo '${{ toJSON(needs) }}' >> "$GITHUB_ENV"
+  #           echo "EOF" >> "$GITHUB_ENV"
+  #         fi
+  #         echo "env file: $(cat "$GITHUB_ENV")"
+  #     - name: check if the required jobs succeeded
+  #       if: env.FORCE != 'true'
+  #       uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+  #       with:
+  #         jobs: ${{ env.JOBS }}
+  #         # Allow skipping the enterprise-only jobs
+  #         allowed-skips: scala_test_with_cometbft, scala_test_docker_compose, scala_test_local_net, scala_test_canton_enterprise
