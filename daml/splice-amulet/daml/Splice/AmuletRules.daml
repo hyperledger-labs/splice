@@ -233,6 +233,7 @@ template AmuletRules
           numPurchases = 1
           amuletSpent = trafficCostAmulet
           usdSpent =  trafficCostUsd
+          totalReimbursed = None
         -- return result
         return AmuletRules_BuyMemberTrafficResult with
           round = transferResult.round
@@ -270,6 +271,11 @@ template AmuletRules
                 numPurchases = acc.numPurchases + traffic.numPurchases
                 usdSpent = acc.usdSpent + traffic.usdSpent
                 amuletSpent = acc.amuletSpent + traffic.amuletSpent
+                totalReimbursed = case (acc.totalReimbursed, traffic.totalReimbursed) of
+                  (None, None) -> None
+                  (Some a, None) -> Some a
+                  (None, Some b) -> Some b
+                  (Some a, Some b) -> Some (a + b)
               ) (initialMemberTraffic dso first.memberId first.synchronizerId first.migrationId) traffics
         mergedTrafficCid <- create mergedTraffic
         return AmuletRules_MergeMemberTrafficContractsResult with ..

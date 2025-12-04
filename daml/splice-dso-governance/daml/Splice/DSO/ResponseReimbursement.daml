@@ -1,0 +1,148 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | All the response reimbursement workflows code that does not depend on `DsoRules`.
+module Splice.DSO.ResponseReimbursement where
+
+import DA.Action
+import DA.Foldable (forA_)
+import DA.Optional
+import DA.Text qualified as T
+
+import Splice.DecentralizedSynchronizer
+import Splice.Util
+
+data ReimbursementInterval = ReimbursementInterval with
+    startExclusive : Time
+    endInclusive : Time
+  deriving (Eq, Show)
+
+-- TODO: consider using a fixed one nibble sharding prefix as that gives a 16x tx size reduction while being cheap to implement due to not being configurable.
+
+template ReimbursementWorkflowState
+  with
+    dso: Party
+    nextIntervalStart: Time
+  where
+    signatory dso
+
+    choice ReimbursementWorkflowState_AddReimbursementInterval
+      : ReimbursementWorkflowState_AddReimbursementIntervalResult
+      with
+        nextIntervalEnd : Time
+      controller dso
+      do
+        intervalStateCid <- create ReimbursementIntervalState with
+          dso = dso
+          interval = ReimbursementInterval with
+            startExclusive = this.nextIntervalStart
+            endInclusive = nextIntervalEnd
+          reimbursementConfirmation = None
+        workflowStateCid <- create this with
+          nextIntervalStart = nextIntervalEnd
+        pure ReimbursementWorkflowState_AddReimbursementIntervalResult with
+          intervalStateCid
+          workflowStateCid
+
+
+data ReimbursementWorkflowState_AddReimbursementIntervalResult = ReimbursementWorkflowState_AddReimbursementIntervalResult with
+    intervalStateCid : ContractId ReimbursementIntervalState
+    workflowStateCid : ContractId ReimbursementWorkflowState
+  deriving (Eq, Show)
+
+
+template ReimbursementIntervalState
+  with
+    dso: Party
+    interval: ReimbursementInterval
+    reimbursementConfirmation : Optional ReimbursementConfirmation
+  where
+    signatory dso
+
+    choice ReimbursementIntervalState_ConfirmReimbursement
+      : ContractId ReimbursementIntervalState -- FIXME
+      with
+        reimbursementConfirmation : ReimbursementConfirmation
+      controller dso
+      do
+        require "Not yet confirmed" (isNone this.responseTrafficDataHash)
+        create this with responseTrafficDataHash = Some responseTrafficDataHash
+
+    choice ReimbursementIntervalState_ReimburseResponses
+      : ReimbursementIntervalState_ReimburseResponsesResult
+      with
+        responseTrafficData : ResponseTrafficData
+      controller dso
+      do
+        case reimbursementConfirmation of
+          None -> abort "Response traffic reimbursement hash not yet been confirmed"
+          Some confirmation -> do
+            let actualHash = hashResponseTrafficData responseTrafficData
+            let expectedHash = confirmation.responseTrafficDataHash
+            unless (actualHash == expectedHash) $
+                abort $ T.unwords ["Response traffic data hash", actualHash.value, "does not match expected hash", expectedHash.value]
+            forA_ responseTrafficData.responseTrafficTotals \(ResponseTrafficTotal with memberId, totalTraffic) ->
+              create MemberTraffic with
+                dso = dso
+                memberId
+                synchronizerId = confirmation.synchronizerId
+                migrationId = confirmation.migrationId
+                totalReimbursed = Some totalTraffic
+                -- Set these fields to reflect that this reimbursement is not a traffic purchase.
+                -- Thereby the aggregation in AmuletRules_MergeMemberTrafficContracts works correctly.
+                totalPurchased = 0
+                amuletSpent = 0.0
+                usdSpent = 0.0
+                numPurchases = 0
+
+
+
+data ReimbursementIntervalState_ReimburseResponsesResult = ReimbursementIntervalState_ReimburseResponsesResult with
+    intervalStateCid : ContractId ReimbursementIntervalState
+    workflowStateCid : ContractId ReimbursementWorkflowState
+  deriving (Eq, Show)
+
+
+data ReimbursementConfirmation = ReimbursementConfirmation with
+    synchronizerId : Text -- ^ Synchronizer on which the responses should be reimbursed. Always set to the global synchronizer-id.
+    migrationId : Int -- ^ Migration id on which the responses should be reimbursed. Always set to the latest migration id.
+    responseTrafficDataHash : Hash
+  deriving (Eq, Show)
+
+data ResponseTrafficData = ResponseTrafficData with
+    responseTrafficTotals : [ResponseTrafficTotal]
+  deriving (Eq, Show)
+
+data ResponseTrafficTotal = ResponseTrafficTotal with
+    memberId : Text
+    totalTraffic : Int
+  deriving (Eq, Show)
+
+
+-- TODO: move into Splice.DSO.CryptoHash
+
+data Hash = Hash with value : Text
+  deriving (Eq, Show)
+
+hashInt : Int -> Hash
+hashInt n = Hash $ T.sha256 (show n)
+
+hashText : Text -> Hash
+hashText = Hash . T.sha256
+
+hashListInternal : [Text] -> Hash
+hashListInternal ts = Hash $ T.sha256 $ mconcat (show (length ts) :: "|" :: ts)
+
+hashRecord : [Hash] -> Hash
+hashRecord = hashListInternal . map (.value)
+
+hashList : (a -> Hash) -> [a] -> Hash
+hashList hashElem xs = hashListInternal [ (hashElem x).value | x <- xs ]
+
+hashResponseTrafficData : ResponseTrafficData -> Hash
+hashResponseTrafficData (ResponseTrafficData with responseTrafficTotals) =
+  hashRecord [hashList hashResponseTrafficTotal responseTrafficTotals]
+
+hashResponseTrafficTotal : ResponseTrafficTotal -> Hash
+hashResponseTrafficTotal (ResponseTrafficTotal with memberId, totalTraffic) =
+  hashRecord [hashText memberId, hashInt totalTraffic]
