@@ -98,7 +98,7 @@ jobs:
     uses: ./.github/workflows/build.scala_test.yml
     with:
       runs_on: self-hosted-k8s-large
-      test_names_file: 'test-full-class-names-signatures.log'
+      test_names_file: 'test-full-class-names-bulk-storage-poc.log'
       with_canton: false
       parallelism: 1
       test_name: scan-bulk-storage-poc
