@@ -198,17 +198,13 @@ spec:
   targetLabels:
       - server
 {{- end }}
-{{- define "splice-util-lib.log-level" -}}
-{{- if .logLevel }}
+{{- define "splice-util-lib.log-level" }}
 - name: LOG_LEVEL_CANTON
-  value: {{ .logLevel }}
+  value: {{ .logLevel | default "INFO" }}
 - name: LOG_LEVEL_STDOUT
-{{- if .logLevelStdout }}
-  value: {{ .logLevelStdout }}
-{{- else }}
-  value: {{ .logLevel }}
-{{- end }}
-{{- end }}
+  value: {{ .logLevelStdout | default "DEBUG" }}
+- name: LOG_IMMEDIATE_FLUSH
+  value: {{ .logAsyncFlush | default false | not | quote }}
 {{- end }}
 {{- define "splice-util-lib.service-account" -}}
 {{- if .serviceAccountName -}}
@@ -240,4 +236,25 @@ app: {{ .app }}
 {{- else }} {{ $value }}
 {{- end }}
 {{- end -}}
+{{- end -}}
+
+{{- define "splice-util-lib.affinity" -}}
+{{- if or .enableAntiAffinity .affinity }}
+affinity:
+  {{- with .affinity }}
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- if .enableAntiAffinity }}
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: splice-component
+              operator: In
+              values:
+                - {{ .app }}
+        topologyKey: kubernetes.io/hostname
+        namespaceSelector: { } # search in all namespaces
+  {{- end }}
+{{- end }}
 {{- end -}}

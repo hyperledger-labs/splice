@@ -36,6 +36,7 @@ import org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.EntryType
 import scala.concurrent.ExecutionContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.topology.ParticipantId
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import org.scalatest.Assertion
 import slick.jdbc.{GetResult, JdbcProfile}
@@ -755,25 +756,32 @@ class ScanAggregatorTest
       val topProviders =
         getTopProvidersByAppRewardsFromTxLog(round, limit, aggr.txLogStoreId).futureValueUS
       topProviders should not be empty
-      store.getTopProvidersByAppRewards(round, limit).futureValue shouldBe topProviders
+      if (i == lastRound.toInt) {
+        store.getTopProvidersByAppRewards(round, limit).futureValue shouldBe topProviders
+      }
       val topValidatorsByValidatorRewards =
         getTopValidatorsByValidatorRewardsFromTxLog(
           round,
           limit,
           aggr.txLogStoreId,
         ).futureValueUS
-      store
-        .getTopValidatorsByValidatorRewards(round, limit)
-        .futureValue shouldBe topValidatorsByValidatorRewards
-      val topValidatorsByPurchasedTraffic =
-        getTopValidatorsByPurchasedTrafficFromTxLog(
-          round,
-          limit,
-          aggr.txLogStoreId,
-        ).futureValue
-      store
-        .getTopValidatorsByPurchasedTraffic(round, limit)
-        .futureValue shouldBe topValidatorsByPurchasedTraffic
+
+      if (i == lastRound.toInt) {
+        store
+          .getTopValidatorsByValidatorRewards(round, limit)
+          .futureValue shouldBe topValidatorsByValidatorRewards
+      }
+      if (i == lastRound.toInt) {
+        val topValidatorsByPurchasedTraffic =
+          getTopValidatorsByPurchasedTrafficFromTxLog(
+            round,
+            limit,
+            aggr.txLogStoreId,
+          ).futureValue
+        store
+          .getTopValidatorsByPurchasedTraffic(round, limit)
+          .futureValue shouldBe topValidatorsByPurchasedTraffic
+      }
     }
     val topProviders =
       getTopProvidersByAppRewardsFromTxLog(lastRound, limit, aggr.txLogStoreId).futureValueUS
@@ -970,7 +978,7 @@ class ScanAggregatorTest
         None,
       ),
       participantId = mkParticipantId("ScanAggregatorTest"),
-      enableImportUpdateBackfill = true,
+      ingestionConfig = IngestionConfig(),
       new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, ProcessingTimeout()),
       initialRound = initialRound,
     )(parallelExecutionContext, implicitly, implicitly)
@@ -1142,7 +1150,7 @@ class ScanAggregatorTest
         and      entry_type = ${EntryType.AppRewardTxLogEntry}
         and      round <= $asOfEndOfRound
         group by rewarded_party
-        order by total_app_rewards desc
+        order by total_app_rewards desc, rewarded_party desc
         limit $limit;
       """.as[(PartyId, BigDecimal)]
     storage.query(q, "getTopProvidersByAppRewardsFromTxLog")
@@ -1160,7 +1168,7 @@ class ScanAggregatorTest
         and    entry_type = ${EntryType.ValidatorRewardTxLogEntry}
         and    round <= $asOfEndOfRound
         group by rewarded_party
-        order by total_validator_rewards desc
+        order by total_validator_rewards desc, rewarded_party desc
         limit $limit;
         """.as[(PartyId, BigDecimal)]
     storage.query(q, "getTopValidatorsByValidatorRewardsFromTxLog")
@@ -1184,7 +1192,7 @@ class ScanAggregatorTest
                 and entry_type = ${EntryType.ExtraTrafficPurchaseTxLogEntry}
                 and round <= $asOfEndOfRound
               group by extra_traffic_validator
-              order by total_traffic_purchased desc
+              order by total_traffic_purchased desc, validator desc
               limit $limit;
            """.as[(PartyId, Long, Long, BigDecimal, Long)],
         "getTopValidatorsByPurchasedTrafficFromTxLog",

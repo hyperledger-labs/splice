@@ -7,12 +7,12 @@ import better.files.*
 import cats.syntax.either.*
 import com.digitalasset.canton.BigDecimalImplicits.*
 import com.digitalasset.canton.config.{DbConfig, LocalNodeConfig}
-import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.crypto.provider.jce.JcePureCrypto
+import com.digitalasset.canton.crypto.{CryptoPureApi, CryptoSchemes}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.examples.java.iou
 import com.digitalasset.canton.examples.java.iou.Amount
-import com.digitalasset.canton.integration.plugins.{UseCommunityReferenceBlockSequencer, UseH2}
+import com.digitalasset.canton.integration.plugins.{UseH2, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -30,6 +30,7 @@ import com.digitalasset.canton.{ProtoDeserializationError, SequencerCounter, con
 import com.google.protobuf.{ByteString, InvalidProtocolBufferException}
 
 import java.nio.file.NoSuchFileException
+import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
 
 sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnvironment {
@@ -54,9 +55,17 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
         participants.all.dars.upload(CantonExamplesPath)
       }
 
-  def cryptoPureApi(config: LocalNodeConfig): CryptoPureApi =
+  def cryptoPureApi(config: LocalNodeConfig)(implicit ec: ExecutionContext): CryptoPureApi =
     JcePureCrypto
-      .create(config.crypto, loggerFactory)
+      .create(
+        config.crypto,
+        config.parameters.caching.sessionEncryptionKeyCache,
+        config.parameters.caching.publicKeyConversionCache,
+        CryptoSchemes
+          .fromConfig(config.crypto)
+          .valueOrFail("fail to validate crypto schemes from the configuration file"),
+        loggerFactory,
+      )
       .valueOr(err => throw new RuntimeException(s"Failed to create pure crypto api: $err"))
 
   "create a dump file" in { implicit env =>
@@ -84,8 +93,7 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
       // Obtain the last event.
       val lastEvent: PossiblyIgnoredProtocolEvent =
         participant1.testing.state_inspection
-          .findMessage(daName, LatestUpto(CantonTimestamp.MaxValue))
-          .value
+          .findMessage(daId, LatestUpto(CantonTimestamp.MaxValue))
           .value
 
       // Dump the last event to a file.
@@ -120,7 +128,8 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
 // architecture-handbook-entry-begin: DumpAllSequencedEventsToFile
       // Obtain all events.
       val allEvents: Seq[PossiblyIgnoredProtocolEvent] =
-        participant1.testing.state_inspection.findMessages(daName, None, None, None).map(_.value)
+        participant1.testing.state_inspection
+          .findMessages(daId, None, None, None, warnOnDiscardedEnvelopes = false)
 
       // Dump all events to a file.
       utils.write_to_file(allEvents.map(_.toProtoV30), dumpFilePath)
@@ -156,8 +165,7 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
       // Create ignored events.
       val lastEvent =
         participant1.testing.state_inspection
-          .findMessage(daName, LatestUpto(CantonTimestamp.MaxValue))
-          .value
+          .findMessage(daId, LatestUpto(CantonTimestamp.MaxValue))
           .value
       val emptyIgnoredEvent =
         IgnoredSequencedEvent(
@@ -263,5 +271,5 @@ sealed trait DumpIntegrationTest extends CommunityIntegrationTest with SharedEnv
 
 final class DumpIntegrationTestH2 extends DumpIntegrationTest {
   registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 }

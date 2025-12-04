@@ -3,6 +3,9 @@
 
 package com.digitalasset.canton.integration.tests.pruning
 
+import com.daml.ledger.api.v2.event_query_service.GetEventsByContractIdResponse
+import com.daml.ledger.api.v2.transaction.Transaction
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS
 import com.digitalasset.canton.BigDecimalImplicits.*
 import com.digitalasset.canton.config.{CantonConfig, DbConfig}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -13,13 +16,15 @@ import com.digitalasset.canton.examples.java.cycle
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
+import com.digitalasset.canton.integration.tests.examples.IouSyntax
+import com.digitalasset.canton.integration.tests.multihostedparties.DivulgenceIntegrationTest.ParticipantSimpleStreamHelper
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.OffsetOutOfRange
 import com.digitalasset.canton.participant.admin.grpc.PruningServiceError.UnsafeToPrune
-import com.digitalasset.canton.protocol.LfContractInst
+import com.digitalasset.canton.protocol.{ContractInstance, LfContractId}
 import com.digitalasset.canton.sequencing.protocol.{Recipients, SubmissionRequest}
 import com.digitalasset.canton.synchronizer.sequencer.{
   HasProgrammableSequencer,
@@ -27,11 +32,16 @@ import com.digitalasset.canton.synchronizer.sequencer.{
   SendDecision,
 }
 import com.digitalasset.canton.time.{NonNegativeFiniteDuration, SimClock}
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PartyId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{SynchronizerAlias, config}
 import org.scalatest.Assertions.fail
-import org.scalatest.OptionValues
+import org.scalatest.{Assertion, OptionValues}
 
 import java.time.Duration as JDuration
 import java.util.concurrent.atomic.AtomicBoolean
@@ -84,7 +94,7 @@ abstract class LedgerPruningIntegrationTest
         )
       }
 
-  def pruneAtCurrentLedgerEnd(
+  protected def pruneAtCurrentLedgerEnd(
       clock: SimClock,
       participant: LocalParticipantReference,
       pingCommand: => Duration,
@@ -104,32 +114,32 @@ abstract class LedgerPruningIntegrationTest
     participant.pruning.prune(desiredPruningOffsetHex)
   }
 
-  def acsContracts(p: LocalParticipantReference, templateIdO: Option[String] = None)(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
-  ): Seq[LfContractInst] = {
-    val all: Seq[LfContractInst] =
-      p.testing.pcs_search(env.daName, activeSet = true).map(_._2.contractInstance)
+  protected def acsContracts(p: LocalParticipantReference, templateIdO: Option[String] = None)(
+      implicit env: TestConsoleEnvironment
+  ): Seq[ContractInstance] = {
+    val all: Seq[ContractInstance] =
+      p.testing.pcs_search(env.daName, activeSet = true).map(_._2)
     templateIdO match {
       case Some(templateId) =>
-        all.filter(_.unversioned.template.qualifiedName.qualifiedName.contains(templateId))
+        all.filter(_.templateId.qualifiedName.qualifiedName.contains(templateId))
       case None => all
     }
   }
 
-  def acsCount(p: LocalParticipantReference)(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  protected def acsCount(p: LocalParticipantReference)(implicit
+      env: TestConsoleEnvironment
   ): Int =
     acsContracts(p).size
 
-  def pcsCount(p: LocalParticipantReference)(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  protected def pcsCount(p: LocalParticipantReference)(implicit
+      env: TestConsoleEnvironment
   ): Int =
     p.testing.pcs_search(env.daName).size
 
-  def fromParticipant(req: SubmissionRequest): Boolean =
+  protected def fromParticipant(req: SubmissionRequest): Boolean =
     req.sender.code == ParticipantId.Code
 
-  def isCommitment(
+  protected def isCommitment(
       req: SubmissionRequest,
       from: LocalParticipantReference,
       to: LocalParticipantReference,
@@ -141,11 +151,51 @@ abstract class LedgerPruningIntegrationTest
       req.batch.envelopes.sizeIs == 1 &&
       req.batch.envelopes.headOption.value.recipients == Recipients.cc(to.id)
 
+  private def contractStore(
+      participant: LocalParticipantReference,
+      synchronizerId: SynchronizerId,
+  ) =
+    participant.testing.state_inspection.syncPersistentStateManager
+      .acsInspection(synchronizerId)
+      .map(_.contractStore)
+      .value
+  private def contractFor(
+      participant: LocalParticipantReference,
+      synchronizerId: SynchronizerId,
+      contractId: String,
+  ): Option[ContractInstance] =
+    contractStore(participant, synchronizerId)
+      .lookup(LfContractId.assertFromString(contractId))
+      .value
+      .futureValueUS
+
+  def assertEventNotFound(
+      participant: LocalParticipantReference,
+      contractId: String,
+      party: PartyId,
+  ): Assertion =
+    loggerFactory.assertLogs(
+      a[CommandFailure] shouldBe thrownBy {
+        participant.ledger_api.event_query
+          .by_contract_id(contractId, Seq(party))
+      },
+      _.commandFailureMessage should include("Contract events not found, or not visible."),
+    )
+
+  def checkCreatedEventFor(
+      participant: LocalParticipantReference,
+      contractId: String,
+      party: PartyId,
+  ): Assertion =
+    participant.ledger_api.javaapi.event_query
+      .by_contract_id(contractId, Seq(party))
+      .hasCreated shouldBe true
+
   "recover ledger api server after failed prune" in { implicit env =>
     import env.*
 
-    participant1.synchronizers.connect_local(sequencer1, alias = daName)
-    participant2.synchronizers.connect_local(sequencer1, alias = daName)
+    participants.all.synchronizers.connect_local(sequencer1, alias = daName)
+    participants.all.dars.upload(CantonExamplesPath)
 
     acsCount(participant1) shouldBe 0
     acsCount(participant2) shouldBe 0
@@ -214,10 +264,10 @@ abstract class LedgerPruningIntegrationTest
 
     def requestJournalSize(
         p: LocalParticipantReference,
-        synchronizerAlias: SynchronizerAlias,
+        psid: PhysicalSynchronizerId,
         end: Option[CantonTimestamp],
     ): Int = {
-      val size = p.testing.state_inspection.requestJournalSize(synchronizerAlias, end = end).value
+      val size = p.testing.state_inspection.requestJournalSize(psid, end = end).value
       size.failOnShutdown
     }
 
@@ -271,13 +321,13 @@ abstract class LedgerPruningIntegrationTest
         // The only contracts pruned from the pcs should be those of the first bong.
         pcsCount(participant) shouldBe expectedPcsCount
 
-        val msgs = participant.testing.sequencer_messages(daName)
+        val msgs = participant.testing.sequencer_messages(daId)
         msgs should not be empty
         forAll(msgs) { msg =>
           msg.timestamp should be >= lastSeenTxTsBeforePruning
         }
 
-        requestJournalSize(participant, daName, end = Some(lastSeenTxTsBeforePruning)) shouldBe 0
+        requestJournalSize(participant, daId, end = Some(lastSeenTxTsBeforePruning)) shouldBe 0
       }
     }
 
@@ -286,11 +336,15 @@ abstract class LedgerPruningIntegrationTest
     val p1Id = participant1.id.adminParty
     val p2Id = participant2.id.adminParty
 
+    // wait until all unrelated active contracts are archived
+    eventually() {
+      acsCount(participant1) shouldBe 0
+      acsCount(participant2) shouldBe 0
+    }
+
     val p1UnrelatedPingContracts = pcsCount(participant1)
-    val p1UnrelatedActivePingContracts = acsCount(participant1)
 
     val p2UnrelatedPingContracts = pcsCount(participant2)
-    val p2UnrelatedActivePingContracts = acsCount(participant2)
 
     // Perform a level 2 bong to produce a lot of archived contracts and events to be pruned.
     // Produces 14 contracts.
@@ -302,7 +356,7 @@ abstract class LedgerPruningIntegrationTest
 
     pcsCount(participant1) shouldBe 14 + p1UnrelatedPingContracts
     // No new ping contracts should remain active
-    acsCount(participant1) shouldBe p1UnrelatedActivePingContracts
+    acsCount(participant1) shouldBe 0
 
     // Creates two more contracts (that stay active)
     createCycleContract(
@@ -408,7 +462,7 @@ abstract class LedgerPruningIntegrationTest
       p1LedgerEnd,
       p1PruningOffset,
       lastSeenTxTsBeforePruning,
-      16 + p1UnrelatedActivePingContracts,
+      16,
       2,
     )
     pruneAndCheck(
@@ -416,7 +470,7 @@ abstract class LedgerPruningIntegrationTest
       p2LedgerEnd,
       p2PruningOffset,
       lastSeenTxTsBeforePruning,
-      16 + p2UnrelatedActivePingContracts,
+      16,
       2,
     )
 
@@ -486,7 +540,7 @@ abstract class LedgerPruningIntegrationTest
           new Amount(3.50.toBigDecimal, "CHF"),
           List().asJava,
         ).create.commands.asScala.toSeq
-      participant1.ledger_api.javaapi.commands.submit_flat(
+      participant1.ledger_api.javaapi.commands.submit(
         Seq(participant1.id.adminParty),
         cmd,
         Some(daId),
@@ -499,6 +553,131 @@ abstract class LedgerPruningIntegrationTest
       participant1.health.ping(participant2)
 
       sequencer.resetPolicy()
+  }
+
+  "prune transient contracts" in { implicit env =>
+    import env.*
+
+    val clock = environment.simClock.value
+
+    val party = participant1.id.adminParty
+
+    val transientCmd =
+      IouSyntax.testIou(party, party).createAnd().exerciseArchive().commands().asScala.toSeq
+
+    val tx = participant1.ledger_api.javaapi.commands.submit(
+      actAs = Seq(party),
+      commands = transientCmd,
+      synchronizerId = Some(daId),
+      transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
+    )
+
+    val contractId = Transaction
+      .fromJavaProto(tx.toProto)
+      .events
+      .flatMap(e => e.event.created)
+      .loneElement
+      .contractId
+    eventually() {
+      val GetEventsByContractIdResponse(created, archived) =
+        participant1.ledger_api.event_query.by_contract_id(contractId, Seq(party))
+      created should not be empty
+      archived should not be empty
+    }
+
+    contractFor(participant1, daId, contractId) should not be empty
+
+    // prune contracts up to the current ledger end to remove transient contracts
+    pruneAtCurrentLedgerEnd(clock, participant1, participant1.health.ping(participant2))
+
+    contractFor(participant1, daId, contractId) shouldBe empty
+    assertEventNotFound(participant1, contractId, party)
+  }
+
+  "prune immediately divulged contracts" in { implicit env =>
+    import env.*
+
+    val alice = participant1.parties.enable("Alice", synchronizeParticipants = Seq(participant2))
+    val bob = participant2.parties.enable("Bob", synchronizeParticipants = Seq(participant1))
+    val clock = environment.simClock.value
+    val end2AtStart = participant2.ledger_api.state.end()
+
+    // divulgence proxy contract for divulgence operations: divulging to bob
+    val (_, divulgeIouByExerciseContract) = participant2.createDivulgeIou(alice, bob)
+
+    // creating an iou with alice, which will be divulged to bob
+    val (immediateDivulgedP1, immediateDivulgedContract) =
+      participant1.immediateDivulgeIou(alice, divulgeIouByExerciseContract)
+    contractFor(participant1, daId, immediateDivulgedP1.contractId) should not be empty
+    // Immediately divulged contracts are stored in the ContractStore
+    contractFor(participant2, daId, immediateDivulgedP1.contractId) should not be empty
+    checkCreatedEventFor(participant1, immediateDivulgedP1.contractId, alice)
+    participant2
+      .acsDeltas(bob, end2AtStart)
+      .map(_._1.contractId) should not contain immediateDivulgedP1.contractId
+    participant2.ledgerEffects(bob, end2AtStart).map(_._1.contractId) should contain(
+      immediateDivulgedP1.contractId
+    )
+    participant2
+      .acsDeltas(alice, end2AtStart)
+      .map(_._1.contractId) should not contain immediateDivulgedP1.contractId
+    participant2.ledgerEffects(alice, end2AtStart).map(_._1.contractId) should contain(
+      immediateDivulgedP1.contractId
+    )
+
+    // archiving the divulged Iou
+    participant1.archiveIou(alice, immediateDivulgedContract)
+
+    pruneAtCurrentLedgerEnd(clock, participant1, participant1.health.ping(participant2))
+    pruneAtCurrentLedgerEnd(clock, participant2, participant2.health.ping(participant1))
+
+    contractFor(participant1, daId, immediateDivulgedP1.contractId) shouldBe empty
+    contractFor(participant2, daId, immediateDivulgedP1.contractId) shouldBe empty
+    assertEventNotFound(participant1, immediateDivulgedP1.contractId, alice)
+  }
+
+  "prune retroactively divulged contracts" in { implicit env =>
+    import env.*
+
+    val alice = participant1.parties.enable("Alice2", synchronizeParticipants = Seq(participant2))
+    val bob = participant2.parties.enable("Bob2", synchronizeParticipants = Seq(participant1))
+    val clock = environment.simClock.value
+    val end2AtStart = participant2.ledger_api.state.end()
+
+    // divulgence proxy contract for divulgence operations: divulging to bob
+    val (_, divulgeIouByExerciseContract) = participant2.createDivulgeIou(alice, bob)
+
+    // create and then retroactively divulge the archival of an iou visible exclusively to alice
+    val (aliceStakeholderCreatedP1, aliceStakeholderCreatedContract) =
+      participant1.createIou(alice, alice)
+    participant1.retroactiveDivulgeAndArchiveIou(
+      alice,
+      divulgeIouByExerciseContract,
+      aliceStakeholderCreatedContract.id,
+    )
+    contractFor(participant1, daId, aliceStakeholderCreatedP1.contractId) should not be empty
+    // Retroactively divulged contracts are not stored in the ContractStore
+    contractFor(participant2, daId, aliceStakeholderCreatedP1.contractId) shouldBe empty
+    checkCreatedEventFor(participant1, aliceStakeholderCreatedP1.contractId, alice)
+    participant2
+      .acsDeltas(bob, end2AtStart)
+      .map(_._1.contractId) should not contain aliceStakeholderCreatedP1.contractId
+    participant2.ledgerEffects(bob, end2AtStart).map(_._1.contractId) should contain(
+      aliceStakeholderCreatedP1.contractId
+    )
+    participant2
+      .acsDeltas(alice, end2AtStart)
+      .map(_._1.contractId) should not contain aliceStakeholderCreatedP1.contractId
+    participant2.ledgerEffects(alice, end2AtStart).map(_._1.contractId) should contain(
+      aliceStakeholderCreatedP1.contractId
+    )
+
+    pruneAtCurrentLedgerEnd(clock, participant1, participant1.health.ping(participant2))
+    pruneAtCurrentLedgerEnd(clock, participant2, participant2.health.ping(participant1))
+
+    contractFor(participant1, daId, aliceStakeholderCreatedP1.contractId) shouldBe empty
+    contractFor(participant2, daId, aliceStakeholderCreatedP1.contractId) shouldBe empty
+    assertEventNotFound(participant1, aliceStakeholderCreatedP1.contractId, alice)
   }
 
   "find_safe_offset returns error when asked to find a safe offset before timestamp without canton ledger state" in {
@@ -539,7 +718,7 @@ object LedgerPruningIntegrationTest extends OptionValues {
 class LedgerPruningIntegrationTestPostgres extends LedgerPruningIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
+    new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory)
   )
   registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 }

@@ -55,7 +55,7 @@ class AdvanceOpenMiningRoundTrigger(
     val rounds = task.work.openRounds
     for {
       dsoRules <- store.getDsoRules()
-      _ = logger.debug(
+      _ = logger.info(
         s"Starting work as for ${task.work}"
       )
       amuletPriceVotes <- store.listSvAmuletPriceVotes()

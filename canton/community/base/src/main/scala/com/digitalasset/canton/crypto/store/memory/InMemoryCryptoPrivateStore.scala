@@ -29,7 +29,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.TrieMapUtil
+import com.digitalasset.canton.util.collection.TrieMapUtil
 import com.digitalasset.canton.version.ReleaseProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 
@@ -182,6 +182,15 @@ class InMemoryCryptoPrivateStore(
             )
           )
     }).map(_.toSet)
+
+  @VisibleForTesting
+  private[canton] def listPrivateKeys()(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Set[StoredPrivateKey]] =
+    for {
+      signingPrivateKeys <- listPrivateKeys(Signing)
+      encryptionPrivateKeys <- listPrivateKeys(Encryption)
+    } yield signingPrivateKeys ++ encryptionPrivateKeys
 
   private[crypto] def deletePrivateKey(
       keyId: Fingerprint

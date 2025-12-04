@@ -32,9 +32,7 @@ class MessageRecorder(
 
     sys.addShutdownHook {
       // This is important to not lose messages, if SIGTERM is sent to Canton.
-      if (streamRef.get().isDefined) {
-        stopRecording()
-      }
+      streamRef.get().foreach(_ => stopRecording())
     }.discard
 
     val stream = new ObjectOutputStream(
@@ -62,7 +60,10 @@ class MessageRecorder(
     logger.debug("Stopping recording...")
     streamRef.getAndSet(None) match {
       case Some(stream) =>
-        blocking(synchronized(stream.close()))
+        blocking(synchronized {
+          stream.close()
+          streamRef.set(None)
+        })
       case None =>
         logger.info("Recorder has not been recording.")
     }
@@ -92,7 +93,7 @@ object MessageRecorder {
           // Workaround for known bugs in the deserialization framework.
           // https://github.com/scala/bug/issues/9777
           // https://bugs.openjdk.java.net/browse/JDK-8024931
-          override def resolveClass(desc: ObjectStreamClass): Class[_] =
+          override def resolveClass(desc: ObjectStreamClass): Class[?] =
             Class.forName(desc.getName, false, loader)
         }) { stream =>
           val builder = List.newBuilder[T]

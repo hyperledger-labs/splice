@@ -91,8 +91,10 @@ INVALID_TRAFFIC_CONTROL_PURCHASED_MESSAGE.* signature threshold not reached
 # The new participant can be both the sender or the counterParticipant in the error message.
 ACS_COMMITMENT_MISMATCH.*aliceValidatorLocalNewForValidatorReonboardingIT
 
-# TODO(#970): figure out why this happens, as in principle the confirmations from three of the mediators and counter-participants should be sufficient
+# TODO(#970): figure out why this happens for SVs, as in principle the confirmations from three of the mediators and counter-participants should be sufficient
 Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=sv
+# TODO(#3162): figure out why this happens also for validators (started on 3.4)
+Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=
 
 # TODO(#936): remove these ignores if possible
 The operation 'insert block' has failed with an exception
@@ -138,14 +140,30 @@ Timeout .*expired, but readers are still active
 # test significantly so for now we don't bother.
 ACS_COMMITMENT_MISMATCH.*(bob|alice)Participant
 
-# TODO(#930) - investigate this on the canton side
-Instrument daml\.sequencer\.bftordering.* has exceeded the maximum allowed cardinality
-
 # TODO(#1450) - investigate this on the canton side
 FAILED_PRECONDITION/SEQUENCER_SENDER_UNKNOWN.*Senders are unknown: MED::sv
 Rejected transaction due to a participant determined timeout
 
 # Seems like sometimes mediators time out maybe around onboarding, not worth investigating unless it causes issues.
 Sequencing result message timed out.*mediator=
+
+# TODO (DACH-NY/canton-network-internal#966) - remove if not necessary anymore
+ACS_COMMITMENT_DEGRADATION
+
+# TODO(#2706) Investigate and remove once fixed
+Waiting for allocation of.*on synchronizer splitwell.*timed out
+
+# rejections when the sync is paused
+# error code will change in the future to MAX_SEQUENCING_TIME_EXCEEDED
+SEQUENCER_SUBMISSION_REQUEST_REFUSED.* The estimated sequencing time .* is already past the max sequencing time
+
+# Sometimes the CI executor seems to take a break, which leads to spurious failed DB activeness checks, see #9388
+DB_CONNECTION_LOST.*Database health check failed to establish a valid connection.*Connection is not available, request timed out
+
+# TODO(#3069): Byproduct of mediator pruning; double-check this is expected (and unavoidable)
+Dynamic synchronizer parameters to compute earliest available pruning timestamp not found
+
+# TODO(#3193): Likely a race in the shutdown of the actor system vs us scheduling something else on it
+java.lang.IllegalStateException: cannot enqueue after timer shutdown
 
 # Make sure to have a trailing newline

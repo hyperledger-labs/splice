@@ -1,0 +1,296 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Delegation from users to wallet operators allowing them to merge
+-- their token standard holdings; and optionally transfer tokens from
+-- the operator to the user as part of the merge operation, e.g., for
+-- efficiently implementing extraTransfers.
+--
+-- The main reasons for using this merge delegation infrastructure are:
+--  - keeping the number of holdings low to reduce storage and compute cost
+--    on the validator node hosting them
+--  - batching operations to execute them more efficiently both in terms
+--    of traffic spend and throughput
+module Splice.Util.Token.Wallet.MergeDelegation where
+
+import DA.Action (void)
+import DA.Foldable (forA_)
+import DA.Traversable (forA)
+import DA.Map qualified as M
+import DA.Optional (fromOptional, isSome)
+
+import Prelude hiding (forA)
+
+import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferInstructionV1
+import Splice.Api.FeaturedAppRightV1
+
+
+-- Merge delegation
+--------------------
+
+-- | A call to perform a transfer using a transfer factory.
+data TransferCall = TransferCall with
+    factoryCid : ContractId TransferFactory
+    choiceArg : TransferFactory_Transfer
+  deriving (Eq, Show)
+
+-- | A call to create featured app markers using a featured app right.
+data FeaturedAppRightCall = FeaturedAppRightCall with
+    appRightCid : ContractId FeaturedAppRight
+    beneficiaries : [AppRewardBeneficiary]
+  deriving (Eq, Show)
+
+-- | The right for a operator like the wallet app operator to merge token
+-- standard holdings on behalf of a token owner.
+template MergeDelegation
+  with
+    operator : Party
+      -- ^ Operator allowed to merge holdings.
+    owner : Party
+      -- ^ Owner delegating their right.
+    meta : Metadata
+      -- ^ Metadata about the delegation, used for extensibility.
+  where
+    signatory owner, operator
+
+    nonconsuming choice MergeDelegation_Merge : MergeDelegation_MergeResult
+      with
+        optMergeTransfer : Optional TransferCall
+          -- ^ The self-transfer to merge holdings for the owner.
+          --
+          -- Optional to allow for an extra transfer to be executed when the
+          -- owner does not yet have any holdings.
+          -- At least one of optMergeTransfer or optExtraTransfer must be provided.
+        optExtraTransfer : Optional TransferCall
+          -- ^ An optional extra transfer from the operator to the user to execute
+          -- as part of the merge operation. The amount of the self-transfer will be
+          -- increased by the amount of the extra transfer, and the new input holdings from the
+          -- extra transfer will be added to the self-transfer's input holdings.
+          --
+          -- These extra transfers can for example be used to efficiently
+          -- implement extraTransfers or reward distributions as part of the merge
+          -- operation.
+          --
+          -- Note that extra transfers only work for users that have preapproved
+          -- incoming transfers from the operator. Therefore there is no
+          -- additional restriction on the merge delegation to let users decide
+          -- whether to allow or disallow those transfers as it is already
+          -- controlled through the preapproval.
+        optFeaturedAppRight : Optional FeaturedAppRightCall
+          -- ^ The featured app right to use to feature the operator's merging activity.
+      controller operator
+      do
+        require "At least one of optMergeTransfer or optExtraTransfer must be provided"
+          (isSome optMergeTransfer || isSome optExtraTransfer)
+
+        -- execute extraTransfer first to get new holdings
+        optExtraTransferResult <- forA optExtraTransfer $ \extraTransfer -> do
+          let extraTf = extraTransfer.choiceArg.transfer
+          checkExpected "extra transfer sender" operator extraTf.sender
+          checkExpected "extra transfer receiver" owner extraTf.receiver
+          forA_ optMergeTransfer $ \mergeTransfer -> do
+            checkExpected "extra transfer instrument-id" mergeTransfer.choiceArg.transfer.instrumentId extraTf.instrumentId
+            checkExpected "extra transfer expected admin" mergeTransfer.choiceArg.expectedAdmin extraTransfer.choiceArg.expectedAdmin
+          result <- exercise extraTransfer.factoryCid extraTransfer.choiceArg
+          case result.output of
+            TransferInstructionResult_Completed receiverHoldingCids -> do
+              pure (receiverHoldingCids, result)
+            other -> abort $
+              "Expected TransferInstructionResult_completed from extraTransfer but got " <> show other <>
+              ". Has the owner " <> show owner <> " setup a transfer preapproval?"
+
+        -- execute self-transfer and update with extraTransfer holdings if any
+        optMergeTransferResult <- forA optMergeTransfer $ \mergeTransfer -> do
+          let selfTransfer0 = mergeTransfer.choiceArg.transfer
+          checkExpected "self-transfer sender" owner selfTransfer0.sender
+          checkExpected "self-transfer receiver" owner selfTransfer0.receiver
+          let selfTransfer = selfTransfer0 with
+                inputHoldingCids = selfTransfer0.inputHoldingCids ++ optional [] (._1) optExtraTransferResult
+                amount = selfTransfer0.amount + optional 0.0 (.choiceArg.transfer.amount) optExtraTransfer
+          let actualChoiceArg = mergeTransfer.choiceArg with
+                transfer = selfTransfer
+
+          result <- exercise mergeTransfer.factoryCid actualChoiceArg
+
+          -- check that the self-transfer actually merged holdings. It should complete as it is a self-transfer.
+          case result.output of
+            TransferInstructionResult_Completed receiverHoldingCids -> do
+              let numInputHoldings = length selfTransfer.inputHoldingCids
+              let numOutputHoldings = length result.senderChangeCids + length receiverHoldingCids
+              require ("Number of sender input holdings " <> show numInputHoldings <> " > " <> " number of sender output holdings " <> show numOutputHoldings)
+                (numInputHoldings > numOutputHoldings)
+            other -> abort ("Expected TransferInstructionResult_completed but got " <> show other)
+
+          -- register activity marker for the merging
+          forA_ optFeaturedAppRight $ \featuredAppRightCall ->
+            createActivityMarkerForProvider operator featuredAppRightCall
+
+          pure result
+
+        pure MergeDelegation_MergeResult with
+         optMergeTransferResult
+         optExtraTransferResult = (._2) <$> optExtraTransferResult
+
+
+    choice MergeDelegation_Reject : MergeDelegation_RejectResult
+      controller operator
+      do pure MergeDelegation_RejectResult with result = ()
+
+    choice MergeDelegation_Withdraw : MergeDelegation_WithdrawResult
+      controller owner
+      do pure MergeDelegation_WithdrawResult with result = ()
+
+
+data MergeDelegation_MergeResult = MergeDelegation_MergeResult
+  with
+    optMergeTransferResult : Optional TransferInstructionResult
+    optExtraTransferResult : Optional TransferInstructionResult
+  deriving (Show, Eq)
+
+-- | Dedicated record type to simplify upgrading
+data MergeDelegation_RejectResult = MergeDelegation_RejectResult with
+    result : ()
+  deriving (Eq, Show)
+
+-- | Dedicated record type to simplify upgrading
+data MergeDelegation_WithdrawResult = MergeDelegation_WithdrawResult with
+    result : ()
+  deriving (Eq, Show)
+
+
+-- Batch merge delegation utility
+---------------------------------
+
+data MergeDelegationCall = MergeDelegationCall with
+    delegationCid : ContractId MergeDelegation
+    choiceArg : MergeDelegation_Merge
+  deriving (Eq, Show)
+
+-- | Utility contract for a operator to execute a batch of merge calls with
+-- proper threading of the operator's change holdings between the calls that
+-- involve extra transfers.
+template BatchMergeUtility with
+    operator : Party
+  where
+    signatory operator
+
+    -- Use this choice to execute many merge delegation calls in a batch.
+    -- Note: this choice optimizes for maximum flexiblity, and does not try to be clever about sharing values of the arguments.
+    -- We can add additional batch choices in the future that are more clever sharing
+    -- once we know what is the common structure.
+    nonconsuming choice BatchMergeUtility_BatchMerge : BatchMergeUtility_BatchMergeResult
+      with
+        mergeCalls : [MergeDelegationCall]
+      controller operator
+      do runBatch operator mergeCalls M.empty []
+
+data BatchMergeUtility_BatchMergeResult = BatchMergeUtility_BatchMergeResult with
+    results : [MergeDelegation_MergeResult]
+      -- ^ Results of each individual merge delegation call.
+    operatorChangeMap : InstrumentHoldingMap
+      -- ^ Change holdings for the operator after executing extra transfers.
+  deriving (Eq, Show)
+
+
+type InstrumentHoldingMap = M.Map InstrumentId [ContractId Holding]
+
+-- | Run a batch of token standard transfers.
+runBatch
+  : Party -> [MergeDelegationCall] -> InstrumentHoldingMap -> [MergeDelegation_MergeResult]
+  -> Update BatchMergeUtility_BatchMergeResult
+runBatch _operator [] holdingMap results =
+  pure BatchMergeUtility_BatchMergeResult with
+    results = reverse results
+    operatorChangeMap = holdingMap
+
+runBatch operator ((MergeDelegationCall with delegationCid; choiceArg) :: calls) holdingMap results = do
+  -- check delegation
+  delegation <- fetch delegationCid
+  checkExpected "delegation operator" operator delegation.operator
+
+  -- adjust the extra transfer if any to include the change from the previous extra transfer
+  adjustedExtraTransfer <- forA choiceArg.optExtraTransfer $ \extraTransfer -> do
+    checkExpected "extra transfer sender" operator extraTransfer.choiceArg.transfer.sender
+    let tf = extraTransfer.choiceArg.transfer
+    let adjustedInputHoldingCids = tf.inputHoldingCids ++ fromOptional [] (M.lookup tf.instrumentId holdingMap)
+    let adjustedExtraTransfer = extraTransfer with
+          choiceArg = extraTransfer.choiceArg with
+            transfer = tf with inputHoldingCids = adjustedInputHoldingCids
+    pure (tf.instrumentId, adjustedExtraTransfer)
+
+  let adjustedChoice = choiceArg with
+        optExtraTransfer = snd <$> adjustedExtraTransfer
+  result <- exercise delegationCid adjustedChoice
+
+  -- run the rest of the merge delegation calls
+  let optNewHoldingMap = do
+        (instrumentId, _) <- adjustedExtraTransfer
+        extraTransferResult <- result.optExtraTransferResult
+        pure (M.insert instrumentId extraTransferResult.senderChangeCids holdingMap)
+
+  runBatch operator calls (fromOptional holdingMap optNewHoldingMap) (result :: results)
+
+
+-- Merge delegation proposal
+----------------------------
+
+-- | Proposal by the user to setup a merge delegation.
+template MergeDelegationProposal
+  with
+    delegation : MergeDelegation
+      -- ^ The delegation to be created if accepted.
+  where
+    signatory delegation.owner
+    observer delegation.operator
+
+    choice MergeDelegationProposal_Accept : MergeDelegationProposal_AcceptResult
+      controller delegation.operator
+      do MergeDelegationProposal_AcceptResult <$> create delegation
+
+    choice MergeDelegationProposal_Reject : MergeDelegationProposal_RejectResult
+      controller delegation.operator
+      do pure MergeDelegationProposal_RejectResult with result = ()
+
+    choice MergeDelegationProposal_Withdraw : MergeDelegationProposal_WithdrawResult
+      controller delegation.owner
+      do pure MergeDelegationProposal_WithdrawResult with result = ()
+
+
+data MergeDelegationProposal_AcceptResult = MergeDelegationProposal_AcceptResult
+  with
+    mergeDelegationCid : ContractId MergeDelegation
+  deriving (Show, Eq)
+
+-- | Dedicated record type to simplify upgrading
+data MergeDelegationProposal_RejectResult = MergeDelegationProposal_RejectResult with
+    result : ()
+  deriving (Eq, Show)
+
+-- | Dedicated record type to simplify upgrading
+data MergeDelegationProposal_WithdrawResult = MergeDelegationProposal_WithdrawResult with
+    result : ()
+  deriving (Eq, Show)
+
+
+-- utility functions
+--------------------
+
+createActivityMarkerForProvider : Party -> FeaturedAppRightCall -> Update ()
+createActivityMarkerForProvider provider call = do
+  appRight <- fetch call.appRightCid
+  require "App right matches expected provider" ((view appRight).provider == provider)
+  void $ exercise call.appRightCid FeaturedAppRight_CreateActivityMarker with
+    beneficiaries = call.beneficiaries
+
+checkExpected : (Eq a, Show a) => Text -> a -> a -> Update ()
+checkExpected description expected actual
+  | expected == actual = pure ()
+  | otherwise = abort ("Unexpected " <> description <> ": expected " <> show expected <> ", but got " <> show actual)
+
+-- | Check whether a required condition is true. If it's not, abort the
+-- transaction with a message saying that the requirement was not met.
+require : CanAssert m => Text -> Bool -> m ()
+require msg invariant =
+  assertMsg ("The requirement '" <> msg <> "' was not met.") invariant

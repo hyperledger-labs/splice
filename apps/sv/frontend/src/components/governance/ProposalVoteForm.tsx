@@ -9,16 +9,7 @@ import { isValidUrl } from '../../utils/validations';
 import { ContractId } from '@daml/types';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ProposalVote, VoteStatus } from '../../utils/types';
-import {
-  Alert,
-  Box,
-  Button,
-  FormControlLabel,
-  Radio,
-  RadioGroup,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Alert, Box, Button, FormControlLabel, Radio, RadioGroup, TextField } from '@mui/material';
 interface CastVoteArgs {
   accepted: boolean;
   url: string;
@@ -87,10 +78,6 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
 
   return (
     <Box data-testid="your-vote-form">
-      <Typography variant="h6" component="h2" mb={2} gutterBottom>
-        Your Vote
-      </Typography>
-
       <form
         onSubmit={e => {
           e.preventDefault();
@@ -99,6 +86,31 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
         }}
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <form.Field
+            name="reason"
+            validators={{
+              onChange: ({ value }) => {
+                const result = z.string().safeParse(value);
+                return result.success ? undefined : result.error.issues[0].message;
+              },
+            }}
+            children={field => {
+              return (
+                <TextField
+                  label="Reason"
+                  multiline
+                  rows={4}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={e => field.handleChange(e.target.value)}
+                  error={!field.state.meta.isValid}
+                  helperText={field.state.meta.errors?.[0]}
+                  inputProps={{ 'data-testid': 'your-vote-reason-input' }}
+                />
+              );
+            }}
+          />
           <form.Field
             name="url"
             validators={{
@@ -129,31 +141,6 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
                     </span>
                   }
                   inputProps={{ 'data-testid': 'your-vote-url-input' }}
-                />
-              );
-            }}
-          />
-          <form.Field
-            name="reason"
-            validators={{
-              onChange: ({ value }) => {
-                const result = z.string().safeParse(value);
-                return result.success ? undefined : result.error.issues[0].message;
-              },
-            }}
-            children={field => {
-              return (
-                <TextField
-                  label="Reason"
-                  multiline
-                  rows={4}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={e => field.handleChange(e.target.value)}
-                  error={!field.state.meta.isValid}
-                  helperText={field.state.meta.errors?.[0]}
-                  inputProps={{ 'data-testid': 'your-vote-reason-input' }}
                 />
               );
             }}

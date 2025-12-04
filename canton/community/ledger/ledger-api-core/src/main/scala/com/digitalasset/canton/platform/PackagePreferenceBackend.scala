@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.platform
 
-import cats.Order.*
 import cats.implicits.{catsSyntaxAlternativeSeparate, toFoldableOps}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
@@ -22,11 +21,12 @@ import com.digitalasset.canton.logging.{
   TracedLogger,
 }
 import com.digitalasset.canton.platform.PackagePreferenceBackend.*
-import com.digitalasset.canton.platform.store.packagemeta.PackageMetadata
+import com.digitalasset.canton.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.SynchronizerId
-import com.digitalasset.canton.util.MapsUtil
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.util.collection.MapsUtil
 import com.digitalasset.canton.{LfPackageId, LfPackageName, LfPackageVersion, LfPartyId}
 import com.digitalasset.daml.lf.language.Ast
 
@@ -84,14 +84,14 @@ class PackagePreferenceBackend(
       synchronizerId: Option[SynchronizerId],
       vettingValidAt: Option[CantonTimestamp],
   )(implicit
-      loggingContext: LoggingContextWithTrace
-  ): FutureUnlessShutdown[Either[String, (Seq[PackageReference], SynchronizerId)]] = {
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Either[String, (Seq[PackageReference], PhysicalSynchronizerId)]] = {
     val routingSynchronizerState = syncService.getRoutingSynchronizerState
     val packageMetadataSnapshot = syncService.getPackageMetadataSnapshot
 
     for {
       _ <- ensurePackageNamesKnown(packageVettingRequirements, packageMetadataSnapshot)
-      packageMapForRequest <- syncService.packageMapFor(
+      packageMapForRequest <- syncService.computePartyVettingMap(
         submitters = Set.empty,
         informees = packageVettingRequirements.allParties,
         vettingValidityTimestamp = vettingValidAt.getOrElse(clock.now),
@@ -115,10 +115,10 @@ class PackagePreferenceBackend(
   }
 
   private def findValidCandidate(
-      synchronizerCandidates: Map[SynchronizerId, Candidate[Set[PackageReference]]]
+      synchronizerCandidates: Map[PhysicalSynchronizerId, Candidate[Set[PackageReference]]]
   )(implicit
-      loggingContextWithTrace: LoggingContextWithTrace
-  ): Either[String, (Seq[PackageReference], SynchronizerId)] = {
+      traceContext: TraceContext
+  ): Either[String, (Seq[PackageReference], PhysicalSynchronizerId)] = {
     val (discardedCandidates, validCandidates) = synchronizerCandidates.view
       .map { case (sync, candidateE) =>
         candidateE.left.map(sync -> _).map(sync -> _)
@@ -131,7 +131,7 @@ class PackagePreferenceBackend(
         // TODO(#25385): Order by the package version with the package precedence set by the order of the vetting requirements
         // Follow the pattern used for SynchronizerRank ordering,
         // where lexicographic order picks the most preferred synchronizer by id
-        implicitly[Ordering[SynchronizerId]].reverse
+        implicitly[Ordering[PhysicalSynchronizerId]].reverse
       )
       .map { case (syncId, packageRefs) =>
         // Valid candidate found
@@ -175,9 +175,7 @@ class PackagePreferenceBackend(
   private def ensurePackageNamesKnown(
       packageVettingRequirements: PackageVettingRequirements,
       packageMetadataSnapshot: PackageMetadata,
-  )(implicit
-      loggingContext: LoggingContextWithTrace
-  ): FutureUnlessShutdown[Unit] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     val requestPackageNames = packageVettingRequirements.allPackageNames
     val knownPackageNames = packageMetadataSnapshot.packageNameMap.keySet
     val unknownPackageNames = requestPackageNames.diff(knownPackageNames)
@@ -221,7 +219,7 @@ object PackagePreferenceBackend {
   }
 
   def computePerSynchronizerPackageCandidates(
-      synchronizersPartiesVettingState: Map[SynchronizerId, Map[LfPartyId, Set[
+      synchronizersPartiesVettingState: Map[PhysicalSynchronizerId, Map[LfPartyId, Set[
         LfPackageId
       ]]],
       packageMetadataSnapshot: PackageMetadata,
@@ -229,8 +227,8 @@ object PackagePreferenceBackend {
       packageFilter: PackageFilter,
       logger: TracedLogger,
   )(implicit
-      loggingContextWithTrace: LoggingContextWithTrace
-  ): Map[SynchronizerId, MapView[LfPackageName, Candidate[SortedPreferences]]] = {
+      traceContext: TraceContext
+  ): Map[PhysicalSynchronizerId, MapView[LfPackageName, Candidate[SortedPreferences]]] = {
     val packageIndex = packageMetadataSnapshot.packageIdVersionMap
     synchronizersPartiesVettingState.view
       .mapValues(
@@ -346,7 +344,7 @@ object PackagePreferenceBackend {
       packageIndex: PackageIndex,
       logger: TracedLogger,
   )(implicit
-      loggingContextWithTrace: LoggingContextWithTrace
+      traceContext: TraceContext
   ): Map[LfPackageName, Candidate[SortedPreferences]] =
     pkgIds.view
       .flatMap { pkgId =>

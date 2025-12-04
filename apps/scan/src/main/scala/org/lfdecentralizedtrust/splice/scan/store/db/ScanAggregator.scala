@@ -142,7 +142,7 @@ final class ScanAggregator(
 
   private def skipAggregation(
       previousRoundTotals: Option[RoundTotals]
-  ): Future[_] = {
+  ): Future[?] = {
     previousRoundTotals
       .map { lastAggregated =>
         Future.failed(
@@ -747,130 +747,139 @@ final class ScanAggregator(
       */
     def aggregate(): DBIOAction[Unit, NoStream, Effect.Write] = {
       sqlu"""
-      create temp table temp_cumulative_totals on commit drop as
-      with previously_aggregated as(
-        select coalesce(max(closed_round), -1) as last_closed_round from round_party_totals where store_id = $roundTotalsStoreId
-      ),
-      new_totals_per_entry as(
-        select    round,
-                  rewarded_party as party,
-                  sum(reward_amount) as app_rewards,
-                  0 as validator_rewards,
-                  0 as traffic_purchased,
-                  0 as traffic_purchased_cc_spent,
-                  0 as traffic_num_purchases,
-                  0 as change_to_initial_amount_as_of_round_zero,
-                  0 as change_to_holding_fees_rate
-        from      scan_txlog_store
-        where     store_id = $txLogStoreId
-        and       round > (select last_closed_round from previously_aggregated)
-        and       round <= $lastClosedRound
-        and       entry_type = ${EntryType.AppRewardTxLogEntry}
-        and       rewarded_party is not null
-        group by  round,
-                  rewarded_party
-        union all
-        select    round,
-                  rewarded_party as party,
-                  0 as app_rewards,
-                  sum(reward_amount) as validator_rewards,
-                  0 as traffic_purchased,
-                  0 as traffic_purchased_cc_spent,
-                  0 as traffic_num_purchases,
-                  0 as change_to_initial_amount_as_of_round_zero,
-                  0 as change_to_holding_fees_rate
-        from      scan_txlog_store
-        where     store_id = $txLogStoreId
-        and       round > (select last_closed_round from previously_aggregated)
-        and       round <= $lastClosedRound
-        and       entry_type = ${EntryType.ValidatorRewardTxLogEntry}
-        and       rewarded_party is not null
-        group by  round,
-                  rewarded_party
-        union all
-        select    round,
-                  extra_traffic_validator as party,
-                  0 as app_rewards,
-                  0 as validator_rewards,
-                  sum(extra_traffic_purchase_traffic_purchased) as traffic_purchased,
-                  sum(extra_traffic_purchase_cc_spent) as traffic_purchased_cc_spent,
-                  count(case when extra_traffic_purchase_traffic_purchased is not null then 1 end) as traffic_num_purchases,
-                  0 as change_to_initial_amount_as_of_round_zero,
-                  0 as change_to_holding_fees_rate
-        from      scan_txlog_store
-        where     store_id = $txLogStoreId
-        and       round > (select last_closed_round from previously_aggregated)
-        and       round <= $lastClosedRound
-        and       entry_type = ${EntryType.ExtraTrafficPurchaseTxLogEntry}
-        and       extra_traffic_validator is not null
-        group by  round,
-                  extra_traffic_validator
-        union all
-        select    round,
-                  key as party,
-                  0 as app_rewards,
-                  0 as validator_rewards,
-                  0 as traffic_purchased,
-                  0 as traffic_purchased_cc_spent,
-                  0 as traffic_num_purchases,
-                  sum((value ->> 'changeToInitialAmountAsOfRoundZero')::numeric) as change_to_initial_amount_as_of_round_zero,
-                  sum((value ->> 'changeToHoldingFeesRate')::numeric) as change_to_holding_fees_rate
-        from      scan_txlog_store,
-                  jsonb_each(entry_data -> 'partyBalanceChanges')
-        where     store_id = $txLogStoreId
-        and       round > (select last_closed_round from previously_aggregated)
-        and       round <= $lastClosedRound
-        and       entry_type = ${EntryType.BalanceChangeTxLogEntry}
-        group by  round,
-                  party
-      ),
-      new_totals as(
-        select    round,
-                  party,
-                  sum(app_rewards) as app_rewards,
-                  sum(validator_rewards) as validator_rewards,
-                  sum(traffic_purchased) as traffic_purchased,
-                  sum(traffic_purchased_cc_spent) as traffic_purchased_cc_spent,
-                  sum(traffic_num_purchases) as traffic_num_purchases,
-                  sum(change_to_initial_amount_as_of_round_zero) as change_to_initial_amount_as_of_round_zero,
-                  sum(change_to_holding_fees_rate) as change_to_holding_fees_rate
-        from      new_totals_per_entry
-        group by  round,
-                  party
-      ),
-      previous_totals as (
-        select  rpt.party as party,
-                coalesce(cumulative_app_rewards, 0) as prev_cumulative_app_rewards,
-                coalesce(cumulative_validator_rewards, 0) as prev_cumulative_validator_rewards,
-                coalesce(cumulative_traffic_purchased, 0) as prev_cumulative_traffic_purchased,
-                coalesce(cumulative_traffic_purchased_cc_spent, 0) as prev_cumulative_traffic_purchased_cc_spent,
-                coalesce(cumulative_traffic_num_purchases, 0) as prev_cumulative_traffic_num_purchases,
-                coalesce(cumulative_change_to_initial_amount_as_of_round_zero, 0) as prev_cumulative_change_to_initial_amount_as_of_round_zero,
-                coalesce(cumulative_change_to_holding_fees_rate, 0) as prev_cumulative_change_to_holding_fees_rate
-        from    round_party_totals rpt
-        join    active_parties ap
-        on      rpt.store_id = ap.store_id
-        and     rpt.party = ap.party
-        and     rpt.closed_round = ap.closed_round
-        where   rpt.store_id = $roundTotalsStoreId
-      )
-      select    nt.round,
-                nt.party,
-                nt.app_rewards,
-                nt.validator_rewards,
-                nt.traffic_purchased,
-                nt.traffic_purchased_cc_spent,
-                nt.traffic_num_purchases,
-                sum(nt.app_rewards) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_app_rewards,0) as cumulative_app_rewards,
-                sum(nt.validator_rewards) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_validator_rewards,0) as cumulative_validator_rewards,
-                sum(nt.traffic_purchased) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_traffic_purchased,0) as cumulative_traffic_purchased,
-                sum(nt.traffic_purchased_cc_spent) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_traffic_purchased_cc_spent,0) as cumulative_traffic_purchased_cc_spent,
-                sum(nt.traffic_num_purchases) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_traffic_num_purchases,0) as cumulative_traffic_num_purchases,
-                sum(nt.change_to_initial_amount_as_of_round_zero) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_change_to_initial_amount_as_of_round_zero,0) as cumulative_change_to_initial_amount_as_of_round_zero,
-                sum(nt.change_to_holding_fees_rate) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_change_to_holding_fees_rate,0) as cumulative_change_to_holding_fees_rate
-      from      new_totals nt
-      left join previous_totals pt
-      on        nt.party = pt.party;
+      create temp table active_parties_before on commit drop as (
+        select party,
+               (select max(closed_round) from active_parties where store_id = $roundTotalsStoreId) as aggr_round,
+               closed_round as active_round
+        from   active_parties
+        where  store_id = $roundTotalsStoreId
+      );
+
+      create temp table temp_cumulative_totals on commit drop as (
+        with previously_aggregated as(
+          select coalesce(max(closed_round), -1) as last_closed_round from round_party_totals where store_id = $roundTotalsStoreId
+        ),
+        new_totals_per_entry as(
+          select    round,
+                    rewarded_party as party,
+                    sum(reward_amount) as app_rewards,
+                    0 as validator_rewards,
+                    0 as traffic_purchased,
+                    0 as traffic_purchased_cc_spent,
+                    0 as traffic_num_purchases,
+                    0 as change_to_initial_amount_as_of_round_zero,
+                    0 as change_to_holding_fees_rate
+          from      scan_txlog_store
+          where     store_id = $txLogStoreId
+          and       round > (select last_closed_round from previously_aggregated)
+          and       round <= $lastClosedRound
+          and       entry_type = ${EntryType.AppRewardTxLogEntry}
+          and       rewarded_party is not null
+          group by  round,
+                    rewarded_party
+          union all
+          select    round,
+                    rewarded_party as party,
+                    0 as app_rewards,
+                    sum(reward_amount) as validator_rewards,
+                    0 as traffic_purchased,
+                    0 as traffic_purchased_cc_spent,
+                    0 as traffic_num_purchases,
+                    0 as change_to_initial_amount_as_of_round_zero,
+                    0 as change_to_holding_fees_rate
+          from      scan_txlog_store
+          where     store_id = $txLogStoreId
+          and       round > (select last_closed_round from previously_aggregated)
+          and       round <= $lastClosedRound
+          and       entry_type = ${EntryType.ValidatorRewardTxLogEntry}
+          and       rewarded_party is not null
+          group by  round,
+                    rewarded_party
+          union all
+          select    round,
+                    extra_traffic_validator as party,
+                    0 as app_rewards,
+                    0 as validator_rewards,
+                    sum(extra_traffic_purchase_traffic_purchased) as traffic_purchased,
+                    sum(extra_traffic_purchase_cc_spent) as traffic_purchased_cc_spent,
+                    count(case when extra_traffic_purchase_traffic_purchased is not null then 1 end) as traffic_num_purchases,
+                    0 as change_to_initial_amount_as_of_round_zero,
+                    0 as change_to_holding_fees_rate
+          from      scan_txlog_store
+          where     store_id = $txLogStoreId
+          and       round > (select last_closed_round from previously_aggregated)
+          and       round <= $lastClosedRound
+          and       entry_type = ${EntryType.ExtraTrafficPurchaseTxLogEntry}
+          and       extra_traffic_validator is not null
+          group by  round,
+                    extra_traffic_validator
+          union all
+          select    round,
+                    key as party,
+                    0 as app_rewards,
+                    0 as validator_rewards,
+                    0 as traffic_purchased,
+                    0 as traffic_purchased_cc_spent,
+                    0 as traffic_num_purchases,
+                    sum((value ->> 'changeToInitialAmountAsOfRoundZero')::numeric) as change_to_initial_amount_as_of_round_zero,
+                    sum((value ->> 'changeToHoldingFeesRate')::numeric) as change_to_holding_fees_rate
+          from      scan_txlog_store,
+                    jsonb_each(entry_data -> 'partyBalanceChanges')
+          where     store_id = $txLogStoreId
+          and       round > (select last_closed_round from previously_aggregated)
+          and       round <= $lastClosedRound
+          and       entry_type = ${EntryType.BalanceChangeTxLogEntry}
+          group by  round,
+                    party
+        ),
+        new_totals as(
+          select    round,
+                    party,
+                    sum(app_rewards) as app_rewards,
+                    sum(validator_rewards) as validator_rewards,
+                    sum(traffic_purchased) as traffic_purchased,
+                    sum(traffic_purchased_cc_spent) as traffic_purchased_cc_spent,
+                    sum(traffic_num_purchases) as traffic_num_purchases,
+                    sum(change_to_initial_amount_as_of_round_zero) as change_to_initial_amount_as_of_round_zero,
+                    sum(change_to_holding_fees_rate) as change_to_holding_fees_rate
+          from      new_totals_per_entry
+          group by  round,
+                    party
+        ),
+        previous_totals as (
+          select  rpt.party as party,
+                  coalesce(cumulative_app_rewards, 0) as prev_cumulative_app_rewards,
+                  coalesce(cumulative_validator_rewards, 0) as prev_cumulative_validator_rewards,
+                  coalesce(cumulative_traffic_purchased, 0) as prev_cumulative_traffic_purchased,
+                  coalesce(cumulative_traffic_purchased_cc_spent, 0) as prev_cumulative_traffic_purchased_cc_spent,
+                  coalesce(cumulative_traffic_num_purchases, 0) as prev_cumulative_traffic_num_purchases,
+                  coalesce(cumulative_change_to_initial_amount_as_of_round_zero, 0) as prev_cumulative_change_to_initial_amount_as_of_round_zero,
+                  coalesce(cumulative_change_to_holding_fees_rate, 0) as prev_cumulative_change_to_holding_fees_rate
+          from    round_party_totals rpt
+          join    active_parties ap
+          on      rpt.store_id = ap.store_id
+          and     rpt.party = ap.party
+          and     rpt.closed_round = ap.closed_round
+          where   rpt.store_id = $roundTotalsStoreId
+        )
+        select    nt.round,
+                  nt.party,
+                  nt.app_rewards,
+                  nt.validator_rewards,
+                  nt.traffic_purchased,
+                  nt.traffic_purchased_cc_spent,
+                  nt.traffic_num_purchases,
+                  sum(nt.app_rewards) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_app_rewards,0) as cumulative_app_rewards,
+                  sum(nt.validator_rewards) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_validator_rewards,0) as cumulative_validator_rewards,
+                  sum(nt.traffic_purchased) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_traffic_purchased,0) as cumulative_traffic_purchased,
+                  sum(nt.traffic_purchased_cc_spent) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_traffic_purchased_cc_spent,0) as cumulative_traffic_purchased_cc_spent,
+                  sum(nt.traffic_num_purchases) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_traffic_num_purchases,0) as cumulative_traffic_num_purchases,
+                  sum(nt.change_to_initial_amount_as_of_round_zero) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_change_to_initial_amount_as_of_round_zero,0) as cumulative_change_to_initial_amount_as_of_round_zero,
+                  sum(nt.change_to_holding_fees_rate) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_change_to_holding_fees_rate,0) as cumulative_change_to_holding_fees_rate
+        from      new_totals nt
+        left join previous_totals pt
+        on        nt.party = pt.party
+      );
 
       insert into active_parties (store_id, party, closed_round)
       select $roundTotalsStoreId, party, max(round)
@@ -912,6 +921,45 @@ final class ScanAggregator(
                   ct.cumulative_change_to_initial_amount_as_of_round_zero,
                   ct.cumulative_change_to_holding_fees_rate
       from        temp_cumulative_totals ct
+      on conflict do nothing;
+
+      -- added for total_amulet_balance until TODO(#800) is fixed
+      -- the active_parties_for_aggr_rounds contains for every party, the round it was active (active_round),
+      -- when the round was aggregated (aggr_round).
+      -- Enables getting the cumulative values per party for when that party was active,
+      -- for the aggregated round, from the round_party_totals table.
+      create temp table active_parties_for_aggr_rounds on commit drop as (
+        select party, aggr_round as aggr_round, active_round from active_parties_before
+        union
+        -- all the parties that were active in the newly aggregated rounds
+        select party, round as aggr_round, round as active_round from temp_cumulative_totals
+        union
+        -- adding the lastClosedRound as aggr_round, for all active_parties after this aggregation.
+        -- This ensures that the total_amulet_balance is calculated based on all parties that were active up to and including lastClosedRound,
+        -- even if they were not active in the newly aggregated rounds.
+        select party,
+               $lastClosedRound as aggr_round,
+               closed_round as active_round
+        from   active_parties
+        where  store_id = $roundTotalsStoreId
+      );
+
+      insert into round_total_amulet_balance (
+        store_id,
+        closed_round,
+        sum_cumulative_change_to_initial_amount_as_of_round_zero,
+        sum_cumulative_change_to_holding_fees_rate
+      )
+      select   $roundTotalsStoreId,
+               ap.aggr_round,
+               coalesce(sum(rpt.cumulative_change_to_initial_amount_as_of_round_zero), 0),
+               coalesce(sum(rpt.cumulative_change_to_holding_fees_rate), 0)
+      from     round_party_totals rpt
+      join     active_parties_for_aggr_rounds ap
+      on       rpt.closed_round = ap.active_round
+      and      rpt.party = ap.party
+      and      rpt.store_id = $roundTotalsStoreId
+      group by ap.aggr_round
       on conflict do nothing;
     """.andThen(DBIOAction.successful(()))
     }

@@ -40,6 +40,15 @@ Validators
 
   How do I determine the traffic used for a specific transaction?
 
+    Since Splice 0.5.x, there are two options: (1) using the traffic cost estimate returned from preparing a transaction or (2) checking the participant logs for the actual traffic used.
+
+    **Option 1:** call the ``/v2/interactive-submission/prepare``
+    `Ledger API endpoint <https://github.com/digital-asset/canton/blob/025cdcf3c04ef052f775d6ccfb88c049a82d65a8/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1916>`__
+    and check the ``costEstimation`` field in the response. It contains an estimate for both the traffic used for submission and the traffic used for confirmation. It is an estimate
+    as the topology state can change between preparing and submitting the transaction.
+
+    **Option 2:** check the participant logs for the actual traffic used for a specific transaction. To do so, follow these steps:
+
     1. Ensure you have ``DEBUG`` logs enabled in your participant configuration.
     2. Determine the trace-id of your command submission in your participant logs.
     3. Search for the ``DEBUG`` log lines containing ``EventCost`` and that ``trace-id``.
@@ -121,12 +130,10 @@ ________
           participants {
             participant1 {
               http-ledger-api {
-                server {
-                    address = 0.0.0.0
-                    port = 10010
-                    port-file = "./json.port"
-                    path-prefix = "my-prefix"
-                }
+                address = 0.0.0.0
+                port = 10010
+                port-file = "./json.port"
+                path-prefix = "my-prefix"
                 websocket-config {
                     http-list-max-elements-limit = 1000,
                     http-list-wait-time = 2s,

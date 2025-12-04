@@ -3,12 +3,12 @@
 
 package com.digitalasset.canton.environment
 
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{
   BatchingConfig,
   CachingConfigs,
   LoggingConfig,
   ProcessingTimeout,
-  SessionSigningKeysConfig,
   StartupMemoryCheckConfig,
   WatchdogConfig,
 }
@@ -34,6 +34,7 @@ object CantonNodeParameters {
     def exitOnFatalFailures: Boolean
     def watchdog: Option[WatchdogConfig]
     def startupMemoryCheckConfig: StartupMemoryCheckConfig
+    def dispatchQueueBackpressureLimit: NonNegativeInt
   }
   object General {
     final case class Impl(
@@ -51,10 +52,10 @@ object CantonNodeParameters {
         override val exitOnFatalFailures: Boolean,
         override val watchdog: Option[WatchdogConfig],
         override val startupMemoryCheckConfig: StartupMemoryCheckConfig,
+        override val dispatchQueueBackpressureLimit: NonNegativeInt,
     ) extends CantonNodeParameters.General
   }
   trait Protocol {
-    def sessionSigningKeys: SessionSigningKeysConfig
     def alphaVersionSupport: Boolean
     def betaVersionSupport: Boolean
     def dontWarnOnDeprecatedPV: Boolean
@@ -62,7 +63,6 @@ object CantonNodeParameters {
 
   object Protocol {
     final case class Impl(
-        sessionSigningKeys: SessionSigningKeysConfig,
         alphaVersionSupport: Boolean,
         betaVersionSupport: Boolean,
         dontWarnOnDeprecatedPV: Boolean,
@@ -89,13 +89,14 @@ trait HasGeneralCantonNodeParameters extends CantonNodeParameters.General {
   override def exitOnFatalFailures: Boolean = general.exitOnFatalFailures
   override def watchdog: Option[WatchdogConfig] = general.watchdog
   override def startupMemoryCheckConfig: StartupMemoryCheckConfig = general.startupMemoryCheckConfig
+  override def dispatchQueueBackpressureLimit: NonNegativeInt =
+    general.dispatchQueueBackpressureLimit
 }
 
 trait HasProtocolCantonNodeParameters extends CantonNodeParameters.Protocol {
 
   protected def protocol: CantonNodeParameters.Protocol
 
-  def sessionSigningKeys: SessionSigningKeysConfig = protocol.sessionSigningKeys
   def alphaVersionSupport: Boolean = protocol.alphaVersionSupport
   def betaVersionSupport: Boolean = protocol.betaVersionSupport
   def dontWarnOnDeprecatedPV: Boolean = protocol.dontWarnOnDeprecatedPV

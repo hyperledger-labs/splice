@@ -61,7 +61,7 @@ class SubscriptionPool[Subscription <: ManagedSubscription](
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, RegistrationError, Subscription] =
-    performUnlessClosingEitherUSF(functionFullName) {
+    synchronizeWithClosing(functionFullName) {
       logger.debug(s"Creating subscription for $member")
       EitherT.right[RegistrationError](createSubscription().map { subscription =>
         blocking {
@@ -177,7 +177,7 @@ class SubscriptionPool[Subscription <: ManagedSubscription](
 
   override def onClosed(): Unit = blocking {
     synchronized {
-      withNewTraceContext { implicit traceContext =>
+      withNewTraceContext("close_subscription_pool") { implicit traceContext =>
         logger.debug(s"Closing all subscriptions in pool: $poolDescription")
         // wait for the subscriptions to actually close in case they are already in the process of closing
         // in which case FlagClosable doesn't wait.

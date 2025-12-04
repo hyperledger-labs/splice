@@ -20,7 +20,7 @@ abstract class AutomationServiceCompanion {
 }
 
 object AutomationServiceCompanion {
-  type TriggerClass = Class[_]
+  type TriggerClass = Class[?]
 
   def aTrigger[T <: Trigger](implicit tag: reflect.ClassTag[T]): TriggerClass =
     tag.runtimeClass

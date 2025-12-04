@@ -285,14 +285,6 @@
   },
   {
     "custom": true,
-    "id": "projects/test-project/global/networks/default",
-    "inputs": {},
-    "name": "default",
-    "provider": "",
-    "type": "gcp:compute/network:Network"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",
@@ -911,6 +903,16 @@
   },
   {
     "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "source.toolkit.fluxcd.io/v1",
@@ -977,6 +979,13 @@
             "toPath": "splice/cluster/pulumi/validator-runbook/Pulumi.validator-runbook.mock.yaml"
           },
           {
+            "fromPath": "cluster/stacks/prod/validator-runbook/Pulumi.validators.extra-validator.mock.yaml",
+            "repository": {
+              "name": "splice-node-active-base"
+            },
+            "toPath": "splice/cluster/pulumi/validator-runbook/Pulumi.validators.extra-validator.mock.yaml"
+          },
+          {
             "fromPath": "cluster/stacks/prod/validator1/Pulumi.validator1.mock.yaml",
             "repository": {
               "name": "splice-node-active-base"
@@ -1038,7 +1047,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.18"
+          "commit": "981227e62011e386cca3cdb5f00b472cf05a12c4"
         },
         "secretRef": {
           "name": "github"
@@ -1091,7 +1100,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.18"
+          "commit": "981227e62011e386cca3cdb5f00b472cf05a12c4"
         },
         "secretRef": {
           "name": "github"

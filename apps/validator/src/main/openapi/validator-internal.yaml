@@ -106,7 +106,8 @@ paths:
       description: |
         As the validator operator, offboard the user specified in the request.
         Offboarding archives the daml contracts required for the user to use a wallet on this validator.
-        Offboarding does not delete the ledger API user, and does not archive any other daml contracts owned by the user.
+        Offboarding deletes the ledger API user.
+        Offboarding does not archive any other daml contracts owned by the user.
       tags: [validator]
       x-jvm-package: validator_admin
       operationId: "offboardUser"
@@ -701,12 +702,16 @@ components:
         - connections
         - sequencer_trust_threshold
         - submission_request_amplification
+        - sequencer_liveness_margin
       properties:
         connections:
           type: array
           items:
             $ref: "#/components/schemas/SequencerAliasToConnections"
         sequencer_trust_threshold:
+          type: integer
+          format: int32
+        sequencer_liveness_margin:
           type: integer
           format: int32
         submission_request_amplification:
@@ -774,6 +779,17 @@ components:
           type: string
         created_at:
           type: string
+        synchronizer_was_paused:
+          type: boolean
+        separate_payload_files:
+          type: boolean
+          description: |
+            If set to true, acs_snapshot is a filename
+        acs_format:
+          type: string
+          enum:
+            - admin_api
+            - ledger_api
 
     GetValidatorDomainDataSnapshotResponse:
       type: object

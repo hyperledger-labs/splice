@@ -1,8 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import {
+  ActionRequiringConfirmation,
+  AmuletRules_ActionRequiringConfirmation,
+} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { THRESHOLD_DEADLINE_SUBTITLE } from '../../utils/constants';
+import {
+  buildAmuletRulesPendingConfigFields,
   configFormDataToConfigChanges,
   createProposalActions,
   getInitialExpiration,
@@ -16,14 +21,25 @@ import { buildAmuletConfigChanges } from '../../utils/buildAmuletConfigChanges';
 import { useAppForm } from '../../hooks/form';
 import {
   validateEffectiveDate,
+  validateExpiration,
   validateExpiryEffectiveDate,
   validateSummary,
   validateUrl,
 } from './formValidators';
 import { FormLayout } from './FormLayout';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
-import { Box, Typography } from '@mui/material';
+import { Alert, Box, Typography } from '@mui/material';
 import { ProposalSummary } from '../governance/ProposalSummary';
+import { buildAmuletRulesConfigFromChanges } from '../../utils/buildAmuletRulesConfigFromChanges';
+import { useProposalMutation } from '../../hooks/useProposalMutation';
+import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
+import { useListDsoRulesVoteRequests } from '../../hooks';
+import {
+  getAmuletConfigToCompareWith,
+  PrettyJsonDiff,
+  useVotesHooks,
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { JsonDiffAccordion } from '../governance/JsonDiffAccordion';
 
 export type SetAmuletConfigCompleteFormData = {
   common: CommonProposalFormData;
@@ -32,18 +48,18 @@ export type SetAmuletConfigCompleteFormData = {
 
 const createProposalAction = createProposalActions.find(a => a.value === 'CRARC_SetConfig');
 
-export interface SetAmuletConfigRulesFormProps {
-  onSubmit: (
-    data: SetAmuletConfigCompleteFormData,
-    action: ActionRequiringConfirmation
-  ) => Promise<void>;
-}
-
-export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> = _ => {
+export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
   const dsoInfoQuery = useDsoInfos();
+  const mutation = useProposalMutation();
+  const dsoProposalsQuery = useListDsoRulesVoteRequests();
+  const votesHooks = useVotesHooks();
   const initialExpiration = getInitialExpiration(dsoInfoQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const pendingConfigFields = useMemo(
+    () => buildAmuletRulesPendingConfigFields(dsoProposalsQuery.data),
+    [dsoProposalsQuery.data]
+  );
 
   const defaultValues = useMemo((): SetAmuletConfigCompleteFormData => {
     if (!dsoInfoQuery.data) {
@@ -85,11 +101,36 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
 
   const form = useAppForm({
     defaultValues,
-    onSubmit: async ({ value }) => {
+    onSubmit: async ({ value: formData }) => {
       if (!showConfirmation) {
         setShowConfirmation(true);
       } else {
-        console.log('submit amulet config form data: ', value);
+        if (!amuletConfig) {
+          throw new Error('Amulet Config is not defined');
+        }
+
+        const changes = configFormDataToConfigChanges(
+          formData.config,
+          allAmuletConfigChanges,
+          false
+        );
+        const baseConfig = amuletConfig;
+        const newConfig = buildAmuletRulesConfigFromChanges(changes);
+        const action: ActionRequiringConfirmation = {
+          tag: 'ARC_AmuletRules',
+          value: {
+            amuletRulesAction: {
+              tag: 'CRARC_SetConfig',
+              value: {
+                baseConfig: baseConfig,
+                newConfig: newConfig,
+              },
+            },
+          },
+        };
+        await mutation.mutateAsync({ formData, action }).catch(e => {
+          console.error(`Failed to submit proposal`, e);
+        });
       }
     },
 
@@ -100,13 +141,52 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
           effectiveDate: value.common.effectiveDate.effectiveDate,
         });
       },
+      onSubmit: ({ value: formData }) => {
+        const changes = configFormDataToConfigChanges(formData.config, allAmuletConfigChanges);
+
+        const conflictingChanges = changes.filter(c =>
+          pendingConfigFields.some(p => p.fieldName === c.fieldName)
+        );
+        const names = conflictingChanges.map(c => c.label).join(', ');
+
+        if (conflictingChanges.length > 0) {
+          return `Cannot modify fields that have pending changes (${names})`;
+        }
+      },
     },
   });
 
   const maybeConfig = dsoInfoQuery.data?.amuletRules.payload.configSchedule.initialValue;
-  const dsoConfig = maybeConfig ? maybeConfig : null;
+  const amuletConfig = maybeConfig ? maybeConfig : null;
   // passing the config twice here because we initially have no changes
-  const amuletConfigChanges = buildAmuletConfigChanges(dsoConfig, dsoConfig, true);
+  const allAmuletConfigChanges = buildAmuletConfigChanges(amuletConfig, amuletConfig, true);
+
+  const effectiveDateString = form.state.values.common.effectiveDate.effectiveDate;
+  const effectivity = effectiveDateString ? dayjs(effectiveDateString).toDate() : undefined;
+
+  const changes = configFormDataToConfigChanges(
+    form.state.values.config,
+    allAmuletConfigChanges,
+    false
+  );
+
+  const baseConfig = amuletConfig;
+  const newConfig = buildAmuletRulesConfigFromChanges(changes);
+  const dsoAction: AmuletRules_ActionRequiringConfirmation = {
+    tag: 'CRARC_SetConfig',
+    value: {
+      baseConfig: baseConfig!,
+      newConfig: newConfig,
+    },
+  };
+
+  const amuletConfigToCompareWith = getAmuletConfigToCompareWith(
+    effectivity,
+    undefined,
+    votesHooks,
+    dsoAction,
+    dsoInfoQuery
+  );
 
   return (
     <FormLayout form={form} id="set-amulet-config-rules-form">
@@ -120,13 +200,19 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
           formType="config-change"
           configFormData={configFormDataToConfigChanges(
             form.state.values.config,
-            amuletConfigChanges
+            allAmuletConfigChanges
           )}
           onEdit={() => setShowConfirmation(false)}
           onSubmit={() => {}}
         />
       ) : (
         <>
+          {pendingConfigFields.length > 0 && (
+            <Alert severity="info" color="warning" variant="outlined">
+              Some fields are disabled for editing due to pending votes.
+            </Alert>
+          )}
+
           <form.AppField name="common.action">
             {field => (
               <field.TextField
@@ -137,11 +223,17 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
             )}
           </form.AppField>
 
-          <form.AppField name="common.expiryDate">
+          <form.AppField
+            name="common.expiryDate"
+            validators={{
+              onChange: ({ value }) => validateExpiration(value),
+              onBlur: ({ value }) => validateExpiration(value),
+            }}
+          >
             {field => (
               <field.DateField
                 title="Threshold Deadline"
-                description="This is the last day voters can vote on this proposal"
+                description={THRESHOLD_DEADLINE_SUBTITLE}
                 id="set-amulet-config-rules-expiry-date"
               />
             )}
@@ -168,9 +260,7 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
               onChange: ({ value }) => validateSummary(value),
             }}
           >
-            {field => (
-              <field.TextArea title="Proposal Summary" id="set-amulet-config-rules-summary" />
-            )}
+            {field => <field.ProposalSummaryField id="set-amulet-config-rules-summary" />}
           </form.AppField>
 
           <form.AppField
@@ -188,16 +278,37 @@ export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> =
               Configuration
             </Typography>
 
-            {amuletConfigChanges.map((change, index) => (
+            {allAmuletConfigChanges.map((change, index) => (
               <form.AppField name={`config.${change.fieldName}`} key={index}>
-                {field => <field.ConfigField configChange={change} key={index} />}
+                {field => (
+                  <field.ConfigField
+                    configChange={change}
+                    key={index}
+                    pendingFieldInfo={pendingConfigFields.find(
+                      f => f.fieldName === change.fieldName
+                    )}
+                  />
+                )}
               </form.AppField>
             ))}
           </Box>
         </>
       )}
 
+      <JsonDiffAccordion>
+        {amuletConfigToCompareWith && amuletConfigToCompareWith[1] ? (
+          <PrettyJsonDiff
+            changes={{
+              newConfig: dsoAction.value.newConfig,
+              baseConfig: dsoAction.value.baseConfig || amuletConfigToCompareWith[1],
+              actualConfig: amuletConfigToCompareWith[1],
+            }}
+          />
+        ) : null}
+      </JsonDiffAccordion>
+
       <form.AppForm>
+        <ProposalSubmissionError error={mutation.error} />
         <form.FormErrors />
         <form.FormControls
           showConfirmation={showConfirmation}

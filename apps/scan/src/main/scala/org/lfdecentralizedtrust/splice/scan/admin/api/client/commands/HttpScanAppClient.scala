@@ -61,8 +61,8 @@ import org.lfdecentralizedtrust.splice.util.{
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig.P2PEndpointConfig
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.P2PEndpointConfig
 import com.digitalasset.canton.topology.{
   Member,
   ParticipantId,
@@ -1064,6 +1064,7 @@ object HttpScanAppClient {
   case class GetAcsSnapshotAt(
       at: java.time.OffsetDateTime,
       migrationId: Long,
+      recordTimeMatch: Option[definitions.AcsRequest.RecordTimeMatch],
       after: Option[Long] = None,
       pageSize: Int = 100,
       partyIds: Option[Vector[PartyId]] = None,
@@ -1080,6 +1081,7 @@ object HttpScanAppClient {
         definitions.AcsRequest(
           migrationId,
           at,
+          recordTimeMatch,
           after,
           pageSize,
           partyIds.map(_.map(_.toProtoPrimitive)),
@@ -1105,6 +1107,7 @@ object HttpScanAppClient {
       at: java.time.OffsetDateTime,
       migrationId: Long,
       partyIds: Vector[PartyId],
+      recordTimeMatch: Option[definitions.HoldingsStateRequest.RecordTimeMatch],
       after: Option[Long] = None,
       pageSize: Int = 100,
   ) extends InternalBaseCommand[
@@ -1119,6 +1122,7 @@ object HttpScanAppClient {
         definitions.HoldingsStateRequest(
           migrationId,
           at,
+          recordTimeMatch,
           after,
           pageSize,
           partyIds.map(_.toProtoPrimitive),
@@ -1135,6 +1139,44 @@ object HttpScanAppClient {
       case http.GetHoldingsStateAtResponse.OK(value) =>
         Right(Some(value))
       case http.GetHoldingsStateAtResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
+  case class GetHoldingsSummaryAt(
+      at: java.time.OffsetDateTime,
+      migrationId: Long,
+      ownerPartyIds: Vector[PartyId],
+      recordTimeMatch: Option[definitions.HoldingsSummaryRequest.RecordTimeMatch],
+      asOfRound: Option[Long],
+  ) extends InternalBaseCommand[
+        http.GetHoldingsSummaryAtResponse,
+        Option[definitions.HoldingsSummaryResponse],
+      ] {
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetHoldingsSummaryAtResponse] =
+      client.getHoldingsSummaryAt(
+        definitions.HoldingsSummaryRequest(
+          migrationId,
+          at,
+          recordTimeMatch,
+          ownerPartyIds.map(_.toProtoPrimitive),
+          asOfRound,
+        ),
+        headers,
+      )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[http.GetHoldingsSummaryAtResponse, Either[
+      String,
+      Option[definitions.HoldingsSummaryResponse],
+    ]] = {
+      case http.GetHoldingsSummaryAtResponse.OK(value) =>
+        Right(Some(value))
+      case http.GetHoldingsSummaryAtResponse.NotFound(_) =>
         Right(None)
     }
   }
@@ -1368,6 +1410,8 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetUpdateByIdV1Response.OK(response) =>
         Right(response)
+      case http.GetUpdateByIdV1Response.NotFound(_) =>
+        Left(s"Update with ID $updateId not found")
     }
   }
 

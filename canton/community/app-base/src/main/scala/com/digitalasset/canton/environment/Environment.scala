@@ -30,7 +30,6 @@ import com.digitalasset.canton.metrics.{CantonHistograms, DbStorageHistograms, M
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.participant.*
 import com.digitalasset.canton.participant.config.ParticipantNodeConfig
-import com.digitalasset.canton.resource.DbMigrationsMetaFactory
 import com.digitalasset.canton.synchronizer.mediator.{
   MediatorNodeBootstrap,
   MediatorNodeBootstrapFactory,
@@ -69,7 +68,6 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
     participantNodeFactory: ParticipantNodeBootstrapFactory,
     sequencerNodeFactory: SequencerNodeBootstrapFactory,
     mediatorNodeFactory: MediatorNodeBootstrapFactory,
-    protected val migrationsFactoryFactory: DbMigrationsMetaFactory,
     override val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging
     with AutoCloseable
@@ -144,7 +142,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
   protected def createHealthDumpGenerator(
       commandRunner: GrpcAdminCommandRunner
   ): HealthDumpGenerator =
-    new HealthDumpGenerator(this, commandRunner)
+    new HealthDumpGenerator(this, commandRunner, loggerFactory)
 
   /* We can't reliably use the health administration instance of the console because:
    * 1) it's tied to the console environment, which we don't have access to yet when the environment is instantiated
@@ -200,7 +198,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
 
   protected val futureSupervisor =
     if (config.monitoring.logging.logSlowFutures)
-      new FutureSupervisor.Impl(timeouts.slowFutureWarn)
+      new FutureSupervisor.Impl(timeouts.slowFutureWarn, loggerFactory)
     else FutureSupervisor.Noop
 
   private val monitorO = if (deadlockConfig.enabled) {
@@ -287,7 +285,6 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
   lazy val participants =
     new ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode](
       createParticipant,
-      migrationsFactoryFactory.create(clock),
       timeouts,
       config.participantsByString,
       config.participantNodeParametersByString,
@@ -298,7 +295,6 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
 
   val sequencers = new SequencerNodes(
     createSequencer,
-    migrationsFactoryFactory.create(clock),
     timeouts,
     config.sequencersByString,
     config.sequencerNodeParametersByString,
@@ -308,7 +304,6 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
   val mediators =
     new MediatorNodes(
       createMediator,
-      migrationsFactoryFactory.create(clock),
       timeouts,
       config.mediatorsByString,
       config.mediatorNodeParametersByString,
@@ -327,7 +322,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
     * started nodes will not be stopped.
     */
   def startAndReconnect(runner: => Unit = ()): Either[StartupError, Unit] =
-    withNewTraceContext { implicit traceContext =>
+    withNewTraceContext("env_start_reconnect") { implicit traceContext =>
       if (config.parameters.manualStart) {
         logger.info("Manual start requested.")
         Right(runner)
@@ -361,7 +356,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
           ParticipantApis(
             ledgerApi = node.config.ledgerApi.port.unwrap,
             adminApi = node.config.adminApi.port.unwrap,
-            jsonApi = node.config.httpLedgerApi.flatMap(_.server.port),
+            jsonApi = node.config.httpLedgerApi.internalPort.map(_.unwrap),
           ),
         )
       }.toMap
@@ -612,7 +607,6 @@ final class CantonEnvironment(
     participantNodeFactory: ParticipantNodeBootstrapFactory,
     sequencerNodeFactory: SequencerNodeBootstrapFactory,
     mediatorNodeFactory: MediatorNodeBootstrapFactory,
-    migrationsFactoryFactory: DbMigrationsMetaFactory,
     override val loggerFactory: NamedLoggerFactory,
 ) extends Environment[CantonConfig](
       config,
@@ -621,7 +615,6 @@ final class CantonEnvironment(
       participantNodeFactory,
       sequencerNodeFactory,
       mediatorNodeFactory,
-      migrationsFactoryFactory,
       loggerFactory,
     ) {
 

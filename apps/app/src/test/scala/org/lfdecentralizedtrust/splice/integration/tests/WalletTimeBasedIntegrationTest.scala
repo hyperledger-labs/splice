@@ -138,7 +138,7 @@ class WalletTimeBasedIntegrationTest
 
       // The previous test may leave a round half-open which makes this test behave differently when it runs in isolation vs the whole suite.
       // We therefore first advance a full round to make this test start from a more deterministic state.
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
 
       clue("Alice taps 0.11001 amulets") {
         aliceWalletClient.tap(0.11001)
@@ -178,8 +178,8 @@ class WalletTimeBasedIntegrationTest
       }
 
       // advance 2 rounds.
-      advanceRoundsByOneTick
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
 
       clue("Check wallet after advancing to next 2 round") {
         eventually()(aliceWalletClient.list().lockedAmulets.head.round shouldBe startRound + 2)
@@ -196,8 +196,8 @@ class WalletTimeBasedIntegrationTest
       }
 
       // advance 2 more rounds.
-      advanceRoundsByOneTick
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
 
       setTriggersWithin(
         Seq.empty,
@@ -216,7 +216,7 @@ class WalletTimeBasedIntegrationTest
       clue(
         "Advance seven rounds to ensure that rewards from previous test cases were claimed or expired"
       ) {
-        Range(1, 8).foreach(_ => advanceRoundsByOneTick)
+        Range(1, 8).foreach(_ => advanceRoundsToNextRoundOpening)
       }
 
       val respond = clue("Alice requests an ANS entry") {
@@ -253,7 +253,7 @@ class WalletTimeBasedIntegrationTest
 
         actAndCheck(
           "Advance six rounds - all rewards should be claimed or expired",
-          Range(1, 7).foreach(_ => advanceRoundsByOneTick),
+          Range(1, 7).foreach(_ => advanceRoundsToNextRoundOpening),
         )(
           "",
           _ => {

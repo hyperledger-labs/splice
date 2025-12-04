@@ -137,14 +137,6 @@
   },
   {
     "custom": true,
-    "id": "projects/test-project/global/networks/default",
-    "inputs": {},
-    "name": "default",
-    "provider": "",
-    "type": "gcp:compute/network:Network"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "enableServerSideApply": "true"
@@ -292,6 +284,16 @@
     "name": "loopback-virtual-service-validator",
     "provider": "",
     "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
+  },
+  {
+    "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
   },
   {
     "custom": true,
@@ -448,6 +450,7 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
+        "disableAuth": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
@@ -491,6 +494,66 @@
       "version": "0.3.20"
     },
     "name": "validator-participant-3",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-party-allocator",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "party-allocator",
+      "namespace": "validator",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "cluster": {
+          "dnsName": "mock.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "mock.global.canton.network.digitalasset.com",
+          "name": "cn-mocknet"
+        },
+        "config": {
+          "jsonLedgerApiUrl": "http://participant-3:7575",
+          "keyDirectory": "/keys",
+          "maxParties": 1234,
+          "parallelism": 321,
+          "preapprovalRetries": 9876,
+          "preapprovalRetryDelayMs": 42,
+          "scanApiUrl": "http://scan-app.sv-1:5012",
+          "token": "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN}",
+          "userId": "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME}",
+          "validatorApiUrl": "http://validator-app:5003"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "validator-party-allocator",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -596,6 +659,13 @@
       "namespace": "validator",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_ENV_VAR_VALIDATOR_NAME",
+            "value": "ADDITIONAL_ENV_VAR_VALIDATOR_NAME"
+          }
+        ],
+        "additionalJvmOptions": "-Dparticipantoption",
         "affinity": {
           "nodeAffinity": {
             "requiredDuringSchedulingIgnoredDuringExecution": {

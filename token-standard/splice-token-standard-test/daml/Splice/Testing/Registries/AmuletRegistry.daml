@@ -95,6 +95,7 @@ data AmuletRegistryConfig = AmuletRegistryConfig
     initialAmuletPrice : Decimal
     demoTime : Time
     noTransferFee : Bool -- ^ If true then the transfer fee is set to zero to test their removal
+    dsoPartyName : Text
   deriving (Eq, Show)
 
 -- | Recommended default configuration for setting up the mock amulet registry.
@@ -103,6 +104,7 @@ defaultAmuletRegistryConfig = AmuletRegistryConfig with
   initialAmuletPrice = 0.5 -- a non-zero price that still makes it easy to reason about fees and amounts
   demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
   noTransferFee = False -- charge fees by default as dealing with them is important as long as they are being charged
+  dsoPartyName = "dso-party"
 
 noTransferFeeConfig : TransferConfig USD
 noTransferFeeConfig = TransferConfig with
@@ -123,7 +125,7 @@ initialize config = do
   -- use a time that is easy to reason about in script outputs
   setTime config.demoTime
 
-  dso <- allocateParty "dso-party"
+  dso <- allocatePartyExact config.dsoPartyName
   let registry = AmuletRegistry with
         dso
         instrumentId = amuletInstrumentIdV1 dso
@@ -226,7 +228,11 @@ registryApi_getTransferFactory
 registryApi_getTransferFactory registry arg = do
   (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
   transferC <- getAmuletRulesTransferContext registry
-  (optPreapproval, preapprovalC) <- lookupPreapprovalWithContext registry arg.transfer.receiver
+  let isSelfTransfer = arg.transfer.sender == arg.transfer.receiver
+  (optPreapproval, preapprovalC) <-
+    if isSelfTransfer
+      then pure (None, emptyOpenApiChoiceContext)
+      else lookupPreapprovalWithContext registry arg.transfer.receiver
   featuredAppRightC <- case optPreapproval of
     None -> pure emptyOpenApiChoiceContext
     Some preapproval -> getFeaturedAppRightContext registry preapproval.provider
@@ -381,7 +387,7 @@ getAmuletRulesTransferContext registry = do
 
 lookupPreapprovalWithContext : AmuletRegistry -> Party -> Script (Optional TransferPreapproval, OpenApiChoiceContext)
 lookupPreapprovalWithContext registry receiver = do
-  preapprovals  <- queryFilter @TransferPreapproval receiver (\preapproval -> preapproval.receiver == receiver)
+  preapprovals  <- queryFilter @TransferPreapproval registry.dso (\preapproval -> preapproval.receiver == receiver)
   case preapprovals of
     [] -> pure (None, emptyOpenApiChoiceContext)
     (preapprovalCid, preapproval) :: _ ->  do

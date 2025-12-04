@@ -7,19 +7,20 @@ import type {
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import {
   getDsoConfigToCompareWith,
+  PrettyJsonDiff,
   useVotesHooks,
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { Alert, Box, Typography } from '@mui/material';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
-import { PrettyJsonDiff } from '../../../../../common/frontend/lib/components/PrettyJsonDiff';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { useListDsoRulesVoteRequests } from '../../hooks';
 import { useAppForm } from '../../hooks/form';
 import { useProposalMutation } from '../../hooks/useProposalMutation';
 import { buildDsoConfigChanges } from '../../utils/buildDsoConfigChanges';
 import { buildDsoRulesConfigFromChanges } from '../../utils/buildDsoRulesConfigFromChanges';
+import { THRESHOLD_DEADLINE_SUBTITLE } from '../../utils/constants';
 import {
   buildPendingConfigFields,
   configFormDataToConfigChanges,
@@ -34,7 +35,9 @@ import { ProposalSummary } from '../governance/ProposalSummary';
 import { FormLayout } from './FormLayout';
 import {
   validateEffectiveDate,
+  validateExpiration,
   validateExpiryEffectiveDate,
+  validateNextScheduledSynchronizerUpgrade,
   validateSummary,
   validateUrl,
 } from './formValidators';
@@ -129,11 +132,23 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
     },
 
     validators: {
-      onChange: ({ value }) => {
-        return validateExpiryEffectiveDate({
-          expiration: value.common.expiryDate,
-          effectiveDate: value.common.effectiveDate.effectiveDate,
+      onChange: ({ value: formData }) => {
+        const expiryError = validateExpiryEffectiveDate({
+          expiration: formData.common.expiryDate,
+          effectiveDate: formData.common.effectiveDate.effectiveDate,
         });
+
+        if (expiryError) return expiryError;
+
+        const syncUpgradeTime = formData.config.nextScheduledSynchronizerUpgradeTime.value;
+        const syncMigrationId = formData.config.nextScheduledSynchronizerUpgradeMigrationId.value;
+        const effectiveDate = formData.common.effectiveDate.effectiveDate;
+
+        return validateNextScheduledSynchronizerUpgrade(
+          syncUpgradeTime,
+          syncMigrationId,
+          effectiveDate
+        );
       },
       onSubmit: ({ value: formData }) => {
         const changes = configFormDataToConfigChanges(formData.config, dsoConfigChanges);
@@ -160,8 +175,6 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
 
   const changes = configFormDataToConfigChanges(form.state.values.config, dsoConfigChanges, false);
   const changedFields = changes.filter(c => c.currentValue !== c.newValue);
-
-  const hasChangedFields = changedFields.length > 0;
 
   const baseConfig = dsoConfig;
   const newConfig = buildDsoRulesConfigFromChanges(changes);
@@ -212,11 +225,17 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
             )}
           </form.AppField>
 
-          <form.AppField name="common.expiryDate">
+          <form.AppField
+            name="common.expiryDate"
+            validators={{
+              onChange: ({ value }) => validateExpiration(value),
+              onBlur: ({ value }) => validateExpiration(value),
+            }}
+          >
             {field => (
               <field.DateField
                 title="Threshold Deadline"
-                description="This is the last day voters can vote on this proposal"
+                description={THRESHOLD_DEADLINE_SUBTITLE}
                 id="set-dso-config-rules-expiry-date"
               />
             )}
@@ -243,7 +262,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
               onChange: ({ value }) => validateSummary(value),
             }}
           >
-            {field => <field.TextArea title="Proposal Summary" id="set-dso-config-rules-summary" />}
+            {field => <field.ProposalSummaryField id="set-dso-config-rules-summary" />}
           </form.AppField>
 
           <form.AppField
@@ -270,6 +289,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
                     pendingFieldInfo={pendingConfigFields.find(
                       f => f.fieldName === change.fieldName
                     )}
+                    effectiveDate={form.state.values.common.effectiveDate.effectiveDate}
                   />
                 )}
               </form.AppField>
@@ -279,7 +299,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
       )}
 
       <JsonDiffAccordion>
-        {dsoConfigToCompareWith[1] && hasChangedFields ? (
+        {dsoConfigToCompareWith[1] ? (
           <PrettyJsonDiff
             changes={{
               newConfig: dsoAction.value.newConfig,
@@ -287,9 +307,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
               actualConfig: dsoConfigToCompareWith[1],
             }}
           />
-        ) : (
-          <Typography>No changes</Typography>
-        )}
+        ) : null}
       </JsonDiffAccordion>
 
       <form.AppForm>

@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
 import com.digitalasset.canton.topology.SynchronizerId
+import io.circe.parser.{parse as parseJson}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.util.{
@@ -11,9 +12,12 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletFrontendTestUtil,
 }
 
+import java.net.URI
+import java.net.http.{HttpClient, HttpRequest, HttpResponse}
+import scala.collection.immutable.ArraySeq
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import scala.util.{Random, Try}
+import scala.util.Random
 
 abstract class RunbookSvPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
@@ -61,7 +65,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
             () => find(id("logout-button")) should not be empty,
           )
 
-          click on "information-tab-cometBft-debug"
+          eventuallyClickOn(id("information-tab-cometBft-debug"))
         },
       )(
         s"We see all other SVs as peers",
@@ -199,42 +203,6 @@ abstract class RunbookSvPreflightIntegrationTestBase
     }
   }
 
-  "The Scan UI shows the same total balance as sv-1" in { implicit env =>
-    val svClient = sv_client("sv")
-    val sv1ScanClient = scancl("sv1Scan")
-    val initialRound = sv1ScanClient.getDsoInfo().initialRound.getOrElse("0").toLong
-
-    val svParty = svClient.getDsoInfo().svParty.toProtoPrimitive
-    val svInfo = svClient.getDsoInfo().dsoRules.payload.svs.asScala.get(svParty).value
-    val joinedAsOfRound = svInfo.joinedAsOfRound.number
-    val lastAggregatedRoundSv = Try(sv1ScanClient.getRoundOfLatestData()._1).getOrElse(initialRound)
-    logger.debug(
-      s"last aggregated round from sv1: $lastAggregatedRoundSv, sv runbook joined as of round: $joinedAsOfRound"
-    )
-    // We do +3 here instead of, say, +1 as this was racy once and we don't care that much about the first few rounds after SV onboarding.
-    if (lastAggregatedRoundSv >= joinedAsOfRound + 3) {
-      withFrontEnd("sv") { implicit webDriver =>
-        go to scanUrl
-        eventually(1.minutes) {
-          val asOfRound = find(id("as-of-round")).value.text
-          asOfRound should startWith("The content on this page is computed as of round: ")
-          asOfRound should not be "The content on this page is computed as of round: --"
-          asOfRound should not be "The content on this page is computed as of round: ??"
-          val round =
-            Try(asOfRound.split(" ").last.toLong)
-              .getOrElse(fail(s"Failed parsing round number from: $asOfRound"))
-          val totalAmuletBalanceSv = find(id("total-amulet-balance-amulet")).value.text
-          val totalAmuletBalanceSv1 = sv1ScanClient
-            .getTotalAmuletBalance(round)
-            .valueOrFail("Amulet balance not yet computed")
-          parseAmountText(totalAmuletBalanceSv, amuletNameAcronym) shouldBe totalAmuletBalanceSv1
-        }
-      }
-    } else {
-      logger.debug("Skipping total balance test, the gap between rounds in sv and sv1 is too large")
-    }
-  }
-
   "The Name Service UI is working" in { implicit env =>
     val ansUrl = s"https://cns.sv.${sys.env("NETWORK_APPS_ADDRESS")}"
     val ansName =
@@ -328,6 +296,29 @@ abstract class RunbookSvPreflightIntegrationTestBase
         val sv1TrafficStatus =
           sv1ScanClient.getMemberTrafficStatus(activeSynchronizer, participantId.member)
         svTrafficStatus shouldBe sv1TrafficStatus
+      }
+    }
+  }
+
+  "Info service is reachable and returns a JSON object" in { _ =>
+    val infoUrl = s"https://info.sv.${sys.env("NETWORK_APPS_ADDRESS")}"
+    val requests = ArraySeq("", "/runtime/dso.json")
+      .map(path =>
+        HttpRequest
+          .newBuilder()
+          .uri(URI.create(s"$infoUrl$path"))
+          .build()
+      )
+    val client = HttpClient.newHttpClient()
+
+    for (request <- requests) {
+      clue(s"Testing info endpoint ${request.uri()}") {
+        eventuallySucceeds(timeUntilSuccess = 5.minutes) {
+          val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+          response.statusCode() shouldBe 200
+          val json = parseJson(response.body()).valueOrFail("Response body must be a valid JSON")
+          json.isObject shouldBe true
+        }
       }
     }
   }

@@ -159,7 +159,7 @@ function resourceClass(
                 storageClassName: 'hyperdisk-balanced-rwo',
                 resources: {
                   requests: {
-                    storage: '24Gi',
+                    storage: '48Gi',
                   },
                 },
               },

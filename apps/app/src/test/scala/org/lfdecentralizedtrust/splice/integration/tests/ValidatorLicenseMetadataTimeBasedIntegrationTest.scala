@@ -89,21 +89,25 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
     // Collect the initial faucet coupons to make sure they don't run after the first license query.
     // We don't disable the trigger globally since the first test should also pass
     // with this trigger enabled.
-    Seq(0, 1).foreach { _ =>
-      aliceValidatorBackend.validatorAutomation
-        .trigger[ReceiveFaucetCouponTrigger]
-        .runOnce()
-        .futureValue
+    advanceTimeForRewardAutomationToRunForCurrentRound
+
+    val licenseWithLastActiveForCurrentRound = eventually() {
+      val license =
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs.awaitJava(
+          ValidatorLicense.COMPANION
+        )(aliceValidatorBackend.getValidatorPartyId())
+      license.data.lastActiveAt.toScala.value shouldBe getLedgerTime.toInstant
+      license.data.faucetState.toScala.value.lastReceivedFor.number shouldBe sv1ScanBackend
+        .getOpenAndIssuingMiningRounds()
+        ._1
+        .filter(
+          _.payload.opensAt.isBefore(getLedgerTime.toInstant)
+        )
+        .map(_.payload.round.number)
+        .maxOption
+        .value
+      license
     }
-    aliceValidatorBackend.validatorAutomation
-      .trigger[ReceiveFaucetCouponTrigger]
-      .runOnce()
-      .futureValue
-    val license =
-      aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs.awaitJava(
-        ValidatorLicense.COMPANION
-      )(aliceValidatorBackend.getValidatorPartyId())
-    license.data.lastActiveAt.toScala.value shouldBe getLedgerTime.toInstant
     setTriggersWithin(
       triggersToResumeAtStart = Seq.empty,
       triggersToPauseAtStart = Seq(
@@ -121,9 +125,9 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
               .awaitJava(
                 ValidatorLicense.COMPANION
               )(aliceValidatorBackend.getValidatorPartyId())
-          newLicense.data.lastActiveAt should not be license.data.lastActiveAt
+          newLicense.data.lastActiveAt should not be licenseWithLastActiveForCurrentRound.data.lastActiveAt
           newLicense.data.lastActiveAt.toScala.value shouldBe getLedgerTime.toInstant
-          newLicense.data.faucetState shouldBe license.data.faucetState
+          newLicense.data.faucetState shouldBe licenseWithLastActiveForCurrentRound.data.faucetState
         },
       )
       succeed
@@ -136,6 +140,9 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
       sv1ScanBackend,
       aliceValidatorBackend,
     )
+
+    advanceTimeForRewardAutomationToRunForCurrentRound
+
     eventually() {
       val validatorLivenessActivityRecordRounds =
         sv1Backend.participantClient.ledger_api_extensions.acs
@@ -159,7 +166,7 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
       actAndCheck(
         "Advance rounds so that issuing rounds 0 and 1 no longer exist",
         (1 to 5).foreach { _ =>
-          advanceRoundsByOneTick
+          advanceRoundsToNextRoundOpening
         },
       )(
         "ValidatorLivenessActivityRecord contracts for round 0 and 1 should be expired",

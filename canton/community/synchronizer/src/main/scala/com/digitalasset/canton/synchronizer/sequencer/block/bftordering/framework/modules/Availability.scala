@@ -7,9 +7,10 @@ import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.serialization.ProtoConverter.{ParsingResult, parseRequired}
 import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.SupportedVersions
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.BatchesRequest
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.AvailabilityStore
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.CryptoProvider
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
   EpochNumber,
@@ -27,11 +28,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   SignedMessage,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.dependencies.AvailabilityModuleDependencies
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
-  Env,
-  Module,
-  SupportedVersions,
-}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{Env, Module}
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30
 import com.digitalasset.canton.tracing.Traced
 import com.digitalasset.canton.version.*
@@ -76,11 +73,11 @@ object Availability {
     final case class LocalBatchCreated(requests: Seq[Traced[OrderingRequest]])
         extends LocalDissemination
 
-    final case class LocalBatchesStored(batches: Seq[(BatchId, OrderingRequestBatch)])
+    final case class LocalBatchesStored(batches: Seq[(Traced[BatchId], OrderingRequestBatch)])
         extends LocalDissemination
 
     final case class LocalBatchStoredSigned(
-        batchId: BatchId,
+        batchId: Traced[BatchId],
         batch: OrderingRequestBatch,
         // None if this message is just used to trigger further dissemination
         signature: Option[Signature],
@@ -465,8 +462,6 @@ object Availability {
     ) extends Consensus[E]
 
     final case class Ordered(batchIds: Seq[BatchId]) extends Consensus[Nothing]
-
-    final case object LocalClockTick extends Consensus[Nothing]
   }
 }
 

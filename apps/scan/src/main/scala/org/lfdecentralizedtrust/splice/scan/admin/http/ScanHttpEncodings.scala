@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import com.daml.ledger.api.v2.TraceContextOuterClass
-import com.daml.ledger.javaapi.data.TransactionTree
 import com.daml.ledger.javaapi.{data, data as javaApi}
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.CantonTimestamp
@@ -24,7 +23,7 @@ import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{
 }
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
-import org.lfdecentralizedtrust.splice.util.{Contract, EventId, LegacyOffset, Trees}
+import org.lfdecentralizedtrust.splice.util.{Codec, Contract, EventId, LegacyOffset, Trees}
 
 import java.time.format.DateTimeFormatterBuilder
 import java.time.{Instant, ZoneOffset}
@@ -128,9 +127,9 @@ sealed trait ScanHttpEncodings {
   }
 
   private def javaToHttpEvent(
-      tree: TransactionTree,
+      tree: javaApi.Transaction,
       eventId: String,
-      treeEvent: javaApi.TreeEvent,
+      treeEvent: javaApi.Event,
       eventIdBuild: (String, Int) => String,
   )(implicit
       elc: ErrorLoggingContext
@@ -234,18 +233,23 @@ sealed trait ScanHttpEncodings {
     TreeUpdateWithMigrationId(
       UpdateHistoryResponse(
         update = ledgerApi.TransactionTreeUpdate(
-          new javaApi.TransactionTree(
+          new javaApi.Transaction(
             http.updateId,
             "",
             http.workflowId,
             Instant.parse(http.effectiveAt),
+            http.eventsById
+              .map { case (eventId, treeEventHttp) =>
+                Integer.valueOf(EventId.nodeIdFromEventId(eventId)) -> httpToJavaEvent(
+                  nodesWithChildren,
+                  treeEventHttp,
+                )
+              }
+              .toSeq
+              .sortBy(_._1)
+              .map(_._2)
+              .asJava,
             LegacyOffset.Api.assertFromStringToLong(http.offset),
-            http.eventsById.map { case (eventId, treeEventHttp) =>
-              Integer.valueOf(EventId.nodeIdFromEventId(eventId)) -> httpToJavaEvent(
-                nodesWithChildren,
-                treeEventHttp,
-              )
-            }.asJava,
             http.synchronizerId,
             TraceContextOuterClass.TraceContext.getDefaultInstance,
             Instant.parse(http.recordTime),
@@ -309,7 +313,7 @@ sealed trait ScanHttpEncodings {
   private def httpToJavaEvent(
       nodesWithChildren: Map[Int, Seq[Int]],
       http: httpApi.TreeEvent,
-  ): javaApi.TreeEvent = http match {
+  ): javaApi.Event = http match {
     case httpApi.TreeEvent.members.CreatedEvent(createdHttp) => httpToJavaCreatedEvent(createdHttp)
     case httpApi.TreeEvent.members.ExercisedEvent(exercisedHttp) =>
       httpToJavaExercisedEvent(nodesWithChildren, exercisedHttp)
@@ -332,6 +336,8 @@ sealed trait ScanHttpEncodings {
       http.signatories.asJava,
       http.observers.asJava,
       http.createdAt.toInstant,
+      /* acsDelta = */ false,
+      /* representativePackageId = */ templateId.getPackageId,
     )
   }
 
@@ -360,6 +366,7 @@ sealed trait ScanHttpEncodings {
       ),
       decodeExerciseResult(templateId, interfaceId, http.choice, http.exerciseResult),
       /*implementedInterfaces = */ java.util.Collections.emptyList(),
+      /*acsDelta = */ false,
     )
   }
 
@@ -460,7 +467,6 @@ object ScanHttpEncodings {
       views.sortBy(_.viewId).toVector.map { v =>
         val quorums: Vector[definitions.Quorum] = v.confirmingParties.asArray
           .getOrElse(Vector.empty)
-          .toVector
           .flatMap { j =>
             val parties = j.hcursor.downField("parties").as[Vector[String]].getOrElse(Vector.empty)
             val threshold = j.hcursor.downField("threshold").as[Int].getOrElse(0)
@@ -482,7 +488,7 @@ object ScanHttpEncodings {
     httpApi.EventHistoryVerdict(
       updateId = verdict.updateId,
       migrationId = verdict.migrationId,
-      domainId = verdict.domainId.toString(),
+      domainId = Codec.encode(verdict.domainId),
       recordTime = formatRecordTime(verdict.recordTime.toInstant),
       finalizationTime = formatRecordTime(verdict.finalizationTime.toInstant),
       submittingParties = verdict.submittingParties.toVector,
@@ -572,6 +578,8 @@ object ScanHttpEncodings {
                     assign.createdEvent.getSignatories,
                     assign.createdEvent.getObservers,
                     assign.createdEvent.createdAt,
+                    assign.createdEvent.isAcsDelta,
+                    assign.createdEvent.getRepresentativePackageId,
                   )
                 ),
               )
@@ -590,8 +598,8 @@ object ScanHttpEncodings {
   }
 
   def makeConsistentAcrossSvs(
-      tree: javaApi.TransactionTree
-  ): javaApi.TransactionTree = {
+      tree: javaApi.Transaction
+  ): javaApi.Transaction = {
     val mapping = Trees
       .getLocalEventIndices(tree)
     val nodesWithChildren = tree.getEventsById.asScala.map {
@@ -604,7 +612,7 @@ object ScanHttpEncodings {
           .map(mapping)
       case (nodeId, _) => mapping(nodeId.intValue()) -> Seq.empty
     }
-    val eventsById: Iterable[(Int, javaApi.TreeEvent)] = tree.getEventsById.asScala.map {
+    val eventsById: Iterable[(Int, javaApi.Event)] = tree.getEventsById.asScala.map {
       case (nodeId, created: javaApi.CreatedEvent) =>
         mapping(nodeId) -> new javaApi.CreatedEvent(
           created.getWitnessParties,
@@ -621,6 +629,8 @@ object ScanHttpEncodings {
           created.getSignatories,
           created.getObservers,
           created.createdAt,
+          created.isAcsDelta,
+          created.getRepresentativePackageId,
         )
       case (nodeId, exercised: javaApi.ExercisedEvent) =>
         val newNodeId = mapping(exercised.getNodeId)
@@ -642,22 +652,18 @@ object ScanHttpEncodings {
           ),
           exercised.getExerciseResult,
           exercised.getImplementedInterfaces,
+          exercised.isAcsDelta,
         )
       case (_, event) => sys.error(s"Unexpected event type: $event")
     }
 
-    new javaApi.TransactionTree(
+    new javaApi.Transaction(
       tree.getUpdateId,
       tree.getCommandId,
       tree.getWorkflowId,
       tree.getEffectiveAt,
+      eventsById.toList.sortBy(_._1).map(_._2).asJava,
       1L, // tree.getOffset not used as the values are participant local and we want consistency across svs
-      eventsById
-        .map { case (key, value) =>
-          Integer.valueOf(key) -> value
-        }
-        .toMap
-        .asJava,
       tree.getSynchronizerId,
       tree.getTraceContext,
       tree.getRecordTime,

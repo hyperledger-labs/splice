@@ -32,7 +32,11 @@ object AuthUtil {
     testTokenSecret(audience, user, secret)
   }
 
-  def testTokenSecret(audience: String, user: String, secret: String): String = {
+  def testTokenSecret(
+      audience: String,
+      user: String,
+      secret: String,
+  ): String = {
     JWT
       .create()
       .withSubject(user)

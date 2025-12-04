@@ -7,7 +7,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions 
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
-import org.lfdecentralizedtrust.splice.store.Limit
+import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit}
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AnsSubscriptionRenewalPaymentTrigger
 import org.lfdecentralizedtrust.splice.sv.config.InitialAnsConfig
 import org.lfdecentralizedtrust.splice.util.{
@@ -1226,12 +1226,27 @@ class WalletTxLogIntegrationTest
         logEntry.senderHoldingFees should beWithin(0, smallAmount)
         logEntry.amuletPrice shouldBe amuletPrice
       }
+      val expectedTxLogEntries = Seq(renewTxLog, creationTxLog, tapTxLog)
       checkTxHistory(
         bobValidatorWalletClient,
-        Seq(renewTxLog, creationTxLog, tapTxLog),
+        expectedTxLogEntries,
         trafficTopups = IgnoreTopupsDevNet,
       )
 
+      clue("Check UpdateHistory works for external parties") {
+        inside(
+          bobValidatorBackend.appState.walletManager
+            .valueOrFail("WalletManager is expected to be defined")
+            .externalPartyWalletManager
+            .lookupExternalPartyWallet(onboarding.party)
+            .valueOrFail(s"Expected ${onboarding.party} to have an external party wallet")
+            .updateHistory
+            .getAllUpdates(None, PageLimit.Max)
+            .futureValue
+        ) { history =>
+          history.size should be >= expectedTxLogEntries.size
+        }
+      }
     }
 
     "handle failed automation (direct transfer)" in { implicit env =>
@@ -1629,7 +1644,7 @@ class WalletTxLogIntegrationTest
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       aliceValidatorWalletClient.tap(100) // funds to create preapproval
-      createTransferPreapprovalIfNotExists(charlieWalletClient)
+      createTransferPreapprovalEnsuringItExists(charlieWalletClient, aliceValidatorBackend)
 
       assertCommandFailsDueToInsufficientFunds(
         aliceWalletClient.transferPreapprovalSend(

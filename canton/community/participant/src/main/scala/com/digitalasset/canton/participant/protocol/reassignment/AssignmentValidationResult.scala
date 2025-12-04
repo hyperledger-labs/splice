@@ -4,9 +4,15 @@
 package com.digitalasset.canton.participant.protocol.reassignment
 
 import cats.data.EitherT
-import cats.syntax.either.*
-import com.digitalasset.canton.data.{CantonTimestamp, ReassignmentSubmitterMetadata}
+import cats.syntax.functor.*
+import com.digitalasset.canton.LfPartyId
+import com.digitalasset.canton.data.{
+  CantonTimestamp,
+  ContractsReassignmentBatch,
+  ReassignmentSubmitterMetadata,
+}
 import com.digitalasset.canton.ledger.participant.state.{
+  AcsChangeFactory,
   CompletionInfo,
   Reassignment,
   ReassignmentInfo,
@@ -14,147 +20,135 @@ import com.digitalasset.canton.ledger.participant.state.{
   Update,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.participant.protocol.ProcessingSteps.InternalContractIds
 import com.digitalasset.canton.participant.protocol.conflictdetection.{ActivenessResult, CommitSet}
-import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.{
-  FieldConversionError,
-  ReassignmentProcessorError,
-}
 import com.digitalasset.canton.participant.protocol.validation.AuthenticationError
-import com.digitalasset.canton.protocol.{
-  DriverContractMetadata,
-  LfContractId,
-  LfNodeCreate,
-  ReassignmentId,
-  RootHash,
-  SerializableContract,
-}
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.protocol.{LfNodeCreate, ReassignmentId, RootHash, UpdateId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ReassignmentTag.Target
-import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{LfPartyId, ReassignmentCounter}
+import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 
-import scala.concurrent.ExecutionContext
+import AssignmentValidationResult.*
 
-final case class AssignmentValidationResult(
+final case class AssignmentValidationResult private[reassignment] (
     rootHash: RootHash,
-    contract: SerializableContract,
-    reassignmentCounter: ReassignmentCounter,
+    contracts: ContractsReassignmentBatch,
     submitterMetadata: ReassignmentSubmitterMetadata,
     reassignmentId: ReassignmentId,
+    sourcePSId: Source[PhysicalSynchronizerId],
+    hostedConfirmingReassigningParties: Set[LfPartyId],
     isReassigningParticipant: Boolean,
-    hostedStakeholders: Set[LfPartyId],
-    validationResult: AssignmentValidationResult.ValidationResult,
+    commonValidationResult: CommonValidationResult,
+    reassigningParticipantValidationResult: ReassigningParticipantValidationResult,
 ) extends ReassignmentValidationResult {
 
-  override def isUnassignment: Boolean = false
-  override def contractId: LfContractId = contract.contractId
+  override def activenessResultIsSuccessful: Boolean = {
 
-  def isSuccessfulF(implicit ec: ExecutionContext): FutureUnlessShutdown[Boolean] =
-    validationResult.isSuccessful
+    // The activeness check is performed at request time and may flag the reassignmentId as inactive
+    // if the unassignment is still in progress. Once the unassignment is complete, its data becomes
+    // available in the reassignment cache. If the activeness check flags the reassignmentId as inactive
+    // but the reassignment cache indicates it is known and the assignment is not yet completed,
+    // the activeness check can be considered valid.
+    val isReassignmentActive: Boolean =
+      !reassigningParticipantValidationResult.isUnassignmentDataNotFound &&
+        !reassigningParticipantValidationResult.isAssignmentCompleted &&
+        commonValidationResult.activenessResult.inactiveReassignments.contains(reassignmentId) &&
+        commonValidationResult.activenessResult.contracts.isSuccessful
 
-  def activenessResult: ActivenessResult = validationResult.activenessResult
-  def authenticationErrorO: Option[AuthenticationError] = validationResult.authenticationErrorO
-  def metadataResultET: EitherT[FutureUnlessShutdown, ReassignmentValidationError, Unit] =
-    validationResult.metadataResultET
-  def validationErrors: Seq[ReassignmentValidationError] = validationResult.validationErrors
+    commonValidationResult.activenessResult.isSuccessful || isReassignmentActive
+  }
 
-  private[reassignment] def commitSet = CommitSet(
-    archivals = Map.empty,
-    creations = Map.empty,
-    unassignments = Map.empty,
-    assignments = Map(
-      contract.contractId ->
-        CommitSet.AssignmentCommit(
-          reassignmentId,
-          contract.metadata,
-          reassignmentCounter,
-        )
-    ),
+  private[reassignment] def commitSet = CommitSet.createForAssignment(
+    reassignmentId,
+    contracts.contracts,
+    sourcePSId.map(_.logical),
   )
 
   private[reassignment] def createReassignmentAccepted(
       targetSynchronizer: Target[SynchronizerId],
       participantId: ParticipantId,
-      targetProtocolVersion: Target[ProtocolVersion],
       recordTime: CantonTimestamp,
   )(implicit
       traceContext: TraceContext
-  ): Either[ReassignmentProcessorError, SequencedUpdate] = {
-
-    val contractInst = contract.contractInstance.unversioned
-    val createNode: LfNodeCreate =
-      LfNodeCreate(
+  ): AcsChangeFactory => InternalContractIds => SequencedUpdate = {
+    val reassignment = contracts.contracts.zipWithIndex.map { case (reassign, idx) =>
+      val contract = reassign.contract
+      val contractInst = contract.inst
+      val createNode = LfNodeCreate(
         coid = contract.contractId,
-        templateId = contractInst.template,
+        templateId = contractInst.templateId,
         packageName = contractInst.packageName,
-        arg = contractInst.arg,
+        arg = contractInst.createArg,
         signatories = contract.metadata.signatories,
         stakeholders = contract.metadata.stakeholders,
         keyOpt = contract.metadata.maybeKeyWithMaintainers,
-        version = contract.contractInstance.version,
+        version = contractInst.version,
       )
-    val driverContractMetadata =
-      DriverContractMetadata(contract.contractSalt).toLfBytes(targetProtocolVersion.unwrap)
-
-    for {
-      updateId <-
-        rootHash.asLedgerTransactionId.leftMap[ReassignmentProcessorError](
-          FieldConversionError(reassignmentId, "Transaction id (root hash)", _)
-        )
-
-      completionInfo =
-        Option.when(participantId == submitterMetadata.submittingParticipant)(
-          CompletionInfo(
-            actAs = List(submitterMetadata.submitter),
-            userId = submitterMetadata.userId,
-            commandId = submitterMetadata.commandId,
-            optDeduplicationPeriod = None,
-            submissionId = submitterMetadata.submissionId,
-          )
-        )
-    } yield Update.SequencedReassignmentAccepted(
-      optCompletionInfo = completionInfo,
-      workflowId = submitterMetadata.workflowId,
-      updateId = updateId,
-      reassignmentInfo = ReassignmentInfo(
-        sourceSynchronizer = reassignmentId.sourceSynchronizer,
-        targetSynchronizer = targetSynchronizer,
-        submitter = Option(submitterMetadata.submitter),
-        reassignmentCounter = reassignmentCounter.unwrap,
-        unassignId = reassignmentId.unassignmentTs,
-        isReassigningParticipant = isReassigningParticipant,
-      ),
-      reassignment = Reassignment.Assign(
-        ledgerEffectiveTime = contract.ledgerCreateTime.toLf,
+      Reassignment.Assign(
+        ledgerEffectiveTime = contract.inst.createdAt.time,
         createNode = createNode,
-        contractMetadata = driverContractMetadata,
-      ),
-      recordTime = recordTime,
-    )
+        contractAuthenticationData = contract.inst.authenticationData,
+        reassignmentCounter = reassign.counter.unwrap,
+        nodeId = idx,
+      )
+    }
+    val updateId = rootHash
+    val completionInfo =
+      Option.when(participantId == submitterMetadata.submittingParticipant)(
+        CompletionInfo(
+          actAs = List(submitterMetadata.submitter),
+          userId = submitterMetadata.userId,
+          commandId = submitterMetadata.commandId,
+          optDeduplicationPeriod = None,
+          submissionId = submitterMetadata.submissionId,
+        )
+      )
+    (acsChangeFactory: AcsChangeFactory) =>
+      (internalContractIds: InternalContractIds) =>
+        Update.SequencedReassignmentAccepted(
+          optCompletionInfo = completionInfo,
+          workflowId = submitterMetadata.workflowId,
+          updateId = UpdateId.fromRootHash(updateId),
+          reassignmentInfo = ReassignmentInfo(
+            sourceSynchronizer = sourcePSId.map(_.logical),
+            targetSynchronizer = targetSynchronizer,
+            submitter = Option(submitterMetadata.submitter),
+            reassignmentId = reassignmentId,
+            isReassigningParticipant = isReassigningParticipant,
+          ),
+          reassignment = Reassignment.Batch(reassignment),
+          recordTime = recordTime,
+          synchronizerId = targetSynchronizer.unwrap,
+          acsChangeFactory = acsChangeFactory,
+          internalContractIds = internalContractIds,
+        )
   }
 }
 
 object AssignmentValidationResult {
-  final case class ValidationResult(
+  final case class CommonValidationResult(
       activenessResult: ActivenessResult,
-      authenticationErrorO: Option[AuthenticationError],
-      metadataResultET: EitherT[FutureUnlessShutdown, ReassignmentValidationError, Unit],
-      validationErrors: Seq[ReassignmentValidationError],
-  ) {
-    def isSuccessful(implicit ec: ExecutionContext): FutureUnlessShutdown[Boolean] =
-      for {
-        modelConformanceCheck <- metadataResultET.value
-      } yield activenessResult.isSuccessful && authenticationErrorO.isEmpty && validationErrors.isEmpty && modelConformanceCheck.isRight
+      participantSignatureVerificationResult: Option[AuthenticationError],
+      contractAuthenticationResultF: EitherT[
+        FutureUnlessShutdown,
+        ReassignmentValidationError,
+        Unit,
+      ],
+      submitterCheckResult: Option[ReassignmentValidationError],
+      reassignmentIdResult: Option[ReassignmentValidationError],
+  ) extends ReassignmentValidationResult.CommonValidationResult
 
-    def addValidationErrors(
-        validationErrors: Seq[ReassignmentValidationError]
-    ): ValidationResult =
-      copy(validationErrors = validationErrors ++ this.validationErrors)
+  final case class ReassigningParticipantValidationResult(
+      errors: Seq[ReassignmentValidationError]
+  ) extends ReassignmentValidationResult.ReassigningParticipantValidationResult {
 
-    def isUnassignmentDataNotFoundOrIncomplete: Boolean = validationErrors.exists {
+    def isUnassignmentDataNotFound: Boolean = errors.exists {
       case AssignmentValidationError.UnassignmentDataNotFound(_) => true
-      case AssignmentValidationError.UnassignmentIncomplete(_) => true
+      case _ => false
+    }
+
+    def isAssignmentCompleted: Boolean = errors.exists {
+      case AssignmentValidationError.AssignmentCompleted(_) => true
       case _ => false
     }
   }

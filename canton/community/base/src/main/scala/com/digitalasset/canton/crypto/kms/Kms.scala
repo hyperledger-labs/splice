@@ -438,8 +438,8 @@ trait Kms extends FlagCloseable with CloseableAtomicHealthComponent {
 
 /** A KMS public key where only its raw byte representation and key specification are stored.
   * Additional internal information related to this key is added later, after which it is converted
-  * into a [[crypto.SigningPublicKey]]. This extra information includes its format (which must be
-  * `DerX509Spki`) and its intended usage.
+  * into a [[com.digitalasset.canton.crypto.SigningPublicKey]]. This extra information includes its
+  * format (which must be `DerX509Spki`) and its intended usage.
   */
 sealed trait KmsPublicKey
 
@@ -545,9 +545,13 @@ sealed trait KmsError extends Product with Serializable with PrettyPrinting {
 
 object KmsError {
 
-  // todo i10029: create error codes for these exceptions
   final case class KmsCreateClientError(reason: String) extends KmsError {
     override protected def pretty: Pretty[KmsCreateClientError] =
+      prettyOfClass(param("reason", _.reason.unquoted))
+  }
+
+  final case class KmsMissingSupportedSpecsError(reason: String) extends KmsError {
+    override protected def pretty: Pretty[KmsMissingSupportedSpecsError] =
       prettyOfClass(param("reason", _.reason.unquoted))
   }
 
@@ -661,14 +665,29 @@ object KmsError {
       prettyOfClass(param("keyId", _.keyId), param("reason", _.reason.unquoted))
   }
 
-  final case class KmsInvalidConfigError(reason: String) extends KmsError {
-    override protected def pretty: Pretty[KmsInvalidConfigError] =
-      prettyOfClass(param("reason", _.reason.unquoted))
-  }
-
   final case class KmsFailedConversionError(purpose: KeyPurpose, reason: String) extends KmsError {
     override protected def pretty: Pretty[KmsFailedConversionError] =
       prettyOfClass(param("purpose", _.purpose), param("reason", _.reason.unquoted))
+  }
+
+}
+
+object Kms {
+
+  trait SupportedSchemes {
+
+    /** The supported signing key specifications by the KMS. */
+    def supportedSigningKeySpecs: NonEmpty[Set[SigningKeySpec]]
+
+    /** The supported signing algorithm specifications by the KMS. */
+    def supportedSigningAlgoSpecs: NonEmpty[Set[SigningAlgorithmSpec]]
+
+    /** The supported encryption key specifications by the KMS. */
+    def supportedEncryptionKeySpecs: NonEmpty[Set[EncryptionKeySpec]]
+
+    /** The supported encryption algorithm specifications by the KMS. */
+    def supportedEncryptionAlgoSpecs: NonEmpty[Set[EncryptionAlgorithmSpec]]
+
   }
 
 }

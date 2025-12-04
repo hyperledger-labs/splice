@@ -20,10 +20,10 @@ import com.digitalasset.canton.platform.store.cache.MutableLedgerEndCache
 import com.digitalasset.canton.platform.store.interning.StringInterningView
 import com.digitalasset.canton.platform.store.{DbSupport, FlywayMigrations}
 import com.digitalasset.canton.platform.{ResourceCloseable, ResourceOwnerFlagCloseableOps}
-import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{LedgerParticipantId, config}
+import com.google.common.annotations.VisibleForTesting
 
 import java.sql.Connection
 import scala.concurrent.{ExecutionContext, Future}
@@ -66,28 +66,31 @@ class LedgerApiStore(
       )
     )
 
-  def onlyForTestingVerifyIntegrity(failForEmptyDB: Boolean = true)(implicit
+  @VisibleForTesting
+  def verifyIntegrity(failForEmptyDB: Boolean = true)(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): FutureUnlessShutdown[Unit] =
     executeSqlUS(DatabaseMetrics.ForTesting("checkIntegrity"))(
-      integrityStorageBackend.onlyForTestingVerifyIntegrity(failForEmptyDB)
+      integrityStorageBackend.verifyIntegrity(failForEmptyDB, ledgerApiStorage.inMemoryCantonStore)
     )
 
-  def onlyForTestingMoveLedgerEndBackToScratch()(implicit
+  @VisibleForTesting
+  def moveLedgerEndBackToScratch()(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): FutureUnlessShutdown[Unit] =
     executeSqlUS(DatabaseMetrics.ForTesting("onlyForTestingMoveLedgerEndBackToScratch"))(
-      integrityStorageBackend.onlyForTestingMoveLedgerEndBackToScratch()
+      integrityStorageBackend.moveLedgerEndBackToScratch()
     )
 
-  def onlyForTestingNumberOfAcceptedTransactionsFor(synchronizerId: SynchronizerId)(implicit
+  @VisibleForTesting
+  def numberOfAcceptedTransactionsFor(synchronizerId: SynchronizerId)(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): FutureUnlessShutdown[Int] =
     executeSqlUS(DatabaseMetrics.ForTesting("numberOfAcceptedTransactionsFor"))(
-      integrityStorageBackend.onlyForTestingNumberOfAcceptedTransactionsFor(synchronizerId)
+      integrityStorageBackend.numberOfAcceptedTransactionsFor(synchronizerId)
     )
 
   /** The latest SynchronizerIndex for a synchronizerId until all events are processed fully and
@@ -196,19 +199,19 @@ class LedgerApiStore(
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): FutureUnlessShutdown[Option[SynchronizerOffset]] =
-    executeSqlUS(metrics.index.db.lastSynchronizerOffsetBeforeOrAtPublicationTime)(
+    executeSqlUS(metrics.index.db.lastSynchronizerOffsetBeforeOrAtRecordTime)(
       eventStorageBackend.lastSynchronizerOffsetBeforeOrAtRecordTime(
         synchronizerId,
         beforeOrAtRecordTimeInclusive.underlying,
       )
     )
 
-  def archivals(fromExclusive: Option[Offset], toInclusive: Offset)(implicit
-      traceContext: TraceContext,
-      ec: ExecutionContext,
-  ): FutureUnlessShutdown[Set[LfContractId]] =
-    executeSqlUS(metrics.index.db.archivals)(
-      eventStorageBackend.archivals(fromExclusive, toInclusive)
+  def prunableContracts(
+      fromExclusive: Option[Offset],
+      toInclusive: Offset,
+  )(implicit traceContext: TraceContext, ec: ExecutionContext): FutureUnlessShutdown[Set[Long]] =
+    executeSqlUS(metrics.index.db.prunableContracts)(
+      eventStorageBackend.prunableContracts(fromExclusive, toInclusive)
     )
 
   private[api] def initializeInMemoryState(implicit

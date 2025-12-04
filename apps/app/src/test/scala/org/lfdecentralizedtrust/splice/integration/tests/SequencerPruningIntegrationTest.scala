@@ -40,7 +40,10 @@ class SequencerPruningIntegrationTest
                     )
                   )
                 )
-              )
+              ),
+              // The pruning trigger only registers the advancing of time when things happen
+              // on the ledger, so let's make sure that things happen frequently.
+              onLedgerStatusReportInterval = NonNegativeFiniteDuration(30.seconds),
             )
           }(config),
         (_, config) =>
@@ -136,5 +139,4 @@ class SequencerPruningIntegrationTest
       timeUntilSuccess = 3.minutes,
     )
   }
-
 }

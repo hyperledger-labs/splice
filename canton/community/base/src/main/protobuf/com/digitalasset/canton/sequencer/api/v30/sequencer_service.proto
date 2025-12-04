@@ -81,7 +81,7 @@ service SequencerService {
   // The call fails synchronously, if the request is invalid, i.e., some field violates a documented validity condition.
   // The call fails asynchronously, if the sequencer does not have a key to sign the event; this may occur if
   // event.topology_timestamp refers to a time before the sequencer has been onboarded.
-  rpc SubscribeV2(SubscriptionRequestV2) returns (stream SubscriptionResponse);
+  rpc Subscribe(SubscriptionRequest) returns (stream SubscriptionResponse);
 
   // Allows a member to acknowledge that they have read all events up to and including the provided timestamp,
   // and that they will never re-read these events again. This information is currently only used for informational
@@ -95,8 +95,17 @@ service SequencerService {
   // known on the synchronizer.
   rpc DownloadTopologyStateForInit(DownloadTopologyStateForInitRequest) returns (stream DownloadTopologyStateForInitResponse);
 
+  // Returns a hash of a result equivalent to DownloadTopologyStateForInit call
+  // for a BFT check without transferring the full state.
+  rpc DownloadTopologyStateForInitHash(DownloadTopologyStateForInitHashRequest) returns (DownloadTopologyStateForInitHashResponse);
+
   // Return the currently known traffic state for a member. Callers must be authorized to request the traffic state.
   rpc GetTrafficStateForMember(GetTrafficStateForMemberRequest) returns (GetTrafficStateForMemberResponse);
+
+  // Return a "current" sequencing time such that, when a `SendAsync` operation is
+  // subsequently called, if sequenced, the sequencing time of the resulting event is guaranteed to
+  // be later than the sequencing time previously returned by the `GetTime` call.
+  rpc GetTime(GetTimeRequest) returns (GetTimeResponse);
 }
 
 message SendAsyncRequest {
@@ -121,7 +130,7 @@ message TrafficControlErrorReason {
 
 message SendAsyncResponse {}
 
-message SubscriptionRequestV2 {
+message SubscriptionRequest {
   option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
   string member = 1;
@@ -175,11 +184,26 @@ message AcknowledgeSignedResponse {}
 message DownloadTopologyStateForInitRequest {
   option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
+  // Member for which to get the topology state
   string member = 1;
 }
 
 message DownloadTopologyStateForInitResponse {
   com.digitalasset.canton.topology.admin.v30.TopologyTransactions topology_transactions = 1;
+}
+
+message DownloadTopologyStateForInitHashRequest {
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+
+  // Member for which to get the topology state hash
+  string member = 1;
+}
+
+message DownloadTopologyStateForInitHashResponse {
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+
+  // Hash of contents of a call to DownloadTopologyStateForInit
+  bytes topology_state_hash = 1;
 }
 
 message GetTrafficStateForMemberRequest {
@@ -195,4 +219,15 @@ message GetTrafficStateForMemberResponse {
   option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
   com.digitalasset.canton.protocol.v30.TrafficState traffic_state = 1;
+}
+
+message GetTimeRequest {
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+}
+
+message GetTimeResponse {
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+
+  //  The result can be empty if the sequencer is still initializing.
+  optional int64 sequencing_timestamp = 1;
 }

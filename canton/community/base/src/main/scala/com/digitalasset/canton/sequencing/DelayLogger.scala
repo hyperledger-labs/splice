@@ -27,9 +27,9 @@ class DelayLogger(
 ) {
   private val caughtUp = new AtomicBoolean(false)
 
-  def checkForDelay(event: PossiblyIgnoredSequencedEvent[_]): Unit =
+  def checkForDelay(event: PossiblyIgnoredSequencedEvent[?]): Unit =
     event match {
-      case event: OrdinarySequencedEvent[_] =>
+      case event: OrdinarySequencedEvent[?] =>
         checkForDelay_(event.asSequencedSerializedEvent)
       case _ => ()
     }

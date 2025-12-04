@@ -1,0 +1,307 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Util.Token.Wallet.IntegrationTests.TestMergeDelegation where
+
+import DA.Action (void)
+import DA.Assert ((===))
+import DA.Foldable (forA_)
+import qualified DA.Map as Map
+import qualified DA.TextMap as TextMap
+import DA.Time
+
+import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+import Splice.Api.FeaturedAppRightV1
+
+import Splice.Util.Token.Wallet.MergeDelegation
+
+import Daml.Script
+
+import Splice.Amulet qualified as Amulet
+import Splice.Testing.Utils
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
+import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+
+
+testMerging : Script ()
+testMerging = do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+
+  (operator, appRightCall) <- setupWalletOperator registry "wallet-operator"
+  (alice, aliceDelegation) <- setupWalletUserNoPreapproval operator "alice"
+
+  AmuletRegistry.tapFaucet registry alice 42.0
+  AmuletRegistry.tapFaucet registry alice 23.0
+  AmuletRegistry.tapFaucet registry alice 15.0
+
+  WalletClient.checkBalance alice registry.instrumentId 80.0
+  holdingCids <- WalletClient.listHoldingCids alice registry.instrumentId
+  length holdingCids === 3
+
+  mergeTransfer <- mkMergeTransfer registry alice
+
+  submit (actAs operator <> readAs alice <> discloseMany (Map.values mergeTransfer.disclosures.disclosures)) $
+    exerciseCmd aliceDelegation MergeDelegation_Merge with
+      optMergeTransfer = mergeTransfer.value
+      optFeaturedAppRight = Some appRightCall
+      optExtraTransfer = None
+
+  -- check the balance didn't change and all of alice's holdings have been merged
+  WalletClient.checkBalance alice registry.instrumentId 80.0
+  holdingCids <- WalletClient.listHoldingCids alice registry.instrumentId
+  length holdingCids === 1
+
+  -- featured app marker has been created
+  markers <- query @Amulet.FeaturedAppActivityMarker operator
+  length markers === 1
+
+
+-- | Test airdropping tokens to multiple users with merge delegation in place.
+testAirdrop : Script ()
+testAirdrop = do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+
+  (operator, featuredAppRight) <- setupWalletOperator registry "wallet-operator"
+
+  (alice, _) <- setupWalletUser registry operator "alice"
+  (bob, _) <- setupWalletUser registry operator "bob"
+
+  AmuletRegistry.tapFaucet registry operator 1000.0 -- funds for the airdrop
+
+  -- round 1
+  runAirdrop registry operator featuredAppRight [alice, bob] 1.0
+  forA_ [alice, bob] $ checkExactlyOneHolding registry 1.0
+
+  -- round 2
+  runAirdrop registry operator featuredAppRight [alice, bob] 1.0
+  forA_ [alice, bob] $ checkExactlyOneHolding registry 2.0
+
+  -- round 3 with new user charlie
+  (charlie, _) <- setupWalletUser registry operator "charlie"
+  runAirdrop registry operator featuredAppRight [alice, charlie, bob] 1.0
+  forA_ [alice, bob] $ checkExactlyOneHolding registry 3.0
+  forA_ [charlie] $ checkExactlyOneHolding registry 1.0
+
+  -- 7.0 Amulet were airdropped
+  WalletClient.checkBalance operator registry.instrumentId 993.0
+
+
+-- | Test the extra transfer funding logic with operator funds from two different registries.
+testMultiRegistryAirdrop : Script ()
+testMultiRegistryAirdrop = do
+  registry1 <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+    dsoPartyName = "dso-party"
+
+  -- We don't yet have a mock token in the Splice repo that we could use to simulate a completely
+  -- different token registry. For testing the logic it is though sufficient to create a second
+  -- instance of Amulet with a different DSO party.
+  registry2 <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+    dsoPartyName = "mock-other-admin-party"
+
+  (operator, featuredAppRight) <- setupWalletOperator registry1 "wallet-operator"
+
+  (alice, _) <- setupWalletUser registry1 operator "alice"
+  (bob, _) <- setupWalletUser registry1 operator "bob"
+
+  -- minimal setup for the second registry
+  now <- getTime
+  AmuletRegistry.createTransferPreapproval registry2 alice operator (now `addRelTime` days 90)
+  AmuletRegistry.createTransferPreapproval registry2 bob operator (now `addRelTime` days 90)
+
+  -- fund alice to check merging
+  AmuletRegistry.tapFaucet registry2 alice 100.0
+
+  -- fund operator
+  AmuletRegistry.tapFaucet registry1 operator 1000.0 -- funds for the airdrop from registry 1
+  AmuletRegistry.tapFaucet registry2 operator 500.0 -- funds for the airdrop from registry 2
+
+  -- round 1
+  runMultiRegistryAirdrop (registry1, Some featuredAppRight) (registry2, Some featuredAppRight) operator [alice, bob] 1.0
+  forA_ [alice, bob] $ checkExactlyOneHolding registry1 1.0
+  forA_ [alice] $ checkExactlyOneHolding registry2 101.0
+  forA_ [bob] $ checkExactlyOneHolding registry2 1.0
+
+  -- one app marker was created as alice already had registry2 funds
+  markers <- query @Amulet.FeaturedAppActivityMarker operator
+  length markers === 1
+
+  -- round 2
+  runMultiRegistryAirdrop (registry1, Some featuredAppRight) (registry2, Some featuredAppRight) operator [alice, bob] 1.0
+  forA_ [alice, bob] $ checkExactlyOneHolding registry1 2.0
+  forA_ [alice] $ checkExactlyOneHolding registry2 102.0
+  forA_ [bob] $ checkExactlyOneHolding registry2 2.0
+
+  -- another four app markers were created as all users had funds that needed to be merged in
+  markers <- query @Amulet.FeaturedAppActivityMarker operator
+  length markers === 5
+
+
+-- setup utilities
+------------------
+
+setupWalletOperator : AmuletRegistry.AmuletRegistry -> Text -> Script (Party, FeaturedAppRightCall)
+setupWalletOperator registry operatorName = do
+  operator <- allocatePartyExact operatorName
+  featuredAppRightCid <- AmuletRegistry.featureApp registry operator
+  void $ submit operator $ createCmd BatchMergeUtility with operator
+  let featuredAppRight = FeaturedAppRightCall with
+        appRightCid = toInterfaceContractId featuredAppRightCid
+        beneficiaries =
+          [ AppRewardBeneficiary with
+              beneficiary = operator
+              weight = 1.0
+          ]
+  pure (operator, featuredAppRight)
+
+setupMergeDelegation : Party -> Party -> Script (ContractId MergeDelegation)
+setupMergeDelegation owner delegate = do
+  delegationProposal <- submit owner $ createCmd MergeDelegationProposal with
+    delegation = MergeDelegation with
+      owner
+      operator = delegate
+      meta = emptyMetadata
+  MergeDelegationProposal_AcceptResult delegation <- submit delegate $ exerciseCmd delegationProposal MergeDelegationProposal_Accept
+  pure delegation
+
+setupWalletUserNoPreapproval : Party -> Text -> Script (Party, ContractId MergeDelegation)
+setupWalletUserNoPreapproval operator userName = do
+  user <- allocatePartyExact userName
+  delegationCid <- setupMergeDelegation user operator
+  pure (user, delegationCid)
+
+setupWalletUser : AmuletRegistry.AmuletRegistry -> Party -> Text -> Script (Party, ContractId MergeDelegation)
+setupWalletUser registry operator userName = do
+  (user, delegationCid) <- setupWalletUserNoPreapproval operator userName
+  now <- getTime
+  AmuletRegistry.createTransferPreapproval registry user operator (now `addRelTime` days 90)
+  pure (user, delegationCid)
+
+
+-- transfer and merge utilities
+-------------------------------
+
+data WithDisclosures a = WithDisclosures with
+  value : a
+  disclosures : Disclosures'
+
+instance Functor WithDisclosures where
+  fmap f (WithDisclosures with value; disclosures) =
+    WithDisclosures with value = f value; disclosures
+
+-- Note: we intentionally do not provide an Applicative instance to simplify reading the code below.
+
+-- | Build a merge transfer for the given user if they have multiple holdings.
+mkMergeTransfer : AmuletRegistry.AmuletRegistry -> Party -> Script (WithDisclosures (Optional TransferCall))
+mkMergeTransfer registry owner = do
+  holdings <- WalletClient.listHoldings owner registry.instrumentId
+  if null holdings then
+    pure $ WithDisclosures with
+      value = None
+      disclosures = mempty
+  else do
+    transfer <- mkImmediateTransfer registry owner owner
+      (sum $ map (._2.amount) holdings)
+      (map (._1) holdings)
+    pure (Some <$> transfer)
+
+-- | Build a transfer that we expect to execute immediately
+mkImmediateTransfer : AmuletRegistry.AmuletRegistry -> Party -> Party -> Decimal -> [ContractId Holding] -> Script (WithDisclosures TransferCall)
+mkImmediateTransfer registry sender receiver amount inputHoldingCids = do
+  now <- getTime
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer = Api.Token.TransferInstructionV1.Transfer with
+        sender
+        receiver
+        amount
+        instrumentId = registry.instrumentId
+        requestedAt = now
+        executeBefore = now `addRelTime` days 1
+        inputHoldingCids
+        meta = Metadata with
+          values = TextMap.fromList [("splice.lfdecentralizedtrust.org/reason", "merge")]
+    extraArgs = emptyExtraArgs
+  pure $ WithDisclosures with
+    value = TransferCall with
+      factoryCid = enrichedChoice.factoryCid
+      choiceArg = enrichedChoice.arg
+    disclosures = enrichedChoice.disclosures
+
+-- | Build the batch transfer for an airdrop with merge delegation calls for multiple users.
+mkAirdropBatchTransfer
+  : AmuletRegistry.AmuletRegistry -> Party -> Optional FeaturedAppRightCall -> [Party] -> Decimal
+  -> Script ([WithDisclosures MergeDelegationCall])
+mkAirdropBatchTransfer registry operator featuredAppRight users amount = do
+  -- get operator context
+  operatorHoldingCids <- WalletClient.listHoldingCids operator registry.instrumentId
+  -- build list of transfers to execute
+  forA (zip [0..length users] users) $ \(i, user) -> do
+    optMergeTransfer <- mkMergeTransfer registry user
+
+    let operatorInputHoldings
+          | i == 0 = operatorHoldingCids
+          | otherwise = []  -- later transfers will get the operator change from prior transfers
+    airdropTransfer <- mkImmediateTransfer registry operator user amount operatorInputHoldings
+    mergeDelegation <- queryFilter @MergeDelegation operator (\md -> md.owner == user && md.operator == operator)
+    let delegationCid = case mergeDelegation of
+          [] -> error $ "No merge delegation found for user " <> show user <> " and operator " <> show operator
+          (cid, _)::_ -> cid
+    pure $ WithDisclosures with
+      value =
+        MergeDelegationCall with
+          delegationCid
+          choiceArg = MergeDelegation_Merge with
+            optMergeTransfer = optMergeTransfer.value
+            optFeaturedAppRight = featuredAppRight
+            optExtraTransfer = Some (airdropTransfer.value)
+      disclosures = optMergeTransfer.disclosures <> airdropTransfer.disclosures
+
+-- | Execute a single round of airdropping
+runAirdrop : AmuletRegistry.AmuletRegistry -> Party -> FeaturedAppRightCall -> [Party] -> Decimal -> Script ()
+runAirdrop registry operator featuredAppRight users amount = do
+  mergeCalls <- mkAirdropBatchTransfer registry operator (Some featuredAppRight) users amount
+  executeBatchMerge operator users mergeCalls
+
+-- | Execute a single round of airdropping tokens from two different registries.
+runMultiRegistryAirdrop
+  : (AmuletRegistry.AmuletRegistry, Optional FeaturedAppRightCall)
+  -> (AmuletRegistry.AmuletRegistry, Optional FeaturedAppRightCall)
+  -> Party -> [Party] -> Decimal -> Script ()
+runMultiRegistryAirdrop (registry1, featuredAppRight1) (registry2, featuredAppRight2) operator users amount = do
+  mergeCalls1 <- mkAirdropBatchTransfer registry1 operator featuredAppRight1 users amount
+  mergeCalls2 <- mkAirdropBatchTransfer registry2 operator featuredAppRight2 users amount
+  let mergeCalls = concat [ [call1, call2] | (call1, call2) <- zip mergeCalls1 mergeCalls2 ]
+  executeBatchMerge operator users mergeCalls
+
+-- | Execute a batch merge for a specific operator and set of users.
+executeBatchMerge : Party -> [Party] -> [WithDisclosures MergeDelegationCall] -> Script ()
+executeBatchMerge operator users mergeCalls = do
+  -- execute all merges in the batch
+  let allDisclosures = mconcat $ map (.disclosures) mergeCalls
+  let batchCalls = map (.value) mergeCalls
+  let readAsRights = mconcat $ map readAs users
+
+  [(batchMergeUtilityCid, _)] <- query @BatchMergeUtility operator
+
+  void $ submit (actAs operator <> readAsRights <> discloseMany (Map.values allDisclosures.disclosures)) $
+    exerciseCmd batchMergeUtilityCid BatchMergeUtility_BatchMerge with
+      mergeCalls = batchCalls
+
+
+-- validation utilities
+------------------------
+
+-- | Check that a user has exactly one holding with the expected amount.
+checkExactlyOneHolding : AmuletRegistry.AmuletRegistry -> Decimal -> Party -> Script ()
+checkExactlyOneHolding registry expectedAmount user = do
+  WalletClient.checkBalance user registry.instrumentId expectedAmount
+  holdingCids <- WalletClient.listHoldingCids user registry.instrumentId
+  length holdingCids === 1
+

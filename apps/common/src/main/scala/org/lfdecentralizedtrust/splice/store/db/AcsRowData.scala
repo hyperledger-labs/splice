@@ -8,6 +8,7 @@ import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.protobuf.ByteString
 import io.circe.Json
+import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 import org.lfdecentralizedtrust.splice.util.Contract
 import slick.jdbc.{PositionedParameters, SetParameter}
 
@@ -24,6 +25,10 @@ trait AcsRowData {
 }
 
 object AcsRowData {
+  trait HasIndexColumns[R] {
+    def indexColumnNames: Seq[String]
+  }
+
   trait AcsRowDataFromContract extends AcsRowData {
     val contract: Contract[?, ?]
     override val identifier: Identifier = contract.identifier
@@ -70,11 +75,17 @@ object AcsInterfaceViewRowData {
   /** Just a helper trait for when a store doesn't care about interfaces.
     */
   trait NoInterfacesIngested extends AcsInterfaceViewRowData
+  object NoInterfacesIngested {
+    implicit val noInterfacesMeansNoIndexColumns: HasIndexColumns[NoInterfacesIngested] =
+      new HasIndexColumns[NoInterfacesIngested] {
+        override def indexColumnNames: Seq[String] = Seq.empty
+      }
+  }
 
   trait AcsInterfaceViewRowDataFromContract extends AcsInterfaceViewRowData {
     val contract: Contract[?, ?]
     override val interfaceId: Identifier = contract.identifier
-    override val interfaceView: DamlRecord[_] = contract.payload
+    override val interfaceView: DamlRecord[?] = contract.payload
   }
 }
 

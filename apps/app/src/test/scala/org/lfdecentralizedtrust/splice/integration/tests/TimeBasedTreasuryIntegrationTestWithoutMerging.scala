@@ -57,14 +57,14 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
     aliceValidatorWalletClient.tap(100)
     createRewardsInRound(aliceValidatorWalletClient, aliceWalletClient, alice, 1)
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
     createRewardsInRound(aliceValidatorWalletClient, aliceWalletClient, alice, 2)
     aliceValidatorWalletClient.tap(50)
 
     // by advancing three rounds, both round 1 and round 2 are in their issuing phase.
-    advanceRoundsByOneTick
-    advanceRoundsByOneTick
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
+    advanceRoundsToNextRoundOpening
+    advanceRoundsToNextRoundOpening
 
     eventually() {
       aliceValidatorWalletClient.list().amulets should have length 2
@@ -124,9 +124,9 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 2010)
 
     // by advancing three rounds, round 1 is in the issuing phase.
-    advanceRoundsByOneTick
-    advanceRoundsByOneTick
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
+    advanceRoundsToNextRoundOpening
+    advanceRoundsToNextRoundOpening
 
     eventually() {
       aliceValidatorWalletClient.list().amulets should have length 1
@@ -192,13 +192,13 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
     aliceValidatorWalletClient.tap(100)
     createRewardsInRound(aliceValidatorWalletClient, aliceWalletClient, alice, 1)
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
     createRewardsInRound(aliceValidatorWalletClient, aliceWalletClient, alice, 2)
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
     createRewardsInRound(aliceValidatorWalletClient, aliceWalletClient, alice, 3)
 
     // by advancing 2 rounds, both round 1 and round 2 are in their issuing phase
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     // moving beyond when the config change is applied, so that the automation triggers
     advanceTime(Duration.ofSeconds(60))
@@ -207,7 +207,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       updatedConfig should be(sv1ScanBackend.getAmuletRules().payload.configSchedule.initialValue)
     }
 
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     aliceValidatorWalletClient.tap(5)
     eventually() {
@@ -248,7 +248,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       }
     }
 
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     clue("rewards from round 2 are merged but not round 3") {
       p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 5)
@@ -298,9 +298,9 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     }
 
     // advancing three rounds so the rewards are collectable.
-    advanceRoundsByOneTick
-    advanceRoundsByOneTick
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
+    advanceRoundsToNextRoundOpening
+    advanceRoundsToNextRoundOpening
 
     loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
       {
@@ -343,7 +343,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     }
 
     // after one more tick, the amulets have no value and should be ignored.
-    advanceRoundsByOneTick
+    advanceRoundsToNextRoundOpening
 
     loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
       {
@@ -373,8 +373,8 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       val (_, _) = onboardAliceAndBob()
 
       clue("create issuing rounds 0 and 1") {
-        advanceRoundsByOneTick
-        advanceRoundsByOneTick
+        advanceRoundsToNextRoundOpening
+        advanceRoundsToNextRoundOpening
       }
       // run a tx so alice wallet's cache is hydrated up to issuing round 1.
       aliceWalletClient.tap(5)
@@ -401,7 +401,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       val Seq(_, issuingRound1) = sv1ScanBackend.getOpenAndIssuingMiningRounds()._2
 
       clue("create issuing round 2") {
-        advanceRoundsByOneTick
+        advanceRoundsToNextRoundOpening
       }
 
       clue("check that issuing round 1 is cached") {

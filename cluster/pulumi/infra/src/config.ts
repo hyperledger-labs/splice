@@ -6,7 +6,7 @@ import {
   loadJsonFromFile,
   externalIpRangesFile,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
+import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import util from 'node:util';
 import { z } from 'zod';
@@ -22,6 +22,14 @@ const MonitoringConfigSchema = z.object({
   alerting: z.object({
     enableNoDataAlerts: z.boolean(),
     alerts: z.object({
+      pruning: z.object({
+        participantRetentionDays: z.number(),
+        sequencerRetentionDays: z.number(),
+        mediatorRetentionDays: z.number(),
+      }),
+      ingestion: z.object({
+        thresholdEntriesPerBatch: z.number(),
+      }),
       delegatelessContention: z.object({
         thresholdPerNamespace: z.number(),
       }),
@@ -57,6 +65,27 @@ const MonitoringConfigSchema = z.object({
     logAlerts: z.object({}).catchall(z.string()).default({}),
   }),
 });
+const CloudArmorConfigSchema = z.object({
+  enabled: z.boolean(),
+  // "preview" is not pulumi preview, but https://cloud.google.com/armor/docs/security-policy-overview#preview_mode
+  allRulesPreviewOnly: z.boolean(),
+  publicEndpoints: z
+    .object({})
+    .catchall(
+      z.object({
+        rulePreviewOnly: z.boolean().default(false),
+        hostname: z.string().regex(/^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/, 'valid DNS hostname'),
+        pathPrefix: z.string().regex(/^\/[^"]*$/, 'HTTP request path starting with /'),
+        throttleAcrossAllEndpointsAllIps: z.object({
+          withinIntervalSeconds: z.number().positive(),
+          maxRequestsBeforeHttp429: z
+            .number()
+            .min(0, '0 to disallow requests or positive to allow'),
+        }),
+      })
+    )
+    .default({}),
+});
 export const InfraConfigSchema = z.object({
   infra: z.object({
     ipWhitelisting: z
@@ -68,14 +97,19 @@ export const InfraConfigSchema = z.object({
       storageSize: z.string(),
       retentionDuration: z.string(),
       retentionSize: z.string(),
+      installPrometheusPushgateway: z.boolean().default(false),
     }),
     istio: z.object({
       enableIngressAccessLogging: z.boolean(),
+      enableClusterAccessLogging: z.boolean().default(false),
     }),
     extraCustomResources: z.object({}).catchall(z.any()).default({}),
   }),
   monitoring: MonitoringConfigSchema,
+  cloudArmor: CloudArmorConfigSchema,
 });
+
+export type CloudArmorConfig = z.infer<typeof CloudArmorConfigSchema>;
 
 export type Config = z.infer<typeof InfraConfigSchema>;
 
@@ -92,6 +126,7 @@ console.error(
 
 export const infraConfig = fullConfig.infra;
 export const monitoringConfig = fullConfig.monitoring;
+export const cloudArmorConfig: CloudArmorConfig = fullConfig.cloudArmor;
 
 type IpRangesDict = { [key: string]: IpRangesDict } | string[];
 

@@ -6,10 +6,20 @@ package com.digitalasset.canton.platform.apiserver.services.command.interactive
 import cats.data.EitherT
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.daml.ledger.api.v2.interactive.interactive_submission_service as proto
+import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
+  CostEstimation,
+  ExecuteSubmissionAndWaitForTransactionResponse,
+  ExecuteSubmissionAndWaitResponse,
+}
+import com.daml.ledger.api.v2.transaction_filter.TransactionFormat
+import com.daml.ledger.api.v2.update_service.GetUpdateResponse
 import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
 import com.digitalasset.base.error.ErrorCode.LoggedApiException
 import com.digitalasset.base.error.RpcError
+import com.digitalasset.canton.LfTimestamp
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher
 import com.digitalasset.canton.ledger.api.services.InteractiveSubmissionService
@@ -19,7 +29,10 @@ import com.digitalasset.canton.ledger.api.services.InteractiveSubmissionService.
 }
 import com.digitalasset.canton.ledger.api.validation.GetPreferredPackagesRequestValidator.PackageVettingRequirements
 import com.digitalasset.canton.ledger.api.{Commands as ApiCommands, PackageReference, SubmissionId}
-import com.digitalasset.canton.ledger.error.groups.CommandExecutionErrors.InteractiveSubmissionExecuteError
+import com.digitalasset.canton.ledger.error.groups.CommandExecutionErrors.{
+  InteractiveSubmissionExecuteError,
+  InteractiveSubmissionPreparationError,
+}
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.SubmissionResult
 import com.digitalasset.canton.ledger.participant.state.index.ContractStore
@@ -38,20 +51,28 @@ import com.digitalasset.canton.platform.apiserver.execution.{
   CommandExecutionResult,
   CommandExecutor,
 }
-import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.ExternalTransactionProcessor
-import com.digitalasset.canton.platform.apiserver.services.{
-  ErrorCause,
-  RejectionGenerators,
-  logging,
+import com.digitalasset.canton.platform.apiserver.services.command.CommandServiceImpl
+import com.digitalasset.canton.platform.apiserver.services.command.CommandServiceImpl.{
+  UpdateServices,
+  validateRequestTimeout,
 }
+import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.ExternalTransactionProcessor
+import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker.SubmissionKey
+import com.digitalasset.canton.platform.apiserver.services.tracking.{
+  CompletionResponse,
+  SubmissionTracker,
+}
+import com.digitalasset.canton.platform.apiserver.services.{RejectionGenerators, logging}
 import com.digitalasset.canton.platform.config.InteractiveSubmissionServiceConfig
 import com.digitalasset.canton.protocol.hash.HashTracer
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.TryUtil
+import com.digitalasset.canton.version.HashingSchemeVersionConverter
 import com.digitalasset.daml.lf.command.ApiCommand
 import com.digitalasset.daml.lf.crypto
+import io.grpc.Context
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -60,6 +81,7 @@ import scala.util.{Failure, Success, Try}
 private[apiserver] object InteractiveSubmissionServiceImpl {
 
   def createApiService(
+      updateServices: UpdateServices,
       submissionSyncService: state.SyncService,
       seedService: SeedService,
       commandExecutor: CommandExecutor,
@@ -69,11 +91,14 @@ private[apiserver] object InteractiveSubmissionServiceImpl {
       config: InteractiveSubmissionServiceConfig,
       contractStore: ContractStore,
       packagePreferenceBackend: PackagePreferenceBackend,
+      transactionSubmissionTracker: SubmissionTracker,
+      defaultTrackingTimeout: NonNegativeFiniteDuration,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       executionContext: ExecutionContext,
       tracer: Tracer,
   ): InteractiveSubmissionService & AutoCloseable = new InteractiveSubmissionServiceImpl(
+    updateServices,
     submissionSyncService,
     seedService,
     commandExecutor,
@@ -83,12 +108,15 @@ private[apiserver] object InteractiveSubmissionServiceImpl {
     config,
     contractStore,
     packagePreferenceBackend,
+    transactionSubmissionTracker,
+    defaultTrackingTimeout,
     loggerFactory,
   )
 
 }
 
 private[apiserver] final class InteractiveSubmissionServiceImpl private[services] (
+    updateServices: UpdateServices,
     syncService: state.SyncService,
     seedService: SeedService,
     commandExecutor: CommandExecutor,
@@ -98,6 +126,8 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
     config: InteractiveSubmissionServiceConfig,
     contractStore: ContractStore,
     packagePreferenceService: PackagePreferenceBackend,
+    transactionSubmissionTracker: SubmissionTracker,
+    defaultTrackingTimeout: NonNegativeFiniteDuration,
     val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext, tracer: Tracer)
     extends InteractiveSubmissionService
@@ -127,13 +157,13 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
         show"Submitted commands for prepare are: ${if (cmds.length > 1) "\n  " else ""}${cmds
             .map {
               case ApiCommand.Create(templateRef, _) =>
-                s"create ${templateRef.qName}"
+                s"create ${templateRef.qualifiedName}"
               case ApiCommand.Exercise(templateRef, _, choiceId, _) =>
-                s"exercise @${templateRef.qName} $choiceId"
+                s"exercise @${templateRef.qualifiedName} $choiceId"
               case ApiCommand.ExerciseByKey(templateRef, _, choiceId, _) =>
-                s"exerciseByKey @${templateRef.qName} $choiceId"
+                s"exerciseByKey @${templateRef.qualifiedName} $choiceId"
               case ApiCommand.CreateAndExercise(templateRef, _, choiceId, _) =>
-                s"createAndExercise ${templateRef.qName} ... $choiceId ..."
+                s"createAndExercise ${templateRef.qualifiedName} ... $choiceId ..."
             }
             .map(_.singleQuoted)
             .toSeq
@@ -147,13 +177,21 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
           request.commands.submissionId.map(SubmissionId.unwrap),
         )
 
-      evaluateAndHash(seedService.nextSeed(), request.commands, request.verboseHashing)
+      evaluateAndHash(
+        seedService.nextSeed(),
+        request.commands,
+        request.verboseHashing,
+        request.maxRecordTime,
+        request.costEstimationHints,
+      )
     }
 
   private def evaluateAndHash(
       submissionSeed: crypto.Hash,
       commands: ApiCommands,
       verboseHashing: Boolean,
+      maxRecordTime: Option[LfTimestamp],
+      costEstimationHints: Option[CostEstimationHints],
   )(implicit
       loggingContext: LoggingContextWithTrace,
       errorLoggingContext: ErrorLoggingContext,
@@ -170,7 +208,9 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
           )
           .leftFlatMap { errCause =>
             metrics.commands.failedCommandInterpretations.mark()
-            EitherT.right[RpcError](failedOnCommandProcessing(errCause))
+            EitherT.right[RpcError](
+              RejectionGenerators.commandExecutorErrorFUS[CommandExecutionResult](errCause)
+            )
           }
       }
       hashTracer: HashTracer =
@@ -184,6 +224,7 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
           commands,
           config.contractLookupParallelism,
           hashTracer,
+          maxRecordTime,
         )
         .leftWiden[RpcError]
       hashingDetails = hashTracer match {
@@ -196,26 +237,43 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
         case HashTracer.NoOp => None
         case stringTracer: HashTracer.StringHashTracer => Some(stringTracer.result)
       }
+      costEstimation <- costEstimationHints.traverse { costHints =>
+        syncService
+          .estimateTrafficCost(
+            synchronizerId = commandExecutionResult.synchronizerRank.synchronizerId.logical,
+            transaction = commandExecutionResult.commandInterpretationResult.transaction,
+            transactionMetadata =
+              commandExecutionResult.commandInterpretationResult.transactionMeta,
+            submitterInfo = commandExecutionResult.commandInterpretationResult.submitterInfo,
+            keyResolver = commandExecutionResult.commandInterpretationResult.globalKeyMapping,
+            disclosedContracts =
+              commandExecutionResult.commandInterpretationResult.processedDisclosedContracts
+                .map(contract => contract.contractId -> contract)
+                .toList
+                .toMap,
+            costHints = costHints,
+          )
+          .map { estimation =>
+            CostEstimation(
+              Some(estimation.estimationTimestamp.toProtoTimestamp),
+              estimation.confirmationRequestCost.value,
+              estimation.confirmationResponseCost.value,
+              estimation.totalCost.value,
+            )
+          }
+          .leftMap(InteractiveSubmissionPreparationError.Reject(_))
+          .leftWiden[RpcError]
+      }
     } yield proto.PrepareSubmissionResponse(
       preparedTransaction = Some(prepareResult.transaction),
       preparedTransactionHash = prepareResult.hash.unwrap,
-      hashingSchemeVersion = prepareResult.hashVersion.toLAPIProto,
+      hashingSchemeVersion = HashingSchemeVersionConverter.toLAPIProto(prepareResult.hashVersion),
       hashingDetails = hashingDetails,
+      costEstimation = costEstimation,
     )
 
     result.value.map(_.leftMap(_.asGrpcError).toTry).flatMap(FutureUnlessShutdown.fromTry)
   }
-
-  private def failedOnCommandProcessing(
-      error: ErrorCause
-  )(implicit
-      errorLoggingContext: ErrorLoggingContext
-  ): FutureUnlessShutdown[CommandExecutionResult] =
-    FutureUnlessShutdown.failed(
-      RejectionGenerators
-        .commandExecutorError(error)
-        .asGrpcError
-    )
 
   override def close(): Unit = ()
 
@@ -305,7 +363,7 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
       vettingValidAt: Option[CantonTimestamp],
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): FutureUnlessShutdown[Either[String, (Seq[PackageReference], SynchronizerId)]] =
+  ): FutureUnlessShutdown[Either[String, (Seq[PackageReference], PhysicalSynchronizerId)]] =
     packagePreferenceService
       .getPreferredPackages(
         packageVettingRequirements = packageVettingRequirements,
@@ -313,4 +371,104 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
         synchronizerId = synchronizerId,
         vettingValidAt = vettingValidAt,
       )
+
+  private def executeAndWaitInternal(executionRequest: ExecuteRequest)(implicit
+      loggingContext: LoggingContextWithTrace
+  ): EitherT[FutureUnlessShutdown, InteractiveSubmissionExecuteError.Reject, CompletionResponse] = {
+    val commandIdLogging =
+      executionRequest.preparedTransaction.metadata
+        .flatMap(_.submitterInfo.map(_.commandId))
+        .map(logging.commandId)
+        .toList
+
+    withEnrichedLoggingContext(
+      logging.submissionId(executionRequest.submissionId),
+      commandIdLogging *,
+    ) { implicit loggingContext =>
+      logger.info(
+        s"Requesting execution of daml transaction with submission ID ${executionRequest.submissionId}"
+      )
+      // Capture deadline before thread switching in Future for-comprehension
+      val deadlineO = Option(Context.current().getDeadline)
+      for {
+        executionResult <- externalTransactionProcessor.processExecute(executionRequest)
+        commandId = executionResult.commandInterpretationResult.submitterInfo.commandId
+        submissionId = executionRequest.submissionId
+        nonNegativeTimeout <- EitherT
+          .liftF(
+            Future.fromTry(
+              validateRequestTimeout(
+                deadlineO,
+                commandId,
+                submissionId,
+                defaultTrackingTimeout,
+              )(errorLoggingContext)
+            )
+          )
+          .mapK(FutureUnlessShutdown.outcomeK)
+        completion <- EitherT
+          .liftF[Future, InteractiveSubmissionExecuteError.Reject, CompletionResponse](
+            transactionSubmissionTracker.track(
+              submissionKey = SubmissionKey(
+                commandId = commandId,
+                submissionId = submissionId,
+                userId = executionRequest.userId,
+                parties = executionResult.commandInterpretationResult.submitterInfo.actAs.toSet,
+              ),
+              timeout = nonNegativeTimeout,
+              submit = childContext => {
+                LoggingContextWithTrace.withNewLoggingContext(
+                  loggingContext.entries.contents.toList*
+                )(childLoggingContextWithTrace =>
+                  FutureUnlessShutdown.outcomeF(
+                    submitIfNotOverloaded(executionResult)(childLoggingContextWithTrace)
+                      .transform(handleSubmissionResult)
+                  )
+                )(childContext)
+              },
+            )(errorLoggingContext, loggingContext.traceContext)
+          )
+          .mapK(FutureUnlessShutdown.outcomeK)
+      } yield completion
+    }
+  }
+
+  override def executeAndWait(executionRequest: ExecuteRequest)(implicit
+      loggingContext: LoggingContextWithTrace
+  ): FutureUnlessShutdown[ExecuteSubmissionAndWaitResponse] =
+    executeAndWaitInternal(executionRequest)
+      .map { completion =>
+        proto.ExecuteSubmissionAndWaitResponse(
+          completion.completion.updateId,
+          completion.completion.offset,
+        )
+      }
+      .value
+      .map(_.leftMap(_.asGrpcError).toTry)
+      .flatMap(FutureUnlessShutdown.fromTry)
+
+  override def executeAndWaitForTransaction(
+      executionRequest: ExecuteRequest,
+      transactionFormat: Option[TransactionFormat],
+  )(implicit
+      loggingContext: LoggingContextWithTrace
+  ): FutureUnlessShutdown[ExecuteSubmissionAndWaitForTransactionResponse] = {
+    val result = for {
+      completionResponse <- executeAndWaitInternal(executionRequest)
+      transaction <- EitherT
+        .liftF[Future, InteractiveSubmissionExecuteError.Reject, GetUpdateResponse](
+          CommandServiceImpl.fetchTransactionFromCompletion(
+            resp = completionResponse,
+            transactionFormat = transactionFormat,
+            updateServices = updateServices,
+            logger = logger,
+          )
+        )
+        .mapK(FutureUnlessShutdown.outcomeK)
+    } yield proto.ExecuteSubmissionAndWaitForTransactionResponse(
+      Some(transaction.getTransaction)
+    )
+
+    result.value.map(_.leftMap(_.asGrpcError).toTry).flatMap(FutureUnlessShutdown.fromTry)
+  }
 }

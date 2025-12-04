@@ -27,12 +27,15 @@ import org.lfdecentralizedtrust.splice.config.{
   GcpBucketConfig,
   LedgerApiClientConfig,
   ParticipantBootstrapDumpConfig,
+  PeriodicBackupDumpConfig,
+  PruningConfig,
   SpliceBackendConfig,
   SpliceInstanceNamesConfig,
   SpliceParametersConfig,
 }
 import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources}
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
 
 import java.nio.file.Path
@@ -94,7 +97,7 @@ object SvOnboardingConfig {
       bootstrappingDump: Option[SvBootstrapDumpConfig] = None,
       initialPackageConfig: InitialPackageConfig = InitialPackageConfig.defaultInitialPackageConfig,
       initialTransferPreapprovalFee: Option[BigDecimal] = None,
-      initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = None,
+      initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = Some(BigDecimal(1.0)),
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
       initialRound: Long = 0L,
   ) extends SvOnboardingConfig
@@ -284,7 +287,7 @@ case class SvAppBackendConfig(
     initialAmuletPriceVote: Option[BigDecimal] = None,
     cometBftConfig: Option[SvCometBftConfig] = None,
     localSynchronizerNode: Option[SvSynchronizerNodeConfig],
-    scan: Option[SvScanConfig],
+    scan: SvScanConfig,
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
     domainMigrationDumpPath: Option[Path] = None,
@@ -309,27 +312,42 @@ case class SvAppBackendConfig(
     // so it can produce a more recent acknowledgement.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(30),
-    // If observation latency is set to 5s, time proofs will be created 5s in the future so if a node receives an event within those 5s
+    // If observation latency is set to 10s, time proofs will be created 10s in the future so if a node receives an event within those 10s
     // it will never send a time proof.
     timeTrackerObservationLatency: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofSeconds(5),
+      NonNegativeFiniteDuration.ofSeconds(10),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[SvCantonIdentifierConfig] = None,
     legacyMigrationId: Option[Long] = None,
     // Defaults to 24h to allow for 24h between preparation and execution of an externally signed transaction
     preparationTimeRecordTimeTolerance: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofHours(24),
+    acsCommitmentReconciliationInterval: PositiveDurationSeconds =
+      SvUtil.defaultAcsCommitmentReconciliationInterval,
     // Defaults to 48h as it must be at least 2x preparationTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
+    // We want to be able to override this for simtime tests
     topologyChangeDelayDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMillis(250),
     delegatelessAutomationExpectedTaskDuration: Long = 5000, // milliseconds
     delegatelessAutomationExpiredRewardCouponBatchSize: Int = 20,
+    // What batch size to target for converting app activity markers
+    delegatelessAutomationFeaturedAppActivityMarkerBatchSize: Int = 100,
+    // how long to wait before forcing a conversion even though the batch size is not full
+    delegatelessAutomationFeaturedAppActivityMarkerMaxAge: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(30),
+    // at what number of markers should the app switch into catchup mode where
+    // every SV tries to convert markers from any other SV's book of work (in a contention avoiding fashion)
+    delegatelessAutomationFeaturedAppActivityMarkerCatchupThreshold: Int = 10_000,
+    delegatelessAutomationExpiredAmuletBatchSize: Int = 100,
+    // configuration to periodically take topology snapshots
+    topologySnapshotConfig: Option[PeriodicBackupDumpConfig] = None,
     bftSequencerConnection: Boolean = true,
     // Skip synchronizer initialization and synchronizer config reconciliation.
     // Can be safely set to true for an SV that has completed onboarding unless you
     // 1. try to reset one of your sequencers or mediators
     // 2. change sequencer URLs that need to get published externally.
+    // Read `shouldSkipSynchronizerInitialization` instead when checking if it should be skipped which takes migrations into account.
     skipSynchronizerInitialization: Boolean = false,
     // The maximum delay before submitting a package vetting
     // change. The actual delay will be chosen randomly (uniformly
@@ -342,7 +360,18 @@ case class SvAppBackendConfig(
     // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
     latestPackagesOnly: Boolean = false,
     followAmuletConversionRateFeed: Option[AmuletConversionRateFeedConfig] = None,
+    // If true, we check that topology on mediator and sequencer is the same after
+    // a migration. This can be a useful assertion but is very slow so should not be enabled on clusters with large topology state.
+    validateTopologyAfterMigration: Boolean = false,
 ) extends SpliceBackendConfig {
+
+  def shouldSkipSynchronizerInitialization =
+    skipSynchronizerInitialization &&
+      onboarding.fold(true) {
+        case _: SvOnboardingConfig.FoundDso => true
+        case _: SvOnboardingConfig.JoinWithKey => true
+        case _: SvOnboardingConfig.DomainMigration => false
+      }
   override val nodeTypeName: String = "SV"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
@@ -404,7 +433,7 @@ final case class SvSequencerConfig(
     adminApi: FullClientConfig,
     internalApi: FullClientConfig,
     externalPublicApiUrl: String,
-    // This needs to be participantResponseTimeout + mediatorResponseTimeout to make sure that the sequencer
+    // This needs to be confirmationResponseTimeout + mediatorResponseTimeout to make sure that the sequencer
     // does not have to serve requests that have been in flight before the sequencer's signing keys became valid.
     // See also https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
     // The default value of 60 seconds is based on Canton defaulting to 30s for each of those.
@@ -426,6 +455,13 @@ final case class SvMediatorConfig(
     adminApi: FullClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
       SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification,
+    pruning: Option[PruningConfig] = Some(
+      PruningConfig(
+        cron = "0 /10 * * * ?", // Run every 10min,
+        maxDuration = PositiveDurationSeconds.ofMinutes(5),
+        retention = PositiveDurationSeconds.ofDays(30),
+      )
+    ),
 ) {
 
   def toCantonConfig: RemoteMediatorConfig = RemoteMediatorConfig(

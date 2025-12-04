@@ -32,10 +32,9 @@ import com.digitalasset.canton.store.SequencedEventStore.{
   OrdinarySequencedEvent,
 }
 import com.digitalasset.canton.topology.processing.SequencedTime
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
 import com.digitalasset.canton.util.MonadUtil
-import com.digitalasset.canton.version.ProtocolVersion
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
@@ -49,8 +48,7 @@ import scala.util.{Failure, Success}
   * [[com.digitalasset.canton.participant.protocol.ProtocolProcessor]].
   */
 class ParallelMessageDispatcher(
-    override protected val protocolVersion: ProtocolVersion,
-    override protected val synchronizerId: SynchronizerId,
+    override protected val synchronizerId: PhysicalSynchronizerId,
     override protected val participantId: ParticipantId,
     override protected val requestTracker: RequestTracker,
     override protected val requestProcessors: RequestProcessors,
@@ -131,7 +129,7 @@ class ParallelMessageDispatcher(
       // other envelopes are referring to)
       case TopologyTransaction(run) => runAsynchronously(run).map(noTopologyTick)
       case TrafficControlTransaction(run) => runSynchronously(run).map(tick)
-      case AcsCommitment(run) => runSynchronously(run).map(tick)
+      case AcsCommitment(run) => runAsynchronously(run).map(tick)
       case CausalityMessageKind(run) => runSynchronously(run).map(tick)
       case MalformedMessage(run) => runSynchronously(run).map(tick)
       case UnspecifiedMessageKind(run) => runSynchronously(run).map(tick)
@@ -176,7 +174,7 @@ class ParallelMessageDispatcher(
           val signedEventE = eventE.map(_ => signedEvent)
           processOrdinary(sequencerCounter, signedEventE)
 
-        case _: IgnoredSequencedEvent[_] =>
+        case _: IgnoredSequencedEvent[?] =>
           pureProcessingResult
       }
       processingResult.map(
@@ -244,7 +242,7 @@ class ParallelMessageDispatcher(
       if (tickDecision.tickRecordOrderPublisher) {
         recordOrderPublisher.tick(
           SequencerIndexMoved(
-            synchronizerId = synchronizerId,
+            synchronizerId = synchronizerId.logical,
             recordTime = ts,
           ),
           sequencerCounter = sc,

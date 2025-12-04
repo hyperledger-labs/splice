@@ -66,10 +66,7 @@ class SvOffboardingIntegrationTest
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withPreSetup(_ => ())
-      .addConfigTransformsToFront(
-        (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
-        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
-      )
+      .addConfigTransformsToFront((_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf))
       .addConfigTransformsToFront((_, conf) =>
         ConfigTransforms.bumpRemoteSplitwellPortsBy(22_000)(conf)
       )
@@ -255,7 +252,7 @@ class SvOffboardingIntegrationTest
         (_: Unit) =>
           sv1ScanBackend.lookupTransferCommandCounterByParty(
             sv1Backend.getDsoInfo().svParty
-          ) shouldBe a[Some[_]],
+          ) shouldBe a[Some[?]],
       )
 
       actAndCheck(

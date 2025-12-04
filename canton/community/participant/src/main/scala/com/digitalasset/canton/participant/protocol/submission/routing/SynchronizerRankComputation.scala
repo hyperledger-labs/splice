@@ -4,6 +4,7 @@
 package com.digitalasset.canton.participant.protocol.submission.routing
 
 import cats.data.{Chain, EitherT}
+import cats.implicits.catsSyntaxAlternativeSeparate
 import cats.syntax.bifunctor.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
@@ -20,7 +21,7 @@ import com.digitalasset.canton.participant.protocol.reassignment.{
 }
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 
@@ -30,7 +31,7 @@ import TransactionRoutingError.AutomaticReassignmentForTransactionFailure
 
 private[routing] class SynchronizerRankComputation(
     participantId: ParticipantId,
-    priorityOfSynchronizer: SynchronizerId => Int,
+    priorityOfSynchronizer: PhysicalSynchronizerId => Int,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
@@ -40,39 +41,37 @@ private[routing] class SynchronizerRankComputation(
       synchronizerState: RoutingSynchronizerState,
       contracts: Seq[ContractData],
       readers: Set[LfPartyId],
-      synchronizerIds: NonEmpty[Set[SynchronizerId]],
+      synchronizerIds: NonEmpty[Set[PhysicalSynchronizerId]],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransactionRoutingError, SynchronizerRank] =
-    EitherT {
-      for {
-        rankedSynchronizers <- synchronizerIds.forgetNE.toList
-          .parTraverseFilter(targetSynchronizer =>
-            compute(
-              contracts,
-              Target(targetSynchronizer),
-              readers,
-              synchronizerState,
-            )
-              // TODO(#25385): The resulting error is discarded in toOption. Consider forwarding it instead
-              .toOption.value
-          )
-        // Priority of synchronizer
-        // Number of reassignments if we use this synchronizer
-        // pick according to the least amount of reassignments
-      } yield rankedSynchronizers.minOption
-        .toRight(
-          // TODO(#25385): Revisit this reported error as it can be misleading
-          TransactionRoutingError.AutomaticReassignmentForTransactionFailure.Failed(
-            s"None of the following $synchronizerIds is suitable for automatic reassignment."
-          )
+    EitherT(
+      synchronizerIds.forgetNE.toList
+        .parTraverse(targetSynchronizer =>
+          compute(contracts, Target(targetSynchronizer), readers, synchronizerState)
+            .leftMap(targetSynchronizer -> _)
+            .value
         )
-    }
+        .map(_.separate)
+        .map { case (failedRankings, successfulRankings) =>
+          // Priority of synchronizer
+          // Number of reassignments if we use this synchronizer
+          // pick according to the least amount of reassignments
+          successfulRankings.minOption.toRight(
+            TransactionRoutingError.TopologyErrors.NoSynchronizerForSubmission
+              .SynchronizerRankingFailed(
+                failedRankings.map { case (synchronizerId, err) =>
+                  synchronizerId -> err.cause
+                }.toMap
+              )
+          )
+        }
+    )
 
   // Includes check that submitting party has a participant with submission rights on source and target synchronizer
   def compute(
       contracts: Seq[ContractData],
-      targetSynchronizer: Target[SynchronizerId],
+      targetSynchronizer: Target[PhysicalSynchronizerId],
       readers: Set[LfPartyId],
       synchronizerState: RoutingSynchronizerState,
   )(implicit
@@ -80,7 +79,7 @@ private[routing] class SynchronizerRankComputation(
       ec: ExecutionContext,
   ): EitherT[FutureUnlessShutdown, TransactionRoutingError, SynchronizerRank] = {
     // (contract id, (reassignment submitter, target synchronizer id))
-    type SingleReassignment = (LfContractId, (LfPartyId, SynchronizerId))
+    type SingleReassignment = (LfContractId, (LfPartyId, PhysicalSynchronizerId))
 
     val targetSnapshotET =
       EitherT.fromEither[FutureUnlessShutdown](
@@ -124,9 +123,9 @@ private[routing] class SynchronizerRankComputation(
 
   private def findReaderThatCanReassignContract(
       sourceSnapshot: Source[TopologySnapshot],
-      sourceSynchronizerId: Source[SynchronizerId],
+      sourceSynchronizerId: Source[PhysicalSynchronizerId],
       targetSnapshot: Target[TopologySnapshot],
-      targetSynchronizerId: Target[SynchronizerId],
+      targetSynchronizerId: Target[PhysicalSynchronizerId],
       contract: ContractData,
       readers: Set[LfPartyId],
   )(implicit traceContext: TraceContext): EitherT[Future, TransactionRoutingError, LfPartyId] = {

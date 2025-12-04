@@ -30,7 +30,7 @@ import com.digitalasset.canton.sequencing.{
 import com.digitalasset.canton.store.SequencedEventStore.SequencedEventWithTraceContext
 import com.digitalasset.canton.store.memory.InMemorySendTrackerStore
 import com.digitalasset.canton.store.{SavePendingSendError, SendTrackerStore}
-import com.digitalasset.canton.topology.DefaultTestIdentities.{participant1, synchronizerId}
+import com.digitalasset.canton.topology.DefaultTestIdentities.participant1
 import com.digitalasset.canton.topology.{DefaultTestIdentities, TestingTopology}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, FailOnShutdown}
@@ -52,7 +52,7 @@ class SendTrackerTest extends AnyWordSpec with BaseTest with MetricsUtils with F
       sign(
         SequencerTestUtils.mockDeliver(
           timestamp = timestamp,
-          synchronizerId = DefaultTestIdentities.synchronizerId,
+          synchronizerId = DefaultTestIdentities.physicalSynchronizerId,
         )
       )
     )(
@@ -69,11 +69,10 @@ class SendTrackerTest extends AnyWordSpec with BaseTest with MetricsUtils with F
         Deliver.create(
           None,
           timestamp,
-          DefaultTestIdentities.synchronizerId,
+          DefaultTestIdentities.physicalSynchronizerId,
           Some(msgId),
           Batch.empty(testedProtocolVersion),
           None,
-          testedProtocolVersion,
           trafficReceipt,
         )
       )
@@ -91,10 +90,9 @@ class SendTrackerTest extends AnyWordSpec with BaseTest with MetricsUtils with F
         DeliverError.create(
           None,
           timestamp,
-          DefaultTestIdentities.synchronizerId,
+          DefaultTestIdentities.physicalSynchronizerId,
           msgId,
           SequencerErrors.SubmissionRequestRefused("test"),
-          testedProtocolVersion,
           trafficReceipt,
         )
       )
@@ -143,9 +141,9 @@ class SendTrackerTest extends AnyWordSpec with BaseTest with MetricsUtils with F
   ): Env = {
     val store = new InMemorySendTrackerStore()
     val topologyClient =
-      TestingTopology(Set(DefaultTestIdentities.synchronizerId))
+      TestingTopology(Set(DefaultTestIdentities.physicalSynchronizerId))
         .build(loggerFactory)
-        .forOwnerAndSynchronizer(participant1, synchronizerId)
+        .forOwnerAndSynchronizer(participant1, DefaultTestIdentities.physicalSynchronizerId)
 
     val histogramInventory = new HistogramInventory()
     val trafficStateController = new TrafficStateController(
@@ -156,7 +154,7 @@ class SendTrackerTest extends AnyWordSpec with BaseTest with MetricsUtils with F
       testedProtocolVersion,
       new EventCostCalculator(loggerFactory),
       new TrafficConsumptionMetrics(MetricName("test"), metricsFactory(histogramInventory)),
-      synchronizerId,
+      DefaultTestIdentities.physicalSynchronizerId,
     )
     val tracker =
       new MySendTracker(
@@ -220,6 +218,7 @@ class SendTrackerTest extends AnyWordSpec with BaseTest with MetricsUtils with F
           )
         )
       )
+
       tracker.trafficStateController.value.updateBalance(
         NonNegativeLong.tryCreate(20),
         PositiveInt.one,
@@ -236,7 +235,7 @@ class SendTrackerTest extends AnyWordSpec with BaseTest with MetricsUtils with F
       assertInContext(
         "test.event-delivered-cost",
         "synchronizer",
-        synchronizerId.toString,
+        DefaultTestIdentities.physicalSynchronizerId.toString,
       )
       assertInContext(
         "test.event-delivered-cost",
@@ -254,11 +253,10 @@ class SendTrackerTest extends AnyWordSpec with BaseTest with MetricsUtils with F
       assertInContext(
         "test.extra-traffic-consumed",
         "synchronizer",
-        synchronizerId.toString,
+        DefaultTestIdentities.physicalSynchronizerId.toString,
       )
       // But not the event agnostic metrics
       assertNotInContext("test.extra-traffic-consumed", "test")
-
     }
 
     "not re-export metrics when replaying events older than current state" in {

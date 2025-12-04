@@ -15,6 +15,7 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -51,6 +52,23 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
         }
       }
 
+      "find a ValidatorOnboarding by secret in JSON format" in {
+        val wanted = validatorOnboarding(
+          """{"sv": "splice-client-1", "validator_party_hint": "splice-client-2", "secret": "good_secret"}"""
+        )
+        val offset = 303L
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(wanted, offset, createdEventSignatories = Seq(storeSvParty))(
+            store.multiDomainAcsStore
+          )
+        } yield {
+          store.lookupValidatorOnboardingBySecretWithOffset("good_secret").futureValue should be(
+            QueryResult(offset, Some(wanted))
+          )
+        }
+      }
+
       "return just the offset if there's no entries" in {
         for {
           store <- mkStore()
@@ -83,6 +101,23 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
           )
           store.lookupUsedSecretWithOffset("bad_secret").futureValue should be(
             QueryResult(secondOffset, Some(unwanted))
+          )
+        }
+      }
+
+      "find a UsedSecret by secret in JSON format" in {
+        val wanted = usedSecret(
+          """{"sv": "splice-client-1::dummy", "validator_party_hint": "splice-client-2", "secret": "good_secret"}"""
+        )
+        val offset = 303L
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(wanted, offset, createdEventSignatories = Seq(storeSvParty))(
+            store.multiDomainAcsStore
+          )
+        } yield {
+          store.lookupUsedSecretWithOffset("good_secret").futureValue should be(
+            QueryResult(offset, Some(wanted))
           )
         }
       }
@@ -154,6 +189,7 @@ class DbSvSvStoreTest
         None,
       ),
       participantId = mkParticipantId("SvSvStoreTest"),
+      IngestionConfig(),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()

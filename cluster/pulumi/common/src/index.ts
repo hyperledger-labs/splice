@@ -1,8 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 export * from './config';
-export * from './auth0';
-export * from './auth0types';
+export * from './auth0/auth0';
+export * from './auth0/auth0types';
+export * from './auth0/secrets';
+export * from './auth0/audiences';
 export * from './backup';
 export * from './domainFees';
 export * from './domainMigration';
@@ -19,7 +21,6 @@ export * from './utils';
 export * from './packageConfig';
 export * from './artifacts';
 export * from './dockerConfig';
-export * from './config/kms';
 export * from './serviceAccount';
 export * from './participantKms';
 export * from './config/migrationSchema';
@@ -27,3 +28,4 @@ export * from './pruning';
 export * from './config/loadTesterConfig';
 export * from './config/networkWideConfig';
 export * from './ratelimit';
+export * from './config/config';

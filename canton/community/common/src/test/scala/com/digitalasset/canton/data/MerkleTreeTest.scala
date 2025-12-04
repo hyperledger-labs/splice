@@ -24,6 +24,7 @@ import com.digitalasset.canton.serialization.{
 }
 import com.digitalasset.canton.version.{
   HasProtocolVersionedWrapper,
+  IgnoreInSerializationTestExhaustivenessCheck,
   ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
@@ -98,7 +99,7 @@ class MerkleTreeTest extends AnyWordSpec with BaseTest {
   "Every Merkle tree" must {
 
     val testCases =
-      Table[MerkleTree[_], RootHash, Boolean, Boolean](
+      Table[MerkleTree[?], RootHash, Boolean, Boolean](
         ("Merkle tree", "Expected root hash", "Is fully unblinded", "Has all leaves blinded"),
         (fullyBlindedTree, fullyBlindedTreeHash, false, false),
         (singletonLeaf1, singletonLeafHash(1), true, true),
@@ -202,14 +203,16 @@ class MerkleTreeTest extends AnyWordSpec with BaseTest {
 
 @SuppressWarnings(Array("org.wartremover.warts.Any"))
 object MerkleTreeTest {
-  type VersionedAbstractLeaf = AbstractLeaf[_ <: VersionedMerkleTree[_]]
+  type VersionedAbstractLeaf = AbstractLeaf[? <: VersionedMerkleTree[?]]
   val hashOps = new SymbolicPureCrypto
 
-  object AbstractLeaf extends VersioningCompanion[VersionedAbstractLeaf] {
+  object AbstractLeaf
+      extends VersioningCompanion[VersionedAbstractLeaf]
+      with IgnoreInSerializationTestExhaustivenessCheck {
     override def name: String = "AbstractLeaf"
     override def versioningTable: VersioningTable = VersioningTable(
       ProtoVersion(30) -> VersionedProtoCodec.raw(
-        ProtocolVersion.v33,
+        ProtocolVersion.v34,
         (_, _, bytes) => fromProto(30)(bytes),
         _.getCryptographicEvidence,
       )
@@ -225,7 +228,7 @@ object MerkleTreeTest {
   }
 
   abstract class AbstractLeaf[
-      A <: MerkleTree[_] with HasCryptographicEvidence with HasProtocolVersionedWrapper[_]
+      A <: MerkleTree[?] with HasCryptographicEvidence with HasProtocolVersionedWrapper[?]
   ](
       val index: Int
   ) extends MerkleTreeLeaf[A](MerkleTreeTest.hashOps)
@@ -242,7 +245,7 @@ object MerkleTreeTest {
     override protected def pretty: Pretty[AbstractLeaf[A]] = prettyOfClass(unnamedParam(_.index))
   }
 
-  def leafFromByteString[L <: AbstractLeaf[_]](
+  def leafFromByteString[L <: AbstractLeaf[?]](
       mkLeaf: Int => L
   )(bytes: ByteString): Either[DeserializationError, L] =
     for {
@@ -279,8 +282,8 @@ object MerkleTreeTest {
   }
 
   abstract class AbstractInnerNode[A](
-      val create: Seq[MerkleTree[_]] => MerkleTree[A],
-      val subtrees: MerkleTree[_]*
+      val create: Seq[MerkleTree[?]] => MerkleTree[A],
+      val subtrees: MerkleTree[?]*
   ) extends MerkleTreeInnerNode[A](MerkleTreeTest.hashOps) {
     this: A =>
 
@@ -294,9 +297,9 @@ object MerkleTreeTest {
     )
   }
 
-  final case class InnerNode1(override val subtrees: MerkleTree[_]*)
+  final case class InnerNode1(override val subtrees: MerkleTree[?]*)
       extends AbstractInnerNode[InnerNode1](InnerNode1.apply, subtrees*) {}
 
-  final case class InnerNode2(override val subtrees: MerkleTree[_]*)
+  final case class InnerNode2(override val subtrees: MerkleTree[?]*)
       extends AbstractInnerNode[InnerNode2](InnerNode2.apply, subtrees*) {}
 }

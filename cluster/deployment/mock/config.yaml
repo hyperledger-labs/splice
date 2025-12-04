@@ -18,7 +18,6 @@ multiValidator:
 sv:
   synchronizer:
     skipInitialization: true
-    topologyChangeDelay: 250ms
 splitwell:
   maxDarVersion: '0.1.8'
 synchronizerMigration:
@@ -26,7 +25,7 @@ synchronizerMigration:
     - id: 1
       version: 0.3.18
       releaseReference:
-        gitReference: "refs/heads/release-line-0.3.18"
+        gitReference: "981227e62011e386cca3cdb5f00b472cf05a12c4"
         repoUrl: https://github.com/hyperledger-labs/splice
         pulumiStacksDir: "cluster/stacks/prod"
         pulumiBaseDir: "splice/cluster/pulumi"
@@ -115,11 +114,23 @@ svs:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
       additionalJvmOptions: "-DcustomScanAppJvmFlag"
+      resources:
+        requests:
+          cpu: "0.5"
+          memory: '1536Mi'
+        limits:
+          memory: '2048Mi'
     svApp:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
       additionalJvmOptions: "-DcustomSvAppJvmFlag"
+      resources:
+        requests:
+          cpu: "1"
+          memory: '1Gi'
+        limits:
+          memory: '2Gi'
     participant:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
@@ -130,6 +141,25 @@ svs:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
       additionalJvmOptions: "-DcustomSequencerJvmFlag"
+      cloudSql:
+        tier: "sequencer-override-tier"
+      resources:
+        requests:
+          cpu: "1"
+          memory: '1Gi'
+        limits:
+          memory: '2Gi'
+    mediator:
+      additionalEnvVars:
+        - name: CUSTOM_MOCK_ENV_VAR_NAME
+          value: CUSTOM_MOCK_ENV_VAR_VALUE
+      additionalJvmOptions: "-DcustomMediatorJvmFlag"
+      resources:
+        requests:
+          cpu: "1"
+          memory: '1Gi'
+        limits:
+          memory: '2Gi'
     logging:
       appsLogLevel: WARN
       cantonLogLevel: INFO
@@ -138,6 +168,11 @@ svs:
     participant:
       bftSequencerConnection: false
   sv-1:
+    periodicSnapshots:
+      topology:
+        projectId: 'da-cn-test'
+        bucketName: 'da-cn-topology-snapshots'
+        backupInterval: '24h'
     logging:
       appsLogLevel: WARN
       cantonLogLevel: INFO
@@ -206,10 +241,21 @@ networkWide:
   maxVettingDelay: 1m
 validators:
   validator-runbook:
+    partyAllocator:
+      enable: true
+      maxParties: 1234
+      parallelism: 321
+      preapprovalRetries: 9876
+      preapprovalRetryDelayMs: 42
     participant:
       additionalEnvVars:
         - name: ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_NAME
           value: ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_VALUE
+      additionalJvmOptions: -Dparticipantoption
+    validatorApp:
+      additionalEnvVars:
+        - name: ADDITIONAL_ENV_VAR_VALIDATOR_NAME
+          value: ADDITIONAL_ENV_VAR_VALIDATOR_NAME
       additionalJvmOptions: -Dparticipantoption
   extra-validator:
     namespace: validator

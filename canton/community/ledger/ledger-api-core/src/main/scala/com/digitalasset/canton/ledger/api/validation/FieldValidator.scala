@@ -4,6 +4,7 @@
 package com.digitalasset.canton.ledger.api.validation
 
 import cats.implicits.toBifunctorOps
+import com.daml.jwt.JwksUrl
 import com.daml.ledger.api.v2.value.Identifier
 import com.digitalasset.canton.ledger.api.validation.ResourceAnnotationValidator.{
   AnnotationsSizeExceededError,
@@ -12,9 +13,14 @@ import com.digitalasset.canton.ledger.api.validation.ResourceAnnotationValidator
 }
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors.*
 import com.digitalasset.canton.ledger.api.validation.ValueValidator.*
-import com.digitalasset.canton.ledger.api.{IdentityProviderId, JwksUrl, SubmissionId, WorkflowId}
+import com.digitalasset.canton.ledger.api.{IdentityProviderId, SubmissionId, WorkflowId}
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.topology.{ParticipantId, PartyId as TopologyPartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PartyId as TopologyPartyId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{Party, TypeConRef}
 import com.digitalasset.daml.lf.value.Value.ContractId
@@ -98,6 +104,17 @@ object FieldValidator {
       errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Ref.UserId] =
     requireNonEmptyParsedId(Ref.UserId.fromString)(s, fieldName)
+
+  def optionalUserId(
+      s: String,
+      fieldName: String,
+  )(implicit
+      errorLoggingContext: ErrorLoggingContext
+  ): Either[StatusRuntimeException, Option[Ref.UserId]] =
+    if (s.isEmpty) Right(None)
+    else {
+      Ref.UserId.fromString(s).map(Some(_)).left.map(invalidField(fieldName, _))
+    }
 
   def requireLedgerString(
       s: String,
@@ -192,6 +209,12 @@ object FieldValidator {
     if (s.isEmpty) Left(missingField(fieldName))
     else SynchronizerId.fromString(s).left.map(invalidField(fieldName, _))
 
+  def requirePhysicalSynchronizerId(s: String, fieldName: String)(implicit
+      errorLoggingContext: ErrorLoggingContext
+  ): Either[StatusRuntimeException, PhysicalSynchronizerId] =
+    if (s.isEmpty) Left(missingField(fieldName))
+    else PhysicalSynchronizerId.fromString(s).left.map(invalidField(fieldName, _))
+
   def optionalSynchronizerId(s: String, fieldName: String)(implicit
       errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Option[SynchronizerId]] =
@@ -213,7 +236,7 @@ object FieldValidator {
     if (s.isEmpty) Left(missingField(fieldName))
     else ContractId.fromString(s).left.map(invalidField(fieldName, _))
 
-  def requireNonEmpty[M[_] <: Iterable[_], T](
+  def requireNonEmpty[M[_] <: Iterable[?], T](
       s: M[T],
       fieldName: String,
   )(implicit

@@ -10,8 +10,9 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.daml.lf.data.Time.Timestamp as LfTimestamp
 import com.google.cloud.bigquery as bq
-import bq.{Field, JobInfo, Schema, TableId}
+import bq.{Field, FieldValueList, JobInfo, Schema, TableId, TableResult}
 import bq.storage.v1.{JsonStreamWriter, TableSchema}
+import org.scalatest.concurrent.TimeLimits.failAfter
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.*
 import slick.jdbc.GetResult
 
@@ -62,6 +63,11 @@ class ScanTotalSupplyBigQueryIntegrationTest
   }
   private val functionsDatasetName = s"functions_$uuid"
   private val dashboardsDatasetName = s"dashboards_$uuid"
+  private val allDatasetNames = Seq(
+    datasetName,
+    functionsDatasetName,
+    dashboardsDatasetName,
+  )
 
   // Test data parameters
   private val mintedAppRewardsAmount = BigDecimal(0)
@@ -80,9 +86,10 @@ class ScanTotalSupplyBigQueryIntegrationTest
   // The test currently produces 80 transactions, which is 0.000926 tps over 24 hours,
   // so we assert for a range of 70-85 transactions, or 0.0008-0.00099 tps.
   private val avgTps = (0.0008, 0.00099)
-  // The peak is 17 transactions in a (simulated) minute, or 0.28333 tps over a minute,
-  // so we assert 15-20 transactions, or 0.25-0.34 tps
-  private val peakTps = (0.25, 0.34)
+  // The peak is 22 transactions in a (simulated) minute, or 0.36667 tps over a minute,
+  // so we assert 19-25 transactions, or 0.31-0.42 tps
+  private val peakTps = (0.31, 0.42)
+  private val totalRounds = 4
 
   override def beforeAll() = {
     super.beforeAll()
@@ -126,12 +133,31 @@ class ScanTotalSupplyBigQueryIntegrationTest
   }
 
   override def afterAll() = {
-    logger.info(s"Cleaning up BigQuery dataset: $datasetName")
+    val singleDeleteTryTime = 13.seconds
 
-    // Delete the temporary BigQuery datasets after tests
-    bigquery.delete(datasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
-    bigquery.delete(functionsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
-    bigquery.delete(dashboardsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+    Future
+      .traverse(allDatasetNames) { dsName =>
+        val logMsg = s"Cleaning up BigQuery dataset: $dsName"
+        Future {
+          logger.info(logMsg)
+          // afterAll only has 60s to complete before its thread gets
+          // interrupted
+          eventuallySucceeds(timeUntilSuccess = 45.seconds, suppressErrors = false) {
+            failAfter(singleDeleteTryTime) {
+              // can hang, so we force retry after singleDeleteTryTime;
+              // even when it hangs it's still likely to succeed, and delete
+              // just succeeds with `false` if already deleted
+              bigquery.delete(dsName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+            }
+          }
+          logger.info(s"Finished $logMsg")
+        }.recoverWith { case util.control.NonFatal(e) =>
+          logger.warn(s"Failed $logMsg")
+          Future failed e
+        }
+      }
+      .futureValue
+
     super.afterAll()
   }
 
@@ -152,12 +178,14 @@ class ScanTotalSupplyBigQueryIntegrationTest
       createBigQueryFunctions()
     }
 
-    val results = withClue("running total supply queries in BigQuery") {
-      runTotalSupplyQueries()
+    withClue("testing total supply queries in BigQuery") {
+      val results = runDashboardQueries()
+      verifyDashboardResults(results)
     }
 
-    withClue(s"verify total supply results") {
-      verifyResults(results)
+    withClue("testing finance queries") {
+      val results = runFinanceQueries()
+      verifyFinanceResults(results)
     }
   }
 
@@ -269,9 +297,20 @@ class ScanTotalSupplyBigQueryIntegrationTest
   ): Unit = {
     actAndCheck(
       "step forward many rounds", {
-        advanceTimeToRoundOpen
-        (1 to 5).foreach { _ =>
-          advanceRoundsByOneTick
+        actAndCheck(
+          "Advance the first round", {
+            advanceRoundsToNextRoundOpening
+          },
+        )(
+          "Wait for alice to report activity up to round 2",
+          _ =>
+            aliceValidatorWalletClient
+              .listValidatorLivenessActivityRecords()
+              .map(_.payload.round.number) should contain(2),
+        )
+
+        (3 to 6).foreach { _ =>
+          advanceRoundsToNextRoundOpening
         }
       },
     )(
@@ -311,7 +350,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
       case db: DbStorage => db
       case s => fail(s"non-DB storage configured, unsupported for BigQuery: ${s.getClass}")
     }
-    val sourceHistoryId = sv1ScanBackend.appState.store.updateHistory.historyId
+    val sourceHistoryId = sv1ScanBackend.appState.automation.updateHistory.historyId
 
     copyTableToBigQuery(
       "update_history_creates",
@@ -523,16 +562,31 @@ class ScanTotalSupplyBigQueryIntegrationTest
     job.waitFor()
   }
 
-  /** Runs the total supply queries from the SQL file
-    */
-  private def runTotalSupplyQueries()(implicit env: FixtureParam): ExpectedMetrics = {
+  private def runFinanceQueries()(implicit env: FixtureParam): FinanceMetrics = {
     val project = bigquery.getOptions.getProjectId
     // The TPS query assumes staleness of up to 4 hours, so we query for stats 5 hours after the current ledger time.
     val timestamp = getLedgerTime.toInstant.plus(5, ChronoUnit.HOURS).toString
+    logger.info(s"Querying all dashboard stats as of $timestamp")
+    val sql =
+      s"SELECT * FROM `$project.$functionsDatasetName.all_finance_stats`('$timestamp', 0);"
+
+    parseFinanceResults(runTableSqlQuery(sql))
+  }
+
+  /** Runs the dashboard queries from the SQL file
+    */
+  private def runDashboardQueries()(implicit env: FixtureParam): DashboardMetrics = {
+    val project = bigquery.getOptions.getProjectId
+    // The TPS query assumes staleness of up to 4 hours, so we query for stats 5 hours after the current ledger time.
+    val timestamp = getLedgerTime.toInstant.plus(5, ChronoUnit.HOURS).toString
+    logger.info(s"Querying all dashboard stats as of $timestamp")
     val sql =
       s"SELECT * FROM `$project.$functionsDatasetName.all_dashboard_stats`('$timestamp', 0);"
 
-    logger.info(s"Querying all stats as of $timestamp")
+    parseDashboardResults(runTableSqlQuery(sql))
+  }
+
+  private def runTableSqlQuery(sql: String): TableResult = {
 
     // Execute the query
     val queryConfig = bq.QueryJobConfiguration
@@ -549,11 +603,15 @@ class ScanTotalSupplyBigQueryIntegrationTest
     job.waitFor()
 
     // results should be available now
-    val result = job.getQueryResults()
-    parseQueryResults(result)
+    job.getQueryResults()
   }
 
-  private case class ExpectedMetrics(
+  private case class FinanceMetrics(
+      // Most metrics reuse the same code as the dasboard computation, so we don't bother validating them again
+      latestRound: Long
+  )
+
+  private case class DashboardMetrics(
       locked: BigDecimal,
       unlocked: BigDecimal,
       currentSupplyTotal: BigDecimal,
@@ -572,51 +630,64 @@ class ScanTotalSupplyBigQueryIntegrationTest
       avgCoinPrice: BigDecimal,
   )
 
-  private def parseQueryResults(result: bq.TableResult) = {
+  private def required(row: FieldValueList, column: String) = {
+    val field = row get column
+    if (field.isNull)
+      fail(s"Column '$column' in all-stats results is null")
+    field
+  }
+
+  def bd(row: FieldValueList, column: String) = {
+    BigDecimal(required(row, column).getStringValue)
+  }
+
+  def int(row: FieldValueList, column: String) = {
+    required(row, column).getLongValue
+  }
+
+  def float(row: FieldValueList, column: String) = {
+    required(row, column).getDoubleValue
+  }
+
+  private def parseFinanceResults(result: bq.TableResult) = {
+    val row = result.iterateAll().iterator().next()
+    logger.debug(s"Query row: $row; schema ${result.getSchema}")
+
+    FinanceMetrics(
+      latestRound = int(row, "latest_round")
+    )
+  }
+
+  private def parseDashboardResults(result: bq.TableResult) = {
     // We expect the final query to return a single row with all metrics
     val row = result.iterateAll().iterator().next()
     logger.debug(s"Query row: $row; schema ${result.getSchema}")
 
-    def required(column: String) = {
-      val field = row get column
-      if (field.isNull)
-        fail(s"Column '$column' in all-stats results is null")
-      field
-    }
-
-    def bd(column: String) = {
-      BigDecimal(required(column).getStringValue)
-    }
-
-    def int(column: String) = {
-      required(column).getLongValue
-    }
-
-    def float(column: String) = {
-      required(column).getDoubleValue
-    }
-
-    ExpectedMetrics(
-      locked = bd("locked"),
-      unlocked = bd("unlocked"),
-      currentSupplyTotal = bd("current_supply_total"),
-      unminted = bd("unminted"),
-      mintedAppRewards = bd("daily_mint_app_rewards"),
-      mintedValidatorRewards = bd("daily_mint_validator_rewards"),
-      mintedSvRewards = bd("daily_mint_sv_rewards"),
-      mintedUnclaimed = bd("daily_mint_unclaimed_activity_records"),
-      burned = bd("daily_burn"),
-      numAmuletHolders = int("num_amulet_holders"),
-      numActiveValidators = int("num_active_validators"),
-      avgTps = float("average_tps"),
-      peakTps = float("peak_tps"),
-      minCoinPrice = bd("daily_min_coin_price"),
-      maxCoinPrice = bd("daily_max_coin_price"),
-      avgCoinPrice = bd("daily_avg_coin_price"),
+    DashboardMetrics(
+      locked = bd(row, "locked"),
+      unlocked = bd(row, "unlocked"),
+      currentSupplyTotal = bd(row, "current_supply_total"),
+      unminted = bd(row, "unminted"),
+      mintedAppRewards = bd(row, "daily_mint_app_rewards"),
+      mintedValidatorRewards = bd(row, "daily_mint_validator_rewards"),
+      mintedSvRewards = bd(row, "daily_mint_sv_rewards"),
+      mintedUnclaimed = bd(row, "daily_mint_unclaimed_activity_records"),
+      burned = bd(row, "daily_burn"),
+      numAmuletHolders = int(row, "num_amulet_holders"),
+      numActiveValidators = int(row, "num_active_validators"),
+      avgTps = float(row, "average_tps"),
+      peakTps = float(row, "peak_tps"),
+      minCoinPrice = bd(row, "daily_min_coin_price"),
+      maxCoinPrice = bd(row, "daily_max_coin_price"),
+      avgCoinPrice = bd(row, "daily_avg_coin_price"),
     )
   }
 
-  private def verifyResults(results: ExpectedMetrics): Unit = {
+  private def verifyFinanceResults(results: FinanceMetrics): Unit = {
+    results.latestRound shouldBe totalRounds withClue "total_rounds"
+  }
+
+  private def verifyDashboardResults(results: DashboardMetrics): Unit = {
     // Verify individual metrics
     forEvery(
       Seq(

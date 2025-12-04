@@ -70,13 +70,13 @@ class HttpTokenStandardMetadataHandler(
   private def lookupTotalSupplyByLatestRound()(implicit ec: ExecutionContext, tc: TraceContext) =
     for {
       (latestRoundNr, effectiveAt) <- OptionT(store.lookupRoundOfLatestData())
-      totalSupply <- OptionT.liftF(store.getTotalAmuletBalance(latestRoundNr))
+      totalSupply <- OptionT(store.getTotalAmuletBalance(latestRoundNr))
     } yield TotalSupply(amount = totalSupply, asOfTimestamp = effectiveAt)
 
   private def lookupTotalSupplyByLatestAcsSnapshot()(implicit tc: TraceContext) = {
     for {
       latestSnapshot <- OptionT(
-        acsSnapshotStore.lookupSnapshotBefore(
+        acsSnapshotStore.lookupSnapshotAtOrBefore(
           acsSnapshotStore.currentMigrationId,
           CantonTimestamp.now(),
         )

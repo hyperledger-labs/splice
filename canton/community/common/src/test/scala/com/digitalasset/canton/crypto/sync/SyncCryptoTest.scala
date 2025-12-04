@@ -4,24 +4,34 @@
 package com.digitalasset.canton.crypto.sync
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{CryptoConfig, SessionSigningKeysConfig}
-import com.digitalasset.canton.crypto.kms.CommunityKmsFactory
+import com.digitalasset.canton.config.KmsConfig.Driver
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.{
+  CachingConfigs,
+  CryptoConfig,
+  CryptoProvider,
+  SessionSigningKeysConfig,
+}
 import com.digitalasset.canton.crypto.signer.SyncCryptoSigner
 import com.digitalasset.canton.crypto.store.CryptoPrivateStoreFactory
 import com.digitalasset.canton.crypto.verifier.SyncCryptoVerifier
 import com.digitalasset.canton.crypto.{
   Crypto,
   Hash,
+  RequiredEncryptionSpecs,
+  RequiredSigningSpecs,
   SigningKeyUsage,
   SynchronizerCryptoClient,
   TestHash,
 }
-import com.digitalasset.canton.resource.{MemoryStorage, Storage}
+import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.protocol.StaticSynchronizerParameters
+import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.topology.DefaultTestIdentities.{participant1, participant2}
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{
   DefaultTestIdentities,
+  PhysicalSynchronizerId,
   SynchronizerId,
   TestingIdentityFactory,
   TestingTopology,
@@ -29,32 +39,93 @@ import com.digitalasset.canton.topology.{
 }
 import com.digitalasset.canton.tracing.NoReportingTracerProvider
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
+import com.typesafe.config.ConfigValueFactory
+import monocle.Monocle.toAppliedFocusOps
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpec
 
-trait SyncCryptoTest extends AnyWordSpec with BaseTest with HasExecutionContext {
+trait SyncCryptoTest
+    extends AnyWordSpec
+    with BaseTest
+    with HasExecutionContext
+    with BeforeAndAfterAll {
+
   protected val sessionSigningKeysConfig: SessionSigningKeysConfig
 
-  protected lazy val otherSynchronizerId = SynchronizerId(
-    UniqueIdentifier.tryFromProtoPrimitive("other::default")
+  // Use JceCrypto for the configured crypto schemes
+  private lazy val jceStaticSynchronizerParameters: StaticSynchronizerParameters =
+    StaticSynchronizerParameters(
+      requiredSigningSpecs = RequiredSigningSpecs(
+        CryptoProvider.Jce.signingAlgorithms.supported,
+        CryptoProvider.Jce.signingKeys.supported,
+      ),
+      requiredEncryptionSpecs = RequiredEncryptionSpecs(
+        CryptoProvider.Jce.encryptionAlgorithms.supported,
+        CryptoProvider.Jce.encryptionKeys.supported,
+      ),
+      requiredSymmetricKeySchemes = CryptoProvider.Jce.symmetric.supported,
+      requiredHashAlgorithms = CryptoProvider.Jce.hash.supported,
+      requiredCryptoKeyFormats = CryptoProvider.Jce.supportedCryptoKeyFormats,
+      requiredSignatureFormats = CryptoProvider.Jce.supportedSignatureFormats,
+      topologyChangeDelay = StaticSynchronizerParameters.defaultTopologyChangeDelay,
+      enableTransparencyChecks = false,
+      protocolVersion = testedProtocolVersion,
+      serial = NonNegativeInt.zero,
+    )
+
+  protected lazy val otherSynchronizerId: PhysicalSynchronizerId = PhysicalSynchronizerId(
+    SynchronizerId(
+      UniqueIdentifier.tryFromProtoPrimitive("other::default")
+    ),
+    jceStaticSynchronizerParameters,
   )
 
   protected lazy val testingTopology: TestingIdentityFactory =
-    TestingTopology(sessionSigningKeysConfig = sessionSigningKeysConfig)
-      .withSynchronizers(synchronizers = DefaultTestIdentities.synchronizerId, otherSynchronizerId)
+    TestingTopology()
+      .withSynchronizers(
+        synchronizers = DefaultTestIdentities.physicalSynchronizerId,
+        otherSynchronizerId,
+      )
       .withSimpleParticipants(participant1, participant2)
+      .withStaticSynchronizerParams(jceStaticSynchronizerParameters)
+      .withCryptoConfig(cryptoConfigWithSessionSigningKeysConfig(sessionSigningKeysConfig))
       .build(crypto, loggerFactory)
 
   protected lazy val defaultUsage: NonEmpty[Set[SigningKeyUsage]] = SigningKeyUsage.ProtocolOnly
-  protected lazy val storage: Storage = new MemoryStorage(loggerFactory, timeouts)
+
+  private val cryptoConfig: CryptoConfig = CryptoConfig()
+
+  // we define a "fake" [[CryptoConfig]] with a session signing keys configuration to control whether
+  // the testing environment uses session signing keys or not. Although the actual `crypto` implementation
+  // used in the tests is a JCE provider (and not a real KMS-backed environment), this "fake" configuration
+  // allows us to simulate a KMS-like setup. By enabling session signing keys within this config, we can trick
+  // the system into behaving as if it's running in a KMS environment, which is useful for testing code paths
+  // that depend on the presence of session signing keys without needing a real KMS infrastructure.
+  protected def cryptoConfigWithSessionSigningKeysConfig(
+      sessionSigningKeys: SessionSigningKeysConfig
+  ): CryptoConfig =
+    cryptoConfig
+      .focus(_.kms)
+      .replace(
+        Some(
+          Driver(
+            "mock",
+            ConfigValueFactory.fromAnyRef(0),
+            sessionSigningKeys = sessionSigningKeys,
+          )
+        )
+      )
+      .focus(_.provider)
+      .replace(CryptoProvider.Kms)
 
   protected lazy val crypto: Crypto = Crypto
     .create(
-      CryptoConfig(),
-      storage,
-      CryptoPrivateStoreFactory.withoutKms(wallClock, parallelExecutionContext),
-      CommunityKmsFactory,
+      cryptoConfig,
+      CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+      CachingConfigs.defaultPublicKeyConversionCache,
+      new MemoryStorage(loggerFactory, timeouts),
+      CryptoPrivateStoreFactory.withoutKms(),
       testedReleaseProtocolVersion,
-      nonStandardConfig = false,
       futureSupervisor,
       wallClock,
       executorService,
@@ -81,7 +152,6 @@ trait SyncCryptoTest extends AnyWordSpec with BaseTest with HasExecutionContext 
   protected lazy val syncCryptoVerifierP2: SyncCryptoVerifier = p2.syncCryptoVerifier
 
   def syncCryptoSignerTest(): Unit = {
-    // TODO(#23732): Add verify signature part and remaining tests (e.g. multiple signatures, etc,.)
     "correctly sign and verify a message" in {
       val signature = syncCryptoSignerP1
         .sign(
@@ -194,6 +264,14 @@ trait SyncCryptoTest extends AnyWordSpec with BaseTest with HasExecutionContext 
 
     }
 
+  }
+
+  override def afterAll(): Unit = {
+    LifeCycle.close(
+      syncCryptoSignerP1,
+      syncCryptoSignerP2,
+    )(logger)
+    super.afterAll()
   }
 
 }

@@ -16,8 +16,8 @@ import com.digitalasset.canton.console.{
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
 import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -55,8 +55,8 @@ trait BackpressureIntegrationTest
       )
       .withSetup { implicit env =>
         import env.*
-        participants.local.dars.upload(CantonExamplesPath)
         participants.local.synchronizers.connect_local(sequencer1, daName)
+        participants.local.dars.upload(CantonExamplesPath)
 
         // Code snippet just for the user manual
         // user-manual-entry-begin: SetResourceLimits
@@ -158,7 +158,7 @@ trait BackpressureIntegrationTest
             // Important to use ABORTED, because it is not used by GRPC internally and it indicates that a retry makes sense.
             entry.message should include("ABORTED/")
             numBackpressure.incrementAndGet()
-          } else if (entry.loggerName.contains("CantonSyncService")) {
+          } else if (entry.loggerName.contains("SynchronizerConnectionsManager")) {
             // Logged by the participant if too many messages need to be rejected
             entry.shouldBeCantonErrorCode(ParticipantOverloaded)
             isOverloaded.set(true)
@@ -337,6 +337,12 @@ trait BackpressureIntegrationTest
         // Make sure to test more than maxAccepted
         val testCount = maxAccepted * 2
 
+        // In addition to the above delay allowance for requests to become dirty (i.e. make it to phases 3 and 4),
+        // allow for requests to be submitted at a slower rate than testCount / second. In #24959, we see
+        // the submissions spanning over 1.4 seconds, and this lowers the actual rate at which requests are submitted.
+        // Hence, increase the max accepted number by 50% without changing the test count.
+        val maxAcceptedIncreasedForSlowSubmissionRate = maxAccepted * 3 / 2
+
         participant1.resources.set_resource_limits(
           ResourceLimits(Some(maxInFlight), Some(rateLimit), maxSubmissionBurstFactor = 0.01)
         )
@@ -347,7 +353,7 @@ trait BackpressureIntegrationTest
           preloadCount,
           testCount,
           minAccepted,
-          maxAccepted,
+          maxAcceptedIncreasedForSlowSubmissionRate,
           rateLimit,
         )
       }
@@ -404,7 +410,7 @@ trait BackpressureIntegrationTest
           if (entry.loggerName.contains("EnvironmentDefinition")) {
             entry.shouldBeCantonErrorCode(ParticipantBackpressure)
             entry.message should include("ABORTED/")
-          } else if (entry.loggerName.contains("CantonSyncService")) {
+          } else if (entry.loggerName.contains("SynchronizerConnectionsManager")) {
             entry.shouldBeCantonErrorCode(ParticipantOverloaded)
           } else {
             fail(s"Unexpected logger name: $entry")
@@ -425,7 +431,7 @@ trait BackpressureIntegrationTest
 }
 
 class BackpressureIntegrationTestInMemory extends BackpressureIntegrationTest {
-  registerPlugin(new UseCommunityReferenceBlockSequencer[StorageConfig.Memory](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[StorageConfig.Memory](loggerFactory))
   registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 }
 

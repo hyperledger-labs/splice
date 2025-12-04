@@ -35,10 +35,10 @@ trait SvFrontendTestUtil extends TestCommon {
     }
     if (enabled) {
       clue("click the submit button") {
-        click on "create-voterequest-submit-button"
+        eventuallyClickOn(id("create-voterequest-submit-button"))
       }
       clue("click accept on the confirmation dialog") {
-        click on "vote-confirmation-dialog-accept-button"
+        eventuallyClickOn(id("vote-confirmation-dialog-accept-button"))
       }
     }
   }

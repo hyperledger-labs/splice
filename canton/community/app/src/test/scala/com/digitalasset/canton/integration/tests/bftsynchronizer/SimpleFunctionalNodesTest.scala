@@ -7,20 +7,17 @@ import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.console.commands.SynchronizerChoice
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UseH2,
-  UsePostgres,
-}
+import com.digitalasset.canton.crypto.SigningKeyUsage
+import com.digitalasset.canton.integration.plugins.{UseH2, UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
   EnvironmentDefinition,
   SharedEnvironment,
 }
-import com.digitalasset.canton.logging.SuppressingLogger
 import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
+import com.digitalasset.canton.topology.transaction.DelegationRestriction.CanSignAllMappings
 
 import scala.concurrent.duration.*
 
@@ -29,10 +26,8 @@ trait SimpleFunctionalNodesTest
     with SharedEnvironment
     with NodeTestingUtils {
 
-  override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
-
   private val topologyTransactionRegistrationTimeout =
-    config.NonNegativeDuration.tryFromDuration(5.seconds)
+    config.NonNegativeFiniteDuration.tryFromDuration(5.seconds)
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P1_S1M1
@@ -53,15 +48,25 @@ trait SimpleFunctionalNodesTest
 
   "Temporarily stop sequencer and participant re-send topology after restart" in { implicit env =>
     import env.*
-
+    val usingPool = participant1.config.sequencerClient.useNewConnectionPool
     loggerFactory.assertLogsUnorderedOptional(
       {
+
+        val testKey = participant1.keys.secret
+          .generate_signing_key("test-key", usage = SigningKeyUsage.NamespaceOnly)
+
         // Stop the only sequencer
         stopAndWait(sequencer1)
 
-        // Have the participant struggle to publish party creation.
-        participant1.parties
-          .enable("partyToSeeAfterSequencerRestart", waitForSynchronizer = SynchronizerChoice.None)
+        // Have the participant struggle to publish a namespace delegation
+        participant1.topology.namespace_delegations
+          .propose_delegation(
+            participant1.namespace,
+            testKey,
+            CanSignAllMappings,
+            Authorized,
+            synchronize = None,
+          )
 
         // Then restart the sequencer
         startAndWait(sequencer1)
@@ -74,13 +79,26 @@ trait SimpleFunctionalNodesTest
 
         // Eventually the participant SynchronizerOutbox should succeed at resending the party creation.
         eventually() {
-          val parties = participant1.parties.list("partyToSeeAfterSequencerRestart")
-          parties should have size (1)
+          val delegations = participant1.topology.namespace_delegations.list(
+            daId,
+            filterNamespace = participant1.namespace.filterString,
+            filterTargetKey = Some(testKey.fingerprint),
+          )
+          delegations should have size 1
         }
       },
       (
         LogEntryOptionality.OptionalMany,
-        _.warningMessage should include("Request failed for sequencer. Is the server running?"),
+        _.warningMessage should include(
+          if (usingPool) "Request failed for server-sequencer1-0. Is the server running?"
+          else "Request failed for sequencer. Is the server running?"
+        ),
+      ),
+      (
+        LogEntryOptionality.OptionalMany,
+        _.warningMessage should include(
+          "Failed broadcasting topology transactions: RequestFailed(No connection available)."
+        ),
       ),
       (
         LogEntryOptionality.Required,
@@ -95,7 +113,7 @@ trait SimpleFunctionalNodesTest
     participant1.ledger_api.parties.allocate("partyCannotRecreate")
     eventually() {
       val parties = participant1.parties.list("partyCannotRecreate")
-      parties should have size (1)
+      parties should have size 1
     }
 
     logger.info("About to allocate the same party a second time")
@@ -113,10 +131,10 @@ trait SimpleFunctionalNodesTest
 
 class SimpleFunctionalNodesTestH2 extends SimpleFunctionalNodesTest {
   registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 }
 
 class SimpleFunctionalNodesTestPostgres extends SimpleFunctionalNodesTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

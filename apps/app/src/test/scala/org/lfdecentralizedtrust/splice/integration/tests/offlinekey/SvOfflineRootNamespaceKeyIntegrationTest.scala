@@ -31,11 +31,9 @@ class SvOfflineRootNamespaceKeyIntegrationTest
       .simpleTopology4Svs(cantonNameSuffix)
       // we start the participants during the test so we cannot pre-allocate
       .withPreSetup(_ => ())
-      .addConfigTransforms(
-        (_, config) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(config),
-        (_, config) =>
-          // use a fresh participant to ensure a fresh deployment so we can validate the topology state
-          ConfigTransforms.bumpCantonPortsBy(22_000)(config),
+      .addConfigTransforms((_, config) =>
+        // use a fresh participant to ensure a fresh deployment so we can validate the topology state
+        ConfigTransforms.bumpCantonPortsBy(22_000)(config)
       )
       // Add a suffix to the canton identifiers to avoid metric conflicts with the shared canton nodes
       .withCantonNodeNameSuffix(cantonNameSuffix)

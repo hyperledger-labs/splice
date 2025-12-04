@@ -5,20 +5,18 @@ package com.digitalasset.canton.ledger.api.validation
 
 import com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilter
 import com.daml.ledger.api.v2.transaction_filter.{
-  CumulativeFilter as ProtoCumulativeFilter,
   EventFormat as ProtoEventFormat,
   Filters,
   InterfaceFilter as ProtoInterfaceFilter,
   ParticipantAuthorizationTopologyFormat as ProtoParticipantAuthorizationTopologyFormat,
   TemplateFilter as ProtoTemplateFilter,
   TopologyFormat as ProtoTopologyFormat,
-  TransactionFilter as ProtoTransactionFilter,
   TransactionFormat as ProtoTransactionFormat,
   TransactionShape as ProtoTransactionShape,
   UpdateFormat as ProtoUpdateFormat,
   WildcardFilter,
 }
-import com.digitalasset.canton.ledger.api.TransactionShape.AcsDelta
+import com.daml.ledger.api.v2.value.Identifier
 import com.digitalasset.canton.ledger.api.validation.ValueValidator.*
 import com.digitalasset.canton.ledger.api.{
   CumulativeFilter,
@@ -34,71 +32,16 @@ import com.digitalasset.canton.ledger.api.{
 }
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.daml.lf.data.Ref.{PackageRef, TypeConRef}
 import io.grpc.StatusRuntimeException
 import scalaz.std.either.*
 import scalaz.std.list.*
 import scalaz.syntax.traverse.*
 
-import scala.annotation.nowarn
-
 object FormatValidator {
 
   import FieldValidator.*
   import ValidationErrors.*
-
-  // TODO(i23504) Cleanup
-  @nowarn("cat=deprecation")
-  def validate(
-      txFilter: ProtoTransactionFilter,
-      verbose: Boolean,
-  )(implicit
-      errorLoggingContext: ErrorLoggingContext
-  ): Either[StatusRuntimeException, EventFormat] =
-    validate(ProtoEventFormat(txFilter.filtersByParty, txFilter.filtersForAnyParty, verbose))
-
-  // TODO(i23504) Cleanup
-  @nowarn("cat=deprecation")
-  def validateLegacyToUpdateFormat(
-      txFilter: ProtoTransactionFilter,
-      verbose: Boolean,
-  )(implicit
-      errorLoggingContext: ErrorLoggingContext
-  ): Either[StatusRuntimeException, UpdateFormat] =
-    for {
-      eventFormat <- FormatValidator.validate(txFilter, verbose)
-    } yield UpdateFormat(
-      includeTransactions =
-        Some(TransactionFormat(eventFormat = eventFormat, transactionShape = AcsDelta)),
-      includeReassignments = Some(eventFormat),
-      includeTopologyEvents = None,
-    )
-
-  // TODO(i23504) Cleanup
-  @nowarn("cat=deprecation")
-  def validateLegacyToTransactionFormat(
-      requestingParties: Seq[String]
-  )(implicit
-      errorLoggingContext: ErrorLoggingContext
-  ): Either[StatusRuntimeException, TransactionFormat] = {
-    val txFilter = ProtoTransactionFilter(
-      filtersByParty = requestingParties
-        .map(
-          _ -> Filters(
-            Seq(
-              ProtoCumulativeFilter(
-                ProtoCumulativeFilter.IdentifierFilter
-                  .WildcardFilter(WildcardFilter(includeCreatedEventBlob = false))
-              )
-            )
-          )
-        )
-        .toMap,
-      filtersForAnyParty = None,
-    )
-    for {
-      eventFormat <- FormatValidator.validate(txFilter = txFilter, verbose = true)
-    } yield TransactionFormat(eventFormat = eventFormat, transactionShape = AcsDelta)
-  }
 
   def validate(eventFormat: ProtoEventFormat)(implicit
       errorLoggingContext: ErrorLoggingContext
@@ -227,7 +170,7 @@ object FormatValidator {
   ): Either[StatusRuntimeException, TemplateFilter] =
     for {
       templateId <- requirePresence(filter.templateId, "templateId")
-      typeConRef <- validateTypeConRef(templateId)
+      typeConRef <- validateTypeConRefWithWarning(templateId)
     } yield TemplateFilter(
       templateTypeRef = typeConRef,
       includeCreatedEventBlob = filter.includeCreatedEventBlob,
@@ -238,12 +181,28 @@ object FormatValidator {
   ): Either[StatusRuntimeException, InterfaceFilter] =
     for {
       interfaceId <- requirePresence(filter.interfaceId, "interfaceId")
-      typeConRef <- validateTypeConRef(interfaceId)
+      typeConRef <- validateTypeConRefWithWarning(interfaceId)
     } yield InterfaceFilter(
       interfaceTypeRef = typeConRef,
       includeView = filter.includeInterfaceView,
       includeCreatedEventBlob = filter.includeCreatedEventBlob,
     )
+
+  private def validateTypeConRefWithWarning(identifier: Identifier)(implicit
+      errorLoggingContext: ErrorLoggingContext
+  ): Either[StatusRuntimeException, TypeConRef] =
+    for {
+      typeConRef <- validateTypeConRef(identifier)
+      _ = typeConRef.pkg match {
+        case PackageRef.Name(_) => ()
+        case PackageRef.Id(id) =>
+          errorLoggingContext.logger.warn(
+            s"Received an identifier with package ID $id, but expected a package name. " +
+              "The query will be resolved for the package-name pertaining to the requested package-id instead. " +
+              "The usage of package IDs in identifiers is deprecated and will be removed in a future release."
+          )(errorLoggingContext.traceContext)
+      }
+    } yield typeConRef
 
   private def validateNonEmptyFilters(
       templateFilters: Seq[ProtoTemplateFilter],

@@ -9,10 +9,12 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcConnectionState
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.{
   P2PEndpoint,
   PlainTextP2PEndpoint,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.endpointToTestBftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Module.{
   SystemInitializationResult,
   SystemInitializer,
@@ -21,6 +23,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Consensus,
   Output,
   P2PNetworkOut,
+  Pruning,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.SimulationModuleSystem.{
@@ -33,6 +36,8 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Env,
   Module,
   ModuleName,
+  P2PConnectionEventListener,
+  P2PNetworkManager,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.framework.PipeTest.{
   Reporter,
@@ -113,41 +118,52 @@ object PipeTest {
     }
   }
 
-  def mkNode[E <: Env[E]](
+  def mkNode[
+      E <: Env[E],
+      P2PNetworkManagerT
+        <: P2PNetworkManager[
+          E,
+          String,
+        ],
+  ](
       pipeStore: PipeStore[E],
       reporter: Reporter,
       loggerFactory: NamedLoggerFactory,
       timeouts: ProcessingTimeout,
-  ): SystemInitializer[E, String, String] = (system, _) => {
-    val module = new PipeNode[E](pipeStore, reporter, loggerFactory, timeouts)
-    val ref = system.newModuleRef[String](ModuleName("module"))
-    system.setModule(ref, module)
-    val p2PAdminModuleRef = system.newModuleRef[P2PNetworkOut.Admin](ModuleName("p2PAdminModule"))
-    val consensusAdminModuleRef =
-      system.newModuleRef[Consensus.Admin](ModuleName("consensusAdminModule"))
-    val outputModuleRef =
-      system.newModuleRef[Output.SequencerSnapshotMessage](ModuleName("outputModule"))
-    ref.asyncSend("init")
-    SystemInitializationResult(
-      ref,
-      ref,
-      p2PAdminModuleRef,
-      consensusAdminModuleRef,
-      outputModuleRef,
-    )
-  }
+  ): SystemInitializer[E, P2PNetworkManagerT, String, String] =
+    (system, createP2PNetworkManager) => {
+      val inputModuleRef = system.newModuleRef[String](ModuleName("module"))()
+      val p2pNetworkManager =
+        createP2PNetworkManager(P2PConnectionEventListener.NoOp, inputModuleRef)
+      val module = new PipeNode[E](pipeStore, reporter, loggerFactory, timeouts)
+      system.setModule(inputModuleRef, module)
+      val p2PAdminModuleRef =
+        system.newModuleRef[P2PNetworkOut.Admin](ModuleName("p2PAdminModule"))()
+      val consensusAdminModuleRef =
+        system.newModuleRef[Consensus.Admin](ModuleName("consensusAdminModule"))()
+      val outputModuleRef =
+        system.newModuleRef[Output.Message[E]](ModuleName("outputModule"))()
+      val pruningModuleRef =
+        system.newModuleRef[Pruning.Message](ModuleName("pruningModule"))()
+      inputModuleRef.asyncSendNoTrace("init")
+      SystemInitializationResult(
+        inputModuleRef,
+        inputModuleRef,
+        p2PAdminModuleRef,
+        consensusAdminModuleRef,
+        outputModuleRef,
+        pruningModuleRef,
+        p2pNetworkManager,
+      )
+    }
 }
 
 class PipeTest extends AnyFlatSpec with BaseTest {
 
   it should "simulation should implement pipeToSelf correctly" in {
     val simSettings = SimulationSettings(
-      localSettings = LocalSettings(
-        randomSeed = 4
-      ),
-      networkSettings = NetworkSettings(
-        randomSeed = 4
-      ),
+      localSettings = LocalSettings(randomSeed = 4),
+      networkSettings = NetworkSettings(randomSeed = 4),
       durationOfFirstPhaseWithFaults = 2.minutes,
     )
 
@@ -161,7 +177,8 @@ class PipeTest extends AnyFlatSpec with BaseTest {
           loggerFactory,
           timeouts,
         )(
-          PipeTest.mkNode(pipeStore, reporter, loggerFactory, timeouts)
+          PipeTest.mkNode(pipeStore, reporter, loggerFactory, timeouts),
+          new P2PGrpcConnectionState(endpointToTestBftNodeId(theEndpoint), loggerFactory),
         )
     )
 

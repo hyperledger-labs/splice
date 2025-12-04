@@ -3,11 +3,12 @@
 
 package com.digitalasset.canton.sequencing.client.channel
 
+import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SequencerAlias
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.crypto.{Crypto, SynchronizerCryptoClient}
+import com.digitalasset.canton.crypto.{SynchronizerCrypto, SynchronizerCryptoClient}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
@@ -20,8 +21,8 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnections,
 }
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{Member, SequencerId, SynchronizerId}
-import com.digitalasset.canton.tracing.TracingConfig
+import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId, SequencerId}
+import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
 import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.ManagedChannel
 
@@ -31,9 +32,9 @@ import scala.concurrent.ExecutionContextExecutor
   * transports
   */
 final class SequencerChannelClientFactory(
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     synchronizerCryptoApi: SynchronizerCryptoClient,
-    crypto: Crypto,
+    crypto: SynchronizerCrypto,
     config: SequencerClientConfig,
     traceContextPropagation: TracingConfig.Propagation,
     synchronizerParameters: StaticSynchronizerParameters,
@@ -47,7 +48,8 @@ final class SequencerChannelClientFactory(
       sequencerConnections: SequencerConnections,
       expectedSequencers: NonEmpty[Map[SequencerAlias, SequencerId]],
   )(implicit
-      executionContext: ExecutionContextExecutor
+      executionContext: ExecutionContextExecutor,
+      traceContext: TraceContext,
   ): Either[String, SequencerChannelClient] =
     makeChannelTransports(
       sequencerConnections,
@@ -132,6 +134,8 @@ final class SequencerChannelClientFactory(
       supportedProtocolVersions,
       config.authToken,
       clock,
+      metricsO = None,
+      metricsContext = MetricsContext.Empty,
       processingTimeout,
       SequencerClient.loggerFactoryWithSequencerAlias(
         loggerFactory,

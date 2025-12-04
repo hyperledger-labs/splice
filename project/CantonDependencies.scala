@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.3.0-snapshot.20250624.13835.0.v78d74d4a"
+  val version: String = "3.4.4"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -133,7 +133,7 @@ object CantonDependencies {
 
   lazy val grpc_api = "io.grpc" % "grpc-api" % grpc_version
   lazy val grpc_protobuf = "io.grpc" % "grpc-protobuf" % grpc_version
-  lazy val grpc_netty = "io.grpc" % "grpc-netty" % grpc_version
+  lazy val grpc_netty_shaded = "io.grpc" % "grpc-netty-shaded" % grpc_version
   lazy val grpc_stub = "io.grpc" % "grpc-stub" % grpc_version
   // pick the version of boring ssl from this table: https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty
   // required for ALPN (which is required for TLS+HTTP/2) when running on Java 8. JSSE will be used on Java 9+.
@@ -184,9 +184,9 @@ object CantonDependencies {
   lazy val janino = "org.codehaus.janino" % "janino" % "3.1.4"
   lazy val logstash = "net.logstash.logback" % "logstash-logback-encoder" % "6.6"
 
-  lazy val cats = "org.typelevel" %% "cats-core" % "2.6.1"
-  lazy val cats_law = "org.typelevel" %% "cats-laws" % "2.6.1"
-  lazy val cats_scalacheck = "io.chrisdavenport" %% "cats-scalacheck" % "0.2.0"
+  lazy val cats = "org.typelevel" %% "cats-core" % "2.9.0"
+  lazy val cats_law = "org.typelevel" %% "cats-laws" % "2.9.0"
+  lazy val cats_scalacheck = "io.chrisdavenport" %% "cats-scalacheck" % "0.3.2"
 
   lazy val chimney = "io.scalaland" %% "chimney" % "1.4.0"
 
@@ -231,9 +231,10 @@ object CantonDependencies {
   lazy val slick = "com.typesafe.slick" %% "slick" % slick_version
   lazy val slick_hikaricp = "com.typesafe.slick" %% "slick-hikaricp" % slick_version
 
-  lazy val testcontainers_version = "1.15.3"
+  lazy val testcontainers_version = "2.0.2"
   lazy val testcontainers = "org.testcontainers" % "testcontainers" % testcontainers_version
-  lazy val testcontainers_postgresql = "org.testcontainers" % "postgresql" % testcontainers_version
+  lazy val testcontainers_postgresql =
+    "org.testcontainers" % "testcontainers-postgresql" % testcontainers_version
 
   lazy val sttp_version = "3.8.16"
   lazy val sttp = "com.softwaremill.sttp.client3" %% "core" % sttp_version
@@ -290,4 +291,13 @@ object CantonDependencies {
   lazy val protobuf_version = google_protobuf_java.revision
   lazy val google_protobuf_java_util =
     "com.google.protobuf" % "protobuf-java-util" % protobuf_version
+
+  // AWS SDK for Java API to encrypt/decrypt keys using AWS KMS
+  lazy val aws_version = "2.29.5"
+  lazy val aws_kms = "software.amazon.awssdk" % "kms" % aws_version
+  lazy val aws_sts = "software.amazon.awssdk" % "sts" % aws_version
+
+  // GCP SDK for Java API to encrypt/decrypt keys using GCP KMS
+  lazy val gcp_kms_version = "2.55.0"
+  lazy val gcp_kms = "com.google.cloud" % "google-cloud-kms" % gcp_kms_version
 }

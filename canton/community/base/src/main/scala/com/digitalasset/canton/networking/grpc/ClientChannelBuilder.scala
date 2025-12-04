@@ -15,8 +15,8 @@ import com.digitalasset.canton.tracing.TraceContextGrpc
 import com.digitalasset.canton.tracing.TracingConfig.Propagation
 import com.digitalasset.canton.util.ResourceUtil.withResource
 import com.google.protobuf.ByteString
-import io.grpc.netty.{GrpcSslContexts, NettyChannelBuilder}
-import io.netty.handler.ssl.{SslContext, SslContextBuilder}
+import io.grpc.netty.shaded.io.grpc.netty.{GrpcSslContexts, NettyChannelBuilder}
+import io.grpc.netty.shaded.io.netty.handler.ssl.{SslContext, SslContextBuilder}
 
 import java.util.concurrent.{Executor, TimeUnit}
 import scala.jdk.CollectionConverters.*
@@ -76,7 +76,7 @@ class ClientChannelBuilder private (protected val loggerFactory: NamedLoggerFact
     maxInboundMessageSize.foreach(s => builder.maxInboundMessageSize(s.unwrap))
     ClientChannelBuilder.configureKeepAlive(keepAliveClient, builder).discard
     if (traceContextPropagation == Propagation.Enabled)
-      builder.intercept(TraceContextGrpc.clientInterceptor).discard
+      builder.intercept(TraceContextGrpc.clientInterceptor()).discard
 
     if (useTls) {
       builder

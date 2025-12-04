@@ -3,23 +3,18 @@
 
 package com.digitalasset.canton.integration.tests.topology
 
-import com.digitalasset.canton.admin.api.client.data.PartyDetails
+import com.digitalasset.canton.admin.api.client.data.parties.PartyDetails
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.console.commands.SynchronizerChoice
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
   SharedEnvironment,
 }
-import com.digitalasset.canton.ledger.error.groups.PartyManagementServiceErrors.PartyNotFound
 import com.digitalasset.canton.topology.TopologyManagerError.MappingAlreadyExists
-import com.digitalasset.canton.topology.transaction.{ParticipantPermission, TopologyChangeOp}
+import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId, UniqueIdentifier}
 
 import java.util.UUID
@@ -71,7 +66,7 @@ trait PartyManagementIntegrationTest extends CommunityIntegrationTest with Share
         val partyId = participant1.parties.enable(
           name,
           synchronizeParticipants = Seq(participant1),
-          waitForSynchronizer = SynchronizerChoice.Only(Seq(daName)),
+          synchronizer = daName,
         )
         // Check that we see it
         participant1.topology.party_to_participant_mappings
@@ -99,7 +94,7 @@ trait PartyManagementIntegrationTest extends CommunityIntegrationTest with Share
         participant1.parties.enable(
           name,
           synchronizeParticipants = Seq(participant1),
-          waitForSynchronizer = SynchronizerChoice.Only(Seq(daName)),
+          synchronizer = daName,
         )
         eventually() {
           // Check that we see it again, but now with serial=3
@@ -110,7 +105,6 @@ trait PartyManagementIntegrationTest extends CommunityIntegrationTest with Share
             .serial shouldBe PositiveInt.three
         }
       }
-
     }
 
     "updating parties" should {
@@ -150,7 +144,7 @@ trait PartyManagementIntegrationTest extends CommunityIntegrationTest with Share
                 partyDetails.copy(annotations = partyDetails.annotations.updated("a", "b"))
               },
             ),
-          _.shouldBeCantonErrorCode(PartyNotFound),
+          _.errorMessage should include("The following parties were not found on the Ledger"),
         )
       }
 
@@ -292,10 +286,9 @@ trait PartyManagementIntegrationTest extends CommunityIntegrationTest with Share
     }
 
   }
-
 }
 
 class PartyManagementIntegrationTestPostgres extends PartyManagementIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

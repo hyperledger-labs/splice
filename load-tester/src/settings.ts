@@ -39,6 +39,8 @@ export const configSchema = z.object({
   test: z.object({
     duration: z.string().min(1),
     iterationsPerMinute: z.coerce.number().min(1),
+    preAllocatedVUs: z.coerce.number().default(20),
+    maxVUs: z.coerce.number().default(50),
   }),
   adaptiveScenario: z.object({
     enabled: z.boolean(),
@@ -76,8 +78,8 @@ export default {
         rate: config.test.iterationsPerMinute,
         timeUnit: '1m',
 
-        // Pre-allocate VUs
-        preAllocatedVUs: 20,
+        preAllocatedVUs: config.test.preAllocatedVUs,
+        maxVUs: config.test.maxVUs,
       },
     },
   },

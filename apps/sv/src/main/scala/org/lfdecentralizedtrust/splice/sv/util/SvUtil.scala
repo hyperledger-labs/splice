@@ -66,6 +66,7 @@ object SvUtil {
   // (See #12107).
   val defaultAcsCommitmentReconciliationInterval: PositiveDurationSeconds =
     PositiveDurationSeconds.ofMinutes(30)
+
   val defaultAcsCommitmentsCatchUpParameters: AcsCommitmentsCatchUpParameters =
     AcsCommitmentsCatchUpParameters(
       // With the default reconciliation interval of 30m this corresponds to a catchup interval of 30m * 24 = 12 hours.
@@ -180,7 +181,7 @@ object SvUtil {
   def getSV1SynchronizerNodeConfig(
       cometBftNode: Option[CometBftNode],
       localSynchronizerNode: LocalSynchronizerNode,
-      scanConfig: Option[SvScanConfig],
+      scanConfig: SvScanConfig,
       synchronizerId: SynchronizerId,
       clock: Clock,
       migrationId: Long,
@@ -234,7 +235,7 @@ object SvUtil {
           cometBftConfig,
           sequencerConfig.toJava,
           mediatorConfig.toJava,
-          scanConfig.map(c => new ScanConfig(c.publicUrl.toString())).toJava,
+          Optional.of(new ScanConfig(scanConfig.publicUrl.toString())),
           Optional.empty(),
         )
       ).asJava
@@ -317,7 +318,10 @@ object SvUtil {
     }
   }
 
-  def generateRandomOnboardingSecret(sv: PartyId): ValidatorOnboardingSecret = {
+  def generateRandomOnboardingSecret(
+      sv: PartyId,
+      partyHint: Option[String],
+  ): ValidatorOnboardingSecret = {
     val rng = new SecureRandom();
     // 256 bits of entropy
     val bytes = new Array[Byte](ValidatorOnboardingSecretLength)
@@ -326,6 +330,7 @@ object SvUtil {
     ValidatorOnboardingSecret(
       sv,
       secret,
+      partyHint,
     )
   }
 

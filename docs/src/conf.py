@@ -24,6 +24,7 @@ import yaml
 from datetime import date
 import re
 
+sys.path.insert(0, os.path.abspath('./_extensions'))
 
 # make_id from docutils removes leading digits from IDs, which makes it impossible to have permanent links to numbered
 # headings. We prefix IDs which start with a digit with "id-" before passing it to make_id to make permanent links work.
@@ -69,6 +70,8 @@ extensions = [
     # interact the right way with how copy-buttons are placed.
     "sphinx_reredirects",
     "sphinxcontrib.openapi",
+    # Custom extensions from the _extensions directory
+    "release_directive",
 ]
 
 # -- Redirects -----------------------------------------------------------

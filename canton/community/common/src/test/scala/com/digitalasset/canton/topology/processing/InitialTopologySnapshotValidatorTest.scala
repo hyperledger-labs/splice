@@ -4,13 +4,12 @@
 package com.digitalasset.canton.topology.processing
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.FailOnShutdown
 import com.digitalasset.canton.config.CantonRequireTypes.String300
-import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SynchronizerCryptoPureApi}
+import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.store.db.{DbTest, PostgresTest}
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.topology.store.db.DbTopologyStoreHelper
 import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
 import com.digitalasset.canton.topology.store.{
@@ -25,22 +24,33 @@ import com.digitalasset.canton.topology.transaction.{
   SignedTopologyTransaction,
 }
 import com.digitalasset.canton.version.ProtocolVersionValidation
+import com.digitalasset.canton.{FailOnShutdown, HasActorSystem}
 
 abstract class InitialTopologySnapshotValidatorTest
     extends TopologyTransactionHandlingBase
+    with HasActorSystem
     with FailOnShutdown {
 
   import Factory.*
 
+  protected def mkDefault() = mk(
+    mkStore(
+      Factory.physicalSynchronizerId1a,
+      "initial-validation",
+    )
+  )
+
   protected def mk(
-      store: TopologyStore[TopologyStoreId.SynchronizerStore] = mkStore(Factory.synchronizerId1a)
+      store: TopologyStore[TopologyStoreId.SynchronizerStore]
   ): (InitialTopologySnapshotValidator, TopologyStore[TopologyStoreId.SynchronizerStore]) = {
 
     val validator = new InitialTopologySnapshotValidator(
       new SynchronizerCryptoPureApi(defaultStaticSynchronizerParameters, crypto),
       store,
-      DefaultProcessingTimeouts.testing,
+      staticSynchronizerParameters = Some(defaultStaticSynchronizerParameters),
+      validateInitialSnapshot = true,
       loggerFactory,
+      cleanupTopologySnapshot = true,
     )
     (validator, store)
   }
@@ -60,13 +70,13 @@ abstract class InitialTopologySnapshotValidatorTest
           ns3k3_k3 -> false, // check that duplicates are properly processed
           dnd_proposal_k1 -> true,
           dnd_proposal_k2 -> true,
+          okm1bk5k1E_k1 -> false,
           dtcp1_k1 -> false,
           dnd_proposal_k3
             .copy(isProposal = false)
             .addSignatures(dnd_proposal_k1.signatures)
             .addSignatures(dnd_proposal_k2.signatures)
             -> false,
-          okm1bk5k1E_k1 -> false,
         ).map { case (tx, expireImmediately) =>
           StoredTopologyTransaction(
             SequencedTime(timestampForInit),
@@ -77,7 +87,7 @@ abstract class InitialTopologySnapshotValidatorTest
           )
         }
       )
-      val (validator, store) = mk()
+      val (validator, store) = mkDefault()
 
       val result = validator.validateAndApplyInitialTopologySnapshot(genesisState).futureValueUS
       result shouldBe Right(())
@@ -95,8 +105,8 @@ abstract class InitialTopologySnapshotValidatorTest
           ns2k2_k2,
           ns3k3_k3,
           ns1k2_k1,
-          dtcp1_k1,
           okm1bk5k1E_k1,
+          dtcp1_k1,
           okmS1k7_k1.removeSignatures(Set(SigningKeys.key7.fingerprint)).value,
         ).map(tx =>
           StoredTopologyTransaction(
@@ -109,7 +119,7 @@ abstract class InitialTopologySnapshotValidatorTest
         )
       )
 
-      val (validator, store) = mk()
+      val (validator, store) = mkDefault()
 
       val result = validator.validateAndApplyInitialTopologySnapshot(genesisState).futureValueUS
       result shouldBe Right(())
@@ -132,7 +142,7 @@ abstract class InitialTopologySnapshotValidatorTest
       // construct a proto with multiple signatures, just like it would be deserialized from a pre-signature-deduplication snapshot
       val dnd_duplicate_k1_sig = {
         val dndProto = dnd.toProtoV30
-        val newSig = cryptoApi.crypto.privateCrypto
+        val newSig = syncCryptoClient.crypto.privateCrypto
           .sign(dnd.hash.hash, SigningKeys.key1.fingerprint, SigningKeyUsage.NamespaceOnly)
           .futureValueUS
           .value
@@ -150,7 +160,9 @@ abstract class InitialTopologySnapshotValidatorTest
       }
 
       dnd.signatures should not be dnd_duplicate_k1_sig.signatures
-      dnd.signatures.map(_.signedBy) shouldBe dnd_duplicate_k1_sig.signatures.map(_.signedBy)
+      dnd.signatures.map(_.authorizingLongTermKey) shouldBe dnd_duplicate_k1_sig.signatures.map(
+        _.authorizingLongTermKey
+      )
 
       val inputTransactions = List(
         ns1k1_k1 -> false, // whether to expire immediately or not
@@ -187,7 +199,7 @@ abstract class InitialTopologySnapshotValidatorTest
         )
 
       val genesisState = toStored(inputTransactions)
-      val (validator, store) = mk()
+      val (validator, store) = mkDefault()
 
       val result = validator.validateAndApplyInitialTopologySnapshot(genesisState).futureValueUS
       result shouldBe Right(())
@@ -211,8 +223,8 @@ abstract class InitialTopologySnapshotValidatorTest
           ns2k2_k2,
           ns3k3_k3,
           ns1k2_k1,
-          dtcp1_k1,
           okm1bk5k1E_k1,
+          dtcp1_k1,
         ).map(tx =>
           StoredTopologyTransaction(
             SequencedTime(timestampForInit),
@@ -223,17 +235,19 @@ abstract class InitialTopologySnapshotValidatorTest
           )
         ) :+ StoredTopologyTransaction(
           SequencedTime(ts(1)),
-          EffectiveTime(ts(1).plus((dmp1_k1.mapping.parameters.topologyChangeDelay.duration))),
+          EffectiveTime(
+            ts(1).plus((StaticSynchronizerParameters.defaultTopologyChangeDelay.unwrap))
+          ),
           validUntil = None,
           okmS1k7_without_k7_signature,
           None,
         )
       )
 
-      val (validator, store) = mk()
+      val (validator, store) = mkDefault()
 
       val result = validator.validateAndApplyInitialTopologySnapshot(genesisState).futureValueUS
-      result.left.value should include regex ("(?s)Store:.*rejectionReason = 'Not authorized'".r)
+      result.left.value should include regex ("(?s)Store:.*rejectionReason = 'Not fully authorized'".r)
 
       val stateAfterInitialization = fetch(store, ts(2))
       // the OTK is rejected and therefore is not returned when looking up valid transactions
@@ -246,7 +260,7 @@ abstract class InitialTopologySnapshotValidatorTest
         .value
         .rejectionReason
         .value
-        .str shouldBe "Not authorized"
+        .str shouldBe "Not fully authorized"
     }
 
     "detect inconsistencies between the snapshot and the result of processing the transactions" in {
@@ -271,7 +285,7 @@ abstract class InitialTopologySnapshotValidatorTest
             ns2k2_k2,
             rejectionReason = Some(String300.tryCreate("some rejection reason")),
           )
-        val (validator, _) = mk()
+        val (validator, _) = mkDefault()
         val result = validator
           .validateAndApplyInitialTopologySnapshot(
             // include a valid transaction as well
@@ -297,7 +311,7 @@ abstract class InitialTopologySnapshotValidatorTest
           ns1k3_k2,
           rejectionReason = None,
         )
-        val (validator, _) = mk()
+        val (validator, _) = mkDefault()
         val result = validator
           .validateAndApplyInitialTopologySnapshot(
             // include a valid transaction as well
@@ -317,12 +331,13 @@ abstract class InitialTopologySnapshotValidatorTest
 
 class InitialTopologySnapshotValidatorTestInMemory extends InitialTopologySnapshotValidatorTest {
   protected def mkStore(
-      synchronizerId: SynchronizerId = SynchronizerId(Factory.uid1a)
+      synchronizerId: PhysicalSynchronizerId = Factory.physicalSynchronizerId1,
+      testName: String,
   ): TopologyStore[TopologyStoreId.SynchronizerStore] =
     new InMemoryTopologyStore(
       TopologyStoreId.SynchronizerStore(synchronizerId),
       testedProtocolVersion,
-      loggerFactory,
+      loggerFactory.appendUnnamedKey("testName", testName),
       timeouts,
     )
 

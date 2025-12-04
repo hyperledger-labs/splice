@@ -9,6 +9,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLogging, TracedLogger}
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.networking.grpc.GrpcError
+import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
 import com.google.protobuf.ByteString
 
@@ -55,6 +56,9 @@ object ConnectionX {
     *   Whether the connection uses TLS.
     * @param customTrustCertificates
     *   Custom X.509 certificates in PEM format, defined if using TLS.
+    * @param expectedSequencerIdO
+    *   If provided, defines the sequencer ID that the connected sequencer is expected to report. If
+    *   empty, any sequencer ID will be accepted.
     * @param tracePropagation
     *   Trace propagation mode used for this connection.
     */
@@ -63,8 +67,17 @@ object ConnectionX {
       endpoint: Endpoint,
       transportSecurity: Boolean,
       customTrustCertificates: Option[ByteString],
+      expectedSequencerIdO: Option[SequencerId],
       tracePropagation: TracingConfig.Propagation,
-  )
+  ) extends PrettyPrinting {
+    override protected def pretty: Pretty[ConnectionXConfig] = prettyOfClass(
+      param("name", _.name.singleQuoted),
+      param("endpoint", _.endpoint.toURI(transportSecurity)),
+      param("transportSecurity", _.transportSecurity),
+      param("customTrustCertificates", _.customTrustCertificates.nonEmpty),
+      paramIfDefined("expectedSequencerId", _.expectedSequencerIdO),
+    )
+  }
 
   class ConnectionXHealth(
       override val name: String,

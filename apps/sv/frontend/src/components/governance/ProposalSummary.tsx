@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Box, Typography } from '@mui/material';
-import { ConfigChange } from '../../utils/types';
+import { THRESHOLD_DEADLINE_SUBTITLE } from '../../utils/constants';
+import type { ConfigChange } from '../../utils/types';
 import { ConfigValuesChanges } from './ConfigValuesChanges';
 
 interface BaseProposalSummaryProps {
@@ -39,6 +40,12 @@ type ProposalSummaryProps = BaseProposalSummaryProps &
         formType: 'config-change';
         configFormData: ConfigChange[];
       }
+    | {
+        formType: 'create-unallocated-unclaimed-activity-record';
+        beneficiary: string;
+        amount: string;
+        expiresAt: string;
+      }
   );
 
 export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
@@ -59,8 +66,8 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
 
         <ProposalField
           id="expiryDate"
-          title="Expiry Date"
-          subtitle="This is the last day voters can vote on this proposal"
+          title="Threshold Deadline"
+          subtitle={THRESHOLD_DEADLINE_SUBTITLE}
           value={expiryDate}
         />
 
@@ -104,6 +111,16 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
 
         {formType === 'offboard' && (
           <ProposalField id="offboardMember" title="Offboard Member" value={props.offboardMember} />
+        )}
+
+        {formType === 'create-unallocated-unclaimed-activity-record' && (
+          <>
+            <ProposalField id="beneficiary" title="Beneficiary" value={props.beneficiary} />
+
+            <ProposalField id="amount" title="Amount" value={props.amount} />
+
+            <ProposalField id="expiresAt" title="Must Mint Before" value={props.expiresAt} />
+          </>
         )}
 
         <Box mt={4}>

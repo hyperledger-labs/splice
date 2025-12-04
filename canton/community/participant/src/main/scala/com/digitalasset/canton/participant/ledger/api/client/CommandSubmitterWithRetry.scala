@@ -76,8 +76,7 @@ class CommandSubmitterWithRetry(
   def abortIfClosing[R](name: String, futureSupervisor: FutureSupervisor)(
       future: => Future[R]
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[R] =
-    if (isClosing) FutureUnlessShutdown.abortedDueToShutdown
-    else {
+    unlessClosing {
       implicit val ec: ExecutionContext = directEc
       val promise = PromiseUnlessShutdown.abortOnShutdown[R](
         description = name,
@@ -142,9 +141,9 @@ class CommandSubmitterWithRetry(
 sealed trait CommandResult extends PrettyPrinting with Product with Serializable
 
 object CommandResult {
-  final case class Success(transactionId: String) extends CommandResult {
+  final case class Success(updateId: String) extends CommandResult {
     override protected def pretty: Pretty[Success.this.type] = prettyOfClass(
-      param("transactionId", _.transactionId.doubleQuoted)
+      param("updateId", _.updateId.doubleQuoted)
     )
   }
 

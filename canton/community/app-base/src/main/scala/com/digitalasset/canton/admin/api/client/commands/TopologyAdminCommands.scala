@@ -7,6 +7,7 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultUnboundedTimeout,
+  ServerEnforcedTimeout,
   TimeoutType,
 }
 import com.digitalasset.canton.admin.api.client.data.*
@@ -336,9 +337,10 @@ object TopologyAdminCommands {
         response.results
           .traverse(ListPartyToParticipantResult.fromProtoV30)
           .leftMap(_.toString)
+
     }
 
-    final case class SynchronizerParametersState(
+    final case class ListSynchronizerParametersState(
         query: BaseQuery,
         filterSynchronizerId: String,
     ) extends BaseCommand[
@@ -350,7 +352,7 @@ object TopologyAdminCommands {
       override protected def createRequest()
           : Either[String, v30.ListSynchronizerParametersStateRequest] =
         Right(
-          new v30.ListSynchronizerParametersStateRequest(
+          v30.ListSynchronizerParametersStateRequest(
             baseQuery = Some(query.toProtoV1),
             filterSynchronizerId = filterSynchronizerId,
           )
@@ -370,7 +372,7 @@ object TopologyAdminCommands {
           .leftMap(_.toString)
     }
 
-    final case class MediatorSynchronizerState(
+    final case class ListMediatorSynchronizerState(
         query: BaseQuery,
         filterSynchronizerId: String,
     ) extends BaseCommand[
@@ -402,7 +404,7 @@ object TopologyAdminCommands {
           .leftMap(_.toString)
     }
 
-    final case class SequencerSynchronizerState(
+    final case class ListSequencerSynchronizerState(
         query: BaseQuery,
         filterSynchronizerId: String,
     ) extends BaseCommand[
@@ -434,19 +436,19 @@ object TopologyAdminCommands {
           .leftMap(_.toString)
     }
 
-    final case class PurgeTopologyTransaction(
+    final case class ListSynchronizerUpgradeAnnouncement(
         query: BaseQuery,
         filterSynchronizerId: String,
     ) extends BaseCommand[
-          v30.ListPurgeTopologyTransactionRequest,
-          v30.ListPurgeTopologyTransactionResponse,
-          Seq[ListPurgeTopologyTransactionResult],
+          v30.ListSynchronizerUpgradeAnnouncementRequest,
+          v30.ListSynchronizerUpgradeAnnouncementResponse,
+          Seq[ListSynchronizerUpgradeAnnouncementResult],
         ] {
 
       override protected def createRequest()
-          : Either[String, v30.ListPurgeTopologyTransactionRequest] =
+          : Either[String, v30.ListSynchronizerUpgradeAnnouncementRequest] =
         Right(
-          new v30.ListPurgeTopologyTransactionRequest(
+          new ListSynchronizerUpgradeAnnouncementRequest(
             baseQuery = Some(query.toProtoV1),
             filterSynchronizerId = filterSynchronizerId,
           )
@@ -454,15 +456,47 @@ object TopologyAdminCommands {
 
       override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
-          request: v30.ListPurgeTopologyTransactionRequest,
-      ): Future[v30.ListPurgeTopologyTransactionResponse] =
-        service.listPurgeTopologyTransaction(request)
+          request: v30.ListSynchronizerUpgradeAnnouncementRequest,
+      ): Future[v30.ListSynchronizerUpgradeAnnouncementResponse] =
+        service.listSynchronizerUpgradeAnnouncement(request)
 
       override protected def handleResponse(
-          response: v30.ListPurgeTopologyTransactionResponse
-      ): Either[String, Seq[ListPurgeTopologyTransactionResult]] =
+          response: v30.ListSynchronizerUpgradeAnnouncementResponse
+      ): Either[String, Seq[ListSynchronizerUpgradeAnnouncementResult]] =
         response.results
-          .traverse(ListPurgeTopologyTransactionResult.fromProtoV30)
+          .traverse(ListSynchronizerUpgradeAnnouncementResult.fromProtoV30)
+          .leftMap(_.toString)
+    }
+
+    final case class ListSequencerConnectionSuccessor(
+        query: BaseQuery,
+        filterSequencerId: String,
+    ) extends BaseCommand[
+          v30.ListSequencerConnectionSuccessorRequest,
+          v30.ListSequencerConnectionSuccessorResponse,
+          Seq[ListSequencerConnectionSuccessorResult],
+        ] {
+
+      override protected def createRequest()
+          : Either[String, v30.ListSequencerConnectionSuccessorRequest] =
+        Right(
+          new ListSequencerConnectionSuccessorRequest(
+            baseQuery = Some(query.toProtoV1),
+            filterSequencerId = filterSequencerId,
+          )
+        )
+
+      override protected def submitRequest(
+          service: TopologyManagerReadServiceStub,
+          request: v30.ListSequencerConnectionSuccessorRequest,
+      ): Future[v30.ListSequencerConnectionSuccessorResponse] =
+        service.listSequencerConnectionSuccessor(request)
+
+      override protected def handleResponse(
+          response: v30.ListSequencerConnectionSuccessorResponse
+      ): Either[String, Seq[ListSequencerConnectionSuccessorResult]] =
+        response.results
+          .traverse(ListSequencerConnectionSuccessorResult.fromProtoV30)
           .leftMap(_.toString)
     }
 
@@ -555,6 +589,42 @@ object TopologyAdminCommands {
       override def timeoutType: TimeoutType = DefaultUnboundedTimeout
     }
 
+    final case class ExportTopologySnapshotV2(
+        observer: StreamObserver[ExportTopologySnapshotV2Response],
+        query: BaseQuery,
+        excludeMappings: Seq[String],
+        filterNamespace: String,
+    ) extends BaseCommand[
+          v30.ExportTopologySnapshotV2Request,
+          CancellableContext,
+          CancellableContext,
+        ] {
+      override protected def createRequest(): Either[String, v30.ExportTopologySnapshotV2Request] =
+        Right(
+          new v30.ExportTopologySnapshotV2Request(
+            baseQuery = Some(query.toProtoV1),
+            excludeMappings = excludeMappings,
+            filterNamespace = filterNamespace,
+          )
+        )
+
+      override protected def submitRequest(
+          service: TopologyManagerReadServiceStub,
+          request: v30.ExportTopologySnapshotV2Request,
+      ): Future[CancellableContext] = {
+        val context = Context.current().withCancellation()
+        context.run(() => service.exportTopologySnapshotV2(request, observer))
+        Future.successful(context)
+      }
+
+      override protected def handleResponse(
+          response: CancellableContext
+      ): Either[String, CancellableContext] =
+        Right(response)
+
+      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
+    }
+
     final case class GenesisState(
         observer: StreamObserver[GenesisStateResponse],
         synchronizerStore: Option[TopologyStoreId.Synchronizer],
@@ -588,6 +658,70 @@ object TopologyAdminCommands {
 
       override def timeoutType: TimeoutType = DefaultUnboundedTimeout
     }
+
+    final case class LogicalUpgradeState(
+        observer: StreamObserver[LogicalUpgradeStateResponse]
+    ) extends BaseCommand[
+          v30.LogicalUpgradeStateRequest,
+          CancellableContext,
+          CancellableContext,
+        ] {
+      override protected def createRequest(): Either[String, v30.LogicalUpgradeStateRequest] =
+        Right(
+          v30.LogicalUpgradeStateRequest()
+        )
+
+      override protected def submitRequest(
+          service: TopologyManagerReadServiceStub,
+          request: v30.LogicalUpgradeStateRequest,
+      ): Future[CancellableContext] = {
+        val context = Context.current().withCancellation()
+        context.run(() => service.logicalUpgradeState(request, observer))
+        Future.successful(context)
+      }
+
+      override protected def handleResponse(
+          response: CancellableContext
+      ): Either[String, CancellableContext] =
+        Right(response)
+
+      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
+    }
+
+    final case class GenesisStateV2(
+        observer: StreamObserver[GenesisStateV2Response],
+        synchronizerStore: Option[TopologyStoreId.Synchronizer],
+        timestamp: Option[CantonTimestamp],
+    ) extends BaseCommand[
+          v30.GenesisStateV2Request,
+          CancellableContext,
+          CancellableContext,
+        ] {
+      override protected def createRequest(): Either[String, v30.GenesisStateV2Request] =
+        Right(
+          v30.GenesisStateV2Request(
+            synchronizerStore.map(_.toProtoV30),
+            timestamp.map(_.toProtoTimestamp),
+          )
+        )
+
+      override protected def submitRequest(
+          service: TopologyManagerReadServiceStub,
+          request: v30.GenesisStateV2Request,
+      ): Future[CancellableContext] = {
+        val context = Context.current().withCancellation()
+        context.run(() => service.genesisStateV2(request, observer))
+        Future.successful(context)
+      }
+
+      override protected def handleResponse(
+          response: CancellableContext
+      ): Either[String, CancellableContext] =
+        Right(response)
+
+      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
+    }
+
   }
 
   object Aggregation {
@@ -718,6 +852,9 @@ object TopologyAdminCommands {
           ImportTopologySnapshotResponse,
           Unit,
         ] {
+
+      override def timeoutType: TimeoutType = ServerEnforcedTimeout
+
       override protected def createRequest(): Either[String, ImportTopologySnapshotRequest] =
         Right(
           ImportTopologySnapshotRequest(
@@ -726,12 +863,13 @@ object TopologyAdminCommands {
             waitToBecomeEffective.map(_.asNonNegativeFiniteApproximation.toProtoPrimitive),
           )
         )
+      @SuppressWarnings(Array("org.wartremover.warts.Null"))
       override protected def submitRequest(
           service: TopologyManagerWriteServiceStub,
           request: ImportTopologySnapshotRequest,
       ): Future[ImportTopologySnapshotResponse] =
         GrpcStreamingUtils.streamToServer(
-          service.importTopologySnapshot,
+          service.withDeadline(null).importTopologySnapshot,
           bytes =>
             ImportTopologySnapshotRequest(
               ByteString.copyFrom(bytes),
@@ -742,6 +880,42 @@ object TopologyAdminCommands {
         )
       override protected def handleResponse(
           response: ImportTopologySnapshotResponse
+      ): Either[String, Unit] = Either.unit
+    }
+
+    final case class ImportTopologySnapshotV2(
+        topologySnapshot: ByteString,
+        store: TopologyStoreId,
+        waitToBecomeEffective: Option[NonNegativeDuration],
+    ) extends BaseWriteCommand[
+          ImportTopologySnapshotV2Request,
+          ImportTopologySnapshotV2Response,
+          Unit,
+        ] {
+      override protected def createRequest(): Either[String, ImportTopologySnapshotV2Request] =
+        Right(
+          ImportTopologySnapshotV2Request(
+            topologySnapshot,
+            Some(store.toProtoV30),
+            waitToBecomeEffective.map(_.asNonNegativeFiniteApproximation.toProtoPrimitive),
+          )
+        )
+      override protected def submitRequest(
+          service: TopologyManagerWriteServiceStub,
+          request: ImportTopologySnapshotV2Request,
+      ): Future[ImportTopologySnapshotV2Response] =
+        GrpcStreamingUtils.streamToServer(
+          service.importTopologySnapshotV2,
+          bytes =>
+            ImportTopologySnapshotV2Request(
+              ByteString.copyFrom(bytes),
+              Some(store.toProtoV30),
+              waitToBecomeEffective.map(_.toProtoPrimitive),
+            ),
+          topologySnapshot,
+        )
+      override protected def handleResponse(
+          response: ImportTopologySnapshotV2Response
       ): Either[String, Unit] = Either.unit
     }
 

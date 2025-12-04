@@ -17,19 +17,19 @@
              - https://github.com/netty/netty/pull/9402 -->
         <!-- Set maximum log level of Netty to INFO to suppress spurious warnings and errors -->
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>io.grpc.netty.NettyServerStream</logger>
+            <logger>io.grpc.netty.shaded.io.grpc.netty.NettyServerStream</logger>
             <maxLevel>INFO</maxLevel>
             <exceptionMessage>Stream closed before write could take place</exceptionMessage>
         </rewrite>
         <!-- Suppress NettyServerHandler handler error which can happen on cancelled client connections https://github.com/grpc/grpc-java/issues/4651 -->
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>io.grpc.netty.NettyServerHandler</logger>
+            <logger>io.grpc.netty.shaded.io.grpc.netty.NettyServerHandler</logger>
             <maxLevel>INFO</maxLevel>
             <contains>Stream Error</contains>
             <exceptionMessage>Received DATA frame for an unknown stream</exceptionMessage>
         </rewrite>
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>io.grpc.netty.NettyServerHandler</logger>
+            <logger>io.grpc.netty.shaded.io.grpc.netty.NettyServerHandler</logger>
             <maxLevel>INFO</maxLevel>
             <contains>Stream Error</contains>
             <exceptionMessage>Stream closed before write could take place</exceptionMessage>
@@ -94,10 +94,17 @@
             TESTING REWRITE RULES
         -->
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>io.grpc.netty.NettyServerStream</logger>
+            <logger>io.grpc.netty.shaded.io.grpc.netty.NettyServerStream</logger>
             <maxLevel>INFO</maxLevel>
             <contains>Exception processing message</contains>
             <exceptionMessage>gRPC message exceeds maximum size</exceptionMessage>
+            <testing>true</testing>
+        </rewrite>
+
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>org.flywaydb.core.Flyway</logger>
+            <maxLevel>INFO</maxLevel>
+            <contains>cleanOnValidationError is deprecated and will be removed in a later release</contains>
             <testing>true</testing>
         </rewrite>
 
@@ -108,16 +115,9 @@
             <testing>true</testing>
         </rewrite>
 
-        <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>com.digitalasset.canton.ledger.api.auth.interceptor.UserBasedAuthInterceptor</logger>
-            <maxLevel>INFO</maxLevel>
-            <contains>Could not resolve is_deactivated status for user </contains>
-            <testing>true</testing>
-        </rewrite>
-
         <!-- KMS integration test might disable certificate verification -->
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>software.amazon.awssdk.http.nio.netty.internal.SslContextProvider</logger>
+            <logger>software.amazon.awssdk.http.nio.grpc.netty.shaded.io.netty.internal.SslContextProvider</logger>
             <maxLevel>INFO</maxLevel>
             <contains>SSL Certificate verification is disabled</contains>
             <testing>true</testing>
@@ -329,6 +329,15 @@
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
             <logger>com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor:DemoExampleReferenceIntegrationTest</logger>
             <contains>ACS_COMMITMENT_DEGRADATION</contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- TODO(#29244): Prevent cache operations triggering RejectedExecutionException upon shutdown
+        Lowered to INFO level to prevent CI flake management from opening separate GH issues for each occurrence.
+        -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.github.benmanes.caffeine.cache.BoundedLocalCache</logger>
+            <contains>Exception thrown when submitting maintenance task</contains>
             <maxLevel>INFO</maxLevel>
             <testing>true</testing>
         </rewrite>
