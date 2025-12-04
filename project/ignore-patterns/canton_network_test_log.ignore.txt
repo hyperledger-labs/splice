@@ -133,7 +133,4 @@ Circuit breaker .* tripped after .* failures.*(Command|Splice)CircuitBreakerTest
 # This is more likely in test code where we run multiple apps against the same database, all trying to create the same index.
 Index .* should be created and is invalid, dropping it
 
-# Expected as the test intentionally creates a vote for a party without ValidatorLicense
-ValidatorLicense not found for validator.*SvTimeBasedOnboardingIntegrationTest
-
 # Make sure to have a trailing newline
