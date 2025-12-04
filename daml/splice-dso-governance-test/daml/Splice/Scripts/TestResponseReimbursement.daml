@@ -84,22 +84,28 @@ test_confirmation_response_traffic_reimbursement = do
   [] <- query @MemberTraffic dso
 
   -- reimburse responses
+  [(intervalStateCid, _)] <- query @ReimbursementIntervalState dso
+  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
+  submitMulti [sv1] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ReimburseResponseTraffic with
+    intervalStateCid
+    responseTrafficData
+    sv = sv1
 
   -- check that the expected member traffic contracts were created
---   actualMemberTrafficContracts <- query @MemberTraffic dso
---   let expectedMemberTrafficContracts = do
---         (memberId, totalTraffic) <- responseTrafficDataRaw
---         pure MemberTraffic with
---           dso = dso
---           memberId
---           synchronizerId = reimbursementConfirmation.synchronizerId
---           migrationId = reimbursementConfirmation.migrationId
---           totalReimbursed = Some totalTraffic
---           totalPurchased = 0
---           amuletSpent = 0.0
---           usdSpent = 0.0
---           numPurchases = 0
---   sortOn (.memberId) (map snd actualMemberTrafficContracts) ===
---     expectedMemberTrafficContracts
+  actualMemberTrafficContracts <- query @MemberTraffic dso
+  let expectedMemberTrafficContracts = do
+        (memberId, totalTraffic) <- responseTrafficDataRaw
+        pure MemberTraffic with
+          dso = dso
+          memberId
+          synchronizerId = reimbursementConfirmation.synchronizerId
+          migrationId = reimbursementConfirmation.migrationId
+          totalReimbursed = Some totalTraffic
+          totalPurchased = 0
+          amuletSpent = 0.0
+          usdSpent = 0.0
+          numPurchases = 0
+  sortOn (.memberId) (map snd actualMemberTrafficContracts) ===
+    expectedMemberTrafficContracts
 
   pure ()

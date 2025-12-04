@@ -1561,8 +1561,6 @@ template DsoRules with
           reimbursementConfirmation
         pure DsoRules_ConfirmResponseTrafficReimbursementResult with result
 
-
-{-
     nonconsuming choice DsoRules_ReimburseResponseTraffic : DsoRules_ReimburseResponsesResult
       with
         intervalStateCid : ContractId ReimbursementIntervalState
@@ -1571,12 +1569,11 @@ template DsoRules with
       controller sv
       do
         _ <- getAndValidateSvParty this (Some sv)
+        -- FIXME: avoid this exercise as it leads to a full copy of the response traffic totals
+        -- in the Ledger API server
         result <- exercise intervalStateCid ReimbursementIntervalState_ReimburseResponses with
           responseTrafficData
         pure DsoRules_ReimburseResponsesResult with result
-
--}
-
 
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
