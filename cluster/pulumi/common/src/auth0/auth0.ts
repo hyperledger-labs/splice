@@ -307,7 +307,7 @@ export function getAuth0ClusterConfig(): Output<Auth0ClusterConfig> {
   return infraOutput.apply(output => {
     if (
       (output['cantonNetwork'] && output['cantonNetwork']['appToClientId'] === undefined) ||
-      (output['mainNet'] && output['mainNet']['appToClientId'] === undefined)
+      (output['mainnet'] && output['mainnet']['appToClientId'] === undefined)
     ) {
       // Infra is already on the new version, and its output is correctly typed
       return output as Auth0ClusterConfig;
