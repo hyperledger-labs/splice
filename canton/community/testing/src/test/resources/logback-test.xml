@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration debug="false">
-  <!-- propagate logback changes to jul handlers -->
+
+    <logger name="org.apache.pekko.stream.connectors.s3" level="DEBUG" />
+    <logger name="org.apache.pekko.http" level="DEBUG" />
+    <logger name="org.apache.pekko" level="DEBUG" /> <root level="INFO">
+    <appender-ref ref="STDOUT" />
+</root>
+
+    <!-- propagate logback changes to jul handlers -->
   <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
     <resetJUL>true</resetJUL>
   </contextListener>
