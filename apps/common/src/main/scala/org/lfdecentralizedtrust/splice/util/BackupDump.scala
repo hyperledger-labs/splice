@@ -100,7 +100,7 @@ object BackupDump {
         loggerFactory
           .getLogger(this.getClass)
           .info(
-            s"all matched blobs found: ${blobs.map(_.getName)}, using offset $offset, and prefix $pref"
+            s"all matched blobs found: ${blobs.map(_.getName)}, using offset $offset, and prefix $pref, bucket ${bucketConfig.bucketName}, project: ${bucketConfig.projectId}"
           )
         blobs.nonEmpty
       case _ =>
