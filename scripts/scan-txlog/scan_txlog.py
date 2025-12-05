@@ -312,7 +312,7 @@ class ScanClient:
             params=params,
             max_retries=30,
             delay_seconds=0.5,
-            statuses={404, 429},
+            statuses={404, 429, 500, 503},
         )
         return (party, DamlDecimal(json["wallet_balance"]))
 
@@ -4309,6 +4309,11 @@ async def _process_transaction(args, app_state, scan_client, transaction):
 async def main():
     global file_handler, LOG
     args = _parse_cli_args()
+
+    # Ensure log directory exists
+    log_directory = os.path.dirname(args.log_file_path)
+    if log_directory and not os.path.exists(log_directory):
+        os.makedirs(log_directory)
 
     LOG = _setup_logger("global", args.loglevel.upper(), args.log_file_path)
     _log_uncaught_exceptions()
