@@ -89,7 +89,7 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
   val zstdTmpBuffer = ByteBuffer.allocateDirect(10 * 1024 * 1024)
   val numUpdatesPerQuery = 1000
 //  val maxFileSize = 64 * 1024 * 1024
-  val maxFileSize = 10 * 1024*1024 // Temporarily set fairly low file sizes for testing
+  val maxFileSize = 24 * 1024*1024 // Temporarily set fairly low file sizes for testing
 
   implicit val system: ActorSystem = ActorSystem("S3UploadPipeline", pekkoConfig)
 
@@ -299,7 +299,7 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
           }
 //          Source.single(data).runWith(FileIO.toPath(Paths.get(s"/home/itai/Downloads/updates_$idx.zstd")))
         }
-        .take(3) // Terminate after writing 3 files
+        .take(30) // Terminate after writing 30 files
         .runWith(Sink.ignore)
 
       streamCompletionFuture.futureValue(timeout = PatienceConfiguration.Timeout(30.minute))
