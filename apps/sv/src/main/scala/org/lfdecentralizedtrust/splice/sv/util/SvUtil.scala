@@ -246,6 +246,7 @@ object SvUtil {
   def defaultDsoRulesConfig(
       synchronizerId: SynchronizerId,
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
+      voteExecutionInstructionTimeout: Option[NonNegativeFiniteDuration] = None,
   ): DsoRulesConfig = new DsoRulesConfig(
     10, // numUnclaimedRewardsThreshold
     5, // numMemberTrafficContractsThreshold, arbitrarily set as 5 for now.
@@ -259,7 +260,9 @@ object SvUtil {
     defaultDsoDecentralizedSynchronizerConfig(synchronizerId), // decentralizedSynchronizerConfig
     Optional.empty(), // nextScheduledHardDomainMigration
     voteCooldownTime.map(t => new RelTime(t.duration.toMicros)).toJava,
-    Optional.empty(), // voteExecutionInstructionTimeout
+    voteExecutionInstructionTimeout
+      .map(t => new RelTime(t.duration.toMicros))
+      .toJava, // voteExecutionInstructionTimeout
   )
 
   def keyPairMatches(
