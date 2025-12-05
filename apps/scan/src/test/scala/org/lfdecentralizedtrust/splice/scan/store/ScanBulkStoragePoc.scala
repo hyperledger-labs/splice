@@ -88,7 +88,7 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
   val gcsEndpoint = URI.create("https://storage.googleapis.com")
   val credentials = AwsBasicCredentials.create(accessKey, secret)
   val zstdTmpBuffer = ByteBuffer.allocateDirect(10 * 1024 * 1024)
-  val numUpdatesPerQuery = 10000
+  val numUpdatesPerQuery = 1000
   val maxFileSize = 128 * 1024 * 1024
 
   implicit val system: ActorSystem = ActorSystem("S3UploadPipeline", pekkoConfig)
@@ -113,6 +113,8 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
       latest = updates.last.update.update.recordTime
       logger.debug(s"Read ${updates.length} updates, up to: $latest")
       total = total + updates.length
+      logger.debug(s"Total read so far: ${total}")
+      println(s"Total read so far: ${total}")
       offerResult match {
         case QueueOfferResult.Enqueued =>
         case QueueOfferResult.Dropped =>
@@ -192,7 +194,7 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
 
       system.scheduler.scheduleAtFixedRate(
         initialDelay = 1.second,
-        interval = 250.millis
+        interval = 100.millis
       ) { () =>
         injectUpdatesToStream(queue, updateHistory).futureValue
       }
@@ -229,12 +231,14 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
           Future {
             val start = Instant.now()
             logger.debug(s"Writing object to gs://$bucketName/$objectKey using S3 client.")
+            println(s"Writing object to gs://$bucketName/$objectKey using S3 client.")
             s3Client.putObject(
               putObj,
               RequestBody.fromBytes(data.toArrayUnsafe())
             )
             val end = Instant.now()
             logger.debug(s"Successfully wrote object to gs://$bucketName/$objectKey using S3 client in ${Duration.between(start, end)}")
+            println(s"Successfully wrote object to gs://$bucketName/$objectKey using S3 client in ${Duration.between(start, end)}")
           }
 
 
