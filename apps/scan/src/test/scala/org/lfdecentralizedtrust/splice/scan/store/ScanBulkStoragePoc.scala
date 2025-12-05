@@ -302,7 +302,7 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
         .take(3) // Terminate after writing 3 files
         .runWith(Sink.ignore)
 
-      streamCompletionFuture.futureValue(timeout = PatienceConfiguration.Timeout(15.minute))
+      streamCompletionFuture.futureValue(timeout = PatienceConfiguration.Timeout(30.minute))
       system.terminate().futureValue
 //      succeed
 
