@@ -206,3 +206,18 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
           pattern: "canton\\.validator-apps\\.validator_backend\\.scan-client\\.seed-urls = \\[\\s*\\$\\{_scan\\.admin-api\\.address\\}\\s*\\]"
+
+  - it: "defaults to BFT scan client when scanType is not specified"
+    set:
+      scanClient:
+        seedUrls: [ "https://custom-node-A.com", "https://custom-node-B.com" ]
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"bft\""
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: 'canton.validator-apps.validator_backend.scan-client.seed-urls = \["https://custom-node-A.com","https://custom-node-B.com"\]'

@@ -112,7 +112,7 @@ spec:
               {{- if eq .Values.scanClient.scanType "trust-single" }}
             canton.validator-apps.validator_backend.scan-client.type = "trust-single"
             canton.validator-apps.validator_backend.scan-client.url = {{ .Values.scanClient.scanAddress | quote }}
-              {{- if eq .Values.scanClient.scanType "bft"}}
+              {{- else if eq .Values.scanClient.scanType "bft"}}
             canton.validator-apps.validator_backend.scan-client.type = "bft"
             canton.validator-apps.validator_backend.scan-client.seed-urls = {{ .Values.scanClient.seedUrls | toJson }}
               {{- else if eq .Values.scanClient.scanType "bft-custom"}}
