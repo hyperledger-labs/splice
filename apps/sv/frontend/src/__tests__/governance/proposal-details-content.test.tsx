@@ -612,7 +612,7 @@ describe('Proposal Details > Votes & Voting', () => {
       </Wrapper>
     );
 
-    const yourVoteBadge = screen.getByTestId('proposal-details-your-vote-chip');
+    const yourVoteBadge = screen.getByTestId('proposal-details-voter-party-id-badge');
     expect(yourVoteBadge).toBeInTheDocument();
   });
 
@@ -629,9 +629,7 @@ describe('Proposal Details > Votes & Voting', () => {
       </Wrapper>
     );
 
-    expect(() => screen.getByTestId('proposal-details-your-vote-chip')).toThrowError(
-      /Unable to find an element/
-    );
+    expect(screen.queryByTestId('proposal-details-voter-party-id-badge')).not.toBeInTheDocument();
   });
 
   test('should render status badge in votes list', async () => {

@@ -34,8 +34,9 @@ spec:
               containerPort: 8080
               protocol: TCP
           resources:
+            requests:
+              cpu: 100m
             limits:
-              cpu: 1
               memory: "512Mi"
       {{- with .Values.nodeSelector }}
       nodeSelector:

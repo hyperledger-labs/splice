@@ -80,7 +80,6 @@ spec:
             cpu: 0.1
             memory: 240Mi
           limits:
-            cpu: 1
             memory: 1536Mi
       {{- with .Values.nodeSelector }}
       nodeSelector:

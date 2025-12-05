@@ -8,16 +8,14 @@ import {
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { ChevronLeft } from '@mui/icons-material';
-import { Box, Button, Chip, Link, Stack, Tab, Tabs, Typography } from '@mui/material';
+import { Box, Button, Divider, Link, Stack, Tab, Tabs, Typography } from '@mui/material';
 import React, { PropsWithChildren, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   getAmuletConfigToCompareWith,
   getDsoConfigToCompareWith,
-  PartyId,
   PrettyJsonDiff,
-  theme,
   useVotesHooks,
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { sanitizeUrl } from '@lfdecentralizedtrust/splice-common-frontend-utils';
@@ -34,7 +32,7 @@ import { JsonDiffAccordion } from './JsonDiffAccordion';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { DetailItem } from './proposal-details/DetailItem';
 import { CreateUnallocatedUnclaimedActivityRecordSection } from './proposal-details/CreateUnallocatedUnclaimedActivityRecordSection';
-import { CopyableIdentifier, MemberIdentifier } from '../beta';
+import { CopyableIdentifier, MemberIdentifier, VoteStats } from '../beta';
 
 dayjs.extend(relativeTime);
 
@@ -348,6 +346,15 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
               onChange={handleVoteTabChange}
               aria-label="vote tabs"
               data-testid="votes-tabs"
+              sx={{
+                // after experimenting with it a little, this is probably the best way to put something akin to borderBottom
+                // inside of the <Tab> components so it doesn't interfere with <Tabs> overflow: hidden property
+                boxShadow: 'inset 0 -2px 0 0 rgba(255, 255, 255, 0.12)',
+                '& .MuiTabs-indicator': {
+                  backgroundColor: 'colors.tertiary',
+                  height: '2px',
+                },
+              }}
             >
               <Tab label={`All (${votes.length})`} value="all" data-testid="all-votes-tab" />
               <Tab
@@ -373,7 +380,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             </Tabs>
 
             <Box
-              sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 4 }}
+              sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}
               data-testid="proposal-details-votes-list"
             >
               {getFilteredVotes().map((vote, index) => (
@@ -435,64 +442,34 @@ interface VoteItemProps {
   isYou?: boolean;
 }
 
-const VoteItem = ({ voter, url, comment, status, isClosed, isYou = false }: VoteItemProps) => {
-  const getStatusColor = () => {
-    switch (status) {
-      case 'accepted':
-        return theme.palette.success.main;
-      case 'rejected':
-        return theme.palette.error.main;
-      case 'no-vote':
-        return isClosed ? theme.palette.error.main : '#ff9800';
-      default:
-        return '#757575';
-    }
-  };
-
-  const getStatusText = () => {
-    switch (status) {
-      case 'accepted':
-        return 'Accepted';
-      case 'rejected':
-        return 'Rejected';
-      case 'no-vote':
-        return isClosed ? 'No Vote' : 'Awaiting Response';
-    }
-  };
-
-  return (
+const VoteItem: React.FC<VoteItemProps> = ({
+  voter,
+  url,
+  comment,
+  status,
+  isClosed,
+  isYou = false,
+}) => (
+  <>
     <Box
       sx={{
-        p: 2,
-        border: '1px solid rgba(81, 81, 81, 1)',
-        borderRadius: 2,
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
+        alignItems: 'center',
       }}
       data-testid="proposal-details-vote"
     >
       <Box sx={{ flexGrow: 1 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-          <PartyId
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <MemberIdentifier
             partyId={voter}
-            className="proposal-details-voter-party-id"
-            id="proposal-details-voter-party-id"
+            size="large"
+            isYou={isYou}
+            data-testid="proposal-details-voter-party-id"
           />
-          {isYou && (
-            <Chip
-              label="You"
-              size="small"
-              sx={{
-                ml: 1,
-                bgcolor: 'rgba(255, 255, 255, 0.1)',
-              }}
-              data-testid="proposal-details-your-vote-chip"
-            />
-          )}
         </Box>
         {comment && (
-          <Typography variant="body2" color="text.secondary">
+          <Typography fontSize={16} color="text.secondary">
             {comment}
           </Typography>
         )}
@@ -504,29 +481,15 @@ const VoteItem = ({ voter, url, comment, status, isClosed, isYou = false }: Vote
           </Typography>
         )}
       </Box>
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <Box
-          component="span"
-          sx={{
-            display: 'inline-block',
-            width: 16,
-            height: 16,
-            borderRadius: '50%',
-            bgcolor: getStatusColor(),
-            mr: 1,
-          }}
-        />
-        <Typography
-          variant="body2"
-          color={getStatusColor()}
-          data-testid="proposal-details-vote-status-value"
-        >
-          {getStatusText()}
-        </Typography>
-      </Box>
+      <VoteStats
+        vote={status}
+        noVoteMessage={isClosed ? 'No Vote' : 'Awaiting Response'}
+        data-testid="proposal-details-vote-status"
+      />
     </Box>
-  );
-};
+    <Divider sx={{ borderBottomWidth: 2 }} />
+  </>
+);
 
 interface OffboardMemberSectionProps {
   memberPartyId: string;

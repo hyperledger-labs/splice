@@ -20,6 +20,7 @@ let betaTheme = createTheme({
       neutral: generateHslPalette(0, 0, [0, 10, 15, 25, 30, 40, 50, 60, 70, 80]),
       primary: generateHslPalette(195, 96, [79, 89]),
       secondary: '#F3FF97',
+      tertiary: '#875CFF',
       mainnet: '#F8FDCD',
       testnet: '#C8F1FE',
       devnet: '#C6B2FF',
@@ -42,6 +43,9 @@ betaTheme = createTheme(betaTheme, {
     },
     secondary: {
       main: '#F3FF97',
+    },
+    tertiary: {
+      main: '#875CFF',
     },
     warning: {
       main: '#FD8575',
@@ -217,7 +221,7 @@ betaTheme = createTheme(betaTheme, {
     MuiChip: {
       styleOverrides: {
         root: {
-          backgroundColor: betaTheme.palette.primary.main,
+          backgroundColor: betaTheme.palette.grey,
         },
       },
     },

@@ -7,14 +7,6 @@
 
 .. release-notes:: upcoming
 
-  - Scan
-
-    - Removed the non-existing `command_id` field from the OpenAPI spec of all
-      scan endpoints that return transactions.
-      The field was included in the "required" section without being a property
-      of the returned transaction object. This is only a bugfix in the OpenAPI spec
-      and has no impact on the actual API behavior.
-
   - API security
 
     - Tightened authorization checks for all non-public API endpoints.
@@ -52,6 +44,24 @@
         - SV app ``/v0/dso`` is currently public, but will require authorization as SV operator,
           similar to most other SV app endpoints.
           Use the public ``/v0/dso`` endpoint in the scan app if you need to fetch DSO info.
+
+.. release-notes:: 0.5.4
+
+  - Participant
+
+    - Fix a bug introduced in 0.5.0/0.5.1 that could cause participant pruning to prune active data.
+      The bug only manifests in a rare edge case involving a manual ACS import on a participant that was already running for some time.
+
+    - Fix a performance regression in participants that causes the processing of events to pause for multiple minutes at random times,
+      due to a bad database query plan on the critical part of the indexer pipeline.
+
+  - Scan
+
+    - Removed the non-existing `command_id` field from the OpenAPI spec of all
+      scan endpoints that return transactions.
+      The field was included in the "required" section without being a property
+      of the returned transaction object. This is only a bugfix in the OpenAPI spec
+      and has no impact on the actual API behavior.
 
 .. release-notes:: 0.5.3
 
