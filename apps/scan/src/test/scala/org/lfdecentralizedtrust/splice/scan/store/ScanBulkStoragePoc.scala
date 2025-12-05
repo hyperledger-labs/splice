@@ -21,16 +21,15 @@ import org.apache.pekko.stream.scaladsl.{Sink, Source, SourceQueueWithComplete}
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
+import org.lfdecentralizedtrust.splice.scan.admin.http.{ProtobufJsonScanHttpEncodings, ScanHttpEncodings}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
-import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, PageLimit, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, Limit, PageLimit, UpdateHistory}
 import org.scalatest.concurrent.PatienceConfiguration
-import com.github.luben.zstd.{ZstdDirectBufferCompressingStreamNoFinalizer}
+import com.github.luben.zstd.ZstdDirectBufferCompressingStreamNoFinalizer
 import software.amazon.awssdk.services.s3.S3Client
 
 import scala.concurrent.duration.*
 import java.time.Duration
-
 import java.time.Instant
 import scala.concurrent.Future
 import io.circe.syntax.*
@@ -74,8 +73,8 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
 
 
 
-  //val db_ip = "10.42.0.4"
-  val db_ip = "localhost"
+  val db_ip = "10.42.0.4"
+//  val db_ip = "localhost"
   val db_pwd = sys.env("SPLICE_TEST_DB_CNADMIN_PWD")
   val participantId = ParticipantId.tryFromProtoPrimitive("PAR::Digital-Asset-Eng-13::122069aae5c6f757c6cbd2be3c9e001c1c3d8a85eaa791b97a0b11b7fbff96e04ed7")
   val dsoParty = PartyId.tryFromProtoPrimitive("DSO::12209471e1a52edc2995ad347371597a5872f2704cb2cb4bb330a849e7309598259e")
@@ -137,11 +136,38 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
   }
 
   var snapshotTimestamp: Option[CantonTimestamp] = None
+  var snapshotAfterToken: Option[Long] = None
+  var done = false
   def injectACSSnapshotToStream(queue: SourceQueueWithComplete[ByteString], acsSnapshotStore: AcsSnapshotStore): Future[Unit] = {
-    for {
-      timestamp <- snapshotTimestamp.getOrElse(getLatestSnapshotTimestamp())
+    if (!done) {
+      for {
+        timestamp <- snapshotTimestamp.map(Future(_)).getOrElse(getLatestSnapshotTimestamp(acsSnapshotStore))
+        queryResult <- acsSnapshotStore.queryAcsSnapshot(7, timestamp, snapshotAfterToken, PageLimit.tryCreate(numUpdatesPerQuery), Seq.empty, Seq.empty)
+        // FIXME: do not abuse the http API returned by javaToHttpCreatedEvent
+        encoded = queryResult.createdEventsInPage.map(event => ProtobufJsonScanHttpEncodings.javaToHttpCreatedEvent(event.eventId, event.event))
+        contractsStr  = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n")
+        offerResult <- queue.offer(ByteString(contractsStr))
+      } yield {
+        done = queryResult.afterToken.isEmpty
+        snapshotAfterToken = queryResult.afterToken
+        val contracts = queryResult.createdEventsInPage
+        logger.debug(s"Read ${contracts.length} contracts from the snapshot (after token: ${queryResult.afterToken})")
+        total = total + contracts.length
+        logger.debug(s"Total read so far: ${total}")
+        println(s"Total read so far: ${total}")
+        offerResult match {
+          case QueueOfferResult.Enqueued =>
+          case QueueOfferResult.Dropped =>
+            throw new RuntimeException("Offer failed: Element Dropped due to full buffer.")
+          case QueueOfferResult.QueueClosed =>
+            throw new IllegalStateException("Offer failed: Queue is closed.")
+          case QueueOfferResult.Failure(ex) =>
+            throw new RuntimeException(s"Offer failed: Stream failed with exception: ${ex.getMessage}", ex)
+        }
+      }
+    } else {
+      Future.successful(())
     }
-
   }
 
   var compressingStream = new ZstdDirectBufferCompressingStreamNoFinalizer(zstdTmpBuffer, 3)
@@ -211,73 +237,75 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
         loggerFactory
       )
       acsSnapshotStore.lookupSnapshotAtOrBefore(7, CantonTimestamp.now()).map(_.map(_.snapshotRecordTime)).map{t => println(s"Latest snapshot is from: ${t.value}")}.futureValue
-      fail()
 
-//
-//      val (queue, initStream) = liveSource
-//        .toMat(Sink.asPublisher(fanout = false))(org.apache.pekko.stream.scaladsl.Keep.both).run()
-//
-//      var idx = 0
-//
-//      system.scheduler.scheduleAtFixedRate(
-//        initialDelay = 1.second,
-//        interval = 100.millis
-//      ) { () =>
+
+      val (queue, initStream) = liveSource
+        .toMat(Sink.asPublisher(fanout = false))(org.apache.pekko.stream.scaladsl.Keep.both).run()
+
+      //
+      var idx = 0
+
+      system.scheduler.scheduleAtFixedRate(
+        initialDelay = 1.second,
+        interval = 100.millis
+      ) { () =>
 //        injectUpdatesToStream(queue, updateHistory).futureValue
-//      }
-//      val streamCompletionFuture = Source.fromPublisher(initStream)
-//        .map { uncompressedChunk =>
-//          logger.debug(s"uncompressed chunk size is ${uncompressedChunk.length} bytes.")
-//          uncompressedChunk
-//        }
-//        .map(zstd(_))
-//        .map { compressedChunk =>
-//          logger.debug(s"compressed chunk size is ${compressedChunk.length} bytes.")
-//          compressedChunk
-//        }
-//        .groupedWeighted((maxFileSize).toLong)((byteString: ByteString) => byteString.length.toLong)
-//        .map(chunks => chunks.fold(ByteString.empty)(_ ++ _))
-//        .map(_ ++ zstdFinish())
-//        .map { finalChunk =>
-//          logger.debug(s"Next chunk to be written is ready, it has ${finalChunk.length} bytes")
-//          finalChunk
-//        }
-//        .buffer(1, OverflowStrategy.backpressure)
-//        .mapAsync(1) { data =>
-//          // Pekko S3 sink breaks on GCS (seemingly because GCS returns xml responses with text/html type headers,
-//          // which breaks the unmarshaller in pekko s3), so we implement our own S3 upload here. For now, it's a
-//          // naive putObject, but we might want to consider making it a multipart upload instead.
-//          idx = idx + 1
-//          logger.debug(s"Writing updates_$idx (${data.length} bytes)")
-//
+        injectACSSnapshotToStream(queue, acsSnapshotStore).futureValue
+      }
+      val streamCompletionFuture = Source.fromPublisher(initStream)
+        .map { uncompressedChunk =>
+          logger.debug(s"uncompressed chunk size is ${uncompressedChunk.length} bytes.")
+          uncompressedChunk
+        }
+        .map(zstd(_))
+        .map { compressedChunk =>
+          logger.debug(s"compressed chunk size is ${compressedChunk.length} bytes.")
+          compressedChunk
+        }
+        .groupedWeighted((maxFileSize).toLong)((byteString: ByteString) => byteString.length.toLong)
+        .map(chunks => chunks.fold(ByteString.empty)(_ ++ _))
+        .map(_ ++ zstdFinish())
+        .map { finalChunk =>
+          logger.debug(s"Next chunk to be written is ready, it has ${finalChunk.length} bytes")
+          finalChunk
+        }
+        .buffer(1, OverflowStrategy.backpressure)
+        .mapAsync(1) { data =>
+          // Pekko S3 sink breaks on GCS (seemingly because GCS returns xml responses with text/html type headers,
+          // which breaks the unmarshaller in pekko s3), so we implement our own S3 upload here. For now, it's a
+          // naive putObject, but we might want to consider making it a multipart upload instead.
+          idx = idx + 1
+          logger.debug(s"Writing updates_$idx (${data.length} bytes)")
+
 //          val objectKey = s"updates_$idx.zstd"
-//          val putObj: PutObjectRequest = PutObjectRequest.builder()
-//            .bucket(bucketName)
-//            .key(objectKey)
-//            .build();
-//          Future {
-//            val start = Instant.now()
-//            logger.debug(s"Writing object to gs://$bucketName/$objectKey using S3 client.")
-//            println(s"Writing object to gs://$bucketName/$objectKey using S3 client.")
-//            s3Client.putObject(
-//              putObj,
-//              RequestBody.fromBytes(data.toArrayUnsafe())
-//            )
-//            val end = Instant.now()
-//            logger.debug(s"Successfully wrote object to gs://$bucketName/$objectKey using S3 client in ${Duration.between(start, end)}")
-//            println(s"Successfully wrote object to gs://$bucketName/$objectKey using S3 client in ${Duration.between(start, end)}")
-//          }
-////          Source.single(data).runWith(FileIO.toPath(Paths.get(s"/home/itai/Downloads/updates_$idx.zstd")))
-//        }
-//        .take(3) // Terminate after writing 3 files
-//        .runWith(Sink.ignore)
-//
-//      streamCompletionFuture.futureValue(timeout = PatienceConfiguration.Timeout(15.minute))
-//      system.terminate().futureValue
-////      succeed
-//
-//      // Fail the test so that logs are uploaded
-//      fail()
+          val objectKey = s"snapshot_$idx.zstd"
+          val putObj: PutObjectRequest = PutObjectRequest.builder()
+            .bucket(bucketName)
+            .key(objectKey)
+            .build();
+          Future {
+            val start = Instant.now()
+            logger.debug(s"Writing object to gs://$bucketName/$objectKey using S3 client.")
+            println(s"Writing object to gs://$bucketName/$objectKey using S3 client.")
+            s3Client.putObject(
+              putObj,
+              RequestBody.fromBytes(data.toArrayUnsafe())
+            )
+            val end = Instant.now()
+            logger.debug(s"Successfully wrote object to gs://$bucketName/$objectKey using S3 client in ${Duration.between(start, end)}")
+            println(s"Successfully wrote object to gs://$bucketName/$objectKey using S3 client in ${Duration.between(start, end)}")
+          }
+//          Source.single(data).runWith(FileIO.toPath(Paths.get(s"/home/itai/Downloads/updates_$idx.zstd")))
+        }
+        .take(3) // Terminate after writing 3 files
+        .runWith(Sink.ignore)
+
+      streamCompletionFuture.futureValue(timeout = PatienceConfiguration.Timeout(15.minute))
+      system.terminate().futureValue
+//      succeed
+
+      // Fail the test so that logs are uploaded
+      fail()
     }
   }
 
