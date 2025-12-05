@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
 
+const kubectlVersion = spliceEnvConfig.requireEnv('KUBECTL_VERSION');
 const cronJobName = 'gc-pod-reaper-job';
 const targetNamespace = 'gc-pod-reaper';
 const serviceAccountName = 'gc-pod-reaper-service-account';
-const reaperImage = 'rancher/kubectl:latest';
+const reaperImage = 'rancher/kubectl:' + kubectlVersion;
 const schedule = '0 3 * * *'; // Run once daily at 03:00 AM UTC
 
 const deleteBadPodsCommand = [
