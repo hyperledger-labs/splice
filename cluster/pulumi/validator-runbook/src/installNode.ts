@@ -201,7 +201,9 @@ async function installValidator(
     ),
   };
 
-  delete validatorValuesFromYamlFiles.scanAddress;
+  if (validatorConfig.validatorApp?.scanClient != null) {
+    delete validatorValuesFromYamlFiles.scanAddress;
+  }
 
   const newParticipantIdentifier =
     validatorConfig.newParticipantId ||
