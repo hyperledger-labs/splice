@@ -200,8 +200,6 @@ trait SvTestUtil extends TestCommon {
       svToCreateVoteRequest: SvAppBackendReference,
       svsToCastVotes: Seq[SvAppBackendReference],
       changes: Seq[ValidatorLicenseChange],
-  )(implicit
-      ec: ExecutionContextExecutor
   ): Unit = {
     val action = new ARC_DsoRules(
       new SRARC_ModifyValidatorLicenses(
@@ -241,23 +239,19 @@ trait SvTestUtil extends TestCommon {
         ).loneElement,
     )
 
-    if (svsToCastVotes.nonEmpty) {
-      svsToCastVotes.parTraverse { sv =>
-        Future {
-          clue(s"${sv.name} sees the vote request") {
-            val svVoteRequest = eventually() {
-              onlyModifyValidatorLicensesVoteRequests(sv.listVoteRequests()).loneElement
-            }
-            getTrackingId(svVoteRequest) shouldBe voteRequest.contractId
-          }
-          sv.castVote(
-            voteRequest.contractId,
-            true,
-            "url",
-            "description",
-          )
+    svsToCastVotes.foreach { sv =>
+      clue(s"${sv.name} sees the vote request") {
+        val svVoteRequest = eventually() {
+          onlyModifyValidatorLicensesVoteRequests(sv.listVoteRequests()).loneElement
         }
-      }.futureValue
+        getTrackingId(svVoteRequest) shouldBe voteRequest.contractId
+      }
+      sv.castVote(
+        voteRequest.contractId,
+        true,
+        "url",
+        "description",
+      )
     }
   }
 

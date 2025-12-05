@@ -152,7 +152,6 @@ class ValidatorLicenseMetadataTimeBasedIntegrationTest
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
 
       // Change Alice's validator license weight to 10.0
-      import env.executionContext
       val aliceNewWeight = BigDecimal(10.0)
       actAndCheck(
         "Modify validator licenses",

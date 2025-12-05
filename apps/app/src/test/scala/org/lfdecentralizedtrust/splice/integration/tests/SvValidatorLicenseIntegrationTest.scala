@@ -160,7 +160,6 @@ class SvValidatorLicenseIntegrationTest
     )
 
     // Create a vote for batch modification, with both weight change and withdrawal
-    import env.executionContext
     actAndCheck(
       "Modify validator licenses",
       modifyValidatorLicenses(

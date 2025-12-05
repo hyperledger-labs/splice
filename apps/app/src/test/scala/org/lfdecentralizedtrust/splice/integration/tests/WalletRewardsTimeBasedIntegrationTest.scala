@@ -120,7 +120,6 @@ class WalletRewardsTimeBasedIntegrationTest
 
       // Change Alice's weight to a very high value
       // This should cause the per-unit issuance to be less than the default of 2.85
-      import env.executionContext
       val aliceWeight = BigDecimal(15000.0)
       actAndCheck(
         "Modify validator licenses",
@@ -239,7 +238,6 @@ class WalletRewardsTimeBasedIntegrationTest
         val initialLastActiveAt = initialLicense.data.lastActiveAt
 
         // Change validator license weight to 0
-        import env.executionContext
         val zeroWeight = BigDecimal(0.0)
         actAndCheck(
           "Modify validator licenses",
