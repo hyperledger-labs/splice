@@ -73,13 +73,12 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
     .withFallback(ConfigFactory.load())
 
 
-  var latest = CantonTimestamp.MinValue
-  var total = 0
 
-  val db_ip = "10.42.0.4"
+  //val db_ip = "10.42.0.4"
+  val db_ip = "localhost"
   val db_pwd = sys.env("SPLICE_TEST_DB_CNADMIN_PWD")
   val participantId = ParticipantId.tryFromProtoPrimitive("PAR::Digital-Asset-Eng-13::122069aae5c6f757c6cbd2be3c9e001c1c3d8a85eaa791b97a0b11b7fbff96e04ed7")
-  val partyId = PartyId.tryFromProtoPrimitive("DSO::12209471e1a52edc2995ad347371597a5872f2704cb2cb4bb330a849e7309598259e")
+  val dsoParty = PartyId.tryFromProtoPrimitive("DSO::12209471e1a52edc2995ad347371597a5872f2704cb2cb4bb330a849e7309598259e")
   val dbConfig = mkDbConfig(DbBasicConfig("cnadmin", db_pwd, "scan_sv_13", db_ip, 5432, false, Some("scan_sv_13")))
   val bucketName = "itai-test-updates-cold-storage"
   val accessKey = sys.env("COLD_STORAGE_ACCESS_KEY")
@@ -102,16 +101,19 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
     .credentialsProvider(StaticCredentialsProvider.create(credentials))
     .build()
 
+  var latestUpdate = CantonTimestamp.MinValue
+  var total = 0
+
   def injectUpdatesToStream(queue: SourceQueueWithComplete[ByteString], updateHistory: UpdateHistory): Future[Unit] = {
-    logger.debug(s"Reading updates starting from $latest")
+    logger.debug(s"Reading updates starting from $latestUpdate")
     for {
-      updates <- updateHistory.getUpdatesWithoutImportUpdates(Some((0, latest)), PageLimit.tryCreate(numUpdatesPerQuery))
+      updates <- updateHistory.getUpdatesWithoutImportUpdates(Some((0, latestUpdate)), PageLimit.tryCreate(numUpdatesPerQuery))
       encoded = updates.map(update => ScanHttpEncodings.encodeUpdate(update, encoding = DamlValueEncoding.ProtobufJson, ScanHttpEncodings.V1))
       updatesStr = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n")
       offerResult <- queue.offer(ByteString(updatesStr))
     } yield {
-      latest = updates.last.update.update.recordTime
-      logger.debug(s"Read ${updates.length} updates, up to: $latest")
+      latestUpdate = updates.last.update.update.recordTime
+      logger.debug(s"Read ${updates.length} updates, up to: $latestUpdate")
       total = total + updates.length
       logger.debug(s"Total read so far: ${total}")
       println(s"Total read so far: ${total}")
@@ -125,6 +127,21 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
           throw new RuntimeException(s"Offer failed: Stream failed with exception: ${ex.getMessage}", ex)
       }
     }
+  }
+
+  def getLatestSnapshotTimestamp(acsSnapshotStore: AcsSnapshotStore): Future[CantonTimestamp] = {
+    acsSnapshotStore
+      .lookupSnapshotAtOrBefore(7, CantonTimestamp.now())
+      .map(_.valueOrFail("Failed to find a snapshot")
+        .snapshotRecordTime)
+  }
+
+  var snapshotTimestamp: Option[CantonTimestamp] = None
+  def injectACSSnapshotToStream(queue: SourceQueueWithComplete[ByteString], acsSnapshotStore: AcsSnapshotStore): Future[Unit] = {
+    for {
+      timestamp <- snapshotTimestamp.getOrElse(getLatestSnapshotTimestamp())
+    }
+
   }
 
   var compressingStream = new ZstdDirectBufferCompressingStreamNoFinalizer(zstdTmpBuffer, 3)
@@ -177,7 +194,7 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
         new DomainMigrationInfo(7, None),
         "DbScanStore",
         participantId,
-        updateStreamParty = partyId,
+        updateStreamParty = dsoParty,
         backfillingRequired = BackfillingRequirement.BackfillingNotRequired,
         loggerFactory,
         enableissue12777Workaround = false,
@@ -186,76 +203,81 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
       )
       updateHistory.ingestionSink.initialize().futureValue
 
-
-      val (queue, initStream) = liveSource
-        .toMat(Sink.asPublisher(fanout = false))(org.apache.pekko.stream.scaladsl.Keep.both).run()
-
-      var idx = 0
-
-      system.scheduler.scheduleAtFixedRate(
-        initialDelay = 1.second,
-        interval = 100.millis
-      ) { () =>
-        injectUpdatesToStream(queue, updateHistory).futureValue
-      }
-      val streamCompletionFuture = Source.fromPublisher(initStream)
-        .map { uncompressedChunk =>
-          logger.debug(s"uncompressed chunk size is ${uncompressedChunk.length} bytes.")
-          uncompressedChunk
-        }
-        .map(zstd(_))
-        .map { compressedChunk =>
-          logger.debug(s"compressed chunk size is ${compressedChunk.length} bytes.")
-          compressedChunk
-        }
-        .groupedWeighted((maxFileSize).toLong)((byteString: ByteString) => byteString.length.toLong)
-        .map(chunks => chunks.fold(ByteString.empty)(_ ++ _))
-        .map(_ ++ zstdFinish())
-        .map { finalChunk =>
-          logger.debug(s"Next chunk to be written is ready, it has ${finalChunk.length} bytes")
-          finalChunk
-        }
-        .buffer(1, OverflowStrategy.backpressure)
-        .mapAsync(1) { data =>
-          // Pekko S3 sink breaks on GCS (seemingly because GCS returns xml responses with text/html type headers,
-          // which breaks the unmarshaller in pekko s3), so we implement our own S3 upload here. For now, it's a
-          // naive putObject, but we might want to consider making it a multipart upload instead.
-          idx = idx + 1
-          logger.debug(s"Writing updates_$idx (${data.length} bytes)")
-
-          val objectKey = s"updates_$idx.zstd"
-          val putObj: PutObjectRequest = PutObjectRequest.builder()
-            .bucket(bucketName)
-            .key(objectKey)
-            .build();
-          Future {
-            val start = Instant.now()
-            logger.debug(s"Writing object to gs://$bucketName/$objectKey using S3 client.")
-            println(s"Writing object to gs://$bucketName/$objectKey using S3 client.")
-            s3Client.putObject(
-              putObj,
-              RequestBody.fromBytes(data.toArrayUnsafe())
-            )
-            val end = Instant.now()
-            logger.debug(s"Successfully wrote object to gs://$bucketName/$objectKey using S3 client in ${Duration.between(start, end)}")
-            println(s"Successfully wrote object to gs://$bucketName/$objectKey using S3 client in ${Duration.between(start, end)}")
-          }
-
-
-
-//          Source.single(data).runWith(FileIO.toPath(Paths.get(s"/home/itai/Downloads/updates_$idx.zstd")))
-          // Calling multiPartUploadWithHeaders, and not multiPartUpload which adds cannedACL headers which GCS does not support
-//          Source.single(data).runWith(S3.multipartUploadWithHeaders("itai-test-updates-cold-storage", s"updates_${idx}.zstd").withAttributes(S3Attributes.settings(gcsS3Settings)))
-        }
-        .take(3) // Terminate after writing 3 files
-        .runWith(Sink.ignore)
-
-      streamCompletionFuture.futureValue(timeout = PatienceConfiguration.Timeout(15.minute))
-      system.terminate().futureValue
-//      succeed
-
-      // Fail the test so that logs are uploaded
+      val acsSnapshotStore = new AcsSnapshotStore(
+        storage,
+        updateHistory,
+        dsoParty,
+        currentMigrationId = 7,
+        loggerFactory
+      )
+      acsSnapshotStore.lookupSnapshotAtOrBefore(7, CantonTimestamp.now()).map(_.map(_.snapshotRecordTime)).map{t => println(s"Latest snapshot is from: ${t.value}")}.futureValue
       fail()
+
+//
+//      val (queue, initStream) = liveSource
+//        .toMat(Sink.asPublisher(fanout = false))(org.apache.pekko.stream.scaladsl.Keep.both).run()
+//
+//      var idx = 0
+//
+//      system.scheduler.scheduleAtFixedRate(
+//        initialDelay = 1.second,
+//        interval = 100.millis
+//      ) { () =>
+//        injectUpdatesToStream(queue, updateHistory).futureValue
+//      }
+//      val streamCompletionFuture = Source.fromPublisher(initStream)
+//        .map { uncompressedChunk =>
+//          logger.debug(s"uncompressed chunk size is ${uncompressedChunk.length} bytes.")
+//          uncompressedChunk
+//        }
+//        .map(zstd(_))
+//        .map { compressedChunk =>
+//          logger.debug(s"compressed chunk size is ${compressedChunk.length} bytes.")
+//          compressedChunk
+//        }
+//        .groupedWeighted((maxFileSize).toLong)((byteString: ByteString) => byteString.length.toLong)
+//        .map(chunks => chunks.fold(ByteString.empty)(_ ++ _))
+//        .map(_ ++ zstdFinish())
+//        .map { finalChunk =>
+//          logger.debug(s"Next chunk to be written is ready, it has ${finalChunk.length} bytes")
+//          finalChunk
+//        }
+//        .buffer(1, OverflowStrategy.backpressure)
+//        .mapAsync(1) { data =>
+//          // Pekko S3 sink breaks on GCS (seemingly because GCS returns xml responses with text/html type headers,
+//          // which breaks the unmarshaller in pekko s3), so we implement our own S3 upload here. For now, it's a
+//          // naive putObject, but we might want to consider making it a multipart upload instead.
+//          idx = idx + 1
+//          logger.debug(s"Writing updates_$idx (${data.length} bytes)")
+//
+//          val objectKey = s"updates_$idx.zstd"
+//          val putObj: PutObjectRequest = PutObjectRequest.builder()
+//            .bucket(bucketName)
+//            .key(objectKey)
+//            .build();
+//          Future {
+//            val start = Instant.now()
+//            logger.debug(s"Writing object to gs://$bucketName/$objectKey using S3 client.")
+//            println(s"Writing object to gs://$bucketName/$objectKey using S3 client.")
+//            s3Client.putObject(
+//              putObj,
+//              RequestBody.fromBytes(data.toArrayUnsafe())
+//            )
+//            val end = Instant.now()
+//            logger.debug(s"Successfully wrote object to gs://$bucketName/$objectKey using S3 client in ${Duration.between(start, end)}")
+//            println(s"Successfully wrote object to gs://$bucketName/$objectKey using S3 client in ${Duration.between(start, end)}")
+//          }
+////          Source.single(data).runWith(FileIO.toPath(Paths.get(s"/home/itai/Downloads/updates_$idx.zstd")))
+//        }
+//        .take(3) // Terminate after writing 3 files
+//        .runWith(Sink.ignore)
+//
+//      streamCompletionFuture.futureValue(timeout = PatienceConfiguration.Timeout(15.minute))
+//      system.terminate().futureValue
+////      succeed
+//
+//      // Fail the test so that logs are uploaded
+//      fail()
     }
   }
 
