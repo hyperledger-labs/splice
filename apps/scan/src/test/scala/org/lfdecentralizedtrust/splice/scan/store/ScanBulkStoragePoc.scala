@@ -88,7 +88,7 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
   val gcsEndpoint = URI.create("https://storage.googleapis.com")
   val credentials = AwsBasicCredentials.create(accessKey, secret)
   val zstdTmpBuffer = ByteBuffer.allocateDirect(10 * 1024 * 1024)
-  val numUpdatesPerQuery = 1000
+  val numUpdatesPerQuery = 10000
   val maxFileSize = 128 * 1024 * 1024
 
   implicit val system: ActorSystem = ActorSystem("S3UploadPipeline", pekkoConfig)
@@ -192,7 +192,7 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
 
       system.scheduler.scheduleAtFixedRate(
         initialDelay = 1.second,
-        interval = 1.seconds
+        interval = 250.millis
       ) { () =>
         injectUpdatesToStream(queue, updateHistory).futureValue
       }
