@@ -714,7 +714,35 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "appLabel": "scan-app",
+      "globalLimits": {
+        "fillInterval": "60s",
+        "maxTokens": 2147483647,
+        "tokensPerFill": 2147483647
+      },
+      "inboundPort": 5012,
+      "namespace": "sv",
+      "rateLimits": [
+        {
+          "actions": [
+            {
+              "name": "acs",
+              "pathPrefix": "/api/scan/v0/acs"
+            },
+            {
+              "clientIp": true,
+              "name": "client_ip"
+            }
+          ],
+          "limits": {
+            "fillInterval": "60s",
+            "maxTokens": 10,
+            "tokensPerFill": 5
+          }
+        }
+      ]
+    },
     "name": "splice-sv-scan-app-rate-limit",
     "provider": "",
     "type": "splice:RateLimit"
