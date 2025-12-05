@@ -536,6 +536,29 @@
           "not": { "required": ["validatorWalletUser"] }
         }
       ]
+    },
+    {
+      "if": {
+        "properties": {
+          "scanClient": {
+            "type": "object"
+          }
+        },
+        "required": ["scanClient"]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": ["scanAddress"]
+            },
+            {
+              "required": ["nonSvValidatorTrustSingleScan"]
+            }
+          ]
+        },
+        "errorMessage": "If 'scanClient' is set, 'scanAddress' and 'nonSvValidatorTrustSingleScan' must not be set."
+      }
     }
   ]
 }
