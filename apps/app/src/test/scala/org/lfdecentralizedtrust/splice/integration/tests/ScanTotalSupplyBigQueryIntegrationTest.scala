@@ -86,9 +86,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
   // The test currently produces 80 transactions, which is 0.000926 tps over 24 hours,
   // so we assert for a range of 70-85 transactions, or 0.0008-0.00099 tps.
   private val avgTps = (0.0008, 0.00099)
-  // The peak is 22 transactions in a (simulated) minute, or 0.36667 tps over a minute,
-  // so we assert 19-25 transactions, or 0.31-0.42 tps
-  private val peakTps = (0.31, 0.42)
+  // The peak is 18 transactions in a (simulated) minute, or 0.36667 tps over a minute,
+  // so we assert 15-21 transactions, or 0.25-0.35 tps
+  private val peakTps = (0.25, 0.35)
   private val totalRounds = 4
 
   override def beforeAll() = {
