@@ -29,8 +29,7 @@
         "down": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiDown.ts",
         "refresh": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiRefresh.ts",
         "cancel": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiCancel.ts",
-        "test": "jest",
-        "resolve-config": "ts-node ./resolvedConfigEmitter.ts"
+        "test": "jest"
     },
     "workspaces": [
         "common",

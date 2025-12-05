@@ -471,15 +471,6 @@ they cover. Please see the [jest "getting started"](https://jestjs.io/docs/getti
 for tips on how to write tests. The type definitions for jest come from the `@jest/globals`
 package usage of which is described [here](https://jestjs.io/docs/getting-started#type-definitions).
 
-### Versioning resolved configuration
-To make sure that changes to cluster configuration are made consciously in light of various
-modularization and reuse mechanisms in the config loader a complete and fully resolved version of
-the cluster configuration file is versioned. Such a file is generated as `config.resolved.yaml`
-for each clusters' main `config.yaml` using `make cluster/deployment/update-resolved-config -j`.
-The `cluster/pulumi/update-expected` make target also includes resolved configuration update.
-Appropriate checks are conducted in pre-commit hooks and later in CI to make sure that these
-resolved configuration files are kept in sync with the original unresolved ones.
-
 ### Pulumi state checks
 To make sure that the impact of changes in the Pulumi resource definitions is well understood we
 rely on checked in `expected` files that need to be updated whenever the expected deployment state changes.
