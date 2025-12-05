@@ -112,15 +112,17 @@ spec:
               {{- if eq .Values.scanClient.scanType "trust-single" }}
             canton.validator-apps.validator_backend.scan-client.type = "trust-single"
             canton.validator-apps.validator_backend.scan-client.url = {{ .Values.scanClient.scanAddress | quote }}
-              {{- else}}
-            canton.validator-apps.validator_backend.scan-client.seed-urls = {{ .Values.scanClient.seedUrls | toJson }}
-                {{- if eq .Values.scanClient.scanType "bft"}}
+              {{- if eq .Values.scanClient.scanType "bft"}}
             canton.validator-apps.validator_backend.scan-client.type = "bft"
-                {{- else if eq .Values.scanClient.scanType "bft-custom"}}
+            canton.validator-apps.validator_backend.scan-client.seed-urls = {{ .Values.scanClient.seedUrls | toJson }}
+              {{- else if eq .Values.scanClient.scanType "bft-custom"}}
             canton.validator-apps.validator_backend.scan-client.type = "bft-custom"
+            canton.validator-apps.validator_backend.scan-client.seed-urls = {{ .Values.scanClient.seedUrls | toJson }}
             canton.validator-apps.validator_backend.scan-client.trusted-svs = {{ .Values.scanClient.trustedSvs | toJson }}
             canton.validator-apps.validator_backend.scan-client.threshold = {{ .Values.scanClient.threshold }}
-                {{- end }}
+              {{- else }}
+            canton.validator-apps.validator_backend.scan-client.type = "bft"
+            canton.validator-apps.validator_backend.scan-client.seed-urls = {{ .Values.scanClient.seedUrls | toJson }}
               {{- end }}
             {{- else }}
             canton.validator-apps.validator_backend.scan-client.type = "bft"
