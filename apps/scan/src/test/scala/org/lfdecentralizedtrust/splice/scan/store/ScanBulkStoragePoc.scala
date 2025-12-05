@@ -88,7 +88,8 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
   val credentials = AwsBasicCredentials.create(accessKey, secret)
   val zstdTmpBuffer = ByteBuffer.allocateDirect(10 * 1024 * 1024)
   val numUpdatesPerQuery = 1000
-  val maxFileSize = 64 * 1024 * 1024
+//  val maxFileSize = 64 * 1024 * 1024
+  val maxFileSize = 10 * 1024*1024 // Temporarily set fairly low file sizes for testing
 
   implicit val system: ActorSystem = ActorSystem("S3UploadPipeline", pekkoConfig)
 
@@ -144,7 +145,7 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
       for {
         timestamp <- snapshotTimestamp.map(Future(_)).getOrElse(getLatestSnapshotTimestamp(acsSnapshotStore))
         queryResult <- acsSnapshotStore.queryAcsSnapshot(7, timestamp, snapshotAfterToken, PageLimit.tryCreate(numUpdatesPerQuery), Seq.empty, Seq.empty)
-        // FIXME: do not abuse the http API returned by javaToHttpCreatedEvent
+        // FIXME: double check if the http API returned by javaToHttpCreatedEvent fits, or we need something slightly different
         encoded = queryResult.createdEventsInPage.map(event => ProtobufJsonScanHttpEncodings.javaToHttpCreatedEvent(event.eventId, event.event))
         contractsStr  = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n")
         offerResult <- queue.offer(ByteString(contractsStr))
