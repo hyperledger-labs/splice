@@ -96,7 +96,13 @@ object BackupDump {
           case Some(p) => s"$p/"
           case None => ""
         }
-        gcpBucket.list(s"$pref$offset", "").nonEmpty
+        val blobs = gcpBucket.list(s"$pref$offset", "")
+        loggerFactory
+          .getLogger(this.getClass)
+          .info(
+            s"all matched blobs found: ${blobs.map(_.getName)}, using offset $offset, and prefix $pref, bucket ${bucketConfig.bucketName}, project: ${bucketConfig.projectId}"
+          )
+        blobs.nonEmpty
       case _ =>
         throw Status.UNIMPLEMENTED
           .withDescription("Topology snapshot works only with GCP buckets")
