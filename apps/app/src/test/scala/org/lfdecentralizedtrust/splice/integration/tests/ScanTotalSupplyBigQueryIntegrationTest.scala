@@ -299,7 +299,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
       Table(
         ("round", "expected balance"),
         (2, BigDecimal("0")),
-        (3, BigDecimal("0")), // 6512.93759512940
+        (3, BigDecimal("6512.93759512940")),
         (4, BigDecimal("13025.8751902588")),
         (5, BigDecimal("19538.8127853882")),
         (6, aliceValidatorMintedAmount),
