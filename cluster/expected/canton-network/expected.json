@@ -242,7 +242,132 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "auth0Client": {},
+      "decentralizedSynchronizerUpgradeConfig": {
+        "active": {
+          "id": 3,
+          "releaseReference": {
+            "deploymentDir": "cluster/deployment",
+            "gitReference": "refs/heads/release-line-0.3.20",
+            "privateConfigsDir": "cluster/configs/configs-private",
+            "publicConfigsDir": "cluster/configs/configs",
+            "pulumiBaseDir": "splice/cluster/pulumi",
+            "pulumiStacksDir": "cluster/stacks/prod",
+            "repoUrl": "https://github.com/hyperledger-labs/splice",
+            "spliceRoot": "splice"
+          },
+          "sequencer": {
+            "enableBftSequencer": false
+          },
+          "version": {
+            "type": "remote",
+            "version": "0.3.20"
+          }
+        },
+        "archived": [
+          {
+            "id": 1,
+            "releaseReference": {
+              "deploymentDir": "cluster/deployment",
+              "gitReference": "981227e62011e386cca3cdb5f00b472cf05a12c4",
+              "pulumiBaseDir": "splice/cluster/pulumi",
+              "pulumiStacksDir": "cluster/stacks/prod",
+              "repoUrl": "https://github.com/hyperledger-labs/splice",
+              "spliceRoot": "splice"
+            },
+            "sequencer": {
+              "enableBftSequencer": false
+            },
+            "version": {
+              "type": "remote",
+              "version": "0.3.18"
+            }
+          },
+          {
+            "id": 2,
+            "releaseReference": {
+              "deploymentDir": "cluster/deployment",
+              "gitReference": "refs/heads/release-line-0.3.19",
+              "pulumiBaseDir": "splice/cluster/pulumi",
+              "pulumiStacksDir": "cluster/stacks/prod",
+              "repoUrl": "https://github.com/hyperledger-labs/splice",
+              "spliceRoot": "splice"
+            },
+            "sequencer": {
+              "enableBftSequencer": false
+            },
+            "version": {
+              "type": "remote",
+              "version": "0.3.19"
+            }
+          }
+        ],
+        "upgrade": {
+          "id": 4,
+          "releaseReference": {
+            "deploymentDir": "cluster/deployment",
+            "gitReference": "refs/heads/release-line-0.3.21",
+            "privateConfigsDir": "cluster/configs/configs-private",
+            "publicConfigsDir": "cluster/configs/configs",
+            "pulumiBaseDir": "splice/cluster/pulumi",
+            "pulumiStacksDir": "cluster/stacks/prod",
+            "repoUrl": "https://github.com/hyperledger-labs/splice",
+            "spliceRoot": "splice"
+          },
+          "sequencer": {
+            "enableBftSequencer": false
+          },
+          "version": {
+            "type": "remote",
+            "version": "0.3.21"
+          }
+        }
+      },
+      "disableOnboardingParticipantPromotionDelay": false,
+      "expectedValidatorOnboardings": [
+        {
+          "expiresIn": "24h",
+          "name": "splitwell2",
+          "secret": "splitwellsecret2"
+        },
+        {
+          "expiresIn": "24h",
+          "name": "validator12",
+          "secret": "validator1secret2"
+        }
+      ],
+      "identitiesBackupLocation": {
+        "bucket": {
+          "bucketName": "da-cn-data-dumps",
+          "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+          "projectId": "da-cn-devnet",
+          "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+        }
+      },
+      "isDevNet": false,
+      "periodicBackupConfig": {
+        "backupInterval": "10m",
+        "location": {
+          "bucket": {
+            "bucketName": "da-cn-data-dumps",
+            "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+            "projectId": "da-cn-devnet",
+            "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+          }
+        }
+      },
+      "sequencerPruningConfig": {
+        "enabled": true,
+        "pruningInterval": "1 hours",
+        "retentionPeriod": "30 days"
+      },
+      "splitPostgresInstances": true,
+      "topupConfig": {
+        "minTopupInterval": "1m",
+        "targetThroughput": 0
+      }
+    },
     "name": "dso",
     "provider": "",
     "type": "canton:network:dso"
@@ -1110,7 +1235,35 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "appLabel": "scan-app",
+      "globalLimits": {
+        "fillInterval": "60s",
+        "maxTokens": 2147483647,
+        "tokensPerFill": 2147483647
+      },
+      "inboundPort": 5012,
+      "namespace": "sv-1",
+      "rateLimits": [
+        {
+          "actions": [
+            {
+              "name": "acs",
+              "pathPrefix": "/api/scan/v0/acs"
+            },
+            {
+              "clientIp": true,
+              "name": "client_ip"
+            }
+          ],
+          "limits": {
+            "fillInterval": "60s",
+            "maxTokens": 10,
+            "tokensPerFill": 5
+          }
+        }
+      ]
+    },
     "name": "splice-sv-1-scan-app-rate-limit",
     "provider": "",
     "type": "splice:RateLimit"
@@ -1118,7 +1271,35 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "appLabel": "scan-app",
+      "globalLimits": {
+        "fillInterval": "60s",
+        "maxTokens": 2147483647,
+        "tokensPerFill": 2147483647
+      },
+      "inboundPort": 5012,
+      "namespace": "sv-da-1",
+      "rateLimits": [
+        {
+          "actions": [
+            {
+              "name": "acs",
+              "pathPrefix": "/api/scan/v0/acs"
+            },
+            {
+              "clientIp": true,
+              "name": "client_ip"
+            }
+          ],
+          "limits": {
+            "fillInterval": "60s",
+            "maxTokens": 10,
+            "tokensPerFill": 5
+          }
+        }
+      ]
+    },
     "name": "splice-sv-da-1-scan-app-rate-limit",
     "provider": "",
     "type": "splice:RateLimit"
