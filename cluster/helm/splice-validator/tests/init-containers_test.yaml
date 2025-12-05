@@ -12,7 +12,6 @@ set:
   nodeIdentifier: "helm-mock-1-validator"
   validatorPartyHint: "helm-mock-1"
   validatorWalletUser: "mock-wallet-user-id"
-  scanAddress: "trusted.scan.mock.com"
   topup:
     enabled: false
   auth:
