@@ -169,6 +169,42 @@ class HttpSvOperatorHandler(
       .map(r0.ListValidatorLicensesResponse.OK)
   }
 
+  override def grantValidatorLicense(
+      respond: r0.GrantValidatorLicenseResponse.type
+  )(
+      body: definitions.GrantValidatorLicenseRequest
+  )(extracted: ActAsKnownUserRequest): Future[r0.GrantValidatorLicenseResponse] = {
+    implicit val ActAsKnownUserRequest(traceContext) = extracted
+    withSpan(s"$workflowId.grantValidatorLicense") { implicit traceContext => _ =>
+      Codec.decode(Codec.Party)(body.partyId) match {
+        case Left(error) =>
+          Future.failed(
+            HttpErrorHandler.badRequest(s"Invalid party ID '${body.partyId}': $error")
+          )
+        case Right(validatorParty) =>
+          for {
+            dsoRules <- dsoStore.getDsoRules()
+            svParty = dsoStore.key.svParty
+            dsoParty = dsoStore.key.dsoParty
+            cmd = dsoRules.exercise(
+              _.exerciseDsoRules_GrantValidatorLicense(
+                svParty.toProtoPrimitive,
+                validatorParty.toProtoPrimitive,
+              )
+            )
+            _ <- dsoStoreWithIngestion
+              .connection(AppStoreWithIngestion.SpliceLedgerConnectionPriority.Low)
+              .submit(Seq(svParty), Seq(dsoParty), cmd)
+              .withSynchronizerId(dsoRules.domain)
+              .noDedup
+              .yieldUnit()
+          } yield {
+            r0.GrantValidatorLicenseResponseOK
+          }
+      }
+    }
+  }
+
   def listOngoingValidatorOnboardings(
       respond: r0.ListOngoingValidatorOnboardingsResponse.type
   )()(

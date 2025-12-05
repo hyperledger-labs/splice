@@ -177,6 +177,12 @@ export function buildDsoConfigChanges(
       currentValue: before?.voteCooldownTime?.microseconds || '',
       newValue: after?.voteCooldownTime?.microseconds || '',
     },
+    {
+      fieldName: 'voteExecutionInstructionTimeout',
+      label: 'Vote Execution Instruction Timeout',
+      currentValue: before?.voteExecutionInstructionTimeout?.microseconds || '',
+      newValue: after?.voteExecutionInstructionTimeout?.microseconds || '',
+    },
   ] as ConfigChange[];
 
   return showAllFields ? changes : changes.filter(c => c.currentValue !== c.newValue);

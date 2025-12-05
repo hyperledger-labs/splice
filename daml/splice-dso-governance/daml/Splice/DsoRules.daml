@@ -33,6 +33,8 @@ import Splice.SvOnboarding
 import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.SvState
+import Splice.DSO.VoteExecution
+import Splice.DsoRules.Utils
 import Splice.Schedule
 import Splice.Util
 import Splice.CometBft()
@@ -114,6 +116,8 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
     -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract.
+  | SRARC_ModifyValidatorLicenses ValidatorLicensesModification
+    -- ^ Voted action to change weights or withdraw validator licenses.
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -143,6 +147,21 @@ data DsoSummary = DsoSummary with
     numSvs : Int
     requiredNumVotes : Int
       -- ^ The number of votes required for considering a confirmation, or a request for a vote
+  deriving (Eq, Show)
+
+-- | Actions possible on a validator license via vote
+data ValidatorLicenseChange
+  = VLC_ChangeWeight with
+      validator : Party
+      weight : Decimal
+  | VLC_Withdraw with
+      validator : Party
+  deriving (Eq, Show)
+
+-- | A modification of the set of validator licenses,
+-- which allows for single vote to modify many licenses.
+data ValidatorLicensesModification = ValidatorLicensesModification with
+    changes : [ValidatorLicenseChange]
   deriving (Eq, Show)
 
 -- | Choice return types
@@ -205,6 +224,9 @@ data DsoRules_GrantFeaturedAppRightResult = DsoRules_GrantFeaturedAppRightResult
 data DsoRules_RevokeFeaturedAppRightResult = DsoRules_RevokeFeaturedAppRightResult
 
 data DsoRules_OnboardValidatorResult = DsoRules_OnboardValidatorResult with
+    validatorLicense : ContractId ValidatorLicense
+
+data DsoRules_GrantValidatorLicenseResult = DsoRules_GrantValidatorLicenseResult with
     validatorLicense : ContractId ValidatorLicense
 
 data DsoRules_MergeValidatorLicenseResult = DsoRules_MergeValidatorLicenseResult with
@@ -293,6 +315,18 @@ data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUn
 
 data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult with
     unclaimedRewardCid : ContractId UnclaimedReward
+
+data DsoRules_ModifyValidatorLicensesResult = DsoRules_ModifyValidatorLicensesResult with
+    instructionCids : [ContractId VoteExecutionInstruction]
+  deriving (Show, Eq)
+
+data DsoRules_ExecuteVoteExecutionInstructionResult = DsoRules_ExecuteVoteExecutionInstructionResult with
+    dummyUnitField : ()
+  deriving (Eq, Show)
+
+data DsoRules_ExpireVoteExecutionInstructionResult = DsoRules_ExpireVoteExecutionInstructionResult with
+    dummyUnitField : ()
+  deriving (Eq, Show)
 
 
 -- Workflow templates
@@ -421,11 +455,20 @@ data DsoRulesConfig = DsoRulesConfig with
     decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
     nextScheduledSynchronizerUpgrade: Optional SynchronizerUpgradeSchedule
     voteCooldownTime : Optional RelTime -- ^ The minimum time between two votes by the same SV.
+    voteExecutionInstructionTimeout : Optional RelTime -- ^ The TTL for vote execution instruction contracts
   deriving (Eq, Show)
 
 -- | Read the `voteCooldownTime` from the `DsoRulesConfig` with a default value of 1 minute.
 getVoteCooldownTime : DsoRulesConfig -> RelTime
 getVoteCooldownTime config = fromOptional (minutes 1) config.voteCooldownTime
+
+-- | Read the `voteExecutionInstructionTimeout` from the `DsoRulesConfig` with a default value of 1 day.
+-- We choose 1 day as the default to balance the need for prompt cleanup of instructions
+-- that are impossible to execute with the expectation that instructions
+-- are always executed. During normal operations, vote instruction execution
+-- should be prompt and happen within less than a minute after their creation.
+getVoteExecutionInstructionTimeout : DsoRulesConfig -> RelTime
+getVoteExecutionInstructionTimeout config = fromOptional (days 1) config.voteExecutionInstructionTimeout
 
 data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     time : Time
@@ -663,7 +706,7 @@ template DsoRules with
           assertWithinDeadline "confirmation.expiresAt" confirmation.expiresAt
           pure confirmation.confirmer
         require "No duplicate confirmers" (unique confirmers)
-        executeActionRequiringConfirmation dso self amuletRulesCid action
+        executeActionRequiringConfirmation dso self amuletRulesCid action None
         return DsoRules_ExecuteConfirmedActionResult
 
 
@@ -794,7 +837,7 @@ template DsoRules with
 
                     Some effectiveTime | now >= effectiveTime && numYays >= s.requiredNumVotes ->
                       try do
-                        executeActionRequiringConfirmation dso self amuletRulesCid request.action
+                        executeActionRequiringConfirmation dso self amuletRulesCid request.action (Some requestCid)
                         pure $ VRO_Accepted with
                           effectiveAt = effectiveTime
                       catch
@@ -812,7 +855,7 @@ template DsoRules with
 
                     None | numYays >= s.requiredNumVotes ->
                       try do
-                        executeActionRequiringConfirmation dso self amuletRulesCid request.action
+                        executeActionRequiringConfirmation dso self amuletRulesCid request.action (Some requestCid)
                         -- TODO(#16139): Remove Config Schedule from AmuletConfig
                         -- TODO(#16137): Implement effectivity on all actions
                         pure $ VRO_Accepted with
@@ -979,28 +1022,50 @@ template DsoRules with
           faucetState = None
           metadata = fmap (\version -> ValidatorLicenseMetadata with version; contactPoint = fromOptional "" contactPoint; lastUpdatedAt = now) version
           lastActiveAt = Some now
+          weight = None -- An individual SV can only create a license with the default weight.
+          kind = Some OperatorLicense
         return DsoRules_OnboardValidatorResult with ..
 
+    -- Grant ValidatorLicense to a party that is not an validator node operator
+    ---------------------------------------------------------------------------
+
+    nonconsuming choice DsoRules_GrantValidatorLicense : DsoRules_GrantValidatorLicenseResult
+      with
+        sponsor : Party
+        validator : Party
+      controller sponsor
+      do
+        require "Sponsor is an SV" (sponsor `Map.member` svs)
+        now <- getTime
+        validatorLicense <- create ValidatorLicense with
+          dso
+          sponsor
+          validator
+          faucetState = None
+          metadata = None
+          lastActiveAt = Some now
+          weight = None
+          kind = Some NonOperatorLicense
+        return DsoRules_GrantValidatorLicenseResult with ..
+
     nonconsuming choice DsoRules_MergeValidatorLicense : DsoRules_MergeValidatorLicenseResult
-      -- ^ Note: removes the old duplicated licenses and creates a new one with the highest lastReceivedFor round
-      -- There should never be duplicates going forward.
+      -- ^ Removes the old duplicated licenses and creates a new one with merged fields having value:
+      -- - lastReceivedFor: max value among all licenses
+      -- - weight: min value among all licenses
+      -- - kind: `Some OperatorLicense` if any license has `None` or `Some OperatorLicense`
       with
         validatorLicenseCids : [ContractId ValidatorLicense]
         sv : Optional Party
       controller sv
       do _ <- getAndValidateSvParty this sv
-         require "Number of validatorLicense contracts to merge is >= 2" (length validatorLicenseCids >= 2)
          validatorLicenses <- forA validatorLicenseCids $ fetchAndArchive (ForDso this.dso)
-         require "All validatorLicenses map to the same validator" ( length (dedup (map (.validator) validatorLicenses)) == 1)
-         -- We don't attempt to merge the fields in the validator licence since there is no good
-         -- way to do so and none of the fields other than lastReceivedFor round are crucial and for that
-         -- taking the max is the correct merge.
-         cid <- create $ maximumOn (\license ->
-                     case license.faucetState of
-                         None    -> Round 0
-                         Some r  -> r.lastReceivedFor) validatorLicenses
-         pure $ DsoRules_MergeValidatorLicenseResult cid
 
+         mergedLicense <- case mergeValidatorLicenses validatorLicenses of
+           Left err -> abort err
+           Right license -> pure license
+
+         cid <- create mergedLicense
+         pure $ DsoRules_MergeValidatorLicenseResult cid
 
     -- SV onboarding
     ----------------
@@ -1251,8 +1316,6 @@ template DsoRules with
         sv : Optional Party
       controller sv
       do
-        -- TODO(#2025) Deprecate AmuletRules_ClaimExpiredRewards. We did not do that in the same change
-        -- as inlining the definition here so don't need to bump splice-amulet which also requires validators to upgrade.
         let AmuletRules_ClaimExpiredRewards{..} = choiceArg
         -- retrieve round
         closedRound <- fetchReferenceData (ForDso with dso) closedRoundCid
@@ -1271,10 +1334,12 @@ template DsoRules with
         let numValidatorFaucetCoupons = optional 0.0 (intToDecimal . length) optValidatorFaucetCouponCids
 
         -- expire validator liveness activity records and compute their unclaimed rewards
-        forA_ (fromOptional [] optValidatorLivenessActivityRecordCids) $ \validatorLivenessActivityRecordCid -> do
-          exercise validatorLivenessActivityRecordCid  ValidatorLivenessActivityRecord_DsoExpire with closedRoundCid
+        expiredValidatorLivenessActivityRecords <- forA (fromOptional [] optValidatorLivenessActivityRecordCids) $ \validatorLivenessActivityRecordCid -> do
+          record <- fetchButArchiveLater (ForDso with dso) validatorLivenessActivityRecordCid
+          exercise validatorLivenessActivityRecordCid ValidatorLivenessActivityRecord_DsoExpire with closedRoundCid
+          return (fromOptional defaultValidatorLicenseWeight record.weight)
 
-        let numValidatorLivenessActivityRecords = optional 0.0 (intToDecimal . length) optValidatorLivenessActivityRecordCids
+        let validatorLivenessActivityRecordsWeight = sum expiredValidatorLivenessActivityRecords
 
         -- expire app rewards and compute their unclaimed rewards
         expiredAppRewards <- forA appCouponCids $ \appCouponCid -> do
@@ -1294,7 +1359,7 @@ template DsoRules with
         -- create unclaimed reward for the total
         let amount =
               validatorRewards * closedRound.issuancePerValidatorRewardCoupon +
-              (numValidatorFaucetCoupons + numValidatorLivenessActivityRecords) * getClosedMiningRoundIssuancePerValidatorFaucetCoupon closedRound +
+              (numValidatorFaucetCoupons + validatorLivenessActivityRecordsWeight) * getClosedMiningRoundIssuancePerValidatorFaucetCoupon closedRound +
               featuredAppRewards * closedRound.issuancePerFeaturedAppRewardCoupon +
               unfeaturedAppRewards * closedRound.issuancePerUnfeaturedAppRewardCoupon +
               intToDecimal svRewardsWeight * closedRound.issuancePerSvRewardCoupon
@@ -1503,6 +1568,46 @@ template DsoRules with
           exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
 
+    nonconsuming choice DsoRules_ModifyValidatorLicenses : DsoRules_ModifyValidatorLicensesResult
+      with
+        modification : ValidatorLicensesModification
+        voteRequest : ContractId VoteRequest
+      controller dso
+      do now <- getTime
+         let expiresAt = now `addRelTime` getVoteExecutionInstructionTimeout config
+         let voteRequestAny = coerceContractId voteRequest
+         instructionCids <- forA modification.changes $ \c -> do
+           case c of
+             VLC_ChangeWeight {validator, weight} -> do
+               let instruction = EI_ValidatorLicenseChangeWeight with validator; weight
+               create VoteExecutionInstruction with dso; instruction; expiresAt; optVoteRequest = Some voteRequestAny
+             VLC_Withdraw {validator} -> do
+               let instruction = EI_ValidatorLicenseWithdraw with validator
+               create VoteExecutionInstruction with dso; instruction; expiresAt; optVoteRequest = Some voteRequestAny
+         return DsoRules_ModifyValidatorLicensesResult with instructionCids
+
+    nonconsuming choice DsoRules_ExecuteVoteExecutionInstruction : DsoRules_ExecuteVoteExecutionInstructionResult
+      with
+        sv : Party
+        inputs : ExecutionInstructionInputs
+        instructionCid : ContractId VoteExecutionInstruction
+      controller sv
+      do _ <- getAndValidateSvParty this (Some sv)
+         voteInstruction <- fetchAndArchive (ForDso dso) instructionCid
+         executeVoteExecutionInstruction dso voteInstruction inputs
+         return DsoRules_ExecuteVoteExecutionInstructionResult with dummyUnitField = ()
+
+    nonconsuming choice DsoRules_ExpireVoteExecutionInstruction : DsoRules_ExpireVoteExecutionInstructionResult
+      with
+        instructionCid : ContractId VoteExecutionInstruction
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        fetchChecked (ForDso with dso) instructionCid
+        exercise instructionCid VoteExecutionInstruction_Expire
+        return DsoRules_ExpireVoteExecutionInstructionResult with dummyUnitField = ()
+
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =
@@ -1534,8 +1639,8 @@ summarizeDso dsoRules = DsoSummary with
 
 -- | Execute an action which requires certain number of confirmations from SVs.
 -- Each confirmed action can at most be executed once.
-executeActionRequiringConfirmation: Party -> ContractId DsoRules -> Optional( ContractId AmuletRules ) -> ActionRequiringConfirmation -> Update ()
-executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act of
+executeActionRequiringConfirmation: Party -> ContractId DsoRules -> Optional( ContractId AmuletRules ) -> ActionRequiringConfirmation -> Optional (ContractId VoteRequest) -> Update ()
+executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act voteRequestCid = case act of
   ARC_AmuletRules with .. ->
     case amuletRulesCid of
       None -> error "amuletRulesCid was not defined."
@@ -1562,6 +1667,9 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_ModifyValidatorLicenses modification -> case voteRequestCid of
+        None -> error "voteRequestCid is required for SRARC_ModifyValidatorLicenses"
+        Some voteRequest -> void $ exercise dsoRulesCid DsoRules_ModifyValidatorLicenses with modification; voteRequest
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
@@ -1789,6 +1897,7 @@ instance Patchable DsoRulesConfig where
     decentralizedSynchronizer = patch new.decentralizedSynchronizer base.decentralizedSynchronizer current.decentralizedSynchronizer
     nextScheduledSynchronizerUpgrade = patch new.nextScheduledSynchronizerUpgrade base.nextScheduledSynchronizerUpgrade current.nextScheduledSynchronizerUpgrade
     voteCooldownTime = patch new.voteCooldownTime base.voteCooldownTime current.voteCooldownTime
+    voteExecutionInstructionTimeout = patch new.voteExecutionInstructionTimeout base.voteExecutionInstructionTimeout current.voteExecutionInstructionTimeout
 
 instance Patchable SynchronizerUpgradeSchedule where
   patch new base current = SynchronizerUpgradeSchedule with
