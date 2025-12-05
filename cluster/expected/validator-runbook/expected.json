@@ -719,7 +719,6 @@
           "postgresName": "postgres",
           "secretName": "postgres-secrets"
         },
-        "scanAddress": "https://scan.sv-2.mock.global.canton.network.digitalasset.com",
         "scanClient": {
           "scanType": "bft-custom",
           "seedUrls": [
