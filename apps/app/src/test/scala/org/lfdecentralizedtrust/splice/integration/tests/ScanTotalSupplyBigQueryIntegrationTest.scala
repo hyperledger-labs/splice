@@ -305,7 +305,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
         (6, aliceValidatorMintedAmount),
       )
     ) { (expectRound, expectedBalance) =>
-      actAndCheck(
+      actAndCheck(timeUntilSuccess = 30.seconds)(
         s"Advance round ${expectRound - 1}", {
           advanceRoundsToNextRoundOpening
           advanceTimeForRewardAutomationToRunForCurrentRound
