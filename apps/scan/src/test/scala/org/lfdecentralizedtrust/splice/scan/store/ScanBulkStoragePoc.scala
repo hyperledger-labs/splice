@@ -89,7 +89,7 @@ class ScanBulkStoragePoc extends AsyncWordSpec with BaseTest with HasExecutionCo
   val credentials = AwsBasicCredentials.create(accessKey, secret)
   val zstdTmpBuffer = ByteBuffer.allocateDirect(10 * 1024 * 1024)
   val numUpdatesPerQuery = 1000
-  val maxFileSize = 128 * 1024 * 1024
+  val maxFileSize = 64 * 1024 * 1024
 
   implicit val system: ActorSystem = ActorSystem("S3UploadPipeline", pekkoConfig)
 
