@@ -105,6 +105,7 @@ export const SelectAction: React.FC = () => {
 
                     <Button
                       variant="contained"
+                      id="next-button"
                       data-testid="next-button"
                       type="submit"
                       disabled={!canSubmit}

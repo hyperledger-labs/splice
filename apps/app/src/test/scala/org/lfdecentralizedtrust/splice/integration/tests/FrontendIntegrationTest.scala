@@ -177,7 +177,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   val options: FirefoxOptions =
     new FirefoxOptions()
       .setLogLevel(FirefoxDriverLogLevel.DEBUG)
-      .addArguments("-headless")
+  // .addArguments("-headless")
   options.setCapability("webSocketUrl", true: Any);
 
   protected val webDrivers: mutable.Map[String, WebDriverType] = mutable.Map.empty
@@ -300,6 +300,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     // We process all browsers in parallel, for faster test termination.
     webDrivers.values.toList.parTraverse { webDriver =>
       Future {
+        com.digitalasset.canton.concurrent.Threading.sleep(30000)
         webDriver.quit()
       }
     }.futureValue
