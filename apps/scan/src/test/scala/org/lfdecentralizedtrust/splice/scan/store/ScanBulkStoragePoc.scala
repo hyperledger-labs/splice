@@ -23,7 +23,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.http.{ProtobufJsonScanHttpEncodings, ScanHttpEncodings}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
-import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, Limit, PageLimit, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, PageLimit, UpdateHistory}
 import org.scalatest.concurrent.PatienceConfiguration
 import com.github.luben.zstd.ZstdDirectBufferCompressingStreamNoFinalizer
 import software.amazon.awssdk.services.s3.S3Client
