@@ -3,6 +3,8 @@
 
 dir := $(call current_dir)
 
+include cluster/deployment/local.mk
+
 .PHONY: $(dir)/build
 $(dir)/build: $(dir)/.build
 
@@ -23,8 +25,6 @@ $(dir)/unit-test: $(dir)/.build
 	cd $(@D) && npm run test
 
 pulumi_projects ::= operator deployment gcp infra canton-network sv-runbook validator-runbook multi-validator cluster sv-canton validator1 splitwell
-
-deployment_dir := $(shell dirname $(dir))/deployment
 
 .PHONY: $(dir)/test $(dir)/update-expected
 $(dir)/test: $(dir)/unit-test $(deployment_dir)/check-resolved-config $(foreach project,$(pulumi_projects),$(dir)/$(project)/test)

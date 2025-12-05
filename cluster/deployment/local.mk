@@ -1,9 +1,9 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-dir := $(call current_dir)
+deployment_dir := $(call current_dir)
 
-cluster_dirs := $(foreach config,$(wildcard $(dir)/*/config.yaml),$(shell dirname $(config)))
+cluster_dirs := $(foreach config,$(wildcard $(deployment_dir)/*/config.yaml),$(shell dirname $(config)))
 resolved_config_targets := $(foreach cluster_dir,$(cluster_dirs),$(cluster_dir)/config.resolved.yaml)
 
 # We use .PHONY because it is hard to pinpoint exact deps for config resolution as it might depend
@@ -18,9 +18,9 @@ $(1)/config.resolved.yaml:
 endef
 $(foreach cluster_dir,$(cluster_dirs),$(eval $(call update_resolved_config,$(cluster_dir))))
 
-.PHONY: $(dir)/update-resolved-config
-$(dir)/update-resolved-config: $(resolved_config_targets)
+.PHONY: $(deployment_dir)/update-resolved-config
+$(deployment_dir)/update-resolved-config: $(resolved_config_targets)
 
-.PHONY: $(dir)/check-resolved-config
-$(dir)/check-resolved-config: $(resolved_config_targets)
+.PHONY: $(deployment_dir)/check-resolved-config
+$(deployment_dir)/check-resolved-config: $(resolved_config_targets)
 	git diff --exit-code --quiet $(resolved_config_targets)
