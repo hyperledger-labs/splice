@@ -6,7 +6,7 @@ import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/
 
 const kubectlVersion = spliceEnvConfig.requireEnv('KUBECTL_VERSION');
 const cronJobName = 'gc-pod-reaper-job';
-const targetNamespace = 'gc-pod-reaper';
+const reaperNamespace = 'gc-pod-reaper';
 const serviceAccountName = 'gc-pod-reaper-service-account';
 const reaperImage = 'rancher/kubectl:' + kubectlVersion;
 const schedule = '0 3 * * *'; // Run once daily at 03:00 AM UTC
@@ -15,6 +15,13 @@ const deleteBadPodsCommand = [
   '/bin/sh',
   '-c',
   `
+    apk add --no-cache jq;
+
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to install jq. Exiting.";
+        exit 1
+    fi
+
     echo "--- $(date) Starting Pod Reaper ---";
 
     TARGET_NAMESPACES_LIST=$(echo "$TARGET_NAMESPACES" | tr ',' ' ');
@@ -73,9 +80,9 @@ export function deployGCPodReaper(
 ): k8s.batch.v1.CronJob {
   const ns = new k8s.core.v1.Namespace(name, {
     metadata: {
-      name: targetNamespace,
+      name: reaperNamespace,
       labels: {
-        'app.kubernetes.io/name': 'gc-pod-reaper',
+        'app.kubernetes.io/name': reaperNamespace,
       },
     },
   });
@@ -116,13 +123,6 @@ export function deployGCPodReaper(
               spec: {
                 serviceAccountName: serviceAccountName,
                 restartPolicy: 'OnFailure',
-                initContainers: [
-                  {
-                    name: 'install-dependencies',
-                    image: reaperImage,
-                    command: ['/bin/sh', '-c', 'apk add --no-cache jq'],
-                  },
-                ],
                 containers: [
                   {
                     name: cronJobName,
