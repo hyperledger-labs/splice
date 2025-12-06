@@ -15,9 +15,8 @@ const deleteBadPodsCommand = [
   '/bin/sh',
   '-c',
   `
-    LOG_FILE="/tmp/pod-reaper-$(date +%Y%m%d%H%M%S).log";
-    echo "--- $(date) Starting Pod Reaper ---" >> $LOG_FILE;
-    echo "Processing pods for deletion..." >> $LOG_FILE;
+    echo "--- $(date) Starting Pod Reaper ---";
+    echo "Processing pods for deletion...";
 
     TARGET_PODS=$(
       kubectl get pods -A -o json | \\
@@ -32,29 +31,29 @@ const deleteBadPodsCommand = [
               .metadata.namespace + " " + .metadata.name)'
     );
 
-    echo "Found pods for deletion:" >> $LOG_FILE;
-    echo "$TARGET_PODS" >> $LOG_FILE;
+    echo "Found pods for deletion:";
+    echo "$TARGET_PODS"; # Output list of pods found
 
     if [ -z "$TARGET_PODS" ]; then
-        echo "No target pods found. Exiting." >> $LOG_FILE;
+        echo "No target pods found. Exiting.";
         exit 0
     fi
 
-    echo "--- Deleting Target Pods ---" >> $LOG_FILE;
+    echo "--- Deleting Target Pods ---";
 
     echo "$TARGET_PODS" | while read -r NAMESPACE NAME; do
         if [ -n "$NAMESPACE" ] && [ -n "$NAME" ]; then
-            echo "Deleting pod $NAMESPACE/$NAME" >> $LOG_FILE;
-            kubectl delete pod -n "$NAMESPACE" "$NAME" >> $LOG_FILE 2>&1
+            echo "Attempting to delete pod $NAMESPACE/$NAME";
+            kubectl delete pod -n "$NAMESPACE" "$NAME"
             if [ $? -eq 0 ]; then
-                echo "Successfully deleted $NAMESPACE/$NAME" >> $LOG_FILE;
+                echo "Successfully deleted $NAMESPACE/$NAME";
             else
-                echo "Failed to delete $NAMESPACE/$NAME" >> $LOG_FILE;
+                echo "Failed to delete $NAMESPACE/$NAME";
             fi
         fi
     done
 
-    echo "--- $(date) Pod Reaper Finished ---" >> $LOG_FILE;
+    echo "--- $(date) Pod Reaper Finished ---";
     true
   `,
 ];
