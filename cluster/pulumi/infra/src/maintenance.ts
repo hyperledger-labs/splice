@@ -123,6 +123,27 @@ export function deployGCPodReaper(
               spec: {
                 serviceAccountName: serviceAccountName,
                 restartPolicy: 'OnFailure',
+                // Nodes in this GKE cluster are configured with Taints (cn_infra, cn_apps,
+                // gke-managed-components) that prevent standard Pods from being scheduled.
+                // These Tolerations allow the gc-pod-reaper-job to run on all available
+                // nodes, ensuring the cleanup task can execute regardless of node role.
+                tolerations: [
+                  {
+                    key: 'cn_infra',
+                    operator: 'Exists',
+                    effect: 'NoSchedule',
+                  },
+                  {
+                    key: 'components.gke.io/gke-managed-components',
+                    operator: 'Exists',
+                    effect: 'NoSchedule',
+                  },
+                  {
+                    key: 'cn_apps',
+                    operator: 'Exists',
+                    effect: 'NoSchedule',
+                  },
+                ],
                 containers: [
                   {
                     name: cronJobName,
