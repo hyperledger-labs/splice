@@ -16,41 +16,49 @@ const deleteBadPodsCommand = [
   '-c',
   `
     echo "--- $(date) Starting Pod Reaper ---";
-    echo "Processing pods for deletion...";
 
-    TARGET_PODS=$(
-      kubectl get pods -A -o json | \\
-      jq -r '.items[] |
-          # Check if the Pod status is "ContainerStatusUnknown"
-          (select(.status.phase == "Unknown" and .status.reason == "ContainerStatusUnknown") |
-              .metadata.namespace + " " + .metadata.name) //
+    TARGET_NAMESPACES_LIST=$(echo "$TARGET_NAMESPACES" | tr ',' ' ');
+    echo "Targeting namespaces: $TARGET_NAMESPACES_LIST";
 
-          # Check for Terminated container with reason "Error" and exit code 137
-          (select(.status.containerStatuses[]?.state.terminated? |
-              .reason == "Error" and .exitCode == 137) |
-              .metadata.namespace + " " + .metadata.name)'
-    );
-
-    echo "Found pods for deletion:";
-    echo "$TARGET_PODS"; # Output list of pods found
-
-    if [ -z "$TARGET_PODS" ]; then
-        echo "No target pods found. Exiting.";
-        exit 0
+    if [ -z "$TARGET_NAMESPACES_LIST" ]; then
+        echo "Error: No target namespaces provided. Exiting.";
+        exit 1
     fi
 
-    echo "--- Deleting Target Pods ---";
+    echo "--- Starting Cleanup Loop ---";
 
-    echo "$TARGET_PODS" | while read -r NAMESPACE NAME; do
-        if [ -n "$NAMESPACE" ] && [ -n "$NAME" ]; then
-            echo "Attempting to delete pod $NAMESPACE/$NAME";
-            kubectl delete pod -n "$NAMESPACE" "$NAME"
-            if [ $? -eq 0 ]; then
-                echo "Successfully deleted $NAMESPACE/$NAME";
-            else
-                echo "Failed to delete $NAMESPACE/$NAME";
-            fi
+    for NAMESPACE in $TARGET_NAMESPACES_LIST; do
+        echo "Processing namespace: $NAMESPACE";
+
+        BAD_PODS=$(
+          kubectl get pods -n "$NAMESPACE" -o json | \\
+          jq -r '.items[] |
+              (select(.status.phase == "Unknown" and .status.reason == "ContainerStatusUnknown") |
+                  .metadata.name) //
+
+              (select(.status.containerStatuses[]?.state.terminated? |
+                  .reason == "Error" and .exitCode == 137) |
+                  .metadata.name)'
+        );
+
+        if [ -z "$BAD_PODS" ]; then
+            echo "No bad pods found in $NAMESPACE. Skipping.";
+            continue
         fi
+
+        echo "Found bad pods in $NAMESPACE: $BAD_PODS";
+
+        for POD_NAME in $BAD_PODS; do
+            echo "Attempting to delete pod $NAMESPACE/$POD_NAME";
+            kubectl delete pod -n "$NAMESPACE" "$POD_NAME"
+            if [ $? -eq 0 ]; then
+                echo "Successfully deleted $NAMESPACE/$POD_NAME";
+            else
+                echo "Failed to delete $NAMESPACE/$POD_NAME";
+            fi
+        done
+        echo "Finished cleanup for $NAMESPACE.";
+        echo "---"
     done
 
     echo "--- $(date) Pod Reaper Finished ---";
@@ -60,6 +68,7 @@ const deleteBadPodsCommand = [
 
 export function deployGCPodReaper(
   name: string,
+  targetNamespaces: string[],
   opts?: pulumi.ComponentResourceOptions
 ): k8s.batch.v1.CronJob {
   const ns = new k8s.core.v1.Namespace(name, {
@@ -70,6 +79,8 @@ export function deployGCPodReaper(
       },
     },
   });
+
+  const targetNamespacesEnv = targetNamespaces.join(',');
 
   new k8s.core.v1.ServiceAccount(
     serviceAccountName,
@@ -118,6 +129,12 @@ export function deployGCPodReaper(
                     image: reaperImage,
                     imagePullPolicy: 'IfNotPresent',
                     command: deleteBadPodsCommand,
+                    env: [
+                      {
+                        name: 'TARGET_NAMESPACES',
+                        value: targetNamespacesEnv,
+                      },
+                    ],
                   },
                 ],
               },

@@ -45,7 +45,7 @@ istioMonitoring(network.ingressNs, []);
 
 if (enableGCReaperJob) {
   console.log('Deploying GC Pod Reaper job based on configuration.');
-  deployGCPodReaper('cluster-pod-gc-reaper', { parent: network.ingressNs.ns });
+  deployGCPodReaper('cluster-pod-gc-reaper', ['multi-validator'], { parent: network.ingressNs.ns });
 }
 configureStorage();
 
