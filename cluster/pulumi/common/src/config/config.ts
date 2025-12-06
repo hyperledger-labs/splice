@@ -43,3 +43,4 @@ class CnConfig {
 
 export const spliceConfig: CnConfig = new CnConfig();
 export const allowDowngrade = spliceConfig.pulumiProjectConfig.allowDowngrade;
+export const enableGCReaperJob = spliceConfig.configuration.enableGCReaperJob;
