@@ -88,9 +88,6 @@ export function deployGCPodReaper(
       metadata: {
         name: cronJobName,
         namespace: ns.metadata.name,
-        annotations: {
-          'pulumi.com/description': 'Scheduled job to automatically clean up error/stuck pods',
-        },
       },
       spec: {
         schedule: schedule,
