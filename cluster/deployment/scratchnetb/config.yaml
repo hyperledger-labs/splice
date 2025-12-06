@@ -70,3 +70,4 @@ svs:
       walletUser: auth0|68c2c41e6470184569e4521e
       auth0:
         clientId: fBFpzZSRuufk9ueV2pSEkOXNYXuQtVmY
+enableGCReaperJob: true

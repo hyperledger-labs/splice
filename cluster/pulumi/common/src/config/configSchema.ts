@@ -21,6 +21,7 @@ export const ConfigSchema = z.object({
     active: defaultActiveMigration,
   }),
   persistentHeapDumps: z.boolean().default(false),
+  enableGCReaperJob: z.boolean().default(false),
   pulumiProjectConfig: z
     .object({
       default: PulumiProjectConfigSchema,
