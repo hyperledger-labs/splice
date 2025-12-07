@@ -137,20 +137,20 @@ export function deployGCPodReaper(
                 tolerations: [
                   {
                     key: 'cn_infra',
-                    operator: 'Equal', // Must be 'Equal' because the Taint has a value (`true`)
-                    value: 'true', // Must match the Taint's value
-                    effect: 'NoSchedule', // Must match the Taint's effect
+                    operator: 'Equal',
+                    value: 'true',
+                    effect: 'NoSchedule',
                   },
                   {
                     key: 'components.gke.io/gke-managed-components',
-                    operator: 'Equal', // Must be 'Equal'
-                    value: 'true', // Must match the Taint's value
+                    operator: 'Equal',
+                    value: 'true',
                     effect: 'NoSchedule',
                   },
                   {
                     key: 'cn_apps',
-                    operator: 'Equal', // Must be 'Equal'
-                    value: 'true', // Must match the Taint's value
+                    operator: 'Equal',
+                    value: 'true',
                     effect: 'NoSchedule',
                   },
                 ],
