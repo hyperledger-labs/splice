@@ -12,7 +12,7 @@ const reaperImage = 'rancher/kubectl:' + kubectlVersion;
 const schedule = '* * * * *'; // Run once daily at 03:00 AM UTC
 
 const deleteBadPodsCommand = [
-  'sh',
+  '/bin/ash',
   '-c',
   `
     apk add --no-cache jq;
