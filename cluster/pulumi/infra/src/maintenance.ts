@@ -12,7 +12,7 @@ const reaperImage = 'ubuntu:22.04';
 // Rancher/Official K8s images failed (exec: no such file) as they lack /bin/ash shell or anything useful.
 // Bitnami has moved most images and Helm charts behind a paywall
 
-const schedule = '* * * * *'; // Run once daily at 03:00 AM UTC
+const schedule = '0 * * * *'; // Run once an hour
 
 const deleteBadPodsCommand = [
   '/bin/bash',
