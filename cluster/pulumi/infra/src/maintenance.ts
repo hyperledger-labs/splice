@@ -8,13 +8,21 @@ const kubectlVersion = spliceEnvConfig.requireEnv('KUBECTL_VERSION');
 const cronJobName = 'gc-pod-reaper-job';
 const reaperNamespace = 'gc-pod-reaper';
 const serviceAccountName = 'gc-pod-reaper-service-account';
-const reaperImage = 'registry.k8s.io/kubectl:' + kubectlVersion;
+const reaperImage = 'bitnami/kubectl:' + kubectlVersion;
+// Previous attempts with 'rancher/kubectl' and 'registry.k8s.io/kubectl' failed repeatedly
+// (CrashLoopBackOff, RunContainerError) because those minimal/distroless images lack a standard
+// shell executable (like /bin/bash or /bin/sh) needed to execute the CronJob script's complex
+// logic (loops, pipes, etc.).
+// Solution: Switched to the 'bitnami/kubectl' image, which is built on a standard Linux base
+// (Debian/Ubuntu). This guarantees the presence of /bin/bash and allows the script to run.
 const schedule = '* * * * *'; // Run once daily at 03:00 AM UTC
 
 const deleteBadPodsCommand = [
   '/bin/bash',
   '-c',
   `
+    apt-get update && apt-get install -y jq;
+
     if [ $? -ne 0 ]; then
         echo "Error: Failed to install jq. Exiting.";
         exit 1
