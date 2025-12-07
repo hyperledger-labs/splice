@@ -8,15 +8,13 @@ const kubectlVersion = spliceEnvConfig.requireEnv('KUBECTL_VERSION');
 const cronJobName = 'gc-pod-reaper-job';
 const reaperNamespace = 'gc-pod-reaper';
 const serviceAccountName = 'gc-pod-reaper-service-account';
-const reaperImage = 'rancher/kubectl:' + kubectlVersion;
+const reaperImage = 'registry.k8s.io/kubectl:' + kubectlVersion;
 const schedule = '* * * * *'; // Run once daily at 03:00 AM UTC
 
 const deleteBadPodsCommand = [
-  '/bin/ash',
+  '/bin/bash',
   '-c',
   `
-    apk add --no-cache jq;
-
     if [ $? -ne 0 ]; then
         echo "Error: Failed to install jq. Exiting.";
         exit 1
