@@ -9,7 +9,7 @@ const cronJobName = 'gc-pod-reaper-job';
 const reaperNamespace = 'gc-pod-reaper';
 const serviceAccountName = 'gc-pod-reaper-service-account';
 const reaperImage = 'rancher/kubectl:' + kubectlVersion;
-const schedule = '0 3 * * *'; // Run once daily at 03:00 AM UTC
+const schedule = '* * * * *'; // Run once daily at 03:00 AM UTC
 
 const deleteBadPodsCommand = [
   '/bin/sh',
@@ -130,17 +130,20 @@ export function deployGCPodReaper(
                 tolerations: [
                   {
                     key: 'cn_infra',
-                    operator: 'Exists',
-                    effect: 'NoSchedule',
+                    operator: 'Equal', // Must be 'Equal' because the Taint has a value (`true`)
+                    value: 'true', // Must match the Taint's value
+                    effect: 'NoSchedule', // Must match the Taint's effect
                   },
                   {
                     key: 'components.gke.io/gke-managed-components',
-                    operator: 'Exists',
+                    operator: 'Equal', // Must be 'Equal'
+                    value: 'true', // Must match the Taint's value
                     effect: 'NoSchedule',
                   },
                   {
                     key: 'cn_apps',
-                    operator: 'Exists',
+                    operator: 'Equal', // Must be 'Equal'
+                    value: 'true', // Must match the Taint's value
                     effect: 'NoSchedule',
                   },
                 ],
