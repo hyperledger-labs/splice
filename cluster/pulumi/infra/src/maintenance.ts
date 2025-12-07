@@ -8,23 +8,24 @@ const kubectlVersion = spliceEnvConfig.requireEnv('KUBECTL_VERSION');
 const cronJobName = 'gc-pod-reaper-job';
 const reaperNamespace = 'gc-pod-reaper';
 const serviceAccountName = 'gc-pod-reaper-service-account';
-const reaperImage = 'bitnami/kubectl:' + kubectlVersion.slice(1);
-// Previous attempts with 'rancher/kubectl' and 'registry.k8s.io/kubectl' failed repeatedly
-// (CrashLoopBackOff, RunContainerError) because those minimal/distroless images lack a standard
-// shell executable (like /bin/bash or /bin/sh) needed to execute the CronJob script's complex
-// logic (loops, pipes, etc.).
-// Solution: Switched to the 'bitnami/kubectl' image, which is built on a standard Linux base
-// (Debian/Ubuntu). This guarantees the presence of /bin/bash and allows the script to run.
+const reaperImage = 'ubuntu:22.04';
+// Rancher/Official K8s images failed (exec: no such file) as they lack /bin/ash shell or anything useful.
+// Bitnami has moved most images and Helm charts behind a paywall
+
 const schedule = '* * * * *'; // Run once daily at 03:00 AM UTC
 
 const deleteBadPodsCommand = [
   '/bin/bash',
   '-c',
   `
-    apt-get update && apt-get install -y jq;
+    apt-get update &&
+    apt-get install -y curl jq &&
+    curl -LO https://dl.k8s.io/release/${kubectlVersion}/bin/linux/amd64/kubectl &&
+    install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl;
 
-    if [ $? -ne 0 ]; then
-        echo "Error: Failed to install jq. Exiting.";
+
+    if [ $? -ne 0 ] || ! command -v kubectl >/dev/null 2>&1; then
+        echo "Error: Failed to install kubectl or jq. Exiting.";
         exit 1
     fi
 
