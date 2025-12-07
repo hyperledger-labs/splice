@@ -8,7 +8,7 @@ const kubectlVersion = spliceEnvConfig.requireEnv('KUBECTL_VERSION');
 const cronJobName = 'gc-pod-reaper-job';
 const reaperNamespace = 'gc-pod-reaper';
 const serviceAccountName = 'gc-pod-reaper-service-account';
-const reaperImage = 'bitnami/kubectl:' + kubectlVersion;
+const reaperImage = 'bitnami/kubectl:' + kubectlVersion.slice(1);
 // Previous attempts with 'rancher/kubectl' and 'registry.k8s.io/kubectl' failed repeatedly
 // (CrashLoopBackOff, RunContainerError) because those minimal/distroless images lack a standard
 // shell executable (like /bin/bash or /bin/sh) needed to execute the CronJob script's complex
