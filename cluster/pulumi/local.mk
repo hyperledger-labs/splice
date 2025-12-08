@@ -3,7 +3,7 @@
 
 dir := $(call current_dir)
 
-include cluster/deployment/local.mk
+include $(shell dirname $(dir))/deployment/local.mk
 
 .PHONY: $(dir)/build
 $(dir)/build: $(dir)/.build
