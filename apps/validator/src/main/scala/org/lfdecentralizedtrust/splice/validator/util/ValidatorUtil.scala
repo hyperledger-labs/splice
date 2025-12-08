@@ -96,6 +96,7 @@ private[validator] object ValidatorUtil {
   def onboard(
       endUserName: String,
       knownParty: Option[PartyId],
+      createPartyIfMissing: Option[Boolean],
       storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
       getAmuletRulesDomain: ScanConnection.GetAmuletRulesDomain,
@@ -122,6 +123,7 @@ private[validator] object ValidatorUtil {
             participantAdminConnection,
           )
       }
+      _ = createPartyIfMissing
       _ <- retryProvider.ensureThatB(
         RetryFor.ClientCalls,
         "onboard_grant_user_rights",
