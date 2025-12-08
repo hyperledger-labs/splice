@@ -91,7 +91,8 @@ export function configureCloudArmorPolicy(
           // TODO (#2723) must be the name of the Service set up by the gateway
           // *that is the backend of the L7 ALB gateway for which this is configured*.
           // For a classic istio gateway this is the same (?) as the gateway name;
-          // for a k8s istio gateway this is <gateway-name>-istio
+          // for a k8s istio gateway this is <gateway-name>-istio.
+          // Can be identified by the apiVersion of the Gateway k8s resource
           name: 'internal-istio-gateway-istio',
           namespace: bothGatewaysNs.ns.metadata.name,
         },
