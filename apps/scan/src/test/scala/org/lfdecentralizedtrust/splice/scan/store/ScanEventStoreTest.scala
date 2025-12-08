@@ -1,19 +1,18 @@
 package org.lfdecentralizedtrust.splice.scan.store
 
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
-import org.lfdecentralizedtrust.splice.store.PageLimit
-import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, PageLimit, StoreTest, UpdateHistory}
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
-import org.lfdecentralizedtrust.splice.store.UpdateHistory
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
-import org.lfdecentralizedtrust.splice.store.StoreTest
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import io.circe.Json
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 
 import scala.concurrent.Future
 
@@ -838,6 +837,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
       loggerFactory,
       enableissue12777Workaround = true,
       enableImportUpdateBackfill = true,
+      HistoryMetrics(NoOpMetricsFactory, migrationId),
     )
     uh.ingestionSink.initialize().map(_ => uh)
   }
@@ -991,7 +991,7 @@ class ScanEventStoreTest extends StoreTest with HasExecutionContext with SpliceP
 
   override protected def cleanDb(
       storage: DbStorage
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[_] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] =
     for {
       _ <- resetAllAppTables(storage)
     } yield ()

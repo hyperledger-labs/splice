@@ -702,12 +702,16 @@ components:
         - connections
         - sequencer_trust_threshold
         - submission_request_amplification
+        - sequencer_liveness_margin
       properties:
         connections:
           type: array
           items:
             $ref: "#/components/schemas/SequencerAliasToConnections"
         sequencer_trust_threshold:
+          type: integer
+          format: int32
+        sequencer_liveness_margin:
           type: integer
           format: int32
         submission_request_amplification:
@@ -781,6 +785,11 @@ components:
           type: boolean
           description: |
             If set to true, acs_snapshot is a filename
+        acs_format:
+          type: string
+          enum:
+            - admin_api
+            - ledger_api
 
     GetValidatorDomainDataSnapshotResponse:
       type: object

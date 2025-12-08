@@ -44,7 +44,7 @@ trait TransactionViewTree extends ViewTree {
 
   override def rootHash: RootHash = tree.rootHash
 
-  lazy val transactionId: UpdateId = UpdateId.fromRootHash(rootHash)
+  lazy val updateId: UpdateId = UpdateId.fromRootHash(rootHash)
 
   override def toBeSigned: Option[RootHash] = if (isTopLevel) Some(rootHash) else None
 
@@ -67,7 +67,7 @@ trait TransactionViewTree extends ViewTree {
 
   lazy val transactionUuid: UUID = commonMetadata.uuid
 
-  override def synchronizerId: PhysicalSynchronizerId = commonMetadata.synchronizerId
+  override def psid: PhysicalSynchronizerId = commonMetadata.synchronizerId
 
   override def mediator: MediatorGroupRecipient = commonMetadata.mediator
 

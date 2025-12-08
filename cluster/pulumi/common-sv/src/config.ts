@@ -14,7 +14,7 @@ import {
   RateLimitSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
-import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
+import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { z } from 'zod';
 
 import { SingleSvConfiguration } from './singleSvConfig';
@@ -84,7 +84,14 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
   onboardingPollingInterval?: string;
   cometBftGovernanceKey?: CnInput<SvCometBftGovernanceKey>;
   initialRound?: string;
+  periodicTopologySnapshotConfig?: BackupConfig;
 }
+
+export const GCPBucketSchema = z.object({
+  projectId: z.string(),
+  bucketName: z.string(),
+  backupInterval: z.string(),
+});
 
 export const SvConfigSchema = z.object({
   sv: z

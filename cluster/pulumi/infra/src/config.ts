@@ -6,7 +6,7 @@ import {
   loadJsonFromFile,
   externalIpRangesFile,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
+import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import util from 'node:util';
 import { z } from 'zod';
@@ -22,6 +22,14 @@ const MonitoringConfigSchema = z.object({
   alerting: z.object({
     enableNoDataAlerts: z.boolean(),
     alerts: z.object({
+      pruning: z.object({
+        participantRetentionDays: z.number(),
+        sequencerRetentionDays: z.number(),
+        mediatorRetentionDays: z.number(),
+      }),
+      ingestion: z.object({
+        thresholdEntriesPerBatch: z.number(),
+      }),
       delegatelessContention: z.object({
         thresholdPerNamespace: z.number(),
       }),

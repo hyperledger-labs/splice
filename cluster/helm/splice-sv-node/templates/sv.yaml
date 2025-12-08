@@ -358,6 +358,30 @@ spec:
             - name: ADDITIONAL_CONFIG_MAX_VETTING_DELAY
               value: canton.sv-apps.sv.max-vetting-delay = "{{ . }}"
             {{- end }}
+            {{- with .Values.periodicTopologySnapshotConfig }}
+            - name: ADDITIONAL_CONFIG_SPLICE_APP_SV_PERIODIC_TOPOLOGY_SNAPSHOT_CONFIG
+              value: |
+                canton.sv-apps.sv.topology-snapshot-config = {
+                  location {
+                    type = gcp
+                    bucket {
+                      project-id = {{ .location.bucket.projectId | quote }}
+                      bucket-name = {{ .location.bucket.bucketName | quote }}
+                      credentials {
+                        type = service-account
+                        json-credentials = ${SPLICE_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
+                      }
+                    }
+                    prefix = {{ .location.prefix | quote }}
+                  }
+                  backup-interval = {{ .backupInterval | quote }}
+                }
+            - name: SPLICE_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
+              valueFrom:
+                secretKeyRef:
+                  key: "json-credentials"
+                  name: {{ .location.bucket.secretName }}
+            {{- end }}
           ports:
             - name: sv-api
               containerPort: 5014

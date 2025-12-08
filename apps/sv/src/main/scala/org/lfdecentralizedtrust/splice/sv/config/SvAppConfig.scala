@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.config.{
   GcpBucketConfig,
   LedgerApiClientConfig,
   ParticipantBootstrapDumpConfig,
+  PeriodicBackupDumpConfig,
   PruningConfig,
   SpliceBackendConfig,
   SpliceInstanceNamesConfig,
@@ -34,6 +35,7 @@ import org.lfdecentralizedtrust.splice.config.{
 }
 import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources}
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
 
 import java.nio.file.Path
@@ -79,6 +81,8 @@ object SvBootstrapDumpConfig {
 
 object SvOnboardingConfig {
   case class FoundDso(
+      acsCommitmentReconciliationInterval: PositiveDurationSeconds =
+        SvUtil.defaultAcsCommitmentReconciliationInterval,
       name: String,
       firstSvRewardWeightBps: Long,
       dsoPartyHint: String = "DSO",
@@ -285,7 +289,7 @@ case class SvAppBackendConfig(
     initialAmuletPriceVote: Option[BigDecimal] = None,
     cometBftConfig: Option[SvCometBftConfig] = None,
     localSynchronizerNode: Option[SvSynchronizerNodeConfig],
-    scan: Option[SvScanConfig],
+    scan: SvScanConfig,
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
     domainMigrationDumpPath: Option[Path] = None,
@@ -336,6 +340,8 @@ case class SvAppBackendConfig(
     // every SV tries to convert markers from any other SV's book of work (in a contention avoiding fashion)
     delegatelessAutomationFeaturedAppActivityMarkerCatchupThreshold: Int = 10_000,
     delegatelessAutomationExpiredAmuletBatchSize: Int = 100,
+    // configuration to periodically take topology snapshots
+    topologySnapshotConfig: Option[PeriodicBackupDumpConfig] = None,
     bftSequencerConnection: Boolean = true,
     // Skip synchronizer initialization and synchronizer config reconciliation.
     // Can be safely set to true for an SV that has completed onboarding unless you

@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import UnassignTrigger.GetTargetDomain
 import io.grpc.Status
 
-class UnassignTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: ContractId[_], T](
+class UnassignTrigger[C <: ContractTypeCompanion[?, TCid, ?, T], TCid <: ContractId[?], T](
     override protected val context: TriggerContext,
     store: AppStore,
     connection: SpliceLedgerConnection,

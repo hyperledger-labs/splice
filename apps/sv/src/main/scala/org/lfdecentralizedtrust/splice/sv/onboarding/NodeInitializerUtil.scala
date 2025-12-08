@@ -3,61 +3,55 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
+import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.digitalasset.canton.admin.api.client.data.SequencerAdminStatus.implicitPrettyString
+import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.{
   EnabledFeaturesConfig,
   NetworkAppClientConfig,
   SpliceInstanceNamesConfig,
   UpgradesConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.{
-  BaseLedgerConnection,
-  PackageVersionSupport,
-  ParticipantAdminConnection,
-  RetryFor,
-  RetryProvider,
-  SpliceLedgerClient,
-}
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
+import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
 import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftNode, CometBftRequestSigner}
-import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
-import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
-import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.stream.Materializer
-import com.digitalasset.canton.admin.api.client.data.SequencerAdminStatus.implicitPrettyString
-
-import scala.jdk.CollectionConverters.*
-import io.grpc.Status
-import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
-import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{
   DomainMigration,
   FoundDso,
   JoinWithKey,
 }
+import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig}
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
+import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.jdk.CollectionConverters.*
 
 trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNodeConfigClient {
 
   protected val config: SvAppBackendConfig
-  protected val storage: Storage
+  protected val storage: DbStorage
   protected val retryProvider: RetryProvider
   protected val clock: Clock
   protected val domainTimeSync: DomainTimeSynchronization
@@ -95,6 +89,8 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       ec: ExecutionContextExecutor,
       mat: Materializer,
       tracer: Tracer,
+      esf: ExecutionSequencerFactory,
+      actorSystem: ActorSystem,
   ) =
     new SvSvAutomationService(
       clock,
@@ -108,6 +104,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       participantAdminConnection,
       localSynchronizerNode,
       retryProvider,
+      config.topologySnapshotConfig,
       loggerFactory,
     )
 
@@ -349,6 +346,33 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
         }
     } yield initialRound
   }
+
+  // Ensure OTK mappings contain only signing keys that are signed
+  protected def ensureCantonNodesOTKRotatedIfNeeded(
+      skipSynchronizerInitialization: Boolean,
+      cantonIdentifierConfig: SvCantonIdentifierConfig,
+      localSynchronizerNode: Option[LocalSynchronizerNode],
+      clock: Clock,
+      loggerFactory: NamedLoggerFactory,
+      retryProvider: RetryProvider,
+      decentralizedSynchronizerId: SynchronizerId,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] =
+    localSynchronizerNode match {
+      case Some(synchronizerNode) if !skipSynchronizerInitialization =>
+        SynchronizerNodeInitializer.rotateCantonNodesOTKIfNeeded(
+          cantonIdentifierConfig,
+          synchronizerNode,
+          clock,
+          loggerFactory,
+          retryProvider,
+          decentralizedSynchronizerId,
+        )
+      case _ =>
+        logger.info(
+          "Skipping OTK keys rotation because skipSynchronizerInitialization is enabled"
+        )
+        Future.unit
+    }
 
   private def setInitialRound(connection: BaseLedgerConnection, initialRound: Long)(implicit
       ec: ExecutionContext,

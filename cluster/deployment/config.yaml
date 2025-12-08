@@ -64,6 +64,12 @@ monitoring:
   alerting:
     enableNoDataAlerts: false
     alerts:
+      pruning:
+        participantRetentionDays: 30
+        sequencerRetentionDays: 30
+        mediatorRetentionDays: 30
+      ingestion:
+        thresholdEntriesPerBatch: 80
       delegatelessContention:
         thresholdPerNamespace: 0.05
       trafficWaste:
@@ -138,7 +144,9 @@ svs:
   default:
     logging:
       appsLogLevel: DEBUG
+      appsAsync: false
       cantonLogLevel: DEBUG
+      cantonAsync: false
       cometbftLogLevel: debug
     participant:
       bftSequencerConnection: true
@@ -164,3 +172,9 @@ validators:
     nodeIdentifier: 'validator-runbook'
     partyHint: 'digitalasset-testValidator-1'
     onboardingSecret: 'validatorsecret'
+    validatorApp:
+      scanClient:
+        scanType: "bft-custom"
+        seedUrls: [ "https://scan.sv-2-eng.scratchb.network.canton.global","https://scan.sv-3-eng.scratchb.network.canton.global" ]
+        threshold: 2
+        trustedSvs: ["Digital-Asset-Eng-2","Digital-Asset-Eng-3"]

@@ -8,12 +8,13 @@ import cats.data.OptionT
 import cats.syntax.apply.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnectionPoolDelays,
@@ -27,6 +28,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import org.lfdecentralizedtrust.splice.config.{
@@ -72,8 +74,8 @@ import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
-  SynchronizerMigrationUtil,
   PackageVetting,
+  SynchronizerMigrationUtil,
   TemplateJsonDecoder,
 }
 
@@ -94,7 +96,7 @@ class JoiningNodeInitializer(
     override protected val clock: Clock,
     override protected val domainTimeSync: DomainTimeSynchronization,
     override protected val domainUnpausedSync: DomainUnpausedSynchronization,
-    override protected val storage: Storage,
+    override protected val storage: DbStorage,
     override val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
@@ -106,6 +108,8 @@ class JoiningNodeInitializer(
     mat: Materializer,
     tc: TraceContext,
     tracer: Tracer,
+    esf: ExecutionSequencerFactory,
+    actorSystem: ActorSystem,
 ) extends NodeInitializerUtil {
 
   private lazy val svConnection = OptionT(joiningConfig.traverse { conf =>
@@ -142,7 +146,7 @@ class JoiningNodeInitializer(
         SequencerConnections.tryMany(
           Seq(GrpcSequencerConnection.tryCreate(url)),
           PositiveInt.one,
-          // TODO(#2110) Rethink this when we enable sequencer connection pools.
+          // We only have a single connection here.
           sequencerLivenessMargin = NonNegativeInt.zero,
           config.participantClient.sequencerRequestAmplification,
           // TODO(#2666) Make the delays configurable.
@@ -331,6 +335,15 @@ class JoiningNodeInitializer(
           )
           Future.unit
         }
+      _ <- ensureCantonNodesOTKRotatedIfNeeded(
+        config.skipSynchronizerInitialization,
+        cantonIdentifierConfig,
+        localSynchronizerNode,
+        clock,
+        loggerFactory,
+        retryProvider,
+        decentralizedSynchronizerId,
+      )
       _ <- onboard(
         decentralizedSynchronizerId,
         dsoAutomation,

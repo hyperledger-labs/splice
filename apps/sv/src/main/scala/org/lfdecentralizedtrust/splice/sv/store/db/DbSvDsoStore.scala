@@ -38,7 +38,7 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{AcsStoreId, SelectFromAcsTableResult}
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
 import org.lfdecentralizedtrust.splice.store.{
   DbVotesAcsStoreQueryBuilder,
@@ -60,7 +60,6 @@ import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, Synchro
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
@@ -98,10 +97,6 @@ class DbSvDsoStore(
         ),
       ),
       domainMigrationInfo,
-      participantId,
-      enableissue12777Workaround = false,
-      enableImportUpdateBackfill = false,
-      BackfillingRequirement.BackfillingNotRequired,
       ingestionConfig,
     )
     with SvDsoStore
@@ -386,7 +381,7 @@ class DbSvDsoStore(
     synchronizerId,
   ).map(_.headOption.flatten.getOrElse(0L))
 
-  private def listRewardCouponsOnDomain[C, TCId <: ContractId[_], T](
+  private def listRewardCouponsOnDomain[C, TCId <: ContractId[?], T](
       companion: C,
       round: Long,
       synchronizerId: SynchronizerId,
@@ -505,7 +500,7 @@ class DbSvDsoStore(
       ignoredParties,
     )
 
-  private def listCouponsGroupedByRound[C, TCId <: ContractId[_]: ClassTag, T](
+  private def listCouponsGroupedByRound[C, TCId <: ContractId[?]: ClassTag, T](
       companion: C,
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
@@ -1393,7 +1388,7 @@ class DbSvDsoStore(
         )
     } yield result.map(contractFromRow(SvRewardState.COMPANION)(_))
 
-  private def lookupContractBySvParty[C, TCId <: ContractId[_], T](
+  private def lookupContractBySvParty[C, TCId <: ContractId[?], T](
       companion: C,
       svPartyId: PartyId,
   )(implicit
@@ -1420,7 +1415,7 @@ class DbSvDsoStore(
     }
   }
 
-  private def lookupContractBySvName[C, TCId <: ContractId[_], T](
+  private def lookupContractBySvName[C, TCId <: ContractId[?], T](
       companion: C,
       svName: String,
   )(implicit

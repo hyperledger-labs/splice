@@ -19,7 +19,7 @@ import MultiDomainAcsStore.ContractState
 /** A trigger for processing ready contracts. Note that the trigger
   * can get called multiple times for the same contract as it gets transferred betweend domains.
   */
-abstract class OnAssignedContractTrigger[C, TCid <: ContractId[_], T](
+abstract class OnAssignedContractTrigger[C, TCid <: ContractId[?], T](
     store: AppStore,
     companion: C,
 )(implicit
@@ -45,6 +45,6 @@ abstract class OnAssignedContractTrigger[C, TCid <: ContractId[_], T](
 }
 
 object OnAssignedContractTrigger {
-  type Template[TCid <: ContractId[_], T] =
+  type Template[TCid <: ContractId[?], T] =
     OnAssignedContractTrigger[Contract.Companion.Template[TCid, T], TCid, T]
 }

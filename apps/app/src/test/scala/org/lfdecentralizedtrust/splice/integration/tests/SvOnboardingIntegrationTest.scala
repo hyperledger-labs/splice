@@ -58,7 +58,9 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
           .singleRequest(registerGet.withHeaders(tokenHeader(invalidUserToken)))
           .futureValue
         responseForInvalidUser.status should be(StatusCodes.Forbidden)
-        responseForInvalidUser.entity.getContentType().toString should be("application/json")
+        responseForInvalidUser.entity.getContentType().toString should be(
+          "application/json"
+        )
       },
       _.warningMessage should include(
         "Authorization Failed"
@@ -131,6 +133,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         .config(sv1Backend.config.domains.global.alias)
         .value
     bobValidatorBackend.participantClient.synchronizers.connect_by_config(config)
+    bobValidatorBackend.participantClient.upload_dar_unless_exists(amuletDarPath)
     val candidate = clue("create a dummy party") {
       val name = "dummy" + env.environment.config.name.getOrElse("")
       bobValidatorBackend.participantClientWithAdminToken.ledger_api.parties

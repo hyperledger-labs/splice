@@ -30,11 +30,13 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerClient,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
+
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.Bft
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
   DomainScans,
   DsoScan,
 }
+import org.lfdecentralizedtrust.splice.scan.admin.http.HttpScanHandler
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
@@ -54,6 +56,7 @@ import org.slf4j.event.Level
 import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Random
 
 // mock verification triggers this
 @SuppressWarnings(Array("com.digitalasset.canton.DiscardedFuture"))
@@ -70,11 +73,13 @@ class BftScanConnectionTest
 
   val synchronizerId = SynchronizerId.tryFromString("domain::id")
 
+  private def scanUrl(n: Int) = s"https://$n.example.com"
+
   def getMockedConnections(n: Int): Seq[SingleScanConnection] = {
     val connections = (0 until n).map { n =>
       val m = mock[SingleScanConnection]
       when(m.config).thenReturn(
-        ScanAppClientConfig(NetworkAppClientConfig(s"https://$n.example.com"))
+        ScanAppClientConfig(NetworkAppClientConfig(scanUrl(n)))
       )
       m
     }
@@ -206,6 +211,7 @@ class BftScanConnectionTest
         initialConnections,
         initialFailedConnections,
         connectionBuilder,
+        _ => Future.unit,
         Bft.getScansInDsoRules,
         NonNegativeFiniteDuration.ofSeconds(refreshSeconds),
         retryProvider,
@@ -310,6 +316,11 @@ class BftScanConnectionTest
           Future.successful(connections(1))
         },
       )
+      // sanity check
+      bft.scanList.scanConnections.open.map(_.config.adminApi.url).toSet should be(
+        connections.take(1).map(_.config.adminApi.url).toSet
+      )
+
       clock.advance(Duration.ofSeconds(refreshSeconds + 1))
       // even after advancing it shouldn't refresh yet, as that's less than refreshSeconds
       clock.advance(Duration.ofSeconds(1))
@@ -320,10 +331,9 @@ class BftScanConnectionTest
       // eventually the refresh goes through and the second connection is used
       eventually() {
         refreshCalled.intValue() should be(1)
-        val result = bft.getDsoPartyId().futureValue
-        try { verify(connections(1), atLeast(1)).getDsoPartyId() }
-        catch { case cause: MockitoAssertionError => fail("Mockito fail", cause) }
-        result should be(partyIdA)
+        bft.scanList.scanConnections.open.map(_.config.adminApi.url).toSet should be(
+          connections.map(_.config.adminApi.url).toSet
+        )
       }
     }
 
@@ -920,6 +930,93 @@ class BftScanConnectionTest
         new ScanAggregatesConnection(bft, retryProvider, retryProvider.loggerFactory)
       val result = con.getRoundAggregate(round).futureValue
       result shouldBe Some(roundAggregate)
+    }
+
+    "get BFT round aggregates from scans, ignoring balance fields" in {
+      val round = 0L
+      def randomValue = BigDecimal(Random.nextInt(50) + 1)
+      def mkRoundTotals() = RoundTotals(
+        closedRound = round,
+        closedRoundEffectiveAt = CantonTimestamp.MinValue,
+        appRewards = BigDecimal(100),
+        validatorRewards = BigDecimal(150),
+        changeToInitialAmountAsOfRoundZero = randomValue,
+        changeToHoldingFeesRate = randomValue,
+        cumulativeAppRewards = BigDecimal(1100),
+        cumulativeValidatorRewards = BigDecimal(1150),
+        cumulativeChangeToInitialAmountAsOfRoundZero = randomValue,
+        cumulativeChangeToHoldingFeesRate = randomValue,
+        totalAmuletBalance = randomValue,
+      )
+      def mkRoundPartyTotals() = RoundPartyTotals(
+        closedRound = round,
+        party = "party-id",
+        appRewards = BigDecimal(10),
+        validatorRewards = BigDecimal(20),
+        trafficPurchased = 10L,
+        trafficPurchasedCcSpent = BigDecimal(30),
+        trafficNumPurchases = 30L,
+        cumulativeAppRewards = BigDecimal(40),
+        cumulativeValidatorRewards = BigDecimal(50),
+        cumulativeChangeToInitialAmountAsOfRoundZero = randomValue,
+        cumulativeChangeToHoldingFeesRate = randomValue,
+        cumulativeTrafficPurchased = 50L,
+        cumulativeTrafficPurchasedCcSpent = BigDecimal(70),
+        cumulativeTrafficNumPurchases = 70L,
+      )
+      def mkRoundAggregateUsingDecoder() = RoundAggregate(
+        ScanRoundAggregatesDecoder
+          .decodeRoundTotal(HttpScanHandler.encodeRoundTotals(mkRoundTotals()))
+          .value,
+        Vector(
+          ScanRoundAggregatesDecoder
+            .decodeRoundPartyTotals(HttpScanHandler.encodeRoundPartyTotals(mkRoundPartyTotals()))
+            .value
+        ),
+      )
+      def mkRoundAggregateWithoutDecoder() = RoundAggregate(
+        mkRoundTotals(),
+        Vector(mkRoundPartyTotals()),
+      )
+      val roundAggregateZeroBalanceValues = mkRoundAggregateWithoutDecoder().copy(
+        roundTotals = mkRoundAggregateWithoutDecoder().roundTotals.copy(
+          changeToInitialAmountAsOfRoundZero = zero,
+          changeToHoldingFeesRate = zero,
+          cumulativeChangeToInitialAmountAsOfRoundZero = zero,
+          cumulativeChangeToHoldingFeesRate = zero,
+          totalAmuletBalance = zero,
+        ),
+        roundPartyTotals = mkRoundAggregateWithoutDecoder().roundPartyTotals.map(
+          _.copy(
+            cumulativeChangeToInitialAmountAsOfRoundZero = zero,
+            cumulativeChangeToHoldingFeesRate = zero,
+          )
+        ),
+      )
+
+      def getConnections(roundAggregateResponse: () => RoundAggregate) = {
+        val connections = getMockedConnections(n = 10)
+        connections.foreach { mock =>
+          when(mock.getAggregatedRounds())
+            .thenReturn(Future.successful(Some(RoundRange(round, round))))
+          when(mock.getRoundAggregate(round))
+            .thenReturn(Future.successful(Some(roundAggregateResponse())))
+        }
+        connections
+      }
+
+      val bft = getBft(getConnections(() => mkRoundAggregateUsingDecoder()))
+      val con =
+        new ScanAggregatesConnection(bft, retryProvider, retryProvider.loggerFactory)
+      val result = con.getRoundAggregate(round).futureValue
+      result shouldBe Some(roundAggregateZeroBalanceValues)
+
+      // not using the decoder should fail on the randomized balance values.
+      val bftFail = getBft(getConnections(() => mkRoundAggregateWithoutDecoder()))
+      val conFail =
+        new ScanAggregatesConnection(bftFail, retryProvider, retryProvider.loggerFactory)
+      val resultFail = conFail.getRoundAggregate(round).failed.futureValue
+      resultFail shouldBe an[BftScanConnection.ConsensusNotReached]
     }
 
     "Not get round aggregates from scans that report having the round aggregate if too many fail" in {

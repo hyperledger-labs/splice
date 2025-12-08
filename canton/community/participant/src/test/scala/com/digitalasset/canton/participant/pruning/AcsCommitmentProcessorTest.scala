@@ -19,6 +19,7 @@ import com.digitalasset.canton.config.{
   CommitmentSendDelay,
   DefaultProcessingTimeouts,
   NonNegativeDuration,
+  PositiveDurationSeconds,
   TestingConfigInternal,
 }
 import com.digitalasset.canton.crypto.*
@@ -87,7 +88,7 @@ import java.time.Duration as JDuration
 import java.util.UUID
 import scala.annotation.nowarn
 import scala.collection.concurrent.TrieMap
-import scala.collection.immutable.{Seq, SortedSet}
+import scala.collection.immutable.{Seq, Set, SortedSet}
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -383,6 +384,12 @@ sealed trait AcsCommitmentProcessorBaseTest
         increasePerceivedComputationTimeForCommitments
       )(interval.duration.multipliedBy(2)),
       doNotAwaitOnCheckingIncomingCommitments = false,
+      commitmentCheckpointInterval =
+        PositiveDurationSeconds.ofSeconds(interval.duration.getSeconds),
+      // just as for the additional consistency checks flag: if enabled, one needs to populate the above ACS
+      // and contract stores correctly, otherwise the tests will fail
+      commitmentMismatchDebugging = false,
+      commitmentProcessorNrAcsChangesBehindToTriggerCatchUp = Some(PositiveInt.tryCreate(5)),
     )
     (acsCommitmentProcessor, store, sequencerClient, changes, acsCommitmentConfigStore)
   }
@@ -1884,6 +1891,117 @@ class AcsCommitmentProcessorTest
       snap3.deleted shouldBe Set.empty
     }
 
+    "running commitments work as expected with garbage collection" in {
+      val rc =
+        new pruning.AcsCommitmentProcessor.RunningCommitments(RecordTime.MinValue, TrieMap.empty)
+
+      rc.watermark shouldBe RecordTime.MinValue
+      rc.snapshot(gc = false) shouldBe CommitmentSnapshot(
+        RecordTime.MinValue,
+        Map.empty,
+        Map.empty,
+        Set.empty,
+      )
+      val ch1 = AcsChange(
+        activations = Map(
+          coid(0, 0) ->
+            ContractStakeholdersAndReassignmentCounter(
+              Set(alice, bob),
+              initialReassignmentCounter,
+            ),
+          coid(0, 1) ->
+            ContractStakeholdersAndReassignmentCounter(
+              Set(bob, carol),
+              initialReassignmentCounter,
+            ),
+        ),
+        deactivations = Map.empty,
+      )
+      rc.update(rt(1, 0), ch1)
+      rc.watermark shouldBe rt(1, 0)
+      val snap1 = rc.snapshot(gc = false)
+      snap1.recordTime shouldBe rt(1, 0)
+      snap1.active.keySet shouldBe Set(SortedSet(alice, bob), SortedSet(bob, carol))
+      snap1.delta.keySet shouldBe Set(SortedSet(alice, bob), SortedSet(bob, carol))
+      snap1.deleted shouldBe Set.empty
+
+      val ch2 = AcsChange(
+        deactivations = Map(
+          coid(0, 0) -> ContractStakeholdersAndReassignmentCounter(
+            Set(alice, bob),
+            initialReassignmentCounter,
+          )
+        ),
+        activations = Map(
+          coid(1, 1) ->
+            ContractStakeholdersAndReassignmentCounter(
+              Set(alice, carol),
+              initialReassignmentCounter,
+            )
+        ),
+      )
+      rc.update(rt(1, 1), ch2)
+      rc.watermark shouldBe rt(1, 1)
+      val snap2 = rc.snapshot(gc = false)
+      snap2.recordTime shouldBe rt(1, 1)
+      snap2.active.keySet should contain theSameElementsAs Set(
+        SortedSet(alice, bob),
+        SortedSet(alice, carol),
+        SortedSet(bob, carol),
+      )
+      // doesn't contain (alice, bob) because delta doesn't contain deleted
+      snap2.delta.keySet should contain theSameElementsAs Set(
+        SortedSet(alice, carol),
+        SortedSet(bob, carol),
+      )
+      snap2.deleted shouldBe Set(SortedSet(alice, bob))
+
+      val ch3 = AcsChange(
+        deactivations = Map.empty,
+        activations = Map(
+          coid(2, 1) ->
+            ContractStakeholdersAndReassignmentCounter(
+              Set(alice, carol),
+              initialReassignmentCounter,
+            )
+        ),
+      )
+      rc.update(rt(3, 0), ch3)
+      val snap3 = rc.snapshot(gc = false)
+      snap3.recordTime shouldBe rt(3, 0)
+      snap3.active.keySet should contain theSameElementsAs Set(
+        SortedSet(alice, bob),
+        SortedSet(alice, carol),
+        SortedSet(bob, carol),
+      )
+      snap3.delta.keySet should contain theSameElementsAs Set(
+        SortedSet(alice, carol),
+        SortedSet(bob, carol),
+      )
+      snap3.deleted shouldBe Set(SortedSet(alice, bob))
+
+      val snap3WithGc = rc.snapshot()
+      snap3WithGc.recordTime shouldBe rt(3, 0)
+      snap3WithGc.active.keySet should contain theSameElementsAs Set(
+        SortedSet(alice, carol),
+        SortedSet(bob, carol),
+      )
+      snap3WithGc.delta.keySet should contain theSameElementsAs Set(
+        SortedSet(alice, carol),
+        SortedSet(bob, carol),
+      )
+      snap3WithGc.deleted shouldBe Set(SortedSet(alice, bob))
+
+      val snap4WithGc = rc.snapshot()
+      snap4WithGc.recordTime shouldBe rt(3, 0)
+      snap4WithGc.active.keySet should contain theSameElementsAs Set(
+        SortedSet(alice, carol),
+        SortedSet(bob, carol),
+      )
+      snap4WithGc.delta.keySet shouldBe empty
+      snap4WithGc.deleted shouldBe empty
+    }
+
     "contracts differing by reassignment counter result in different commitments if the PV support reassignment counters" in {
       val rc1 =
         new pruning.AcsCommitmentProcessor.RunningCommitments(RecordTime.MinValue, TrieMap.empty)
@@ -2176,6 +2294,113 @@ class AcsCommitmentProcessorTest
           assert(received.size === 5)
           // all local commitments were matched and can be pruned
           assert(outstanding.contains(toc(55).timestamp))
+        })
+      }
+
+      "enter catch up mode when processing falls behind and enqueued acs changes exceed the threshold" in {
+        val timeProofs = List(3L, 8, 20, 35, 59, 70, 90, 110, 130, 150, 200).map(
+          CantonTimestamp.ofEpochSecond
+        )
+        val contractSetup = (1 to 99).map(i =>
+          // contract ID to stakeholders, creation and archival time
+          coid(0, i) -> (
+            Set(alice, bob),
+            toc(i.toLong),
+            toc(i.toLong + 1),
+            initialReassignmentCounter,
+            initialReassignmentCounter,
+          )
+        ) ++ Seq(
+          coid(0, 100) -> (
+            Set(alice, bob),
+            toc(99),
+            toc(101),
+            initialReassignmentCounter,
+            initialReassignmentCounter,
+          )
+        ) ++ (100 to 199)
+          .map(i =>
+            // contract ID to stakeholders, creation and archival time
+            coid(0, i) -> (
+              Set(alice, carol),
+              toc(i.toLong),
+              toc(i.toLong + 1),
+              initialReassignmentCounter,
+              initialReassignmentCounter,
+            )
+          ) ++ Seq(
+          coid(0, 200) -> (
+            Set(alice, carol),
+            toc(199),
+            toc(201),
+            initialReassignmentCounter,
+            initialReassignmentCounter,
+          )
+        ).toMap
+
+        val topology = Map(
+          localId -> Set(alice),
+          remoteId1 -> Set(bob),
+          remoteId2 -> Set(carol),
+        )
+
+        val (proc, store, sequencerClient, changes, _) =
+          testSetupDontPublish(
+            timeProofs,
+            contractSetup.toMap,
+            topology,
+            acsCommitmentsCatchUpModeEnabled = true,
+            warnOnAcsCommitmentDegradation = true,
+            // this will force us to evaluate the condition for catch-up when acs change queue exceeds a threshold
+            increasePerceivedComputationTimeForCommitments = false,
+          )
+
+        val remoteCommitments = List(
+          (remoteId1, Map((coid(0, 100), initialReassignmentCounter)), ts(95), ts(100), None),
+          (remoteId2, Map((coid(0, 200), initialReassignmentCounter)), ts(195), ts(200), None),
+        )
+
+        (for {
+          processor <- proc
+          _ <- checkCatchUpModeCfgCorrect(processor, timeProofs.head)
+          remote <- remoteCommitments.parTraverse(commitmentMsg)
+          delivered = remote.map(cmt =>
+            (
+              cmt.message.period.toInclusive.plusSeconds(1),
+              List(OpenEnvelope(cmt, Recipients.cc(localId))(testedProtocolVersion)),
+            )
+          )
+          // First ask for the remote commitments to be processed, and then compute locally
+          // This triggers catch-up mode
+          _ <- delivered.parTraverse_ { case (ts, batch) =>
+            processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
+          }
+          _ <- processChanges(processor, store, changes)
+
+          outstanding <- store.noOutstandingCommitments(timeProofs.lastOption.value)
+          computedAll <- store
+            .searchComputedBetween(
+              CantonTimestamp.Epoch,
+              timeProofs.lastOption.value,
+            )
+          computed = computedAll.filter(_._2 != localId)
+          received <- store
+            .searchReceivedBetween(
+              CantonTimestamp.Epoch,
+              timeProofs.lastOption.value,
+            )
+        } yield {
+          // the participant doesn't catch up to tick 10, because we're probably too late to see the enqueued acs changes when we
+          // evaluate the catch-up condition, so it'll send commitments for both ticks 5 and 10
+          // after that, the participant catches up to ticks 20, 30, .., 3:20, which corresponds to toc 200
+          // this sums up to 21 commitments
+          sequencerClient.requests.size shouldBe 21
+          assert(computed.size === 21)
+          assert(received.size === 2)
+          // all local commitments were matched and can be pruned
+          eventually() {
+            assert(outstanding.contains(toc(200).timestamp))
+          }
         })
       }
 

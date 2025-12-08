@@ -3,7 +3,7 @@
 import { ValidatorNodeConfigSchema } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { z } from 'zod';
 
-import { clusterSubConfig } from './configLoader';
+import { clusterSubConfig } from './config';
 
 export const SplitwellConfigSchema = z
   .object({

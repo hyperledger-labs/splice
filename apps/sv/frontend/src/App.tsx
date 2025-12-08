@@ -15,11 +15,11 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   Navigate,
-  Outlet,
   Route,
   RouterProvider,
   createBrowserRouter,
   createRoutesFromElements,
+  useLocation,
   useNavigate,
 } from 'react-router-dom';
 
@@ -75,10 +75,16 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   );
 };
 
-const BetaThemeWrapper: React.FC<React.PropsWithChildren> = () => {
+const ConditionalThemeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const location = useLocation();
+  const isBeta = location.pathname.startsWith('/governance-beta');
+
+  const currentTheme = isBeta ? betaTheme : theme;
+
   return (
-    <ThemeProvider theme={betaTheme}>
-      <Outlet />
+    <ThemeProvider theme={currentTheme}>
+      <CssBaseline />
+      {children}
     </ThemeProvider>
   );
 };
@@ -91,7 +97,9 @@ const App: React.FC = () => {
         errorElement={<ErrorRouterPage />}
         element={
           <Providers>
-            <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
+            <ConditionalThemeProvider>
+              <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
+            </ConditionalThemeProvider>
           </Providers>
         }
       >
@@ -101,15 +109,13 @@ const App: React.FC = () => {
           <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
           <Route path="amulet-price" element={<AmuletPrice />} />
           <Route path="votes" element={<Voting />} />
-          <Route element={<BetaThemeWrapper />}>
-            <Route
-              path="governance-beta"
-              element={<Navigate to="/governance-beta/proposals" replace />}
-            />
-            <Route path="governance-beta/proposals" element={<Governance />} />
-            <Route path="governance-beta/proposals/create" element={<CreateProposal />} />
-            <Route path="governance-beta/proposals/:contractId" element={<VoteRequestDetails />} />
-          </Route>
+          <Route
+            path="governance-beta"
+            element={<Navigate to="/governance-beta/proposals" replace />}
+          />
+          <Route path="governance-beta/proposals" element={<Governance />} />
+          <Route path="governance-beta/proposals/create" element={<CreateProposal />} />
+          <Route path="governance-beta/proposals/:contractId" element={<VoteRequestDetails />} />
         </Route>
       </Route>
     )
@@ -117,17 +123,14 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider theme={theme}>
-        <HelmetProvider>
-          <Helmet>
-            <title>Super Validator Operations</title>
-            <meta name="description" content="Super Validator Operations" />
-            <link rel="icon" href={config.spliceInstanceNames.networkFaviconUrl} />
-          </Helmet>
-          <CssBaseline />
-          <RouterProvider router={router} />
-        </HelmetProvider>
-      </ThemeProvider>
+      <HelmetProvider>
+        <Helmet>
+          <title>Super Validator Operations</title>
+          <meta name="description" content="Super Validator Operations" />
+          <link rel="icon" href={config.spliceInstanceNames.networkFaviconUrl} />
+        </Helmet>
+        <RouterProvider router={router} />
+      </HelmetProvider>
     </ErrorBoundary>
   );
 };

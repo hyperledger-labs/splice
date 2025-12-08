@@ -59,6 +59,7 @@ import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.BinaryFileUtil
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias, config}
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.LazyLogging
@@ -333,7 +334,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     private def mapToLedgerApiValue(value: Any): Value = {
 
       // assuming that String.toString = id, we'll just map any Map to a string map without casting
-      def safeMapCast(map: Map[_, _]): Map[String, Any] = map.map { case (key, value) =>
+      def safeMapCast(map: Map[?, ?]): Map[String, Any] = map.map { case (key, value) =>
         (key.toString, value)
       }
 
@@ -350,7 +351,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         case x: Instant => Value.Sum.Timestamp(x.toEpochMilli * 1000L)
         case x: Option[Any] => Value.Sum.Optional(Optional(value = x.map(mapToLedgerApiValue)))
         case x: Value.Sum => x
-        case x: Map[_, _] => Value.Sum.Record(buildArguments(safeMapCast(x)))
+        case x: Map[?, ?] => Value.Sum.Record(buildArguments(safeMapCast(x)))
         case x: (Any, Any) => productToLedgerApiRecord(x)
         case x: (Any, Any, Any) => productToLedgerApiRecord(x)
         case _ =>
@@ -788,6 +789,53 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       synchronizerId
     }
 
+    @Help.Summary("Bootstraps a local synchronizer using default arguments")
+    @Help.Description(
+      "This is a convenience method for bootstrapping a local synchronizer." +
+        "The synchronizer will include all sequencers and mediators that are currently running." +
+        "It will be owned by the sequencers, while the mediator threshold will be set to require" +
+        "all mediators to confirm."
+    )
+    def synchronizer_local(
+        synchronizerName: String = "local"
+    )(implicit consoleEnvironment: ConsoleEnvironment): SynchronizerId = {
+      def checkEnoughAndNotInitialized[T <: InstanceReference](
+          name: String,
+          items: Seq[T],
+      ): Seq[T] = {
+        val distinct = items
+          .filter(x => x.health.is_running() && x.health.active && x.health.has_identity())
+          .groupBy(_.id)
+          .flatMap { case (_, v) =>
+            v.headOption.toList
+          }
+          .toList
+        if (distinct.isEmpty) {
+          consoleEnvironment.raiseError(s"No ${name}s available to bootstrap a local synchronizer.")
+        }
+        distinct.find(_.health.initialized()).foreach { ref =>
+          consoleEnvironment.raiseError(
+            s"$name ${ref.id} has already been initialized"
+          )
+        }
+        distinct
+      }
+      val distinctSequencers =
+        checkEnoughAndNotInitialized("sequencer", consoleEnvironment.sequencers.all)
+      val distinctMediators =
+        checkEnoughAndNotInitialized("mediator", consoleEnvironment.mediators.all)
+      synchronizer(
+        synchronizerName,
+        distinctSequencers,
+        distinctMediators,
+        synchronizerOwners = distinctSequencers,
+        synchronizerThreshold = PositiveInt.tryCreate(distinctSequencers.length),
+        staticSynchronizerParameters =
+          data.StaticSynchronizerParameters.defaultsWithoutKMS(ProtocolVersion.forSynchronizer),
+        mediatorThreshold = PositiveInt.tryCreate(distinctMediators.size),
+      ).logical
+    }
+
     @Help.Summary(
       "Bootstraps a new synchronizer."
     )
@@ -1014,7 +1062,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     // Helper to find all HA-active nodes
     private def allPrunableNodes(implicit
         env: ConsoleEnvironment
-    ): Map[String, PruningSchedulerAdministration[_]] =
+    ): Map[String, PruningSchedulerAdministration[?]] =
       (env.participants.all.collect { case p if p.health.active => p.name -> p.pruning }
         ++ env.sequencers.all.collect {
           case s

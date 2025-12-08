@@ -197,6 +197,12 @@ trait CommonAppInstanceReferences {
     "sv1ValidatorLocal"
   )
 
+  def sv1ValidatorWithPruningBackend(implicit
+      env: SpliceTestConsoleEnvironment
+  ): ValidatorAppBackendReference = v(
+    "sv1ValidatorWithPruning"
+  )
+
   def sv2ValidatorBackend(implicit
       env: SpliceTestConsoleEnvironment
   ): ValidatorAppBackendReference = v(

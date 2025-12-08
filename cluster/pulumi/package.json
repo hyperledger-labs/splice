@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "main": "src/index.ts",
     "devDependencies": {
+        "@jest/globals": "^30.2.0",
         "@trivago/prettier-plugin-sort-imports": "^4.3.0",
         "@types/request": "^2.48.13",
         "@typescript-eslint/eslint-plugin": "^7.7.1",
@@ -11,8 +12,10 @@
         "eslint-config-prettier": "8.10.0",
         "eslint-plugin-import": "^2.29.1",
         "eslint-plugin-promise": "^6.1.1",
+        "jest": "^30.2.0",
         "minimatch": "5.1.2",
         "prettier": "^3.4.2",
+        "ts-jest": "^29.4.5",
         "typescript": "^5.4.5"
     },
     "scripts": {
@@ -25,7 +28,9 @@
         "up": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiUp.ts",
         "down": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiDown.ts",
         "refresh": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiRefresh.ts",
-        "cancel": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiCancel.ts"
+        "cancel": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiCancel.ts",
+        "test": "jest",
+        "resolve-config": "ts-node ./resolvedConfigEmitter.ts"
     },
     "workspaces": [
         "common",

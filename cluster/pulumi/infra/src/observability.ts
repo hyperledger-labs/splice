@@ -753,6 +753,36 @@ function createGrafanaAlerting(namespace: Input<string>) {
               }
             : {}),
           ...{
+            'acs-stores_alerts.yaml': readGrafanaAlertingFile('acs-stores_alerts.yaml').replaceAll(
+              '$NODATA',
+              loadTesterConfig?.enable ? 'Alerting' : 'OK'
+            ),
+            'pruning_alerts.yaml': readGrafanaAlertingFile('pruning_alerts.yaml')
+              .replaceAll('$NODATA', loadTesterConfig?.enable ? 'Alerting' : 'OK')
+              .replaceAll(
+                '$PARTICIPANT_PRUNING_RETENTION_IN_DAYS',
+                monitoringConfig.alerting.alerts.pruning.participantRetentionDays.toString()
+              )
+              .replaceAll(
+                '$PARTICIPANT_PRUNING_RETENTION_IN_HOURS',
+                (monitoringConfig.alerting.alerts.pruning.participantRetentionDays * 24).toString()
+              )
+              .replaceAll(
+                '$SEQUENCER_PRUNING_RETENTION_IN_DAYS',
+                monitoringConfig.alerting.alerts.pruning.sequencerRetentionDays.toString()
+              )
+              .replaceAll(
+                '$SEQUENCER_PRUNING_RETENTION_IN_HOURS',
+                (monitoringConfig.alerting.alerts.pruning.sequencerRetentionDays * 24).toString()
+              )
+              .replaceAll(
+                '$MEDIATOR_PRUNING_RETENTION_IN_DAYS',
+                monitoringConfig.alerting.alerts.pruning.mediatorRetentionDays.toString()
+              )
+              .replaceAll(
+                '$MEDIATOR_PRUNING_RETENTION_IN_HOURS',
+                (monitoringConfig.alerting.alerts.pruning.mediatorRetentionDays * 24).toString()
+              ),
             'deployment_alerts.yaml': readGrafanaAlertingFile('deployment_alerts.yaml'),
             'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml')
               .replace(
@@ -767,10 +797,15 @@ function createGrafanaAlerting(namespace: Input<string>) {
               )
               .replaceAll('$ENABLE_COMETBFT_PRUNING', (!ENABLE_COMETBFT_PRUNING).toString())
               .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
-            'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml').replaceAll(
-              '$CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE',
-              monitoringConfig.alerting.alerts.delegatelessContention.thresholdPerNamespace.toString()
-            ),
+            'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml')
+              .replaceAll(
+                '$CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE',
+                monitoringConfig.alerting.alerts.delegatelessContention.thresholdPerNamespace.toString()
+              )
+              .replaceAll(
+                '$INGESTION_ENTRIES_PER_BATCH_THRESHOLD',
+                monitoringConfig.alerting.alerts.ingestion.thresholdEntriesPerBatch.toString()
+              ),
             'sv-status-report_alerts.yaml': readAndSetAlertRulesGrafanaAlertingFile(
               'sv-status-report_alerts.yaml',
               [

@@ -41,7 +41,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
@@ -93,14 +93,15 @@ class UpdateHistory(
     override protected val loggerFactory: NamedLoggerFactory,
     enableissue12777Workaround: Boolean,
     enableImportUpdateBackfill: Boolean,
-    val oMetrics: Option[HistoryMetrics] = None,
+    metrics: HistoryMetrics,
 )(implicit
     ec: ExecutionContext,
     closeContext: CloseContext,
 ) extends HasIngestionSink
     with AcsJdbcTypes
     with AcsQueries
-    with NamedLogging {
+    with NamedLogging
+    with AutoCloseable {
 
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile
 
@@ -118,9 +119,13 @@ class UpdateHistory(
       s.copy(lastIngestedRecordTime = Some(ts))
     }
     (for {
-      metrics <- oMetrics
       lastIngestedRecordTime <- newState.lastIngestedRecordTime
-    } yield metrics.UpdateHistory.latestRecordTime.updateValue(lastIngestedRecordTime)).discard
+    } yield metrics.UpdateHistory.latestRecordTime.updateValue(lastIngestedRecordTime)(
+      MetricsContext(
+        "update_stream_party" -> updateStreamParty.toProtoPrimitive,
+        "store_name" -> storeName,
+      )
+    )).discard
   }
 
   def waitUntilInitialized: Future[Unit] = state.get().initialized.future
@@ -132,6 +137,8 @@ class UpdateHistory(
       .getOrElse(throw new RuntimeException("Using historyId before it was assigned"))
 
   def isReady: Boolean = state.get().historyId.isDefined
+
+  override def close(): Unit = metrics.close()
 
   lazy val ingestionSink: MultiDomainAcsStore.IngestionSink =
     new MultiDomainAcsStore.IngestionSink {
@@ -337,15 +344,11 @@ class UpdateHistory(
                 None
             }
 
-            val timeIngestion = oMetrics
-              .map(metrics =>
-                (future: Future[Unit]) =>
-                  metrics.UpdateHistory.latency
-                    .timeFuture[Unit](future)(
-                      metrics.metricsContextFromUpdate(updateOrCheckpoint, backfilling = false)
-                    )
-              )
-              .getOrElse(identity[Future[Unit]])
+            val timeIngestion = (future: Future[Unit]) =>
+              metrics.UpdateHistory.latency
+                .timeFuture(future)(
+                  metrics.metricsContextFromUpdate(updateOrCheckpoint, backfilling = false)
+                )
 
             timeIngestion {
               // Note: in theory, it's enough if this action is atomic - there should only be a single
@@ -408,14 +411,12 @@ class UpdateHistory(
                 .queryAndUpdate(action, "ingestUpdate")
                 .map { ingestedEvents =>
                   recordTime.foreach(advanceLastIngestedRecordTime)
-                  oMetrics.foreach { metrics =>
-                    metrics.UpdateHistory.eventCount.inc(ingestedEvents.numCreatedEvents)(
-                      MetricsContext("event_type" -> "created")
-                    )
-                    metrics.UpdateHistory.eventCount.inc(ingestedEvents.numExercisedEvents)(
-                      MetricsContext("event_type" -> "exercised")
-                    )
-                  }
+                  metrics.UpdateHistory.eventCount.inc(ingestedEvents.numCreatedEvents)(
+                    MetricsContext("event_type" -> "created")
+                  )
+                  metrics.UpdateHistory.eventCount.inc(ingestedEvents.numExercisedEvents)(
+                    MetricsContext("event_type" -> "exercised")
+                  )
                 }
             }
           }
@@ -475,7 +476,7 @@ class UpdateHistory(
     val safeParticipantOffset = lengthLimited(LegacyOffset.Api.fromLong(reassignment.offset))
     val safeUnassignId = lengthLimited(event.unassignId)
     val safeContractId = lengthLimited(event.contractId.contractId)
-    oMetrics.foreach(_.UpdateHistory.unassignments.mark())
+    metrics.UpdateHistory.unassignments.mark()
     sqlu"""
       insert into update_history_unassignments(
         history_id,update_id,record_time,
@@ -521,7 +522,7 @@ class UpdateHistory(
     val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdEvent.createdAt)
     val safeSignatories = event.createdEvent.getSignatories.asScala.toSeq.map(lengthLimited)
     val safeObservers = event.createdEvent.getObservers.asScala.toSeq.map(lengthLimited)
-    oMetrics.foreach(_.UpdateHistory.assignments.mark())
+    metrics.UpdateHistory.assignments.mark()
     sqlu"""
       insert into update_history_assignments(
         history_id,update_id,record_time,
@@ -551,7 +552,7 @@ class UpdateHistory(
       tree: Transaction,
       migrationId: Long,
   ): DBIOAction[IngestedEvents, NoStream, Effect.Read & Effect.Write] = {
-    oMetrics.foreach(_.UpdateHistory.transactionsTrees.mark())
+    metrics.UpdateHistory.transactionsTrees.mark()
     insertTransactionUpdateRow(tree, migrationId)
       .flatMap(updateRowId => {
         // Note: the order of elements in the eventsById map doesn't matter, and is not preserved here.
@@ -1418,7 +1419,7 @@ class UpdateHistory(
     }
   }
 
-  def lookupContractById[TCId <: ContractId[_], T <: DamlRecord[_]](
+  def lookupContractById[TCId <: ContractId[?], T <: DamlRecord[?]](
       companion: Contract.Companion.Template[TCId, T]
   )(contractId: TCId)(implicit tc: TraceContext): Future[Option[Contract[TCId, T]]] = {
     for {
@@ -2337,25 +2338,21 @@ object UpdateHistory {
   // Since we're interested in the highest known migration id, we don't need to filter by anything
   // (store ID, participant ID, etc. are not even known at the time we want to call this).
   def getHighestKnownMigrationId(
-      storage: Storage
+      storage: DbStorage
   )(implicit
       ec: ExecutionContext,
       closeContext: CloseContext,
       tc: TraceContext,
   ): Future[Option[Long]] = {
-    storage match {
-      case storage: DbStorage =>
-        for {
-          queryResult <- storage.query(
-            sql"""
+    for {
+      queryResult <- storage.query(
+        sql"""
                select max(migration_id) from update_history_last_ingested_offsets
             """.as[Option[Long]],
-            "getHighestKnownMigrationId",
-          )
-        } yield {
-          queryResult.headOption.flatten
-        }
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
+        "getHighestKnownMigrationId",
+      )
+    } yield {
+      queryResult.headOption.flatten
     }
   }
 
@@ -2431,7 +2428,7 @@ object UpdateHistory {
       contractKey: Option[String],
   ) {
 
-    def toContract[TCId <: ContractId[_], T <: DamlRecord[_]](
+    def toContract[TCId <: ContractId[?], T <: DamlRecord[?]](
         companion: Contract.Companion.Template[TCId, T]
     ): Contract[TCId, T] = {
       Contract

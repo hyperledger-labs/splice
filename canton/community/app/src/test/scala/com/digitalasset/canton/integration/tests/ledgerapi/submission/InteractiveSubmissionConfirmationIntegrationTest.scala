@@ -17,6 +17,7 @@ import com.digitalasset.canton.integration.plugins.UseProgrammableSequencer
 import com.digitalasset.canton.integration.tests.ledgerapi.submission.BaseInteractiveSubmissionTest.defaultConfirmingParticipant
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
+  ConfigTransforms,
   EnvironmentDefinition,
   HasCycleUtils,
   SharedEnvironment,
@@ -44,6 +45,7 @@ import org.scalatest.Assertion
 import org.slf4j.event.Level
 
 import java.util.UUID
+import scala.collection.immutable.Seq
 import scala.concurrent.{Await, Future, Promise}
 import scala.util.Failure
 
@@ -74,7 +76,7 @@ final class InteractiveSubmissionConfirmationIntegrationTest
           keysThreshold = PositiveInt.one,
         )
       }
-      .addConfigTransforms(enableInteractiveSubmissionTransforms*)
+      .addConfigTransform(ConfigTransforms.enableInteractiveSubmissionTransforms)
 
   registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 
@@ -98,6 +100,16 @@ final class InteractiveSubmissionConfirmationIntegrationTest
         aliceE.signingFingerprints.head1,
         SigningKeyUsage.ProtocolOnly,
       )
+
+      val localVerdictWarning = Seq(2, 3).map[(LogEntry => Assertion, String)]({ p =>
+        (
+          e => {
+            e.warningMessage should (include regex "LOCAL_VERDICT_MALFORMED_REQUEST.*with a view that is not correctly authenticated")
+            e.mdc.get("participant") shouldBe Some(s"participant$p")
+          },
+          s"participant$p authentication",
+        )
+      })
 
       // To bypass the checks in phase 1 we play a trick by holding back the submission request in the sequencer
       // while we increase the key threshold, and release afterwards
@@ -129,11 +141,11 @@ final class InteractiveSubmissionConfirmationIntegrationTest
           completion.status.value.code shouldBe Status.Code.INVALID_ARGUMENT.value()
         },
         LogEntry.assertLogSeq(
-          Seq(2, 3).map({ p =>
+          localVerdictWarning ++ Seq(2, 3).map({ p =>
             (
               e => {
                 e.warningMessage should (include(
-                  s"Received 1 valid signatures (0 invalid), but expected at least 2 valid for ${aliceE.partyId}"
+                  s"Received 1 valid signatures from distinct keys (0 invalid), but expected at least 2 valid for ${aliceE.partyId}"
                 ))
                 e.mdc.get("participant") shouldBe Some(s"participant$p")
               },
@@ -167,7 +179,11 @@ final class InteractiveSubmissionConfirmationIntegrationTest
         ),
       )
       val signatures = Map(
-        aliceE.partyId -> global_secret.sign(prepared.preparedTransactionHash, aliceE)
+        aliceE.partyId -> global_secret.sign(
+          prepared.preparedTransactionHash,
+          aliceE,
+          useAllKeys = true,
+        )
       )
 
       // To bypass the checks in phase 1 we play a trick by holding back the submission request in the sequencer
@@ -189,7 +205,7 @@ final class InteractiveSubmissionConfirmationIntegrationTest
               (
                 e => {
                   e.warningMessage should (include(
-                    s"Received 0 valid signatures (3 invalid), but expected at least 2 valid for ${aliceE.partyId}"
+                    s"Received 0 valid signatures from distinct keys (3 invalid), but expected at least 2 valid for ${aliceE.partyId}"
                   ))
                   e.mdc.get("participant") shouldBe Some(s"participant$p")
                 },
@@ -206,7 +222,7 @@ final class InteractiveSubmissionConfirmationIntegrationTest
         val (submissionId, ledgerEnd) = exec(prepared, signatures, epn)
 
         val newKeys = NonEmptyUtil.fromUnsafe(
-          Seq.fill(3)(
+          Set.fill(3)(
             env.global_secret.keys.secret.generate_key(usage = SigningKeyUsage.ProtocolOnly)
           )
         )
@@ -219,7 +235,7 @@ final class InteractiveSubmissionConfirmationIntegrationTest
         )
 
         // Update alice with the new keys for subsequent tests
-        aliceE = aliceE.copy(signingFingerprints = newKeys.map(_.fingerprint))
+        aliceE = aliceE.copy(signingFingerprints = newKeys.map(_.fingerprint).toSeq)
         releaseSubmission.success(())
         val completion = findCompletion(
           submissionId,
@@ -244,7 +260,7 @@ final class InteractiveSubmissionConfirmationIntegrationTest
           cpn.topology.party_to_key_mappings.sign_and_update(
             aliceE.partyId,
             env.daId,
-            _.tryCopy(threshold = PositiveInt.two, signingKeys = newKeys),
+            _.tryCopy(threshold = PositiveInt.two, signingKeys = newKeys.toSet),
           )
 
           // Update alice with the new keys for subsequent tests
@@ -278,7 +294,11 @@ final class InteractiveSubmissionConfirmationIntegrationTest
       val prepared = ppn.ledger_api.javaapi.interactive_submission
         .prepare(Seq(aliceE.partyId), Seq(pass.commands().loneElement))
       val signatures = Map(
-        aliceE.partyId -> global_secret.sign(prepared.preparedTransactionHash, aliceE)
+        aliceE.partyId -> global_secret.sign(
+          prepared.preparedTransactionHash,
+          aliceE,
+          useAllKeys = true,
+        )
       )
       // This is only currently detected in phase III, at which point warnings are issued
       val completion =
@@ -305,6 +325,13 @@ final class InteractiveSubmissionConfirmationIntegrationTest
     "fail with missing input contracts" in { implicit env =>
       import env.*
       import monocle.syntax.all.*
+
+      // Set Alice back to threshold one
+      cpn.topology.party_to_key_mappings.sign_and_update(
+        aliceE.partyId,
+        env.daId,
+        _.tryCopy(threshold = PositiveInt.one),
+      )
 
       // Exercise the Repeat choice
       val exerciseRepeatOnCycleContract =

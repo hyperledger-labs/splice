@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration
 
 import cats.syntax.either.*
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import org.lfdecentralizedtrust.splice.config.{
   EnabledFeaturesConfig,
   SpliceInstanceNamesConfig,
@@ -59,7 +60,7 @@ import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInit
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
@@ -68,6 +69,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
@@ -90,7 +92,7 @@ class DomainMigrationInitializer(
     override protected val clock: Clock,
     override protected val domainTimeSync: DomainTimeSynchronization,
     override protected val domainUnpausedSync: DomainUnpausedSynchronization,
-    override protected val storage: Storage,
+    override protected val storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
@@ -107,6 +109,8 @@ class DomainMigrationInitializer(
     mat: Materializer,
     tc: TraceContext,
     tracer: Tracer,
+    esf: ExecutionSequencerFactory,
+    actorSystem: ActorSystem,
 ) extends NodeInitializerUtil {
 
   private val readOnlyConnection = ledgerClient.readOnlyConnection(
@@ -117,6 +121,7 @@ class DomainMigrationInitializer(
     participantAdminConnection,
     config.timeTrackerMinObservationDuration,
     config.timeTrackerObservationLatency,
+    newSequencerConnectionPool = enabledFeatures.newSequencerConnectionPool,
     loggerFactory,
   )
 
@@ -287,6 +292,8 @@ class DomainMigrationInitializer(
         SequencerConnections.single(localSynchronizerNode.sequencerConnection),
         domainMigrationDump.domainDataSnapshot.dars,
         domainMigrationDump.domainDataSnapshot.acsSnapshot,
+        legacyAcsImport =
+          domainMigrationDump.domainDataSnapshot.acsFormat == http.DomainDataSnapshot.AcsFormat.AdminApi,
       )
       _ = logger.info("resumed domain")
     } yield {}

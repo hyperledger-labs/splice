@@ -90,7 +90,6 @@ object BuildCommon {
           "-Wunused:params",
           // https://github.com/scala/bug/issues/12883 I have no idea what's the purpose of that warning
           "-Wconf:msg=access modifiers for `.*` method are copied from the case class constructor under Scala 3:s",
-          "-quickfix:any",
         ),
         Test / testOptions ++= Seq(
           // Enable logging of begin and end of test cases, test suites, and test runs.
@@ -678,7 +677,7 @@ object BuildCommon {
           scalaVersion,
           sbtVersion,
           BuildInfoKey("damlLibrariesVersion" -> CantonDependencies.daml_libraries_version),
-          BuildInfoKey("stableProtocolVersions" -> List()),
+          BuildInfoKey("stableProtocolVersions" -> List("34")),
           BuildInfoKey("betaProtocolVersions" -> List()),
         ),
         buildInfoPackage := "com.digitalasset.canton.buildinfo",

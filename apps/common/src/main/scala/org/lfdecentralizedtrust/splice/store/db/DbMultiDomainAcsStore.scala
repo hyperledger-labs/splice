@@ -38,7 +38,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.showPretty
 
@@ -58,7 +58,6 @@ import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{
   SelectFromAcsTableWithStateResult,
 }
 import org.lfdecentralizedtrust.splice.store.db.AcsTables.ContractStateRowData
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
@@ -89,8 +88,8 @@ final class DbMultiDomainAcsStore[TXE](
     txLogStoreDescriptor: Option[StoreDescriptor],
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: MultiDomainAcsStore.ContractFilter[
-      _ <: AcsRowData,
-      _ <: AcsInterfaceViewRowData,
+      ? <: AcsRowData,
+      ? <: AcsInterfaceViewRowData,
     ],
     txLogConfig: TxLogStore.Config[TXE],
     domainMigrationInfo: DomainMigrationInfo,
@@ -170,7 +169,7 @@ final class DbMultiDomainAcsStore[TXE](
           .asRuntimeException()
       }
 
-  override def lookupContractById[C, TCid <: ContractId[_], T](companion: C)(id: ContractId[_])(
+  override def lookupContractById[C, TCid <: ContractId[?], T](companion: C)(id: ContractId[?])(
       implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -192,7 +191,7 @@ final class DbMultiDomainAcsStore[TXE](
 
   /** Returns any contract of the same template as the passed companion.
     */
-  override def findAnyContractWithOffset[C, TCid <: ContractId[_], T](companion: C)(implicit
+  override def findAnyContractWithOffset[C, TCid <: ContractId[?], T](companion: C)(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[QueryResult[Option[ContractWithState[TCid, T]]]] = waitUntilAcsIngested {
@@ -263,7 +262,7 @@ final class DbMultiDomainAcsStore[TXE](
     }
   }
 
-  override def listContracts[C, TCid <: ContractId[_], T](
+  override def listContracts[C, TCid <: ContractId[?], T](
       companion: C,
       limit: Limit,
   )(implicit
@@ -273,7 +272,7 @@ final class DbMultiDomainAcsStore[TXE](
     listContractsPaginated(companion, None, limit, SortOrder.Ascending).map(_.resultsInPage)
   }
 
-  override def listContractsPaginated[C, TCid <: ContractId[_], T](
+  override def listContractsPaginated[C, TCid <: ContractId[?], T](
       companion: C,
       after: Option[Long],
       limit: Limit,
@@ -306,7 +305,7 @@ final class DbMultiDomainAcsStore[TXE](
     } yield ResultsPage(withState, afterToken)
   }
 
-  override def listAssignedContracts[C, TCid <: ContractId[_], T](
+  override def listAssignedContracts[C, TCid <: ContractId[?], T](
       companion: C,
       limit: Limit,
   )(implicit
@@ -355,7 +354,7 @@ final class DbMultiDomainAcsStore[TXE](
     } yield assigned
   }
 
-  override def listContractsOnDomain[C, TCid <: ContractId[_], T](
+  override def listContractsOnDomain[C, TCid <: ContractId[?], T](
       companion: C,
       domain: SynchronizerId,
       limit: Limit,
@@ -380,7 +379,7 @@ final class DbMultiDomainAcsStore[TXE](
     } yield contracts
   }
 
-  override def streamAssignedContracts[C, TCid <: ContractId[_], T](companion: C)(implicit
+  override def streamAssignedContracts[C, TCid <: ContractId[?], T](companion: C)(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Source[AssignedContract[TCid, T], NotUsed] = {
@@ -709,7 +708,7 @@ final class DbMultiDomainAcsStore[TXE](
       .map(reassignmentEventUnassignFromRow)
   }
 
-  override def isReadyForAssign(contractId: ContractId[_], out: ReassignmentId)(implicit
+  override def isReadyForAssign(contractId: ContractId[?], out: ReassignmentId)(implicit
       tc: TraceContext
   ): Future[Boolean] = {
     waitUntilAcsIngested {
@@ -782,7 +781,7 @@ final class DbMultiDomainAcsStore[TXE](
     }
   }
 
-  override def findInterfaceViewByContractId[C, ICid <: ContractId[_], View <: DamlRecord[View]](
+  override def findInterfaceViewByContractId[C, ICid <: ContractId[?], View <: DamlRecord[View]](
       companion: C
   )(contractId: ICid)(implicit
       companionClass: ContractCompanion[C, ICid, View],
@@ -834,7 +833,7 @@ final class DbMultiDomainAcsStore[TXE](
 
   override private[store] def listIncompleteReassignments()(implicit
       tc: TraceContext
-  ): Future[Map[ContractId[_], NonEmpty[Set[ReassignmentId]]]] = {
+  ): Future[Map[ContractId[?], NonEmpty[Set[ReassignmentId]]]] = {
     for {
       rows <- storage
         .query(
@@ -877,50 +876,13 @@ final class DbMultiDomainAcsStore[TXE](
   override lazy val ingestionSink: IngestionSink = new MultiDomainAcsStore.IngestionSink {
     override def ingestionFilter: IngestionFilter = contractFilter.ingestionFilter
 
-    private sealed trait InitializeDescriptorResult[StoreId]
-    private case class StoreHasData[StoreId](
-        storeId: StoreId,
-        lastIngestedOffset: Long,
-    ) extends InitializeDescriptorResult[StoreId]
-    private case class StoreHasNoData[StoreId](
-        storeId: StoreId
-    ) extends InitializeDescriptorResult[StoreId]
-    private case class StoreNotUsed[StoreId]() extends InitializeDescriptorResult[StoreId]
-
     private[this] def initializeDescriptor(
         descriptor: StoreDescriptor
     )(implicit
         traceContext: TraceContext
     ): Future[InitializeDescriptorResult[Int]] = {
-      // Notes:
-      // - Postgres JSONB does not preserve white space, does not preserve the order of object keys, and does not keep duplicate object keys
-      // - Postgres JSONB columns have a maximum size of 255MB
-      // - We are using noSpacesSortKeys to insert a canonical serialization of the JSON object, even though this is not necessary for Postgres
-      // - 'ON CONFLICT DO NOTHING RETURNING ...' does not return anything if the row already exists, that's why we are using two separate queries
-      val descriptorStr = String256M.tryCreate(descriptor.toJson.noSpacesSortKeys)
       for {
-        _ <- storage
-          .update(
-            sql"""
-            insert into store_descriptors (descriptor)
-            values (${descriptorStr}::jsonb)
-            on conflict do nothing
-           """.asUpdate,
-            "initializeDescriptor.1",
-          )
-
-        newStoreId <- storage
-          .querySingle(
-            sql"""
-             select id
-             from store_descriptors
-             where descriptor = ${descriptorStr}::jsonb
-             """.as[Int].headOption,
-            "initializeDescriptor.2",
-          )
-          .getOrRaise(
-            new RuntimeException(s"No row for $descriptor found, which was just inserted!")
-          )
+        newStoreId <- StoreDescriptorStore.getStoreIdForDescriptor(descriptor, storage)
 
         _ <- storage
           .update(
@@ -931,6 +893,7 @@ final class DbMultiDomainAcsStore[TXE](
              """.asUpdate,
             "initializeDescriptor.3",
           )
+
         lastIngestedOffset <- storage
           .querySingle(
             sql"""
@@ -2302,39 +2265,6 @@ object DbMultiDomainAcsStore {
       mutable.ArrayBuffer.empty,
       mutable.ArrayBuffer.empty,
     )
-  }
-
-  /** Identifies an instance of a store.
-    *
-    *  @param version    The version of the store.
-    *                    Bumping this number will cause the store to forget all previously ingested data
-    *                    and start from a clean state.
-    *                    Bump this number whenever you make breaking changes in the ingestion filter or
-    *                    TxLog parser, or if you want to reset the store after fixing a bug that lead to
-    *                    data corruption.
-    * @param name        The name of the store, usually the simple name of the corresponding scala class.
-    * @param party       The party that owns the store (i.e., the party that subscribes
-    *                    to the update stream that feeds the store).
-    * @param participant The participant that serves the update stream that feeds this store.
-    * @param key         A set of named values that are used to filter the update stream or
-    *                    can otherwise be used to distinguish between different instances of the store.
-    */
-  case class StoreDescriptor(
-      version: Int,
-      name: String,
-      party: PartyId,
-      participant: ParticipantId,
-      key: Map[String, String],
-  ) {
-    def toJson: io.circe.Json = {
-      Json.obj(
-        "version" -> Json.fromInt(version),
-        "name" -> Json.fromString(name),
-        "party" -> Json.fromString(party.toProtoPrimitive),
-        "participant" -> Json.fromString(participant.toProtoPrimitive),
-        "key" -> Json.obj(key.map { case (k, v) => k -> Json.fromString(v) }.toSeq*),
-      )
-    }
   }
 
   sealed trait BatchStep

@@ -51,6 +51,28 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "postgresPassword": ""
         }
       },
@@ -220,7 +242,132 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "auth0Client": {},
+      "decentralizedSynchronizerUpgradeConfig": {
+        "active": {
+          "id": 3,
+          "releaseReference": {
+            "deploymentDir": "cluster/deployment",
+            "gitReference": "refs/heads/release-line-0.3.20",
+            "privateConfigsDir": "cluster/configs/configs-private",
+            "publicConfigsDir": "cluster/configs/configs",
+            "pulumiBaseDir": "splice/cluster/pulumi",
+            "pulumiStacksDir": "cluster/stacks/prod",
+            "repoUrl": "https://github.com/hyperledger-labs/splice",
+            "spliceRoot": "splice"
+          },
+          "sequencer": {
+            "enableBftSequencer": false
+          },
+          "version": {
+            "type": "remote",
+            "version": "0.3.20"
+          }
+        },
+        "archived": [
+          {
+            "id": 1,
+            "releaseReference": {
+              "deploymentDir": "cluster/deployment",
+              "gitReference": "981227e62011e386cca3cdb5f00b472cf05a12c4",
+              "pulumiBaseDir": "splice/cluster/pulumi",
+              "pulumiStacksDir": "cluster/stacks/prod",
+              "repoUrl": "https://github.com/hyperledger-labs/splice",
+              "spliceRoot": "splice"
+            },
+            "sequencer": {
+              "enableBftSequencer": false
+            },
+            "version": {
+              "type": "remote",
+              "version": "0.3.18"
+            }
+          },
+          {
+            "id": 2,
+            "releaseReference": {
+              "deploymentDir": "cluster/deployment",
+              "gitReference": "refs/heads/release-line-0.3.19",
+              "pulumiBaseDir": "splice/cluster/pulumi",
+              "pulumiStacksDir": "cluster/stacks/prod",
+              "repoUrl": "https://github.com/hyperledger-labs/splice",
+              "spliceRoot": "splice"
+            },
+            "sequencer": {
+              "enableBftSequencer": false
+            },
+            "version": {
+              "type": "remote",
+              "version": "0.3.19"
+            }
+          }
+        ],
+        "upgrade": {
+          "id": 4,
+          "releaseReference": {
+            "deploymentDir": "cluster/deployment",
+            "gitReference": "refs/heads/release-line-0.3.21",
+            "privateConfigsDir": "cluster/configs/configs-private",
+            "publicConfigsDir": "cluster/configs/configs",
+            "pulumiBaseDir": "splice/cluster/pulumi",
+            "pulumiStacksDir": "cluster/stacks/prod",
+            "repoUrl": "https://github.com/hyperledger-labs/splice",
+            "spliceRoot": "splice"
+          },
+          "sequencer": {
+            "enableBftSequencer": false
+          },
+          "version": {
+            "type": "remote",
+            "version": "0.3.21"
+          }
+        }
+      },
+      "disableOnboardingParticipantPromotionDelay": false,
+      "expectedValidatorOnboardings": [
+        {
+          "expiresIn": "24h",
+          "name": "splitwell2",
+          "secret": "splitwellsecret2"
+        },
+        {
+          "expiresIn": "24h",
+          "name": "validator12",
+          "secret": "validator1secret2"
+        }
+      ],
+      "identitiesBackupLocation": {
+        "bucket": {
+          "bucketName": "da-cn-data-dumps",
+          "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+          "projectId": "da-cn-devnet",
+          "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+        }
+      },
+      "isDevNet": false,
+      "periodicBackupConfig": {
+        "backupInterval": "10m",
+        "location": {
+          "bucket": {
+            "bucketName": "da-cn-data-dumps",
+            "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+            "projectId": "da-cn-devnet",
+            "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+          }
+        }
+      },
+      "sequencerPruningConfig": {
+        "enabled": true,
+        "pruningInterval": "1 hours",
+        "retentionPeriod": "30 days"
+      },
+      "splitPostgresInstances": true,
+      "topupConfig": {
+        "minTopupInterval": "1m",
+        "targetThroughput": 0
+      }
+    },
     "name": "dso",
     "provider": "",
     "type": "canton:network:dso"
@@ -1088,7 +1235,35 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "appLabel": "scan-app",
+      "globalLimits": {
+        "fillInterval": "60s",
+        "maxTokens": 2147483647,
+        "tokensPerFill": 2147483647
+      },
+      "inboundPort": 5012,
+      "namespace": "sv-1",
+      "rateLimits": [
+        {
+          "actions": [
+            {
+              "name": "acs",
+              "pathPrefix": "/api/scan/v0/acs"
+            },
+            {
+              "clientIp": true,
+              "name": "client_ip"
+            }
+          ],
+          "limits": {
+            "fillInterval": "60s",
+            "maxTokens": 10,
+            "tokensPerFill": 5
+          }
+        }
+      ]
+    },
     "name": "splice-sv-1-scan-app-rate-limit",
     "provider": "",
     "type": "splice:RateLimit"
@@ -1096,7 +1271,35 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "appLabel": "scan-app",
+      "globalLimits": {
+        "fillInterval": "60s",
+        "maxTokens": 2147483647,
+        "tokensPerFill": 2147483647
+      },
+      "inboundPort": 5012,
+      "namespace": "sv-da-1",
+      "rateLimits": [
+        {
+          "actions": [
+            {
+              "name": "acs",
+              "pathPrefix": "/api/scan/v0/acs"
+            },
+            {
+              "clientIp": true,
+              "name": "client_ip"
+            }
+          ],
+          "limits": {
+            "fillInterval": "60s",
+            "maxTokens": 10,
+            "tokensPerFill": 5
+          }
+        }
+      ]
+    },
     "name": "splice-sv-da-1-scan-app-rate-limit",
     "provider": "",
     "type": "splice:RateLimit"
@@ -1567,6 +1770,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": true,
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
@@ -1761,6 +1965,7 @@
           "readVsWriteScalingFactor": 4
         },
         "isDevNet": false,
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -1776,6 +1981,18 @@
         "onboardingRoundZeroDuration": "2 h",
         "onboardingType": "found-dso",
         "participantAddress": "participant-3",
+        "periodicTopologySnapshotConfig": {
+          "backupInterval": "24h",
+          "location": {
+            "bucket": {
+              "bucketName": "da-cn-topology-snapshots",
+              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+              "projectId": "da-cn-test",
+              "secretName": "cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots"
+            },
+            "prefix": "mock/sv-1"
+          }
+        },
         "persistence": {
           "databaseName": "sv_sv_1",
           "port": 5432,
@@ -1871,6 +2088,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -2433,6 +2651,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": false,
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
@@ -2602,6 +2821,7 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -2710,6 +2930,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "maxVettingDelay": "1m",
         "metrics": {

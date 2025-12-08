@@ -12,7 +12,7 @@ cluster:
   fixedTokens: false
 
 # TODO(DACH-NY/canton-network-internal#2125) Revisit idle timeout on 3.4
-defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.numThreads=8 -XX:ActiveProcessorCount=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data -Dpekko.http.server.idle-timeout=20m -Dpekko.http.client.idle-timeout=20m
+defaultJvmOptions: -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.numThreads=8 -XX:ActiveProcessorCount=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data -Dpekko.http.server.idle-timeout=20m -Dpekko.http.client.idle-timeout=20m
 resources:
   limits:
     memory: 8Gi

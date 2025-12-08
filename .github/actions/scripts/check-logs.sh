@@ -93,11 +93,14 @@ find_exceptions |
 sed -i 's/secret=test/secret=hidden/g' "$LOGFILE"
 
 find_secrets() {
-  set +o pipefail # rg returns 1 if there were not matches
+  set +o pipefail # rg returns 1 if there were no matches
+  # Common x=y format
   rg -o -e "(secret|token|private-key|password)=[^,[:space:]]*" "$LOGFILE" |
     # we mask secrets as "****" in our logs and testcontainers obfuscates secrets as "hidden non-blank value"
     # (https://github.com/testcontainers/testcontainers-java/blob/bf5605a2031d7f29f86a85430e3509a198c6e125/core/src/main/java/org/testcontainers/utility/AuthConfigUtil.java#L33)
     rg -v -e "=\\\\\"\*\*\*\*\\\\\"" -e "=hidden" || true
+  # JWTs; `eyJhbGc` is a base64-endcoded JSON object that starts with `{"alg`
+  rg -o -e "(Bearer\s*$|(Bearer\s*e|eyJhbGc)[A-Za-z0-9\-\_]{2,}\.[A-Za-z0-9\-\_]{2,}\.[A-Za-z0-9\-\_]{2,})" "$LOGFILE" || true
 }
 
 # Find leaked secrets

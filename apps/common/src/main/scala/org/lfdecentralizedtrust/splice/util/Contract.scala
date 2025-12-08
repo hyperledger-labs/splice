@@ -48,8 +48,8 @@ import scala.util.Try
   */
 final case class Contract[TCid, T](
     identifier: Identifier,
-    override val contractId: TCid & ContractId[_],
-    override val payload: T & DamlRecord[_],
+    override val contractId: TCid & ContractId[?],
+    override val payload: T & DamlRecord[?],
     val createdEventBlob: ByteString,
     val createdAt: Instant,
 ) extends PrettyPrinting
@@ -100,7 +100,7 @@ final case class Contract[TCid, T](
 
 object Contract {
   object Companion {
-    type Template[TCid, Data] = ContractCompanion[_ <: CodegenContract[TCid, Data], TCid, Data]
+    type Template[TCid, Data] = ContractCompanion[? <: CodegenContract[TCid, Data], TCid, Data]
     type Interface[ICid, Marker, View] = InterfaceCompanion[Marker, ICid, View]
   }
 
