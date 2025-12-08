@@ -481,7 +481,7 @@ class SV1Initializer(
         val values = initialValues.tryUpdate(
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =
-            PositiveSeconds.fromConfig(config.acsCommitmentReconciliationInterval),
+            PositiveSeconds.fromConfig(sv1Config.acsCommitmentReconciliationInterval),
           acsCommitmentsCatchUp = Some(SvUtil.defaultAcsCommitmentsCatchUpParameters),
           preparationTimeRecordTimeTolerance =
             NonNegativeFiniteDuration.fromConfig(config.preparationTimeRecordTimeTolerance),
@@ -650,7 +650,11 @@ class SV1Initializer(
     private def bootstrapDso(initialRound: Long, packageVersionSupport: PackageVersionSupport)(
         implicit tc: TraceContext
     ): Future[Unit] = {
-      val dsoRulesConfig = SvUtil.defaultDsoRulesConfig(synchronizerId, sv1Config.voteCooldownTime)
+      val dsoRulesConfig = SvUtil.defaultDsoRulesConfig(
+        synchronizerId,
+        sv1Config.voteCooldownTime,
+        sv1Config.acsCommitmentReconciliationInterval,
+      )
       for {
         (participantId, trafficStateForAllMembers, amuletRules, dsoRules) <- (
           participantAdminConnection.getParticipantId(),
