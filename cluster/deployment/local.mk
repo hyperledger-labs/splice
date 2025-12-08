@@ -11,7 +11,7 @@ resolved_config_targets := $(foreach cluster_dir,$(cluster_dirs),$(cluster_dir)/
 # more specific config loading rules, it might make sense to try list the dependencies here.
 define update_resolved_config
 .PHONY: $(1)/config.resolved.yaml
-$(1)/config.resolved.yaml:
+$(1)/config.resolved.yaml: $(shell dirname $(deployment_dir))/pulumi/build
 	source $(1)/.envrc.vars && \
 	cd "${SPLICE_ROOT}/cluster/pulumi" && \
 	npm run resolve-config
