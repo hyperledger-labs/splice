@@ -130,7 +130,7 @@ tests:
     set:
       scanClient:
         scanType: "trust-single"
-        scanAddress: "https://single.scan.url:5003"
+        scanAddress: "https://single.scan.url:5004"
     documentSelector:
       path: kind
       value: Deployment
@@ -140,7 +140,7 @@ tests:
           pattern: "canton.validator-apps.validator_backend.scan-client.type = \"trust-single\""
       - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
-          pattern: 'canton.validator-apps.validator_backend.scan-client.url = "https://single.scan.url:5003"'
+          pattern: 'canton.validator-apps.validator_backend.scan-client.url = "https://single.scan.url:5004"'
 
   - it: "configures scan-client for standard bft mode, including multiple seedUrls"
     set:
