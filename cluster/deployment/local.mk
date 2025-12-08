@@ -1,10 +1,11 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-deployment_dir := $(call current_dir)
+deployment_dir ::= $(call current_dir)
 
-cluster_dirs := $(foreach config,$(wildcard $(deployment_dir)/*/config.yaml),$(shell dirname $(config)))
-resolved_config_targets := $(foreach cluster_dir,$(cluster_dirs),$(cluster_dir)/config.resolved.yaml)
+clusters ::= scratchneta scratchnetb scratchnetc scratchnetd scratchnete
+cluster_dirs ::= $(foreach cluster,$(clusters),$(deployment_dir)/$(cluster))
+resolved_config_targets ::= $(foreach cluster_dir,$(cluster_dirs),$(cluster_dir)/config.resolved.yaml)
 
 # We use .PHONY because it is hard to pinpoint exact deps for config resolution as it might depend
 # on many config files and the config loader implementation. At some point, when we get rid of
