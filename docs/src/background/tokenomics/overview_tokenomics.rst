@@ -81,7 +81,8 @@ or interacts with Daml models that feature the application provider's party.  A 
 (e.g., a CC Transfer using the Splice Wallet UI) or when CC is burned.
 
 Aside from the minting weight, an application's reward also depends on whether it is designated as *featured* or *unfeatured* (the
-default state). An unfeatured application does not receive any reward. A featured application receives a minting weight with a total
+default state). After CIP-0078 was implemented, only featured applications get a reward.
+A featured application receives a minting weight with a total
 equivalent value of about $1 US (the SuperValidators may adjust this in the future).
 
 .. _how_to_become_a_featured_application:
