@@ -71,8 +71,7 @@ There are five key templates involved in the accounting for network activity:
       - :ref:`SvRewardCoupon <type-splice-amulet-svrewardcoupon-68580>`
 
 The last four are activity records while a ``FeaturedAppActivityMarker`` is not considered an activity record. As discussed later, a
-``FeaturedAppActivityMarker`` is converted into an ``AppRewardCoupon`` via automation run by the Super Validators.  After CIP-0078,
-the featured CC transfer and `FeaturedAppActivityMarker`` both generate the same reward. The ``FeaturedAppActivityMarker`` is the
+``FeaturedAppActivityMarker`` is converted into an ``AppRewardCoupon`` via automation run by the Super Validators.  The featured CC transfer and `FeaturedAppActivityMarker`` both generate the same reward. The ``FeaturedAppActivityMarker`` is the
 preferred way to generate app activity records.
 
 The ``FeaturedAppActivityMarker``,
