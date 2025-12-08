@@ -119,5 +119,6 @@ The holding fee remains but its behavior changed so that no holding fees are cha
 
 The holding fees is a fixed fee, per separate coin contract (UTXO) per unit
 of time, that is independent of the coin amount.  It promotes merging of CC to reduce network storage use by incentivizing merging or removal of dust coins.
-Holding fees are not charged when transferring coins but only explicitly on expired coin contracts via the ``Amulet_Expire`` choice,
+Holding fees are not charged when transferring coins but only explicitly on expired coin contracts via the ``Amulet_Expire`` choice.
+A coin contract (UTXO) may be expired by the Super Validators once its accrued holding fees are greater than its coin value.
 This makes accounting for holding fees simple as the value of the coin contract is charged as a holding fee.
