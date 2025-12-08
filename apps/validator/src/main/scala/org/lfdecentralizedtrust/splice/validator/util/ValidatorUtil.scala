@@ -111,19 +111,28 @@ private[validator] object ValidatorUtil {
     for {
       userPartyId <- knownParty match {
         case Some(party) =>
-          connection.createUserWithPrimaryParty(
-            endUserName,
-            party,
-            Seq(),
-          )
+          if (createPartyIfMissing.getOrElse(false)) {
+            connection.getOrAllocateParty(
+              party.uid.identifier.unwrap,
+              Seq(),
+              participantAdminConnection,
+            )
+          } else {
+            connection.createUserWithPrimaryParty(
+              endUserName,
+              party,
+              Seq(),
+            )
+          }
         case None =>
+          // we cannot differentiate between createPartyIfMissing or false, without breaking backwards compatibility
+          // in the future, if createPartyIfMissing is false, then this should return an error.
           connection.getOrAllocateParty(
             endUserName,
             Seq(),
             participantAdminConnection,
           )
       }
-      _ = createPartyIfMissing
       _ <- retryProvider.ensureThatB(
         RetryFor.ClientCalls,
         "onboard_grant_user_rights",
