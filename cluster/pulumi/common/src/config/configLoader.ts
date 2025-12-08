@@ -3,7 +3,7 @@
 import * as Yaml from 'js-yaml';
 import { existsSync, readFileSync } from 'fs';
 import { merge, mergeWith } from 'lodash';
-import { dirname, resolve } from 'path';
+import { dirname, join, resolve } from 'path';
 
 import { spliceEnvConfig } from './envConfig';
 
@@ -133,8 +133,10 @@ export function loadClusterYamlConfig(): unknown {
   const commonOverridesConfig = existsSync(commonOverridesConfigPath)
     ? readAndParseYaml(commonOverridesConfigPath)
     : {};
-  const clusterOverridesConfig = readAndParseYaml(
-    `${spliceEnvConfig.context.clusterPath()}/config.yaml`
-  );
+  const clusterOverridesConfig = readAndParseYaml(getMainConfigPath());
   return merge({}, baseConfig, commonOverridesConfig, clusterOverridesConfig);
+}
+
+export function getMainConfigPath(): string {
+  return join(spliceEnvConfig.context.clusterPath(), 'config.yaml');
 }
