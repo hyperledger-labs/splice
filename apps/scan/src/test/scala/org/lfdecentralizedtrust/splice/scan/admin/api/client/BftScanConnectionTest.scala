@@ -73,11 +73,13 @@ class BftScanConnectionTest
 
   val synchronizerId = SynchronizerId.tryFromString("domain::id")
 
+  private def scanUrl(n: Int) = s"https://$n.example.com"
+
   def getMockedConnections(n: Int): Seq[SingleScanConnection] = {
     val connections = (0 until n).map { n =>
       val m = mock[SingleScanConnection]
       when(m.config).thenReturn(
-        ScanAppClientConfig(NetworkAppClientConfig(s"https://$n.example.com"))
+        ScanAppClientConfig(NetworkAppClientConfig(scanUrl(n)))
       )
       m
     }
@@ -314,6 +316,11 @@ class BftScanConnectionTest
           Future.successful(connections(1))
         },
       )
+      // sanity check
+      bft.scanList.scanConnections.open.map(_.config.adminApi.url).toSet should be(
+        connections.take(1).map(_.config.adminApi.url).toSet
+      )
+
       clock.advance(Duration.ofSeconds(refreshSeconds + 1))
       // even after advancing it shouldn't refresh yet, as that's less than refreshSeconds
       clock.advance(Duration.ofSeconds(1))
@@ -324,10 +331,9 @@ class BftScanConnectionTest
       // eventually the refresh goes through and the second connection is used
       eventually() {
         refreshCalled.intValue() should be(1)
-        val result = bft.getDsoPartyId().futureValue
-        try { verify(connections(1), atLeast(1)).getDsoPartyId() }
-        catch { case cause: MockitoAssertionError => fail("Mockito fail", cause) }
-        result should be(partyIdA)
+        bft.scanList.scanConnections.open.map(_.config.adminApi.url).toSet should be(
+          connections.map(_.config.adminApi.url).toSet
+        )
       }
     }
 
