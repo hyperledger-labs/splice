@@ -4,6 +4,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
+import * as gcp from "@pulumi/gcp";
 
 // possible values and their meaning: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gatewayclass
 const gcloudGatewayClass = 'gke-l7-global-external-managed';
@@ -15,7 +16,7 @@ interface L7GatewayConfig {
     name: string;
     port: number;
   };
-  securityPolicyName?: pulumi.Input<string>;
+  securityPolicy: gcp.compute.SecurityPolicy;
 }
 
 /**
@@ -62,13 +63,10 @@ function createL7Gateway(
  */
 function createGCPBackendPolicy(
   config: L7GatewayConfig,
+  gateway: k8s.apiextensions.CustomResource,
   opts?: pulumi.CustomResourceOptions
-): k8s.apiextensions.CustomResource | undefined {
-  if (!config.securityPolicyName) {
-    return undefined;
-  }
-
-  const policyName = `${config.gatewayName}-backend-policy`;
+): k8s.apiextensions.CustomResource {
+  const policyName = `${config.gatewayName}-cloud-armor-link`;
   return new k8s.apiextensions.CustomResource(
     policyName,
     {
@@ -80,17 +78,22 @@ function createGCPBackendPolicy(
       },
       spec: {
         default: {
-          securityPolicy: config.securityPolicyName,
+          securityPolicy: config.securityPolicy.name,
         },
         targetRef: {
           group: '',
           kind: 'Service',
+          // TODO (#2723) must be the name of the Service set up by the gateway
+          // *that is the backend of the L7 ALB gateway for which this is configured*.
+          // For a classic istio gateway this is the same (?) as the gateway name;
+          // for a k8s istio gateway this is <gateway-name>-istio.
+          // Can be identified by the apiVersion of the Gateway k8s resource
           name: config.serviceTarget.name,
           namespace: config.ingressNs.ns.metadata.name,
         },
       },
     },
-    opts
+    {...opts, parent: config.securityPolicy, dependsOn: [gateway, config.securityPolicy] }
   );
 }
 
@@ -184,13 +187,13 @@ export function configureGKEL7Gateway(
   opts?: pulumi.ComponentResourceOptions
 ): {
   gateway: k8s.apiextensions.CustomResource;
-  backendPolicy?: k8s.apiextensions.CustomResource;
+  backendPolicy: k8s.apiextensions.CustomResource;
   healthCheckPolicy: k8s.apiextensions.CustomResource;
   httpRoute: k8s.apiextensions.CustomResource;
 } {
   const gateway = createL7Gateway(config, opts);
 
-  const backendPolicy = createGCPBackendPolicy(config, {
+  const backendPolicy = createGCPBackendPolicy(config, gateway, {
     ...opts,
     dependsOn: [gateway],
   });
