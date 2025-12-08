@@ -551,17 +551,19 @@ components:
       properties:
         name:
           type: string
-          description: The name/ID of the user to onboard.
+          description: The name of the user to onboard.
         party_id:
           type: string
           description: |
-            The Party ID of an *existing* party to associate with the user. If provided, 'new_party_hint' must be omitted.
-        new_party_hint:
-            type: string
-            description: |
-              Creates a new party for the user with a Party ID derived from new_party_hint.
-              If provided, 'party_id' must be omitted.
-
+            The party id of the user to onboard.
+            If no party_id is provided and createPartyIfMissing is true, then a fresh party will be generated, using the 'name' as the Party Hint.
+            If party_id is provided and createPartyIfMissing is false, then the party must already exist on the ledger. The existing party will be assigned to the user.
+            If party_id is provided and createPartyIfMissing is true, then if the party does not exist, a new party will be created using the provided party_id as the Party Hint.
+        createPartyIfMissing:
+          type: boolean
+          description: |
+            If true, create the party if it does not already exist on the ledger.
+            Default is 'false'.
 
     OnboardUserResponse:
       type: object
