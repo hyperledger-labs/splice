@@ -1,15 +1,31 @@
 package org.lfdecentralizedtrust.splice.performance
 
 import com.digitalasset.canton.LogReporter
+import com.monovore.decline._
 import com.typesafe.config.{Config, ConfigFactory}
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.performance.tests.DbSvDsoStoreIngestionPerformanceTest
 import org.scalatest.{Args, Suite}
 
+object Foo extends CommandApp(
+  name = "splice-perf",
+  header = "Splice Performance Testing Tool",
+  main = {
+    case _ =>
+      println("This is a placeholder for the command-line application.")
+  })
+
 object PerformanceRunner extends App {
+
+  sealed trait Args
+  case class DownloadTxs(host: Uri) extends Args
+  case class RunTest(testName: String, configPath: String) extends Args
 
   // Set up logging: only WARN and ERROR to stdout
 //  private val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
   // (Assume logging config is handled via HOCON or logback config file)
+
+
 
   // Parse CLI arguments
   case class CliArgs(command: String, testName: String, configPath: String)
