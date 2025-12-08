@@ -27,7 +27,7 @@ class PeriodicTopologySnapshotIntegrationTest[T <: BackupDumpConfig] extends Int
     BackupDumpConfig.Gcp(GcpBucketConfig.inferForTesting(TopologySnapshotTest), None)
 
   private def listDump(utcDate: String): Seq[Blob] =
-    bucket.list(startOffset = s"topology_snapshot_$utcDate", endOffset = "")
+    bucket.list(prefix = s"topology_snapshot_$utcDate")
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

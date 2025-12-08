@@ -56,6 +56,21 @@ class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLogger
     blobs.result()
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
+  def list(prefix: String): Seq[Blob] = {
+    val blobs = Seq.newBuilder[Blob]
+    var page = storage.list(
+      config.bucketName,
+      Storage.BlobListOption.prefix(prefix),
+    )
+    blobs ++= page.getValues().asScala
+    while (page.hasNextPage) {
+      page = page.getNextPage
+      blobs ++= page.getValues().asScala
+    }
+    blobs.result()
+  }
+
   def readBytesFromBucket(fileName: String): Array[Byte] = {
     val blobId = BlobId.of(config.bucketName, fileName)
     val blob = storage.get(blobId)
