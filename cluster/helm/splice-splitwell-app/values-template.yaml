@@ -6,7 +6,6 @@ defaultJvmOptions: -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxRAMPercentage
 fixedTokens: false
 resources:
   limits:
-    cpu: "2"
     memory: 1536Mi
   requests:
     cpu: "0.2"

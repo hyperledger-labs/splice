@@ -10,7 +10,6 @@ set:
   nodeIdentifier: "helm-mock-1-validator"
   validatorPartyHint: "helm-mock-1"
   validatorWalletUser: "mock-wallet-user-id"
-  scanAddress: "trusted.scan.mock.com"
   spliceInstanceNames:
     networkName: MockNet
     networkFaviconUrl: https://mock.net/favicon.ico

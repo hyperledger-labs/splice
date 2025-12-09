@@ -3,8 +3,9 @@
 
 imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
 resources:
+  requests:
+    cpu: 100m
   limits:
-    cpu: "1"
     memory: 1536Mi
 
 spliceInstanceNames:

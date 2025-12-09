@@ -96,12 +96,7 @@ object BackupDump {
           case Some(p) => s"$p/"
           case None => ""
         }
-        val blobs = gcpBucket.list(s"$pref$offset", "")
-        loggerFactory
-          .getLogger(this.getClass)
-          .info(
-            s"all matched blobs found: ${blobs.map(_.getName)}, using offset $offset, and prefix $pref, bucket ${bucketConfig.bucketName}, project: ${bucketConfig.projectId}"
-          )
+        val blobs = gcpBucket.listBlobsByPrefix(prefix = s"$pref$offset")
         blobs.nonEmpty
       case _ =>
         throw Status.UNIMPLEMENTED

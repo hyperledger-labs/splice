@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority.Low
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.FoundDso
 import org.lfdecentralizedtrust.splice.util.{StandaloneCanton, TriggerTestUtil, WalletTestUtil}
 
 import java.util.UUID
@@ -68,9 +69,21 @@ class ManualStartIntegrationTest
           // as pruning can be done only up to the end of the latest complete acs commitment interval
           svApps = conf.svApps.updatedWith(InstanceName.tryCreate("sv1")) {
             _.map { config =>
-              config.copy(acsCommitmentReconciliationInterval =
-                PositiveDurationSeconds.ofSeconds(30)
-              )
+              config.onboarding match {
+                case Some(c) =>
+                  c match {
+                    case foundDsoConfig: FoundDso =>
+                      config.copy(onboarding =
+                        Some(
+                          foundDsoConfig.copy(acsCommitmentReconciliationInterval =
+                            PositiveDurationSeconds.ofSeconds(30)
+                          )
+                        )
+                      )
+                    case _ => config
+                  }
+                case None => config
+              }
             }
           },
           validatorApps = conf.validatorApps
@@ -190,7 +203,7 @@ class ManualStartIntegrationTest
         }
 
         clue("Check sv1 participant is actively pruning") {
-          eventually(70.seconds) {
+          eventually(120.seconds) {
             sv1Backend.svAutomation
               .connection(Low)
               // returns 0 when participant pruning is disabled

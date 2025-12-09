@@ -41,12 +41,27 @@ class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLogger
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
-  def list(startOffset: String, endOffset: String): Seq[Blob] = {
+  def listBlobsByOffset(startOffset: String, endOffset: String): Seq[Blob] = {
     val blobs = Seq.newBuilder[Blob]
     var page = storage.list(
       config.bucketName,
       Storage.BlobListOption.startOffset(startOffset),
       Storage.BlobListOption.endOffset(endOffset),
+    )
+    blobs ++= page.getValues().asScala
+    while (page.hasNextPage) {
+      page = page.getNextPage
+      blobs ++= page.getValues().asScala
+    }
+    blobs.result()
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
+  def listBlobsByPrefix(prefix: String): Seq[Blob] = {
+    val blobs = Seq.newBuilder[Blob]
+    var page = storage.list(
+      config.bucketName,
+      Storage.BlobListOption.prefix(prefix),
     )
     blobs ++= page.getValues().asScala
     while (page.hasNextPage) {
