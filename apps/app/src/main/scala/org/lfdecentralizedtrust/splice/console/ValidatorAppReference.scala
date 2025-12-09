@@ -105,10 +105,14 @@ abstract class ValidatorAppReference(
   @Help.Description(
     """Onboard individual canton-amulet user with a fresh or existing party-id. Return the user's partyId."""
   )
-  def onboardUser(user: String, existingPartyId: Option[PartyId] = None): PartyId = {
+  def onboardUser(
+      user: String,
+      existingPartyId: Option[PartyId] = None,
+      createIfMissing: Option[Boolean] = None,
+  ): PartyId = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAdminAppClient.OnboardUser(user, existingPartyId)
+        HttpValidatorAdminAppClient.OnboardUser(user, existingPartyId, createIfMissing)
       )
     }
   }

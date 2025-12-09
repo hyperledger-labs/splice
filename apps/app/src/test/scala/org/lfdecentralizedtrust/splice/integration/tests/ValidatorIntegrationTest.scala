@@ -578,4 +578,56 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     getUser.primaryParty.value.uid.identifier shouldBe validatorPartyHint
   }
 
+  "onboard user with custom party hint and check assignment/creation modes" in { implicit env =>
+    initDso()
+    aliceValidatorBackend.startSync()
+
+    val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+    val testUser1 = s"test-user-1-${Random.nextInt(10000)}"
+    val testUser2 = s"test-user-2-${Random.nextInt(10000)}"
+    val testUser3 = s"test-user-3-${Random.nextInt(10000)}"
+    val customPartyHint = s"CustomHintABC${Random.nextInt(10000)}"
+
+    def onboard(
+        name: String,
+        partyId: Option[PartyId] = None,
+        createIfMissing: Option[Boolean] = None,
+    ): PartyId = {
+      aliceValidatorBackend.onboardUser(name, partyId, createIfMissing)
+    }
+
+    clue("Assign new user to existing Validator Party (party_id provided)") {
+      val assignedPartyId = onboard(
+        name = testUser1,
+        partyId = Some(aliceValidatorParty),
+      )
+      assignedPartyId shouldBe aliceValidatorParty
+      aliceValidatorBackend.listUsers() should contain(testUser1)
+    }
+
+    clue("Default creation: Use 'name' as hint") {
+      val defaultPartyId = onboard(
+        name = testUser2
+      )
+
+      val expectedHint = BaseLedgerConnection.sanitizeUserIdToPartyString(testUser2)
+      defaultPartyId.toString.split("::").head shouldBe expectedHint
+      aliceValidatorBackend.listUsers() should contain(testUser2)
+    }
+
+    clue("Custom creation: Use party_id as hint (createPartyIfMissing=true)") {
+      val desiredPartyId = PartyId.tryCreate(customPartyHint, aliceValidatorParty.uid.namespace)
+
+      val customPartyId = onboard(
+        name = testUser3,
+        partyId = Some(desiredPartyId),
+        createIfMissing = Some(true),
+      )
+
+      customPartyId.toString.split("::").head shouldBe customPartyHint
+      customPartyId shouldBe desiredPartyId
+      aliceValidatorBackend.listUsers() should contain(testUser3)
+    }
+  }
+
 }
