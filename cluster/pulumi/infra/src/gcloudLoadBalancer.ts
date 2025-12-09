@@ -7,7 +7,7 @@ import { ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
 import * as gcp from "@pulumi/gcp";
 
 // possible values and their meaning: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gatewayclass
-const gcloudGatewayClass = 'gke-l7-global-external-managed';
+const gcloudGatewayClass = 'gke-l7-regional-external-managed';
 
 interface L7GatewayConfig {
   gatewayName: string;
