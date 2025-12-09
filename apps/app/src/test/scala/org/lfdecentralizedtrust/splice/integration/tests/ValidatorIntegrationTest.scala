@@ -583,10 +583,11 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     aliceValidatorBackend.startSync()
 
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
-    val testUser1 = s"test-user-1-${Random.nextInt(10000)}"
-    val testUser2 = s"test-user-2-${Random.nextInt(10000)}"
-    val testUser3 = s"test-user-3-${Random.nextInt(10000)}"
-    val customPartyHint = s"CustomHintABC${Random.nextInt(10000)}"
+    val testUser1 = s"test-1-${Random.nextInt(10000)}"
+    val testUser2 = s"test-2-${Random.nextInt(10000)}"
+    val testUser3 = s"test-3-${Random.nextInt(10000)}"
+    val testUser4 = s"test-4-${Random.nextInt(10000)}"
+    val customPartyHint = s"CustomHint${Random.nextInt(10000)}"
 
     def onboard(
         name: String,
@@ -596,24 +597,26 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
       aliceValidatorBackend.onboardUser(name, partyId, createIfMissing)
     }
 
-    clue("Assign new user to existing Validator Party (party_id provided)") {
-
+    clue(
+      "Assign new user to existing Validator Party"
+    ) {
       aliceValidatorBackend.listUsers() should not contain testUser1
-
       val assignedPartyId = onboard(
         name = testUser1,
         partyId = Some(aliceValidatorParty),
+        createIfMissing = Some(false),
       )
       assignedPartyId shouldBe aliceValidatorParty
       aliceValidatorBackend.listUsers() should contain(testUser1)
     }
 
-    clue("Default creation: Use 'name' as hint") {
-
+    clue("Use 'name' as hint") {
       aliceValidatorBackend.listUsers() should not contain testUser2
 
       val defaultPartyId = onboard(
-        name = testUser2
+        name = testUser2,
+        partyId = None,
+        createIfMissing = Some(true),
       )
 
       val expectedHint = BaseLedgerConnection.sanitizeUserIdToPartyString(testUser2)
@@ -621,11 +624,9 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
       aliceValidatorBackend.listUsers() should contain(testUser2)
     }
 
-    clue("Custom creation: Use party_id as hint (createPartyIfMissing=true)") {
+    clue("Use partyId as hint") {
       val desiredPartyId = PartyId.tryCreate(customPartyHint, aliceValidatorParty.uid.namespace)
-
       aliceValidatorBackend.listUsers() should not contain testUser3
-
       val customPartyId = onboard(
         name = testUser3,
         partyId = Some(desiredPartyId),
@@ -635,6 +636,18 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
       customPartyId.toString.split("::").head shouldBe customPartyHint
       customPartyId shouldBe desiredPartyId
       aliceValidatorBackend.listUsers() should contain(testUser3)
+    }
+
+    clue("Fail when creation is disallowed but no party is provided to assign to") {
+      val thrown = intercept[RuntimeException] {
+        onboard(
+          name = testUser4,
+          partyId = None,
+          createIfMissing = Some(false),
+        )
+      }
+      thrown.getMessage should include("INVALID_ARGUMENT")
+      aliceValidatorBackend.listUsers() should not contain testUser4
     }
   }
 
