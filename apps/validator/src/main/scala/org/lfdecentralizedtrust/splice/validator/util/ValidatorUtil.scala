@@ -156,48 +156,37 @@ private[validator] object ValidatorUtil {
               }
 
           } else {
-            connection.getOptionalPrimaryParty(endUserName).flatMap {
-              case Some(existingParty) =>
-                logger.debug(
-                  s"No party ID provided, creation disallowed, but user $endUserName has existing party $existingParty. Associating."
-                )
-                connection
-                  .createUserWithPrimaryParty(
-                    endUserName,
-                    existingParty,
-                    Seq(),
+
+            logger.debug(
+              s"No party ID provided and creation disallowed. Checking for existing party."
+            )
+
+            connection
+              .getOptionalPrimaryParty(endUserName)
+              .recover {
+                case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.NOT_FOUND =>
+                  None
+              }
+              .flatMap {
+                case Some(existingParty) =>
+                  logger.debug(
+                    s"No party ID provided, creation disallowed, but user $endUserName has existing party $existingParty. Associating."
                   )
-                  .map(_ => existingParty)
+                  connection
+                    .createUserWithPrimaryParty(
+                      endUserName,
+                      existingParty,
+                      Seq(),
+                    )
+                    .map(_ => existingParty)
 
-              case None =>
-                connection
-                  .getOptionalPrimaryParty(endUserName)
-                  .recover {
-                    case e: StatusRuntimeException
-                        if e.getStatus.getCode == Status.Code.NOT_FOUND =>
-                      None
-                  }
-                  .flatMap {
-                    case Some(existingParty) =>
-                      logger.debug(
-                        s"No party ID provided, creation disallowed, but user $endUserName has existing party $existingParty. Associating."
-                      )
-                      connection
-                        .createUserWithPrimaryParty(
-                          endUserName,
-                          existingParty,
-                          Seq(),
-                        )
-                        .map(_ => existingParty)
-
-                    case None =>
-                      throw Status.INVALID_ARGUMENT
-                        .withDescription(
-                          s"party_id must be provided when createPartyIfMissing is false and no existing party for user $endUserName is found."
-                        )
-                        .asRuntimeException()
-                  }
-            }
+                case None =>
+                  throw Status.INVALID_ARGUMENT
+                    .withDescription(
+                      s"party_id must be provided when createPartyIfMissing is false and no existing party for user $endUserName is found."
+                    )
+                    .asRuntimeException()
+              }
           }
       }
       _ <- retryProvider.ensureThatB(
