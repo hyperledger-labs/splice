@@ -61,7 +61,7 @@ groups:
                 name: Expression
                 type: __expr__
                 uid: __expr__
-              expression: $B/$A
+              expression: $A/$B
               intervalMs: 1000
               maxDataPoints: 43200
               refId: C
