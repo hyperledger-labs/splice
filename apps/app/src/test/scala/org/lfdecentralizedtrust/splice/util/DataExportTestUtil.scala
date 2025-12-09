@@ -25,7 +25,7 @@ trait DataExportTestUtil extends TestCommon {
       s"$cluster/$namespace/${getFileName(instant)}"
     val now = Instant.now
     // Query everything within the last 20min and check that we have at least one.
-    val blobs = bucket.list(name(now.plus(-20, ChronoUnit.MINUTES)), name(now))
+    val blobs = bucket.listBlobsByOffset(name(now.plus(-20, ChronoUnit.MINUTES)), name(now))
     blobs should not be empty
     forAll(blobs) { blob =>
       val dump = bucket.readStringFromBucket(Paths.get(blob.getName))

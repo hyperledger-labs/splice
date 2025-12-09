@@ -722,8 +722,8 @@
         "scanClient": {
           "scanType": "bft-custom",
           "seedUrls": [
-            "https://scan.sv-2-eng.scratchb.network.canton.global",
-            "https://scan.sv-3-eng.scratchb.network.canton.global"
+            "https://scan.sv-2-eng.test.network.canton.global",
+            "https://scan.sv-3-eng.test.network.canton.global"
           ],
           "threshold": 2,
           "trustedSvs": [
