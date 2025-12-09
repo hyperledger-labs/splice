@@ -330,6 +330,7 @@ object DbStorageSetup {
       port: Int,
       connectionPoolEnabled: Boolean =
         false, // disable by default, as the config is mainly used for setup / migration
+      currentSchema: Option[String] = None,
   ) {
 
     private def configOfMap(map: Map[String, Object]): Config = {
@@ -348,7 +349,10 @@ object DbStorageSetup {
         "properties.portNumber" -> (port: Integer),
         "properties.user" -> username,
         "properties.password" -> password,
-      )
+      ) ++ (currentSchema match {
+        case Some(schema) => Map[String, Object]("properties.currentSchema" -> schema)
+        case _ => Map[String, Object]()
+      })
     )
 
     def toPostgresDbConfig: Postgres = Postgres(
