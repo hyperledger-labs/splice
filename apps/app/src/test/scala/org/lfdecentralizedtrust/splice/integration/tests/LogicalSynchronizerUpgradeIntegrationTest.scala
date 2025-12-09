@@ -7,18 +7,13 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.HexString
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
-import com.google.protobuf.ByteString
-import monocle.Monocle.toAppliedFocusOps
-import org.lfdecentralizedtrust.splice.config.{
-  ConfigTransforms,
-  NetworkAppClientConfig,
-  SynchronizerConfig,
-}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.environment.{
   MediatorAdminConnection,
@@ -33,21 +28,18 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.B
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.scan.config.CacheConfig
 import org.lfdecentralizedtrust.splice.setup.NodeInitializer
-import org.lfdecentralizedtrust.splice.splitwell.config.{
-  SplitwellDomains,
-  SplitwellSynchronizerConfig,
-}
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.DomainMigration
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer
 import org.lfdecentralizedtrust.splice.util.*
-import org.scalatest.time.{Minute, Span}
-import org.slf4j.event.Level
+import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
+import org.scalatest.time.{Minutes, Span}
 
 import java.net.URI
+import java.nio.file.Path
 import java.time.Duration
 import java.util.UUID
 import scala.collection.parallel.CollectionConverters.seqIsParallelizable
-import scala.jdk.CollectionConverters.SeqHasAsJava
+import scala.concurrent.duration.DurationInt
 
 class LogicalSynchronizerUpgradeIntegrationTest
     extends IntegrationTest
@@ -64,7 +56,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
   override def dbsSuffix = "lsu"
 
-  override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
+  override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(5, Minutes)))
 
   // We manually force a snapshot on sv1 in the test. The other SVs
   // won't have a snapshot at that time so the assertions in the
@@ -76,134 +68,81 @@ class LogicalSynchronizerUpgradeIntegrationTest
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       .addConfigTransforms((_, config) => {
-        config.copy(
-          scanApps = config.scanApps ++ Seq(1, 2, 3, 4).map(sv =>
-            InstanceName.tryCreate(s"sv${sv}ScanLocal") ->
-              ConfigTransforms.withBftSequencer(
-                s"sv${sv}ScanLocal",
+        ConfigTransforms
+          .bumpCantonSyncPortsBy(22_000, _.contains("Local"))
+          .compose(
+            ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
+              if (name.endsWith("Local")) {
                 config
-                  .scanApps(InstanceName.tryCreate(s"sv${sv}Scan"))
-                  .copy(domainMigrationId = 1L),
-                migrationId = 1L,
-                basePort = 27010,
-              )
-          ),
-          validatorApps = config.validatorApps + (
-            InstanceName.tryCreate("sv1ValidatorLocal") ->
-              config
-                .validatorApps(InstanceName.tryCreate("sv1Validator"))
-                .copy(
-                  domainMigrationId = 1L
+              } else {
+                config.copy(
+                  domainMigrationDumpPath =
+                    Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
                 )
-          ) + (
-            InstanceName.tryCreate("aliceValidatorLocal") -> {
-              val aliceValidatorConfig = config
-                .validatorApps(InstanceName.tryCreate("aliceValidator"))
-              val sv1ScanConfig = config
-                .scanApps(InstanceName.tryCreate("sv1Scan"))
-              aliceValidatorConfig
-                .copy(
-                  // Disable bft connections as we only start sv1 scan.
-                  scanClient =
-                    TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
-                  restoreFromMigrationDump = Some(
-                    (migrationDumpDir("aliceValidator") / "domain_migration_dump.json").path
-                  ),
-                  domainMigrationId = 1L,
-                )
-
+              }
             }
-          ) + (
-            InstanceName.tryCreate("splitwellValidatorLocal") -> {
-              val splitwellValidatorConfig = config
-                .validatorApps(InstanceName.tryCreate("splitwellValidator"))
-              val sv1ScanConfig = config
-                .scanApps(InstanceName.tryCreate("sv1Scan"))
-              splitwellValidatorConfig
-                .copy(
-                  // Disable bft connections as we only start sv1 scan.
-                  scanClient =
-                    TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
-                  restoreFromMigrationDump = Some(
-                    (migrationDumpDir("splitwellValidator") / "domain_migration_dump.json").path
-                  ),
-                  onboarding = splitwellValidatorConfig.onboarding.map(onboarding =>
-                    onboarding.copy(
-                      svClient = onboarding.svClient.copy(adminApi =
-                        NetworkAppClientConfig(url = "http://localhost:27114")
-                      )
+          )(
+            config.copy(
+              svApps = config.svApps ++
+                Seq(1, 2, 3, 4).map(sv =>
+                  InstanceName.tryCreate(s"sv${sv}Local") ->
+                    ConfigTransforms.withBftSequencer(
+                      config
+                        .svApps(InstanceName.tryCreate(s"sv$sv"))
+                        .copy(
+                          onboarding = Some(
+                            DomainMigration(
+                              name = getSvName(sv),
+                              dumpFilePath = Path.of(""),
+                            )
+                          ),
+                          domainMigrationId = 1L,
+                          legacyMigrationId = Some(0L),
+                        )
                     )
-                  ),
-                  domainMigrationId = 1L,
-                )
-            }
-          ),
-          splitwellApps = config.splitwellApps + (
-            InstanceName.tryCreate("providerSplitwellBackendLocal") -> {
-              val splitwellBackendConfig =
-                config.splitwellApps(InstanceName.tryCreate("providerSplitwellBackend"))
-              splitwellBackendConfig
-                .copy(
-                  domains = SplitwellSynchronizerConfig(
-                    splitwell = SplitwellDomains(
-                      preferred = SynchronizerConfig(
-                        alias = SynchronizerAlias.tryCreate("global")
+                ),
+              scanApps = config.scanApps ++ Seq(1, 2, 3, 4).map(sv =>
+                InstanceName.tryCreate(s"sv${sv}ScanLocal") ->
+                  ConfigTransforms.withBftSequencer(
+                    s"sv${sv}ScanLocal",
+                    config
+                      .scanApps(InstanceName.tryCreate(s"sv${sv}Scan"))
+                      .copy(domainMigrationId = 1L),
+                    migrationId = 1L,
+                    basePort = 27010,
+                  )
+              ),
+              validatorApps = config.validatorApps + (
+                InstanceName.tryCreate("sv1ValidatorLocal") ->
+                  config
+                    .validatorApps(InstanceName.tryCreate("sv1Validator"))
+                    .copy(
+                      domainMigrationId = 1L
+                    )
+              ) + (
+                InstanceName.tryCreate("aliceValidatorLocal") -> {
+                  val aliceValidatorConfig = config
+                    .validatorApps(InstanceName.tryCreate("aliceValidator"))
+                  val sv1ScanConfig = config
+                    .scanApps(InstanceName.tryCreate("sv1Scan"))
+                  aliceValidatorConfig
+                    .copy(
+                      // Disable bft connections as we only start sv1 scan.
+                      scanClient =
+                        TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
+                      restoreFromMigrationDump = Some(
+                        (migrationDumpDir("aliceValidator") / "domain_migration_dump.json").path
                       ),
-                      others = Seq.empty,
+                      domainMigrationId = 1L,
                     )
-                  ),
-                  domainMigrationId = 1L,
-                )
-            }
-          ),
-          splitwellAppClients = config.splitwellAppClients + (
-            InstanceName.tryCreate("aliceSplitwellLocal") -> config
-              .splitwellAppClients(InstanceName.tryCreate("aliceSplitwell"))
-          ),
-        )
+
+                }
+              ),
+            )
+          )
       })
       .addConfigTransform((_, config) =>
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
-      )
-      .addConfigTransforms((_, conf) =>
-        ConfigTransforms.bumpCantonPortsBy(
-          22_000,
-          name =>
-            // Bob actually doesn't migrate and is instead used to test unavailable validators
-            name != "bobValidatorLocal" && name.contains("Local"),
-        )(conf)
-      )
-      .addConfigTransform(
-        // update validator app config for the aliceValidator and splitwellValidator to set the migrationDumpPath
-        (_, conf) =>
-          ConfigTransforms.updateAllValidatorConfigs((name, validatorConfig) =>
-            if (name == "aliceValidator" || name == "splitwellValidator")
-              validatorConfig.copy(
-                domainMigrationDumpPath =
-                  Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
-              )
-            else validatorConfig
-          )(conf)
-      )
-      .addConfigTransforms((_, conf) =>
-        ConfigTransforms.updateAllSvAppConfigs((name, c) =>
-          if (name.endsWith("Local")) {
-            c.copy(
-              onboarding = Some(
-                DomainMigration(
-                  c.onboarding.value.name,
-                  (migrationDumpDir(
-                    name.stripSuffix("Local")
-                  ) / "domain_migration_dump.json").path,
-                )
-              )
-            )
-          } else
-            c.copy(
-              domainMigrationDumpPath =
-                Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
-            )
-        )(conf)
       )
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllScanAppConfigs_(conf =>
@@ -219,7 +158,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       )
       .withManualStart
 
-  "migrate global domain to new nodes with downtime" in { implicit env =>
+  "migrate global domain to new nodes without downtime" in { implicit env =>
     startAllSync(
       sv1ScanBackend,
       sv2ScanBackend,
@@ -308,38 +247,10 @@ class LogicalSynchronizerUpgradeIntegrationTest
       onboarding
     }
 
-    val bobValidatorLocalBackend: ValidatorAppBackendReference = v("bobValidatorLocal")
+    startValidatorAndTapAmulet(aliceValidatorBackend, aliceValidatorWalletClient)
 
-    withCanton(
-      Seq(
-        testResourcesPath / "unavailable-validator-topology-canton.conf"
-      ),
-      Seq(),
-      "stop-bob-validator-before-domain-migration",
-      "VALIDATOR_ADMIN_USER" -> bobValidatorLocalBackend.config.ledgerApiUser,
-    ) {
-      startValidatorAndTapAmulet(bobValidatorLocalBackend, bobWalletClient)
-      bobValidatorLocalBackend.stop()
-    }
-
-    withClueAndLog(
-      s"the validator is no longer available"
-    ) {
-      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-        {
-          bobValidatorLocalBackend.participantClientWithAdminToken.health.status
-        },
-        logEntries => {
-          forExactly(1, logEntries) { logEntry =>
-            logEntry.message should startWith(
-              s"""Request failed for remote participant for `bobValidatorLocal`, with admin token. Is the server running? Did you configure the server address as 0.0.0.0? Are you using the right TLS settings? (details logged as DEBUG)
-                 |  GrpcServiceUnavailable: UNAVAILABLE/io exception""".stripMargin
-            )
-          }
-        },
-      )
-    }
-
+    val newSynchronizerSerial = decentralizedSynchronizerPSId.serial + NonNegativeInt.one
+    val successorPsid = decentralizedSynchronizerPSId.copy(serial = newSynchronizerSerial)
     withCantonSvNodes(
       (
         None,
@@ -361,89 +272,98 @@ class LogicalSynchronizerUpgradeIntegrationTest
       val allBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
       val allNewBackends = Seq(sv1LocalBackend, sv2LocalBackend, sv3LocalBackend, sv4LocalBackend)
       val migrationTime = CantonTimestamp.now().plusSeconds(60)
-      val newSynchronizerSerial = decentralizedSynchronizerPSId.serial
 
-      clue(s"Announce migration at $migrationTime") {
+      val announcement = clue(s"Announce migration at $migrationTime") {
         allBackends.par.map { backend =>
           backend.participantClientWithAdminToken.topology.synchronizer_upgrade.announcement
             .propose(
-              decentralizedSynchronizerPSId.copy(serial =
-                newSynchronizerSerial + NonNegativeInt.one
-              ),
+              successorPsid,
               migrationTime,
+              store = Some(Synchronizer(decentralizedSynchronizerId)),
             )
-
         }
+        allBackends.head.participantClientWithAdminToken.topology.synchronizer_upgrade.announcement
+          .list()
+          .head
       }
+
+      val synchronizerFreezeTime = announcement.context.validFrom
 
       clue("trigger dump") {
         allBackends.par.map { backend =>
-          backend.triggerDecentralizedSynchronizerMigrationDump(
-            0,
-            Some(
-              migrationTime.toInstant
-            ),
-          )
+          eventuallySucceeds(suppressErrors = false) {
+            backend.triggerDecentralizedSynchronizerMigrationDump(
+              0,
+              Some(
+                synchronizerFreezeTime
+              ),
+            )
+          }
         }
       }
 
       clue("init new nodes") {
-
         allNewBackends.zip(allBackends).par.map { case (newBackend, oldBackend) =>
-          val expectedDirectory = directoryForDump(newBackend.name, migrationTime.toInstant)
-          expectedDirectory.exists shouldBe true
-          val dump = DomainMigrationInitializer.loadDomainMigrationDump(expectedDirectory.path)
-          val sequencerInitializer =
-            new NodeInitializer(sequencerAdminConnection(newBackend), retryProvider, loggerFactory)
-          val newMediatorAdminConnection = mediatorAdminConnection(newBackend)
-          val mediatorInitializer =
-            new NodeInitializer(newMediatorAdminConnection, retryProvider, loggerFactory)
+          TraceContext.withNewTraceContext(s"init ${oldBackend.name}") { implicit traceContext =>
+            val expectedDirectory = directoryForDump(oldBackend.name, synchronizerFreezeTime)
+            expectedDirectory.exists shouldBe true
+            val lsuSynchronizerState =
+              oldBackend.sequencerClient.topology.transactions.logical_upgrade_state()
+            val dump = DomainMigrationInitializer
+              .loadDomainMigrationDump((expectedDirectory / "domain_migration_dump.json").path)
+            val sequencerInitializer =
+              new NodeInitializer(
+                sequencerAdminConnection(newBackend),
+                retryProvider,
+                loggerFactory,
+              )
+            val newMediatorAdminConnection = mediatorAdminConnection(newBackend)
+            val mediatorInitializer =
+              new NodeInitializer(newMediatorAdminConnection, retryProvider, loggerFactory)
 
-          sequencerInitializer.initializeFromDumpAndWait(dump.nodeIdentities.sequencer).futureValue
-          mediatorInitializer.initializeFromDumpAndWait(dump.nodeIdentities.mediator).futureValue
+            sequencerInitializer
+              .initializeFromDump(dump.nodeIdentities.sequencer)
+              .futureValue
+            mediatorInitializer.initializeFromDump(dump.nodeIdentities.mediator).futureValue
 
-          val staticSynchronizerParameters =
-            oldBackend.sequencerClient.synchronizer_parameters.static.get()
-          val newStaticSyncParams = staticSynchronizerParameters.copy(
-            serial = staticSynchronizerParameters.serial + NonNegativeInt.one
-          )
-          newBackend.sequencerClient.setup.initialize_from_synchronizer_predecessor(
-            ByteString.copyFrom(
-              dump.domainDataSnapshot.genesisState.value.asJava
-            ),
-            newStaticSyncParams,
-          )
+            val staticSynchronizerParameters =
+              oldBackend.sequencerClient.synchronizer_parameters.static.get()
+            val newStaticSyncParams = staticSynchronizerParameters.copy(
+              serial = staticSynchronizerParameters.serial + NonNegativeInt.one
+            )
+            newBackend.sequencerClient.setup.initialize_from_synchronizer_predecessor(
+              lsuSynchronizerState,
+              newStaticSyncParams,
+            )
 
-          newMediatorAdminConnection.initialize(
-            PhysicalSynchronizerId(
-              decentralizedSynchronizerId,
-              newStaticSyncParams.toInternal,
-            ),
-            GrpcSequencerConnection.tryCreate(
-              newBackend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
-            ),
-            newBackend.config.localSynchronizerNode.value.mediator.sequencerRequestAmplification,
-          )
+            newMediatorAdminConnection.initialize(
+              PhysicalSynchronizerId(
+                decentralizedSynchronizerId,
+                newStaticSyncParams.toInternal,
+              ),
+              GrpcSequencerConnection.tryCreate(
+                newBackend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+              ),
+              newBackend.config.localSynchronizerNode.value.mediator.sequencerRequestAmplification,
+            )
+          }
         }
       }
 
-      val sequencerUrlSetBeforeUpgrade = getSequencerUrlSet(
-        aliceValidatorBackend.participantClientWithAdminToken,
-        decentralizedSynchronizerAlias,
-      )
+      aliceValidatorBackend.validatorAutomation
+        .trigger[ReconcileSequencerConnectionsTrigger]
+        .pause()
+        .futureValue
 
       clue("Announce new sequencer urls") {
-        allBackends.par.map { backend =>
-          backend.participantClientWithAdminToken.topology.synchronizer_upgrade.sequencer_successors
+        allBackends.zip(allNewBackends).par.map { case (oldBackend, newBackend) =>
+          oldBackend.sequencerClient.topology.synchronizer_upgrade.sequencer_successors
             .propose_successor(
-              backend.sequencerClient.id,
+              oldBackend.sequencerClient.id,
               NonEmpty(
                 Seq,
                 URI.create(
-                  backend.sequencerClient.config.publicApi
-                    .focus(_.port)
-                    .modify(_ + 22_000)
-                    .endpointAsString
+                  newBackend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
                 ),
               ),
               decentralizedSynchronizerId,
@@ -451,14 +371,38 @@ class LogicalSynchronizerUpgradeIntegrationTest
         }
       }
 
+      val newSequencerUrls = allNewBackends.map { newBackend =>
+        newBackend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+          .stripPrefix("http://")
+      }
+
+      def participantIsConnectedToNewSynchronizer(
+          clientWithAdminToken: ParticipantClientReference
+      ) = {
+        clientWithAdminToken.synchronizers
+          .list_connected()
+          .loneElement
+          .physicalSynchronizerId shouldBe successorPsid
+        val sequencerUrlSet = getSequencerUrlSet(
+          clientWithAdminToken,
+          decentralizedSynchronizerAlias,
+        )
+        sequencerUrlSet should have size 4
+        sequencerUrlSet should contain theSameElementsAs newSequencerUrls.toSet
+      }
+
       clue("Validator connects to the new sequencers") {
-        eventually() {
-          val sequencerUrlSet = getSequencerUrlSet(
-            aliceValidatorBackend.participantClientWithAdminToken,
-            decentralizedSynchronizerAlias,
-          )
-          sequencerUrlSet should have size 4
-          sequencerUrlSet.intersect(sequencerUrlSetBeforeUpgrade) shouldBe Set.empty
+        eventually(60.seconds) {
+          val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
+          participantIsConnectedToNewSynchronizer(clientWithAdminToken)
+        }
+      }
+
+      clue("SVs connect to the new sequencers") {
+        allBackends.par.map { backend =>
+          eventually() {
+            participantIsConnectedToNewSynchronizer(backend.participantClientWithAdminToken)
+          }
         }
       }
 
