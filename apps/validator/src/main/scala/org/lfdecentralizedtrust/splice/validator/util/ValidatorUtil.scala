@@ -191,9 +191,6 @@ private[validator] object ValidatorUtil {
                         .map(_ => existingParty)
 
                     case None =>
-                      logger.warn(
-                        s"No party ID provided, creation disallowed, and no existing party found."
-                      )
                       throw Status.INVALID_ARGUMENT
                         .withDescription(
                           s"party_id must be provided when createPartyIfMissing is false and no existing party for user $endUserName is found."
