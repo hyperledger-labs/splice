@@ -13,13 +13,19 @@ Canton distinguishes between parties and users, as documented in detail in the
 a party is an identity on-ledger, while a user represents an off-ledger entity
 that can be associated with one or more parties.
 
-By default, when a user logs in for the first time in the wallet, and presses the "Onboard yourself" button,
+The validator API endpoint `/v0/admin/users` supports three distinct modes for creating user and party associations:
+
+1. Default Party Creation: Allocating a new party using the user ID as the party hint.
+2. Association with Existing Party: Linking a user to an existing party for wallet sharing.
+3. Custom Party Hint: Allocating a new party using a human-readable party hint.
+
+Default Party Creation: By default, when a user logs in for the first time in the wallet, and presses the "Onboard yourself" button,
 the Validator allocates a fresh party, with a fresh Party ID, and associates that user
 with the newly allocated party. As part of validator initialization, a party is automatically created for the
 Validator Operator. The user provided during installation as the `validatorWalletUser` will be
 associated with this party as its primary party.
 
-More users can be configured such that their primary party is that of the validator operator.
+Association with Existing Party: Users can be configured such that their primary party is that of the validator operator.
 In effect, when such users login to the wallet UI, they will be accessing the wallet of the validator
 operator. Note that this will be the same wallet accessed by different users, with currently
 no support for finer grained permissions per user.
@@ -49,6 +55,18 @@ In order to associate a user with the party of the validator operator, the follo
    onboarded through the API call above. If you do see the button, it means that something has gone wrong
    in the process above (do not click the button!).
 
+Custom Party Hint: This mode allows providing a human-readable Party ID (including the hint).
+This is used to create parties with descriptive hints (e.g., treasury_dept::...) instead of OAuth IDs.
+
+1. Follow steps 1-3 from Mode 2 to obtain the USER and TOKEN.
+2. Determine the desired, full PartyID ``(Hint::Namespace)``, e.g., ``alice::f3d917....``. Use the namespace of an existing party (like the validator operator's) for the namespace part. Save the full ID in a ``PARTY_ID`` environment variable: ``export PARTY_ID=alice::f3d917...``.
+3. Run the following command to create the new party (if missing) and associate the user:
+
+.. code-block:: bash
+
+    curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+    --data-raw "{\"party_id\":\"$PARTY_ID\",\"name\":\"$USER\",\"createPartyIfMissing\":true}" \
+    https://<URL of your wallet>/api/validator/v0/admin/users
 
 Disable wallet and wallet automation
 -----------------------------------------------
