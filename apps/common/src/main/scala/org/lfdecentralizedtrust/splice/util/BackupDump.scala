@@ -96,7 +96,7 @@ object BackupDump {
           case Some(p) => s"$p/"
           case None => ""
         }
-        val blobs = gcpBucket.list(prefix = s"$pref$offset")
+        val blobs = gcpBucket.listBlobsByPrefix(prefix = s"$pref$offset")
         blobs.nonEmpty
       case _ =>
         throw Status.UNIMPLEMENTED
