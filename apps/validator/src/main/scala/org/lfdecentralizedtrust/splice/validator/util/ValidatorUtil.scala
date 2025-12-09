@@ -112,26 +112,71 @@ private[validator] object ValidatorUtil {
       userPartyId <- knownParty match {
         case Some(party) =>
           if (createPartyIfMissing.getOrElse(false)) {
-            connection.getOrAllocateParty(
-              party.uid.identifier.unwrap,
-              Seq(),
-              participantAdminConnection,
-            )
+            for {
+              newlyAllocatedPartyId <- connection.getOrAllocateParty(
+                party.uid.identifier.unwrap,
+                Seq(),
+                participantAdminConnection,
+              )
+              _ <- connection.createUserWithPrimaryParty(
+                endUserName,
+                newlyAllocatedPartyId,
+                Seq(),
+              )
+            } yield newlyAllocatedPartyId
+
           } else {
-            connection.createUserWithPrimaryParty(
-              endUserName,
-              party,
-              Seq(),
-            )
+            logger.debug(s"Creation disallowed. Associating user.")
+            connection
+              .createUserWithPrimaryParty(
+                endUserName,
+                party,
+                Seq(),
+              )
+              .map(_ => party)
           }
+
         case None =>
-          // we cannot differentiate between createPartyIfMissing or false, without breaking backwards compatibility
-          // in the future, if createPartyIfMissing is false, then this should return an error.
-          connection.getOrAllocateParty(
-            endUserName,
-            Seq(),
-            participantAdminConnection,
-          )
+          if (createPartyIfMissing.getOrElse(true)) {
+            logger.debug(s"No party ID provided and creation allowed. Allocating default party.")
+            connection
+              .getOrAllocateParty(
+                endUserName,
+                Seq(),
+                participantAdminConnection,
+              )
+              .flatMap { newlyAllocatedPartyId =>
+                connection
+                  .createUserWithPrimaryParty(
+                    endUserName,
+                    newlyAllocatedPartyId,
+                    Seq(),
+                  )
+                  .map(_ => newlyAllocatedPartyId)
+              }
+
+          } else {
+            connection.getOptionalPrimaryParty(endUserName).flatMap {
+              case Some(existingParty) =>
+                logger.debug(
+                  s"No party ID provided, creation disallowed, but user $endUserName has existing party $existingParty. Associating."
+                )
+                connection
+                  .createUserWithPrimaryParty(
+                    endUserName,
+                    existingParty,
+                    Seq(),
+                  )
+                  .map(_ => existingParty)
+
+              case None =>
+                throw Status.INVALID_ARGUMENT
+                  .withDescription(
+                    s"party_id must be provided when createPartyIfMissing is false and no existing party for user $endUserName is found."
+                  )
+                  .asRuntimeException()
+            }
+          }
       }
       _ <- retryProvider.ensureThatB(
         RetryFor.ClientCalls,
