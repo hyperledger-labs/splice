@@ -558,7 +558,7 @@ components:
             The party id of the user to onboard.
             If no party_id is provided then a fresh party will be generated, using the 'name' as the Party Hint.
             If party_id is provided and createPartyIfMissing is false, then the party must already exist on the ledger. The existing party will be assigned to the user.
-            If party_id is provided and createPartyIfMissing is true, then a new party will be created using the provided party_id as the Party Hint.
+            If party_id is provided and createPartyIfMissing is true, then: if a party with the provided party_id exists, the user will be associated with it. Otherwise, a new party will be created using the provided party_id, and the user will be associated with that new party.
         createPartyIfMissing:
           type: boolean
           description: |
