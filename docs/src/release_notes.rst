@@ -7,6 +7,9 @@
 
 .. release-notes:: upcoming
 
+  - Validator
+    - Added support for specifying a custom Party ID during user onboarding via the `/v0/admin/users` API using the `party_id` and `createPartyIfMissing` fields.
+
   - API security
 
     - Tightened authorization checks for all non-public API endpoints.
