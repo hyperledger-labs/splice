@@ -1,0 +1,5 @@
+org.lfdecentralizedtrust.splice.integration.tests.BootstrapPackageConfigIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.ManualStartIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.SvOffboardingIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.SvReonboardingIntegrationTest

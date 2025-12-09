@@ -1,0 +1,4 @@
+org.lfdecentralizedtrust.splice.integration.tests.ScanFrontendTimeBasedIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.SvFrontendTimeBasedIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.WalletFrontendTimeBasedIntegrationTest
+org.lfdecentralizedtrust.splice.integration.tests.WalletTransactionHistoryFrontendTimeBasedIntegrationTest
