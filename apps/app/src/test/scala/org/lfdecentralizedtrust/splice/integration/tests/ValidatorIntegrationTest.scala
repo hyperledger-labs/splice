@@ -604,7 +604,6 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
       val assignedPartyId = onboard(
         name = testUser1,
         partyId = Some(aliceValidatorParty),
-        createIfMissing = Some(false),
       )
       assignedPartyId shouldBe aliceValidatorParty
       aliceValidatorBackend.listUsers() should contain(testUser1)
@@ -615,7 +614,6 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
 
       val defaultPartyId = onboard(
         name = testUser2,
-        partyId = None,
         createIfMissing = Some(true),
       )
 
@@ -642,7 +640,6 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
       val thrown = intercept[RuntimeException] {
         onboard(
           name = testUser4,
-          partyId = None,
           createIfMissing = Some(false),
         )
       }

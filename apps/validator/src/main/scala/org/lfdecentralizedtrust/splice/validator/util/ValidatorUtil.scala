@@ -25,7 +25,7 @@ import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.HexString
-import io.grpc.Status
+import io.grpc.{Status, StatusRuntimeException}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Base64
@@ -144,7 +144,7 @@ private[validator] object ValidatorUtil {
                 endUserName,
                 Seq(),
                 participantAdminConnection,
-              )
+              ) // if the party already exists, then a user is not created automatically, hence we create the user explicitly
               .flatMap { newlyAllocatedPartyId =>
                 connection
                   .createUserWithPrimaryParty(
@@ -170,11 +170,36 @@ private[validator] object ValidatorUtil {
                   .map(_ => existingParty)
 
               case None =>
-                throw Status.INVALID_ARGUMENT
-                  .withDescription(
-                    s"party_id must be provided when createPartyIfMissing is false and no existing party for user $endUserName is found."
-                  )
-                  .asRuntimeException()
+                connection
+                  .getOptionalPrimaryParty(endUserName)
+                  .recover {
+                    case e: StatusRuntimeException
+                        if e.getStatus.getCode == Status.Code.NOT_FOUND =>
+                      None
+                  }
+                  .flatMap {
+                    case Some(existingParty) =>
+                      logger.debug(
+                        s"No party ID provided, creation disallowed, but user $endUserName has existing party $existingParty. Associating."
+                      )
+                      connection
+                        .createUserWithPrimaryParty(
+                          endUserName,
+                          existingParty,
+                          Seq(),
+                        )
+                        .map(_ => existingParty)
+
+                    case None =>
+                      logger.warn(
+                        s"No party ID provided, creation disallowed, and no existing party found."
+                      )
+                      throw Status.INVALID_ARGUMENT
+                        .withDescription(
+                          s"party_id must be provided when createPartyIfMissing is false and no existing party for user $endUserName is found."
+                        )
+                        .asRuntimeException()
+                  }
             }
           }
       }
