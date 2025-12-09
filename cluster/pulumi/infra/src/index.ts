@@ -14,6 +14,7 @@ import {
   installGcpLoggingAlerts,
   installClusterMaintenanceUpdateAlerts,
 } from './gcpAlerts';
+import { configureGKEL7Gateway } from './gcpLoadBalancer';
 import { configureIstio, istioMonitoring } from './istio';
 import { configureNetwork } from './network';
 import { configureObservability } from './observability';
@@ -25,17 +26,14 @@ export const ingressIp = network.ingressIp.address;
 export const ingressNs = network.ingressNs.ns.metadata.name;
 export const egressIp = network.egressIp.address;
 
-const cloudArmorBackendConfig = configureCloudArmorPolicy(
-  cloudArmorConfig,
-  network.ingressNs
-)?.backendConfig;
+const cloudArmorSecurityPolicy = configureCloudArmorPolicy(cloudArmorConfig, network.ingressNs);
 
-const istio = configureIstio(
-  network.ingressNs,
-  ingressIp,
-  network.cometbftIngressIp.address,
-  cloudArmorBackendConfig
-);
+const istio = configureIstio(network.ingressNs, ingressIp, network.cometbftIngressIp.address);
+
+const gcpGateway = configureGKEL7Gateway({
+  ingressNs: network.ingressNs,
+  securityPolicy: cloudArmorSecurityPolicy,
+});
 
 // Ensures that images required from Quay for observability can be pulled
 const observabilityDependsOn = istio.concat([network]);

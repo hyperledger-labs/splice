@@ -1,13 +1,12 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-
+import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
-import * as gcp from "@pulumi/gcp";
 
 // possible values and their meaning: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gatewayclass
-const gcloudGatewayClass = 'gke-l7-regional-external-managed';
+const gcpGatewayClass = 'gke-l7-regional-external-managed';
 
 interface L7GatewayConfig {
   gatewayName: string;
@@ -37,7 +36,7 @@ function createL7Gateway(
         namespace: config.ingressNs.ns.metadata.name,
       },
       spec: {
-        gatewayClassName: gcloudGatewayClass,
+        gatewayClassName: gcpGatewayClass,
         listeners: [
           {
             name: 'http',
@@ -56,6 +55,20 @@ function createL7Gateway(
     },
     opts
   );
+}
+
+function backendTargetRef(config: L7GatewayConfig) {
+  return {
+    group: '',
+    kind: 'Service',
+    // TODO (#2723) must be the name of the Service set up by the gateway
+    // *that is the backend of the L7 ALB gateway for which this is configured*.
+    // For a classic istio gateway this is the same (?) as the gateway name;
+    // for a k8s istio gateway this is <gateway-name>-istio.
+    // Can be identified by the apiVersion of the Gateway k8s resource
+    name: config.serviceTarget.name,
+    namespace: config.ingressNs.ns.metadata.name,
+  };
 }
 
 /**
@@ -80,20 +93,10 @@ function createGCPBackendPolicy(
         default: {
           securityPolicy: config.securityPolicy.name,
         },
-        targetRef: {
-          group: '',
-          kind: 'Service',
-          // TODO (#2723) must be the name of the Service set up by the gateway
-          // *that is the backend of the L7 ALB gateway for which this is configured*.
-          // For a classic istio gateway this is the same (?) as the gateway name;
-          // for a k8s istio gateway this is <gateway-name>-istio.
-          // Can be identified by the apiVersion of the Gateway k8s resource
-          name: config.serviceTarget.name,
-          namespace: config.ingressNs.ns.metadata.name,
-        },
+        targetRef: backendTargetRef(config),
       },
     },
-    {...opts, parent: config.securityPolicy, dependsOn: [gateway, config.securityPolicy] }
+    { ...opts, parent: config.securityPolicy, dependsOn: [gateway, config.securityPolicy] }
   );
 }
 
@@ -125,12 +128,7 @@ function createHealthCheckPolicy(
             },
           },
         },
-        targetRef: {
-          group: '',
-          kind: 'Service',
-          name: config.serviceTarget.name,
-          namespace: config.ingressNs.ns.metadata.name,
-        },
+        targetRef: backendTargetRef(config),
       },
     },
     opts
