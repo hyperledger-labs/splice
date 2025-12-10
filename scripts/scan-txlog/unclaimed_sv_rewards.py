@@ -209,7 +209,7 @@ class ScanClient:
         if after:
             payload["after"] = after.to_json()
         response = await self.session.post(
-            f"{self.url}/api/scan/v0/updates", json=payload
+            f"{self.url}/api/scan/v2/updates", json=payload
         )
         response.raise_for_status()
         json = await response.json()
