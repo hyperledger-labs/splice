@@ -21,6 +21,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SyncConnectionStalenessCheck
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.RichOptional
@@ -38,12 +39,13 @@ import scala.jdk.OptionConverters.RichOptional
 class SvOnboardingMediatorProposalTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
-    participantAdminConnection: ParticipantAdminConnection,
+    val participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
     override val tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[MediatorToOnboard] {
+) extends PollingParallelTaskExecutionTrigger[MediatorToOnboard]
+    with SyncConnectionStalenessCheck {
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
@@ -122,12 +124,17 @@ class SvOnboardingMediatorProposalTrigger(
 
   override protected def isStaleTask(task: MediatorToOnboard)(implicit
       tc: TraceContext
-  ): Future[Boolean] =
-    participantAdminConnection
-      .getMediatorSynchronizerState(task.synchronizerId, AuthorizedState)
-      .map { state =>
-        state.mapping.active.contains(task.mediatorId)
-      }
+  ): Future[Boolean] = {
+    for {
+      notConnected <- isNotConnectedToSync()
+      state <- participantAdminConnection.getMediatorSynchronizerState(
+        task.synchronizerId,
+        AuthorizedState,
+      )
+    } yield {
+      state.mapping.active.contains(task.mediatorId) || notConnected
+    }
+  }
 }
 
 object SvOnboardingMediatorProposalTrigger {
