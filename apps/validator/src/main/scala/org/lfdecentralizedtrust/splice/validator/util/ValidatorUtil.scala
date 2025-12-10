@@ -118,16 +118,16 @@ private[validator] object ValidatorUtil {
                 Seq(),
                 participantAdminConnection,
               )
-              _ <- connection.createUserWithPrimaryParty(
+              allocatedPartyId <- connection.createUserWithPrimaryParty(
                 endUserName,
                 newlyAllocatedPartyId,
                 Seq(),
               )
             } yield {
               logger.debug(
-                s"Creation allowed. Allocated new party ID $newlyAllocatedPartyId for user $endUserName"
+                s"Creation allowed. Allocated new party ID $allocatedPartyId for user $endUserName"
               )
-              newlyAllocatedPartyId
+              allocatedPartyId
             }
           } else {
             connection
