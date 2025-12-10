@@ -137,22 +137,29 @@ private[validator] object ValidatorUtil {
                 party,
                 Seq(),
               )
-              .map(_ => {
-                logger.debug(s"Creation disallowed. Associating user $endUserName with existing party $party")
-                party
+              .map(newParty => {
+                logger.debug(
+                  s"Creation disallowed. Associating user $endUserName with existing party $newParty"
+                )
+                newParty
               })
           }
 
         case None =>
           if (createPartyIfMissing.getOrElse(true)) {
-            val allocatedParty = connection
+            connection
               .getOrAllocateParty(
                 endUserName,
                 Seq(),
                 participantAdminConnection,
               )
-            logger.debug(s"No party ID provided and creation allowed. Allocated $allocatedParty for user $endUserName")
-            allocatedParty
+              .map(allocatedParty => {
+                logger.debug(
+                  s"No party ID provided and creation allowed. Allocated $allocatedParty for user $endUserName"
+                )
+                allocatedParty
+              })
+
           } else {
 
             logger.debug(
