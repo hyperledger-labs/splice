@@ -24,7 +24,6 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.integration.tests.SvMigrationApiIntegrationTest.directoryForDump
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import org.lfdecentralizedtrust.splice.scan.config.CacheConfig
 import org.lfdecentralizedtrust.splice.setup.NodeInitializer
@@ -111,32 +110,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
                     migrationId = 1L,
                     basePort = 27010,
                   )
-              ),
-              validatorApps = config.validatorApps + (
-                InstanceName.tryCreate("sv1ValidatorLocal") ->
-                  config
-                    .validatorApps(InstanceName.tryCreate("sv1Validator"))
-                    .copy(
-                      domainMigrationId = 1L
-                    )
-              ) + (
-                InstanceName.tryCreate("aliceValidatorLocal") -> {
-                  val aliceValidatorConfig = config
-                    .validatorApps(InstanceName.tryCreate("aliceValidator"))
-                  val sv1ScanConfig = config
-                    .scanApps(InstanceName.tryCreate("sv1Scan"))
-                  aliceValidatorConfig
-                    .copy(
-                      // Disable bft connections as we only start sv1 scan.
-                      scanClient =
-                        TrustSingle(url = s"http://127.0.0.1:${sv1ScanConfig.adminApi.port}"),
-                      restoreFromMigrationDump = Some(
-                        (migrationDumpDir("aliceValidator") / "domain_migration_dump.json").path
-                      ),
-                      domainMigrationId = 1L,
-                    )
-
-                }
               ),
             )
           )
@@ -288,6 +261,10 @@ class LogicalSynchronizerUpgradeIntegrationTest
       }
 
       val synchronizerFreezeTime = announcement.context.validFrom
+      val topologyTransactionsOnTheSync = sv1Backend.sequencerClient.topology.transactions
+        .list(store = Synchronizer(decentralizedSynchronizerId))
+        .result
+        .size
 
       clue("trigger dump") {
         allBackends.par.map { backend =>
@@ -350,6 +327,14 @@ class LogicalSynchronizerUpgradeIntegrationTest
         }
       }
 
+      // stop old backend as the topology trigger will push crazy stuff when the participant connect to the new sync but the topology was not sycned yet
+      // https://github.com/DACH-NY/canton/issues/29819
+      clue("Stop old backends") {
+        allBackends.par.map { backend =>
+          backend.stop()
+        }
+      }
+
       aliceValidatorBackend.validatorAutomation
         .trigger[ReconcileSequencerConnectionsTrigger]
         .pause()
@@ -389,16 +374,20 @@ class LogicalSynchronizerUpgradeIntegrationTest
         )
         sequencerUrlSet should have size 4
         sequencerUrlSet should contain theSameElementsAs newSequencerUrls.toSet
+        clientWithAdminToken.topology.transactions
+          .list(store = Synchronizer(decentralizedSynchronizerId))
+          .result
+          .size should be >= topologyTransactionsOnTheSync
       }
 
-      clue("Validator connects to the new sequencers") {
+      clue("Validator connects to the new sequencers and sync topology") {
         eventually(60.seconds) {
           val clientWithAdminToken = aliceValidatorBackend.participantClientWithAdminToken
           participantIsConnectedToNewSynchronizer(clientWithAdminToken)
         }
       }
 
-      clue("SVs connect to the new sequencers") {
+      clue("SVs connect to the new sequencers and sync topology") {
         allBackends.par.map { backend =>
           eventually() {
             participantIsConnectedToNewSynchronizer(backend.participantClientWithAdminToken)
