@@ -1669,7 +1669,7 @@
           "istioNamespace": "cluster-ingress"
         }
       },
-      "version": "1.26.1"
+      "version": "1.28.1"
     },
     "name": "istio-base",
     "provider": "",
@@ -1889,7 +1889,7 @@
           }
         ]
       },
-      "version": "1.26.1"
+      "version": "1.28.1"
     },
     "name": "istio-ingress-cometbft",
     "provider": "",
@@ -2073,7 +2073,7 @@
           }
         ]
       },
-      "version": "1.26.1"
+      "version": "1.28.1"
     },
     "name": "istio-ingress",
     "provider": "",
@@ -2313,7 +2313,7 @@
           }
         ]
       },
-      "version": "1.26.1"
+      "version": "1.28.1"
     },
     "name": "istiod",
     "provider": "",
@@ -2841,32 +2841,32 @@
               "control_plane": {
                 "datasource": "Prometheus",
                 "gnetId": 7645,
-                "revision": 259
+                "revision": 280
               },
               "mesh": {
                 "datasource": "Prometheus",
                 "gnetId": 7639,
-                "revision": 259
+                "revision": 280
               },
               "performance": {
                 "datasource": "Prometheus",
                 "gnetId": 11829,
-                "revision": 259
+                "revision": 280
               },
               "service": {
                 "datasource": "Prometheus",
                 "gnetId": 7636,
-                "revision": 259
+                "revision": 280
               },
               "wasm": {
                 "datasource": "Prometheus",
                 "gnetId": 13277,
-                "revision": 216
+                "revision": 237
               },
               "workload": {
                 "datasource": "Prometheus",
                 "gnetId": 7630,
-                "revision": 259
+                "revision": 280
               }
             },
             "k6s": {
