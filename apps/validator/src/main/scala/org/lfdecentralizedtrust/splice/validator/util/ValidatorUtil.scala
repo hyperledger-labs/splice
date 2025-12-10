@@ -123,28 +123,36 @@ private[validator] object ValidatorUtil {
                 newlyAllocatedPartyId,
                 Seq(),
               )
-            } yield newlyAllocatedPartyId
+            } yield {
+              logger.debug(
+                s"Creation allowed. Allocated new party ID $newlyAllocatedPartyId for user $endUserName"
+              )
+              newlyAllocatedPartyId
+            }
 
           } else {
-            logger.debug(s"Creation disallowed. Associating user.")
             connection
               .createUserWithPrimaryParty(
                 endUserName,
                 party,
                 Seq(),
               )
-              .map(_ => party)
+              .map(_ => {
+                logger.debug(s"Creation disallowed. Associating user $endUserName with existing party $party")
+                party
+              })
           }
 
         case None =>
           if (createPartyIfMissing.getOrElse(true)) {
-            logger.debug(s"No party ID provided and creation allowed. Allocating default party.")
-            connection
+            val allocatedParty = connection
               .getOrAllocateParty(
                 endUserName,
                 Seq(),
                 participantAdminConnection,
               )
+            logger.debug(s"No party ID provided and creation allowed. Allocated $allocatedParty for user $endUserName")
+            allocatedParty
           } else {
 
             logger.debug(
