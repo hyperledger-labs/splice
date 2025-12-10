@@ -1,0 +1,115 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Wallet.MintingDelegation where
+
+import DA.Assert
+import Splice.AmuletRules
+import Splice.Round
+import Splice.Types
+import Splice.Util
+import Splice.ValidatorLicense
+
+template MintingDelegationProposal
+  with
+    delegation : MintingDelegation
+  where
+    signatory delegation.beneficiary
+    observer delegation.delegate
+
+    choice MintingDelegationProposal_Accept : MintingDelegationProposal_AcceptResult
+      controller delegation.delegate
+      do MintingDelegationProposal_AcceptResult <$> create delegation
+
+    choice MintingDelegationProposal_Reject : MintingDelegationProposal_RejectResult
+      controller delegation.delegate
+      do pure MintingDelegationProposal_RejectResult with dummyUnitField = ()
+
+    choice MintingDelegationProposal_Withdraw : MintingDelegationProposal_WithdrawResult
+      controller delegation.beneficiary
+      do pure MintingDelegationProposal_WithdrawResult with dummyUnitField = ()
+
+defaultAmuletMergeLimit : Int
+defaultAmuletMergeLimit = 10
+
+template MintingDelegation
+  with
+    dso : Party
+    beneficiary : Party
+    delegate : Party
+    expiresAt : Time
+    amuletMergeLimit : Int
+      -- ^ The number of amulet contracts to keep after auto-merging; i.e.,
+      -- auto-merge contracts once there are strictly more than this number of contracts.
+  where
+    signatory beneficiary, delegate
+
+    nonconsuming choice MintingDelegation_RecordValidatorLivenessActivity : MintingDelegation_RecordValidatorLivenessActivityResult
+      with
+        validatorLicenseCid : ContractId ValidatorLicense
+        openRoundCid : ContractId OpenMiningRound
+      controller delegate
+      do assertWithinDeadline "expiresAt" expiresAt
+         _ <- fetchChecked (ForOwner with dso, owner = beneficiary) validatorLicenseCid
+         validatorLivenessResult <- exercise validatorLicenseCid (ValidatorLicense_RecordValidatorLivenessActivity openRoundCid)
+         pure MintingDelegation_RecordValidatorLivenessActivityResult with validatorLivenessResult
+
+    nonconsuming choice MintingDelegation_Mint : MintingDelegation_MintResult
+      with
+        inputs : [TransferInput]
+        context : PaymentTransferContext
+      controller delegate
+      do assertWithinDeadline "expiresAt" expiresAt
+         require "Minting is unfeatured" (context.context.featuredAppRight == None)
+         transferResult <- exercise context.amuletRules AmuletRules_Transfer with
+           transfer = Transfer with
+             sender = beneficiary
+             provider = delegate
+             inputs
+             outputs = []
+             beneficiaries = None
+           context = context.context
+           expectedDso = Some dso
+         pure MintingDelegation_MintResult with transferResult
+
+    choice MintingDelegation_Reject : MintingDelegation_RejectResult
+      controller delegate
+      do pure MintingDelegation_RejectResult with dummyUnitField = ()
+
+    choice MintingDelegation_Withdraw : MintingDelegation_WithdrawResult
+      controller beneficiary
+      do pure MintingDelegation_WithdrawResult with dummyUnitField = ()
+
+data MintingDelegationProposal_AcceptResult = MintingDelegationProposal_AcceptResult
+  with
+    mintingDelegationCid : ContractId MintingDelegation
+  deriving (Show, Eq)
+
+data MintingDelegationProposal_RejectResult = MintingDelegationProposal_RejectResult
+  with
+    dummyUnitField : ()
+  deriving (Show, Eq)
+
+data MintingDelegationProposal_WithdrawResult = MintingDelegationProposal_WithdrawResult
+  with
+    dummyUnitField : ()
+  deriving (Show, Eq)
+
+data MintingDelegation_RejectResult = MintingDelegation_RejectResult
+  with
+    dummyUnitField : ()
+  deriving (Show, Eq)
+
+data MintingDelegation_WithdrawResult = MintingDelegation_WithdrawResult
+  with
+    dummyUnitField : ()
+  deriving (Show, Eq)
+
+data MintingDelegation_RecordValidatorLivenessActivityResult = MintingDelegation_RecordValidatorLivenessActivityResult
+  with
+    validatorLivenessResult : ValidatorLicense_RecordValidatorLivenessActivityResult
+
+data MintingDelegation_MintResult = MintingDelegation_MintResult
+  with
+    transferResult : TransferResult
+  deriving (Show, Eq)

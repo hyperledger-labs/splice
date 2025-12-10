@@ -1,0 +1,140 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.Wallet.TestMintingDelegation where
+
+import DA.Assert
+import DA.Time
+import Daml.Script
+
+import Splice.AmuletRules
+import Splice.Util
+import Splice.Wallet.MintingDelegation
+import Splice.ValidatorLicense
+
+import Splice.Scripts.Util
+
+testMintingDelegation : Script ()
+testMintingDelegation = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  beneficiary <- allocateParty "beneficiary"
+  let delegate = aliceValidator.primaryParty
+
+  -- Create a MintingDelegation
+  now <- getTime
+  proposalCid <- submit beneficiary $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary
+      delegate
+      expiresAt = now `addRelTime` days 30
+      amuletMergeLimit = defaultAmuletMergeLimit
+
+  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submitMulti [delegate] [app.dso] $ exerciseCmd proposalCid MintingDelegationProposal_Accept
+
+  -- Create a ValidatorLicense for the beneficiary with weight 2.0
+  let weight = 2.0
+  validatorLicenseCid <- submit app.dso $ createCmd ValidatorLicense with
+    validator = beneficiary
+    sponsor = app.dso
+    dso = app.dso
+    faucetState = None
+    metadata = None
+    lastActiveAt = None
+    weight = Some weight
+    kind = None
+
+  (openRoundCid, _) <- getLatestOpenRound app
+
+  submitMulti [delegate] [beneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_RecordValidatorLivenessActivity with
+    validatorLicenseCid
+    openRoundCid
+
+  [(livenessActivityRecordCid, activityRecord)] <- query @ValidatorLivenessActivityRecord beneficiary
+  activityRecord.weight === Some weight
+
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+
+  balanceBefore <- getNormalizedBalance beneficiary
+
+  context <- getTransferContext app alice None
+
+  (amuletRulesCid, _) <- getAmuletRules app
+  submitMulti [delegate] [beneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_Mint with
+    inputs = [InputValidatorLivenessActivityRecord livenessActivityRecordCid]
+    context = PaymentTransferContext with
+      context
+      amuletRules = amuletRulesCid
+
+  balanceAfter <- getNormalizedBalance beneficiary
+  let reward = balanceAfter - balanceBefore
+  require "Reward should be around 5.7 (2.85 * 2)" (reward >= 5.5 && reward <= 5.8)
+
+  pure ()
+
+testMintingDelegation_checksExpiry : Script ()
+testMintingDelegation_checksExpiry = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  beneficiary <- allocateParty "beneficiary"
+  let delegate = aliceValidator.primaryParty
+  let delegationLifetime = days 30
+
+  now <- getTime
+  proposalCid <- submit beneficiary $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary
+      delegate
+      expiresAt = now `addRelTime` delegationLifetime
+      amuletMergeLimit = defaultAmuletMergeLimit
+
+  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submitMulti [delegate] [app.dso] $ exerciseCmd proposalCid MintingDelegationProposal_Accept
+
+  validatorLicenseCid <- submit app.dso $ createCmd ValidatorLicense with
+    validator = beneficiary
+    sponsor = app.dso
+    dso = app.dso
+    faucetState = None
+    metadata = None
+    lastActiveAt = None
+    weight = None
+    kind = None
+
+  -- Record an activity before expiry to have a valid livenessActivityRecordCid
+  (openRoundCid, _) <- getLatestOpenRound app
+  submitMulti [delegate] [beneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_RecordValidatorLivenessActivity with
+    validatorLicenseCid
+    openRoundCid
+
+  [(livenessActivityRecordCid, _)] <- query @ValidatorLivenessActivityRecord beneficiary
+
+  -- Advance rounds so record can be minted
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+
+  (newOpenRoundCid, _) <- getLatestOpenRound app
+
+  -- Advance time past expiry
+  passTime delegationLifetime
+
+  -- RecordValidatorLivenessActivity should fail after expiry
+  submitMultiMustFail [delegate] [beneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_RecordValidatorLivenessActivity with
+    validatorLicenseCid
+    openRoundCid = newOpenRoundCid
+
+  -- Mint should fail after expiry
+  context <- getTransferContext app alice None
+  (amuletRulesCid, _) <- getAmuletRules app
+
+  submitMultiMustFail [delegate] [beneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_Mint with
+    inputs = [InputValidatorLivenessActivityRecord livenessActivityRecordCid]
+    context = PaymentTransferContext with
+      context
+      amuletRules = amuletRulesCid
+
+  pure ()
