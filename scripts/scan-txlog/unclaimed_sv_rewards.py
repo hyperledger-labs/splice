@@ -32,6 +32,11 @@ from typing import List, Tuple
 getcontext().prec = 38
 getcontext().rounding = ROUND_HALF_EVEN
 
+# Ensure log directory exists before logger initialization
+log_directory = "log"
+if not os.path.exists(log_directory):
+    os.makedirs(log_directory)
+
 def _default_logger(name, loglevel):
     cli_handler = colorlog.StreamHandler()
     cli_handler.setFormatter(
@@ -47,7 +52,7 @@ def _default_logger(name, loglevel):
             datefmt="%Y-%m-%d %H:%M:%S",
         )
     )
-    file_handler = logging.FileHandler("log/scan_txlog.log")
+    file_handler = logging.FileHandler("log/unclaimed_sv_rewards.log")
     file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s:%(name)s:%(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
 
     logger = colorlog.getLogger(name)
