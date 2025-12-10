@@ -16,7 +16,8 @@ import scala.util.control.NonFatal
 class TestRunner(testNames: String, configPath: String)(implicit
     val loggerFactory: NamedLoggerFactory,
     tc: TraceContext,
-) extends NamedLogging {
+) extends Runnable
+    with NamedLogging {
 
   def run(): Unit = {
     @unused
