@@ -36,7 +36,7 @@ def _default_logger(name, loglevel):
     cli_handler = colorlog.StreamHandler()
     cli_handler.setFormatter(
         colorlog.ColoredFormatter(
-            "%(log_color)s%(levelname)s:%(name)s:%(message)s",
+            "%(log_color)s%(asctime)s - %(levelname)s:%(name)s:%(message)s",
             log_colors={
                 "DEBUG": "cyan",
                 "INFO": "green",
@@ -44,10 +44,11 @@ def _default_logger(name, loglevel):
                 "ERROR": "red",
                 "CRITICAL": "red,bg_white",
             },
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
     )
     file_handler = logging.FileHandler("log/scan_txlog.log")
-    file_handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+    file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s:%(name)s:%(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
 
     logger = colorlog.getLogger(name)
     logger.addHandler(cli_handler)
@@ -1027,7 +1028,7 @@ def save_global_cache(args, global_state, next_chunk_to_process, current_migrati
     if backup:
         os.remove(backup)
 
-async def run_chunk_serial(start_time, end_time, migration_id, args):
+async def run_chunk_serial(session, start_time, end_time, migration_id, args):
     """
     Executes the scan-processing loop for a specific time chunk.
     This function initializes a fresh State for the chunk, iterates through
@@ -1045,57 +1046,56 @@ async def run_chunk_serial(start_time, end_time, migration_id, args):
     # Set the initial pagination key for this chunk
     state.pagination_key = PaginationKey(migration_id, start_time.isoformat())
 
-    async with aiohttp.ClientSession() as session:
-        scan_client = ScanClient(session, args.scan_url, args.page_size)
+    scan_client = ScanClient(session, args.scan_url, args.page_size)
 
-        while True:
-            # Fetch a batch from Scan API
-            json_batch = await scan_client.updates(state.pagination_key)
-            batch = [
-                TransactionTree.parse(tx)
-                for tx in json_batch
-                if state.should_process(tx)
-            ]
+    while True:
+        # Fetch a batch from Scan API
+        json_batch = await scan_client.updates(state.pagination_key)
+        batch = [
+            TransactionTree.parse(tx)
+            for tx in json_batch
+            if state.should_process(tx)
+        ]
 
-            # Detect migration_id changes and retry with an updated key
-            if batch:
-                maybe_new_mid = batch[0].migration_id
-                if maybe_new_mid != state.pagination_key.last_migration_id:
-                    LOG.debug("migration_id changed; updating pagination key and retrying")
-                    state.pagination_key = PaginationKey(
-                        maybe_new_mid,
-                        state.pagination_key.last_record_time
-                    )
-                    json_batch = await scan_client.updates(state.pagination_key)
-                    batch = [
-                        TransactionTree.parse(tx)
-                        for tx in json_batch
-                        if state.should_process(tx)
-                    ]
-
-            LOG.debug(f"Processing batch of size {len(batch)} at {state.pagination_key}")
-
-            # Process each transaction
-            for transaction in batch:
-                state.process_transaction(transaction)
-
-            # Update pagination key based on the last processed transaction
-            if len(batch) >= 1:
-                last = batch[-1]
+        # Detect migration_id changes and retry with an updated key
+        if batch:
+            maybe_new_mid = batch[0].migration_id
+            if maybe_new_mid != state.pagination_key.last_migration_id:
+                LOG.debug("migration_id changed; updating pagination key and retrying")
                 state.pagination_key = PaginationKey(
-                    last.migration_id,
-                    last.record_time.isoformat()
+                    maybe_new_mid,
+                    state.pagination_key.last_record_time
                 )
+                json_batch = await scan_client.updates(state.pagination_key)
+                batch = [
+                    TransactionTree.parse(tx)
+                    for tx in json_batch
+                    if state.should_process(tx)
+                ]
 
-            # Stop when fewer results than the page size are returned
-            if len(batch) < scan_client.page_size:
-                LOG.debug(f"Reached end of chunk at {state.pagination_key}")
-                break
+        LOG.debug(f"Processing batch of size {len(batch)} at {state.pagination_key}")
+
+        # Process each transaction
+        for transaction in batch:
+            state.process_transaction(transaction)
+
+        # Update pagination key based on the last processed transaction
+        if len(batch) >= 1:
+            last = batch[-1]
+            state.pagination_key = PaginationKey(
+                last.migration_id,
+                last.record_time.isoformat()
+            )
+
+        # Stop when fewer results than the page size are returned
+        if len(batch) < scan_client.page_size:
+            LOG.debug(f"Reached end of chunk at {state.pagination_key}")
+            break
 
     # The fully processed state of this chunk is returned
     return state
 
-async def run_worker(chunk_id, start_time, end_time, migration_id, args):
+async def run_worker(session, chunk_id, start_time, end_time, migration_id, args):
     """
     Worker wrapper:
     - Executes run_chunk_serial()
@@ -1105,7 +1105,7 @@ async def run_worker(chunk_id, start_time, end_time, migration_id, args):
         f"Worker {chunk_id} STARTED [{start_time} → {end_time}] "
         f"using migration_id={migration_id}"
     )
-    state = await run_chunk_serial(start_time, end_time, migration_id, args)
+    state = await run_chunk_serial(session, start_time, end_time, migration_id, args)
     return chunk_id, state
 
 
@@ -1166,65 +1166,68 @@ async def main():
 
     start_wall_clock = time.time()
 
-    # MAIN SCHEDULER LOOP
-    while tasks or launched_chunks < num_chunks:
+    async with aiohttp.ClientSession() as shared_session:
 
-        # Launch workers if capacity available
-        while (
-            len(tasks) < concurrency
-            and launched_chunks < num_chunks
-        ):
-            chunk_id, start_time, end_time = chunks[launched_chunks]
-            tasks[chunk_id] = asyncio.create_task(
-                run_worker(
-                    chunk_id,
-                    start_time,
-                    end_time,
-                    current_migration_id,
-                    args
+        # MAIN SCHEDULER LOOP
+        while tasks or launched_chunks < num_chunks:
+
+            # Launch workers if capacity available
+            while (
+                len(tasks) < concurrency
+                and launched_chunks < num_chunks
+            ):
+                chunk_id, start_time, end_time = chunks[launched_chunks]
+                tasks[chunk_id] = asyncio.create_task(
+                    run_worker(
+                        shared_session,
+                        chunk_id,
+                        start_time,
+                        end_time,
+                        current_migration_id,
+                        args
+                    )
                 )
+                launched_chunks += 1
+
+            # Wait for ANY worker to finish
+            done_set, _ = await asyncio.wait(
+                tasks.values(),
+                return_when=asyncio.FIRST_COMPLETED
             )
-            launched_chunks += 1
+            done_task = next(iter(done_set))
+            finished_chunk_id, worker_state = done_task.result()
+            LOG.debug(f"Worker {finished_chunk_id} COMPLETE")
+            del tasks[finished_chunk_id]
+            # Store worker result for ordered processing
+            results[finished_chunk_id] = worker_state
 
-        # Wait for ANY worker to finish
-        done_set, _ = await asyncio.wait(
-            tasks.values(),
-            return_when=asyncio.FIRST_COMPLETED
-        )
-        done_task = next(iter(done_set))
-        finished_chunk_id, worker_state = done_task.result()
-        LOG.debug(f"Worker {finished_chunk_id} COMPLETE")
-        del tasks[finished_chunk_id]
-        # Store worker result for ordered processing
-        results[finished_chunk_id] = worker_state
+            # Check migration_id update
+            worker_migration_id = worker_state.pagination_key.last_migration_id
+            if worker_migration_id > current_migration_id:
+                LOG.warning(
+                    f"Migration changed: {current_migration_id} → {worker_migration_id}"
+                )
+                current_migration_id = worker_migration_id
 
-        # Check migration_id update
-        worker_migration_id = worker_state.pagination_key.last_migration_id
-        if worker_migration_id > current_migration_id:
-            LOG.warning(
-                f"Migration changed: {current_migration_id} → {worker_migration_id}"
-            )
-            current_migration_id = worker_migration_id
+            # Process chunks in order
+            while next_chunk_to_process in results:
+                state = results.pop(next_chunk_to_process)
+                LOG.debug(f"Merging chunk {next_chunk_to_process}")
 
-        # Process chunks in order
-        while next_chunk_to_process in results:
-            state = results.pop(next_chunk_to_process)
-            LOG.debug(f"Merging chunk {next_chunk_to_process}")
+                # Merge the worker state's accumulated data
+                global_state.merge_from(state)
 
-            # Merge the worker state's accumulated data
-            global_state.merge_from(state)
+                # Process exercise pending events (except chunk 0)
+                if next_chunk_to_process != 0:
+                    for (tx, event_id) in state.exercise_pending_events:
+                        global_state.process_events(tx, [event_id])
 
-            # Process exercise pending events (except chunk 0)
-            if next_chunk_to_process != 0:
-                for (tx, event_id) in state.exercise_pending_events:
-                    global_state.process_events(tx, [event_id])
+                    # Drop unresolved pending events — after the global merge they are known to be
+                    # irrelevant (cannot be attributed to the beneficiary).
+                    global_state.exercise_pending_events.clear()
 
-                # Drop unresolved pending events — after the global merge they are known to be
-                # irrelevant (cannot be attributed to the beneficiary).
-                global_state.exercise_pending_events.clear()
-
-            next_chunk_to_process += 1
-            save_global_cache(args, global_state, next_chunk_to_process, current_migration_id)
+                next_chunk_to_process += 1
+                save_global_cache(args, global_state, next_chunk_to_process, current_migration_id)
 
     # All chunks processed
     duration = time.time() - start_wall_clock
