@@ -8,8 +8,6 @@ org.lfdecentralizedtrust.splice.environment.CommandCircuitBreakerTest
 org.lfdecentralizedtrust.splice.environment.CommandIdDedupTest
 org.lfdecentralizedtrust.splice.environment.TopologyAwarePackageVersionSupportTest
 org.lfdecentralizedtrust.splice.http.UrlValidatorTest
-org.lfdecentralizedtrust.splice.performance.tests.DbScanStoreIngestionPerformanceTest
-org.lfdecentralizedtrust.splice.performance.tests.DbSvDsoStoreIngestionPerformanceTest
 org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnectionTest
 org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodingsTest
 org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerTest

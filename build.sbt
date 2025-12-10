@@ -2048,6 +2048,8 @@ updateTestConfigForParallelRuns := {
     name contains "CometBft"
   def isRecordTimeToleranceTest(name: String): Boolean =
     name contains "RecordTimeToleranceTimeBasedIntegrationTest"
+  def isPerformanceTest(name: String): Boolean =
+    name endsWith "PerformanceTest"
 
   val allTestNames =
     definedTests
@@ -2063,6 +2065,11 @@ updateTestConfigForParallelRuns := {
 
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
+    (
+      "performance tests",
+      "test-full-class-names-performance.log",
+      (t: String) => isPerformanceTest(t),
+    ),
     (
       "manual tests with custom canton instance",
       "test-full-class-names-signatures.log",

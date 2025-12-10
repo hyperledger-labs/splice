@@ -3,6 +3,7 @@ package org.lfdecentralizedtrust.splice.performance
 import cats.data.Chain
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpClientBuilder
 import org.lfdecentralizedtrust.splice.http.HttpClient
@@ -21,27 +22,26 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.annotation.tailrec
 import scala.concurrent.duration.*
-import scala.concurrent.{Await, ExecutionContextExecutor}
+import scala.concurrent.{Await, ExecutionContext}
 
-object DownloadTxMainnet extends App with NamedLogging {
-  override protected def loggerFactory: NamedLoggerFactory = NamedLoggerFactory.root
+class DownloadScanUpdates(host: String, migrationId: Int)(implicit
+    ec: ExecutionContext,
+    as: ActorSystem,
+    override val loggerFactory: NamedLoggerFactory,
+    tc: TraceContext,
+) extends NamedLogging {
 
-  implicit val actorSystem: ActorSystem = ActorSystem()
-
-  try {
-    implicit val ec: ExecutionContextExecutor = scala.concurrent.ExecutionContext.global
+  def run(): Unit = {
     implicit val httpClient: HttpClient =
       HttpClient(HttpClient.HttpRequestParameters(NonNegativeDuration.ofSeconds(40L)), logger)
-    val host = "https://scan.sv-2.global.canton.network.digitalasset.com"
 
-    val migrationId = 3 // TODO: figure out how to configure this
     val client = http.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
 
     val now = Instant.now()
     val start = now.minus(1, ChronoUnit.HOURS)
 
-    def query(at: Instant) = {
-      println(s"Querying at $at")
+    def query(at: Instant): UpdateHistoryResponseV2 = {
+      logger.info(s"Querying at $at")
       Await
         .result(
           client
@@ -57,6 +57,7 @@ object DownloadTxMainnet extends App with NamedLogging {
         .getOrElse(throw new RuntimeException())
         .fold(identity, _ => throw new RuntimeException(), _ => throw new RuntimeException())
     }
+
     @tailrec
     def loop(at: Instant, acc: Chain[UpdateHistoryItemV2]): Chain[UpdateHistoryItemV2] = {
       val nextResponse = query(at)
@@ -83,8 +84,7 @@ object DownloadTxMainnet extends App with NamedLogging {
     )
     val path = Paths.get("update_history_response.json")
     Files.write(path, toWrite.noSpaces.getBytes(StandardCharsets.UTF_8))
-  } finally {
-    Await.result(actorSystem.terminate(), 10.seconds)
+
   }
 
 }

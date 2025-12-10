@@ -1,0 +1,2 @@
+org.lfdecentralizedtrust.splice.performance.tests.DbScanStoreIngestionPerformanceTest
+org.lfdecentralizedtrust.splice.performance.tests.DbSvDsoStoreIngestionPerformanceTest
