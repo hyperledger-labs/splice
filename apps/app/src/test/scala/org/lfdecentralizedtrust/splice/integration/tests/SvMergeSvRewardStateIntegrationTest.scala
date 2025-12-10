@@ -43,7 +43,9 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
       // ReceiveSvRewardCouponTrigger and MergeSvRewardStateContractsTrigger can race to modify
       // the same SvRewardState contracts (`LOCAL_VERDICT_LOCKED_CONTRACTS`),
       // leading to trigger retries and non-deterministic output of the loggerFactory.assertLogs below.
-      activeSvs.map(_.dsoAutomation.trigger[ReceiveSvRewardCouponTrigger]).foreach(_.pause())
+      activeSvs
+        .map(_.dsoAutomation.trigger[ReceiveSvRewardCouponTrigger])
+        .foreach(_.pause().futureValue)
     }
 
     setTriggersWithin(
