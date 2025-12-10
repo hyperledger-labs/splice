@@ -144,41 +144,24 @@ private[validator] object ValidatorUtil {
                 endUserName,
                 Seq(),
                 participantAdminConnection,
-              ) // if the party already exists, then a user is not created automatically, hence we create the user explicitly
-              .flatMap { newlyAllocatedPartyId =>
-                connection
-                  .createUserWithPrimaryParty(
-                    endUserName,
-                    newlyAllocatedPartyId,
-                    Seq(),
-                  )
-                  .map(_ => newlyAllocatedPartyId)
-              }
-
+              )
           } else {
 
             logger.debug(
               s"No party ID provided and creation disallowed. Checking for existing party."
             )
-
             connection
               .getOptionalPrimaryParty(endUserName)
               .recover {
                 case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.NOT_FOUND =>
                   None
               }
-              .flatMap {
+              .map {
                 case Some(existingParty) =>
                   logger.debug(
-                    s"No party ID provided, creation disallowed, but user $endUserName has existing party $existingParty. Associating."
+                    s"No party ID provided, creation disallowed, but user $endUserName has existing party $existingParty."
                   )
-                  connection
-                    .createUserWithPrimaryParty(
-                      endUserName,
-                      existingParty,
-                      Seq(),
-                    )
-                    .map(_ => existingParty)
+                  existingParty
 
                 case None =>
                   throw Status.INVALID_ARGUMENT
