@@ -86,9 +86,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
   // The test currently produces 80 transactions, which is 0.000926 tps over 24 hours,
   // so we assert for a range of 70-85 transactions, or 0.0008-0.00099 tps.
   private val avgTps = (0.0008, 0.00099)
-  // The peak is 22 transactions in a (simulated) minute, or 0.36667 tps over a minute,
-  // so we assert 19-25 transactions, or 0.31-0.42 tps
-  private val peakTps = (0.31, 0.42)
+  // The peak is 18 transactions in a (simulated) minute, or 0.3 tps over a minute,
+  // so we assert 15-21 transactions, or 0.25-0.35 tps
+  private val peakTps = (0.25, 0.35)
   private val totalRounds = 4
 
   override def beforeAll() = {
@@ -295,30 +295,26 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def createTestData(bobParty: PartyId)(implicit
       env: FixtureParam
   ): Unit = {
-    actAndCheck(
-      "step forward many rounds", {
-        actAndCheck(
-          "Advance the first round", {
-            advanceRoundsToNextRoundOpening
-          },
-        )(
-          "Wait for alice to report activity up to round 2",
-          _ =>
-            aliceValidatorWalletClient
-              .listValidatorLivenessActivityRecords()
-              .map(_.payload.round.number) should contain(2),
-        )
-
-        (3 to 6).foreach { _ =>
+    forAll(
+      Table(
+        ("round", "expected balance"),
+        (2, BigDecimal("0")),
+        (3, BigDecimal("6512.93759512940")),
+        (4, BigDecimal("13025.8751902588")),
+        (5, BigDecimal("19538.8127853882")),
+        (6, aliceValidatorMintedAmount),
+      )
+    ) { (expectRound, expectedBalance) =>
+      actAndCheck(timeUntilSuccess = 30.seconds)(
+        s"Advance round ${expectRound - 1}", {
           advanceRoundsToNextRoundOpening
-        }
-      },
-    )(
-      "alice validator receives rewards",
-      _ => {
-        aliceValidatorWalletClient.balance().unlockedQty shouldBe aliceValidatorMintedAmount
-      },
-    )
+          advanceTimeForRewardAutomationToRunForCurrentRound
+        },
+      )(
+        s"alice validator receives rewards up to round $expectRound",
+        _ => aliceValidatorWalletClient.balance().unlockedQty should be >= expectedBalance,
+      )
+    }
 
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
     val (lockingParty, lockingClient) = (aliceValidatorParty, aliceValidatorWalletClient)

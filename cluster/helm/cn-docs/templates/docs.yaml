@@ -36,8 +36,9 @@ spec:
               containerPort: 443
               protocol: TCP
           resources:
+            requests:
+              cpu: 100m
             limits:
-              cpu: 1
               memory: "1536Mi"
           env:
             - name: SPLICE_CLUSTER

@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.config.{
   GcpBucketConfig,
   LedgerApiClientConfig,
   ParticipantBootstrapDumpConfig,
+  PeriodicBackupDumpConfig,
   PruningConfig,
   SpliceBackendConfig,
   SpliceInstanceNamesConfig,
@@ -80,6 +81,8 @@ object SvBootstrapDumpConfig {
 
 object SvOnboardingConfig {
   case class FoundDso(
+      acsCommitmentReconciliationInterval: PositiveDurationSeconds =
+        SvUtil.defaultAcsCommitmentReconciliationInterval,
       name: String,
       firstSvRewardWeightBps: Long,
       dsoPartyHint: String = "DSO",
@@ -321,8 +324,6 @@ case class SvAppBackendConfig(
     // Defaults to 24h to allow for 24h between preparation and execution of an externally signed transaction
     preparationTimeRecordTimeTolerance: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofHours(24),
-    acsCommitmentReconciliationInterval: PositiveDurationSeconds =
-      SvUtil.defaultAcsCommitmentReconciliationInterval,
     // Defaults to 48h as it must be at least 2x preparationTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
     // We want to be able to override this for simtime tests
@@ -339,6 +340,8 @@ case class SvAppBackendConfig(
     // every SV tries to convert markers from any other SV's book of work (in a contention avoiding fashion)
     delegatelessAutomationFeaturedAppActivityMarkerCatchupThreshold: Int = 10_000,
     delegatelessAutomationExpiredAmuletBatchSize: Int = 100,
+    // configuration to periodically take topology snapshots
+    topologySnapshotConfig: Option[PeriodicBackupDumpConfig] = None,
     bftSequencerConnection: Boolean = true,
     // Skip synchronizer initialization and synchronizer config reconciliation.
     // Can be safely set to true for an SV that has completed onboarding unless you
