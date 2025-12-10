@@ -129,7 +129,6 @@ private[validator] object ValidatorUtil {
               )
               newlyAllocatedPartyId
             }
-
           } else {
             connection
               .createUserWithPrimaryParty(
@@ -144,7 +143,6 @@ private[validator] object ValidatorUtil {
                 newParty
               })
           }
-
         case None =>
           if (createPartyIfMissing.getOrElse(true)) {
             connection
@@ -159,9 +157,7 @@ private[validator] object ValidatorUtil {
                 )
                 allocatedParty
               })
-
           } else {
-
             logger.debug(
               s"No party ID provided and creation disallowed. Checking for existing party."
             )
