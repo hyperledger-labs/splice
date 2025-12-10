@@ -9,7 +9,6 @@
 
   - Validator
     - Added support for specifying a custom party hint during user onboarding via the `/v0/admin/users` API.
-      To assign a custom party hint, set `party_id` with the custom hint and set `createPartyIfMissing` to true.
 
   - API security
 
