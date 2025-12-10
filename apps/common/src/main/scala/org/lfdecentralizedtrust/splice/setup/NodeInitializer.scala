@@ -401,14 +401,15 @@ class NodeInitializer(
       case _ =>
         throw new IllegalStateException("Latest transaction is not of OwnerToKeyMapping type.")
     }
-    val toRotate = currentKeys.map(_.id).filterNot(allOtkSignatures.contains)
-    if (toRotate.nonEmpty) {
+    val signingKeysToRotate =
+      currentKeys.filter(_.isSigning).map(_.id).filterNot(allOtkSignatures.contains)
+    if (signingKeysToRotate.nonEmpty) {
       logger.info(
-        s"Checking whether the following keys (likely created on a version before 0.3.1) need to be rotated because of missing signatures: $toRotate"
+        s"The following keys (likely created on a version before 0.3.1) need to be rotated because of missing signatures: $signingKeysToRotate"
       )
       for {
         newKeys <- Future.traverse(currentKeys) {
-          case key: SigningPublicKey if toRotate.contains(key.id) =>
+          case key: SigningPublicKey if signingKeysToRotate.contains(key.id) =>
             connection.generateKeyPair(
               key.keySpec.name,
               key.usage,
