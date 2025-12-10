@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data.Identifier
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvRewardState
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.MergeSvRewardStateContractsTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import org.lfdecentralizedtrust.splice.util.TriggerTestUtil
 import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.resumeAllDsoDelegateTriggers
 
@@ -37,6 +38,16 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
       rewardState.data.svName shouldBe "Digital-Asset-2"
       rewardState
     }
+
+    clue("Pause ReceiveSvRewardCouponTrigger to avoid races") {
+      // ReceiveSvRewardCouponTrigger and MergeSvRewardStateContractsTrigger can race to modify
+      // the same SvRewardState contracts (`LOCAL_VERDICT_LOCKED_CONTRACTS`),
+      // leading to trigger retries and non-deterministic output of the loggerFactory.assertLogs below.
+      activeSvs
+        .map(_.dsoAutomation.trigger[ReceiveSvRewardCouponTrigger])
+        .foreach(_.pause().futureValue)
+    }
+
     setTriggersWithin(
       triggersToPauseAtStart =
         activeSvs.map(_.dsoDelegateBasedAutomation.trigger[MergeSvRewardStateContractsTrigger]),
