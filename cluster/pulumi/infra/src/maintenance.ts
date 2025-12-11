@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { DOCKER_REPO } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
 
 import { infraAffinityAndTolerations } from '../../common';
@@ -179,8 +178,8 @@ export function deployGCPodReaper(
                 containers: [
                   {
                     name: cronJobName,
-                    image: `${DOCKER_REPO}/splice-debug:latest`,
-                    imagePullPolicy: 'IfNotPresent',
+                    image: `ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-debug:latest`,
+                    imagePullPolicy: 'Always',
                     command: deleteBadPodsCommand,
                     env: [
                       {
