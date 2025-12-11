@@ -36,7 +36,8 @@ template MintingDelegationProposal
 defaultAmuletMergeLimit : Int
 defaultAmuletMergeLimit = 10
 
--- | The right allowing delegate to record liveness activity and mint rewards on behalf of the beneficiary.
+-- | The right allowing delegate to record liveness activity and 
+-- trigger the minting of rewards on behalf of the beneficiary.
 template MintingDelegation
   with
     beneficiary : Party
