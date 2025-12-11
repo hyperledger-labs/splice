@@ -133,3 +133,4 @@ As of now, it has the following limitations:
   Note that this repository will still vendor Canton from its
   [open source repository](https://github.com/digital-asset/canton)
   as some of its code is reused by the Splice apps for convenience.
+
