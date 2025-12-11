@@ -1,12 +1,18 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 // ensure the config is loaded and the ENV is overriden
-import { enableGCReaperJob, config } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
 import { configureCloudArmorPolicy } from './cloudArmor';
-import { cloudArmorConfig, clusterBaseDomain, clusterBasename, monitoringConfig } from './config';
+import {
+  cloudArmorConfig,
+  clusterBaseDomain,
+  clusterBasename,
+  enableGCReaperJob,
+  monitoringConfig,
+} from './config';
 import { installExtraCustomResources } from './extraCustomResources';
 import {
   getNotificationChannel,
@@ -44,7 +50,6 @@ if (enableAlerts && !clusterIsResetPeriodically) {
 istioMonitoring(network.ingressNs, []);
 
 if (enableGCReaperJob) {
-  console.log('Deploying GC Pod Reaper job based on configuration.');
   deployGCPodReaper('cluster-pod-gc-reaper', ['multi-validator'], { parent: network.ingressNs.ns });
 }
 configureStorage();
