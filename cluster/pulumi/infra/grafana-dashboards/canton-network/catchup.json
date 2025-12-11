@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 380,
+  "id": 555,
   "links": [],
   "panels": [
     {
@@ -350,7 +350,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "max by (namespace) (timestamp(daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"participant\"}) - ((daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"participant\"} > 0) / 1e6))",
+          "expr": "max by (namespace) (timestamp(daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"participant\", migration_id=~\"$migration\"}) - ((daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"participant\", migration_id=~\"$migration\"} > 0) / 1e6))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -1371,5 +1371,5 @@
   "timezone": "",
   "title": "Global Domain Catchup",
   "uid": "ca9df344-c699-4efe-83c2-5fb2639d96d9",
-  "version": 4
+  "version": 2
 }
