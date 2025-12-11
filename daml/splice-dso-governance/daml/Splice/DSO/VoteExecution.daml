@@ -1,0 +1,85 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Support for execution of a voted action.
+-- They were built as `ActionRequiringConfirmation` vote request execution
+-- doesn't work well for choices that need to act on contracts that get cycled
+-- frequently, e.g., ValidatorLicense.
+-- The contracts here act as an indirection to handle such scenarios.
+module Splice.DSO.VoteExecution where
+
+import DA.Assert (assertDeadlineExceeded)
+import Splice.Api.Token.MetadataV1 (AnyContractId)
+import Splice.Types (ForDso(..), ForOwner(..))
+import Splice.Util
+import Splice.ValidatorLicense
+
+-- | Instruction for executing a voted action.
+data ExecutionInstruction
+  = EI_ValidatorLicenseChangeWeight with
+      validator : Party
+      weight : Decimal
+  | EI_ValidatorLicenseWithdraw with
+      validator : Party
+  deriving (Eq, Show)
+
+
+-- | Inputs required to execute an instruction.
+-- The inputs depend on the instruction type.
+data ExecutionInstructionInputs
+  = EII_ValidatorLicense (ContractId ValidatorLicense)
+  | EII_Dummy -- added to ensure this is compiled as a variant
+  deriving (Eq, Show)
+
+data VoteExecutionInstruction_ExpireResult = VoteExecutionInstruction_ExpireResult with
+    dummyUnitField : () -- dummy field to make this compile as a record
+  deriving (Eq, Show)
+
+-- | These instruction contracts serve as an indirection mechanism that allows
+-- voted actions to be executed on a batch of contracts.
+template VoteExecutionInstruction
+  with
+    dso : Party
+    instruction : ExecutionInstruction
+    expiresAt : Time
+    optVoteRequest : Optional AnyContractId
+      -- ^ Optional `ContractId VoteRequest` for which this instruction exists.
+      -- Referenced using `AnyContractId` to break the cyclic dependency to `DsoRules`.
+  where
+    signatory dso
+    ensure validExecutionInstruction instruction
+
+    choice VoteExecutionInstruction_Expire : VoteExecutionInstruction_ExpireResult
+      controller dso
+      do assertDeadlineExceeded "expiresAt" expiresAt
+         return VoteExecutionInstruction_ExpireResult with dummyUnitField = ()
+
+
+-- | Validates an execution instruction.
+validExecutionInstruction : ExecutionInstruction -> Bool
+validExecutionInstruction instruction = case instruction of
+  EI_ValidatorLicenseChangeWeight {weight} -> weight >= 0.0
+  EI_ValidatorLicenseWithdraw {} -> True
+
+-- | Executes a vote instruction with the given inputs.
+executeVoteExecutionInstruction : Party -> VoteExecutionInstruction -> ExecutionInstructionInputs -> Update ()
+executeVoteExecutionInstruction dso voteInstruction inputs = do
+  case (voteInstruction.instruction, inputs) of
+    (EI_ValidatorLicenseChangeWeight {validator, weight}, EII_ValidatorLicense validatorLicenseCid) -> do
+      license <- fetchAndArchive (ForOwner with dso; owner = validator) validatorLicenseCid
+      _ <- create license with weight = Some weight
+      pure ()
+
+    (EI_ValidatorLicenseWithdraw {validator}, EII_ValidatorLicense validatorLicenseCid) -> do
+      _ <- fetchButArchiveLater (ForOwner with dso; owner = validator) validatorLicenseCid
+      exercise validatorLicenseCid ValidatorLicense_Withdraw with reason = "revoked by governance decision"
+      pure ()
+
+    (_, _) ->
+      error "Encountered unexpected ExecutionInstructionInputs"
+
+-- Instances
+-------------
+
+instance HasCheckedFetch VoteExecutionInstruction ForDso where
+  contractGroupId VoteExecutionInstruction {..} = ForDso with dso

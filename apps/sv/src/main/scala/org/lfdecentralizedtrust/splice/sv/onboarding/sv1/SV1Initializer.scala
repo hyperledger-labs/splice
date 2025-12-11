@@ -654,6 +654,7 @@ class SV1Initializer(
         synchronizerId,
         sv1Config.voteCooldownTime,
         sv1Config.acsCommitmentReconciliationInterval,
+        sv1Config.voteExecutionInstructionTimeout,
       )
       for {
         (participantId, trafficStateForAllMembers, amuletRules, dsoRules) <- (

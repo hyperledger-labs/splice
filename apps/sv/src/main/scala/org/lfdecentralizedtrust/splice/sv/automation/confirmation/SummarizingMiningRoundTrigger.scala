@@ -164,10 +164,11 @@ class SummarizingMiningRoundTrigger(
         round,
         domain,
       )
-      validatorLivenessActivityRecords <- store.countValidatorLivenessActivityRecordsOnDomain(
-        round,
-        domain,
-      )
+      validatorLivenessActivityRecordsWeight <- store
+        .sumValidatorLivenessActivityRecordsWeightsOnDomain(
+          round,
+          domain,
+        )
       svRewardCouponsWeightSum <- store.sumSvRewardCouponWeightsOnDomain(
         round,
         domain,
@@ -179,7 +180,7 @@ class SummarizingMiningRoundTrigger(
         unfeaturedAppRewardCoupons = appRewardCoupons.unfeatured,
         validatorRewardCoupons = validatorRewardCoupons,
         validatorLivenessActivityRecords =
-          validatorFaucetCoupons + validatorLivenessActivityRecords,
+          BigDecimal(validatorFaucetCoupons) + validatorLivenessActivityRecordsWeight,
         svRewardCouponsWeightSum = svRewardCouponsWeightSum,
       )
     }
@@ -192,7 +193,7 @@ object SummarizingMiningRoundTrigger {
       featuredAppRewardCoupons: BigDecimal,
       unfeaturedAppRewardCoupons: BigDecimal,
       validatorRewardCoupons: BigDecimal,
-      validatorLivenessActivityRecords: Long,
+      validatorLivenessActivityRecords: BigDecimal,
       svRewardCouponsWeightSum: Long,
   ) extends PrettyPrinting {
     lazy val summary: splice.issuance.OpenMiningRoundSummary =
@@ -201,7 +202,10 @@ object SummarizingMiningRoundTrigger {
         featuredAppRewardCoupons.bigDecimal,
         unfeaturedAppRewardCoupons.bigDecimal,
         svRewardCouponsWeightSum,
-        Optional.of(validatorLivenessActivityRecords),
+        Optional.empty(), // optTotalValidatorFaucetCoupons (deprecated)
+        Optional.of(
+          validatorLivenessActivityRecords.bigDecimal
+        ), // optTotalValidatorLivenessActivityRecords
       )
 
     override def pretty: Pretty[this.type] =
