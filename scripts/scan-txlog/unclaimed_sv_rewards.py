@@ -82,9 +82,9 @@ def _parse_cli_args() -> argparse.Namespace:
         """
     )
     parser.add_argument(
-        "scan_url",
-        help="Address of the Splice Scan server",
-        default="http://localhost:5012",
+        "scan_urls",
+        nargs="+",
+        help="Address(es) of the Splice Scan server(s). Multiple URLs can be provided for round-robin failover.",
     )
     parser.add_argument("--loglevel", help="Sets the log level", default="INFO")
     parser.add_argument(
@@ -199,21 +199,81 @@ class PaginationKey:
 @dataclass
 class ScanClient:
     session: aiohttp.ClientSession
-    url: str
+    urls: list[str]
     page_size: int
     call_count: int = 0
+    retry_count: int = 0
+    current_url_index: int = 0
+    UPDATES_PATH = "/api/scan/v2/updates"
+
+    def _get_current_url(self) -> str:
+        """Get the current URL from the round-robin list."""
+        return self.urls[self.current_url_index]
+
+    def _rotate_to_next_url(self):
+        """Move to the next URL in the round-robin list."""
+        self.current_url_index = (self.current_url_index + 1) % len(self.urls)
+        LOG.info(f"Rotating to next scan URL: {self._get_current_url()}")
 
     async def updates(self, after: Optional[PaginationKey]):
-        self.call_count = self.call_count + 1
         payload = {"page_size": self.page_size}
         if after:
             payload["after"] = after.to_json()
-        response = await self.session.post(
-            f"{self.url}/api/scan/v2/updates", json=payload
+
+        json = await self.__post_with_retry_on_statuses(
+            f"{self._get_current_url()}{self.UPDATES_PATH}",
+            payload=payload,
+            max_retries=30,
+            delay_seconds=0.5,
+            statuses={404, 429, 500, 503},
         )
-        response.raise_for_status()
-        json = await response.json()
         return json["transactions"]
+
+    async def __post_with_retry_on_statuses(
+        self, url, payload, max_retries, delay_seconds, statuses
+    ):
+        assert max_retries >= 1
+        retry = 0
+        self.call_count += 1
+        last_response = None
+        total_attempts = max_retries * len(self.urls)
+
+        while retry < total_attempts:
+            try:
+                response = await self.session.post(url, json=payload)
+                last_response = response
+                if response.status in statuses:
+                    LOG.debug(
+                        f"Request to {url} with payload {payload} failed with status {response.status}"
+                    )
+                    retry += 1
+                    if retry < total_attempts:
+                        self.retry_count += 1
+                        self._rotate_to_next_url()
+                        url = f"{self._get_current_url()}{self.UPDATES_PATH}"
+                    await asyncio.sleep(delay_seconds)
+                else:
+                    response.raise_for_status()
+                    return await response.json()
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                LOG.debug(
+                    f"Request to {url} with payload {payload} failed with error: {e}"
+                )
+                retry += 1
+                if retry < total_attempts:
+                    self.retry_count += 1
+                    self._rotate_to_next_url()
+                    url = f"{self._get_current_url()}{self.UPDATES_PATH}"
+                    await asyncio.sleep(delay_seconds)
+                else:
+                    LOG.error(f"Exceeded max retries {total_attempts} across all URLs, giving up")
+                    raise RuntimeError("POST failed: no response received in any attempt")
+
+        LOG.error(f"Exceeded max retries {total_attempts} across all URLs, giving up")
+        if last_response is not None:
+            last_response.raise_for_status()
+
+        raise RuntimeError("POST failed: no response received in any attempt")
 
 
 # Daml Decimals have a precision of 38 and a scale of 10, i.e., 10 digits after the decimal point.
@@ -857,22 +917,35 @@ class State:
         # Only handle SvRewardCoupons created within the configured time range for the given beneficiary
         match self.active_rewards.pop(event.contract_id, None):
             # None means either:
-            # - The reward was created outside the time range of the worker, or
+            # - The reward was created in the previous chunk, or
             # - The exercise event is for a different beneficiary
             case None:
                 match status:
                     case RewardStatus.EXPIRED:
                         # Note: At this point it is not possible to filter by beneficiary.
                         self.exercise_pending_events.append((transaction.with_only_event(event), event.event_id))
+                        LOG.debug(
+                            "Queued DsoExpire event for deferred processing "
+                            "(will be matched against active rewards from previous chunks)."
+                        )
                     case RewardStatus.CLAIMED:
                         if self.beneficiary in event.acting_parties:
                             self.exercise_pending_events.append((transaction.with_only_event(event), event.event_id))
+                            LOG.debug(
+                                "Queued ArchiveAsBeneficiary event for deferred processing "
+                                "(will be matched against active rewards from previous chunks)."
+                            )
             case reward:
                 match status:
                     case RewardStatus.EXPIRED:
+                       # Consume and remove the closed round for this reward, since each closed round is used exactly once
                         match self.active_closed_rounds.pop(reward.round):
                             case None:
                                 self.exercise_pending_events.append((transaction.with_only_event(event), event.event_id))
+                                LOG.debug(
+                                    "Queued DsoExpire event for deferred processing "
+                                    "(will be matched against active closed round from previous chunks)."
+                                )
                             case mining_round_info:
                                 amount = self._calculate_amount(reward, mining_round_info)
                                 LOG.debug(
@@ -882,9 +955,14 @@ class State:
                                 self.reward_summary.reward_expired_total_amount += amount
 
                     case RewardStatus.CLAIMED:
+                        # Consume and remove the issuing round for this reward, since each issuing round is used exactly once
                         match self.active_issuing_rounds.pop(reward.round):
                             case None:
                                 self.exercise_pending_events.append((transaction.with_only_event(event), event.event_id))
+                                LOG.debug(
+                                    "Queued ArchiveAsBeneficiary event for deferred processing "
+                                    "(will be matched against active issuing round from previous chunks)."
+                                )
                             case mining_round_info:
                                 amount = self._calculate_amount(reward, mining_round_info)
                                 LOG.debug(
@@ -1033,13 +1111,16 @@ def save_global_cache(args, global_state, next_chunk_to_process, current_migrati
     if backup:
         os.remove(backup)
 
-async def run_chunk_serial(session, start_time, end_time, migration_id, args):
+async def run_chunk_serial(session, chunk_id, start_time, end_time, migration_id, args):
     """
     Executes the scan-processing loop for a specific time chunk.
     This function initializes a fresh State for the chunk, iterates through
     all available Scan API pages within the given time range, processes all
     transactions, and returns the resulting State.
     """
+
+    begin_chunk = time.time()
+    tx_count = 0
 
     # Initialize state for this worker chunk
     state = State.from_args(args)
@@ -1051,11 +1132,20 @@ async def run_chunk_serial(session, start_time, end_time, migration_id, args):
     # Set the initial pagination key for this chunk
     state.pagination_key = PaginationKey(migration_id, start_time.isoformat())
 
-    scan_client = ScanClient(session, args.scan_url, args.page_size)
+    # Rotate URLs for this chunk
+    k = chunk_id % len(args.scan_urls)
+    rotated_urls = args.scan_urls[k:] + args.scan_urls[:k]
+    LOG.debug(f"Scan urls for chunk {chunk_id}: {rotated_urls}")
+
+    scan_client = ScanClient(session, rotated_urls, args.page_size)
 
     while True:
         # Fetch a batch from Scan API
+        LOG.debug(f"Fetching data from Scan API for chunk {chunk_id} with pagination_key: {state.pagination_key}")
+        begin_batch = time.time()
         json_batch = await scan_client.updates(state.pagination_key)
+        duration_batch = time.time() - begin_batch
+        LOG.debug(f"End Scan API fetch for chunk {chunk_id} with pagination_key: {state.pagination_key}. ({duration_batch:.2f} sec.)")
         batch = [
             TransactionTree.parse(tx)
             for tx in json_batch
@@ -1078,11 +1168,12 @@ async def run_chunk_serial(session, start_time, end_time, migration_id, args):
                     if state.should_process(tx)
                 ]
 
-        LOG.debug(f"Processing batch of size {len(batch)} at {state.pagination_key}")
+        LOG.debug(f"Processing batch of size {len(batch)} for chunk {chunk_id} at {state.pagination_key}")
 
         # Process each transaction
         for transaction in batch:
             state.process_transaction(transaction)
+            tx_count += 1
 
         # Update pagination key based on the last processed transaction
         if len(batch) >= 1:
@@ -1097,8 +1188,14 @@ async def run_chunk_serial(session, start_time, end_time, migration_id, args):
             LOG.debug(f"Reached end of chunk at {state.pagination_key}")
             break
 
+    duration_chunk = time.time() - begin_chunk
+    LOG.info(
+        f"End chunk run. ({duration_chunk:.2f} sec., {tx_count} transaction(s), {scan_client.call_count} Scan API call(s),"
+        f"{scan_client.retry_count} retries) for chunk {chunk_id}"
+    )
     # The fully processed state of this chunk is returned
     return state
+
 
 async def run_worker(session, chunk_id, start_time, end_time, migration_id, args):
     """
@@ -1110,9 +1207,12 @@ async def run_worker(session, chunk_id, start_time, end_time, migration_id, args
         f"Worker {chunk_id} STARTED [{start_time} → {end_time}] "
         f"using migration_id={migration_id}"
     )
-    state = await run_chunk_serial(session, start_time, end_time, migration_id, args)
-    return chunk_id, state
-
+    try:
+        state = await run_chunk_serial(session, chunk_id, start_time, end_time, migration_id, args)
+        return chunk_id, state
+    except Exception as e:
+        LOG.error(f"Fatal error in worker {chunk_id}: {e}")
+        sys.exit(1)
 
 def split_into_chunks(begin_time: datetime, end_time: datetime, chunk_size: timedelta):
     """
@@ -1139,6 +1239,7 @@ async def main():
     _log_uncaught_exceptions()
 
     LOG.info(f"Starting unclaimed_sv_rewards with arguments: {args}")
+    LOG.info(f"Using scan URLs (round-robin): {args.scan_urls}")
 
     # Prepare initial parameters
     begin_time = datetime.fromisoformat(args.begin_record_time)
@@ -1195,6 +1296,7 @@ async def main():
                 launched_chunks += 1
 
             # Wait for ANY worker to finish
+            LOG.debug(f"Waiting for any worker to finish fetching/processing")
             done_set, _ = await asyncio.wait(
                 tasks.values(),
                 return_when=asyncio.FIRST_COMPLETED
@@ -1216,14 +1318,17 @@ async def main():
 
             # Process chunks in order
             while next_chunk_to_process in results:
-                state = results.pop(next_chunk_to_process)
-                LOG.debug(f"Merging chunk {next_chunk_to_process}")
-
                 # Merge the worker state's accumulated data
+                LOG.debug(f"Merging chunk {next_chunk_to_process}")
+                state = results.pop(next_chunk_to_process)
                 global_state.merge_from(state)
 
                 # Process exercise pending events (except chunk 0)
                 if next_chunk_to_process != 0:
+                    LOG.debug(
+                        f"Re-procressing exercise pending events from chunk {next_chunk_to_process} "
+                        f"over the global statte"
+                        )
                     for (tx, event_id) in state.exercise_pending_events:
                         global_state.process_events(tx, [event_id])
 
