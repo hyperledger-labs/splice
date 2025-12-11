@@ -4,11 +4,15 @@
 module Splice.Scripts.Wallet.TestMintingDelegation where
 
 import DA.Assert
+import DA.Foldable (forA_)
 import DA.Time
 import Daml.Script
 
+import Splice.Amulet (FeaturedAppActivityMarker(..))
 import Splice.AmuletRules
+import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
 import Splice.Util
+import Splice.Util.Token.Wallet.MergeDelegation (FeaturedAppRightCall(..))
 import Splice.Wallet.MintingDelegation
 import Splice.ValidatorLicense
 
@@ -50,6 +54,7 @@ testMintingDelegation = do
   submitMulti [delegate] [beneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_RecordValidatorLivenessActivity with
     validatorLicenseCid
     openRoundCid
+    optFeaturedAppRight = None
 
   [(livenessActivityRecordCid, activityRecord)] <- query @ValidatorLivenessActivityRecord beneficiary
   activityRecord.weight === Some weight
@@ -109,6 +114,7 @@ testMintingDelegation_checksExpiry = do
   submitMulti [delegate] [beneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_RecordValidatorLivenessActivity with
     validatorLicenseCid
     openRoundCid
+    optFeaturedAppRight = None
 
   [(livenessActivityRecordCid, _)] <- query @ValidatorLivenessActivityRecord beneficiary
 
@@ -126,6 +132,7 @@ testMintingDelegation_checksExpiry = do
   submitMultiMustFail [delegate] [beneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_RecordValidatorLivenessActivity with
     validatorLicenseCid
     openRoundCid = newOpenRoundCid
+    optFeaturedAppRight = None
 
   -- Mint should fail after expiry
   context <- getTransferContext app alice None
@@ -136,5 +143,66 @@ testMintingDelegation_checksExpiry = do
     context = PaymentTransferContext with
       context
       amuletRules = amuletRulesCid
+
+  pure ()
+
+testMintingDelegation_withFeaturedAppRight : Script ()
+testMintingDelegation_withFeaturedAppRight = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  beneficiary <- allocateParty "beneficiary"
+  let delegate = aliceValidator.primaryParty
+
+  -- Feature the delegate's app
+  featuredAppRightCid <- featureApp app aliceValidator
+
+  -- Create a MintingDelegation
+  now <- getTime
+  proposalCid <- submit beneficiary $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary
+      delegate
+      expiresAt = now `addRelTime` days 30
+      amuletMergeLimit = defaultAmuletMergeLimit
+
+  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submitMulti [delegate] [app.dso] $ exerciseCmd proposalCid MintingDelegationProposal_Accept
+
+  -- Create a ValidatorLicense for the beneficiary
+  validatorLicenseCid <- submit app.dso $ createCmd ValidatorLicense with
+    validator = beneficiary
+    sponsor = app.dso
+    dso = app.dso
+    faucetState = None
+    metadata = None
+    lastActiveAt = None
+    weight = Some 1.0
+    kind = None
+
+  (openRoundCid, _) <- getLatestOpenRound app
+
+  -- Allocate another beneficiary for the app reward
+  appRewardBeneficiary2 <- allocateParty "appRewardBeneficiary2"
+
+  -- Record activity with featured app right with multiple beneficiaries
+  submitMulti [delegate] [beneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_RecordValidatorLivenessActivity with
+    validatorLicenseCid
+    openRoundCid
+    optFeaturedAppRight = Some FeaturedAppRightCall with
+      appRightCid = toInterfaceContractId featuredAppRightCid
+      beneficiaries =
+        [ AppRewardBeneficiary with beneficiary = delegate, weight = 0.6
+        , AppRewardBeneficiary with beneficiary = appRewardBeneficiary2, weight = 0.4
+        ]
+
+  -- Check that activity markers were created for both beneficiaries with correct weights
+  allMarkers <- query @FeaturedAppActivityMarker delegate
+  length allMarkers === 2
+
+  let expectedWeights = [(delegate, 0.6), (appRewardBeneficiary2, 0.4)]
+  forA_ expectedWeights $ \(b, expectedWeight) ->
+    case find (\(_, m) -> m.beneficiary == b) allMarkers of
+      Some (_, m) -> m.weight === expectedWeight
+      None -> fail $ "Marker not found for " <> show b
 
   pure ()

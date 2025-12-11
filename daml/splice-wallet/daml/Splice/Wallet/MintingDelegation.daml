@@ -4,15 +4,19 @@
 module Splice.Wallet.MintingDelegation where
 
 import DA.Assert
+import DA.Foldable (forA_)
 import Splice.AmuletRules
 import Splice.Round
 import Splice.Types
 import Splice.Util
+import Splice.Util.Token.Wallet.MergeDelegation (FeaturedAppRightCall, createActivityMarkerForProvider)
 import Splice.ValidatorLicense
 
+-- | Proposal by the user to setup a minting delegation.
 template MintingDelegationProposal
   with
     delegation : MintingDelegation
+      -- ^ The delegation to be created if accepted.
   where
     signatory delegation.beneficiary
     observer delegation.delegate
@@ -32,12 +36,17 @@ template MintingDelegationProposal
 defaultAmuletMergeLimit : Int
 defaultAmuletMergeLimit = 10
 
+-- | The right allowing delegate to record liveness activity and mint rewards on behalf of the beneficiary.
 template MintingDelegation
   with
-    dso : Party
     beneficiary : Party
+      -- ^ The party on whose behalf minting is performed.
     delegate : Party
+      -- ^ The party authorized to perform minting operations.
+    dso : Party
+      -- ^ Expected DSO party.
     expiresAt : Time
+      -- ^ The time after which this delegation is no longer valid.
     amuletMergeLimit : Int
       -- ^ The number of amulet contracts to keep after auto-merging; i.e.,
       -- auto-merge contracts once there are strictly more than this number of contracts.
@@ -47,17 +56,25 @@ template MintingDelegation
     nonconsuming choice MintingDelegation_RecordValidatorLivenessActivity : MintingDelegation_RecordValidatorLivenessActivityResult
       with
         validatorLicenseCid : ContractId ValidatorLicense
+          -- ^ The validator license of the beneficiary to record liveness activity for.
         openRoundCid : ContractId OpenMiningRound
+          -- ^ The open mining round for which to record activity.
+        optFeaturedAppRight : Optional FeaturedAppRightCall
+          -- ^ The featured app right to use to feature the delegate's activity.
       controller delegate
       do assertWithinDeadline "expiresAt" expiresAt
          _ <- fetchChecked (ForOwner with dso, owner = beneficiary) validatorLicenseCid
          validatorLivenessResult <- exercise validatorLicenseCid (ValidatorLicense_RecordValidatorLivenessActivity openRoundCid)
+          -- register activity marker for the liveness activity creation
+         forA_ optFeaturedAppRight $ createActivityMarkerForProvider delegate
          pure MintingDelegation_RecordValidatorLivenessActivityResult with validatorLivenessResult
 
     nonconsuming choice MintingDelegation_Mint : MintingDelegation_MintResult
       with
         inputs : [TransferInput]
+          -- ^ The inputs to the transfer, like the validator liveness activity records owned by the beneficiary.
         context : PaymentTransferContext
+          -- ^ The transfer context including amulet rules.
       controller delegate
       do assertWithinDeadline "expiresAt" expiresAt
          require "Minting is unfeatured" (context.context.featuredAppRight == None)
