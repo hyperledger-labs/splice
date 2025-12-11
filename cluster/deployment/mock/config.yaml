@@ -176,6 +176,9 @@ svs:
       bigQuery:
         dataset: mock_da2_scan
         prefix: da2
+    validatorApp:
+      sweep:
+        fromEnv: SV1
   sv-da-1: # non "sv-X" key => additional SV that is always deployed (key == node name == k8s namespace)
     publicName: Digital-Asset-1
     subdomain: sv-1
