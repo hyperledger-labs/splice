@@ -18,7 +18,7 @@ infra:
     storageSize: "2Ti"
   istio:
     enableIngressAccessLogging: true
-  enableGCReaperJob: true
+  enableGCReaperJob: false
 # configs specific for the pulumi project
 # will be applied to all the stacks in the project
 pulumiProjectConfig:

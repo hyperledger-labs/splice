@@ -708,23 +708,6 @@
     "id": "",
     "inputs": {
       "apiVersion": "v1",
-      "kind": "Namespace",
-      "metadata": {
-        "labels": {
-          "app.kubernetes.io/name": "gc-pod-reaper"
-        },
-        "name": "gc-pod-reaper"
-      }
-    },
-    "name": "cluster-pod-gc-reaper",
-    "provider": "",
-    "type": "kubernetes:core/v1:Namespace"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
@@ -1047,98 +1030,6 @@
     "name": "dns01-sa-key-secret",
     "provider": "",
     "type": "gcp:secretmanager/secretVersion:SecretVersion"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "batch/v1",
-      "kind": "CronJob",
-      "metadata": {
-        "name": "gc-pod-reaper-job",
-        "namespace": "gc-pod-reaper"
-      },
-      "spec": {
-        "concurrencyPolicy": "Forbid",
-        "failedJobsHistoryLimit": 2,
-        "jobTemplate": {
-          "metadata": {
-            "labels": {
-              "app": "gc-pod-reaper"
-            }
-          },
-          "spec": {
-            "template": {
-              "spec": {
-                "affinity": {
-                  "nodeAffinity": {
-                    "requiredDuringSchedulingIgnoredDuringExecution": {
-                      "nodeSelectorTerms": [
-                        {
-                          "matchExpressions": [
-                            {
-                              "key": "cn_infra",
-                              "operator": "Exists"
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  }
-                },
-                "containers": [
-                  {
-                    "command": [
-                      "/bin/bash",
-                      "-c",
-                      "\n    apt-get update &&\n    apt-get install -y jq &&\n    curl -LO https://dl.k8s.io/release/0.0.0/bin/linux/amd64/kubectl &&\n    install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl;\n\n\n    if [ $? -ne 0 ] || ! command-v kubectl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then\n        echo \"Error: Failed to install kubectl or jq. Exiting.\";\n        exit 1\n    fi\n\n    echo \"--- $(date) Starting Pod Reaper ---\";\n\n    TARGET_NAMESPACES_LIST=$(echo \"$TARGET_NAMESPACES\" | tr ',' ' ');\n    echo \"Targeting namespaces: $TARGET_NAMESPACES_LIST\";\n\n    if [ -z \"$TARGET_NAMESPACES_LIST\" ]; then\n        echo \"Error: No target namespaces provided. Exiting.\";\n        exit 1\n    fi\n\n    echo \"--- Starting Cleanup Loop ---\";\n\n    for NAMESPACE in $TARGET_NAMESPACES_LIST; do\n        echo \"Processing namespace: $NAMESPACE\";\n\n        BAD_PODS=$(\n          kubectl get pods -n \"$NAMESPACE\" -o json | \\\n          jq -r '.items[] |\n              (select(.status.phase == \"Unknown\" and .status.reason == \"ContainerStatusUnknown\") |\n                  .metadata.name) //\n\n              (select(.status.containerStatuses[]?.state.terminated? |\n                  .reason == \"Error\" and .exitCode == 137) |\n                  .metadata.name)'\n        );\n\n        if [ -z \"$BAD_PODS\" ]; then\n            echo \"No bad pods found in $NAMESPACE. Skipping.\";\n            continue\n        fi\n\n        echo \"Found bad pods in $NAMESPACE: $BAD_PODS\";\n\n        for POD_NAME in $BAD_PODS; do\n            echo \"Attempting to delete pod $NAMESPACE/$POD_NAME\";\n            kubectl delete pod -n \"$NAMESPACE\" \"$POD_NAME\"\n            if [ $? -eq 0 ]; then\n                echo \"Successfully deleted $NAMESPACE/$POD_NAME\";\n            else\n                echo \"Failed to delete $NAMESPACE/$POD_NAME\";\n            fi\n        done\n        echo \"Finished cleanup for $NAMESPACE.\";\n        echo \"---\"\n    done\n\n    echo \"--- $(date) Pod Reaper Finished ---\";\n    true\n  "
-                    ],
-                    "env": [
-                      {
-                        "name": "TARGET_NAMESPACES",
-                        "value": "multi-validator"
-                      }
-                    ],
-                    "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-debug:0.3.20",
-                    "imagePullPolicy": "IfNotPresent",
-                    "name": "gc-pod-reaper-job"
-                  }
-                ],
-                "restartPolicy": "OnFailure",
-                "serviceAccountName": "gc-pod-reaper-service-account",
-                "tolerations": [
-                  {
-                    "effect": "NoSchedule",
-                    "key": "cn_infra",
-                    "operator": "Exists"
-                  }
-                ]
-              }
-            }
-          }
-        },
-        "schedule": "*/2 * * * *",
-        "successfulJobsHistoryLimit": 2
-      }
-    },
-    "name": "gc-pod-reaper-job",
-    "provider": "",
-    "type": "kubernetes:batch/v1:CronJob"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "ServiceAccount",
-      "metadata": {
-        "name": "gc-pod-reaper-service-account",
-        "namespace": "gc-pod-reaper"
-      }
-    },
-    "name": "gc-pod-reaper-service-account",
-    "provider": "",
-    "type": "kubernetes:core/v1:ServiceAccount"
   },
   {
     "custom": true,
@@ -2686,64 +2577,6 @@
     "name": "mock.network.canton.global",
     "provider": "",
     "type": "gcp:dns/recordSet:RecordSet"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "rbac.authorization.k8s.io/v1",
-      "kind": "RoleBinding",
-      "metadata": {
-        "name": "multi-validatorgc-pod-reaper-pod-manager-binding",
-        "namespace": "multi-validator"
-      },
-      "roleRef": {
-        "apiGroup": "rbac.authorization.k8s.io",
-        "kind": "Role",
-        "name": "multi-validator-gc-pod-reaper-role"
-      },
-      "subjects": [
-        {
-          "kind": "ServiceAccount",
-          "name": "gc-pod-reaper-service-account",
-          "namespace": "gc-pod-reaper"
-        }
-      ]
-    },
-    "name": "multi-validator-gc-pod-reaper-pod-manager-binding",
-    "provider": "",
-    "type": "kubernetes:rbac.authorization.k8s.io/v1:RoleBinding"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "rbac.authorization.k8s.io/v1",
-      "kind": "Role",
-      "metadata": {
-        "name": "multi-validator-gc-pod-reaper-role",
-        "namespace": "multi-validator"
-      },
-      "rules": [
-        {
-          "apiGroups": [
-            ""
-          ],
-          "resources": [
-            "pods"
-          ],
-          "verbs": [
-            "list",
-            "create",
-            "delete",
-            "update"
-          ]
-        }
-      ]
-    },
-    "name": "multi-validator-gc-pod-reaper-role",
-    "provider": "",
-    "type": "kubernetes:rbac.authorization.k8s.io/v1:Role"
   },
   {
     "custom": true,

@@ -4,7 +4,6 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { DOCKER_REPO } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
-import { Version } from '@lfdecentralizedtrust/splice-pulumi-multi-validator/version';
 
 import { infraAffinityAndTolerations } from '../../common';
 
@@ -180,7 +179,7 @@ export function deployGCPodReaper(
                 containers: [
                   {
                     name: cronJobName,
-                    image: `${DOCKER_REPO}/splice-debug:${Version}`,
+                    image: `${DOCKER_REPO}/splice-debug:latest`,
                     imagePullPolicy: 'IfNotPresent',
                     command: deleteBadPodsCommand,
                     env: [
