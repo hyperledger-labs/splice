@@ -1,0 +1,65 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: wallet-sweep
+    folder: canton-network
+    interval: 5m
+    rules:
+      - uid: $RULE_UID
+        title: $SUB_TITLE
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              disableTextWrap: false
+              editorMode: builder
+              expr: splice_wallet_unlocked_amulet_balance{owner=~"$OWNER_PREFIX_REGEX"}
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+              useBackend: false
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - $MAX_BALANCE
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: '{{ $labels.owner }} are not sweeping their wallet as configured.'
+          severity: critical
+          summary: Wallet not sweeping as expected.
+        labels: {}
+        isPaused: false
+        notification_settings:
+          receiver: cn-ci-channel-notification
