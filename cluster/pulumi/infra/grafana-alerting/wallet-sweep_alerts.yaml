@@ -17,7 +17,10 @@ groups:
             model:
               disableTextWrap: false
               editorMode: builder
-              expr: splice_wallet_unlocked_amulet_balance{owner=~"$OWNER_PREFIX_REGEX"}
+              expr: |-
+                splice_wallet_unlocked_amulet_balance{owner=~"$OWNER_PREFIX_REGEX"}
+                  * on() group_left
+                sum(splice_amulet_price_latest_open_round_price{namespace="sv-1"})
               fullMetaSearch: false
               includeNullMetadata: true
               instant: true
