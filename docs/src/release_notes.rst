@@ -7,6 +7,9 @@
 
 .. release-notes:: upcoming
 
+  - Validator
+    - Added support for specifying a custom party hint during user onboarding via the `/v0/admin/users` API.
+
   - API security
 
     - Tightened authorization checks for all non-public API endpoints.

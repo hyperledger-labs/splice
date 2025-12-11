@@ -525,6 +525,7 @@ class ValidatorApp(
         .onboard(
           instance.walletUser.getOrElse(instance.serviceUser),
           Some(party),
+          Some(false),
           storeWithIngestion,
           validatorUserName = config.ledgerApiUser,
           // we're initializing so AmuletRules is guaranteed to be on synchronizerId
@@ -973,6 +974,7 @@ class ValidatorApp(
           ValidatorUtil.onboard(
             endUserName = user,
             knownParty = Some(validatorParty),
+            Some(false),
             automation,
             validatorUserName = config.ledgerApiUser,
             // we're initializing so AmuletRules is guaranteed to be on synchronizerId
