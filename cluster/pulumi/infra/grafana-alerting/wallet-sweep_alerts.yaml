@@ -3,7 +3,7 @@ groups:
   - orgId: 1
     name: wallet-sweep
     folder: canton-network
-    interval: 5m
+    interval: 10m
     rules:
       - uid: $RULE_UID
         title: $SUB_TITLE
@@ -33,7 +33,7 @@ groups:
               conditions:
                 - evaluator:
                     params:
-                      - $MAX_BALANCE
+                      - $MAX_BALANCE_THRESHOLD
                     type: gt
                   operator:
                     type: and
@@ -52,14 +52,13 @@ groups:
               maxDataPoints: 43200
               refId: C
               type: threshold
-        noDataState: NoData
-        execErrState: Error
+        noDataState: $NODATA
+        execErrState: Alerting
         for: 5m
         annotations:
-          description: '{{ $labels.owner }} are not sweeping their wallet as configured.'
+          description: Owner {{ $labels.owner }} are not sweeping their wallet as configured.
           severity: critical
           summary: Wallet not sweeping as expected.
-        labels: {}
+        labels:
+          "": ""
         isPaused: false
-        notification_settings:
-          receiver: cn-ci-channel-notification
