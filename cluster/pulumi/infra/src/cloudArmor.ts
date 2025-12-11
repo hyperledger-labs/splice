@@ -1,9 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as gcp from '@pulumi/gcp';
+import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
-import { CLUSTER_BASENAME } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CLUSTER_BASENAME, ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import * as config from './config';
 
@@ -37,13 +38,20 @@ export interface PredefinedWafRule {
 /**
  * Creates a Cloud Armor security policy
  * @param cac loaded configuration
+ * @param bothGatewaysNs namespace where both the L7 ALB and the Istio gateways are installed
  * @param opts Pulumi resource options
  * @returns The created security policy resource, if enabled
  */
 export function configureCloudArmorPolicy(
   cac: CloudArmorConfig,
+  bothGatewaysNs: ExactNamespace,
   opts?: pulumi.ComponentResourceOptions
-): gcp.compute.SecurityPolicy | undefined {
+):
+  | {
+      securityPolicy: gcp.compute.SecurityPolicy;
+      backendPolicy: k8s.apiextensions.CustomResource;
+    }
+  | undefined {
   if (!cac.enabled) {
     return undefined;
   }
@@ -61,6 +69,36 @@ export function configureCloudArmorPolicy(
       // making those changes harder to review than with the separate resources
     },
     opts
+  );
+
+  const policyName = `waf-ca-backend-policy-${CLUSTER_BASENAME}`;
+  const backendPolicy = new k8s.apiextensions.CustomResource(
+    policyName,
+    {
+      apiVersion: 'networking.gke.io/v1',
+      kind: 'GCPBackendPolicy',
+      metadata: {
+        name: policyName,
+        namespace: bothGatewaysNs.ns.metadata.name,
+      },
+      spec: {
+        default: {
+          securityPolicy: securityPolicy.name,
+        },
+        targetRef: {
+          group: '',
+          kind: 'Service',
+          // TODO (#2723) must be the name of the Service set up by the gateway
+          // *that is the backend of the L7 ALB gateway for which this is configured*.
+          // For a classic istio gateway this is the same (?) as the gateway name;
+          // for a k8s istio gateway this is <gateway-name>-istio.
+          // Can be identified by the apiVersion of the Gateway k8s resource
+          name: 'internal-istio-gateway-istio',
+          namespace: bothGatewaysNs.ns.metadata.name,
+        },
+      },
+    },
+    { parent: securityPolicy, dependsOn: [securityPolicy] }
   );
 
   const ruleOpts = { ...opts, parent: securityPolicy, deletedWith: securityPolicy };
@@ -81,7 +119,7 @@ export function configureCloudArmorPolicy(
   // Step 5: Add default deny rule
   addDefaultDenyRule(securityPolicy, cac.allRulesPreviewOnly, ruleOpts);
 
-  return securityPolicy;
+  return { securityPolicy, backendPolicy };
 }
 
 /**
