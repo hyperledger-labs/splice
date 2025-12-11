@@ -15,7 +15,7 @@ const serviceAccountName = 'gc-pod-reaper-service-account';
 // Rancher/Official K8s images failed (exec: no such file) as they lack /bin/ash shell or anything useful.
 // Bitnami has moved most images and Helm charts behind a paywall
 
-const schedule = '0 * * * *'; // Run once an hour
+const schedule = '*/2 * * * *'; // Run once every 2 minutes
 
 const deleteBadPodsCommand = [
   '/bin/bash',
@@ -95,6 +95,49 @@ export function deployGCPodReaper(
         'app.kubernetes.io/name': reaperNamespace,
       },
     },
+  });
+
+  targetNamespaces.forEach(namespace => {
+    const podManagementRole = new k8s.rbac.v1.Role(
+      namespace + '-gc-pod-reaper-role',
+      {
+        metadata: {
+          name: namespace + '-gc-pod-reaper-role',
+          namespace: namespace,
+        },
+        rules: [
+          {
+            apiGroups: [''], // Core API group for Pods
+            resources: ['pods'],
+            verbs: ['list', 'create', 'delete', 'update'],
+          },
+        ],
+      },
+      { parent: ns }
+    );
+
+    new k8s.rbac.v1.RoleBinding(
+      namespace + '-gc-pod-reaper-pod-manager-binding',
+      {
+        metadata: {
+          name: namespace + 'gc-pod-reaper-pod-manager-binding',
+          namespace: namespace,
+        },
+        subjects: [
+          {
+            kind: 'ServiceAccount',
+            name: serviceAccountName,
+            namespace: 'gc-pod-reaper',
+          },
+        ],
+        roleRef: {
+          kind: 'Role',
+          name: podManagementRole.metadata.name,
+          apiGroup: 'rbac.authorization.k8s.io',
+        },
+      },
+      { parent: podManagementRole, dependsOn: [podManagementRole] }
+    );
   });
 
   const targetNamespacesEnv = targetNamespaces.join(',');
