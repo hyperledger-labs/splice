@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import { DOCKER_REPO } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
+import { Version } from '@lfdecentralizedtrust/splice-pulumi-multi-validator/version';
 
 const kubectlVersion = spliceEnvConfig.requireEnv('KUBECTL_VERSION');
 const cronJobName = 'gc-pod-reaper-job';
 const reaperNamespace = 'gc-pod-reaper';
 const serviceAccountName = 'gc-pod-reaper-service-account';
-const reaperImage = 'ubuntu:22.04';
 // Rancher/Official K8s images failed (exec: no such file) as they lack /bin/ash shell or anything useful.
 // Bitnami has moved most images and Helm charts behind a paywall
 
@@ -19,12 +20,12 @@ const deleteBadPodsCommand = [
   '-c',
   `
     apt-get update &&
-    apt-get install -y curl jq &&
+    apt-get install -y jq &&
     curl -LO https://dl.k8s.io/release/${kubectlVersion}/bin/linux/amd64/kubectl &&
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl;
 
 
-    if [ $? -ne 0 ] || ! command -v kubectl >/dev/null 2>&1; then
+    if [ $? -ne 0 ] || ! command-v kubectl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
         echo "Error: Failed to install kubectl or jq. Exiting.";
         exit 1
     fi
@@ -157,7 +158,7 @@ export function deployGCPodReaper(
                 containers: [
                   {
                     name: cronJobName,
-                    image: reaperImage,
+                    image: `${DOCKER_REPO}/splice-debug:${Version}`,
                     imagePullPolicy: 'IfNotPresent',
                     command: deleteBadPodsCommand,
                     env: [
