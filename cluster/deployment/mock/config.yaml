@@ -233,6 +233,17 @@ infra:
       spec:
         key: value
         anotherKey: anotherValue
+  istio:
+    istiodValues: # example istiod overrides
+      global:
+        proxy:
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
 cluster:
   nodePools:
     apps:
