@@ -158,6 +158,7 @@ test_designExample= do
     inputUnclaimedActivityRecordAmount = Some 0.0
     inputValidatorFaucetAmount = Some 0.0
     inputSvRewardAmount = 0.0
+    inputDevelopmentFundAmount = Some 0.0
     inputAmuletAmount = refreshAmuletAmount + lockedAmuletAmount
     balanceChanges = Map.empty
     holdingFees

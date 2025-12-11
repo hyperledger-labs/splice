@@ -45,6 +45,8 @@ data AmuletConfig unit = AmuletConfig with
       -- that should be used for command submissions.
     transferPreapprovalFee : Optional Decimal -- ^ Fee for keeping a transfer pre-approval around.
     featuredAppActivityMarkerAmount : Optional Decimal -- ^ $-amount used for the conversion from FeaturedAppActivityMarker -> AppRewardCoupon
+    optDevelopmentFundManager : Optional Party
+      -- ^ Party authorized to manage and allocate minting rights from the Development Fund.
   deriving (Eq, Show)
 
 -- $1/year specified as a daily rate
@@ -120,6 +122,7 @@ instance Patchable (AmuletConfig USD) where
     packageConfig = patch new.packageConfig base.packageConfig current.packageConfig
     transferPreapprovalFee = patch new.transferPreapprovalFee base.transferPreapprovalFee current.transferPreapprovalFee
     featuredAppActivityMarkerAmount = patch new.featuredAppActivityMarkerAmount base.featuredAppActivityMarkerAmount current.featuredAppActivityMarkerAmount
+    optDevelopmentFundManager = patch new.optDevelopmentFundManager base.optDevelopmentFundManager current.optDevelopmentFundManager
 
 instance Patchable (TransferConfig USD) where
   patch new base current = TransferConfig with
