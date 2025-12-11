@@ -28,11 +28,16 @@ import sys
 getcontext().prec = 38
 getcontext().rounding = ROUND_HALF_EVEN
 
+# Ensure log directory exists before logger initialization
+log_directory = "log"
+if not os.path.exists(log_directory):
+    os.makedirs(log_directory)
+
 def _default_logger(name, loglevel):
     cli_handler = colorlog.StreamHandler()
     cli_handler.setFormatter(
         colorlog.ColoredFormatter(
-            "%(log_color)s%(levelname)s:%(name)s:%(message)s",
+            "%(log_color)s%(asctime)s - %(levelname)s:%(name)s:%(message)s",
             log_colors={
                 "DEBUG": "cyan",
                 "INFO": "green",
@@ -40,10 +45,11 @@ def _default_logger(name, loglevel):
                 "ERROR": "red",
                 "CRITICAL": "red,bg_white",
             },
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
     )
     file_handler = logging.FileHandler("log/scan_txlog.log")
-    file_handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+    file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s:%(name)s:%(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
 
     logger = colorlog.getLogger(name)
     logger.addHandler(cli_handler)
@@ -72,9 +78,9 @@ def _parse_cli_args() -> argparse.Namespace:
         """
     )
     parser.add_argument(
-        "scan_url",
-        help="Address of the Splice Scan server",
-        default="http://localhost:5012",
+        "scan_urls",
+        nargs="+",
+        help="Address(es) of the Splice Scan server(s). Multiple URLs can be provided for round-robin failover.",
     )
     parser.add_argument("--loglevel", help="Sets the log level", default="INFO")
     parser.add_argument(
@@ -177,21 +183,75 @@ class PaginationKey:
 @dataclass
 class ScanClient:
     session: aiohttp.ClientSession
-    url: str
+    urls: list[str]
     page_size: int
     call_count: int = 0
+    retry_count: int = 0
+    current_url_index: int = 0
+
+    def _get_current_url(self) -> str:
+        """Get the current URL from the round-robin list."""
+        return self.urls[self.current_url_index]
+
+    def _rotate_to_next_url(self):
+        """Move to the next URL in the round-robin list."""
+        self.current_url_index = (self.current_url_index + 1) % len(self.urls)
+        LOG.info(f"Rotating to next scan URL: {self._get_current_url()}")
 
     async def updates(self, after: Optional[PaginationKey]):
-        self.call_count = self.call_count + 1
         payload = {"page_size": self.page_size}
         if after:
             payload["after"] = after.to_json()
-        response = await self.session.post(
-            f"{self.url}/api/scan/v0/updates", json=payload
+
+        json = await self.__post_with_retry_on_statuses(
+            f"{self._get_current_url()}/api/scan/v0/updates",
+            payload=payload,
+            max_retries=30,
+            delay_seconds=0.5,
+            statuses={404, 429, 500, 503},
         )
-        response.raise_for_status()
-        json = await response.json()
         return json["transactions"]
+
+    async def __post_with_retry_on_statuses(
+        self, url, payload, max_retries, delay_seconds, statuses
+    ):
+        assert max_retries >= 1
+        retry = 0
+        self.call_count = self.call_count + 1
+        total_attempts = max_retries * len(self.urls)
+
+        while retry < total_attempts:
+            try:
+                response = await self.session.post(url, json=payload)
+                if response.status in statuses:
+                    LOG.debug(
+                        f"Request to {url} with payload {payload} failed with status {response.status}"
+                    )
+                    retry += 1
+                    if retry < total_attempts:
+                        self.retry_count = self.retry_count + 1
+                        self._rotate_to_next_url()
+                        url = f"{self._get_current_url()}/api/scan/v0/updates"
+                    await asyncio.sleep(delay_seconds)
+                else:
+                    response.raise_for_status()
+                    return await response.json()
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                LOG.debug(
+                    f"Request to {url} with payload {payload} failed with error: {e}"
+                )
+                retry += 1
+                if retry < total_attempts:
+                    self.retry_count = self.retry_count + 1
+                    self._rotate_to_next_url()
+                    url = f"{self._get_current_url()}/api/scan/v0/updates"
+                    await asyncio.sleep(delay_seconds)
+                else:
+                    raise
+
+        LOG.error(f"Exceeded max retries {total_attempts} across all URLs, giving up")
+        response.raise_for_status()
+        return await response.json()
 
 
 # Daml Decimals have a precision of 38 and a scale of 10, i.e., 10 digits after the decimal point.
@@ -919,6 +979,7 @@ async def main():
     _log_uncaught_exceptions()
 
     LOG.info(f"Starting unclaimed_sv_rewards with arguments: {args}")
+    LOG.info(f"Using scan URLs (round-robin): {args.scan_urls}")
 
     app_state = State.create_or_restore_from_cache(args)
 
@@ -926,7 +987,7 @@ async def main():
     tx_count = 0
 
     async with aiohttp.ClientSession() as session:
-        scan_client = ScanClient(session, args.scan_url, args.page_size)
+        scan_client = ScanClient(session, args.scan_urls, args.page_size)
 
         while True:
             json_batch = await scan_client.updates(app_state.pagination_key)
@@ -950,7 +1011,7 @@ async def main():
 
     duration = time.time() - begin_t
     LOG.info(
-        f"End run. ({duration:.2f} sec., {tx_count} transaction(s), {scan_client.call_count} Scan API call(s))"
+        f"End run. ({duration:.2f} sec., {tx_count} transaction(s), {scan_client.call_count} Scan API call(s), {scan_client.retry_count} retries)"
     )
     LOG.debug(
         f"active_mining_rounds count: {len(app_state.active_issuing_rounds)}"
