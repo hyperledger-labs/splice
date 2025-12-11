@@ -2277,7 +2277,12 @@
             "excludeOutboundPorts": "5432,26657",
             "resources": {
               "limits": {
-                "memory": "4096Mi"
+                "cpu": "2000m",
+                "memory": "2Gi"
+              },
+              "requests": {
+                "cpu": "500m",
+                "memory": "512Mi"
               }
             }
           }
