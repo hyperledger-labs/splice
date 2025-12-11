@@ -1070,6 +1070,22 @@
           "spec": {
             "template": {
               "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
                 "containers": [
                   {
                     "command": [
@@ -1094,20 +1110,7 @@
                   {
                     "effect": "NoSchedule",
                     "key": "cn_infra",
-                    "operator": "Equal",
-                    "value": "true"
-                  },
-                  {
-                    "effect": "NoSchedule",
-                    "key": "components.gke.io/gke-managed-components",
-                    "operator": "Equal",
-                    "value": "true"
-                  },
-                  {
-                    "effect": "NoSchedule",
-                    "key": "cn_apps",
-                    "operator": "Equal",
-                    "value": "true"
+                    "operator": "Exists"
                   }
                 ]
               }

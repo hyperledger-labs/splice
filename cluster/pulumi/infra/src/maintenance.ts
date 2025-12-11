@@ -6,6 +6,8 @@ import { DOCKER_REPO } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
 import { Version } from '@lfdecentralizedtrust/splice-pulumi-multi-validator/version';
 
+import { infraAffinityAndTolerations } from '../../common';
+
 const kubectlVersion = spliceEnvConfig.requireEnv('KUBECTL_VERSION');
 const cronJobName = 'gc-pod-reaper-job';
 const reaperNamespace = 'gc-pod-reaper';
@@ -131,30 +133,7 @@ export function deployGCPodReaper(
               spec: {
                 serviceAccountName: serviceAccountName,
                 restartPolicy: 'OnFailure',
-                // Nodes in this GKE cluster are configured with Taints (cn_infra, cn_apps,
-                // gke-managed-components) that prevent standard Pods from being scheduled.
-                // These Tolerations allow the gc-pod-reaper-job to run on all available
-                // nodes, ensuring the cleanup task can execute regardless of node role.
-                tolerations: [
-                  {
-                    key: 'cn_infra',
-                    operator: 'Equal',
-                    value: 'true',
-                    effect: 'NoSchedule',
-                  },
-                  {
-                    key: 'components.gke.io/gke-managed-components',
-                    operator: 'Equal',
-                    value: 'true',
-                    effect: 'NoSchedule',
-                  },
-                  {
-                    key: 'cn_apps',
-                    operator: 'Equal',
-                    value: 'true',
-                    effect: 'NoSchedule',
-                  },
-                ],
+                ...infraAffinityAndTolerations,
                 containers: [
                   {
                     name: cronJobName,
