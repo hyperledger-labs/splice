@@ -4,7 +4,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
 
-import { infraAffinityAndTolerations } from '../../common';
+import { DOCKER_REPO, infraAffinityAndTolerations } from '../../common';
 
 const kubectlVersion = spliceEnvConfig.requireEnv('KUBECTL_VERSION');
 const cronJobName = 'gc-pod-reaper-job';
@@ -178,7 +178,7 @@ export function deployGCPodReaper(
                 containers: [
                   {
                     name: cronJobName,
-                    image: `ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-debug:latest`,
+                    image: `${DOCKER_REPO}/splice-debug`,
                     imagePullPolicy: 'Always',
                     command: deleteBadPodsCommand,
                     env: [
