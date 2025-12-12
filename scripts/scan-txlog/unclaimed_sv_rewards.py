@@ -95,13 +95,13 @@ def _parse_cli_args() -> argparse.Namespace:
     parser.add_argument(
         "--concurrency",
         type=int,
-        default=10,
+        default=130,
         help="Maximum number of concurrent chunk workers (async tasks).",
     )
     parser.add_argument(
         "--chunk-size-in-hours",
         type=float,
-        default=1.0,
+        default=0.1,
         help="Size of each processing chunk, expressed in hours (e.g. 0.5, 1, 24).",
     )
     parser.add_argument(
