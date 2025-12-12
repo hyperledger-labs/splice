@@ -6,7 +6,13 @@ import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
 import { configureCloudArmorPolicy } from './cloudArmor';
-import { cloudArmorConfig, clusterBaseDomain, clusterBasename, monitoringConfig } from './config';
+import {
+  cloudArmorConfig,
+  clusterBaseDomain,
+  clusterBasename,
+  enableGCReaperJob,
+  monitoringConfig,
+} from './config';
 import { installExtraCustomResources } from './extraCustomResources';
 import {
   getNotificationChannel,
@@ -15,6 +21,7 @@ import {
   installClusterMaintenanceUpdateAlerts,
 } from './gcpAlerts';
 import { configureIstio, istioMonitoring } from './istio';
+import { deployGCPodReaper } from './maintenance';
 import { configureNetwork } from './network';
 import { configureObservability } from './observability';
 import { configureStorage } from './storage';
@@ -42,6 +49,9 @@ if (enableAlerts && !clusterIsResetPeriodically) {
 }
 istioMonitoring(network.ingressNs, []);
 
+if (enableGCReaperJob) {
+  deployGCPodReaper('cluster-pod-gc-reaper', ['multi-validator'], { parent: network.ingressNs.ns });
+}
 configureStorage();
 
 configureCloudArmorPolicy(cloudArmorConfig);
