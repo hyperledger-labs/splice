@@ -7,5 +7,3 @@ Using approximate topology snapshot.*.*StandaloneSequencer
 Failed to acknowledge clean timestamp.*closed stream
 
 The traffic balance request submission timed
-
-# Make sure to have a trailing newline

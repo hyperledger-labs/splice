@@ -30,5 +30,3 @@ Trying to materialize stream after materializer has been shutdown
 ApiUpdateService.*AbruptTerminationException
 # Consequence of the AbruptTerminationException
 UpdateService/GetUpdates.*failed with INTERNAL
-
-# Make sure to have a trailing newline
