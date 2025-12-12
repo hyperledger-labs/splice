@@ -8,25 +8,24 @@ Summarizes claimed, expired, and unclaimed minting rewards for a given beneficia
 within a specified time range and weight, based on SvRewardCoupon activity.
 """
 
-import aiohttp
-import asyncio
+# Standard library
 import argparse
-from concurrent.futures import Future, ThreadPoolExecutor
-from decimal import *
-from dataclasses import dataclass, replace
-from datetime import datetime, timedelta
-from enum import Enum
+import asyncio
 import hashlib
 import json
 import logging
-import colorlog
 import os
-from typing import Optional, Self
-import time
 import sys
-
+import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import List, Tuple
+from decimal import *
+from enum import Enum
+from typing import Optional, Self
+
+# Third-party libraries
+import aiohttp
+import colorlog
 
 # Set precision and rounding mode
 getcontext().prec = 38
@@ -1332,9 +1331,12 @@ async def main():
                     for (tx, event_id) in state.exercise_pending_events:
                         global_state.process_events(tx, [event_id])
 
-                    # Drop unresolved pending events — after the global merge they are known to be
-                    # irrelevant (cannot be attributed to the beneficiary).
-                    global_state.exercise_pending_events.clear()
+                    LOG.debug(f"exercise_pending_events_len: {len(global_state.exercise_pending_events)}") # TODOV
+
+                # Drop unresolved pending events — after the global merge and re-processing, they are known to be
+                # irrelevant (cannot be attributed to the beneficiary).
+                # Chunk 0: discard pending exercises of the beneficiary - they correspond to rewards created before begin_record_time.
+                global_state.exercise_pending_events.clear()
 
                 next_chunk_to_process += 1
                 save_global_cache(args, global_state, next_chunk_to_process, current_migration_id)
