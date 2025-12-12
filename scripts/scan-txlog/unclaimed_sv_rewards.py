@@ -76,20 +76,25 @@ def _parse_cli_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="""Scans the transaction log over a given time range and reports statistics on SvRewardCoupon contracts
         (claimed, expired, and unclaimed) for a specific beneficiary. It calculates the corresponding reward amounts
-        based on the IssuingMiningRound contracts. This script helps identify unclaimed minting rights due to
+        based on the ClosedMiningRound and IssuingMiningRound contracts. This script helps identify unclaimed minting rights due to
         expired or unexercised SvRewardCoupons within the specified window.
         """
     )
     parser.add_argument(
         "scan_urls",
         nargs="+",
-        help="Address(es) of the Splice Scan server(s). Multiple URLs can be provided for round-robin failover.",
+        help=(
+            "Address(es) of the Splice Scan server(s). Multiple URLs improve resilience "
+            "(round-robin failover) and increase throughput, as each chunk selects a "
+            "different URL to maximize concurrency. It is recommended to provide as many "
+            "Scan endpoints as possible for best performance."
+        ),
     )
     parser.add_argument("--loglevel", help="Sets the log level", default="INFO")
     parser.add_argument(
         "--page-size",
         type=int,
-        default=1000,
+        default=100,
         help="Number of transactions to fetch per network request",
     )
     parser.add_argument(
@@ -148,13 +153,19 @@ def _parse_cli_args() -> argparse.Namespace:
     parser.add_argument(
         "--weight",
         type=non_negative_int,
-        help="Weight of sv coupon rewards to consider",
+        help=(
+            "Weight of SvRewardCoupons to consider. Note: CIP weights (e.g., 0.5, 1, 2) "
+            "map to script weights by multiplying by 10,000 (e.g., 5K, 10K, 20K)."
+        ),
         required=True,
     )
     parser.add_argument(
         "--already-minted-weight",
         type=non_negative_int,
-        help="Weight already minted for the time range provided",
+        help=(
+            "Weight already minted for the given time range. Uses the same scale as --weight "
+            "(CIP weight × 10,000 → script weight)."
+        ),
         required=True,
     )
     return parser.parse_args()
