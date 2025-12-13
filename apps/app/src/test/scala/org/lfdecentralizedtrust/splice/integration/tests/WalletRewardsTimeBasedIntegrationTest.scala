@@ -5,7 +5,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.validatorlic
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{SpliceUtil, SvTestUtil, TimeTestUtil, WalletTestUtil}
-import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
+import org.lfdecentralizedtrust.splice.wallet.automation.ReceiveFaucetCouponTrigger
 
 import scala.concurrent.duration.DurationInt
 import scala.jdk.OptionConverters.*

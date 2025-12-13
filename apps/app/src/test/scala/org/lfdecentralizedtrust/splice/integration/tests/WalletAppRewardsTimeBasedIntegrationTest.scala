@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.util.*
-import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
+import org.lfdecentralizedtrust.splice.wallet.automation.ReceiveFaucetCouponTrigger
 
 // Split out from WalletTimeBasedIntegrationTest due to test-isolation woes making the test in here flaky.
 class WalletAppRewardsTimeBasedIntegrationTest

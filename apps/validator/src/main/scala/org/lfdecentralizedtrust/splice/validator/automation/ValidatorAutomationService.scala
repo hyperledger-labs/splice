@@ -33,6 +33,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
 }
 import org.lfdecentralizedtrust.splice.wallet.automation.{
   OffboardUserPartyTrigger,
+  ReceiveFaucetCouponTrigger,
   ValidatorRightTrigger,
   WalletAppInstallTrigger,
 }
