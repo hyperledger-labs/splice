@@ -7,6 +7,7 @@ import cats.data.OptionT
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.RoundBasedRewardTrigger.RoundBasedTask
@@ -39,14 +40,13 @@ class ReceiveFaucetCouponTrigger(
     userWalletManager: UserWalletManager,
     validatorTopupConfig: ValidatorTopupConfig,
     spliceLedgerConnection: SpliceLedgerConnection,
+    licensedParty: PartyId,
     clock: Clock,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
     materializer: Materializer,
 ) extends RoundBasedRewardTrigger[ReceiveFaucetCouponTrigger.Task] {
-
-  private val validatorParty = validatorStore.key.validatorParty
 
   override protected def retrieveAvailableTasksForRound()(implicit
       tc: TraceContext
@@ -121,8 +121,8 @@ class ReceiveFaucetCouponTrigger(
         .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
       outcome <- spliceLedgerConnection
         .submit(
-          actAs = Seq(validatorParty),
-          readAs = Seq(validatorParty),
+          actAs = Seq(licensedParty),
+          readAs = Seq(licensedParty),
           license.exercise(
             _.exerciseValidatorLicense_RecordValidatorLivenessActivity(
               unclaimedRound.contractId

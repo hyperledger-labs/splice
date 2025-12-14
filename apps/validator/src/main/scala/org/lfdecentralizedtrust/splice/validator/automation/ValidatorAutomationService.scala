@@ -173,6 +173,7 @@ class ValidatorAutomationService(
           walletManager,
           validatorTopupConfig,
           connection(SpliceLedgerConnectionPriority.Medium),
+          store.key.validatorParty,
           clock,
         )
       )
