@@ -13,17 +13,16 @@ Canton distinguishes between parties and users, as documented in detail in the
 a party is an identity on-ledger, while a user represents an off-ledger entity
 that can be associated with one or more parties.
 
-The validator API endpoint `/v0/admin/users` supports three distinct modes for creating user and party associations:
-
-1. Default Party Creation: Allocating a new party using the user ID as the party hint. The user is associated with this newly created party.
-2. Association with Existing Party: Linking a user to an existing party for wallet sharing.
-3. Custom Party Hint: Allocating a new party using a human-readable party hint. The user is associated with this newly created party.
-
-Default Party Creation: By default, when a user logs in for the first time in the wallet, and presses the "Onboard yourself" button,
+By default, when a user logs in for the first time in the wallet, and presses the "Onboard yourself" button,
 the Validator allocates a fresh party, with a fresh Party ID, and associates that user
 with the newly allocated party. As part of validator initialization, a party is automatically created for the
 Validator Operator. The user provided during installation as the `validatorWalletUser` will be
 associated with this party as its primary party.
+
+In addition to above approach, the validator API endpoint `/v0/admin/users` supports two additional modes for creating user and party associations:
+
+1. Association with Existing Party: Linking a user to an existing party.
+2. Custom Party Hint: Allocating a new party using a human-readable party hint and associating the user to this newly created party.
 
 Association with Existing Party: Users can be configured such that their primary party is that of the validator operator (or any other existing party).
 In effect, when such users login to the wallet UI, they will be accessing the wallet of the validator
