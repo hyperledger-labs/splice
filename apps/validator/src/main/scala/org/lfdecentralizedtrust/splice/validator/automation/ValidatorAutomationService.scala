@@ -26,14 +26,18 @@ import org.lfdecentralizedtrust.splice.util.QualifiedName
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import org.lfdecentralizedtrust.splice.validator.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
+import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
+import org.lfdecentralizedtrust.splice.wallet.store.{
+  FetchCommandPriority,
+}
 import org.lfdecentralizedtrust.splice.wallet.automation.{
   OffboardUserPartyTrigger,
   ValidatorRightTrigger,
   WalletAppInstallTrigger,
 }
 import org.lfdecentralizedtrust.splice.wallet.config.TransferPreapprovalConfig
-import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
+import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -46,7 +50,7 @@ import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.nio.file.Path
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, ExecutionContext, Future}
 
 class ValidatorAutomationService(
     automationConfig: AutomationConfig,
@@ -164,17 +168,22 @@ class ValidatorAutomationService(
       )
     )
 
+
     if (automationConfig.enableAutomaticRewardsCollectionAndAmuletMerging) {
+      val priorityFetcher = new FetchValidatorCommandPriority(
+         store,
+         walletManager,
+         scanConnection,
+         clock,
+         validatorTopupConfig)
       registerTrigger(
         new ReceiveFaucetCouponTrigger(
           triggerContext,
           scanConnection,
           store,
-          walletManager,
-          validatorTopupConfig,
           connection(SpliceLedgerConnectionPriority.Medium),
           store.key.validatorParty,
-          clock,
+          priorityFetcher
         )
       )
     }
@@ -298,4 +307,28 @@ object ValidatorAutomationService extends AutomationServiceCompanion {
   private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] = None
 
   override protected[this] def expectedTriggerClasses: Seq[Nothing] = Seq.empty
+}
+
+private class FetchValidatorCommandPriority (
+  store:  ValidatorStore,
+  walletManager: UserWalletManager,
+  scanConnection: BftScanConnection,
+  clock: Clock,
+  topupConfig: ValidatorTopupConfig,
+) (implicit
+  ec: ExecutionContext,
+  mat: Materializer,
+) extends FetchCommandPriority {
+   private def lowOrHigh(isLow: Boolean): CommandPriority = {
+     val result: CommandPriority = if (isLow) CommandPriority.Low else CommandPriority.High
+     result
+   }
+   override def getCommandPriority()(implicit  tc: TraceContext): Future[CommandPriority] = {
+     for {
+       validatorWallet <- ValidatorUtil.getValidatorWallet(store, walletManager)
+       priority <- TopupUtil
+        .hasSufficientFundsForTopup(scanConnection, validatorWallet.store, topupConfig, clock)
+        .map(lowOrHigh)
+     } yield priority
+   }
 }

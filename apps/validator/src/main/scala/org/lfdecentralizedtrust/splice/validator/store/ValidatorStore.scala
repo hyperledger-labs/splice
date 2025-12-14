@@ -22,7 +22,7 @@ import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, MultiDomainAcsSto
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorStore
 import org.lfdecentralizedtrust.splice.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
-import org.lfdecentralizedtrust.splice.wallet.store.WalletStore
+import org.lfdecentralizedtrust.splice.wallet.store.{ValidatorLicenseStore, WalletStore}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -36,7 +36,7 @@ import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait ValidatorStore extends WalletStore with AppStore {
+trait ValidatorStore extends WalletStore with ValidatorLicenseStore with AppStore {
 
   /** The key identifying the parties considered by this store. */
   val key: ValidatorStore.Key
@@ -50,13 +50,6 @@ trait ValidatorStore extends WalletStore with AppStore {
       ContractWithState[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]
     ]
   ]]
-
-  def lookupValidatorLicenseWithOffset()(implicit tc: TraceContext): Future[
-    QueryResult[Option[ContractWithState[
-      validatorLicenseCodegen.ValidatorLicense.ContractId,
-      validatorLicenseCodegen.ValidatorLicense,
-    ]]]
-  ]
 
   def lookupValidatorRightByPartyWithOffset(
       party: PartyId
