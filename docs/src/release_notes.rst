@@ -8,7 +8,8 @@
 .. release-notes:: upcoming
 
   - Validator
-    - Added support for specifying a custom party hint during user onboarding via the `/v0/admin/users` API.
+    - Added support for picking a custom name for new parties created when onboarding users via the `/v0/admin/users` API.
+      See :ref:`Users, Parties and Wallets in the Splice Wallet <validator-users>`
 
   - API security
 
