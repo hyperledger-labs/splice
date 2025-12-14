@@ -118,9 +118,6 @@ Failed to connect to scan of .*DisasterRecoveryIntegrationTest
 Failed to connect to scan of .*AppUpgradeIntegrationTest
 Failed to connect to scan of .*ConfigurationProvidedBftScanConnectionIntegrationTest
 
-# Testing for a deliberately erroneous scenario where no party ID is provided
-party_id must be provided.*ValidatorIntegrationTest
-
 # Ignore scan connection issues in reonboarding test.
 Failed to connect to scan of .*SvDevNetReonboardingIntegrationTest
 

@@ -637,13 +637,21 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     }
 
     clue("Fail when creation is disallowed but no party is provided to assign to") {
-      intercept[com.digitalasset.canton.console.CommandFailure] {
-        onboard(
-          name = testUser4,
-          createIfMissing = Some(false),
-        )
-      }
-      // we only get "Command execution failed" in the error.
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+        intercept[com.digitalasset.canton.console.CommandFailure] {
+          onboard(
+            name = testUser4,
+            createIfMissing = Some(false),
+          )
+        },
+        entries => {
+          forAtLeast(1, entries)(
+            _.message should include(
+              s"party_id must be provided when createPartyIfMissing is false and no existing"
+            )
+          )
+        },
+      )
       aliceValidatorBackend.listUsers() should not contain testUser4
     }
   }
