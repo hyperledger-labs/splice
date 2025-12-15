@@ -12,7 +12,7 @@ const serviceAccountName = 'gc-pod-reaper-service-account';
 // Rancher/Official K8s images failed (exec: no such file) as they lack /bin/ash shell or anything useful.
 // Bitnami has moved most images and Helm charts behind a paywall
 
-const schedule = '*/2 * * * *'; // Run once every 2 minutes
+const schedule = '*/50 * * * *'; // Run once every 50 minutes
 
 const deleteBadPodsCommand = [
   '/bin/bash',

@@ -1,5 +1,6 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+
 # We don't currently have a need for multi-architecture support in this image,
 # so we're hard-coding amd64, and accepting that this will break on arm64.
 FROM --platform=linux/amd64 ubuntu:24.04@sha256:440dcf6a5640b2ae5c77724e68787a906afb8ddee98bf86db94eea8528c2c076
