@@ -16,6 +16,7 @@ import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.config.{
   CantonConfig,
   ConfigErrors,
+  DefaultPorts,
   GCLoggingConfig,
   Generate,
   SharedCantonConfig,
@@ -165,7 +166,7 @@ abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
       for {
         mergedUserConfigs <- mergedUserConfigsE
         finalConfig = CantonConfig.mergeConfigs(mergedUserConfigs, Seq(configFromMap))
-        loadedConfig <- loadConfig(finalConfig)
+        loadedConfig <- loadConfig(finalConfig, None)
           .leftMap { err =>
             // if loading failed and there is more than one file, writing it into a temporary file
             if (configFiles.sizeCompare(1) > 0) {
@@ -265,7 +266,10 @@ abstract class CantonAppDriver extends App with NamedLogging with NoTracing {
     case Left(_) => sys.exit(1)
   }
 
-  def loadConfig(config: com.typesafe.config.Config): Either[CantonConfigError, Config]
+  def loadConfig(
+      config: com.typesafe.config.Config,
+      defaultPorts: Option[DefaultPorts],
+  ): Either[CantonConfigError, Config]
 }
 
 object CantonAppDriver {

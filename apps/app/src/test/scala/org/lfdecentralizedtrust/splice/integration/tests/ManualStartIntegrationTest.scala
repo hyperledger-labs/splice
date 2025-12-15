@@ -4,7 +4,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.PruningSchedule
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{FullClientConfig, PositiveDurationSeconds}
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.topology.{
   MediatorId,
@@ -15,7 +15,7 @@ import com.digitalasset.canton.topology.{
   SequencerId,
   UniqueIdentifier,
 }
-import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, SpliceBackendConfig}
+import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, PruningConfig, SpliceBackendConfig}
 import org.lfdecentralizedtrust.splice.console.AppBackendReference
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -23,9 +23,10 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority.Low
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.FoundDso
 import org.lfdecentralizedtrust.splice.util.{StandaloneCanton, TriggerTestUtil, WalletTestUtil}
-import org.lfdecentralizedtrust.splice.validator.config.ParticipantPruningConfig
 
 import java.util.UUID
 import scala.concurrent.duration.DurationInt
@@ -43,6 +44,13 @@ class ManualStartIntegrationTest
 
   override lazy val dbsSuffix = "manual_start_2_" + UUID.randomUUID.toString.substring(0, 4)
 
+  val sv1PruningScheduleOverride = PruningConfig(
+    // run every 10s, for quick feedback
+    "/10 * * * * ?",
+    PositiveDurationSeconds.tryFromDuration(10.seconds),
+    PositiveDurationSeconds.tryFromDuration(20.seconds),
+  )
+
   override def environmentDefinition: SpliceEnvironmentDefinition = {
     EnvironmentDefinition
       // Do not use `simpleTopology4Svs`, because that one waits for shared canton nodes to be initialized
@@ -56,22 +64,50 @@ class ManualStartIntegrationTest
       .addConfigTransforms((_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf))
       // By default, alice validator connects to the splitwell domain. This test doesn't start the splitwell node.
       .addConfigTransform((_, conf) =>
-        conf.copy(validatorApps =
-          conf.validatorApps.updatedWith(InstanceName.tryCreate("aliceValidator")) {
-            _.map { aliceValidatorConfig =>
-              val withoutExtraDomains = aliceValidatorConfig.domains.copy(extra = Seq.empty)
-              aliceValidatorConfig.copy(
-                domains = withoutExtraDomains,
-                participantPruningSchedule = Some(
-                  ParticipantPruningConfig(
-                    "0 0 * * * ?",
-                    PositiveDurationSeconds.tryFromDuration(1.hours),
-                    PositiveDurationSeconds.tryFromDuration(30.hours),
-                  )
-                ),
-              )
+        conf.copy(
+          // reduce it so that the test hits 2 acs commitments intervals
+          // as pruning can be done only up to the end of the latest complete acs commitment interval
+          svApps = conf.svApps.updatedWith(InstanceName.tryCreate("sv1")) {
+            _.map { config =>
+              config.onboarding match {
+                case Some(c) =>
+                  c match {
+                    case foundDsoConfig: FoundDso =>
+                      config.copy(onboarding =
+                        Some(
+                          foundDsoConfig.copy(acsCommitmentReconciliationInterval =
+                            PositiveDurationSeconds.ofSeconds(30)
+                          )
+                        )
+                      )
+                    case _ => config
+                  }
+                case None => config
+              }
             }
-          }
+          },
+          validatorApps = conf.validatorApps
+            .updatedWith(InstanceName.tryCreate("aliceValidator")) {
+              _.map { aliceValidatorConfig =>
+                val withoutExtraDomains = aliceValidatorConfig.domains.copy(extra = Seq.empty)
+                aliceValidatorConfig.copy(
+                  domains = withoutExtraDomains,
+                  participantPruningSchedule = Some(
+                    PruningConfig(
+                      "0 0 * * * ?",
+                      PositiveDurationSeconds.tryFromDuration(1.hours),
+                      PositiveDurationSeconds.tryFromDuration(30.hours),
+                    )
+                  ),
+                )
+              }
+            }
+            + (InstanceName.tryCreate("sv1ValidatorWithPruning") ->
+              conf
+                .validatorApps(InstanceName.tryCreate("sv1Validator"))
+                .copy(
+                  participantPruningSchedule = Some(sv1PruningScheduleOverride)
+                )),
         )
       )
       // Add a suffix to the canton identifiers to avoid metric conflicts with the shared canton nodes
@@ -114,15 +150,16 @@ class ManualStartIntegrationTest
           "EXTRA_PARTICIPANT_DB" -> ("participant_extra_" + dbsSuffix),
         ),
       )() {
-        val allCnApps = Seq[AppBackendReference](
+        val allCnAppsBase = Seq[AppBackendReference](
           sv1Backend,
           sv1ScanBackend,
-          sv1ValidatorBackend,
           sv2Backend,
           sv2ScanBackend,
           sv2ValidatorBackend,
           aliceValidatorBackend,
         )
+        val allCnAppsAtStart = allCnAppsBase ++ Seq(sv1ValidatorBackend)
+        val allCnApps = allCnAppsBase ++ Seq(sv1ValidatorWithPruningBackend)
 
         val allTopologyConnections
             : Seq[(TopologyAdminConnection, UniqueIdentifier => Member & NodeIdentity)] = Seq(
@@ -150,7 +187,29 @@ class ManualStartIntegrationTest
         }
 
         clue("Starting all Splice apps") {
-          startAllSync(allCnApps*)
+          startAllSync(allCnAppsAtStart*)
+        }
+
+        // We want to set pruning a bit later so it doesn't break init
+        clue("Restart sv1 validator with pruning enabled") {
+          sv1ValidatorBackend.stop()
+          sv1ValidatorWithPruningBackend.startSync()
+        }
+
+        clue("Check sv1 participant has the expected pruning schedule") {
+          sv1ValidatorBackend.participantClient.pruning.get_schedule() shouldBe Some(
+            sv1PruningScheduleOverride.toSchedule
+          )
+        }
+
+        clue("Check sv1 participant is actively pruning") {
+          eventually(120.seconds) {
+            sv1Backend.svAutomation
+              .connection(Low)
+              // returns 0 when participant pruning is disabled
+              .latestPrunedOffset()
+              .futureValue should be > 0L
+          }
         }
 
         clue(
@@ -169,7 +228,9 @@ class ManualStartIntegrationTest
           )
         }
 
-        clue("SV1 and SV2 have configured amplification on the mediator sequencer connection") {
+        clue(
+          "SV1 and SV2 have configured amplification and pruning on the mediator sequencer connection"
+        ) {
           Seq(
             mediatorAdminConnection("sv1", sv1Backend.config),
             mediatorAdminConnection("sv2", sv2Backend.config),
@@ -181,7 +242,13 @@ class ManualStartIntegrationTest
                 .value
             sequencerConnections.connections.size shouldBe 1
             sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
+            sequencerConnections.sequencerLivenessMargin shouldBe NonNegativeInt.zero
             sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification
+            mediatorConnection.getPruningSchedule().futureValue.value shouldBe PruningSchedule(
+              "0 /10 * * * ?",
+              PositiveDurationSeconds.ofMinutes(5),
+              PositiveDurationSeconds.ofDays(30),
+            )
             // otherwise we get log warnings
             mediatorConnection.close()
           }

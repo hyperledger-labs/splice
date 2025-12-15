@@ -287,6 +287,16 @@
   },
   {
     "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",
@@ -709,7 +719,18 @@
           "postgresName": "postgres",
           "secretName": "postgres-secrets"
         },
-        "scanAddress": "https://scan.sv-2.mock.global.canton.network.digitalasset.com",
+        "scanClient": {
+          "scanType": "bft-custom",
+          "seedUrls": [
+            "https://scan.sv-2-eng.test.network.canton.global",
+            "https://scan.sv-3-eng.test.network.canton.global"
+          ],
+          "threshold": 2,
+          "trustedSvs": [
+            "Digital-Asset-Eng-2",
+            "Digital-Asset-Eng-3"
+          ]
+        },
         "spliceInstanceNames": {
           "amuletName": "Amulet",
           "amuletNameAcronym": "AMT",

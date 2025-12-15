@@ -29,6 +29,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyholding.DummyHolding
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummytwointerfaces.DummyTwoInterfaces
 import org.lfdecentralizedtrust.splice.migration.MigrationTimeInfo
+import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
@@ -48,10 +49,16 @@ abstract class MultiDomainAcsStoreTest[
     id
   }
 
-  case class GenericAcsRowData(contract: Contract[_, _]) extends AcsRowData.AcsRowDataFromContract {
+  case class GenericAcsRowData(contract: Contract[?, ?]) extends AcsRowData.AcsRowDataFromContract {
     override def contractExpiresAt: Option[Time.Timestamp] = None
 
-    override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
+  }
+  object GenericAcsRowData {
+    implicit val hasIndexColumns: HasIndexColumns[GenericAcsRowData] =
+      new HasIndexColumns[GenericAcsRowData] {
+        override def indexColumnNames: Seq[String] = Seq.empty
+      }
   }
 
   case class GenericInterfaceRowData(
@@ -59,6 +66,12 @@ abstract class MultiDomainAcsStoreTest[
       override val interfaceView: DamlRecord[?],
   ) extends AcsInterfaceViewRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
+  }
+  object GenericInterfaceRowData {
+    implicit val hasIndexColumns: HasIndexColumns[GenericInterfaceRowData] =
+      new HasIndexColumns[GenericInterfaceRowData] {
+        override def indexColumnNames: Seq[String] = Seq.empty
+      }
   }
 
   protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[
@@ -113,7 +126,7 @@ abstract class MultiDomainAcsStoreTest[
   protected type CReady = AssignedContract[AppRewardCoupon.ContractId, AppRewardCoupon]
 
   protected def assertIncompleteReassignments(
-      incompleteReassignmentsById: Map[ContractId[_], NonEmpty[Set[ReassignmentId]]] = Map.empty
+      incompleteReassignmentsById: Map[ContractId[?], NonEmpty[Set[ReassignmentId]]] = Map.empty
   )(implicit store: Store) =
     for {
       actualIncompleteReassignmentsById <- store.listIncompleteReassignments()
@@ -153,7 +166,7 @@ abstract class MultiDomainAcsStoreTest[
     store.lookupContractById(AppRewardCoupon.COMPANION)(c.contractId)
 
   protected def assertReadyForAssign(
-      contractId: ContractId[_],
+      contractId: ContractId[?],
       reassignmentId: ReassignmentId,
       expected: Boolean,
   )(implicit

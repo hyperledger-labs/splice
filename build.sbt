@@ -64,6 +64,9 @@ inThisBuild(
 //    semanticdbIncludeInJar := true, // cache it in the remote cache
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
+    // slows down just the non integration tests which is a really small subset
+    // this helps us get actual realistic times for how long a test takes to run
+    Test / parallelExecution := false,
   )
 )
 
@@ -939,6 +942,7 @@ lazy val `apps-common` =
         spray_json,
         pekko_spray_json,
         Dependencies.parallel_collections,
+        pekko_connectors_google_cloud_storage,
       ),
       BuildCommon.sharedAppSettings,
       buildInfoKeys := Seq[BuildInfoKey](
@@ -1886,6 +1890,7 @@ checkErrors := {
 
   splitAndCheckCantonLogFile("canton", usesSimtime = false)
   splitAndCheckCantonLogFile("canton-simtime", usesSimtime = true)
+  splitAndCheckCantonLogFile("canton-missing-signatures", usesSimtime = false)
   import better.files._
   val dir = File("log/")
   if (dir.exists())
@@ -2030,6 +2035,10 @@ updateTestConfigForParallelRuns := {
       "SvOffboardingIntegrationTest",
       "ManualStartIntegrationTest",
     ).exists(name.contains)
+  def isManualSignatureIntegrationTest(name: String): Boolean =
+    Seq(
+      "ManualSignatureIntegrationTest"
+    ).exists(name.contains)
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
   def isLocalNetTest(name: String): Boolean =
@@ -2053,6 +2062,11 @@ updateTestConfigForParallelRuns := {
 
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
+    (
+      "manual tests with custom canton instance",
+      "test-full-class-names-signatures.log",
+      (t: String) => isManualSignatureIntegrationTest(t),
+    ),
     (
       "Unit tests",
       "test-full-class-names-non-integration.log",

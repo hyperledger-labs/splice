@@ -903,6 +903,16 @@
   },
   {
     "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "source.toolkit.fluxcd.io/v1",

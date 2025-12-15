@@ -486,7 +486,7 @@ trait PackageUploadIntegrationTest
       ) shouldBe (content.description.name, content.description.version, content.description.description)
       content.packages.map(_.packageId) should contain(mainPackageId)
 
-      val prim = participant1.packages.list(filterName = "daml-prim").headOption.value
+      val prim = participant1.packages.list(filterName = "daml-prim-DA-Types").headOption.value
       // just test whether we correctly can find the references for a given package
       participant1.packages.get_references(prim.packageId).map(_.name).toSet shouldBe Set(
         AdminWorkflowServices.PingDarResourceName,
@@ -547,13 +547,20 @@ trait PackageUploadIntegrationTest
         cantonExamplesMainPkgId
       )
 
+      // Wait for the package vetting to be effectively removed from the store
+      eventually() {
+        inStore(daId, participant4) should not contain cantonTestsMainPackageId
+      }
       // Now, remove the CantonExamples DAR
-      participant4.packages.synchronize_vetting()
       participant4.dars.remove(cantonExamplesMainPkgId)
       // Check that CantonExamples main package-id was removed
       participant4.packages
         .list(filterName = "CantonExamples")
         .map(_.packageId) should not contain cantonExamplesMainPkgId
+
+      eventually() {
+        inStore(daId, participant4) should not contain cantonExamplesMainPkgId
+      }
     }
   }
 

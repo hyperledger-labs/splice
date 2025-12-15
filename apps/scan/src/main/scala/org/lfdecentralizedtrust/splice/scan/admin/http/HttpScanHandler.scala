@@ -105,6 +105,7 @@ import com.digitalasset.canton.util.ErrorUtil
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
+import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.{RoundPartyTotals, RoundTotals}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory
@@ -118,6 +119,7 @@ class HttpScanHandler(
     participantAdminConnection: ParticipantAdminConnection,
     sequencerAdminConnection: SequencerAdminConnection,
     protected val storeWithIngestion: AppStoreWithIngestion[ScanStore],
+    updateHistory: UpdateHistory,
     snapshotStore: AcsSnapshotStore,
     eventStore: ScanEventStore,
     dsoAnsResolver: DsoAnsResolver,
@@ -136,6 +138,7 @@ class HttpScanHandler(
     with HttpValidatorLicensesHandler
     with HttpFeatureSupportHandler {
 
+  import HttpScanHandler.*
   private val store = storeWithIngestion.store
 
   override protected val workflowId: String = this.getClass.getSimpleName
@@ -773,7 +776,6 @@ class HttpScanHandler(
       extracted: TraceContext,
   ): Future[Vector[definitions.UpdateHistoryItem]] = {
     implicit val tc: TraceContext = extracted
-    val updateHistory = store.updateHistory
     val afterO = after.map { after =>
       val afterRecordTime = parseTimestamp(after.afterRecordTime)
       (
@@ -880,7 +882,7 @@ class HttpScanHandler(
     for {
       eventO <- eventStore.getEventByUpdateId(
         updateId,
-        store.updateHistory.domainMigrationInfo.currentMigrationId,
+        updateHistory.domainMigrationInfo.currentMigrationId,
       )
     } yield {
       eventO match {
@@ -922,7 +924,6 @@ class HttpScanHandler(
       extracted: TraceContext,
   ): Future[Vector[definitions.EventHistoryItem]] = {
     implicit val tc: TraceContext = extracted
-    val updateHistory = store.updateHistory
     val afterO = after.map { a =>
       val afterRecordTime = parseTimestamp(a.afterRecordTime)
       (a.afterMigrationId, afterRecordTime)
@@ -1274,7 +1275,7 @@ class HttpScanHandler(
           .sequentialTraverse(txLogEntryMap.view.toList) { case (cid, entry) =>
             // The update history ingests independently so this lookup can return None temporarily.
             // We just filter out those contracts.
-            store.updateHistory
+            updateHistory
               .lookupContractById(TransferCommand.COMPANION)(cid)
               .map(
                 _.map(c =>
@@ -1454,7 +1455,7 @@ class HttpScanHandler(
                   .asRuntimeException(),
               )
             )
-          snapshotTime <- snapshotStore.updateHistory
+          snapshotTime <- updateHistory
             .getUpdatesBefore(
               snapshotStore.currentMigrationId,
               synchronizerId,
@@ -1756,7 +1757,7 @@ class HttpScanHandler(
   ): Future[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]] = {
     implicit val tc = extracted
     for {
-      tx <- store.updateHistory.getUpdate(updateId)
+      tx <- updateHistory.getUpdate(updateId)
     } yield {
       tx.fold[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]](
         Left(
@@ -1895,25 +1896,7 @@ class HttpScanHandler(
       ensureValidRange(request.startRound, request.endRound, 200) {
         for {
           roundTotals <- store.getRoundTotals(request.startRound, request.endRound)
-          entries = roundTotals.map { roundTotal =>
-            definitions.RoundTotals(
-              closedRound = roundTotal.closedRound,
-              closedRoundEffectiveAt = java.time.OffsetDateTime
-                .ofInstant(roundTotal.closedRoundEffectiveAt.toInstant, ZoneOffset.UTC),
-              appRewards = Codec.encode(roundTotal.appRewards),
-              validatorRewards = Codec.encode(roundTotal.validatorRewards),
-              changeToInitialAmountAsOfRoundZero =
-                Codec.encode(roundTotal.changeToInitialAmountAsOfRoundZero),
-              changeToHoldingFeesRate = Codec.encode(roundTotal.changeToHoldingFeesRate),
-              cumulativeAppRewards = Codec.encode(roundTotal.cumulativeAppRewards),
-              cumulativeValidatorRewards = Codec.encode(roundTotal.cumulativeValidatorRewards),
-              cumulativeChangeToInitialAmountAsOfRoundZero =
-                Codec.encode(roundTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
-              cumulativeChangeToHoldingFeesRate =
-                Codec.encode(roundTotal.cumulativeChangeToHoldingFeesRate),
-              totalAmuletBalance = Codec.encode(roundTotal.totalAmuletBalance),
-            )
-          }
+          entries = roundTotals.map(encodeRoundTotals)
         } yield v0.ScanResource.ListRoundTotalsResponse.OK(
           definitions.ListRoundTotalsResponse(entries.toVector)
         )
@@ -1930,27 +1913,7 @@ class HttpScanHandler(
       ensureValidRange(request.startRound, request.endRound, 50) {
         for {
           roundPartyTotals <- store.getRoundPartyTotals(request.startRound, request.endRound)
-          entries = roundPartyTotals.map { roundPartyTotal =>
-            definitions.RoundPartyTotals(
-              closedRound = roundPartyTotal.closedRound,
-              party = roundPartyTotal.party,
-              appRewards = Codec.encode(roundPartyTotal.appRewards),
-              validatorRewards = Codec.encode(roundPartyTotal.validatorRewards),
-              trafficPurchased = roundPartyTotal.trafficPurchased,
-              trafficPurchasedCcSpent = Codec.encode(roundPartyTotal.trafficPurchasedCcSpent),
-              trafficNumPurchases = roundPartyTotal.trafficNumPurchases,
-              cumulativeAppRewards = Codec.encode(roundPartyTotal.cumulativeAppRewards),
-              cumulativeValidatorRewards = Codec.encode(roundPartyTotal.cumulativeValidatorRewards),
-              cumulativeChangeToInitialAmountAsOfRoundZero =
-                Codec.encode(roundPartyTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
-              cumulativeChangeToHoldingFeesRate =
-                Codec.encode(roundPartyTotal.cumulativeChangeToHoldingFeesRate),
-              cumulativeTrafficPurchased = roundPartyTotal.cumulativeTrafficPurchased,
-              cumulativeTrafficPurchasedCcSpent =
-                Codec.encode(roundPartyTotal.cumulativeTrafficPurchasedCcSpent),
-              cumulativeTrafficNumPurchases = roundPartyTotal.cumulativeTrafficNumPurchases,
-            )
-          }
+          entries = roundPartyTotals.map(encodeRoundPartyTotals)
         } yield v0.ScanResource.ListRoundPartyTotalsResponse.OK(
           definitions.ListRoundPartyTotalsResponse(entries.toVector)
         )
@@ -2092,7 +2055,7 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetMigrationInfoResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getMigrationInfo") { _ => _ =>
-      val sourceHistory = store.updateHistory.sourceHistory
+      val sourceHistory = updateHistory.sourceHistory
       for {
         infoO <- sourceHistory.migrationInfo(body.migrationId)
       } yield infoO match {
@@ -2125,7 +2088,6 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetUpdatesBeforeResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getUpdatesBefore") { _ => _ =>
-      val updateHistory = store.updateHistory
       updateHistory
         .getUpdatesBefore(
           migrationId = body.migrationId,
@@ -2156,7 +2118,6 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetImportUpdatesResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getImportUpdates") { _ => _ =>
-      val updateHistory = store.updateHistory
       updateHistory
         .getImportUpdates(
           migrationId = body.migrationId,
@@ -2286,7 +2247,7 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.getBackfillingStatus") { _ => _ =>
       for {
-        updateHistoryStatus <- store.updateHistory.getBackfillingState()
+        updateHistoryStatus <- updateHistory.getBackfillingState()
         txLogStatus <- store.multiDomainAcsStore.getTxLogBackfillingState()
         updateHistoryComplete = updateHistoryStatus == BackfillingState.Complete
         txLogComplete = txLogStatus == TxLogBackfillingState.Complete
@@ -2345,4 +2306,46 @@ object HttpScanHandler {
   // We expect a handful at most but want to somewhat guard against attacks
   // so we just hardcode a limit of 100.
   private val MAX_TRANSFER_COMMAND_CONTRACTS: Int = 100
+
+  def encodeRoundTotals(roundTotal: RoundTotals): definitions.RoundTotals = {
+    definitions.RoundTotals(
+      closedRound = roundTotal.closedRound,
+      closedRoundEffectiveAt = java.time.OffsetDateTime
+        .ofInstant(roundTotal.closedRoundEffectiveAt.toInstant, ZoneOffset.UTC),
+      appRewards = Codec.encode(roundTotal.appRewards),
+      validatorRewards = Codec.encode(roundTotal.validatorRewards),
+      changeToInitialAmountAsOfRoundZero =
+        Codec.encode(roundTotal.changeToInitialAmountAsOfRoundZero),
+      changeToHoldingFeesRate = Codec.encode(roundTotal.changeToHoldingFeesRate),
+      cumulativeAppRewards = Codec.encode(roundTotal.cumulativeAppRewards),
+      cumulativeValidatorRewards = Codec.encode(roundTotal.cumulativeValidatorRewards),
+      cumulativeChangeToInitialAmountAsOfRoundZero =
+        Codec.encode(roundTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
+      cumulativeChangeToHoldingFeesRate =
+        Codec.encode(roundTotal.cumulativeChangeToHoldingFeesRate),
+      totalAmuletBalance = Codec.encode(roundTotal.totalAmuletBalance),
+    )
+  }
+
+  def encodeRoundPartyTotals(roundPartyTotal: RoundPartyTotals): definitions.RoundPartyTotals = {
+    definitions.RoundPartyTotals(
+      closedRound = roundPartyTotal.closedRound,
+      party = roundPartyTotal.party,
+      appRewards = Codec.encode(roundPartyTotal.appRewards),
+      validatorRewards = Codec.encode(roundPartyTotal.validatorRewards),
+      trafficPurchased = roundPartyTotal.trafficPurchased,
+      trafficPurchasedCcSpent = Codec.encode(roundPartyTotal.trafficPurchasedCcSpent),
+      trafficNumPurchases = roundPartyTotal.trafficNumPurchases,
+      cumulativeAppRewards = Codec.encode(roundPartyTotal.cumulativeAppRewards),
+      cumulativeValidatorRewards = Codec.encode(roundPartyTotal.cumulativeValidatorRewards),
+      cumulativeChangeToInitialAmountAsOfRoundZero =
+        Codec.encode(roundPartyTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
+      cumulativeChangeToHoldingFeesRate =
+        Codec.encode(roundPartyTotal.cumulativeChangeToHoldingFeesRate),
+      cumulativeTrafficPurchased = roundPartyTotal.cumulativeTrafficPurchased,
+      cumulativeTrafficPurchasedCcSpent =
+        Codec.encode(roundPartyTotal.cumulativeTrafficPurchasedCcSpent),
+      cumulativeTrafficNumPurchases = roundPartyTotal.cumulativeTrafficNumPurchases,
+    )
+  }
 }

@@ -3,9 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.store
 
+import cats.data.NonEmptyList
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
-import com.daml.ledger.api.v2.transaction_filter.{EventFormat, CumulativeFilter}
+import com.daml.ledger.api.v2.transaction_filter.{CumulativeFilter, EventFormat}
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.{
   Interface,
   Template as TemplateCompanion,
@@ -18,7 +19,6 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
   ReassignmentEvent,
-  TreeUpdate,
   TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
@@ -64,16 +64,16 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
 
   import MultiDomainAcsStore.*
 
-  def lookupContractById[C, TCid <: ContractId[_], T](
+  def lookupContractById[C, TCid <: ContractId[?], T](
       companion: C
-  )(id: ContractId[_])(implicit
+  )(id: ContractId[?])(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]]
 
   /** Returns any contract of the same template as the passed companion.
     */
-  def findAnyContractWithOffset[C, TCid <: ContractId[_], T](
+  def findAnyContractWithOffset[C, TCid <: ContractId[?], T](
       companion: C
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
@@ -82,9 +82,9 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
 
   /** Check if the contract is active on the current domain.
     */
-  def lookupContractByIdOnDomain[C, TCid <: ContractId[_], T](
+  def lookupContractByIdOnDomain[C, TCid <: ContractId[?], T](
       companion: C
-  )(domain: SynchronizerId, id: ContractId[_])(implicit
+  )(domain: SynchronizerId, id: ContractId[?])(implicit
       ec: ExecutionContext,
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -112,9 +112,9 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
     *
     * Throws [[Status.NOT_FOUND]] if no such contract exists.
     */
-  final def getContractById[C, TCid <: ContractId[_], T](
+  final def getContractById[C, TCid <: ContractId[?], T](
       companion: C
-  )(id: ContractId[_])(implicit
+  )(id: ContractId[?])(implicit
       ec: ExecutionContext,
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -125,16 +125,16 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
     *
     * Throws [[Status.NOT_FOUND]] if no such contract exists.
     */
-  final def getContractByIdOnDomain[C, TCid <: ContractId[_], T](
+  final def getContractByIdOnDomain[C, TCid <: ContractId[?], T](
       companion: C
-  )(domain: SynchronizerId, id: ContractId[_])(implicit
+  )(domain: SynchronizerId, id: ContractId[?])(implicit
       ec: ExecutionContext,
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Contract[TCid, T]] =
     orContractIdNotFound(lookupContractByIdOnDomain(companion)(domain, id))(companion, id)
 
-  def listContractsPaginated[C, TCid <: ContractId[_], T](
+  def listContractsPaginated[C, TCid <: ContractId[?], T](
       companion: C,
       after: Option[Long],
       limit: Limit,
@@ -144,7 +144,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
       traceContext: TraceContext,
   ): Future[ResultsPage[ContractWithState[TCid, T]]]
 
-  def listContracts[C, TCid <: ContractId[_], T](
+  def listContracts[C, TCid <: ContractId[?], T](
       companion: C,
       limit: Limit = Limit.DefaultLimit,
   )(implicit
@@ -152,7 +152,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
       traceContext: TraceContext,
   ): Future[Seq[ContractWithState[TCid, T]]]
 
-  def listAssignedContracts[C, TCid <: ContractId[_], T](
+  def listAssignedContracts[C, TCid <: ContractId[?], T](
       companion: C,
       limit: Limit = Limit.DefaultLimit,
   )(implicit
@@ -166,7 +166,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
     * for contracts that exist in per-domain variations and are never transferred, e.g.,
     * install contracts.
     */
-  def listContractsOnDomain[C, TCid <: ContractId[_], T](
+  def listContractsOnDomain[C, TCid <: ContractId[?], T](
       companion: C,
       domain: SynchronizerId,
       limit: Limit = Limit.DefaultLimit,
@@ -185,7 +185,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
     * Note that the same contract can be returned multiple
     * times as it moves across domains.
     */
-  def streamAssignedContracts[C, TCid <: ContractId[_], T](
+  def streamAssignedContracts[C, TCid <: ContractId[?], T](
       companion: C
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
@@ -203,7 +203,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
   /** Returns true if the unassign event can still potentially be transferred in.
     * Intended to be used as a staleness check for the results of `streamReadyForAssign`.
     */
-  def isReadyForAssign(contractId: ContractId[_], out: ReassignmentId)(implicit
+  def isReadyForAssign(contractId: ContractId[?], out: ReassignmentId)(implicit
       tc: TraceContext
   ): Future[Boolean]
 
@@ -240,7 +240,7 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
   /** Testing API: returns all contracts that have in-flight reassignments */
   private[store] def listIncompleteReassignments()(implicit
       tc: TraceContext
-  ): Future[Map[ContractId[_], NonEmpty[Set[ReassignmentId]]]]
+  ): Future[Map[ContractId[?], NonEmpty[Set[ReassignmentId]]]]
 
   /** Testing API: lookup last ingested offset */
   private[store] def lookupLastIngestedOffset()(implicit tc: TraceContext): Future[Option[Long]]
@@ -303,6 +303,9 @@ object MultiDomainAcsStore extends StoreErrors {
         )
       }
     }
+
+    def getAcsIndexColumnNames: Seq[String]
+    def getInterfaceViewsIndexColumnNames: Seq[String]
   }
 
   private type DecodeFromCreatedEvent[TCid <: ContractId[T], T <: Template] =
@@ -351,6 +354,9 @@ object MultiDomainAcsStore extends StoreErrors {
         Identifier, // interfaces are not (currently) upgradeable, so we match by package-id
         InterfaceFilter[?, ?, ?, IR],
       ],
+  )(implicit
+      hasAcsIndexColumns: AcsRowData.HasIndexColumns[R],
+      hasInterfaceViewsIndexColumns: AcsRowData.HasIndexColumns[IR],
   ) extends ContractFilter[R, IR] {
 
     override val ingestionFilter =
@@ -359,6 +365,10 @@ object MultiDomainAcsStore extends StoreErrors {
         // In interface filters the ledger API warns when using a package id so we convert to a package name here.
         interfaceFilters.keys.map(PackageQualifiedName.getFromResources(_)).toSeq,
       )
+
+    def getAcsIndexColumnNames: Seq[String] = hasAcsIndexColumns.indexColumnNames
+    def getInterfaceViewsIndexColumnNames: Seq[String] =
+      hasInterfaceViewsIndexColumns.indexColumnNames
 
     override def contains(ev: CreatedEvent)(implicit elc: ErrorLoggingContext): Boolean = {
       val matchesTemplate = templateFilters
@@ -438,6 +448,8 @@ object MultiDomainAcsStore extends StoreErrors {
           PackageQualifiedName,
           TemplateFilter[?, ?, R],
         ],
+    )(implicit
+        hasAcsIndexColumns: AcsRowData.HasIndexColumns[R]
     ): SimpleContractFilter[R, AcsInterfaceViewRowData.NoInterfacesIngested] =
       SimpleContractFilter[R, AcsInterfaceViewRowData.NoInterfacesIngested](
         primaryParty,
@@ -556,7 +568,7 @@ object MultiDomainAcsStore extends StoreErrors {
     }
   }
 
-  trait ContractCompanion[-C, TCid <: ContractId[_], T] {
+  trait ContractCompanion[-C, TCid <: ContractId[?], T] {
     def fromCreatedEvent(
         companion: C
     )(
@@ -687,7 +699,7 @@ object MultiDomainAcsStore extends StoreErrors {
     * interfaces, but this is good enough for the current callers.
     */
   private[splice] type ConstrainedTemplate =
-    TemplateCompanion[_ <: ContractId[T], T] forSome {
+    TemplateCompanion[? <: ContractId[T], T] forSome {
       type T <: Template
     }
 
@@ -739,14 +751,9 @@ object MultiDomainAcsStore extends StoreErrors {
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
     )(implicit traceContext: TraceContext): Future[Unit]
 
-    def ingestUpdate(update: TreeUpdateOrOffsetCheckpoint)(implicit
+    def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
         traceContext: TraceContext
     ): Future[Unit]
-
-    final def ingestUpdate(synchronizerId: SynchronizerId, update: TreeUpdate)(implicit
-        traceContext: TraceContext
-    ): Future[Unit] =
-      ingestUpdate(TreeUpdateOrOffsetCheckpoint.Update(update, synchronizerId))
   }
 
   object IngestionSink {
@@ -816,7 +823,7 @@ object MultiDomainAcsStore extends StoreErrors {
     * is defined based as the highest transfer counter
     */
   case class ContractStateEvent(
-      contractId: ContractId[_],
+      contractId: ContractId[?],
       transferCounter: Long,
       state: StoreContractState,
   ) extends PrettyPrinting {
@@ -833,7 +840,7 @@ object MultiDomainAcsStore extends StoreErrors {
     )
   }
 
-  private def orContractIdNotFound[A, C](found: Future[Option[A]])(companion: C, id: ContractId[_])(
+  private def orContractIdNotFound[A, C](found: Future[Option[A]])(companion: C, id: ContractId[?])(
       implicit
       ec: ExecutionContext,
       companionClass: ContractCompanion[C, ?, ?],

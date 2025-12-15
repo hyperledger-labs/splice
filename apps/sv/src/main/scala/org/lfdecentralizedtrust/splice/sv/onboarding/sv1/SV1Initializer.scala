@@ -9,6 +9,7 @@ import cats.implicits.{
   catsSyntaxTuple4Semigroupal,
 }
 import cats.syntax.functorFilter.*
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.config.{
@@ -59,7 +60,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnectionPoolDelays,
@@ -93,6 +94,7 @@ import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
@@ -114,7 +116,7 @@ class SV1Initializer(
     override protected val clock: Clock,
     override protected val domainTimeSync: DomainTimeSynchronization,
     override protected val domainUnpausedSync: DomainUnpausedSynchronization,
-    override protected val storage: Storage,
+    override protected val storage: DbStorage,
     override protected val retryProvider: RetryProvider,
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -126,6 +128,8 @@ class SV1Initializer(
     closeContext: CloseContext,
     mat: Materializer,
     tracer: Tracer,
+    esf: ExecutionSequencerFactory,
+    actorSystem: ActorSystem,
 ) extends NodeInitializerUtil {
 
   import SV1Initializer.bootstrapTransactionOrdering
@@ -190,7 +194,7 @@ class SV1Initializer(
               )
             ),
             PositiveInt.one,
-            // TODO(#2110) Rethink this when we enable sequencer connection pools.
+            // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
             config.participantClient.sequencerRequestAmplification,
             // TODO(#2666) Make the delays configurable.
@@ -203,11 +207,22 @@ class SV1Initializer(
             observationLatency = config.timeTrackerObservationLatency,
           ),
         ),
+        newSequencerConnectionPool = config.parameters.enabledFeatures.newSequencerConnectionPool,
         overwriteExistingConnection =
           false, // The validator will manage sequencer connections after initial setup
         retryFor = RetryFor.WaitingOnInitDependency,
       )
       _ = logger.info("Participant connected to domain")
+      _ <- ensureCantonNodesOTKRotatedIfNeeded(
+        config.skipSynchronizerInitialization,
+        cantonIdentifierConfig,
+        Some(localSynchronizerNode),
+        clock,
+        loggerFactory,
+        retryProvider,
+        synchronizerId,
+      )
+      _ = logger.info("Synchronizer rotated OTK keys that were not signed")
       (dsoParty, svParty, _) <- (
         setupDsoParty(synchronizerId, initConnection, namespace),
         SetupUtil.setupSvParty(
@@ -466,7 +481,7 @@ class SV1Initializer(
         val values = initialValues.tryUpdate(
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =
-            PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval),
+            PositiveSeconds.fromConfig(sv1Config.acsCommitmentReconciliationInterval),
           acsCommitmentsCatchUp = Some(SvUtil.defaultAcsCommitmentsCatchUpParameters),
           preparationTimeRecordTimeTolerance =
             NonNegativeFiniteDuration.fromConfig(config.preparationTimeRecordTimeTolerance),
@@ -635,7 +650,11 @@ class SV1Initializer(
     private def bootstrapDso(initialRound: Long, packageVersionSupport: PackageVersionSupport)(
         implicit tc: TraceContext
     ): Future[Unit] = {
-      val dsoRulesConfig = SvUtil.defaultDsoRulesConfig(synchronizerId, sv1Config.voteCooldownTime)
+      val dsoRulesConfig = SvUtil.defaultDsoRulesConfig(
+        synchronizerId,
+        sv1Config.voteCooldownTime,
+        sv1Config.acsCommitmentReconciliationInterval,
+      )
       for {
         (participantId, trafficStateForAllMembers, amuletRules, dsoRules) <- (
           participantAdminConnection.getParticipantId(),

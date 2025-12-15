@@ -42,7 +42,7 @@ class OptionalTopologyMappingChecks(
     loggerFactory: NamedLoggerFactory,
 )(implicit
     executionContext: ExecutionContext
-) extends TopologyMappingChecksWithStore(store, loggerFactory) {
+) extends TopologyMappingChecksWithStore(MaybeEmptyTopologyStore(store), loggerFactory) {
 
   private def loadHistoryFromStore(
       effectiveTime: EffectiveTime,
@@ -87,6 +87,7 @@ class OptionalTopologyMappingChecks(
       toValidate: GenericSignedTopologyTransaction,
       inStore: Option[GenericSignedTopologyTransaction],
       pendingChangesLookup: PendingChangesLookup,
+      relaxChecksForBackwardsCompatibility: Boolean,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TopologyTransactionRejection, Unit] = {

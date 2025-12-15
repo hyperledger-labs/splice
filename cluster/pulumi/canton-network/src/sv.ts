@@ -43,6 +43,7 @@ import {
   approvedSvIdentities,
   CantonBftSynchronizerNode,
   CometbftSynchronizerNode,
+  configForSv,
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
   installSvLoopback,
@@ -53,6 +54,7 @@ import { installValidatorApp } from '@lfdecentralizedtrust/splice-pulumi-common-
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { initialAmuletPrice } from '@lfdecentralizedtrust/splice-pulumi-common/src/initialAmuletPrice';
 import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
+import { topologySnapshotConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/topology-snapshot';
 import { Resource } from '@pulumi/pulumi';
 
 import {
@@ -130,9 +132,7 @@ export async function installSvNode(
 
   const auth0Secrets: CnInput<pulumi.Resource>[] = await installSvAppSecrets(
     xns,
-    baseConfig.auth0Client,
-    baseConfig.auth0SvAppName,
-    baseConfig.nodeName
+    baseConfig.auth0Client
   );
 
   const periodicBackupConfig: BackupConfig | undefined = baseConfig.periodicBackupConfig
@@ -147,6 +147,15 @@ export async function installSvNode(
       }
     : undefined;
 
+  const svConfig = configForSv(baseConfig.nodeName);
+  const periodicTopologySnapshotConfig: BackupConfig | undefined = svConfig.periodicSnapshots
+    ?.topology
+    ? await topologySnapshotConfig(
+        svConfig.periodicSnapshots?.topology,
+        `${CLUSTER_BASENAME}/${xns.logicalName}`
+      )
+    : undefined;
+
   const identitiesBackupLocation = {
     ...baseConfig.identitiesBackupLocation,
     prefix: baseConfig.identitiesBackupLocation.prefix || `${CLUSTER_BASENAME}/${xns.logicalName}`,
@@ -158,6 +167,10 @@ export async function installSvNode(
     xns,
     config.identitiesBackupLocation.bucket
   );
+
+  const topologySnapshotConfigSecret = periodicTopologySnapshotConfig
+    ? installBootstrapDataBucketSecret(xns, periodicTopologySnapshotConfig.location.bucket)
+    : undefined;
 
   const backupConfigSecret: pulumi.Resource | undefined = config.periodicBackupConfig
     ? config.periodicBackupConfig.location.bucket != config.identitiesBackupLocation.bucket
@@ -189,6 +202,7 @@ export async function installSvNode(
     )
     .concat([identitiesBackupConfigSecret])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
+    .concat(topologySnapshotConfigSecret ? [topologySnapshotConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
     .concat(loopback)
     .concat(imagePullDeps)
@@ -242,7 +256,7 @@ export async function installSvNode(
 
   const svApp = installSvApp(
     decentralizedSynchronizerUpgradeConfig,
-    config,
+    { ...config, periodicTopologySnapshotConfig },
     xns,
     dependsOn,
     appsPostgres,
@@ -379,6 +393,7 @@ async function installValidator(
     sweep: svConfig.sweep,
     nodeIdentifier: svConfig.onboardingName,
     logLevel: svConfig.logging?.appsLogLevel,
+    logAsync: svConfig.logging?.appsAsync,
     additionalEnvVars: [
       ...(bftSequencerConnection
         ? []
@@ -503,7 +518,7 @@ function installSvApp(
     onboardingPollingInterval: config.onboardingPollingInterval,
     enablePostgresMetrics: true,
     auth: {
-      audience: getSvAppApiAudience(config.auth0Client.getCfg()),
+      audience: getSvAppApiAudience(config.auth0Client.getCfg(), xns.logicalName),
       jwksUrl: `https://${config.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
     },
     contactPoint: daContactPoint,
@@ -513,8 +528,10 @@ function installSvApp(
       delegatelessAutomationExpiredRewardCouponBatchSize,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: config.logging?.appsLogLevel,
+    logAsyncFlush: config.logging?.appsAsync,
     additionalEnvVars,
     resources: config.svApp?.resources,
+    periodicTopologySnapshotConfig: config.periodicTopologySnapshotConfig,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -584,6 +601,7 @@ function installScan(
       : {}),
     enablePostgresMetrics: true,
     logLevel: config.logging?.appsLogLevel,
+    logAsyncFlush: config.logging?.appsAsync,
     additionalEnvVars: config.scanApp?.additionalEnvVars || [],
     resources: config.scanApp?.resources,
   };

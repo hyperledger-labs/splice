@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.splitwell.config.SplitwellSynchronizerConfig
 import org.lfdecentralizedtrust.splice.splitwell.store.SplitwellStore
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.{LimitHelpers, MultiDomainAcsStore}
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsInterfaceViewRowData,
@@ -30,7 +30,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -44,6 +44,7 @@ class DbSplitwellStore(
     override protected val retryProvider: RetryProvider,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    ingestionConfig: IngestionConfig,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -64,10 +65,7 @@ class DbSplitwellStore(
         ),
       ),
       domainMigrationInfo = domainMigrationInfo,
-      participantId = participantId,
-      enableissue12777Workaround = false,
-      enableImportUpdateBackfill = false,
-      BackfillingRequirement.BackfillingNotRequired,
+      ingestionConfig,
     )
     with AcsTables
     with AcsQueries
@@ -385,8 +383,8 @@ class DbSplitwellStore(
   }
 
   private def listLaggingContracts[LeaderC, LeaderTCid <: ContractId[
-    _
-  ], LeaderT, FollowerC, FollowerTCid <: ContractId[_], FollowerT, Id](
+    ?
+  ], LeaderT, FollowerC, FollowerTCid <: ContractId[?], FollowerT, Id](
       leaderCompanion: LeaderC,
       followerCompanion: FollowerC,
       getLeaderId: LeaderT => Id,

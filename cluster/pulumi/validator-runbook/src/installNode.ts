@@ -37,6 +37,7 @@ import {
   failOnAppVersionMismatch,
   networkWideConfig,
   getValidatorAppApiAudience,
+  getNamespaceConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { installParticipant } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
@@ -64,6 +65,8 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   );
 
   const xns = exactNamespace(validatorConfig.namespace, true);
+
+  auth0Client.reuseNamespaceConfig('validator', xns.logicalName);
 
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
@@ -178,11 +181,6 @@ async function installValidator(
     },
   };
 
-  const validatorNameSpaceAuth0Clients = auth0Client.getCfg().namespaceToUiToClientId['validator'];
-  if (!validatorNameSpaceAuth0Clients) {
-    throw new Error('No validator namespace in auth0 config');
-  }
-
   const validatorSecrets = await installValidatorSecrets(xns, auth0Client);
 
   const validatorValuesFromYamlFiles = {
@@ -203,6 +201,10 @@ async function installValidator(
     ),
   };
 
+  if (validatorConfig.validatorApp?.scanClient != null) {
+    delete validatorValuesFromYamlFiles.scanAddress;
+  }
+
   const newParticipantIdentifier =
     validatorConfig.newParticipantId ||
     validatorValuesFromYamlFiles?.participantIdentitiesDumpImport?.newParticipantIdentifier;
@@ -215,6 +217,7 @@ async function installValidator(
         ? true
         : validatorValuesFromYamlFiles.migration.migrating,
     },
+    scanClient: validatorConfig.validatorApp?.scanClient,
     metrics: {
       enable: true,
     },
@@ -255,7 +258,7 @@ async function installValidator(
     ...validatorValuesWithOnboardingOverride,
     auth: {
       ...validatorValuesWithOnboardingOverride.auth,
-      audience: getValidatorAppApiAudience(auth0Client.getCfg()),
+      audience: getValidatorAppApiAudience(auth0Client.getCfg(), xns.logicalName),
     },
   };
 
@@ -269,7 +272,7 @@ async function installValidator(
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
-  const cnsUiClientId = validatorNameSpaceAuth0Clients['cns'];
+  const cnsUiClientId = getNamespaceConfig(auth0Client.getCfg(), xns.logicalName).uiClientIds.cns;
   if (!cnsUiClientId) {
     throw new Error('No validator ui client id in auth0 config');
   }

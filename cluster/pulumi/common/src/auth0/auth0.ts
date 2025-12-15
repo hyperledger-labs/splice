@@ -8,15 +8,18 @@ import { Output } from '@pulumi/pulumi';
 import { AuthenticationClient, ManagementClient, TokenSet } from 'auth0';
 
 import { config, isMainNet } from '../config';
-import { CLUSTER_BASENAME, fixedTokens } from '../utils';
+import { infraStack } from '../stackReferences';
+import { fixedTokens } from '../utils';
+import { DEFAULT_AUDIENCE } from './audiences';
 import type {
   Auth0Client,
   Auth0SecretMap,
   Auth0ClientAccessToken,
   Auth0ClientSecret,
-  ClientIdMap,
   Auth0Config,
   Auth0ClusterConfig,
+  Auth0NamespaceConfig,
+  NamespacedAuth0Configs,
 } from './auth0types';
 
 type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
@@ -57,6 +60,20 @@ export class Auth0Fetch implements Auth0Client {
 
   public getCfg(): Auth0Config {
     return this.cfg;
+  }
+
+  // Any namespace that we deploy using validator-runbook stack currently reuses the
+  // Auth0 artifacts from the 'validator' namespace, so we just copy the config over
+  // so that any lookup by namespace will just work.
+  public reuseNamespaceConfig(fromNamespace: string, toNamespace: string): void {
+    if (fromNamespace === toNamespace) {
+      // Nothing to do
+      return;
+    }
+    if (!this.cfg.namespacedConfigs[fromNamespace]) {
+      throw new Error(`No Auth0 configuration for namespace ${fromNamespace}`);
+    }
+    this.cfg.namespacedConfigs[toNamespace] = this.cfg.namespacedConfigs[fromNamespace];
   }
 
   private async loadSecrets(): Promise<Auth0SecretMap> {
@@ -253,16 +270,6 @@ export class Auth0Fetch implements Auth0Client {
   }
 }
 
-export function requireAuth0ClientId(clientIdMap: ClientIdMap, app: string): string {
-  const appClientId = clientIdMap[app];
-
-  if (!appClientId) {
-    throw new Error(`Unknown Auth0 client ID for app: ${app}, ${JSON.stringify(clientIdMap)}`);
-  }
-
-  return appClientId;
-}
-
 export function auth0UserNameEnvVar(
   name: string,
   secretName: string | null = null
@@ -294,9 +301,221 @@ export enum Auth0ClientType {
   MAINSTACK,
 }
 
+export function getAuth0ClusterConfig(): Output<Auth0ClusterConfig> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const infraOutput: pulumi.Output<any> = infraStack.requireOutput('auth0');
+  return infraOutput.apply(output => {
+    if (
+      (output['cantonNetwork'] && output['cantonNetwork']['appToClientId'] === undefined) ||
+      (output['mainnet'] && output['mainnet']['appToClientId'] === undefined)
+    ) {
+      // Infra is already on the new version, and its output is correctly typed
+      return output as Auth0ClusterConfig;
+    }
+
+    // Infra is on the older version, and we need to massage it into the new shape
+    const cnNamespaces: NamespacedAuth0Configs = {};
+    let cn: Auth0Config | undefined = undefined;
+    if (output['cantonNetwork']) {
+      // TODO(#2873): remove this once infra on all clusters has been migrated
+      for (let i = 1; i <= 16; i++) {
+        if (output['cantonNetwork']['namespaceToUiToClientId'][`sv-${i}`]) {
+          cnNamespaces[`sv-${i}`] = {
+            audiences: {
+              ledgerApi:
+                output['cantonNetwork']['appToApiAudience']['participant'] || DEFAULT_AUDIENCE,
+              validatorApi:
+                output['cantonNetwork']['appToApiAudience']['validator'] || DEFAULT_AUDIENCE,
+              svAppApi: output['cantonNetwork']['appToApiAudience']['sv'] || DEFAULT_AUDIENCE,
+            },
+            backendClientIds: {
+              svApp: output['cantonNetwork']['appToClientId'][`sv-${i}`],
+              validator: output['cantonNetwork']['appToClientId'][`sv${i}_validator`],
+            },
+            uiClientIds: {
+              wallet: output['cantonNetwork']['namespaceToUiToClientId'][`sv-${i}`]['wallet'],
+              cns: output['cantonNetwork']['namespaceToUiToClientId'][`sv-${i}`]['cns'],
+              sv: output['cantonNetwork']['namespaceToUiToClientId'][`sv-${i}`]['sv'],
+            },
+          };
+        }
+      }
+
+      if (output['cantonNetwork']['namespaceToUiToClientId']['sv-da-1']) {
+        cnNamespaces['sv-da-1'] = {
+          audiences: {
+            ledgerApi:
+              output['cantonNetwork']['appToApiAudience']['participant'] || DEFAULT_AUDIENCE,
+            validatorApi:
+              output['cantonNetwork']['appToApiAudience']['validator'] || DEFAULT_AUDIENCE,
+            svAppApi: output['cantonNetwork']['appToApiAudience']['sv'] || DEFAULT_AUDIENCE,
+          },
+          backendClientIds: {
+            svApp: output['cantonNetwork']['appToClientId']['sv-da-1']!,
+            validator: output['cantonNetwork']['appToClientId']['sv-da-1_validator']!,
+          },
+          uiClientIds: {
+            wallet: output['cantonNetwork']['namespaceToUiToClientId']['sv-da-1']['wallet']!,
+            cns: output['cantonNetwork']['namespaceToUiToClientId']['sv-da-1']['cns']!,
+            sv: output['cantonNetwork']['namespaceToUiToClientId']['sv-da-1']['sv']!,
+          },
+        };
+      }
+
+      if (output['cantonNetwork']['namespaceToUiToClientId']['splitwell']) {
+        cnNamespaces['splitwell'] = {
+          audiences: {
+            ledgerApi:
+              output['cantonNetwork']['appToApiAudience']['participant'] || DEFAULT_AUDIENCE,
+            validatorApi:
+              output['cantonNetwork']['appToApiAudience']['validator'] || DEFAULT_AUDIENCE,
+            svAppApi: output['cantonNetwork']['appToApiAudience']['sv'] || DEFAULT_AUDIENCE,
+          },
+          backendClientIds: {
+            validator: output['cantonNetwork']['appToClientId']['splitwell_validator']!,
+            splitwell: output['cantonNetwork']['appToClientId']['splitwell']!,
+          },
+          uiClientIds: {
+            splitwell:
+              output['cantonNetwork']['namespaceToUiToClientId']['splitwell']['splitwell']!,
+            wallet: output['cantonNetwork']['namespaceToUiToClientId']['splitwell']['wallet']!,
+            cns: output['cantonNetwork']['namespaceToUiToClientId']['splitwell']['cns']!,
+          },
+        };
+      }
+
+      if (output['cantonNetwork']['namespaceToUiToClientId']['validator1']) {
+        cnNamespaces['validator1'] = {
+          audiences: {
+            ledgerApi:
+              output['cantonNetwork']['appToApiAudience']['participant'] || DEFAULT_AUDIENCE,
+            validatorApi:
+              output['cantonNetwork']['appToApiAudience']['validator'] || DEFAULT_AUDIENCE,
+          },
+          backendClientIds: {
+            validator: output['cantonNetwork']['appToClientId']['validator1']!,
+          },
+          uiClientIds: {
+            wallet: output['cantonNetwork']['namespaceToUiToClientId']['validator1']['wallet']!,
+            cns: output['cantonNetwork']['namespaceToUiToClientId']['validator1']['cns']!,
+            splitwell:
+              output['cantonNetwork']['namespaceToUiToClientId']['validator1']['splitwell']!,
+          },
+        };
+      }
+      cn = {
+        namespacedConfigs: cnNamespaces,
+        auth0Domain: output['cantonNetwork']['auth0Domain']!,
+        auth0MgtClientId: output['cantonNetwork']['auth0MgtClientId']!,
+        auth0MgtClientSecret: output['cantonNetwork']['auth0MgtClientSecret']!,
+        fixedTokenCacheName: output['cantonNetwork']['fixedTokenCacheName']!,
+      };
+    }
+
+    const svRunbookNamespaces: NamespacedAuth0Configs = {};
+    let svRunbook: Auth0Config | undefined = undefined;
+    if (output['svRunbook']) {
+      svRunbookNamespaces['sv'] = {
+        audiences: {
+          ledgerApi: output['svRunbook']['appToApiAudience']['participant'] || DEFAULT_AUDIENCE,
+          validatorApi: output['svRunbook']['appToApiAudience']['validator'] || DEFAULT_AUDIENCE,
+          svAppApi: output['svRunbook']['appToApiAudience']['sv'] || DEFAULT_AUDIENCE,
+        },
+        backendClientIds: {
+          svApp: output['svRunbook']['appToClientId']['sv']!,
+          validator: output['svRunbook']['appToClientId']['validator']!,
+        },
+        uiClientIds: {
+          wallet: output['svRunbook']['namespaceToUiToClientId']['sv']['wallet']!,
+          cns: output['svRunbook']['namespaceToUiToClientId']['sv']['cns']!,
+          sv: output['svRunbook']['namespaceToUiToClientId']['sv']['sv']!,
+        },
+      };
+      svRunbook = {
+        namespacedConfigs: svRunbookNamespaces,
+        auth0Domain: output['svRunbook']['auth0Domain']!,
+        auth0MgtClientId: output['svRunbook']['auth0MgtClientId']!,
+        auth0MgtClientSecret: output['svRunbook']['auth0MgtClientSecret']!,
+        fixedTokenCacheName: output['svRunbook']['fixedTokenCacheName']!,
+      };
+    }
+
+    let validatorRunbook: Auth0Config | undefined = undefined;
+    if (output['validatorRunbook']) {
+      const validatorRunbookNamespaces: NamespacedAuth0Configs = {};
+      validatorRunbookNamespaces['validator'] = {
+        audiences: {
+          ledgerApi:
+            output['validatorRunbook']['appToApiAudience']['participant'] || DEFAULT_AUDIENCE,
+          validatorApi:
+            output['validatorRunbook']['appToApiAudience']['validator'] || DEFAULT_AUDIENCE,
+        },
+        backendClientIds: {
+          validator: output['validatorRunbook']['appToClientId']['validator']!,
+        },
+        uiClientIds: {
+          wallet: output['validatorRunbook']['namespaceToUiToClientId']['validator']['wallet']!,
+          cns: output['validatorRunbook']['namespaceToUiToClientId']['validator']['cns']!,
+        },
+      };
+      validatorRunbook = {
+        namespacedConfigs: validatorRunbookNamespaces,
+        auth0Domain: output['validatorRunbook']['auth0Domain']!,
+        auth0MgtClientId: output['validatorRunbook']['auth0MgtClientId']!,
+        auth0MgtClientSecret: output['validatorRunbook']['auth0MgtClientSecret']!,
+        fixedTokenCacheName: output['validatorRunbook']['fixedTokenCacheName']!,
+      };
+    }
+
+    const mainNet: Auth0Config | undefined = undefined;
+    if (output['mainNet']) {
+      const mainNetNamespaces: NamespacedAuth0Configs = {};
+      mainNetNamespaces['sv-1'] = {
+        audiences: {
+          ledgerApi: output['mainNet']['appToApiAudience']['participant'] || DEFAULT_AUDIENCE,
+          validatorApi: output['mainNet']['appToApiAudience']['validator'] || DEFAULT_AUDIENCE,
+          svAppApi: output['mainNet']['appToApiAudience']['sv'] || DEFAULT_AUDIENCE,
+        },
+        backendClientIds: {
+          svApp: output['mainNet']['appToClientId']['sv']!,
+          validator: output['mainNet']['appToClientId']['validator']!,
+        },
+        uiClientIds: {
+          wallet: output['mainNet']['namespaceToUiToClientId']['sv-1']['wallet']!,
+          cns: output['mainNet']['namespaceToUiToClientId']['sv-1']['cns']!,
+          sv: output['mainNet']['namespaceToUiToClientId']['sv-1']['sv']!,
+        },
+      };
+      mainNetNamespaces['sv-da-1'] = {
+        audiences: {
+          ledgerApi: output['mainNet']['appToApiAudience']['participant'] || DEFAULT_AUDIENCE,
+          validatorApi: output['mainNet']['appToApiAudience']['validator'] || DEFAULT_AUDIENCE,
+          svAppApi: output['mainNet']['appToApiAudience']['sv'] || DEFAULT_AUDIENCE,
+        },
+        backendClientIds: {
+          svApp: output['mainNet']['appToClientId']['sv-da-1']!,
+          validator: output['mainNet']['appToClientId']['sv-da-1_validator']!,
+        },
+        uiClientIds: {
+          wallet: output['mainNet']['namespaceToUiToClientId']['sv-da-1']['wallet']!,
+          cns: output['mainNet']['namespaceToUiToClientId']['sv-da-1']['cns']!,
+          sv: output['mainNet']['namespaceToUiToClientId']['sv-da-1']['sv']!,
+        },
+      };
+    }
+
+    const newOutput: Auth0ClusterConfig = {
+      cantonNetwork: cn,
+      svRunbook: svRunbook,
+      validatorRunbook: validatorRunbook,
+      mainnet: mainNet,
+    };
+    return newOutput;
+  });
+}
+
 export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> {
-  const infraStack = new pulumi.StackReference(`organization/infra/infra.${CLUSTER_BASENAME}`);
-  const auth0ClusterCfg = infraStack.requireOutput('auth0') as pulumi.Output<Auth0ClusterConfig>;
+  const auth0ClusterCfg = getAuth0ClusterConfig();
   switch (clientType) {
     case Auth0ClientType.RUNBOOK:
       if (!auth0ClusterCfg.svRunbook) {
@@ -334,6 +553,17 @@ export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> 
         });
       }
   }
+}
+
+export function getNamespaceConfig(
+  auth0Config: Auth0Config,
+  namespace: string
+): Auth0NamespaceConfig {
+  const nsConfig = auth0Config.namespacedConfigs[namespace];
+  if (!nsConfig) {
+    throw new Error(`No Auth0 configuration for namespace ${namespace}`);
+  }
+  return nsConfig;
 }
 
 export const svUserIds = (auth0Cfg: Auth0Config): Output<string[]> => {

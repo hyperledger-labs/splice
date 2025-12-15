@@ -27,12 +27,15 @@ import org.lfdecentralizedtrust.splice.config.{
   GcpBucketConfig,
   LedgerApiClientConfig,
   ParticipantBootstrapDumpConfig,
+  PeriodicBackupDumpConfig,
+  PruningConfig,
   SpliceBackendConfig,
   SpliceInstanceNamesConfig,
   SpliceParametersConfig,
 }
 import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources}
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
 
 import java.nio.file.Path
@@ -78,6 +81,8 @@ object SvBootstrapDumpConfig {
 
 object SvOnboardingConfig {
   case class FoundDso(
+      acsCommitmentReconciliationInterval: PositiveDurationSeconds =
+        SvUtil.defaultAcsCommitmentReconciliationInterval,
       name: String,
       firstSvRewardWeightBps: Long,
       dsoPartyHint: String = "DSO",
@@ -284,7 +289,7 @@ case class SvAppBackendConfig(
     initialAmuletPriceVote: Option[BigDecimal] = None,
     cometBftConfig: Option[SvCometBftConfig] = None,
     localSynchronizerNode: Option[SvSynchronizerNodeConfig],
-    scan: Option[SvScanConfig],
+    scan: SvScanConfig,
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
     domainMigrationDumpPath: Option[Path] = None,
@@ -309,10 +314,10 @@ case class SvAppBackendConfig(
     // so it can produce a more recent acknowledgement.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(30),
-    // If observation latency is set to 5s, time proofs will be created 5s in the future so if a node receives an event within those 5s
+    // If observation latency is set to 10s, time proofs will be created 10s in the future so if a node receives an event within those 10s
     // it will never send a time proof.
     timeTrackerObservationLatency: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofSeconds(5),
+      NonNegativeFiniteDuration.ofSeconds(10),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[SvCantonIdentifierConfig] = None,
     legacyMigrationId: Option[Long] = None,
@@ -335,6 +340,8 @@ case class SvAppBackendConfig(
     // every SV tries to convert markers from any other SV's book of work (in a contention avoiding fashion)
     delegatelessAutomationFeaturedAppActivityMarkerCatchupThreshold: Int = 10_000,
     delegatelessAutomationExpiredAmuletBatchSize: Int = 100,
+    // configuration to periodically take topology snapshots
+    topologySnapshotConfig: Option[PeriodicBackupDumpConfig] = None,
     bftSequencerConnection: Boolean = true,
     // Skip synchronizer initialization and synchronizer config reconciliation.
     // Can be safely set to true for an SV that has completed onboarding unless you
@@ -448,6 +455,13 @@ final case class SvMediatorConfig(
     adminApi: FullClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
       SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification,
+    pruning: Option[PruningConfig] = Some(
+      PruningConfig(
+        cron = "0 /10 * * * ?", // Run every 10min,
+        maxDuration = PositiveDurationSeconds.ofMinutes(5),
+        retention = PositiveDurationSeconds.ofDays(30),
+      )
+    ),
 ) {
 
   def toCantonConfig: RemoteMediatorConfig = RemoteMediatorConfig(

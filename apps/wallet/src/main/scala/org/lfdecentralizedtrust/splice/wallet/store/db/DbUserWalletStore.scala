@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{AcsStoreId, SelectFromAcsTableResult}
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
@@ -44,7 +44,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import slick.jdbc.canton.SQLActionBuilder
 
@@ -58,6 +58,7 @@ class DbUserWalletStore(
     override protected val retryProvider: RetryProvider,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    ingestionConfig: IngestionConfig,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -94,10 +95,7 @@ class DbUserWalletStore(
         ),
       ),
       domainMigrationInfo,
-      participantId,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = false,
-      BackfillingRequirement.BackfillingNotRequired,
+      ingestionConfig,
     )
     with UserWalletStore
     with AcsTables
@@ -114,7 +112,7 @@ class DbUserWalletStore(
 
   override def toString: String = show"DbUserWalletStore(endUserParty=${key.endUserParty})"
 
-  override protected def acsContractFilter
+  override def acsContractFilter
       : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
         org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletAcsStoreRowData,
         org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletAcsInterfaceViewRowData,
@@ -190,7 +188,7 @@ class DbUserWalletStore(
       ccValue = sql"rti.issuance * acs.reward_coupon_weight",
     )
 
-  private def listSortedRewardCoupons[C, TCid <: ContractId[_], T](
+  private def listSortedRewardCoupons[C, TCid <: ContractId[?], T](
       companion: C,
       issuingRoundsMap: Map[Round, IssuingMiningRound],
       roundToIssuance: IssuingMiningRound => Option[BigDecimal],

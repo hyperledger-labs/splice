@@ -105,10 +105,11 @@ case class SpliceConfig(
     ),
     features: CantonFeatures = CantonFeatures(),
     override val pekkoConfig: Option[Config] = None,
-) extends ConfigDefaults[DefaultPorts, SpliceConfig]
+) extends ConfigDefaults[Option[DefaultPorts], SpliceConfig]
     with SharedCantonConfig[SpliceConfig] {
 
-  override def withDefaults(defaults: DefaultPorts, edition: CantonEdition): SpliceConfig = this
+  override def withDefaults(defaults: Option[DefaultPorts], edition: CantonEdition): SpliceConfig =
+    this
 
   // TODO(DACH-NY/canton-network-node#736): we want to remove all of the configurations options below:
   override val participants: Map[InstanceName, ParticipantNodeConfig] = Map.empty
@@ -329,7 +330,8 @@ object SpliceConfig {
       case Right(resolvedConfig) =>
         loadRawConfig(resolvedConfig)
           .flatMap { conf =>
-            val confWithDefaults = conf.withDefaults(new DefaultPorts(), CommunityCantonEdition)
+            val confWithDefaults =
+              conf.withDefaults(Some(DefaultPorts.create()), CommunityCantonEdition)
             confWithDefaults.validate.toEither
               .map(_ => confWithDefaults)
               .leftMap(causes => ConfigErrors.ValidationError.Error(causes.toList))
@@ -360,16 +362,17 @@ object SpliceConfig {
       loaded <- loadAndValidate(parsedAndMerged)
     } yield loaded
 
-  import CantonConfig.*
   import pureconfig.generic.semiauto.*
+
+  private val cantonConfigReaders = new CantonConfig.ConfigReaders()(elc)
 
   class ConfigReaders(implicit
       private val
       elc: ErrorLoggingContext
   ) {
-    import CantonConfig.ConfigReaders.*
     import BaseCantonConfig.Readers.*
-    import CantonConfig.ConfigReaders.dbConfigReader
+
+    import cantonConfigReaders.*
 
     implicit val configReader: ConfigReader[SynchronizerAlias] = ConfigReader.fromString(str =>
       SynchronizerAlias.create(str).left.map(err => CannotConvert(str, "SynchronizerAlias", err))
@@ -420,6 +423,7 @@ object SpliceConfig {
 
     implicit val upgradesConfig: ConfigReader[UpgradesConfig] = deriveReader[UpgradesConfig]
 
+    implicit val ingestionConfig: ConfigReader[IngestionConfig] = deriveReader[IngestionConfig]
     implicit val automationConfig: ConfigReader[AutomationConfig] =
       deriveReader[AutomationConfig]
     implicit val LedgerApiClientConfigReader: ConfigReader[LedgerApiClientConfig] =
@@ -688,13 +692,20 @@ object SpliceConfig {
       }
     implicit val migrateValidatorPartyConfigReader: ConfigReader[MigrateValidatorPartyConfig] =
       deriveReader[MigrateValidatorPartyConfig]
-    implicit val participantPruningConfigReader: ConfigReader[ParticipantPruningConfig] =
-      deriveReader[ParticipantPruningConfig]
+    implicit val pruningConfigReader: ConfigReader[PruningConfig] =
+      deriveReader[PruningConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
       deriveReader[ValidatorAppBackendConfig].emap { conf =>
         val participantIdentifier =
           ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(conf).participant
         for {
+          _ <- Either.cond(
+            !(conf.domains.global.url.isDefined && conf.domains.global.sequencerNames.isDefined),
+            (),
+            ConfigValidationFailed(
+              "Configuration error: `url` and `sequencerNames` cannot both be specified for the global domain."
+            ),
+          )
           _ <- Either.cond(
             !conf.svValidator || conf.validatorPartyHint.isEmpty,
             (),
@@ -846,6 +857,7 @@ object SpliceConfig {
 
     implicit val upgradesConfig: ConfigWriter[UpgradesConfig] = deriveWriter[UpgradesConfig]
 
+    implicit val ingestionConfig: ConfigWriter[IngestionConfig] = deriveWriter[IngestionConfig]
     implicit val automationConfig: ConfigWriter[AutomationConfig] =
       deriveWriter[AutomationConfig]
     implicit val LedgerApiClientConfigWriter: ConfigWriter[LedgerApiClientConfig] =
@@ -1022,8 +1034,8 @@ object SpliceConfig {
       deriveWriter[TransferPreapprovalConfig]
     implicit val migrateValidatorPartyConfigWriter: ConfigWriter[MigrateValidatorPartyConfig] =
       deriveWriter[MigrateValidatorPartyConfig]
-    implicit val participantPruningConfigWriter: ConfigWriter[ParticipantPruningConfig] =
-      deriveWriter[ParticipantPruningConfig]
+    implicit val pruningConfigWriter: ConfigWriter[PruningConfig] =
+      deriveWriter[PruningConfig]
     implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =
       deriveWriter[ValidatorAppBackendConfig]
     implicit val validatorClientConfigWriter: ConfigWriter[ValidatorAppClientConfig] =

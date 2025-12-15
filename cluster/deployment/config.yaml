@@ -39,6 +39,8 @@ pulumiProjectConfig:
       # enable enterprise plus for better performance and faster maintenance
       enterprisePlus: false
     skipSynchronizerInitialization: true
+    # default not allowing version downgrades in our apps
+    allowDowngrade: true
   sv-runbook:
     cloudSql:
       enabled: false
@@ -62,6 +64,12 @@ monitoring:
   alerting:
     enableNoDataAlerts: false
     alerts:
+      pruning:
+        participantRetentionDays: 30
+        sequencerRetentionDays: 30
+        mediatorRetentionDays: 30
+      ingestion:
+        thresholdEntriesPerBatch: 80
       delegatelessContention:
         thresholdPerNamespace: 0.05
       trafficWaste:
@@ -72,10 +80,10 @@ monitoring:
       # we alert if the rate is higher than expected to spot potential overload situations
       confirmationRequests:
         total:
-          rate: 10
+          rate: 15
           overMinutes: 5
         perMember:
-          rate: 2
+          rate: 3
           overMinutes: 5
       cloudSql:
         maintenance: false
@@ -136,7 +144,9 @@ svs:
   default:
     logging:
       appsLogLevel: DEBUG
+      appsAsync: false
       cantonLogLevel: DEBUG
+      cantonAsync: false
       cometbftLogLevel: debug
     participant:
       bftSequencerConnection: true

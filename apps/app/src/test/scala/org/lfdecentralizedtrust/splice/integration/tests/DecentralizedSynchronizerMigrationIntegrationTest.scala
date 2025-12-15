@@ -14,7 +14,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api.IdentityProviderConfig
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
-import com.digitalasset.canton.topology.{ForceFlag, ForceFlags, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.HexString
@@ -82,6 +82,7 @@ import org.lfdecentralizedtrust.splice.util.{
   SplitwellTestUtil,
   StandaloneCanton,
   SvTestUtil,
+  SynchronizerMigrationUtil,
   WalletTestUtil,
 }
 import org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger
@@ -435,9 +436,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
         .getExternalPartyBalance(externalParty)
         .totalUnlockedCoin shouldBe "0.0000000000"
       walletClient.transferPreapprovalSend(externalParty, 40.0, UUID.randomUUID.toString)
-      validatorBackend
-        .getExternalPartyBalance(externalParty)
-        .totalUnlockedCoin shouldBe "40.0000000000"
+      eventually() {
+        validatorBackend
+          .getExternalPartyBalance(externalParty)
+          .totalUnlockedCoin shouldBe "40.0000000000"
+      }
       onboarding
     }
 
@@ -606,10 +609,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               clue(
                 s"reset domain parameters to old values confirmationRequestsMaxRate=${domainDynamicParams.confirmationRequestsMaxRate},mediatorReactionTimeout=${domainDynamicParams.mediatorReactionTimeout}"
               ) {
-                changeDomainParameters(
-                  allNodes.map(_.oldParticipantConnection),
-                  domainDynamicParams.confirmationRequestsMaxRate,
-                  domainDynamicParams.mediatorReactionTimeout,
+                unpauseSynchronizer(
+                  allNodes.map(_.oldParticipantConnection)
                 )
               }
               deleteDirectoryRecursively(migrationDumpDir.toFile)
@@ -698,7 +699,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 majorityUpgradeNodes.parTraverse { upgradeNode =>
                   val connection = upgradeNode.newParticipantConnection
                   for {
-                    id <- connection.getId()
                     result <- connection
                       .ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
                         "keep just sv1",
@@ -1000,14 +1000,14 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             withClueAndLog("Backfilled history includes ACS import") {
               eventually() {
-                sv1ScanLocalBackend.appState.store.updateHistory.sourceHistory
+                sv1ScanLocalBackend.appState.automation.updateHistory.sourceHistory
                   .migrationInfo(1L)
                   .futureValue
                   .exists(_.complete) should be(true)
               }
 
               val backfilledUpdates =
-                sv1ScanLocalBackend.appState.store.updateHistory
+                sv1ScanLocalBackend.appState.automation.updateHistory
                   .getAllUpdates(None, PageLimit.tryCreate(1000))
                   .futureValue
               backfilledUpdates.collect {
@@ -1132,25 +1132,18 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     }
   }
 
-  private def changeDomainParameters(
-      nodes: Seq[ParticipantAdminConnection],
-      confirmationRequestsMaxRate: NonNegativeInt,
-      mediatorReactionTimeout: com.digitalasset.canton.time.NonNegativeFiniteDuration,
+  private def unpauseSynchronizer(
+      nodes: Seq[ParticipantAdminConnection]
   )(implicit
       env: SpliceTestConsoleEnvironment,
       ec: ExecutionContextExecutor,
   ): Unit = {
     nodes
       .parTraverse { node =>
-        node
-          .ensureDomainParameters(
-            decentralizedSynchronizerId,
-            _.tryUpdate(
-              confirmationRequestsMaxRate = confirmationRequestsMaxRate,
-              mediatorReactionTimeout = mediatorReactionTimeout,
-            ),
-            forceChanges = ForceFlags(ForceFlag.AllowOutOfBoundsValue),
-          )
+        SynchronizerMigrationUtil.ensureSynchronizerIsUnpaused(
+          node,
+          decentralizedSynchronizerId,
+        )
       }
       .futureValue
       .discard
@@ -1336,7 +1329,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             for (i <- 0 to 2)
               yield participant.ledger_api.parties
                 .allocate(
-                  s"fake-party-${i}-${suffix}",
+                  s"fake-party-$i-$suffix",
                   synchronizerId = Some(decentralizedSynchronizerId),
                 )
                 .party
@@ -1412,6 +1405,14 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             Map("fake-key-4" -> "fake-value-4"),
             "",
             false,
+          )
+          participant.ledger_api.users.create(
+            s"fake-user-4-${suffix}",
+            Set(),
+            Option(someParties(0)),
+          )
+          participant.ledger_api.users.create(
+            s"fake-user-5-${suffix}"
           )
         }
       },

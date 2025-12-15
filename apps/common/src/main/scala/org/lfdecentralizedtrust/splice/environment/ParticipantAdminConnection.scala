@@ -15,12 +15,11 @@ import com.digitalasset.canton.admin.api.client.data.{
   ListConnectedSynchronizersResult,
   NodeStatus,
   ParticipantStatus,
-  PruningSchedule,
 }
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.admin.participant.v30.{ExportAcsResponse, PruningServiceGrpc}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, PositiveDurationSeconds}
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
   ContractImportMode,
@@ -29,8 +28,8 @@ import com.digitalasset.canton.participant.admin.data.{
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
-  SequencerConnectionValidation,
   SequencerConnection,
+  SequencerConnectionValidation,
   SequencerConnections,
 }
 import com.digitalasset.canton.sequencing.protocol.TrafficState
@@ -88,18 +87,20 @@ class ParticipantAdminConnection(
     )
     with HasParticipantId
     with ParticipantAdminDarsConnection
-    with StatusAdminConnection {
+    with StatusAdminConnection
+    with PruningAdminConnection {
   override val serviceName = "Canton Participant Admin API"
 
-  val pruningCommands = new PruningSchedulerCommands[PruningServiceStub](
-    PruningServiceGrpc.stub,
-    _.setSchedule(_),
-    _.clearSchedule(_),
-    _.setCron(_),
-    _.setMaxDuration(_),
-    _.setRetention(_),
-    _.getSchedule(_),
-  )
+  override val pruningCommands: PruningSchedulerCommands[PruningServiceGrpc.PruningServiceStub] =
+    new PruningSchedulerCommands[PruningServiceStub](
+      PruningServiceGrpc.stub,
+      _.setSchedule(_),
+      _.clearSchedule(_),
+      _.setCron(_),
+      _.setMaxDuration(_),
+      _.setRetention(_),
+      _.getSchedule(_),
+    )
 
   override type Status = ParticipantStatus
 
@@ -256,6 +257,7 @@ class ParticipantAdminConnection(
   def ensureDomainRegisteredAndConnected(
       config: SynchronizerConnectionConfig,
       overwriteExistingConnection: Boolean,
+      newSequencerConnectionPool: Boolean,
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] = for {
     _ <- retryProvider
@@ -282,6 +284,7 @@ class ParticipantAdminConnection(
             case Some(_) =>
               modifySynchronizerConnectionConfigAndReconnect(
                 config.synchronizerAlias,
+                newSequencerConnectionPool,
                 _ => Some(config),
               )
                 .map(_ => ())
@@ -486,6 +489,7 @@ class ParticipantAdminConnection(
 
   private def modifyOrRegisterSynchronizerConnectionConfig(
       config: SynchronizerConnectionConfig,
+      newSequencerConnectionPool: Boolean,
       f: SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig],
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Boolean] =
@@ -502,6 +506,7 @@ class ParticipantAdminConnection(
           ensureDomainRegisteredAndConnected(
             config,
             overwriteExistingConnection = true,
+            newSequencerConnectionPool = newSequencerConnectionPool,
             retryFor = retryFor,
           ).map(_ => false)
       }
@@ -509,12 +514,13 @@ class ParticipantAdminConnection(
 
   def modifySynchronizerConnectionConfigAndReconnect(
       domain: SynchronizerAlias,
+      newSequencerConnectionPool: Boolean,
       f: SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig],
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       configModified <- modifySynchronizerConnectionConfig(domain, f)
       _ <-
-        if (configModified) {
+        if (configModified && !newSequencerConnectionPool) {
           logger.info(
             s"reconnect to the domain $domain for new sequencer configuration to take effect"
           )
@@ -524,13 +530,19 @@ class ParticipantAdminConnection(
 
   def modifyOrRegisterSynchronizerConnectionConfigAndReconnect(
       config: SynchronizerConnectionConfig,
+      newSequencerConnectionPool: Boolean,
       f: SynchronizerConnectionConfig => Option[SynchronizerConnectionConfig],
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
-      configModified <- modifyOrRegisterSynchronizerConnectionConfig(config, f, retryFor)
+      configModified <- modifyOrRegisterSynchronizerConnectionConfig(
+        config,
+        newSequencerConnectionPool,
+        f,
+        retryFor,
+      )
       _ <-
-        if (configModified) {
+        if (configModified && !newSequencerConnectionPool) {
           logger.info(
             s"reconnect to the domain ${config.synchronizerAlias} for new sequencer configuration to take effect"
           )
@@ -773,38 +785,6 @@ class ParticipantAdminConnection(
       isProposal = true,
     )
   }
-
-  private def setPruningSchedule(
-      cron: String,
-      maxDuration: PositiveDurationSeconds,
-      retention: PositiveDurationSeconds,
-  )(implicit tc: TraceContext): Future[Unit] =
-    runCmd(pruningCommands.SetScheduleCommand(cron, maxDuration, retention))
-
-  private def getPruningSchedule()(implicit tc: TraceContext): Future[Option[PruningSchedule]] =
-    runCmd(pruningCommands.GetScheduleCommand())
-
-  /** The schedule is specified in cron format and "max_duration" and "retention" durations. The cron string indicates
-    *      the points in time at which pruning should begin in the GMT time zone, and the maximum duration indicates how
-    *      long from the start time pruning is allowed to run as long as pruning has not finished pruning up to the
-    *      specified retention period.
-    */
-  def ensurePruningSchedule(
-      cron: String,
-      maxDuration: PositiveDurationSeconds,
-      retention: PositiveDurationSeconds,
-  )(implicit tc: TraceContext): Future[Unit] =
-    retryProvider.ensureThatB(
-      RetryFor.WaitingOnInitDependency,
-      "participant_pruning_schedule",
-      s"Pruning schedule is set to ($cron, $maxDuration, $retention)",
-      getPruningSchedule().map(scheduleO =>
-        scheduleO.contains(PruningSchedule(cron, maxDuration, retention))
-      ),
-      setPruningSchedule(cron, maxDuration, retention),
-      logger,
-    )
-
 }
 
 object ParticipantAdminConnection {

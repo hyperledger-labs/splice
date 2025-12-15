@@ -10,8 +10,7 @@ import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.ParticipantId
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
 import scala.concurrent.ExecutionContext
 
@@ -20,14 +19,10 @@ abstract class DbTxLogAppStore[TXE](
     acsTableName: String,
     txLogTableName: String,
     interfaceViewsTableNameOpt: Option[String],
-    acsStoreDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
-    txLogStoreDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
+    acsStoreDescriptor: StoreDescriptor,
+    txLogStoreDescriptor: StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
-    participantId: ParticipantId,
-    enableissue12777Workaround: Boolean,
-    enableImportUpdateBackfill: Boolean,
-    backfillingRequired: BackfillingRequirement,
-    oHistoryMetrics: Option[HistoryMetrics] = None,
+    ingestionConfig: IngestionConfig,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -38,11 +33,7 @@ abstract class DbTxLogAppStore[TXE](
       interfaceViewsTableNameOpt = interfaceViewsTableNameOpt,
       acsStoreDescriptor = acsStoreDescriptor,
       domainMigrationInfo = domainMigrationInfo,
-      participantId = participantId,
-      enableissue12777Workaround = enableissue12777Workaround,
-      enableImportUpdateBackfill = enableImportUpdateBackfill,
-      backfillingRequired,
-      oHistoryMetrics = oHistoryMetrics,
+      ingestionConfig = ingestionConfig,
     )
     with TxLogAppStore[TXE] {
 
@@ -59,6 +50,7 @@ abstract class DbTxLogAppStore[TXE](
       txLogConfig,
       domainMigrationInfo,
       retryProvider,
+      ingestionConfig,
       handleIngestionSummary,
     )
 }
@@ -67,13 +59,9 @@ abstract class DbAppStore(
     storage: DbStorage,
     acsTableName: String,
     interfaceViewsTableNameOpt: Option[String],
-    acsStoreDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
+    acsStoreDescriptor: StoreDescriptor,
     domainMigrationInfo: DomainMigrationInfo,
-    participantId: ParticipantId,
-    enableissue12777Workaround: Boolean,
-    enableImportUpdateBackfill: Boolean,
-    backfillingRequired: BackfillingRequirement,
-    oHistoryMetrics: Option[HistoryMetrics] = None,
+    ingestionConfig: IngestionConfig,
 )(implicit
     protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -98,28 +86,17 @@ abstract class DbAppStore(
       TxLogStore.Config.empty,
       domainMigrationInfo,
       retryProvider,
+      ingestionConfig,
       handleIngestionSummary,
     )
+
+  override lazy val storeName: String = multiDomainAcsStore.storeName
 
   override lazy val domains: InMemorySynchronizerStore =
     new InMemorySynchronizerStore(
       acsContractFilter.ingestionFilter.primaryParty,
       loggerFactory,
       retryProvider,
-    )
-
-  override lazy val updateHistory: UpdateHistory =
-    new UpdateHistory(
-      storage,
-      domainMigrationInfo,
-      acsStoreDescriptor.name,
-      participantId,
-      acsContractFilter.ingestionFilter.primaryParty,
-      backfillingRequired,
-      loggerFactory,
-      enableissue12777Workaround,
-      enableImportUpdateBackfill,
-      oHistoryMetrics,
     )
 
   override def close(): Unit = {

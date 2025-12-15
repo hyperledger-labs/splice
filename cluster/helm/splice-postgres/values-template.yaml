@@ -4,7 +4,6 @@
 imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
 resources:
   limits:
-    cpu: "4"
     memory: 12Gi
   requests:
     cpu: "0.5"

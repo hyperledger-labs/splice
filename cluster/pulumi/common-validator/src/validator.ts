@@ -82,6 +82,7 @@ type BasicValidatorConfig = {
   deduplicationDuration?: string;
   disableAuth?: boolean;
   logLevel?: LogLevel;
+  logAsync?: boolean;
   resources?: K8sResourceSchema;
 };
 
@@ -138,7 +139,7 @@ export async function installValidatorApp(
 
   const validatorSecrets: Secret[] = baseConfig.disableAuth
     ? []
-    : await installValidatorSecrets(config.xns, config.auth0Client, config.auth0ValidatorAppName);
+    : await installValidatorSecrets(config.xns, config.auth0Client);
 
   const participantBootstrapDumpSecret: pulumi.Resource | undefined =
     !config.svValidator && config.participantBootstrapDump
@@ -228,7 +229,10 @@ export async function installValidatorApp(
       auth: config.disableAuth
         ? undefined
         : {
-            audience: getValidatorAppApiAudience(config.auth0Client.getCfg()),
+            audience: getValidatorAppApiAudience(
+              config.auth0Client.getCfg(),
+              config.xns.logicalName
+            ),
             jwksUrl: `https://${config.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
           },
       walletSweep,
@@ -240,6 +244,7 @@ export async function installValidatorApp(
       maxVettingDelay: networkWideConfig?.maxVettingDelay,
       disableAuth: baseConfig.disableAuth || false,
       logLevel: config.logLevel,
+      logAsyncFlush: config.logAsync,
       resources: baseConfig.svValidator ? config.resources : {},
       ...spliceInstanceNames,
     },

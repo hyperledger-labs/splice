@@ -6,12 +6,41 @@ import {
   KmsConfigSchema,
   LogLevelSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
-import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
+import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { z } from 'zod';
+
+export const ScanClientConfigSchema = z
+  .object({
+    scanType: z.enum(['trust-single', 'bft', 'bft-custom']),
+    scanAddress: z.string().optional(),
+    threshold: z.number().default(0),
+    trustedSvs: z.array(z.string()).default([]),
+    seedUrls: z.array(z.string()).min(1, 'seedUrls must contain at least one element.').optional(),
+  })
+  .refine(
+    data => {
+      if (data.scanType === 'bft-custom') {
+        const threshold = data.threshold;
+        const trustedSvsSize = data.trustedSvs.length;
+        const seedUrlsSize = data.seedUrls ? data.seedUrls.length : 0;
+        return trustedSvsSize >= threshold && seedUrlsSize >= threshold;
+      } else {
+        return true;
+      }
+    },
+    {
+      message:
+        "For 'bft-custom' scanType, both 'trustedSvs' and 'seedUrls' must have a length greater than or equal to 'threshold'.",
+      path: ['scanType'],
+    }
+  );
+
+export type ScanClientConfig = z.infer<typeof ScanClientConfigSchema>;
 
 export const ValidatorAppConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
   additionalJvmOptions: z.string().optional(),
+  scanClient: ScanClientConfigSchema.optional(),
 });
 
 export const ParticipantConfigSchema = z.object({
@@ -23,6 +52,7 @@ export const ValidatorNodeConfigSchema = z.object({
   logging: z
     .object({
       level: LogLevelSchema.optional(),
+      async: z.boolean().optional(),
     })
     .default({}),
   kms: KmsConfigSchema.optional(),

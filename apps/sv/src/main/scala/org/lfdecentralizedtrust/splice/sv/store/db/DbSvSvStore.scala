@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.{
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
 import org.lfdecentralizedtrust.splice.store.{MultiDomainAcsStore, StoreErrors}
 import org.lfdecentralizedtrust.splice.sv.store.{SvStore, SvSvStore}
@@ -20,7 +20,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -33,6 +33,7 @@ class DbSvSvStore(
     override protected val retryProvider: RetryProvider,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    ingestionConfig: IngestionConfig,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -54,10 +55,7 @@ class DbSvSvStore(
         ),
       ),
       domainMigrationInfo = domainMigrationInfo,
-      participantId = participantId,
-      enableissue12777Workaround = false,
-      enableImportUpdateBackfill = false,
-      BackfillingRequirement.BackfillingNotRequired,
+      ingestionConfig,
     )
     with SvSvStore
     with AcsTables

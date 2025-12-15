@@ -652,6 +652,8 @@ class ScanFrontendTimeBasedIntegrationTest
             inside(find(id("navlink-/validator-licenses"))) { case Some(navlink) =>
               navlink.underlying.click()
             }
+            // make sure that seed licenses are rendered in the UI before proceeding to mitigate flakeyness
+            getLicensesTableRows.size shouldBe >(0)
           },
         )
 
@@ -669,7 +671,7 @@ class ScanFrontendTimeBasedIntegrationTest
         )(
           "a new validator row is added",
           _ => {
-            checkLastValidatorLicenseRow(
+            checkValidatorLicenseRow(
               licenseRows.size.toLong,
               sv1Backend.getDsoInfo().svParty,
               newValidatorParty,

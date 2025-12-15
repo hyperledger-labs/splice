@@ -671,17 +671,6 @@ object ConfigTransforms {
     )
   }
 
-  def bumpSelfHostedParticipantPortsBy(bump: Int): ConfigTransform = {
-    val transforms = Seq(
-      updateAllValidatorConfigs { case (name, config) =>
-        if (name.startsWith("sv")) config
-        else
-          config.focus(_.participantClient).modify(portTransform(bump, _))
-      }
-    )
-    transforms.foldLeft((c: SpliceConfig) => c)((f, tf) => f compose tf)
-  }
-
   def withBftSequencer(config: SvAppBackendConfig): SvAppBackendConfig =
     config
       .focus(_.localSynchronizerNode)
@@ -814,7 +803,6 @@ object ConfigTransforms {
     val userToken = AuthUtil.LedgerApi.testToken(
       user = user,
       secret = secret,
-      expiration = NonNegativeFiniteDuration.ofDays(30),
     )
     c.copy(
       authConfig = AuthTokenSourceConfig.Static(

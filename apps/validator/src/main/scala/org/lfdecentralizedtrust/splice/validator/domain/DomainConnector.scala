@@ -16,7 +16,6 @@ import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfi
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
@@ -120,6 +119,7 @@ class DomainConnector(
     participantAdminConnection.ensureDomainRegisteredAndConnected(
       domainConfig,
       overwriteExistingConnection = true,
+      newSequencerConnectionPool = config.parameters.enabledFeatures.newSequencerConnectionPool,
       retryFor = RetryFor.WaitingOnInitDependency,
     )
   }
@@ -160,8 +160,8 @@ class DomainConnector(
                       Thresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
                       config.sequencerRequestAmplificationPatience,
                     ),
-                    // TODO(#2110) Rethink this when we enable sequencer connection pools.
-                    sequencerLivenessMargin = NonNegativeInt.zero,
+                    sequencerLivenessMargin =
+                      Thresholds.sequencerConnectionsLivenessMargin(nonEmptyConnections.size),
                     // TODO(#2666) Make the delays configurable.
                     sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
                   )
@@ -192,8 +192,22 @@ class DomainConnector(
           // so this is just an extra safeguard.
           sequencers.synchronizerId == decentralizedSynchronizerId
         )
+      val svFilteredSequencers = config.domains.global.sequencerNames match {
+        case Some(allowedNames) =>
+          val allowedNamesSet = allowedNames.toList.toSet
+          logger.debug(
+            s"Filtering sequencers to only include: ${allowedNames.toList.mkString(", ")}"
+          )
+          filteredSequencers.map { domainSequencer =>
+            domainSequencer.copy(sequencers =
+              domainSequencer.sequencers.filter(s => allowedNamesSet.contains(s.svName))
+            )
+          }
+        case None =>
+          filteredSequencers
+      }
       (
-        filteredSequencers.map { domainSequencer =>
+        svFilteredSequencers.map { domainSequencer =>
           config.domains.global.alias ->
             extractValidConnections(domainSequencer.sequencers, domainTime, migrationId)
         }.toMap,

@@ -21,6 +21,7 @@ class DomainDataRestorer(
     participantAdminConnection: ParticipantAdminConnection,
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration,
     timeTrackerObservationLatency: NonNegativeFiniteDuration,
+    newSequencerConnectionPool: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
@@ -69,6 +70,7 @@ class DomainDataRestorer(
         _ = logger.info("Imported the ACS")
         _ <- participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
           synchronizerAlias,
+          newSequencerConnectionPool,
           config => Some(config.copy(manualConnect = false)),
         )
       } yield ()

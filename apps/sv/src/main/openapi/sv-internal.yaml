@@ -18,7 +18,7 @@ paths:
   /v0/admin/validator/onboarding/ongoing:
     get:
       tags: [sv]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "listOngoingValidatorOnboardings"
       responses:
         "200":
@@ -30,7 +30,7 @@ paths:
   /v0/admin/validator/onboarding/prepare:
     post:
       tags: [sv]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "prepareValidatorOnboarding"
       requestBody:
         required: true
@@ -50,7 +50,7 @@ paths:
   /v0/admin/validator/licenses:
     get:
       tags: [sv]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "listValidatorLicenses"
       parameters:
         - name: "after"
@@ -75,7 +75,7 @@ paths:
   /v0/admin/domain/cometbft/status:
     get:
       tags: [sv]
-      x-jvm-package: sv
+      x-jvm-package: sv_public
       operationId: "getCometBftNodeStatus"
       responses:
         "200":
@@ -95,7 +95,7 @@ paths:
   /v0/admin/domain/cometbft/json-rpc:
     post:
       tags: [sv]
-      x-jvm-package: sv
+      x-jvm-package: sv_public
       operationId: "cometBftJsonRpcRequest"
       requestBody:
         required: true
@@ -119,7 +119,7 @@ paths:
   /v0/admin/domain/cometbft/debug:
     get:
       tags: [sv]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "getCometBftNodeDebugDump"
       responses:
         "200":
@@ -139,7 +139,7 @@ paths:
   /v0/admin/domain/sequencer/status:
     get:
       tags: [sv]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "getSequencerNodeStatus"
       responses:
         "200":
@@ -157,7 +157,7 @@ paths:
   /v0/admin/domain/mediator/status:
     get:
       tags: [sv]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "getMediatorNodeStatus"
       responses:
         "200":
@@ -272,7 +272,7 @@ paths:
   /v0/admin/sv/voterequests:
     get:
       tags: [ sv ]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "listDsoRulesVoteRequests"
       responses:
         "200":
@@ -284,7 +284,7 @@ paths:
   /v0/admin/sv/voteresults:
     post:
       tags: [ sv ]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "listVoteRequestResults"
       requestBody:
         required: true
@@ -302,7 +302,7 @@ paths:
   /v0/admin/sv/voterequests/{vote_request_contract_id}:
     get:
       tags: [ sv ]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "lookupDsoRulesVoteRequest"
       parameters:
         - name: "vote_request_contract_id"
@@ -326,7 +326,7 @@ paths:
   /v0/admin/sv/votes:
     post:
       tags: [ sv ]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "castVote"
       requestBody:
         required: true
@@ -342,7 +342,7 @@ paths:
   /v0/admin/sv/voterequest:
     post:
       tags: [ sv ]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "listVoteRequestsByTrackingCid"
       requestBody:
         required: true
@@ -360,7 +360,7 @@ paths:
   /v0/admin/sv/voterequest/create:
     post:
       tags: [ sv ]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "createVoteRequest"
       requestBody:
         required: true
@@ -376,7 +376,7 @@ paths:
   /v0/admin/sv/amulet-price/votes:
     get:
       tags: [sv]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "ListAmuletPriceVotes"
       responses:
         "200":
@@ -388,7 +388,7 @@ paths:
   /v0/admin/sv/open-mining-rounds:
     get:
       tags: [sv]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "ListOpenMiningRounds"
       responses:
         "200":
@@ -400,7 +400,7 @@ paths:
   /v0/admin/sv/amulet-price/vote:
     put:
       tags: [sv]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "UpdateAmuletPriceVote"
       requestBody:
         required: true
@@ -416,7 +416,7 @@ paths:
   /v0/admin/authorization:
     get:
       tags: [sv]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "isAuthorized"
       responses:
         "200":
@@ -426,7 +426,7 @@ paths:
   /v0/onboard/validator:
     post:
       tags: [sv]
-      x-jvm-package: sv
+      x-jvm-package: sv_public
       operationId: "onboardValidator"
       requestBody:
         required: true
@@ -444,7 +444,7 @@ paths:
   /v0/onboard/sv/start:
     post:
       tags: [sv]
-      x-jvm-package: sv
+      x-jvm-package: sv_public
       operationId: "startSvOnboarding"
       requestBody:
         required: true
@@ -462,7 +462,7 @@ paths:
   /v0/onboard/sv/status/{candidate_party_id_or_name}:
     get:
       tags: [sv]
-      x-jvm-package: sv
+      x-jvm-package: sv_public
       operationId: "getSvOnboardingStatus"
       parameters:
         - name: "candidate_party_id_or_name"
@@ -484,7 +484,7 @@ paths:
   /v0/onboard/sv/party-migration/authorize:
     post:
       tags: [sv]
-      x-jvm-package: sv
+      x-jvm-package: sv_public
       operationId: "onboardSvPartyMigrationAuthorize"
       requestBody:
         required: true
@@ -510,7 +510,7 @@ paths:
   /v0/onboard/sv/sequencer:
     post:
       tags: [sv]
-      x-jvm-package: sv
+      x-jvm-package: sv_public
       operationId: "onboardSvSequencer"
       requestBody:
         required: true
@@ -530,7 +530,7 @@ paths:
   /v0/devnet/onboard/validator/prepare:
     post:
       tags: [sv]
-      x-jvm-package: sv
+      x-jvm-package: sv_public
       description: "faucet for validator candidates self-service"
       operationId: "devNetOnboardValidatorPrepare"
       responses:
@@ -547,7 +547,8 @@ paths:
   /v0/dso:
     get:
       tags: [sv]
-      x-jvm-package: sv
+      # TODO(DACH-NY/canton-network-internal#2106) Move to sv_operator
+      x-jvm-package: sv_public
       operationId: "getDsoInfo"
       responses:
         "200":
@@ -592,7 +593,7 @@ paths:
   /v0/admin/feature-support:
     get:
       tags: [ sv ]
-      x-jvm-package: sv_admin
+      x-jvm-package: sv_operator
       operationId: "featureSupport"
       responses:
         "200":
@@ -1107,6 +1108,8 @@ components:
         migration_id:
           type: integer
           format: int64
+        timestamp:
+          type: string
 
     GetDomainMigrationDumpResponse:
       type: object

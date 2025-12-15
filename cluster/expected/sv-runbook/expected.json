@@ -513,6 +513,16 @@
   },
   {
     "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
     "id": "",
     "inputs": {
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
@@ -704,7 +714,35 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "appLabel": "scan-app",
+      "globalLimits": {
+        "fillInterval": "60s",
+        "maxTokens": 2147483647,
+        "tokensPerFill": 2147483647
+      },
+      "inboundPort": 5012,
+      "namespace": "sv",
+      "rateLimits": [
+        {
+          "actions": [
+            {
+              "name": "acs",
+              "pathPrefix": "/api/scan/v0/acs"
+            },
+            {
+              "clientIp": true,
+              "name": "client_ip"
+            }
+          ],
+          "limits": {
+            "fillInterval": "60s",
+            "maxTokens": 10,
+            "tokensPerFill": 5
+          }
+        }
+      ]
+    },
     "name": "splice-sv-scan-app-rate-limit",
     "provider": "",
     "type": "splice:RateLimit"
@@ -895,6 +933,7 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-2.mock.global.canton.network.digitalasset.com"
         },
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {

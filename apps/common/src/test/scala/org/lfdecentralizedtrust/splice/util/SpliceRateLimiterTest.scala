@@ -10,7 +10,6 @@ import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.apache.pekko.stream.testkit.StreamSpec
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
-import org.lfdecentralizedtrust.splice.util.{SpliceRateLimitMetrics, SpliceRateLimiter}
 import org.lfdecentralizedtrust.splice.util.SpliceRateLimiterTest.runRateLimited
 
 import scala.concurrent.Future
@@ -89,7 +88,7 @@ class SpliceRateLimiterTest extends StreamSpec with BaseTest with MetricValues {
 
   private def withRateLimiter[A](f: (SpliceRateLimitMetrics, SpliceRateLimiter) => A): A = {
     val metricsFactory = new InMemoryMetricsFactory()
-    val rateLimitMetrics = SpliceRateLimitMetrics(metricsFactory)(MetricsContext.Empty)
+    val rateLimitMetrics = SpliceRateLimitMetrics(metricsFactory, logger)(MetricsContext.Empty)
     val rateLimiter = new SpliceRateLimiter(
       "test",
       SpliceRateLimitConfig(enabled = true, 10),

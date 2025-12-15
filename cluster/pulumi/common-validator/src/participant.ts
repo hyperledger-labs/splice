@@ -68,7 +68,7 @@ export function installParticipant(
     ...participantValues,
     auth: {
       ...participantValues.auth,
-      targetAudience: getLedgerApiAudience(auth0Config),
+      targetAudience: getLedgerApiAudience(auth0Config, xns.logicalName),
     },
   };
 
@@ -81,6 +81,7 @@ export function installParticipant(
     {
       ...participantValuesWithSpecifiedAud,
       logLevel: validatorConfig.logging?.level,
+      logAsyncFlush: validatorConfig.logging?.async,
       persistence: {
         databaseName: pgName,
         schema: 'participant',

@@ -66,7 +66,7 @@ export function installSvParticipant(
     },
     auth: {
       ...participantValues.auth,
-      targetAudience: getLedgerApiAudience(auth0Config),
+      targetAudience: getLedgerApiAudience(auth0Config, xns.logicalName),
       jwksUrl: `https://${auth0Config.auth0Domain}/.well-known/jwks.json`,
     },
     ...kmsValues,
@@ -83,6 +83,7 @@ export function installSvParticipant(
       ),
       logLevel: svConfig.logging?.cantonLogLevel,
       logLevelStdout: svConfig.logging?.cantonStdoutLogLevel,
+      logAsyncFlush: svConfig.logging?.cantonAsync,
       participantAdminUserNameFrom,
       metrics: {
         enable: true,

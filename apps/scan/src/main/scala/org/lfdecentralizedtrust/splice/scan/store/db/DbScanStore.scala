@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.digitalasset.canton.config.{NonNegativeDuration}
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -50,7 +50,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   VoteRequestTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
@@ -64,6 +64,7 @@ import org.lfdecentralizedtrust.splice.store.{
   PageLimit,
   SortOrder,
   TxLogStore,
+  UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
@@ -74,7 +75,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import io.grpc.Status
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
@@ -96,7 +97,7 @@ class DbScanStore(
     createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
-    enableImportUpdateBackfill: Boolean,
+    ingestionConfig: IngestionConfig,
     storeMetrics: DbScanStoreMetrics,
     initialRound: Long,
 )(implicit
@@ -129,11 +130,7 @@ class DbScanStore(
         ),
       ),
       domainMigrationInfo,
-      participantId,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = enableImportUpdateBackfill,
-      BackfillingRequirement.NeedsBackfilling,
-      Some(storeMetrics.history),
+      ingestionConfig,
     )
     with ScanStore
     with AcsTables
@@ -924,7 +921,7 @@ class DbScanStore(
   ): Future[Option[ContractWithState[SvNodeState.ContractId, SvNodeState]]] =
     lookupContractBySvParty(SvNodeState.COMPANION, svPartyId)
 
-  private def lookupContractBySvParty[C, TCId <: ContractId[_], T](
+  private def lookupContractBySvParty[C, TCId <: ContractId[?], T](
       companion: C,
       svPartyId: PartyId,
   )(implicit
@@ -1057,8 +1054,10 @@ class DbScanStore(
         .toMap
     }
 
-  override def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
+  // TODO (#934): this method probably belongs in UpdateHistory instead
+  override def lookupContractByRecordTime[C, TCId <: ContractId[?], T](
       companion: C,
+      updateHistory: UpdateHistory,
       recordTime: CantonTimestamp,
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],

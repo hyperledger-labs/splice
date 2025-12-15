@@ -8,6 +8,7 @@ import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Identifier, Transaction}
+import com.daml.metrics.api.MetricsContext
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
@@ -40,7 +41,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
@@ -63,6 +64,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import com.digitalasset.canton.discard.Implicits.*
+import com.digitalasset.canton.util.MonadUtil
 
 /** Stores all original daml updates visible to `updateStreamParty`.
   *
@@ -91,14 +93,15 @@ class UpdateHistory(
     override protected val loggerFactory: NamedLoggerFactory,
     enableissue12777Workaround: Boolean,
     enableImportUpdateBackfill: Boolean,
-    val oMetrics: Option[HistoryMetrics] = None,
+    metrics: HistoryMetrics,
 )(implicit
     ec: ExecutionContext,
     closeContext: CloseContext,
 ) extends HasIngestionSink
     with AcsJdbcTypes
     with AcsQueries
-    with NamedLogging {
+    with NamedLogging
+    with AutoCloseable {
 
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile
 
@@ -112,12 +115,17 @@ class UpdateHistory(
   def lastIngestedRecordTime: Option[CantonTimestamp] = state.get().lastIngestedRecordTime
 
   private def advanceLastIngestedRecordTime(ts: CantonTimestamp): Unit = {
-    val _ = state.updateAndGet { s =>
-      s.lastIngestedRecordTime match {
-        case Some(curr) if ts < curr => s
-        case _ => s.copy(lastIngestedRecordTime = Some(ts))
-      }
+    val newState = state.updateAndGet { s =>
+      s.copy(lastIngestedRecordTime = Some(ts))
     }
+    (for {
+      lastIngestedRecordTime <- newState.lastIngestedRecordTime
+    } yield metrics.UpdateHistory.latestRecordTime.updateValue(lastIngestedRecordTime)(
+      MetricsContext(
+        "update_stream_party" -> updateStreamParty.toProtoPrimitive,
+        "store_name" -> storeName,
+      )
+    )).discard
   }
 
   def waitUntilInitialized: Future[Unit] = state.get().initialized.future
@@ -129,6 +137,8 @@ class UpdateHistory(
       .getOrElse(throw new RuntimeException("Using historyId before it was assigned"))
 
   def isReady: Boolean = state.get().historyId.isDefined
+
+  override def close(): Unit = metrics.close()
 
   lazy val ingestionSink: MultiDomainAcsStore.IngestionSink =
     new MultiDomainAcsStore.IngestionSink {
@@ -319,72 +329,98 @@ class UpdateHistory(
         Future.unit
       }
 
-      override def ingestUpdate(updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint)(implicit
+      override def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
           traceContext: TraceContext
       ): Future[Unit] = {
-        val offset: Long = updateOrCheckpoint.offset
-        val recordTime = updateOrCheckpoint match {
-          case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), _) =>
-            Some(reassignment.recordTime)
-          case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), _) =>
-            Some(CantonTimestamp.assertFromInstant(tree.getRecordTime))
-          case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) => None
-        }
+        MonadUtil
+          .sequentialTraverse(batch.toList) { updateOrCheckpoint =>
+            val offset: Long = updateOrCheckpoint.offset
+            val recordTime = updateOrCheckpoint match {
+              case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), _) =>
+                Some(reassignment.recordTime)
+              case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), _) =>
+                Some(CantonTimestamp.assertFromInstant(tree.getRecordTime))
+              case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) =>
+                None
+            }
 
-        // Note: in theory, it's enough if this action is atomic - there should only be a single
-        // ingestion sink storing updates for the given (participant, party, migrationId) tuple,
-        // so there should be no concurrent updates.
-        // In practice, we still want to have some protection against duplicate inserts, in case
-        // the ingestion service is buggy or there are two misconfigured apps trying to ingest the same updates.
-        // This is implemented with a unique index in the database schema.
-        val action = readOffsetAction()
-          .flatMap({
-            case None =>
-              logger.debug(
-                s"History $historyId migration $domainMigrationId ingesting None => $offset @ $recordTime"
-              )
-              ingestUpdateOrCheckpoint_(updateOrCheckpoint, domainMigrationId).andThen(
-                updateOffset(offset)
-              )
-            case Some(lastIngestedOffset) =>
-              if (offset <= lastIngestedOffset) {
-                updateOrCheckpoint match {
-                  case _: TreeUpdateOrOffsetCheckpoint.Update =>
-                    logger.warn(
-                      s"Update offset $offset <= last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
-                        "This is expected if the SQL query was automatically retried after a transient database error. " +
-                        "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
-                        "ingesting into the same logical database."
+            val timeIngestion = (future: Future[Unit]) =>
+              metrics.UpdateHistory.latency
+                .timeFuture(future)(
+                  metrics.metricsContextFromUpdate(updateOrCheckpoint, backfilling = false)
+                )
+
+            timeIngestion {
+              // Note: in theory, it's enough if this action is atomic - there should only be a single
+              // ingestion sink storing updates for the given (participant, party, migrationId) tuple,
+              // so there should be no concurrent updates.
+              // In practice, we still want to have some protection against duplicate inserts, in case
+              // the ingestion service is buggy or there are two misconfigured apps trying to ingest the same updates.
+              // This is implemented with a unique index in the database schema.
+              val action = readOffsetAction()
+                .flatMap({
+                  case None =>
+                    logger.debug(
+                      s"History $historyId migration $domainMigrationId ingesting None => $offset @ $recordTime"
                     )
-                  case _: TreeUpdateOrOffsetCheckpoint.Checkpoint =>
-                    // we can receive an offset equal to the last ingested and that can be safely ignore
-                    if (offset < lastIngestedOffset) {
-                      logger.warn(
-                        s"Checkpoint offset $offset < last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
-                          "This is expected if the SQL query was automatically retried after a transient database error. " +
-                          "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
-                          "ingesting into the same logical database."
+                    for {
+                      ingestedEvents <- ingestUpdateOrCheckpoint_(
+                        updateOrCheckpoint,
+                        domainMigrationId,
                       )
+                      _ <- updateOffset(offset)
+                    } yield ingestedEvents
+                  case Some(lastIngestedOffset) =>
+                    if (offset <= lastIngestedOffset) {
+                      updateOrCheckpoint match {
+                        case _: TreeUpdateOrOffsetCheckpoint.Update =>
+                          logger.warn(
+                            s"Update offset $offset <= last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
+                              "This is expected if the SQL query was automatically retried after a transient database error. " +
+                              "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
+                              "ingesting into the same logical database."
+                          )
+                        case _: TreeUpdateOrOffsetCheckpoint.Checkpoint =>
+                          // we can receive an offset equal to the last ingested and that can be safely ignore
+                          if (offset < lastIngestedOffset) {
+                            logger.warn(
+                              s"Checkpoint offset $offset < last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
+                                "This is expected if the SQL query was automatically retried after a transient database error. " +
+                                "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
+                                "ingesting into the same logical database."
+                            )
+                          }
+                      }
+                      DBIO.successful(IngestedEvents(0, 0))
+                    } else {
+                      logger.debug(
+                        s"History $historyId migration $domainMigrationId ingesting $lastIngestedOffset => $offset @ $recordTime"
+                      )
+                      for {
+                        ingestedEvents <- ingestUpdateOrCheckpoint_(
+                          updateOrCheckpoint,
+                          domainMigrationId,
+                        )
+                        _ <- updateOffset(offset)
+                      } yield ingestedEvents
                     }
-                }
-                DBIO.successful(())
-              } else {
-                logger.debug(
-                  s"History $historyId migration $domainMigrationId ingesting $lastIngestedOffset => $offset @ $recordTime"
-                )
-                ingestUpdateOrCheckpoint_(updateOrCheckpoint, domainMigrationId).andThen(
-                  updateOffset(offset)
-                )
-              }
-          })
-          .map(_ => ())
-          .transactionally
+                })
+                .transactionally
 
-        storage
-          .queryAndUpdate(action, "ingestUpdate")
-          .map { _ =>
-            recordTime.foreach(advanceLastIngestedRecordTime)
+              storage
+                .queryAndUpdate(action, "ingestUpdate")
+                .map { ingestedEvents =>
+                  recordTime.foreach(advanceLastIngestedRecordTime)
+                  metrics.UpdateHistory.eventCount.inc(ingestedEvents.numCreatedEvents)(
+                    MetricsContext("event_type" -> "created")
+                  )
+                  metrics.UpdateHistory.eventCount.inc(ingestedEvents.numExercisedEvents)(
+                    MetricsContext("event_type" -> "exercised")
+                  )
+                }
+            }
           }
+          .map(_ => ())
       }
 
       private def updateOffset(offset: Long): DBIOAction[?, NoStream, Effect.Write] =
@@ -398,21 +434,21 @@ class UpdateHistory(
   private def ingestUpdateOrCheckpoint_(
       updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint,
       migrationId: Long,
-  ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+  ): DBIOAction[IngestedEvents, NoStream, Effect.Read & Effect.Write] = {
     updateOrCheckpoint match {
       case TreeUpdateOrOffsetCheckpoint.Update(update, _) =>
         ingestUpdate_(update, migrationId)
-      case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) => DBIO.unit
+      case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) => DBIO.successful(IngestedEvents(0, 0))
     }
   }
 
   private def ingestUpdate_(
       update: TreeUpdate,
       migrationId: Long,
-  ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+  ): DBIOAction[IngestedEvents, NoStream, Effect.Read & Effect.Write] = {
     update match {
       case ReassignmentUpdate(reassignment) =>
-        ingestReassignment(reassignment, migrationId)
+        ingestReassignment(reassignment, migrationId).map(_ => IngestedEvents(0, 0))
       case TransactionTreeUpdate(tree) =>
         ingestTransactionTree(tree, migrationId)
     }
@@ -440,7 +476,7 @@ class UpdateHistory(
     val safeParticipantOffset = lengthLimited(LegacyOffset.Api.fromLong(reassignment.offset))
     val safeUnassignId = lengthLimited(event.unassignId)
     val safeContractId = lengthLimited(event.contractId.contractId)
-    oMetrics.foreach(_.UpdateHistory.unassignments.mark())
+    metrics.UpdateHistory.unassignments.mark()
     sqlu"""
       insert into update_history_unassignments(
         history_id,update_id,record_time,
@@ -486,7 +522,7 @@ class UpdateHistory(
     val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdEvent.createdAt)
     val safeSignatories = event.createdEvent.getSignatories.asScala.toSeq.map(lengthLimited)
     val safeObservers = event.createdEvent.getObservers.asScala.toSeq.map(lengthLimited)
-    oMetrics.foreach(_.UpdateHistory.assignments.mark())
+    metrics.UpdateHistory.assignments.mark()
     sqlu"""
       insert into update_history_assignments(
         history_id,update_id,record_time,
@@ -515,29 +551,31 @@ class UpdateHistory(
   private def ingestTransactionTree(
       tree: Transaction,
       migrationId: Long,
-  ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
-    oMetrics.foreach(_.UpdateHistory.transactionsTrees.mark())
-    insertTransactionUpdateRow(tree, migrationId).flatMap(updateRowId => {
-      // Note: the order of elements in the eventsById map doesn't matter, and is not preserved here.
-      // The order of elements in the rootEventIds and childEventIds lists DOES matter, and needs to be preserved.
-      DBIOAction.seq[Effect.Write](
-        tree.getEventsById.values().asScala.toSeq.map {
-          case created: CreatedEvent =>
-            insertCreateEventRow(tree.getUpdateId, created, tree, migrationId, updateRowId)
-          case exercised: ExercisedEvent =>
-            insertExerciseEventRow(
-              tree.getUpdateId,
-              exercised,
-              tree,
-              migrationId,
-              updateRowId,
-              tree.getChildNodeIds(exercised).asScala.toSeq.map(_.intValue()),
-            )
-          case e =>
-            throw new RuntimeException(s"Unsupported event type: $e")
-        }*
-      )
-    })
+  ): DBIOAction[IngestedEvents, NoStream, Effect.Read & Effect.Write] = {
+    metrics.UpdateHistory.transactionsTrees.mark()
+    insertTransactionUpdateRow(tree, migrationId)
+      .flatMap(updateRowId => {
+        // Note: the order of elements in the eventsById map doesn't matter, and is not preserved here.
+        // The order of elements in the rootEventIds and childEventIds lists DOES matter, and needs to be preserved.
+        DBIOAction.seq[Effect.Write](
+          tree.getEventsById.values().asScala.toSeq.map {
+            case created: CreatedEvent =>
+              insertCreateEventRow(tree.getUpdateId, created, tree, migrationId, updateRowId)
+            case exercised: ExercisedEvent =>
+              insertExerciseEventRow(
+                tree.getUpdateId,
+                exercised,
+                tree,
+                migrationId,
+                updateRowId,
+                tree.getChildNodeIds(exercised).asScala.toSeq.map(_.intValue()),
+              )
+            case e =>
+              throw new RuntimeException(s"Unsupported event type: $e")
+          }*
+        )
+      })
+      .map(_ => IngestedEvents.eventCount(Seq(tree)))
   }
 
   private def insertTransactionUpdateRow(
@@ -1381,7 +1419,7 @@ class UpdateHistory(
     }
   }
 
-  def lookupContractById[TCId <: ContractId[_], T <: DamlRecord[_]](
+  def lookupContractById[TCId <: ContractId[?], T <: DamlRecord[?]](
       companion: Contract.Companion.Template[TCId, T]
   )(contractId: TCId)(implicit tc: TraceContext): Future[Option[Contract[TCId, T]]] = {
     for {
@@ -2175,13 +2213,17 @@ class UpdateHistory(
     )(implicit
         tc: TraceContext
     ): Future[DestinationHistory.InsertResult] = {
-      insertItems(migrationId, items).map(insertedItems =>
+      insertItems(migrationId, items).map { insertedItems =>
+        val ingestedEvents = IngestedEvents.eventCount(insertedItems.map(_.update).collect {
+          case TransactionTreeUpdate(tree) => tree
+        })
         DestinationHistory.InsertResult(
           backfilledUpdates = insertedItems.size.toLong,
-          backfilledEvents = eventCount(insertedItems),
+          backfilledExercisedEvents = ingestedEvents.numExercisedEvents,
+          backfilledCreatedEvents = ingestedEvents.numCreatedEvents,
           lastBackfilledRecordTime = insertedItems.last.update.recordTime,
         )
-      )
+      }
     }
 
     override def insertImportUpdates(
@@ -2197,14 +2239,6 @@ class UpdateHistory(
         )
       )
     }
-
-    private def eventCount(updates: NonEmptyList[UpdateHistoryResponse]): Long =
-      updates
-        .map(_.update)
-        .collect { case TransactionTreeUpdate(tree) =>
-          tree.getEventsById.size().toLong
-        }
-        .sum
 
     private def insertItems(
         migrationId: Long,
@@ -2266,7 +2300,9 @@ class UpdateHistory(
         _ <-
           if (!itemExists) {
             DBIOAction
-              .sequence(items.map(item => ingestUpdate_(item.update, migrationId)))
+              .sequence(items.map { item =>
+                ingestUpdate_(item.update, migrationId)
+              })
           } else {
             DBIOAction.successful(())
           }
@@ -2278,7 +2314,6 @@ class UpdateHistory(
           "destinationHistory.insert",
         )
         .map { nonEmpty =>
-          advanceLastIngestedRecordTime(nonEmpty.last.update.recordTime)
           nonEmpty
         }
     }
@@ -2303,25 +2338,21 @@ object UpdateHistory {
   // Since we're interested in the highest known migration id, we don't need to filter by anything
   // (store ID, participant ID, etc. are not even known at the time we want to call this).
   def getHighestKnownMigrationId(
-      storage: Storage
+      storage: DbStorage
   )(implicit
       ec: ExecutionContext,
       closeContext: CloseContext,
       tc: TraceContext,
   ): Future[Option[Long]] = {
-    storage match {
-      case storage: DbStorage =>
-        for {
-          queryResult <- storage.query(
-            sql"""
+    for {
+      queryResult <- storage.query(
+        sql"""
                select max(migration_id) from update_history_last_ingested_offsets
             """.as[Option[Long]],
-            "getHighestKnownMigrationId",
-          )
-        } yield {
-          queryResult.headOption.flatten
-        }
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
+        "getHighestKnownMigrationId",
+      )
+    } yield {
+      queryResult.headOption.flatten
     }
   }
 
@@ -2397,7 +2428,7 @@ object UpdateHistory {
       contractKey: Option[String],
   ) {
 
-    def toContract[TCId <: ContractId[_], T <: DamlRecord[_]](
+    def toContract[TCId <: ContractId[?], T <: DamlRecord[?]](
         companion: Contract.Companion.Template[TCId, T]
     ): Contract[TCId, T] = {
       Contract

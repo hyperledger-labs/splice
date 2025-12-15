@@ -69,6 +69,24 @@ Create the application namespace within Kubernetes.
     The validator deployment assumes one validator per namespace.
     If you wish to run multiple validators in the same cluster, please create a separate namespace for each.
 
+.. _validator-http-proxy-helm:
+
+HTTP Proxy configuration
+------------------------
+
+If you need to use an HTTP forward proxy for egress in your environment, you need to set ``https.proxyHost`` and ``https.proxyPort``
+in ``additionalJvmOptions`` in the validator and participant helm charts to use the HTTP proxy for outgoing connections:
+
+.. code-block:: yaml
+
+  additionalJvmOptions: |
+    -Dhttps.proxyHost=your.proxy.host
+    -Dhttps.proxyPort=your_proxy_port
+
+Replace ``your.proxy.host`` and ``your_proxy_port`` with the actual host and port of your HTTP proxy.
+You can set ``https.nonProxyHosts`` as well to prevent proxying for particular addresses.
+Proxy authentication is currently not supported.
+
 .. _validator-postgres-auth:
 
 Configuring PostgreSQL authentication
@@ -632,7 +650,7 @@ Configuring automatic traffic purchases
 ---------------------------------------
 
 By default your node will be configured to automatically purchase :ref:`traffic <traffic>` on a pay-as-you-go basis
-:ref:`automatically purchase traffic <traffic_topup>`.
+(see :ref:`automatically purchase traffic <traffic_topup>`).
 To disable or tune to your needs, edit the following section in the validator-values.yaml file:
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
@@ -640,30 +658,7 @@ To disable or tune to your needs, edit the following section in the validator-va
     :start-after: CONFIGURING_TOPUP_START
     :end-before: CONFIGURING_TOPUP_END
 
-On each successful top-up, the validator app purchases a `top-up amount` of roughly ``targetThroughput * minTopupInterval`` bytes of traffic
-(specific amount can vary due to rounding-up).
-The ``minTopupInterval`` allows validator operators to control the upper-bound frequency at which automated top-ups happen.
-If the top-up amount is below the synchronizer-wide ``minTopupAmount`` (see :ref:`traffic_parameters`),
-``minTopupInterval`` is automatically stretched so that at least ``minTopupAmount`` bytes of traffic are
-purchased while respecting the configured ``targetThroughput``.
-
-The next top-up gets triggered when all of the following conditions are met:
-
-- The available :ref:`extra traffic balance <traffic_accounting>` drops below the configured top-up amount
-  (i.e., below ``targetThroughput * minTopupInterval``).
-- At least ``minTopupInterval`` has elapsed since the last top-up.
-- The validator has sufficient CC in its wallet to buy the top-up amount worth on traffic
-  (except on DevNet, where the validator app will automatically tap enough coin to purchase traffic).
-
-
-Validators receive a small amount of free traffic from the Super Validators, which suffices for submitting the
-top-up transaction. However, if many other transactions are submitted, you may run into a situation where
-you have exhausted also the free traffic, thus the validator cannot submit the top-up transaction.
-The free traffic grant accumulates gradually and continuously. When no transactions are submitted, it
-takes about twenty minutes for free traffic to accumulate to the maximum possible.
-If you've consumed your traffic balance by submitting too many transactions without purchasing traffic,
-pause your Validator node (validator app and participant) for twenty minutes to allow your free traffic
-balance to accumulate.
+.. include:: ../common/traffic_topups.rst
 
 
 .. todo::

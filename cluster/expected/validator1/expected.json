@@ -279,6 +279,16 @@
   },
   {
     "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
     "id": "",
     "inputs": {},
     "name": "participantKmsServiceAccountKey",
@@ -328,7 +338,7 @@
         }
       }
     },
-    "name": "splice-auth0-secret-validator1-validator1",
+    "name": "splice-auth0-secret-validator1-validator",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },

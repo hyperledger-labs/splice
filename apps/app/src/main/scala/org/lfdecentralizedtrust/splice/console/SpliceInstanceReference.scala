@@ -109,7 +109,7 @@ trait HttpAppReference extends AppReference with HttpCommandRunner {
   override def keys: KeyAdministrationGroup = noGrpcError()
 
   override def adminCommand[Result](
-      grpcCommand: GrpcAdminCommand[_, _, Result]
+      grpcCommand: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] = noGrpcError()
 
   private def noGrpcError() = throw new NotImplementedError(
@@ -124,7 +124,7 @@ trait HttpAppReference extends AppReference with HttpCommandRunner {
   def httpClientConfig: NetworkAppClientConfig
 
   override protected[splice] def httpCommand[Result](
-      httpCommand: HttpCommand[_, Result],
+      httpCommand: HttpCommand[?, Result],
       basePath: Option[String] = None,
   ): ConsoleCommandResult[Result] =
     spliceConsoleEnvironment.httpCommandRunner.runCommand(
@@ -258,20 +258,20 @@ class ParticipantClientReference(
     val pkgs = this.ledger_api.packages.list()
     if (!pkgs.map(_.packageId).contains(hash)) {
       discard[String](this.dars.upload(path, vetAllPackages = false))
-      val connected = this.synchronizers.list_connected()
-      if (connected.isEmpty) {
-        logger.error(s"Trying to vet $path on ${this.id} but not connected to any synchronizer")
-      }
-      connected.foreach { sync =>
-        this.topology.vetted_packages.propose_delta(
-          this.id,
-          adds = dar.all
-            .map(p => LfPackageId.assertFromString(p.getHash))
-            .distinct
-            .map(VettedPackage(_, None, None)),
-          store = TopologyStoreId.Synchronizer(sync.synchronizerId),
-        )
-      }
+    }
+    val connected = this.synchronizers.list_connected()
+    if (connected.isEmpty) {
+      logger.error(s"Trying to vet $path on ${this.id} but not connected to any synchronizer")
+    }
+    connected.foreach { sync =>
+      this.topology.vetted_packages.propose_delta(
+        this.id,
+        adds = dar.all
+          .map(p => LfPackageId.assertFromString(p.getHash))
+          .distinct
+          .map(VettedPackage(_, None, None)),
+        store = TopologyStoreId.Synchronizer(sync.synchronizerId),
+      )
     }
   }
 }

@@ -34,7 +34,7 @@ trait AcsQueries extends AcsJdbcTypes {
   /** @param tableName Must be SQL-safe, as it needs to be interpolated unsafely.
     *                  This is fine, as all calls to this method should use static string constants.
     */
-  protected def selectFromAcsTable[C, TCid <: ContractId[_], T](
+  protected def selectFromAcsTable[C, TCid <: ContractId[?], T](
       tableName: String,
       storeId: AcsStoreId,
       migrationId: Long,
@@ -74,7 +74,7 @@ trait AcsQueries extends AcsJdbcTypes {
     }
 
   /** Similar to [[selectFromAcsTable]], but also returns the contract state (i.e., the domain to which a contract is currently assigned) */
-  protected def selectFromAcsTableWithState[C, TCid <: ContractId[_], T](
+  protected def selectFromAcsTableWithState[C, TCid <: ContractId[?], T](
       tableName: String,
       storeId: AcsStoreId,
       migrationId: Long,
@@ -122,7 +122,7 @@ trait AcsQueries extends AcsJdbcTypes {
     * This guarantees that the fetched contracts exist in the given offset,
     * whereas two separate queries (one to fetch the contract and one to fetch the offset) don't guarantee that.
     */
-  protected def selectFromAcsTableWithOffset[C, TCid <: ContractId[_], T](
+  protected def selectFromAcsTableWithOffset[C, TCid <: ContractId[?], T](
       tableName: String,
       storeId: AcsStoreId,
       migrationId: Long,
@@ -185,7 +185,7 @@ trait AcsQueries extends AcsJdbcTypes {
 
   /** Same as [[selectFromAcsTableWithOffset]], but also includes the contract state.
     */
-  protected def selectFromAcsTableWithStateAndOffset[C, TCid <: ContractId[_], T](
+  protected def selectFromAcsTableWithStateAndOffset[C, TCid <: ContractId[?], T](
       tableName: String,
       storeId: AcsStoreId,
       migrationId: Long,
@@ -268,23 +268,21 @@ trait AcsQueries extends AcsJdbcTypes {
   /** Constructions like `seq.mkString("(", ",", ")")` are dangerous because they can lead to SQL injection.
     * Prefer using this instead, or [[inClause]] when in a `WHERE x IN`.
     */
-  protected def sqlCommaSeparated[V](
-      seq: Iterable[V]
-  )(implicit
-      sp: SetParameter[V]
-  ): SQLActionBuilder = {
+  protected def sqlCommaSeparated(
+      seq: Iterable[SQLActionBuilder]
+  ): SQLActionBuilderChain = {
     seq
-      .map(v => sql"$v")
+      .map(SQLActionBuilderChain(_))
       .reduceOption { (acc, next) =>
-        (acc ++ sql"," ++ next).toActionBuilder
+        acc ++ sql"," ++ next
       }
-      .getOrElse(sql"")
+      .getOrElse(SQLActionBuilderChain(sql""))
   }
 
   protected def inClause[V: SetParameter](seq: Iterable[V]): SQLActionBuilderChain =
-    sql"(" ++ sqlCommaSeparated(seq) ++ sql")"
+    sql"(" ++ sqlCommaSeparated(seq.map(v => sql"$v")) ++ sql")"
 
-  protected def contractFromRow[C, TCId <: ContractId[_], T](companion: C)(
+  protected def contractFromRow[C, TCId <: ContractId[?], T](companion: C)(
       row: AcsQueries.SelectFromAcsTableResult
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
@@ -293,7 +291,7 @@ trait AcsQueries extends AcsJdbcTypes {
     row.toContract(companion)
   }
 
-  protected def assignedContractFromRow[C, TCid <: ContractId[_], T](companion: C)(
+  protected def assignedContractFromRow[C, TCid <: ContractId[?], T](companion: C)(
       row: SelectFromAcsTableWithStateResult
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
@@ -311,7 +309,7 @@ trait AcsQueries extends AcsJdbcTypes {
     }
   }
 
-  protected def contractWithStateFromRow[C, TCid <: ContractId[_], T](companion: C)(
+  protected def contractWithStateFromRow[C, TCid <: ContractId[?], T](companion: C)(
       row: SelectFromAcsTableWithStateResult
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
@@ -347,7 +345,7 @@ object AcsQueries {
       createdAt: Timestamp,
       contractExpiresAt: Option[Timestamp],
   ) extends StoreErrors {
-    def toContract[C, TCId <: ContractId[_], T](companion: C)(implicit
+    def toContract[C, TCId <: ContractId[?], T](companion: C)(implicit
         companionClass: ContractCompanion[C, TCId, T],
         decoder: TemplateJsonDecoder,
     ): Contract[TCId, T] = {

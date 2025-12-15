@@ -5,20 +5,140 @@
 
 .. _release_notes:
 
-Release Notes
-=============
+.. release-notes:: upcoming
 
-Upcoming
---------
+  - API security
+
+    - Tightened authorization checks for all non-public API endpoints.
+
+      All non-public endpoints now properly respect the current user rights
+      defined in the participant user management service.
+      Revoking user rights on the participant will revoke access to the corresponding API endpoints.
+
+      In general, endpoints that required authentication before will now check that the authenticated user
+      is not deactivated on the participant has ``actAs`` rights for the relevant party
+      (wallet party for the wallet app API, SV operator party for the SV app API, etc).
+
+    - Administrative SV app endpoints now require participant admin rights.
+
+      The following SV app endpoints now require the user to have participant admin rights in
+      the participant user management service.
+
+        - ``/v0/admin/domain/pause``
+        - ``/v0/admin/domain/unpause``
+        - ``/v0/admin/domain/migration-dump``
+        - ``/v0/admin/domain/migration-dump``
+        - ``/v0/admin/domain/identities-dump``
+        - ``/v0/admin/domain/data-snapshot``
+
+      This allows for finer grained access control
+      where users with ``actAs`` rights for the SV operator party but without participant admin
+      rights may use the SV or wallet UIs, but may not perform administrative actions like
+      hard synchronizer migrations.
+
+      Note that only the service users of the SV and validator apps should automatically have participant admin rights.
+      If you are using other users to access the above endpoints, check their rights.
+
+    - Some endpoints will have changed authorization rules in an upcoming release.
+
+        - SV app ``/v0/dso`` is currently public, but will require authorization as SV operator,
+          similar to most other SV app endpoints.
+          Use the public ``/v0/dso`` endpoint in the scan app if you need to fetch DSO info.
+
+.. release-notes:: 0.5.4
+
+  - Participant
+
+    - Fix a bug introduced in 0.5.0/0.5.1 that could cause participant pruning to prune active data.
+      The bug only manifests in a rare edge case involving a manual ACS import on a participant that was already running for some time.
+
+    - Fix a performance regression in participants that causes the processing of events to pause for multiple minutes at random times,
+      due to a bad database query plan on the critical part of the indexer pipeline.
+
+  - Scan
+
+    - Removed the non-existing `command_id` field from the OpenAPI spec of all
+      scan endpoints that return transactions.
+      The field was included in the "required" section without being a property
+      of the returned transaction object. This is only a bugfix in the OpenAPI spec
+      and has no impact on the actual API behavior.
+
+.. release-notes:: 0.5.3
+
+  Note: 0.5.2 mistakingly introduced default pruning for Canton participants and should be skipped in favor of 0.5.3.
+  Participants **do not** prune any data by default.
+  Pruning can be enabled explicitly by any validator operator.
+  For more information please check the :ref:`docs <validator_participant_pruning>`.
+
+  - Sequencer connections
+
+    - Improve retries for sending sequencer submissions when a sequencer rejects the request with an overloaded error code by retrying immediately on another node.
+    - The network timeout for the connection was lowered to 15 seconds to detect failures faster.
+
+  - Validator
+
+    - Fix bug that caused validators to fail on restoring participant users without rights during a synchronizer migration.
+
+  - Scan
+
+    - The round-based aggregates for balance values (changes to holding fees and initial amounts since round zero)
+      have diverged between scans because of the way amulet expiration is counted in rounds.
+      The balance values recorded in the round aggregates are effectively not depended upon anymore by scan APIs,
+      and are now set to zero to avoid consensus problems when an SV reads aggregates
+      from the rest of the network when first joining.
+
+    - Please note that ``/v0/total-amulet-balance`` and ``/v0/wallet-balance`` endpoints are marked for removal, and will be removed in an upcoming release.
+      See the Scan OpenAPI documentation for details: `/v0/total-amulet-balance <app_dev/scan_api/scan_openapi.html#get--v0-total-amulet-balance>`_
+      and `/v0/wallet-balance <app_dev/scan_api/scan_openapi.html#get--v0-wallet-balance>`_.
+
+  - Daml
+
+    - Fixed a bug in ``WalletUserProxy_TransferInstruction_Withdraw``, where the controller was
+      required to be the ``receiver`` instead of the ``sender`` of the transfer instruction. Upgrade
+      to ``splice-util-featured-app-proxies`` version ``1.2.1`` or newer to get the fix.
+
+  - SV app
+
+    - The SV app will no longer store the update history and such, will not be able to answer historical queries.
+      All updates involving the DSO party will still be stored and returned by Scan.
+
+    - Deployment
+
+      - The helm values under ``scan``, that is ``publicUrl`` and ``internalUrl`` are now mandatory.
+        All SVs already deploy scan on DevNet, TestNet and MainNet so this should have no impact.
+
+  - Docs
+
+    - Improvements to validator docs on :ref:`Synchronizer Upgrades with Downtime <validator-upgrades>`.
+
+.. release-notes:: 0.5.1
+
+  - Canton Participant
+
+    - Fix an issue where after a restart the participant could fail to
+      come up as a query exceeded the 65353 query parameter limit. This
+      should only an issue for SVs or participants with very high
+      traffic.
+
+
+.. release-notes:: 0.5.0
+
+  .. important::
+
+      Upgrade to Canton 3.4: This upgrade requires a Synchronizer Migration with Downtime and cannot be applied through a regular upgrade.
+      For details refer to the approved `CIP <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0089/cip-0089.md>`_
+      as well as the respective documentation pages for :ref:`validators <validator-upgrades>` and :ref:`SVs <sv-upgrades>`.
 
   - Deployment
 
-      - Docker-compose based deployments of LocalNet, validator, and SV expose only to 127.0.0.1 by default. If you want to expose externally, use ``-E`` in validator and superValidator ``start.sh``. For LocalNet, set ``export HOST_BIND_IP=0.0.0.0`` manually.
+      - **Breaking**: Docker-compose based deployments of LocalNet, validator, and SV expose only to 127.0.0.1 by default. If you want to expose externally, use ``-E`` in validator and superValidator ``start.sh``. For LocalNet, set ``export HOST_BIND_IP=0.0.0.0`` manually.
 
   - Validator
 
       - ``/v0/admin/users/offboard``:
         Offboarding a user now also deletes the ledger API user in the participant node.
+      - If you need to use an HTTP proxy in your environment, you can now use `https.proxyHost` and `https.proxyPort` Java system properties.
+        Please see :ref:`HTTP Proxy configuration <validator-http-proxy-helm>` for Kubernetes-Based deployment and :ref:`HTTP Proxy configuration <validator-http-proxy-compose>` for Docker Compose-Based deployment.
 
   - Scan
 
@@ -29,6 +149,26 @@ Upcoming
   - Docs
 
     - Document additional approach for resuming a :ref:`validator disaster recovery <validator_dr>` process that has failed at the step of importing the :term:`ACS`.
+    - Added a section on :ref:`configuring traffic <compose_validator_topup>` topups for Docker-compose deployments
+    - Add a section on :ref:`wallet_how_to_earn_featured_app_rewards`
+
+  - Mediator
+
+    - Mediators now prune data to only retain the last 30 days matching the 30 day pruning interval of sequencers.
+
+.. release-notes:: 0.4.25
+
+  Note: 0.4.24 was published incorrectly and should be skipped in favor of 0.4.25.
+
+  - Canton Participant
+
+    - Fix an issue where after a restart the participant could fail to
+      come up as a query exceeded the 65353 query parameter limit. This
+      should only an issue for SVs or participants with very high
+      traffic.
+
+
+.. release-notes:: 0.4.23
 
   - Daml
 
@@ -37,10 +177,25 @@ Upcoming
       implementing auto-merging of holdings and airdrop campaigns, as
       explained in :ref:`holding_utxo_management`.
       The package is optional and not uploaded by default to a validator node.
+    - Extended the ``splice-util-featured-app-proxies.dar``
+      :ref:`package <package-featured-app-proxies>` to
+      support executing :ref:`batch/bulk transfers <type-splice-util-featuredapp-walletuserproxy-walletuserproxybatchtransfer-93002>` of Canton Network token standard tokens,
+      both for featured and unfeatured apps.
 
 
-0.4.22
-------
+  - Performance improvements
+
+    - Scan
+
+        - Cache open rounds with a default TTL of 30s. This should reduce load when rounds change and lots of clients try to read the open rounds. `View PR 2860. <https://github.com/hyperledger-labs/splice/pull/2860>`_
+
+        - Reduce database load when the connection to the mediator verdict ingestion is restarted. `View PR 2861. <https://github.com/hyperledger-labs/splice/pull/2861>`_
+
+  - Deployment
+
+    - Increased the resource allocation for most apps, double check any changes if you override the default resources. `View PR 2972. <https://github.com/hyperledger-labs/splice/pull/2972>`_
+
+.. release-notes:: 0.4.22
 
   - SV
 
@@ -53,8 +208,8 @@ Upcoming
       is in catchup mode because there are too many markers.
       Catchup mode only triggers when one or more of the SVs failed to convert the markers assigned to them for too long.
 
-0.4.21
-------
+
+.. release-notes:: 0.4.21
 
   - Deployment
 
@@ -90,8 +245,7 @@ Upcoming
     - The SV App now exposes metrics for SV-voted coin prices and the coin price in latest open mining round.
 
 
-0.4.20
-------
+.. release-notes:: 0.4.20
 
   - Deployment
 
