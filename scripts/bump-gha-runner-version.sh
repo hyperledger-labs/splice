@@ -47,4 +47,5 @@ gh pr create \
   --base "main" \
   --head "$updated_branch" \
   --title "Bump GHA runner version to the latest (auto-generated)" \
+  --body "" \
   --reviewer isegall-da,martinflorian-da,ray-roestenburg-da,mblaze-da
