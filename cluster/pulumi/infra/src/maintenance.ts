@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
+import { Version } from '@lfdecentralizedtrust/splice-pulumi-common/src/version';
 
 import { DOCKER_REPO, infraAffinityAndTolerations } from '../../common';
 
-const kubectlVersion = spliceEnvConfig.requireEnv('KUBECTL_VERSION');
 const cronJobName = 'gc-pod-reaper-job';
 const reaperNamespace = 'gc-pod-reaper';
 const serviceAccountName = 'gc-pod-reaper-service-account';
@@ -19,17 +18,6 @@ const deleteBadPodsCommand = [
   '/bin/bash',
   '-c',
   `
-    apt-get update &&
-    apt-get install -y jq &&
-    curl -LO https://dl.k8s.io/release/${kubectlVersion}/bin/linux/amd64/kubectl &&
-    install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl;
-
-
-    if [ $? -ne 0 ] || ! command-v kubectl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
-        echo "Error: Failed to install kubectl or jq. Exiting.";
-        exit 1
-    fi
-
     echo "--- $(date) Starting Pod Reaper ---";
 
     TARGET_NAMESPACES_LIST=$(echo "$TARGET_NAMESPACES" | tr ',' ' ');
@@ -178,7 +166,7 @@ export function deployGCPodReaper(
                 containers: [
                   {
                     name: cronJobName,
-                    image: `${DOCKER_REPO}/splice-debug`,
+                    image: `${DOCKER_REPO}/splice-debug:${Version}`,
                     imagePullPolicy: 'Always',
                     command: deleteBadPodsCommand,
                     env: [
