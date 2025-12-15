@@ -7,7 +7,6 @@ dependencies:
   - daml-stdlib
   - daml-script
 data-dependencies:
-- ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
 - ../splice-amulet/.daml/dist/splice-amulet-current.dar
 - ../splice-amulet-test/.daml/dist/splice-amulet-test-current.dar
 - ../splice-util/.daml/dist/splice-util-current.dar
