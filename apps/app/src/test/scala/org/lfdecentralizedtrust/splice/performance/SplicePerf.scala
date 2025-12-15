@@ -78,6 +78,36 @@ object SplicePerfImpl {
       .orElse(
         Opts.subcommand(
           Command(
+            "download-scan-acs-snapshot",
+            "Downloads the ACS snapshot from the provided SV (default DA SV-1 MainNet) at the given time.",
+          )(
+            (
+              Opts
+                .option[String]("host", "Host URI of the SV node", "h")
+                .withDefault("https://scan.sv-2.global.canton.network.digitalasset.com"),
+              Opts.option[Int]("migration-id", "Migration ID to query the ACS snapshot for", "m"),
+              Opts
+                .option[String]("write-path", "Path to write the ACS snapshot to", "w")
+                .map(
+                  java.nio.file.Paths.get(_)
+                ),
+              Opts
+                .option[String](
+                  "snapshot-time",
+                  "The time at which to download the ACS snapshot (ISO-8601 format)",
+                  "s",
+                )
+                .map(Instant.parse)
+                .withDefault(Instant.now()),
+            ).mapN { (host, migrationId, writePath, snapshotTime) =>
+              run(new DownloadScanAcsSnapshot(host, migrationId, writePath, snapshotTime))
+            }
+          )
+        )
+      )
+      .orElse(
+        Opts.subcommand(
+          Command(
             "run",
             "Runs the given test(s)",
           )(
