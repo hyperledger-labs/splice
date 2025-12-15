@@ -6,8 +6,10 @@ on:
 
 jobs:
   bump_gha_runner_version:
-    runs-on: ubuntu-24.04
     name: Bump GHA runner version
+    runs-on: self-hosted-k8s-small
+    container:
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
