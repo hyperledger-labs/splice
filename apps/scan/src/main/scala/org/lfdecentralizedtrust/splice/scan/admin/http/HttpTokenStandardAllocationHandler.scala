@@ -50,6 +50,7 @@ class HttpTokenStandardAllocationHandler(
           allocationId,
           requireLockedAmulet = true,
           canBeFeatured = true,
+          excludeDebugFields = body.excludeDebugFields.getOrElse(false),
         )
       } yield v1.Resource.GetAllocationTransferContextResponseOK(choiceContext)
     }
@@ -67,6 +68,7 @@ class HttpTokenStandardAllocationHandler(
           allocationId,
           requireLockedAmulet = false,
           canBeFeatured = false,
+          excludeDebugFields = body.excludeDebugFields.getOrElse(false),
         )
       } yield v1.Resource.GetAllocationCancelContextResponseOK(choiceContext)
     }
@@ -84,6 +86,7 @@ class HttpTokenStandardAllocationHandler(
           allocationId,
           requireLockedAmulet = false,
           canBeFeatured = false,
+          excludeDebugFields = body.excludeDebugFields.getOrElse(false),
         )
       } yield v1.Resource.GetAllocationWithdrawContextResponseOK(choiceContext)
     }
@@ -94,6 +97,7 @@ class HttpTokenStandardAllocationHandler(
       allocationId: String,
       requireLockedAmulet: Boolean,
       canBeFeatured: Boolean,
+      excludeDebugFields: Boolean,
   )(implicit
       tc: TraceContext
   ): Future[definitions.ChoiceContext] = {
@@ -125,7 +129,7 @@ class HttpTokenStandardAllocationHandler(
         ),
         store,
         clock,
-        new ChoiceContextBuilder(_),
+        new ChoiceContextBuilder(_, excludeDebugFields),
       )
     } yield context
   }
@@ -133,13 +137,13 @@ class HttpTokenStandardAllocationHandler(
 
 object HttpTokenStandardAllocationHandler {
 
-  final class ChoiceContextBuilder(activeSynchronizerId: String)(implicit
-      elc: ErrorLoggingContext
+  final class ChoiceContextBuilder(activeSynchronizerId: String, excludeDebugFields: Boolean)(
+      implicit elc: ErrorLoggingContext
   ) extends util.ChoiceContextBuilder[
         definitions.DisclosedContract,
         definitions.ChoiceContext,
         ChoiceContextBuilder,
-      ](activeSynchronizerId) {
+      ](activeSynchronizerId, excludeDebugFields) {
 
     def build(): definitions.ChoiceContext = definitions.ChoiceContext(
       choiceContextData = io.circe.parser
@@ -156,6 +160,7 @@ object HttpTokenStandardAllocationHandler {
     override protected def toTokenStandardDisclosedContract[TCId, T](
         contract: Contract[TCId, T],
         synchronizerId: String,
+        excludeDebugFields: Boolean,
     ): definitions.DisclosedContract = {
       val asHttp = contract.toHttp
       definitions.DisclosedContract(
@@ -164,9 +169,15 @@ object HttpTokenStandardAllocationHandler {
         createdEventBlob = asHttp.createdEventBlob,
         synchronizerId = synchronizerId,
         debugPackageName =
-          DarResources.lookupPackageId(contract.identifier.getPackageId).map(_.metadata.name),
-        debugPayload = Some(asHttp.payload),
-        debugCreatedAt = Some(contract.createdAt.atOffset(ZoneOffset.UTC)),
+          if (excludeDebugFields) None
+          else
+            DarResources
+              .lookupPackageId(contract.identifier.getPackageId)
+              .map(_.metadata.name),
+        debugPayload = if (excludeDebugFields) None else Some(asHttp.payload),
+        debugCreatedAt =
+          if (excludeDebugFields) None
+          else Some(contract.createdAt.atOffset(ZoneOffset.UTC)),
       )
     }
   }
