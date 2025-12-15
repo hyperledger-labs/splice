@@ -1342,8 +1342,6 @@ async def main():
                     for (tx, event_id) in state.exercise_pending_events:
                         global_state.process_events(tx, [event_id])
 
-                    LOG.debug(f"exercise_pending_events_len: {len(global_state.exercise_pending_events)}") # TODOV
-
                 # Drop unresolved pending events — after the global merge and re-processing, they are known to be
                 # irrelevant (cannot be attributed to the beneficiary).
                 # Chunk 0: discard pending exercises of the beneficiary - they correspond to rewards created before begin_record_time.
