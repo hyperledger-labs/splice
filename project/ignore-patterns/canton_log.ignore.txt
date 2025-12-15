@@ -166,4 +166,7 @@ Dynamic synchronizer parameters to compute earliest available pruning timestamp 
 # TODO(#3193): Likely a race in the shutdown of the actor system vs us scheduling something else on it
 java.lang.IllegalStateException: cannot enqueue after timer shutdown
 
+# In validatorintegrationtest we set the url for a sequencer to example.com to simulate an unreachable sequencer.
+Connection has failed validation since.*server-Digital-Asset-Eng-4-0.*Causes: First received frame was not SETTINGS. Hex dump for first 5 bytes
+
 # Make sure to have a trailing newline
