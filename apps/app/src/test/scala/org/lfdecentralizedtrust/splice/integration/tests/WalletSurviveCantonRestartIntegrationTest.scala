@@ -2,7 +2,6 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
@@ -28,16 +27,6 @@ class WalletSurviveCantonRestartIntegrationTest
     EnvironmentDefinition
       .simpleTopology1SvWithLocalValidator(this.getClass.getSimpleName)
       .withSequencerConnectionsFromScanDisabled()
-      .addConfigTransforms((_, conf) =>
-        ConfigTransforms.updateAllValidatorConfigs { case (name, config) =>
-          if (name == "aliceValidatorLocalBackend") {
-            import monocle.macros.syntax.lens.*
-            config.focus(_.parameters.enabledFeatures.newSequencerConnectionPool).replace(true)
-          } else {
-            config
-          }
-        }(conf)
-      )
   }
 
   "Wallet" should {
