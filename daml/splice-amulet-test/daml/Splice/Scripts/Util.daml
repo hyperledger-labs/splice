@@ -668,14 +668,15 @@ setAmuletConfig app baseConfig newConfig = do
       baseConfig
 
 allocateDevelopmentFundCoupon
-  : AmuletApp -> Party -> Party -> Decimal -> Time -> [ContractId UnclaimedDevelopmentFundCoupon]
+  : AmuletApp -> Party -> Party -> Decimal -> Time -> Text -> [ContractId UnclaimedDevelopmentFundCoupon]
   -> Script AmuletRules_AllocateDevelopmentFundCouponResult
-allocateDevelopmentFundCoupon app fundManager beneficiary amount expiresAt unclaimedDevelopmentFundCouponCids = do
+allocateDevelopmentFundCoupon app fundManager beneficiary amount expiresAt reason unclaimedDevelopmentFundCouponCids = do
   submitExerciseAmuletRulesByKey app [fundManager] [] AmuletRules_AllocateDevelopmentFundCoupon with
     unclaimedDevelopmentFundCouponCids
     beneficiary
     amount
     expiresAt
+    reason
     fundManager
 
 -- Metadata verification

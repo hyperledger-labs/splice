@@ -626,6 +626,7 @@ template AmuletRules
         beneficiary : Party
         amount : Decimal
         expiresAt : Time
+        reason : Text
         fundManager : Party
       controller fundManager
       do
@@ -651,7 +652,8 @@ template AmuletRules
              | otherwise -> Some <$> create UnclaimedDevelopmentFundCoupon with dso; amount = leftover
 
         -- record development fund coupon contract
-        developmentFundCouponCid <- create DevelopmentFundCoupon with dso; beneficiary; fundManager; amount; expiresAt
+        developmentFundCouponCid <- create DevelopmentFundCoupon with
+          dso; beneficiary; fundManager; amount; expiresAt; reason
 
         return AmuletRules_AllocateDevelopmentFundCouponResult with
           developmentFundCouponCid

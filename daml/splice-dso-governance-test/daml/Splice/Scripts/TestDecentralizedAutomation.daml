@@ -120,9 +120,10 @@ testDevelopmentFundCouponExpiry = do
   let
     expiresAt = addRelTime now (hours 1)
     amount = unclaimedDevelopmentFundCoupon.amount
+    reason = "Alice fixed issue XXX"
   alice <- setupUser app "alice" app.dso
   developmentFundCouponCid <- (.developmentFundCouponCid) <$>
-    allocateDevelopmentFundCoupon app fundManager alice.primaryParty amount expiresAt [unclaimedDevelopmentFundCouponCid]
+    allocateDevelopmentFundCoupon app fundManager alice.primaryParty amount expiresAt reason [unclaimedDevelopmentFundCouponCid]
 
   -- Unhappy - expiresAt has not been reached
   submitMultiMustFail [sv1] [app.dso] do

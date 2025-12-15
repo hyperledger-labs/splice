@@ -600,10 +600,12 @@ testInputDevelopmentFundCoupon = do
 
   -- Allocate a DevelopmentFundCoupon
   now <- getTime
-  let expiresAt = addRelTime now (days 2)
+  let
+    expiresAt = addRelTime now (days 2)
+    reason = "Bob fixed issue XXX"
   AmuletRules_AllocateDevelopmentFundCouponResult
     { developmentFundCouponCid, optUnclaimedDevelopmentFundCouponCid = None } <-
-      allocateDevelopmentFundCoupon app alice.primaryParty bob.primaryParty totalAmount expiresAt [cid1, cid2]
+      allocateDevelopmentFundCoupon app alice.primaryParty bob.primaryParty totalAmount expiresAt reason [cid1, cid2]
 
   -- Unhappy - expiresAt has been reached
   setTime $ addRelTime expiresAt (minutes 1)
