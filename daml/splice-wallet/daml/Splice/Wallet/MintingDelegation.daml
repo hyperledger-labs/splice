@@ -4,12 +4,10 @@
 module Splice.Wallet.MintingDelegation where
 
 import DA.Assert
-import DA.Foldable (forA_)
 import Splice.AmuletRules
 import Splice.Round
 import Splice.Types
 import Splice.Util
-import Splice.Util.Token.Wallet.MergeDelegation (FeaturedAppRightCall, createActivityMarkerForProvider)
 import Splice.ValidatorLicense
 
 -- | Proposal by the user to setup a minting delegation.
@@ -59,14 +57,10 @@ template MintingDelegation
           -- ^ The validator license of the beneficiary to record liveness activity for.
         openRoundCid : ContractId OpenMiningRound
           -- ^ The open mining round for which to record activity.
-        optFeaturedAppRight : Optional FeaturedAppRightCall
-          -- ^ The featured app right to use to feature the delegate's activity.
       controller delegate
       do assertWithinDeadline "expiresAt" expiresAt
          _ <- fetchChecked (ForOwner with dso, owner = beneficiary) validatorLicenseCid
          validatorLivenessResult <- exercise validatorLicenseCid (ValidatorLicense_RecordValidatorLivenessActivity openRoundCid)
-          -- register activity marker for the liveness activity creation
-         forA_ optFeaturedAppRight $ createActivityMarkerForProvider delegate
          pure MintingDelegation_RecordValidatorLivenessActivityResult with validatorLivenessResult
 
     nonconsuming choice MintingDelegation_Mint : MintingDelegation_MintResult

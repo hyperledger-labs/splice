@@ -11,10 +11,8 @@ data-dependencies:
 - ../../token-standard/splice-api-token-transfer-instruction-v1/.daml/dist/splice-api-token-transfer-instruction-v1-current.dar
 - ../../token-standard/splice-api-token-allocation-instruction-v1/.daml/dist/splice-api-token-allocation-instruction-v1-current.dar
 - ../../token-standard/splice-api-token-allocation-v1/.daml/dist/splice-api-token-allocation-v1-current.dar
-- ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
 - ../splice-amulet/.daml/dist/splice-amulet-current.dar
 - ../splice-util/.daml/dist/splice-util-current.dar
-- ../splice-util-token-standard-wallet/.daml/dist/splice-util-token-standard-wallet-current.dar
 - ../splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
 build-options:
   - --ghc-option=-Wunused-binds

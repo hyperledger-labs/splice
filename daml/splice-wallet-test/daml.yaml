@@ -11,7 +11,6 @@ data-dependencies:
 - ../splice-amulet/.daml/dist/splice-amulet-current.dar
 - ../splice-amulet-test/.daml/dist/splice-amulet-test-current.dar
 - ../splice-util/.daml/dist/splice-util-current.dar
-- ../splice-util-token-standard-wallet/.daml/dist/splice-util-token-standard-wallet-current.dar
 - ../splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
 - ../splice-wallet/.daml/dist/splice-wallet-current.dar
 - ../../token-standard/examples/splice-token-test-trading-app/.daml/dist/splice-token-test-trading-app-current.dar
