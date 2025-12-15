@@ -1,7 +1,7 @@
 # Note that we don't currently support arm64 runners, so we build this only for amd64
-FROM --platform=$BUILDPLATFORM ghcr.io/actions/actions-runner:2.328.0@sha256:db0dcae6d28559e54277755a33aba7d0665f255b3bd2a66cdc5e132712f155e0
+FROM --platform=$BUILDPLATFORM ghcr.io/actions/actions-runner:2.330.0@sha256:ee54ad8776606f29434f159196529b7b9c83c0cb9195c1ff5a7817e7e570dcfe
 
-LABEL org.opencontainers.image.base.name="ghcr.io/actions/actions-runner:2.328.0"
+LABEL org.opencontainers.image.base.name="ghcr.io/actions/actions-runner:2.330.0"
 #Ideally, we'd reduce duplication between this and splice-test-ci, but we're not tackling that right now
 
 RUN sudo apt-get update && \
