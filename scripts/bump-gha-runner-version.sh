@@ -13,9 +13,10 @@ runner_version=$(
   | sed 's/^v//' # remove the 'v' prefix
 )
 
+# gets the multiplatform image digest
 runner_digest=$(
-  docker manifest inspect "ghcr.io/actions/actions-runner:${runner_version}" \
-  | jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest'
+  docker buildx imagetools inspect "ghcr.io/actions/actions-runner:${runner_version}" \
+  | yq '.Digest'
 )
 
 docker_runner_file="${SPLICE_ROOT}/cluster/images/splice-test-docker-runner/Dockerfile"
