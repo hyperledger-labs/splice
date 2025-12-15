@@ -23,19 +23,26 @@ import org.lfdecentralizedtrust.splice.store.{
 }
 import org.lfdecentralizedtrust.splice.util.QualifiedName
 import org.lfdecentralizedtrust.splice.wallet.config.{AutoAcceptTransfersConfig, WalletSweepConfig}
-import org.lfdecentralizedtrust.splice.wallet.store.{TxLogEntry, UserWalletStore}
+import org.lfdecentralizedtrust.splice.wallet.store.{
+  FetchCommandPriority,
+  TxLogEntry,
+  UserWalletStore,
+  ValidatorLicenseStore,
+}
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class UserWalletAutomationService(
     store: UserWalletStore,
+    licenseStore: ValidatorLicenseStore,
     val updateHistory: UpdateHistory,
     treasury: TreasuryService,
     ledgerClient: SpliceLedgerClient,
@@ -136,6 +143,29 @@ class UserWalletAutomationService(
         clock,
       )
     )
+    validatorTopupConfigO match {
+      case Some(_) => ()
+        // true iff this a validatorParty; faucet coupons are handled by ValidatorAutomation
+      case None => {
+        val priorityFetcher = new FetchCommandPriority() {
+           override def getCommandPriority()(
+             implicit  tc: TraceContext
+           ): Future[CommandPriority] = {
+              Future.successful(CommandPriority.Low)
+           }
+        }
+        registerTrigger(
+          new ReceiveFaucetCouponTrigger(
+            triggerContext,
+            scanConnection,
+            licenseStore,
+            connection(SpliceLedgerConnectionPriority.Medium),
+            store.key.endUserParty,
+            priorityFetcher
+          )
+        )
+      }
+    }
   }
 
   walletSweep.foreach { config =>
@@ -211,6 +241,7 @@ object UserWalletAutomationService extends AutomationServiceCompanion {
       aTrigger[AcceptedTransferOfferTrigger],
       aTrigger[CompleteBuyTrafficRequestTrigger],
       aTrigger[CollectRewardsAndMergeAmuletsTrigger],
+      aTrigger[ReceiveFaucetCouponTrigger],
       aTrigger[UnassignTrigger.Template[?, ?]],
       aTrigger[AssignTrigger],
       aTrigger[TransferFollowTrigger],

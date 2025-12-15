@@ -124,6 +124,7 @@ class UserWalletService(
 
   val automation = new UserWalletAutomationService(
     store,
+    walletManager.store,
     updateHistory,
     treasury,
     ledgerClient,

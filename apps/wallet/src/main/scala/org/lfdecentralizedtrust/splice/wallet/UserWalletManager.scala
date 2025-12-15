@@ -27,7 +27,7 @@ import org.lfdecentralizedtrust.splice.wallet.config.{
   TreasuryConfig,
   WalletSweepConfig,
 }
-import org.lfdecentralizedtrust.splice.wallet.store.{UserWalletStore, WalletStore}
+import org.lfdecentralizedtrust.splice.wallet.store.{UserWalletStore, ValidatorLicenseStore}
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -45,7 +45,7 @@ import scala.concurrent.{ExecutionContext, Future, blocking}
 /** Manages all services comprising an end-user wallets. */
 class UserWalletManager(
     ledgerClient: SpliceLedgerClient,
-    val store: WalletStore,
+    val store: ValidatorLicenseStore,
     val validatorUser: String,
     val externalPartyWalletManager: ExternalPartyWalletManager,
     automationConfig: AutomationConfig,
