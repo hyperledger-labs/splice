@@ -87,6 +87,9 @@ data UnclaimedActivityRecord_DsoExpireResult = UnclaimedActivityRecord_DsoExpire
 data DevelopmentFundCoupon_WithdrawResult = DevelopmentFundCoupon_WithdrawResult with
   unclaimedDevelopmentFundCouponCid : ContractId UnclaimedDevelopmentFundCoupon
 
+data DevelopmentFundCoupon_RejectResult = DevelopmentFundCoupon_RejectResult with
+  unclaimedDevelopmentFundCouponCid : ContractId UnclaimedDevelopmentFundCoupon
+
 data DevelopmentFundCoupon_DsoExpireResult = DevelopmentFundCoupon_DsoExpireResult with
   unclaimedDevelopmentFundCouponCid : ContractId UnclaimedDevelopmentFundCoupon
 
@@ -430,6 +433,15 @@ template DevelopmentFundCoupon
         assertWithinDeadline "DevelopmentFundCoupon.expiresAt" expiresAt
         unclaimedDevelopmentFundCouponCid <- create UnclaimedDevelopmentFundCoupon with dso; amount
         return DevelopmentFundCoupon_WithdrawResult with unclaimedDevelopmentFundCouponCid
+
+    choice DevelopmentFundCoupon_Reject : DevelopmentFundCoupon_RejectResult
+      with
+        reason : Text -- ^ Reason for rejecting the coupon.
+      controller beneficiary
+      do
+        assertWithinDeadline "DevelopmentFundCoupon.expiresAt" expiresAt
+        unclaimedDevelopmentFundCouponCid <- create UnclaimedDevelopmentFundCoupon with dso; amount
+        return DevelopmentFundCoupon_RejectResult with unclaimedDevelopmentFundCouponCid
 
     choice DevelopmentFundCoupon_DsoExpire : DevelopmentFundCoupon_DsoExpireResult
       controller dso

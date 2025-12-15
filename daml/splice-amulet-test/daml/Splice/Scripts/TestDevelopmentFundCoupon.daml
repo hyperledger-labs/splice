@@ -118,6 +118,38 @@ testWithdrawalOfDevelopmentFundCoupon = do
 
   pure ()
 
+testRejectionOfDevelopmentFundCoupon : Script ()
+testRejectionOfDevelopmentFundCoupon = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  now <- getTime
+  let
+    amount = 42.0
+    expiresAt = addRelTime now (days 1)
+    fundManager = alice.primaryParty
+    beneficiary = bob.primaryParty
+    reason = "Some reason"
+
+  developmentFundCouponCid <- createDevelopmentFundCoupon app fundManager beneficiary amount expiresAt reason
+
+  -- Unhappy - expiresAt has been reached
+  setTime $ addRelTime expiresAt (minutes 1)
+  rejectDevelopmentFundCouponMustFail fundManager reason developmentFundCouponCid
+
+  setTime now
+
+  -- Unhappy - invalid controller
+  rejectDevelopmentFundCouponMustFail app.dso reason developmentFundCouponCid
+  rejectDevelopmentFundCouponMustFail fundManager reason developmentFundCouponCid
+
+  -- Happy
+  unclaimedDevelopmentFundCouponCid <- rejectDevelopmentFundCoupon beneficiary reason developmentFundCouponCid
+  Some unclaimedDevelopmentFundCoupon <- queryContractId app.dso unclaimedDevelopmentFundCouponCid
+  unclaimedDevelopmentFundCoupon === UnclaimedDevelopmentFundCoupon with
+    dso = app.dso
+    amount
+
+  pure ()
+
 testExpiryOfDevelopmentFundCoupon : Script ()
 testExpiryOfDevelopmentFundCoupon = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
@@ -150,6 +182,9 @@ testExpiryOfDevelopmentFundCoupon = do
   pure ()
 
 
+-- Helpers
+----------
+
 allocateDevelopmentFundCouponMustFail
   : AmuletApp -> Party -> Party -> Decimal -> Time -> Text -> [ContractId UnclaimedDevelopmentFundCoupon]
   -> Script ()
@@ -174,6 +209,16 @@ createDevelopmentFundCoupon app fundManager beneficiary amount expiresAt reason 
       amount
       expiresAt
       reason
+
+rejectDevelopmentFundCoupon : Party -> Text -> ContractId DevelopmentFundCoupon -> Script (ContractId UnclaimedDevelopmentFundCoupon)
+rejectDevelopmentFundCoupon fundManager reason developmentFundCouponCid =
+  (.unclaimedDevelopmentFundCouponCid) <$> submit fundManager do
+    exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_Reject with reason
+
+rejectDevelopmentFundCouponMustFail : Party -> Text -> ContractId DevelopmentFundCoupon -> Script ()
+rejectDevelopmentFundCouponMustFail actor reason developmentFundCouponCid =
+  submitMustFail actor do
+    exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_Reject with reason
 
 withdrawDevelopmentFundCoupon : Party -> Text -> ContractId DevelopmentFundCoupon -> Script (ContractId UnclaimedDevelopmentFundCoupon)
 withdrawDevelopmentFundCoupon fundManager reason developmentFundCouponCid =
