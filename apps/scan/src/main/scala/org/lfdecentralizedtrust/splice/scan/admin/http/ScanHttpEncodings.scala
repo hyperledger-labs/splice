@@ -192,7 +192,7 @@ sealed trait ScanHttpEncodings {
 
   def httpToLapiUpdate(http: httpApi.UpdateHistoryItemV2): TreeUpdateWithMigrationId = http match {
     case httpApi.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(httpTransaction) =>
-      httpToLapiTransaction(httpTransaction)
+      httpToLapiTransaction(httpTransaction, 1L) // offset not used in v2
     case httpApi.UpdateHistoryItemV2.members.UpdateHistoryReassignment(httpReassignment) =>
       httpToLapiReassignment(httpReassignment)
   }
@@ -203,8 +203,9 @@ sealed trait ScanHttpEncodings {
     case httpApi.UpdateHistoryItem.members.UpdateHistoryReassignment(httpReassignment) =>
       httpToLapiReassignment(httpReassignment)
   }
-  private def httpToLapiTransaction(
-      httpV2: httpApi.UpdateHistoryTransactionV2
+  def httpToLapiTransaction(
+      httpV2: httpApi.UpdateHistoryTransactionV2,
+      offset: Long,
   ): TreeUpdateWithMigrationId = {
     val http = httpApi.UpdateHistoryTransaction(
       updateId = httpV2.updateId,
@@ -213,7 +214,7 @@ sealed trait ScanHttpEncodings {
       recordTime = httpV2.recordTime,
       synchronizerId = httpV2.synchronizerId,
       effectiveAt = httpV2.effectiveAt,
-      offset = LegacyOffset.Api.fromLong(1L), // not used in v2
+      offset = LegacyOffset.Api.fromLong(offset),
       rootEventIds = httpV2.rootEventIds,
       eventsById = httpV2.eventsById,
     )
