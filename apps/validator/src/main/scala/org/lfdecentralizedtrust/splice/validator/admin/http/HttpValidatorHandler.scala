@@ -50,7 +50,7 @@ class HttpValidatorHandler(
       .onboard(
         name,
         None,
-        Some(true),
+        None,
         storeWithIngestion,
         validatorUserName,
         getAmuletRulesDomain,
