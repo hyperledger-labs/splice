@@ -33,6 +33,11 @@ const deleteBadPodsCommand = [
     for NAMESPACE in $TARGET_NAMESPACES_LIST; do
         echo "Processing namespace: $NAMESPACE";
 
+        echo "Listing all pods in $NAMESPACE:";
+        kubectl get pods -n "$NAMESPACE";
+
+        echo "--- checking PODS with bad status in $NAMESPACE ---";
+
         BAD_PODS=$(
           kubectl get pods -n "$NAMESPACE" -o json | \\
           jq -r '.items[] |
