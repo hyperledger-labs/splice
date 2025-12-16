@@ -1,7 +1,7 @@
-name: Bump GHA runner version (WIP)
+name: Bump GHA runner version
 on:
-  # schedule:
-  #   - cron: '30 6 1,15 * *'  # Monthly on the 1st and 15th at 06:30
+  schedule:
+    - cron: '30 6 1,15 * *'  # Monthly on the 1st and 15th at 06:30
   workflow_dispatch:
 
 jobs:
