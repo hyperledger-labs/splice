@@ -13,6 +13,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup
+        shell: bash
+        run: ./.github/actions/scripts/common_setup.sh
+
+      - name: Set up Nix (Self hosted)
+        uses: ./.github/actions/nix/setup_nix
+        with:
+          cache_version: 7
+          artifactory_user: dummy
+          artifactory_password: dummy
       
       - name: Check for the latest version and create a PR to splice
         uses: ./.github/actions/nix/run_bash_command_in_nix
