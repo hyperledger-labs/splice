@@ -1,6 +1,5 @@
 # TODO(#2942) reduce duplication between all scratchnet configs
 infra:
-  enableGCReaperJob: false
   prometheus:
     retentionDuration: "30d"
     retentionSize: "200GB"
