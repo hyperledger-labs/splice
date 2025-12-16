@@ -4,6 +4,7 @@
 module Splice.Ans where
 
 import DA.Action (void)
+import DA.TextMap qualified as TM
 import DA.Time
 
 import Splice.Amulet
@@ -12,6 +13,9 @@ import Splice.Types
 import Splice.Wallet.Payment
 import Splice.Wallet.Subscriptions
 import Splice.Util
+
+import Splice.Api.Token.MetadataV1 (emptyMetadata)
+import Splice.Api.Credential.RegistryV1 qualified as RegistryV1
 
 data AnsRules_RequestEntryResult = AnsRules_RequestEntryResult
   with
@@ -283,73 +287,7 @@ template AnsEntryContext
         return AnsEntryContext_RejectEntryInitialPaymentResult with
           amuletSum = result.amuletSum
 
-template AnsConfigV2 with
-    dso : Party
-    entryTTL : RelTime
-  where
-    signatory dso
 
-{-
-
-canton.network/url#<name> : url
-
-
--}
-
-template AnsEntryV2
-  with
-    dso : Party
-    publisher : Party
-    holder : Party
-    validFrom : Optional Time
-    validUntil : Optional Time
-    claims : TextMap Text
-    createdAt : Time
-    meta : Metadata
-  where
-    ensure validEntry this
-
-    signatory publisher, holder
-    observer dso
-
-    choice AnsEntryV2_DsoInvalidCreatedAt : ()
-      controller dso
-      do
-        -- created at cannot be in the future
-        assertWithinDeadline "createdAt" createdAt
-        pure ()
-
-    choice AnsEntryV2_Update : ContractId AnsEntryV2
-      with
-        newCreatedAt : Time
-        actor : Party
-      controller actor
-      do
-        assertDeadlineExceeded "newCreatedAt" newCreatedAt
-        create this with
-          createdAt = newCreatedAt
-
-    choice AnsEntryV2_DsoExpire : ()
-      with
-        configCid : ContractId AnsConfigV2
-      controller dso
-      do
-        config <- fetchChecked (ForDso dso) configCid
-        assertDeadlineExceeded "createdAt + ansConfig.entryTTL" (createdAt `addRelTime` config.entryTTL)
-        pure ()
-
-
-validEntry : AnsEntryV2 -> Bool
-validEntry AnsEntryV2{..} =
-    TextMap.size claims <= 10 &&
-    -- only printable ASCII characters in claim keys
-    -- at most 400 characters per claim key
-    -- at most 2000 characters per claim value
-    case (validFrom, validUntil) of
-      (Some from, Some until) -> createdAt <= from && from < until
-      (Some from, None)       -> createdAt <= from
-      (None, Some until)      -> createdAt < until
-      (None, None)            -> True
 
 
 
@@ -363,8 +301,6 @@ template AnsEntry
     url : Text -- either empty or contains a valid http/https url
     description : Text -- can be empty
     expiresAt : Time
-
-
   where
     signatory user, dso
 {-
@@ -380,6 +316,23 @@ template AnsEntry
 
 -}
 
+    interface instance RegistryV1.CredentialRecord for AnsEntry where
+      view = RegistryV1.CredentialRecordView with
+        admin = dso
+        issuer = dso
+        holder = user
+        credential = RegistryV1.Credential with
+          claims = TM.fromList [
+              ("ans.name", name),
+              ("ans.url#" <> name, url),
+              ("ans.description#" <> name, description)
+            ]
+          validFrom = None
+          validUntil = Some expiresAt
+          meta = emptyMetadata
+        createdAt = None
+        expiresAt = Some expiresAt
+        meta = emptyMetadata
 
     choice AnsEntry_Expire : AnsEntry_ExpireResult
       with

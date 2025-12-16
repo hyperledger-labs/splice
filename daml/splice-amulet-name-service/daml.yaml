@@ -10,10 +10,12 @@ data-dependencies:
 - ../splice-util/.daml/dist/splice-util-current.dar
 - ../splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
 - ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
+- ../../token-standard/splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
   - -Wno-ledger-time-is-alpha
+  - -Wupgrade-interfaces # FIXME: remove once the interface files moved
   - --target=2.1
 codegen:
   java:
