@@ -283,6 +283,75 @@ template AnsEntryContext
         return AnsEntryContext_RejectEntryInitialPaymentResult with
           amuletSum = result.amuletSum
 
+template AnsConfigV2 with
+    dso : Party
+    entryTTL : RelTime
+  where
+    signatory dso
+
+{-
+
+canton.network/url#<name> : url
+
+
+-}
+
+template AnsEntryV2
+  with
+    dso : Party
+    publisher : Party
+    holder : Party
+    validFrom : Optional Time
+    validUntil : Optional Time
+    claims : TextMap Text
+    createdAt : Time
+    meta : Metadata
+  where
+    ensure validEntry this
+
+    signatory publisher, holder
+    observer dso
+
+    choice AnsEntryV2_DsoInvalidCreatedAt : ()
+      controller dso
+      do
+        -- created at cannot be in the future
+        assertWithinDeadline "createdAt" createdAt
+        pure ()
+
+    choice AnsEntryV2_Update : ContractId AnsEntryV2
+      with
+        newCreatedAt : Time
+        actor : Party
+      controller actor
+      do
+        assertDeadlineExceeded "newCreatedAt" newCreatedAt
+        create this with
+          createdAt = newCreatedAt
+
+    choice AnsEntryV2_DsoExpire : ()
+      with
+        configCid : ContractId AnsConfigV2
+      controller dso
+      do
+        config <- fetchChecked (ForDso dso) configCid
+        assertDeadlineExceeded "createdAt + ansConfig.entryTTL" (createdAt `addRelTime` config.entryTTL)
+        pure ()
+
+
+validEntry : AnsEntryV2 -> Bool
+validEntry AnsEntryV2{..} =
+    TextMap.size claims <= 10 &&
+    -- only printable ASCII characters in claim keys
+    -- at most 400 characters per claim key
+    -- at most 2000 characters per claim value
+    case (validFrom, validUntil) of
+      (Some from, Some until) -> createdAt <= from && from < until
+      (Some from, None)       -> createdAt <= from
+      (None, Some until)      -> createdAt < until
+      (None, None)            -> True
+
+
 
 -- | A ans entry that needs to be renewed continuously.
 -- Renewal recreates this contract with an updated `expiresAt` field.
@@ -294,8 +363,23 @@ template AnsEntry
     url : Text -- either empty or contains a valid http/https url
     description : Text -- can be empty
     expiresAt : Time
+
+
   where
     signatory user, dso
+{-
+
+  issuer: dso
+  holder: user
+  validFrom: None
+  validUntil: Some(expiresAt)
+  claims:
+    cns.canton.network/name: name
+    cns.canton.network/<name>/url: url
+    cns.canton.network/<name>/description: description
+
+-}
+
 
     choice AnsEntry_Expire : AnsEntry_ExpireResult
       with
