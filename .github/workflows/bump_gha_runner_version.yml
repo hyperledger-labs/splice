@@ -31,7 +31,7 @@ jobs:
           cmd: |
             git config user.email "splice-maintainers@digitalasset.com"
             git config user.name "DA Automation"
-            ./scripts/bump_gha_runner_version.sh
+            ./scripts/bump-gha-runner-version.sh
           additional_nix_args: "--keep GH_TOKEN"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
