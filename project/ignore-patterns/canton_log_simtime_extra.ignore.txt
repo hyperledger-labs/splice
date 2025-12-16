@@ -36,5 +36,3 @@ UNAVAILABLE/Channel shutdownNow invoked
 # This kicks in when an interval is skipped which can easily be caused in simtime mode
 # by bumping the time by more than the reconciliation interval.
 ACS_COMMITMENT_DEGRADATION
-
-# Make sure to have a trailing newline
