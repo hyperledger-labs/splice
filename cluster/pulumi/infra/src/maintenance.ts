@@ -9,9 +9,6 @@ import { DOCKER_REPO, infraAffinityAndTolerations } from '../../common';
 const cronJobName = 'gc-pod-reaper-job';
 const reaperNamespace = 'gc-pod-reaper';
 const serviceAccountName = 'gc-pod-reaper-service-account';
-// Rancher/Official K8s images failed (exec: no such file) as they lack /bin/ash shell or anything useful.
-// Bitnami has moved most images and Helm charts behind a paywall
-
 const schedule = '0 * * * *'; // Run once every hour, at minute 0
 
 const deleteBadPodsCommand = [
