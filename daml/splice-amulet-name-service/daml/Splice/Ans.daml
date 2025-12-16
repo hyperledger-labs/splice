@@ -288,9 +288,6 @@ template AnsEntryContext
           amuletSum = result.amuletSum
 
 
-
-
-
 -- | A ans entry that needs to be renewed continuously.
 -- Renewal recreates this contract with an updated `expiresAt` field.
 template AnsEntry
@@ -303,18 +300,6 @@ template AnsEntry
     expiresAt : Time
   where
     signatory user, dso
-{-
-
-  issuer: dso
-  holder: user
-  validFrom: None
-  validUntil: Some(expiresAt)
-  claims:
-    cns.canton.network/name: name
-    cns.canton.network/<name>/url: url
-    cns.canton.network/<name>/description: description
-
--}
 
     interface instance RegistryV1.CredentialRecord for AnsEntry where
       view = RegistryV1.CredentialRecordView with
@@ -324,6 +309,10 @@ template AnsEntry
         credential = RegistryV1.Credential with
           claims = TM.fromList [
               ("ans.name", name),
+              -- Make the URL and Description fields properties with the CNS name as the subject
+              -- Not namespaced as we expect them to be defined in a CIP
+              --
+              -- TODO: build the separate CIP that builds ANS on top of the DSO credential registry.
               ("ans.url#" <> name, url),
               ("ans.description#" <> name, description)
             ]
