@@ -7,6 +7,9 @@
 
 .. release-notes:: upcoming
 
+  - Validator
+    - Added support for picking a custom name for new parties created when onboarding users via the `/v0/admin/users` API. See :ref:`docs <validator-users>`.
+
   - API security
 
     - Tightened authorization checks for all non-public API endpoints.
