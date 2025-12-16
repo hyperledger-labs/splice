@@ -31,6 +31,7 @@ INVALID_ACKNOWLEDGEMENT_TIMESTAMP.*Member.*has acknowledged the timestamp.*when 
 # TODO(#962) Figure out where this is coming from
 Request failed for sequencer.*GrpcClientGaveUp: .*/Authentication token refresh failed with grpc error
 Request failed for sequencer.*GrpcServiceUnavailable: UNAVAILABLE/Health-check stream unexpectedly closed
+UNAVAILABLE/Channel shutdownNow invoked
 
 # This kicks in when an interval is skipped which can easily be caused in simtime mode
 # by bumping the time by more than the reconciliation interval.

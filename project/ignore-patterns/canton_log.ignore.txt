@@ -168,5 +168,6 @@ java.lang.IllegalStateException: cannot enqueue after timer shutdown
 
 # In validatorintegrationtest we set the url for a sequencer to example.com to simulate an unreachable sequencer.
 Connection has failed validation since.*server-Digital-Asset-Eng-4-0.*Causes: First received frame was not SETTINGS. Hex dump for first 5 bytes
+Connection has failed validation since.*server-Digital-Asset-Eng-4-0.*GrpcServiceUnavailable: UNAVAILABLE/io exception
 
 # Make sure to have a trailing newline
