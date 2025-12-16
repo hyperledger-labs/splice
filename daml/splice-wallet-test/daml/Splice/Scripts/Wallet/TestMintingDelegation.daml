@@ -29,7 +29,7 @@ testMintingDelegation = do
       beneficiary
       delegate
       expiresAt = now `addRelTime` days 30
-      amuletMergeLimit = defaultAmuletMergeLimit
+      amuletMergeLimit = 10
 
   MintingDelegationProposal_AcceptResult mintingDelegationCid <- submitMulti [delegate] [app.dso] $ exerciseCmd proposalCid MintingDelegationProposal_Accept
 
@@ -90,7 +90,7 @@ testMintingDelegation_checksExpiry = do
       beneficiary
       delegate
       expiresAt = now `addRelTime` delegationLifetime
-      amuletMergeLimit = defaultAmuletMergeLimit
+      amuletMergeLimit = 10
 
   MintingDelegationProposal_AcceptResult mintingDelegationCid <- submitMulti [delegate] [app.dso] $ exerciseCmd proposalCid MintingDelegationProposal_Accept
 

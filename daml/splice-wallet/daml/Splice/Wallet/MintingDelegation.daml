@@ -31,9 +31,6 @@ template MintingDelegationProposal
       controller delegation.beneficiary
       do pure MintingDelegationProposal_WithdrawResult with dummyUnitField = ()
 
-defaultAmuletMergeLimit : Int
-defaultAmuletMergeLimit = 10
-
 -- | The right allowing delegate to record liveness activity and mint rewards on behalf of the beneficiary.
 template MintingDelegation
   with
@@ -71,7 +68,6 @@ template MintingDelegation
           -- ^ The transfer context including amulet rules.
       controller delegate
       do assertWithinDeadline "expiresAt" expiresAt
-         require "Minting is unfeatured" (context.context.featuredAppRight == None)
          transferResult <- exercise context.amuletRules AmuletRules_Transfer with
            transfer = Transfer with
              sender = beneficiary
@@ -79,7 +75,7 @@ template MintingDelegation
              inputs
              outputs = []
              beneficiaries = None
-           context = context.context
+           context = context.context with featuredAppRight = None
            expectedDso = Some dso
          pure MintingDelegation_MintResult with transferResult
 
