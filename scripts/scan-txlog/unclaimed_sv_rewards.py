@@ -709,12 +709,8 @@ class State:
     beneficiary: str
     # Maps CIDs of active SvRewardCoupons to their reward information
     active_rewards: dict[str, Reward]
-    # # Maps CIDs of active issuing rounds to their round numbers
-    # active_issuing_rounds_cid_to_round_number: dict[str, int]
     # Maps round numbers of active issuing rounds to their round information
     active_issuing_rounds: dict[int, IssuingRound]
-    # # Maps CIDs of active closed rounds to their round numbers
-    # active_closed_rounds_cid_to_round_number: dict[str, int]
     # Maps round numbers of active closed rounds to their round information
     active_closed_rounds: dict[int, ClosedRound]
     begin_record_time: datetime
