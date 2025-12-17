@@ -192,6 +192,7 @@ class DomainConnector(
           // so this is just an extra safeguard.
           sequencers.synchronizerId == decentralizedSynchronizerId
         )
+      logger.debug(s"All Sequencers: ${filteredSequencers}")
       val svFilteredSequencers = config.domains.global.sequencerNames match {
         case Some(allowedNames) =>
           val allowedNamesSet = allowedNames.toList.toSet
@@ -206,6 +207,7 @@ class DomainConnector(
         case None =>
           filteredSequencers
       }
+      logger.debug(s"Filtered Sequencers: ${filteredSequencers}")
       (
         svFilteredSequencers.map { domainSequencer =>
           config.domains.global.alias ->
