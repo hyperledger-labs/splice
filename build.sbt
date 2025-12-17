@@ -2069,11 +2069,6 @@ updateTestConfigForParallelRuns := {
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
     (
-      "Scan Bulk Storage PoC",
-      "test-full-class-names-bulk-storage-poc.log",
-      (t: String) => t.contains("ScanBulkStoragePoc"),
-    ),
-    (
       "manual tests with custom canton instance",
       "test-full-class-names-signatures.log",
       (t: String) => isManualSignatureIntegrationTest(t),
