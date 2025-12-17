@@ -26,9 +26,9 @@
     "@daml.js/splice-amulet": "file:common/frontend/daml.js/splice-amulet-0.1.14",
     "@daml.js/splice-dso-governance": "file:common/frontend/daml.js/splice-dso-governance-0.1.20",
     "@daml.js/splice-validator-lifecycle": "file:common/frontend/daml.js/splice-validator-lifecycle-0.1.5",
-    "@daml.js/splice-wallet": "file:common/frontend/daml.js/splice-wallet-0.1.14",
+    "@daml.js/splice-wallet": "file:common/frontend/daml.js/splice-wallet-0.1.15",
     "@daml.js/splice-wallet-payments": "file:common/frontend/daml.js/splice-wallet-payments-0.1.14",
-    "@daml.js/splitwell": "file:common/frontend/daml.js/splitwell-0.1.14",
+    "@daml.js/splitwell": "file:common/frontend/daml.js/splitwell-0.1.15",
     "xunit-viewer": "^10.6.1"
   }
 }
