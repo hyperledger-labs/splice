@@ -9,6 +9,38 @@ import {
 import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { z } from 'zod';
 
+export const SynchronizerConfigSchema = z
+  .object({
+    sequencerNames: z.array(z.string()).optional(),
+    url: z.string().optional(),
+  })
+  .refine(
+    data => {
+      const hasNames = data.sequencerNames && data.sequencerNames.length > 0;
+      const hasUrl = !!data.url;
+
+      return (hasNames || hasUrl) && !(hasNames && hasUrl);
+    },
+    {
+      message: "One of 'sequencerNames' (non-empty) or 'url' must be provided, but not both.",
+      path: ['sequencerNames'],
+    }
+  )
+  .refine(
+    data => {
+      if (data.sequencerNames) {
+        return data.sequencerNames.length >= 1;
+      }
+      return true;
+    },
+    {
+      message: 'sequencerNames must contain at least one name if provided.',
+      path: ['sequencerNames'],
+    }
+  );
+
+export type SynchronizerConfig = z.infer<typeof SynchronizerConfigSchema>;
+
 export const ScanClientConfigSchema = z
   .object({
     scanType: z.enum(['trust-single', 'bft', 'bft-custom']),
@@ -41,6 +73,7 @@ export const ValidatorAppConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
   additionalJvmOptions: z.string().optional(),
   scanClient: ScanClientConfigSchema.optional(),
+  sequencerClient: SynchronizerConfigSchema.optional(),
 });
 
 export const ParticipantConfigSchema = z.object({
