@@ -942,6 +942,7 @@ lazy val `apps-common` =
         spray_json,
         pekko_spray_json,
         Dependencies.parallel_collections,
+        pekko_connectors_google_cloud_storage,
       ),
       BuildCommon.sharedAppSettings,
       buildInfoKeys := Seq[BuildInfoKey](
@@ -1083,7 +1084,13 @@ lazy val `apps-scan` =
       `splice-dso-governance-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(pekko_http_cors, scalapb_runtime_grpc, scalapb_runtime, zstd, aws_s3),
+      libraryDependencies ++= Seq(
+        pekko_http_cors,
+        scalapb_runtime_grpc,
+        scalapb_runtime,
+        zstd,
+        aws_s3,
+      ),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(

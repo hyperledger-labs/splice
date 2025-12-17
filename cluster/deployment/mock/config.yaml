@@ -168,6 +168,11 @@ svs:
     participant:
       bftSequencerConnection: false
   sv-1:
+    periodicSnapshots:
+      topology:
+        projectId: 'da-cn-test'
+        bucketName: 'da-cn-topology-snapshots'
+        backupInterval: '24h'
     logging:
       appsLogLevel: WARN
       cantonLogLevel: INFO
@@ -176,6 +181,9 @@ svs:
       bigQuery:
         dataset: mock_da2_scan
         prefix: da2
+    validatorApp:
+      sweep:
+        fromEnv: SV1
   sv-da-1: # non "sv-X" key => additional SV that is always deployed (key == node name == k8s namespace)
     publicName: Digital-Asset-1
     subdomain: sv-1
@@ -228,6 +236,17 @@ infra:
       spec:
         key: value
         anotherKey: anotherValue
+  istio:
+    istiodValues: # example istiod overrides
+      global:
+        proxy:
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
 cluster:
   nodePools:
     apps:
@@ -248,6 +267,11 @@ validators:
           value: ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_VALUE
       additionalJvmOptions: -Dparticipantoption
     validatorApp:
+      scanClient:
+        scanType: "bft-custom"
+        seedUrls: [ "https://scan.sv-2-eng.test.network.canton.global","https://scan.sv-3-eng.test.network.canton.global" ]
+        threshold: 2
+        trustedSvs: [ "Digital-Asset-Eng-2","Digital-Asset-Eng-3" ]
       additionalEnvVars:
         - name: ADDITIONAL_ENV_VAR_VALIDATOR_NAME
           value: ADDITIONAL_ENV_VAR_VALIDATOR_NAME

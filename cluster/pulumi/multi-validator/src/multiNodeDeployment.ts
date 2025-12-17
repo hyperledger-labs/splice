@@ -10,9 +10,9 @@ import {
   numNodesPerInstance,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { ServiceMonitor } from '@lfdecentralizedtrust/splice-pulumi-common/src/metrics';
+import { Version } from '@lfdecentralizedtrust/splice-pulumi-common/src/version';
 import _ from 'lodash';
 
-import { Version } from '../version';
 import { EnvironmentVariable, multiValidatorConfig } from './config';
 
 export interface BaseMultiNodeArgs {

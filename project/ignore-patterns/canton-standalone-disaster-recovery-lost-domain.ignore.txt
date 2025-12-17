@@ -7,5 +7,3 @@ Using approximate topology snapshot.*.*StandaloneSequencer
 Response message for request.*timed out
 
 The traffic balance request submission timed
-
-# Make sure to have a trailing newline

@@ -201,6 +201,10 @@ async function installValidator(
     ),
   };
 
+  if (validatorConfig.validatorApp?.scanClient != null) {
+    delete validatorValuesFromYamlFiles.scanAddress;
+  }
+
   const newParticipantIdentifier =
     validatorConfig.newParticipantId ||
     validatorValuesFromYamlFiles?.participantIdentitiesDumpImport?.newParticipantIdentifier;
@@ -213,6 +217,7 @@ async function installValidator(
         ? true
         : validatorValuesFromYamlFiles.migration.migrating,
     },
+    scanClient: validatorConfig.validatorApp?.scanClient,
     metrics: {
       enable: true,
     },

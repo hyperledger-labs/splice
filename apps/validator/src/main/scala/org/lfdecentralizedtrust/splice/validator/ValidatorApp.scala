@@ -39,6 +39,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
+import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.http.v0.status.wallet.WalletResource as StatusWalletResource
 import org.lfdecentralizedtrust.splice.http.v0.external.ans.AnsResource
 import org.lfdecentralizedtrust.splice.http.v0.external.wallet.WalletResource as ExternalWalletResource
@@ -270,6 +271,8 @@ class ValidatorApp(
                       sequencerConnections,
                       migrationDump.dars,
                       migrationDump.acsSnapshot,
+                      legacyAcsImport =
+                        migrationDump.acsFormat == http.DomainMigrationDump.AcsFormat.AdminApi,
                     )
                   }
                   _ <- appInitStep("Restoring participant users data") {
@@ -522,6 +525,7 @@ class ValidatorApp(
         .onboard(
           instance.walletUser.getOrElse(instance.serviceUser),
           Some(party),
+          Some(false),
           storeWithIngestion,
           validatorUserName = config.ledgerApiUser,
           // we're initializing so AmuletRules is guaranteed to be on synchronizerId
@@ -970,6 +974,7 @@ class ValidatorApp(
           ValidatorUtil.onboard(
             endUserName = user,
             knownParty = Some(validatorParty),
+            Some(false),
             automation,
             validatorUserName = config.ledgerApiUser,
             // we're initializing so AmuletRules is guaranteed to be on synchronizerId
