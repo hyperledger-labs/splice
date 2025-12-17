@@ -70,6 +70,9 @@ export function buildAmuletRulesConfigFromChanges(
       featuredAppRewardCap: getValue(`issuanceCurveFutureValues${i}FeaturedAppRewardCap`),
       unfeaturedAppRewardCap: getValue(`issuanceCurveFutureValues${i}UnfeaturedAppRewardCap`),
       optValidatorFaucetCap: getValue(`issuanceCurveFutureValues${i}OptValidatorFaucetCap`),
+      optDevelopmentFundPercentage: getValue(
+        `issuanceCurveFutureValues${i}optDevelopmentFundPercentage`
+      ),
     };
     futureValues.push({ _1: time, _2: config });
   }
@@ -79,6 +82,7 @@ export function buildAmuletRulesConfigFromChanges(
     tickDuration: { microseconds: getValue('tickDuration') },
     transferPreapprovalFee: transferPreapprovalFee === '' ? null : transferPreapprovalFee,
     featuredAppActivityMarkerAmount: getValue('featuredAppActivityMarkerAmount'),
+    optDevelopmentFundManager: getValue('optDevelopmentFundManager'),
 
     transferConfig: {
       createFee: { fee: getValue('transferConfigCreateFee') },
@@ -103,6 +107,9 @@ export function buildAmuletRulesConfigFromChanges(
         featuredAppRewardCap: getValue('issuanceCurveInitialValueFeaturedAppRewardCap'),
         unfeaturedAppRewardCap: getValue('issuanceCurveInitialValueUnfeaturedAppRewardCap'),
         optValidatorFaucetCap: getValue('issuanceCurveInitialValueOptValidatorFaucetCap'),
+        optDevelopmentFundPercentage: getValue(
+          'issuanceCurveInitialValueOptDevelopmentFundPercentage'
+        ),
       },
       futureValues: futureValues,
     },
