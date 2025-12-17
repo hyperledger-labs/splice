@@ -129,9 +129,17 @@ spec:
             canton.validator-apps.validator_backend.scan-client.seed-urls = [ ${_scan.admin-api.address} ]
             {{- end }}
         {{ end }}
-        {{ if not .Values.useSequencerConnectionsFromScan }}
+        {{ if not .Values.useSequencerConnectionsFromScan -}}
         - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
           value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.decentralizedSynchronizerUrl | quote }}
+        {{ else if .Values.sequencerClient -}}
+            {{- if .Values.sequencerClient.url}}
+        - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
+          value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.sequencerClient.url | quote }}
+            {{- else if .Values.sequencerClient.sequencerNames }}
+        - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
+          value: canton.validator-apps.validator_backend.domains.global.sequencer-names = {{ .Values.sequencerClient.sequencerNames | toJson}}
+            {{ - end }}
         {{ end }}
         {{- range $ii, $domain := .Values.extraDomains }}
         - name: ADDITIONAL_CONFIG_EXTRA_DOMAIN_{{ $ii }}
