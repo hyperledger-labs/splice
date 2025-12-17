@@ -22,7 +22,6 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.{
 import org.lfdecentralizedtrust.splice.store.{Limit, StoreTest, UnboundLimit}
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import org.lfdecentralizedtrust.splice.util.{EventId, PackageQualifiedName, ValueJsonCodecCodegen}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{ListObjectsRequest, S3Object}
