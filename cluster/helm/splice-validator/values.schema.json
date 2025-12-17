@@ -577,6 +577,32 @@
         },
         "errorMessage": "If 'scanClient' is set, 'scanAddress' and 'nonSvValidatorTrustSingleScan' must not be set. All the scan specific configuration must be done inside the 'scanClient' object."
       }
+    },
+    {
+      "if": {
+        "required": ["synchronizer"]
+      },
+      "then": {
+        "properties": {
+          "synchronizer": {
+            "oneOf": [
+              {
+                "required": ["sequencerNames"],
+                "not": { "required": ["url"] },
+                "properties": {
+                  "sequencerNames": {
+                    "minItems": 1
+                  }
+                }
+              },
+              {
+                "required": ["url"],
+                "not": { "required": ["sequencerNames"] }
+              }
+            ]
+          }
+        }
+      }
     }
   ]
 }
