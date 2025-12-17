@@ -139,7 +139,7 @@ spec:
             {{- else if .Values.sequencerClient.sequencerNames }}
         - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
           value: canton.validator-apps.validator_backend.domains.global.sequencer-names = {{ .Values.sequencerClient.sequencerNames | toJson}}
-            {{ - end }}
+            {{- end }}
         {{ end }}
         {{- range $ii, $domain := .Values.extraDomains }}
         - name: ADDITIONAL_CONFIG_EXTRA_DOMAIN_{{ $ii }}
