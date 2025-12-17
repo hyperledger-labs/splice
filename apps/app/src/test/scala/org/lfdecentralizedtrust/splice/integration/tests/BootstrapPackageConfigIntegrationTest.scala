@@ -224,6 +224,7 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
         ),
         java.util.Optional.empty(),
         java.util.Optional.empty(),
+        java.util.Optional.empty(),
       )
 
       val upgradeAction = new ARC_AmuletRules(
@@ -361,6 +362,7 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
         amuletConfig.decentralizedSynchronizer,
         amuletConfig.tickDuration,
         amuletConfig.packageConfig,
+        java.util.Optional.empty(),
         java.util.Optional.empty(),
         java.util.Optional.empty(),
       )
