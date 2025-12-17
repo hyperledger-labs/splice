@@ -2047,8 +2047,10 @@ updateTestConfigForParallelRuns := {
     ).exists(name.contains)
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
+  // TODO: if we keep it as-is, rename isLocalNetTest to be something like "withDockerWithoutCanton" (or maybe create a separate group for it, since this one e.g. builds the images which we don't need for the bulk-storage tests),
+  // otherwise move BulkStorageTest from here
   def isLocalNetTest(name: String): Boolean =
-    name contains "LocalNet"
+    name.contains("LocalNet") || name.contains("BulkStorageTest")
   def isCometBftTest(name: String): Boolean =
     name contains "CometBft"
   def isRecordTimeToleranceTest(name: String): Boolean =
@@ -2072,6 +2074,11 @@ updateTestConfigForParallelRuns := {
       "manual tests with custom canton instance",
       "test-full-class-names-signatures.log",
       (t: String) => isManualSignatureIntegrationTest(t),
+    ),
+    (
+      "tests for localnet",
+      "test-full-class-names-local-net-based.log",
+      (t: String) => isLocalNetTest(t),
     ),
     (
       "Unit tests",
@@ -2152,11 +2159,6 @@ updateTestConfigForParallelRuns := {
       "resource intensive tests",
       "test-full-class-names-resource-intensive.log",
       (t: String) => isResourceIntensiveTest(t),
-    ),
-    (
-      "tests for localnet",
-      "test-full-class-names-local-net-based.log",
-      (t: String) => isLocalNetTest(t),
     ),
     (
       "tests using docker images",
