@@ -34,6 +34,7 @@ case class ZstdGroupedWeight(minSize: Long) extends GraphStage[FlowShape[ByteStr
         bytes ++ bs,
         left - bs.size,
       )
+
   }
   private object State {
     def empty(): State = State(ByteString.empty, minSize)
