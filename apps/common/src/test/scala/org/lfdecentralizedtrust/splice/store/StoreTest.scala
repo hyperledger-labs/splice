@@ -139,6 +139,10 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     LfContractId.assertFromString("00" + f"$cIdCounter%064x").coid
   }
 
+  protected def resetCIdCounter() = {
+    cIdCounter = 0
+  }
+
   protected def time(n: Long): CantonTimestamp = CantonTimestamp.ofEpochSecond(n)
 
   private def schedule(

@@ -1,0 +1,107 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package org.lfdecentralizedtrust.splice.scan.store.bulk
+
+import scala.concurrent.ExecutionContext
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.tracing.TraceContext
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.OverflowStrategy
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
+import org.apache.pekko.util.ByteString
+import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
+import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
+import org.lfdecentralizedtrust.splice.store.HardLimit
+
+import scala.concurrent.Future
+import io.circe.syntax.*
+import java.nio.ByteBuffer
+
+case class BulkStorageConfig(
+    dbReadChunkSize: Int,
+    maxFileSize: Long,
+)
+
+object BulkStorageConfigs {
+  val bulkStorageConfigV1 = BulkStorageConfig(
+    1000,
+    (64 * 1024 * 1024).toLong,
+  )
+  val bulkStorageTestConfig = BulkStorageConfig(
+    1000,
+    50000L,
+  )
+}
+
+sealed trait Position
+case object Start extends Position
+case object End extends Position
+final case class Index(value: Long) extends Position
+
+class AcsSnapshotBulkStorage(
+    val config: BulkStorageConfig,
+    val acsSnapshotStore: AcsSnapshotStore,
+    val s3Connection: S3BucketConnection,
+    override val loggerFactory: NamedLoggerFactory,
+)(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
+    extends NamedLogging {
+
+  def getAcsSnapshotChunk(
+      migrationId: Long,
+      timestamp: CantonTimestamp,
+      after: Option[Long],
+  ): Future[(Position, ByteString)] = {
+    for {
+      snapshot <- acsSnapshotStore.queryAcsSnapshot(
+        migrationId,
+        snapshot = timestamp,
+        after,
+        limit = HardLimit.tryCreate(config.dbReadChunkSize),
+        Seq.empty,
+        Seq.empty,
+      )
+    } yield {
+      val encoded = snapshot.createdEventsInPage.map(event =>
+        CompactJsonScanHttpEncodings.javaToHttpCreatedEvent(event.eventId, event.event)
+      )
+      val contractsStr = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n") + "\n"
+      val contractsBytes = ByteString(contractsStr)
+      logger.debug(
+        s"Read ${encoded.length} contracts from ACS, to a bytestring of size ${contractsBytes.length} bytes"
+      )
+      (snapshot.afterToken.fold(End: Position)(Index(_)), contractsBytes)
+    }
+
+  }
+
+  def dumpAcsSnapshot(migrationId: Long, timestamp: CantonTimestamp): Future[Unit] = {
+
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
+    var idx = 0
+
+    Source
+      .unfoldAsync(Start: Position) {
+        case Start => getAcsSnapshotChunk(migrationId, timestamp, None).map(Some(_))
+        case Index(i) => getAcsSnapshotChunk(migrationId, timestamp, Some(i)).map(Some(_))
+        case End => Future.successful(None)
+      }
+      .via(ZstdGroupedWeight(config.maxFileSize))
+      // Add a buffer so that the next object continues accumulating while we write the previous one
+      .buffer(
+        1,
+        OverflowStrategy.backpressure,
+      )
+      .mapAsync(1) { zstdObj =>
+        val objectKey = s"snapshot_$idx.zstd"
+        Future {
+          // TODO: error handling
+          val _ = s3Connection.writeFullObject(objectKey, ByteBuffer.wrap(zstdObj.toArrayUnsafe()))
+          idx += 1
+        }
+      }
+      .runWith(Sink.ignore)
+
+  }.map(_ => ())
+}
