@@ -37,6 +37,7 @@ class S3BucketConnection(
 
   // Writes a full object from memory into an s3 object
   def writeFullObject(key: String, content: ByteBuffer)(implicit tc: TraceContext) = {
+    logger.debug(s"Writing ${content.array().length} bytes to S3 object $key")
     val putObj: PutObjectRequest = PutObjectRequest
       .builder()
       .bucket(bucketName)
