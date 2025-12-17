@@ -163,12 +163,6 @@
             },
             "type": "Literal"
           },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
-            },
-            "type": "Literal"
-          },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
               "value": "/share/source/cluster/configs/configs-private"

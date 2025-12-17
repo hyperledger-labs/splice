@@ -129,12 +129,6 @@
             },
             "type": "Literal"
           },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
-            },
-            "type": "Literal"
-          },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
               "value": "/share/source/cluster/configs/configs-private"
@@ -469,12 +463,6 @@
             },
             "type": "Literal"
           },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
-            },
-            "type": "Literal"
-          },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
               "value": "/share/source/cluster/configs/configs-private"
@@ -756,12 +744,6 @@
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "mock"
-            },
-            "type": "Literal"
-          },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -1509,12 +1491,6 @@
             },
             "type": "Literal"
           },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
-            },
-            "type": "Literal"
-          },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
               "value": "/share/source/cluster/configs/configs-private"
@@ -1796,12 +1772,6 @@
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "mock"
-            },
-            "type": "Literal"
-          },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -2089,12 +2059,6 @@
             },
             "type": "Literal"
           },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
-            },
-            "type": "Literal"
-          },
           "PULUMI_VERSION": {
             "literal": {
               "value": "0.0.0"
@@ -2376,12 +2340,6 @@
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "mock"
-            },
-            "type": "Literal"
-          },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -2681,12 +2639,6 @@
             },
             "type": "Literal"
           },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
-            },
-            "type": "Literal"
-          },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
               "value": "/share/source/cluster/configs/configs-private"
@@ -2983,12 +2935,6 @@
             },
             "type": "Literal"
           },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
-            },
-            "type": "Literal"
-          },
           "PULUMI_VERSION": {
             "literal": {
               "value": "0.0.0"
@@ -3273,12 +3219,6 @@
             },
             "type": "Literal"
           },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
-            },
-            "type": "Literal"
-          },
           "PULUMI_VERSION": {
             "literal": {
               "value": "0.0.0"
@@ -3560,12 +3500,6 @@
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "mock"
-            },
-            "type": "Literal"
-          },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -3865,12 +3799,6 @@
             },
             "type": "Literal"
           },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
-            },
-            "type": "Literal"
-          },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
               "value": "/share/source/cluster/configs/configs-private"
@@ -4167,12 +4095,6 @@
             },
             "type": "Literal"
           },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
-            },
-            "type": "Literal"
-          },
           "PULUMI_VERSION": {
             "literal": {
               "value": "0.0.0"
@@ -4459,12 +4381,6 @@
             },
             "type": "Literal"
           },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
-            },
-            "type": "Literal"
-          },
           "PULUMI_VERSION": {
             "literal": {
               "value": "0.0.0"
@@ -4748,12 +4664,6 @@
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "mock"
-            },
-            "type": "Literal"
-          },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -5055,12 +4965,6 @@
             },
             "type": "Literal"
           },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
-            },
-            "type": "Literal"
-          },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
               "value": "/share/source/cluster/configs/configs-private"
@@ -5359,12 +5263,6 @@
             },
             "type": "Literal"
           },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
-            },
-            "type": "Literal"
-          },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
               "value": "/share/source/cluster/configs/configs-private"
@@ -5648,12 +5546,6 @@
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "mock"
-            },
-            "type": "Literal"
-          },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -5949,12 +5841,6 @@
             },
             "type": "Literal"
           },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
-            },
-            "type": "Literal"
-          },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
               "value": "/share/source/cluster/configs/configs-private"
@@ -6236,12 +6122,6 @@
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "mock"
-            },
-            "type": "Literal"
-          },
-          "KUBECTL_VERSION": {
-            "literal": {
-              "value": "0.0.0"
             },
             "type": "Literal"
           },

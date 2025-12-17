@@ -161,12 +161,6 @@ export function createStackCR(
                 value: config.requireEnv('PULUMI_VERSION'),
               },
             },
-            KUBECTL_VERSION: {
-              type: 'Literal',
-              literal: {
-                value: config.requireEnv('KUBECTL_VERSION'),
-              },
-            },
             SPLICE_ROOT: {
               type: 'Literal',
               literal: {
