@@ -247,7 +247,6 @@ tests:
 
   - it: "uses sequencerClient.sequencerNames as a JSON array when provided"
     set:
-      useSequencerConnectionsFromScan: true
       sequencerClient:
         sequencerNames: [ "sequencer-1", "sequencer-2" ]
     documentSelector:
