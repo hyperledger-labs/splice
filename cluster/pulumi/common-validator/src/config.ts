@@ -11,35 +11,28 @@ import { z } from 'zod';
 
 export const SynchronizerConfigSchema = z
   .object({
+    type: z.enum(['from-scan', 'trusted-url', 'trusted-svs']).default('from-scan'),
     sequencerNames: z.array(z.string()).optional(),
     url: z.string().optional(),
   })
   .refine(
     data => {
-      const hasNames = data.sequencerNames && data.sequencerNames.length > 0;
-      const hasUrl = !!data.url;
-
-      return (hasNames || hasUrl) && !(hasNames && hasUrl);
-    },
-    {
-      message: "One of 'sequencerNames' (non-empty) or 'url' must be provided, but not both.",
-      path: ['sequencerNames'],
-    }
-  )
-  .refine(
-    data => {
-      if (data.sequencerNames) {
-        return data.sequencerNames.length >= 1;
+      if (data.type === 'trusted-url') {
+        return !!data.url && (!data.sequencerNames || data.sequencerNames.length === 0);
+      }
+      if (data.type === 'trusted-svs') {
+        return !!(data.sequencerNames && data.sequencerNames.length > 0) && !data.url;
       }
       return true;
     },
     {
-      message: 'sequencerNames must contain at least one name if provided.',
-      path: ['sequencerNames'],
+      message:
+        "Configuration mismatch: 'trusted-url' requires only a URL, and 'trusted-svs' requires only sequencerNames.",
+      path: ['type'],
     }
   );
 
-export type SynchronizerConfig = z.infer<typeof SynchronizerConfigSchema>;
+export type synchronizerConfigSchema = z.infer<typeof SynchronizerConfigSchema>;
 
 export const ScanClientConfigSchema = z
   .object({

@@ -13,13 +13,21 @@
       "type": "object",
       "description": "Configuration parameters for the sequencer connections.",
       "properties": {
+        "synchronizerType": {
+          "type": "string",
+          "enum": [
+            "from-scan",
+            "trusted-url",
+            "trusted-svs"
+          ]
+        },
         "sequencerNames": {
           "type": "array",
           "items": {
             "type": "string"
           },
           "default": [],
-          "description": "Optional list of trusted sequencer names."
+          "description": "Optional list of trusted sequencer / SV names."
         },
         "url": {
           "type": "string",
