@@ -45,6 +45,6 @@ runs:
       run: |
         if [[ "${RUNNER_ENVIRONMENT}" != "self-hosted" ]]; then
           echo "Not a self-hosted runner. Installing required Python packages..."
-          python3 -m pip install git requests
+          python3 -m pip install GitPython requests
         fi
         ${GITHUB_ACTION_PATH}/../../scripts/notification-scripts/failure_notification.py --job_subname "${{ inputs.job_subname }}"
