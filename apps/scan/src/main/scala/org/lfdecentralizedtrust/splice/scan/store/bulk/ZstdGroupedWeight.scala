@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicReference
 case class ZstdGroupedWeight(minSize: Long) extends GraphStage[FlowShape[ByteString, ByteString]] {
   require(minSize > 0, "minSize must be greater than 0")
 
-  val zstdTmpBufferSize = 10 * 1024 * 1024; // TODO: make configurable?
+  val zstdTmpBufferSize = 10 * 1024 * 1024; // TODO(#3429): make configurable?
 
   val in = Inlet[ByteString]("ZstdGroupedWeight.in")
   val out = Outlet[ByteString]("ZstdGroupedWeight.out")
