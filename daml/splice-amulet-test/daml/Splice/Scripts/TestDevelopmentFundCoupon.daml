@@ -63,6 +63,7 @@ testAllocateDevelopmentFundCoupon = do
     allocateDevelopmentFundCoupon app alice.primaryParty bob.primaryParty firstAllocationAmount
       expiresAt reason unclaimedDevelopmentFundCouponCids
   Some developmentFundCoupon <- queryContractId bob.primaryParty developmentFundCouponCid
+  Some leftOverUnclaimedDevelopmentFundCoupon <- queryContractId app.dso leftOverUnclaimedDevelopmentFundCouponCid
   developmentFundCoupon === DevelopmentFundCoupon with
     dso = app.dso
     beneficiary = bob.primaryParty
@@ -70,6 +71,9 @@ testAllocateDevelopmentFundCoupon = do
     amount = firstAllocationAmount
     expiresAt
     reason
+  leftOverUnclaimedDevelopmentFundCoupon === UnclaimedDevelopmentFundCoupon with
+    dso = app.dso
+    amount = secondAllocationAmount
 
   -- Happy - Development Fund coupon allocated with no UnclaimedDevelopmentFundCoupon leftover
   AmuletRules_AllocateDevelopmentFundCouponResult { developmentFundCouponCid, optUnclaimedDevelopmentFundCouponCid = None } <-
