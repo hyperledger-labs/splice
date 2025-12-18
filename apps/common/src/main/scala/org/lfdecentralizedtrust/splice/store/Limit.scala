@@ -72,6 +72,8 @@ trait LimitHelpers { _: NamedLogging =>
       traceContext: TraceContext
   ): C = {
     limit match {
+      case PageLimit(limit, _) =>
+        result.take(limit.intValue())
       case HardLimit(limit, _) =>
         val resultSize = result.size
         if (resultSize > limit) {
@@ -85,8 +87,6 @@ trait LimitHelpers { _: NamedLogging =>
         } else {
           result
         }
-      case _ =>
-        result.take(limit.limit.intValue())
     }
   }
 
@@ -96,6 +96,8 @@ trait LimitHelpers { _: NamedLogging =>
       result: C & scala.collection.IterableOps[?, CC, C],
   ): C = {
     limit match {
+      case PageLimit(limit, _) =>
+        result.take(limit.intValue())
       case HardLimit(limit, _) =>
         val resultSize = result.size
         if (resultSize > limit) {
@@ -107,15 +109,13 @@ trait LimitHelpers { _: NamedLogging =>
         } else {
           result
         }
-      case _ =>
-        result.take(limit.limit.intValue())
     }
   }
 
   protected def sqlLimit(limit: Limit): Int = {
     limit match {
+      case PageLimit(limit, _) => limit
       case HardLimit(limit, _) => limit + 1
-      case _ => limit.limit
     }
   }
 
