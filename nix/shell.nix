@@ -115,6 +115,10 @@ in pkgs.mkShell {
 
   CANTON = "${pkgs.canton}";
   CANTON_VERSION = "${sources.version}";
+  CANTON_BASE_IMAGE_SHA256 = "${sources.canton_base_image_sha256}";
+  CANTON_PARTICIPANT_IMAGE_SHA256 = "${sources.canton_participant_image_sha256}";
+  CANTON_SEQUENCER_IMAGE_SHA256 = "${sources.canton_sequencer_image_sha256}";
+  CANTON_MEDIATOR_IMAGE_SHA256 = "${sources.canton_mediator_image_sha256}";
   DAML_COMPILER_VERSION = "${damlCompilerSources.version}";
   SDK_VERSION = "${sources.tooling_sdk_version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
