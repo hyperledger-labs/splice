@@ -132,13 +132,13 @@ spec:
         {{ if not .Values.useSequencerConnectionsFromScan -}}
         - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
           value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.decentralizedSynchronizerUrl | quote }}
-        {{ else if .Values.sequencerClient -}}
-            {{- if .Values.sequencerClient.url}}
+        {{ else if .Values.synchronizer -}}
+            {{- if .Values.synchronizer.url}}
         - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
-          value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.sequencerClient.url | quote }}
-            {{- else if .Values.sequencerClient.sequencerNames }}
+          value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.synchronizer.url | quote }}
+            {{- else if .Values.synchronizer.sequencerNames }}
         - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
-          value: canton.validator-apps.validator_backend.domains.global.sequencer-names = {{ .Values.sequencerClient.sequencerNames | toJson}}
+          value: canton.validator-apps.validator_backend.domains.global.sequencer-names = {{ .Values.synchronizer.sequencerNames | toJson}}
             {{- end }}
         {{ end }}
         {{- range $ii, $domain := .Values.extraDomains }}

@@ -73,7 +73,7 @@ export const ValidatorAppConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
   additionalJvmOptions: z.string().optional(),
   scanClient: ScanClientConfigSchema.optional(),
-  sequencerClient: SynchronizerConfigSchema.optional(),
+  synchronizer: SynchronizerConfigSchema.optional(),
 });
 
 export const ParticipantConfigSchema = z.object({
