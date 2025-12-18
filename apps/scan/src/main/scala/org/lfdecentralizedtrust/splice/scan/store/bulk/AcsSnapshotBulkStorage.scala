@@ -17,7 +17,9 @@ import org.lfdecentralizedtrust.splice.store.HardLimit
 
 import scala.concurrent.Future
 import io.circe.syntax.*
+
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicInteger
 
 case class BulkStorageConfig(
     dbReadChunkSize: Int,
@@ -28,10 +30,6 @@ object BulkStorageConfigs {
   val bulkStorageConfigV1 = BulkStorageConfig(
     1000,
     (64 * 1024 * 1024).toLong,
-  )
-  val bulkStorageTestConfig = BulkStorageConfig(
-    1000,
-    50000L,
   )
 }
 
@@ -48,7 +46,7 @@ class AcsSnapshotBulkStorage(
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
-  def getAcsSnapshotChunk(
+  private def getAcsSnapshotChunk(
       migrationId: Long,
       timestamp: CantonTimestamp,
       after: Option[Long],
@@ -78,8 +76,7 @@ class AcsSnapshotBulkStorage(
 
   def dumpAcsSnapshot(migrationId: Long, timestamp: CantonTimestamp): Future[Unit] = {
 
-    @SuppressWarnings(Array("org.wartremover.warts.Var"))
-    var idx = 0
+    val idx = new AtomicInteger(0)
 
     Source
       .unfoldAsync(Start: Position) {
@@ -102,7 +99,7 @@ class AcsSnapshotBulkStorage(
           //    partially written object.
           // TODO(#3429): Error handling
           val _ = s3Connection.writeFullObject(objectKey, ByteBuffer.wrap(zstdObj.toArrayUnsafe()))
-          idx += 1
+          idx.addAndGet(1)
         }
       }
       .runWith(Sink.ignore)

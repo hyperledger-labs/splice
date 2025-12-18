@@ -15,7 +15,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodi
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
 import org.lfdecentralizedtrust.splice.scan.store.bulk.{
   AcsSnapshotBulkStorage,
-  BulkStorageConfigs,
+  BulkStorageConfig,
   S3BucketConnection,
   S3Config,
 }
@@ -37,6 +37,10 @@ import scala.sys.process.*
 class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with HasActorSystem {
 
   val acsSnapshotSize = 48500
+  val bulkStorageTestConfig = BulkStorageConfig(
+    1000,
+    50000L,
+  )
 
   "AcsSnapshotSourceTest" should {
     "work" in {
@@ -52,7 +56,7 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
         val s3BucketConnection = S3BucketConnection(s3Config, "bucket", loggerFactory)
         for {
           _ <- new AcsSnapshotBulkStorage(
-            BulkStorageConfigs.bulkStorageTestConfig,
+            bulkStorageTestConfig,
             store,
             s3BucketConnection,
             loggerFactory,
