@@ -81,7 +81,6 @@ case class ZstdGroupedWeight(minSize: Long) extends GraphStage[FlowShape[ByteStr
       private val state: AtomicReference[State] = new AtomicReference[State](State.empty())
 
       override def postStop(): Unit = {
-        println("in postStop")
         super.postStop()
         if (zstd.get() != null) {
           zstd.get().close()
