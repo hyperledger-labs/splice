@@ -798,7 +798,7 @@ data RewardsIssuanceConfig = RewardsIssuanceConfig with
 
 -- | Execute a transfer.
 executeTransfer : RewardsIssuanceConfig -> TransferContext -> Party -> Transfer -> Update TransferResult
-executeTransfer config context dso t  = do
+executeTransfer config context dso t = do
   -- compute summaries
   csum <- summarizeAndValidateContext context dso t
   isum <- summarizeAndConsumeInputs csum dso t.sender t.inputs
