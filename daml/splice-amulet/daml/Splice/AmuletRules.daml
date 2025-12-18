@@ -594,8 +594,8 @@ template AmuletRules
 
         return AmuletRules_MergeUnclaimedRewardsResult with ..
 
-    -- Batch merge of unclaimed development fund coupons
     nonconsuming choice AmuletRules_MergeUnclaimedDevelopmentFundCoupons : AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult
+      -- ^ Batch merge of unclaimed development fund coupons
       with
         unclaimedDevelopmentFundCouponCids : [ContractId UnclaimedDevelopmentFundCoupon]
       controller dso
@@ -614,10 +614,10 @@ template AmuletRules
 
         return AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult with ..
 
-    -- Allows the Development Fund manager to allocate a specified amount from a
+    nonconsuming choice AmuletRules_AllocateDevelopmentFundCoupon : AmuletRules_AllocateDevelopmentFundCouponResult
+    -- ^ Allows the Development Fund manager to allocate a specified amount from a
     -- collection of UnclaimedDevelopmentFundCoupons to a beneficiary, generating a
     -- DevelopmentFundCoupon and producing a leftover unclaimed coupon if applicable.
-    nonconsuming choice AmuletRules_AllocateDevelopmentFundCoupon : AmuletRules_AllocateDevelopmentFundCouponResult
       with
         unclaimedDevelopmentFundCouponCids : [ContractId UnclaimedDevelopmentFundCoupon]
         beneficiary : Party
