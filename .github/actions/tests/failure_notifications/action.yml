@@ -41,6 +41,4 @@ runs:
         FAILURE_NOTIFICATIONS_URL: ${{ inputs.notifications_url }}
         NOTIFICATION_SLACK_CHANNEL: ${{ inputs.slack_channel }}
       shell: bash
-      run: |
-        source .envrc.vars
-        ${SPLICE_ROOT}/.github/actions/scripts/notification-scripts/failure_notification.py --job_subname "${{ inputs.job_subname }}"
+      run: ${GITHUB_ACTION_PATH}/../../scripts/notification-scripts/failure_notification.py --job_subname "${{ inputs.job_subname }}"
