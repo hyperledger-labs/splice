@@ -41,4 +41,10 @@ runs:
         FAILURE_NOTIFICATIONS_URL: ${{ inputs.notifications_url }}
         NOTIFICATION_SLACK_CHANNEL: ${{ inputs.slack_channel }}
       shell: bash
-      run: ${GITHUB_ACTION_PATH}/../../scripts/notification-scripts/failure_notification.py --job_subname "${{ inputs.job_subname }}"
+      # on self-hosted runners all python packages are preinstalled but on github-hosted they will be missing
+      run: |
+        if [[ "${RUNNER_ENVIRONMENT}" != "self-hosted" ]]; then
+          echo "Not a self-hosted runner. Installing required Python packages..."
+          python3 -m pip install git requests
+        fi
+        ${GITHUB_ACTION_PATH}/../../scripts/notification-scripts/failure_notification.py --job_subname "${{ inputs.job_subname }}"
