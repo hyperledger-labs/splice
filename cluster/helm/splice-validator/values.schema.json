@@ -588,32 +588,6 @@
     },
     {
       "if": {
-        "required": ["synchronizer"]
-      },
-      "then": {
-        "properties": {
-          "synchronizer": {
-            "oneOf": [
-              {
-                "required": ["sequencerNames"],
-                "not": { "required": ["url"] },
-                "properties": {
-                  "sequencerNames": {
-                    "minItems": 1
-                  }
-                }
-              },
-              {
-                "required": ["url"],
-                "not": { "required": ["sequencerNames"] }
-              }
-            ]
-          }
-        }
-      }
-    },
-    {
-      "if": {
       "properties": {
         "synchronizer": {
           "properties": {
