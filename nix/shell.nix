@@ -114,6 +114,7 @@ in pkgs.mkShell {
   ] ++ linuxOnly;
 
   CANTON = "${pkgs.canton}";
+  CANTON_VERSION = "${sources.version}";
   DAML_COMPILER_VERSION = "${damlCompilerSources.version}";
   SDK_VERSION = "${sources.tooling_sdk_version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
