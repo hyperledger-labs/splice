@@ -133,5 +133,4 @@ in pkgs.mkShell {
 
   PULUMI_VERSION="${pkgs.pulumi-bin.version}";
   GECKODRIVER="${pkgs.geckodriver}/bin/geckodriver";
-  KUBECTL_VERSION="${pkgs.kubectl.version}";
 }
