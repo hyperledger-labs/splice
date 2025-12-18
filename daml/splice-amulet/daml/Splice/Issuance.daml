@@ -76,7 +76,9 @@ data IssuingRoundParameters = IssuingRoundParameters with
     unclaimedValidatorRewards : Decimal
     unclaimedSvRewards : Decimal -- ^ Can be non-zero due to rounding, or no SV having had the chance to claim their coupons.
     issuancePerValidatorFaucetCoupon : Decimal
-    amuletsToIssueToDevelopmentFund : Decimal
+    optAmuletsToIssueToDevelopmentFund : Optional Decimal
+      -- ^ Note: Made optional as the addition of this field is checked by the upgrade checker
+      -- on package upload because `IssuingRoundParameters` is serializable.
   deriving (Eq, Show)
 
 validateOpenMiningRoundSummary : CanAssert m => OpenMiningRoundSummary -> m ()
@@ -98,7 +100,7 @@ computeIssuingRoundParameters tickDuration amuletPrice config summary =
       unclaimedAppRewards = featuredAppIssuance.unclaimedRewards
       unclaimedSvRewards
       issuancePerValidatorFaucetCoupon = validatorFaucetIssuance.issuancePerCoupon
-      amuletsToIssueToDevelopmentFund
+      optAmuletsToIssueToDevelopmentFund = Some amuletsToIssueToDevelopmentFund
   where
     developmentFundPercentage = fromOptional 0.0 config.optDevelopmentFundPercentage
 

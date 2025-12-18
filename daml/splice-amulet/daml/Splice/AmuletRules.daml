@@ -460,12 +460,13 @@ template AmuletRules
             amount = totalUnclaimedRewards
 
         -- record unclaimed development fund coupon contract
+        let amuletsToIssueToDevelopmentFund = fromOptional 0.0 params.optAmuletsToIssueToDevelopmentFund
         unclaimedDevelopmentFundCouponCid <-
-          if params.amuletsToIssueToDevelopmentFund > 0.0
+          if amuletsToIssueToDevelopmentFund > 0.0
             then
               Some <$> create UnclaimedDevelopmentFundCoupon with
                 dso
-                amount = params.amuletsToIssueToDevelopmentFund
+                amount = amuletsToIssueToDevelopmentFund
             else pure None
 
         -- create issuing round
