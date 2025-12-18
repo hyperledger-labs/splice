@@ -588,64 +588,61 @@
     },
     {
       "if": {
-      "properties": {
-        "synchronizer": {
-          "properties": {
-            "synchronizerType": { "const": "from-scan" }
-          }
-        }
-      }
-    },
-      "then": {
+        "required": ["synchronizer"],
         "properties": {
           "synchronizer": {
-            "properties": {
-              "url": { "not": {} },
-              "sequencerNames": { "not": {} }
-            }
+            "required": ["synchronizerType"]
           }
         }
-      }},
-    {
-      "if": {
-      "properties": {
-        "synchronizer": {
-          "properties": {
-            "synchronizerType": { "const": "trusted-url" }
-          }
-        }
-      }
-    },
+      },
       "then": {
-        "properties": {
-          "synchronizer": {
-            "required": ["url"],
-            "properties": {
-              "sequencerNames": { "not": {} }
+        "allOf": [
+          {
+            "if": {
+              "properties": { "synchronizer": { "properties": { "synchronizerType": { "const": "from-scan" } } } }
+            },
+            "then": {
+              "properties": {
+                "synchronizer": {
+                  "properties": {
+                    "url": { "not": {} },
+                    "sequencerNames": { "not": {} }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "synchronizer": { "properties": { "synchronizerType": { "const": "trusted-url" } } } }
+            },
+            "then": {
+              "properties": {
+                "synchronizer": {
+                  "required": ["url"],
+                  "properties": { "sequencerNames": { "not": {} } }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "synchronizer": { "properties": { "synchronizerType": { "const": "trusted-svs" } } } }
+            },
+            "then": {
+              "properties": {
+                "synchronizer": {
+                  "required": ["sequencerNames"],
+                  "properties": {
+                    "url": { "not": {} },
+                    "sequencerNames": { "minItems": 1 }
+                  }
+                }
+              }
             }
           }
-        }
-      }},
-    {
-      "if": {
-      "properties": {
-        "synchronizer": {
-          "properties": {
-            "synchronizerType": { "const": "trusted-svs" }
-          }
-        }
+        ]
       }
-    },
-      "then": {
-        "properties": {
-          "synchronizer": {
-            "required": ["sequencerNames"],
-            "properties": {
-              "url": { "not": {} },
-              "sequencerNames": { "minItems": 1 }
-            }
-          }
-        }
-      }}
+    }
   ]
 }
