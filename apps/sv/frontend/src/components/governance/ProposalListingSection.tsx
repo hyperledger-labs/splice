@@ -176,7 +176,11 @@ const VoteRow: React.FC<VoteRowProps> = props => {
   );
 
   return (
-    <RouterLink to={`/governance-beta/proposals/${contractId}`} style={{ textDecoration: 'none' }}>
+    <RouterLink
+      to={`/governance-beta/proposals/${contractId}`}
+      style={{ textDecoration: 'none' }}
+      data-testid={`${uniqueId}-row-link`}
+    >
       <TableRow
         sx={{
           display: 'grid',

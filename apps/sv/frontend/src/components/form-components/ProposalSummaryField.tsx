@@ -38,6 +38,7 @@ export const ProposalSummaryField: React.FC<ProposalSummaryFieldProps> = props =
         error={!field.state.meta.isValid}
         helperText={field.state.meta.errors?.[0]}
         inputProps={{ 'data-testid': id }}
+        id={id}
       />
       <Typography variant="body2" sx={{ mt: 1 }} data-testid={`${id}-subtitle`}>
         {subtitle || PROPOSAL_SUMMARY_SUBTITLE}

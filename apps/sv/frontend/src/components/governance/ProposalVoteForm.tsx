@@ -106,7 +106,8 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
                   onChange={e => field.handleChange(e.target.value)}
                   error={!field.state.meta.isValid}
                   helperText={field.state.meta.errors?.[0]}
-                  inputProps={{ 'data-testid': 'your-vote-reason-input' }}
+                  slotProps={{ htmlInput: { 'data-testid': 'your-vote-reason-input' } }}
+                  id="your-vote-reason-input"
                 />
               );
             }}
@@ -140,7 +141,8 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
                       {field.state.meta.errors?.[0]}
                     </span>
                   }
-                  inputProps={{ 'data-testid': 'your-vote-url-input' }}
+                  slotProps={{ htmlInput: { 'data-testid': 'your-vote-url-input' } }}
+                  id="your-vote-url-input"
                 />
               );
             }}
@@ -203,6 +205,7 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
                 variant="contained"
                 sx={{ minWidth: 100 }}
                 data-testid="submit-vote-button"
+                id="submit-vote-button"
               >
                 {isSubmitting ? 'Submitting...' : previouslyVoted ? 'Update' : 'Submit'}
               </Button>
