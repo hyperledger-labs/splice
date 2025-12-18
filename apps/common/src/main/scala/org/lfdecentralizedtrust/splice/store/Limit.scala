@@ -10,16 +10,17 @@ import io.grpc.Status
 
 sealed trait Limit {
   val limit: Int
+  // TODO (#767): make configurable (it's currently an argument, but not user-configurable e.g. via config values)
+  val maxPageSize: Int
 }
 
 object Limit {
 
-  // TODO (#767): make configurable
-  val MaxPageSize: Int = 1000
-  val DefaultLimit: Limit = HardLimit.tryCreate(MaxPageSize)
+  val DefaultMaxPageSize: Int = 1000
+  val DefaultLimit: Limit = HardLimit.tryCreate(DefaultMaxPageSize)
 
-  private[store] def validateLimit(limit: Int): Either[String, Int] = {
-    if (limit > MaxPageSize) Left(s"Exceeded limit maximum ($limit > $MaxPageSize).")
+  private[store] def validateLimit(limit: Int, maxPageSize: Int): Either[String, Int] = {
+    if (limit > maxPageSize) Left(s"Exceeded limit maximum ($limit > $maxPageSize).")
     else if (limit < 1) Left("Limit must be at least 1.")
     else Right(limit)
   }
@@ -29,13 +30,13 @@ object Limit {
 /** Limit for when the result is expected to not exceed the limit.
   * If exceeded, the store should log a WARN.
   */
-case class HardLimit private (limit: Int) extends Limit
+case class HardLimit private (limit: Int, maxPageSize: Int) extends Limit
 object HardLimit {
-  def apply(limit: Int): Either[String, HardLimit] = {
-    Limit.validateLimit(limit).map(new HardLimit(_))
+  def apply(limit: Int, maxPageSize: Int = Limit.DefaultMaxPageSize): Either[String, HardLimit] = {
+    Limit.validateLimit(limit, maxPageSize).map(new HardLimit(_, maxPageSize))
   }
-  def tryCreate(limit: Int): HardLimit =
-    HardLimit(limit).valueOr(err =>
+  def tryCreate(limit: Int, maxPageSize: Int = Limit.DefaultMaxPageSize): HardLimit =
+    HardLimit(limit, maxPageSize).valueOr(err =>
       throw Status.INVALID_ARGUMENT
         .withDescription(err)
         .asRuntimeException()
@@ -47,25 +48,18 @@ object HardLimit {
   * To be used with pagination.  A limit of ''n'' implies that if there are
   * ''k > n'' result elements, ''z'' elements where ''0≤z≤n'' may be returned.
   */
-case class PageLimit private (limit: Int) extends Limit
+case class PageLimit private (limit: Int, maxPageSize: Int) extends Limit
 object PageLimit {
-  val Max: PageLimit = new PageLimit(Limit.MaxPageSize)
-  def apply(limit: Int): Either[String, PageLimit] = {
-    Limit.validateLimit(limit).map(new PageLimit(_))
+  val Max: PageLimit = new PageLimit(Limit.DefaultMaxPageSize, Limit.DefaultMaxPageSize)
+  def apply(limit: Int, maxPageSize: Int = Limit.DefaultMaxPageSize): Either[String, PageLimit] = {
+    Limit.validateLimit(limit, maxPageSize).map(new PageLimit(_, maxPageSize))
   }
-  def tryCreate(limit: Int): PageLimit =
-    PageLimit(limit).valueOr(err =>
+  def tryCreate(limit: Int, maxPageSize: Int = Limit.DefaultMaxPageSize): PageLimit =
+    PageLimit(limit, maxPageSize).valueOr(err =>
       throw Status.INVALID_ARGUMENT
         .withDescription(err)
         .asRuntimeException()
     )
-}
-
-/** Limit with no constraints. Must not be used for production, use only for testing.
-  */
-case class UnboundLimit private (limit: Int) extends Limit
-object UnboundLimit {
-  def apply(limit: Int): UnboundLimit = new UnboundLimit(limit)
 }
 
 trait LimitHelpers { _: NamedLogging =>
@@ -78,7 +72,7 @@ trait LimitHelpers { _: NamedLogging =>
       traceContext: TraceContext
   ): C = {
     limit match {
-      case HardLimit(limit) =>
+      case HardLimit(limit, _) =>
         val resultSize = result.size
         if (resultSize > limit) {
           logger.warn(
@@ -102,7 +96,7 @@ trait LimitHelpers { _: NamedLogging =>
       result: C & scala.collection.IterableOps[?, CC, C],
   ): C = {
     limit match {
-      case HardLimit(limit) =>
+      case HardLimit(limit, _) =>
         val resultSize = result.size
         if (resultSize > limit) {
           throw io.grpc.Status.FAILED_PRECONDITION
@@ -120,7 +114,7 @@ trait LimitHelpers { _: NamedLogging =>
 
   protected def sqlLimit(limit: Limit): Int = {
     limit match {
-      case HardLimit(limit) => limit + 1
+      case HardLimit(limit, _) => limit + 1
       case _ => limit.limit
     }
   }

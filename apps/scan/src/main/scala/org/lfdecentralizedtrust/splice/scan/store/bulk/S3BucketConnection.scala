@@ -35,8 +35,8 @@ class S3BucketConnection(
     ret.put(bytes)
   }
 
-  // Writes a full object from memory into an s3 object
-  def writeFullObject(key: String, content: ByteBuffer)(implicit tc: TraceContext) = {
+  // Writes a full object from memory into an s3 object (a blocking call)
+  def writeFullObject(key: String, content: ByteBuffer)(implicit tc: TraceContext): Unit = {
     logger.debug(s"Writing ${content.array().length} bytes to S3 object $key")
     val putObj: PutObjectRequest = PutObjectRequest
       .builder()
@@ -47,11 +47,16 @@ class S3BucketConnection(
       putObj,
       RequestBody.fromBytes(content.array()),
     )
+    ()
   }
 }
 
 object S3BucketConnection {
-  def apply(s3Config: S3Config, bucketName: String, loggerFactory: NamedLoggerFactory) = {
+  def apply(
+      s3Config: S3Config,
+      bucketName: String,
+      loggerFactory: NamedLoggerFactory,
+  ): S3BucketConnection = {
     new S3BucketConnection(
       S3Client
         .builder()

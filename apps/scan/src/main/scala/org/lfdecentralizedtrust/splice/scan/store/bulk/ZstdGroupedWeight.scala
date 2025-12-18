@@ -41,11 +41,10 @@ case class ZstdGroupedWeight(minSize: Long) extends GraphStage[FlowShape[ByteStr
   }
 
   class ZSTD(
-      val tmpBufferSize: Int,
+      val tmpBuffer: ByteBuffer,
       val compressionLevel: Int = 3,
-  ) {
+  ) extends AutoCloseable {
 
-    val tmpBuffer = ByteBuffer.allocateDirect(tmpBufferSize)
     val compressingStream =
       new ZstdDirectBufferCompressingStreamNoFinalizer(tmpBuffer, compressionLevel)
 
@@ -62,22 +61,37 @@ case class ZstdGroupedWeight(minSize: Long) extends GraphStage[FlowShape[ByteStr
     }
 
     def zstdFinish(): ByteString = {
-      compressingStream.close()
       tmpBuffer.flip()
       val result = ByteString.fromByteBuffer(tmpBuffer)
       tmpBuffer.clear()
       compressingStream.close()
       result
     }
+
+    override def close(): Unit = {
+      compressingStream.close()
+    }
   }
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new GraphStageLogic(shape) with InHandler with OutHandler {
-      private val zstd = new AtomicReference[ZSTD](new ZSTD(zstdTmpBufferSize, 3))
+      // TODO(#3429): consider implementing a pool of tmp buffers to avoid allocating a new one for each stage
+      private val tmpBuffer = ByteBuffer.allocateDirect(zstdTmpBufferSize)
+      private val zstd = new AtomicReference[ZSTD](new ZSTD(tmpBuffer, 3))
       private val state: AtomicReference[State] = new AtomicReference[State](State.empty())
 
+      override def postStop(): Unit = {
+        println("in postStop")
+        super.postStop()
+        if (zstd.get() != null) {
+          zstd.get().close()
+        }
+      }
+
       private def reset(): Unit = {
-        zstd.set(new ZSTD(zstdTmpBufferSize, 3))
+        tmpBuffer.clear()
+        zstd.get().close()
+        zstd.set(new ZSTD(tmpBuffer, 3))
         state.set(State.empty())
       }
 

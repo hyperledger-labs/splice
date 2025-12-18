@@ -19,7 +19,7 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.{
   S3BucketConnection,
   S3Config,
 }
-import org.lfdecentralizedtrust.splice.store.{Limit, StoreTest, UnboundLimit}
+import org.lfdecentralizedtrust.splice.store.{Limit, StoreTest, HardLimit}
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import org.lfdecentralizedtrust.splice.util.{EventId, PackageQualifiedName, ValueJsonCodecCodegen}
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
@@ -33,6 +33,7 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.sys.process.*
+import scala.util.Using
 
 class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with HasActorSystem {
 
@@ -70,7 +71,7 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
               0,
               timestamp,
               None,
-              UnboundLimit(acsSnapshotSize),
+              HardLimit.tryCreate(acsSnapshotSize, acsSnapshotSize),
               Seq.empty,
               Seq.empty,
             )
@@ -112,7 +113,7 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
     val compressed = s3BucketConnection.readFullObject(s3obj.key())
     val uncompressed = ByteBuffer.allocateDirect(compressed.capacity() * 200)
     compressed.flip()
-    new ZstdDirectBufferDecompressingStream(compressed).read(uncompressed)
+    Using(new ZstdDirectBufferDecompressingStream(compressed)) { ds => ds.read(uncompressed) }
     uncompressed.flip()
     val allContractsStr = StandardCharsets.UTF_8.newDecoder().decode(uncompressed).toString
     val allContracts = allContractsStr.split("\n")
