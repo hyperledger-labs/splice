@@ -188,7 +188,7 @@ class DbUserWalletStore(
       ccValue = sql"rti.issuance * acs.reward_coupon_weight",
     )
 
-  private def listSortedRewardCoupons[C, TCid <: ContractId[_], T](
+  private def listSortedRewardCoupons[C, TCid <: ContractId[?], T](
       companion: C,
       issuingRoundsMap: Map[Round, IssuingMiningRound],
       roundToIssuance: IssuingMiningRound => Option[BigDecimal],

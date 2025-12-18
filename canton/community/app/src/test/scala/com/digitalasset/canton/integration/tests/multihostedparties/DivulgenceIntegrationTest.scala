@@ -15,10 +15,13 @@ import com.digitalasset.canton.console.{CommandFailure, LocalParticipantReferenc
 import com.digitalasset.canton.examples.java.divulgence.DivulgeIouByExercise
 import com.digitalasset.canton.examples.java.iou.Iou
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
+import com.digitalasset.canton.integration.{ConfigTransforms, EnvironmentDefinition}
+import com.digitalasset.canton.participant.config.ParticipantNodeConfig
 import com.digitalasset.canton.protocol.{ContractInstance, LfContractId}
 import com.digitalasset.canton.topology.PartyId
+import monocle.macros.syntax.lens.*
 
-final class DivulgenceIntegrationTest extends OfflinePartyReplicationIntegrationTestBase {
+trait DivulgenceIntegrationTest extends OfflinePartyReplicationIntegrationTestBase {
   import DivulgenceIntegrationTest.*
 
   "Divulgence should work as expected" in { implicit env =>
@@ -37,6 +40,40 @@ final class DivulgenceIntegrationTest extends OfflinePartyReplicationIntegration
         .lookup(LfContractId.assertFromString(contractId))
         .value
         .futureValueUS
+
+    def checkCreatedEventFor(
+        participant: LocalParticipantReference,
+        contractId: String,
+        party: PartyId,
+    ) =
+      participant.ledger_api.javaapi.event_query
+        .by_contract_id(contractId, Seq(party))
+        .hasCreated shouldBe true
+
+    def checkArchivedEventFor(
+        participant: LocalParticipantReference,
+        contractId: String,
+        party: PartyId,
+    ) = {
+      checkCreatedEventFor(participant, contractId, party) // ensure created event exists
+      participant.ledger_api.javaapi.event_query
+        .by_contract_id(contractId, Seq(party))
+        .hasArchived shouldBe true
+    }
+
+    // the divulged contract should not be visible by the event query service
+    def assertEventNotFound(
+        participant: LocalParticipantReference,
+        contractId: String,
+        party: PartyId,
+    ) =
+      loggerFactory.assertLogs(
+        a[CommandFailure] shouldBe thrownBy {
+          participant.ledger_api.event_query
+            .by_contract_id(contractId, Seq(party))
+        },
+        _.commandFailureMessage should include("Contract events not found, or not visible."),
+      )
 
     // baseline Iou-s to test views / stakeholders / projections on the two participants, and ensure correct party migration baseline
     val (aliceStakeholderCreatedP1, _) = participant1.createIou(alice, alice)
@@ -269,6 +306,18 @@ final class DivulgenceIntegrationTest extends OfflinePartyReplicationIntegration
       divulgeIouByExerciseP1,
       immediateDivulged2P1,
     )
+    // event query
+    checkCreatedEventFor(participant1, aliceStakeholderCreatedP1.contractId, alice)
+    checkCreatedEventFor(participant1, aliceBobStakeholderCreatedP1.contractId, alice)
+    checkCreatedEventFor(participant1, divulgeIouByExerciseP1.contractId, alice)
+    checkCreatedEventFor(participant1, immediateDivulged1P1.contractId, alice)
+    checkCreatedEventFor(participant1, immediateDivulged2P1.contractId, alice)
+    checkArchivedEventFor(participant1, immediateDivulged1ArchiveP1.contractId, alice)
+    assertEventNotFound(participant1, bobStakeholderCreatedP2.contractId, alice)
+    checkCreatedEventFor(participant1, aliceBobStakeholderCreatedP2.contractId, alice)
+    checkCreatedEventFor(participant1, divulgeIouByExerciseP2.contractId, alice)
+    checkCreatedEventFor(participant1, aliceStakeholderCreated2P1.contractId, alice)
+    checkArchivedEventFor(participant1, aliceStakeholderCreated2P1Archived.contractId, alice)
 
     // participant2 alice
     val aliceStakeholderCreatedP2Import = participant2.acsDeltas(alice)(2)._1
@@ -287,6 +336,18 @@ final class DivulgenceIntegrationTest extends OfflinePartyReplicationIntegration
       aliceStakeholderCreatedP2Import,
       immediateDivulged2P2Import,
     )
+    // event query
+    checkCreatedEventFor(participant2, aliceStakeholderCreatedP1.contractId, alice)
+    checkCreatedEventFor(participant2, aliceBobStakeholderCreatedP1.contractId, alice)
+    checkCreatedEventFor(participant2, divulgeIouByExerciseP1.contractId, alice)
+    assertEventNotFound(participant2, immediateDivulged1P1.contractId, alice)
+    checkCreatedEventFor(participant2, immediateDivulged2P1.contractId, alice)
+    assertEventNotFound(participant2, immediateDivulged1ArchiveP1.contractId, alice)
+    assertEventNotFound(participant2, bobStakeholderCreatedP2.contractId, alice)
+    checkCreatedEventFor(participant2, aliceBobStakeholderCreatedP2.contractId, alice)
+    checkCreatedEventFor(participant2, divulgeIouByExerciseP2.contractId, alice)
+    assertEventNotFound(participant2, aliceStakeholderCreated2P1.contractId, alice)
+    assertEventNotFound(participant2, aliceStakeholderCreated2P1Archived.contractId, alice)
 
     // participant1 bob
     participant1.acsDeltas(bob) shouldBe List(
@@ -297,6 +358,18 @@ final class DivulgenceIntegrationTest extends OfflinePartyReplicationIntegration
       aliceBobStakeholderCreatedP1,
       divulgeIouByExerciseP1,
     )
+    // event query
+    assertEventNotFound(participant1, aliceStakeholderCreatedP1.contractId, bob)
+    checkCreatedEventFor(participant1, aliceBobStakeholderCreatedP1.contractId, bob)
+    checkCreatedEventFor(participant1, divulgeIouByExerciseP1.contractId, bob)
+    assertEventNotFound(participant1, immediateDivulged1P1.contractId, bob)
+    assertEventNotFound(participant1, immediateDivulged2P1.contractId, bob)
+    assertEventNotFound(participant1, immediateDivulged1ArchiveP1.contractId, bob)
+    assertEventNotFound(participant1, bobStakeholderCreatedP2.contractId, bob)
+    checkCreatedEventFor(participant1, aliceBobStakeholderCreatedP2.contractId, bob)
+    checkCreatedEventFor(participant1, divulgeIouByExerciseP2.contractId, bob)
+    assertEventNotFound(participant1, aliceStakeholderCreated2P1.contractId, bob)
+    assertEventNotFound(participant1, aliceStakeholderCreated2P1Archived.contractId, bob)
 
     // participant2 bob
     participant2.acsDeltas(bob) shouldBe List(
@@ -309,15 +382,18 @@ final class DivulgenceIntegrationTest extends OfflinePartyReplicationIntegration
       aliceBobStakeholderCreatedP2,
       divulgeIouByExerciseP2,
     )
-
-    // the divulged contract should not be visible by the event query service
-    loggerFactory.assertLogs(
-      a[CommandFailure] shouldBe thrownBy {
-        participant2.ledger_api.event_query
-          .by_contract_id(immediateDivulged1P1.contractId, Seq(alice, bob))
-      },
-      _.commandFailureMessage should include("Contract events not found, or not visible."),
-    )
+    // event query
+    assertEventNotFound(participant2, aliceStakeholderCreatedP1.contractId, bob)
+    checkCreatedEventFor(participant2, aliceBobStakeholderCreatedP1.contractId, bob)
+    checkCreatedEventFor(participant2, divulgeIouByExerciseP1.contractId, bob)
+    assertEventNotFound(participant2, immediateDivulged1P1.contractId, bob)
+    assertEventNotFound(participant2, immediateDivulged2P1.contractId, bob)
+    assertEventNotFound(participant2, immediateDivulged1ArchiveP1.contractId, bob)
+    checkCreatedEventFor(participant2, bobStakeholderCreatedP2.contractId, bob)
+    checkCreatedEventFor(participant2, aliceBobStakeholderCreatedP2.contractId, bob)
+    checkCreatedEventFor(participant2, divulgeIouByExerciseP2.contractId, bob)
+    assertEventNotFound(participant2, aliceStakeholderCreated2P1.contractId, bob)
+    assertEventNotFound(participant2, aliceStakeholderCreated2P1Archived.contractId, bob)
   }
 }
 
@@ -336,14 +412,20 @@ object DivulgenceIntegrationTest {
         .flatMap(_.createdEvent)
         .map(c => OffsetCid(c.offset, c.contractId))
 
-    def acsDeltas(partyId: PartyId): Seq[(OffsetCid, EventType)] =
-      updates(TRANSACTION_SHAPE_ACS_DELTA, Seq(partyId))
+    def acsDeltas(
+        partyId: PartyId,
+        beginOffsetExclusive: Long = 0L,
+    ): Seq[(OffsetCid, EventType)] =
+      updates(TRANSACTION_SHAPE_ACS_DELTA, Seq(partyId), beginOffsetExclusive)
 
     def acsDeltas(parties: Seq[PartyId]): Seq[(OffsetCid, EventType)] =
       updates(TRANSACTION_SHAPE_ACS_DELTA, parties)
 
-    def ledgerEffects(partyId: PartyId): Seq[(OffsetCid, EventType)] =
-      updates(TRANSACTION_SHAPE_LEDGER_EFFECTS, Seq(partyId))
+    def ledgerEffects(
+        partyId: PartyId,
+        beginOffsetExclusive: Long = 0L,
+    ): Seq[(OffsetCid, EventType)] =
+      updates(TRANSACTION_SHAPE_LEDGER_EFFECTS, Seq(partyId), beginOffsetExclusive)
 
     def eventsWithAcsDelta(parties: Seq[PartyId]): Seq[Event] =
       updatesEvents(TRANSACTION_SHAPE_LEDGER_EFFECTS, parties).filter(_.event match {
@@ -395,6 +477,7 @@ object DivulgenceIntegrationTest {
     private def updatesEvents(
         transactionShape: TransactionShape,
         parties: Seq[PartyId],
+        beginOffsetExclusive: Long = 0L,
     ): Seq[Event] =
       participant.ledger_api.updates
         .updates(
@@ -416,6 +499,7 @@ object DivulgenceIntegrationTest {
           ),
           completeAfter = PositiveInt.tryCreate(1000000),
           endOffsetInclusive = Some(participant.ledger_api.state.end()),
+          beginOffsetExclusive = beginOffsetExclusive,
         )
         .collect { case TransactionWrapper(tx) =>
           tx.events
@@ -425,8 +509,13 @@ object DivulgenceIntegrationTest {
     private def updates(
         transactionShape: TransactionShape,
         parties: Seq[PartyId],
+        beginOffsetExclusive: Long = 0L,
     ): Seq[(OffsetCid, EventType)] =
-      updatesEvents(transactionShape = transactionShape, parties = parties)
+      updatesEvents(
+        transactionShape = transactionShape,
+        parties = parties,
+        beginOffsetExclusive = beginOffsetExclusive,
+      )
         .map(_.event)
         .collect {
           case Event.Event.Created(event) => OffsetCid(event.offset, event.contractId) -> Created
@@ -437,4 +526,25 @@ object DivulgenceIntegrationTest {
             OffsetCid(event.offset, event.contractId) -> NonConsumed
         }
   }
+}
+
+class DivulgenceIntegrationTestWithCache extends DivulgenceIntegrationTest
+
+class DivulgenceIntegrationTestWithoutCache extends DivulgenceIntegrationTest {
+  override def environmentDefinition: EnvironmentDefinition =
+    super.environmentDefinition.addConfigTransforms(
+      ConfigTransforms.updateAllParticipantConfigs { (_: String, c: ParticipantNodeConfig) =>
+        c
+          .focus(_.ledgerApi.userManagementService.enabled)
+          .replace(true)
+          .focus(_.ledgerApi.userManagementService.maxCacheSize)
+          .replace(0)
+          .focus(_.ledgerApi.indexService.maxContractKeyStateCacheSize)
+          .replace(0)
+          .focus(_.ledgerApi.indexService.maxContractStateCacheSize)
+          .replace(0)
+          .focus(_.ledgerApi.indexService.maxTransactionsInMemoryFanOutBufferSize)
+          .replace(0)
+      }
+    )
 }

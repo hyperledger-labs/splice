@@ -23,7 +23,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
   // Note: Update actions must be idempotent. To avoid manually constructing a 'INSERT ... ON UPDATE DO NOTHING' statement,
   // we first check whether the target row exists in a separate statement. This is good enough for tests that perform
   // all database operations sequentially.
-  protected def insertRowIfNotExists[E <: slick.lifted.AbstractTable[_]](
+  protected def insertRowIfNotExists[E <: slick.lifted.AbstractTable[?]](
       table: TableQuery[E]
   )(
       filter: E => Rep[Boolean],

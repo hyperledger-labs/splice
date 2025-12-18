@@ -306,7 +306,7 @@ class CachingScanStore(
   ): Future[Map[TransferCommand.ContractId, TransferCommandTxLogEntry]] =
     store.lookupLatestTransferCommandEvents(sender, nonce, limit)
 
-  override def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
+  override def lookupContractByRecordTime[C, TCId <: ContractId[?], T](
       companion: C,
       updateHistory: UpdateHistory,
       recordTime: CantonTimestamp,

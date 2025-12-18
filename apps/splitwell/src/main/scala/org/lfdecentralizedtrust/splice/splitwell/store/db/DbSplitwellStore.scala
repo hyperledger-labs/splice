@@ -383,8 +383,8 @@ class DbSplitwellStore(
   }
 
   private def listLaggingContracts[LeaderC, LeaderTCid <: ContractId[
-    _
-  ], LeaderT, FollowerC, FollowerTCid <: ContractId[_], FollowerT, Id](
+    ?
+  ], LeaderT, FollowerC, FollowerTCid <: ContractId[?], FollowerT, Id](
       leaderCompanion: LeaderC,
       followerCompanion: FollowerC,
       getLeaderId: LeaderT => Id,

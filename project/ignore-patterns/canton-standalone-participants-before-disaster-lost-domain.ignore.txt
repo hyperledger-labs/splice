@@ -7,5 +7,3 @@ SEQUENCER_SUBSCRIPTION_LOST
 Failed to acknowledge clean timestamp.*CANCELLED
 
 'sequencer-client' is now in state Failed
-
-# Make sure to have a trailing newline

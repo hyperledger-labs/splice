@@ -401,14 +401,15 @@ class NodeInitializer(
       case _ =>
         throw new IllegalStateException("Latest transaction is not of OwnerToKeyMapping type.")
     }
-    val toRotate = currentKeys.map(_.id).filterNot(allOtkSignatures.contains)
-    if (toRotate.nonEmpty) {
+    val signingKeysToRotate =
+      currentKeys.filter(_.isSigning).map(_.id).filterNot(allOtkSignatures.contains)
+    if (signingKeysToRotate.nonEmpty) {
       logger.info(
-        s"The following keys with missing signature need to be rotated: $toRotate, this is expected for nodes that joined MainNet before version 0.3.1."
+        s"The following keys (likely created on a version before 0.3.1) need to be rotated because of missing signatures: $signingKeysToRotate"
       )
       for {
         newKeys <- Future.traverse(currentKeys) {
-          case key: SigningPublicKey if toRotate.contains(key.id) =>
+          case key: SigningPublicKey if signingKeysToRotate.contains(key.id) =>
             connection.generateKeyPair(
               key.keySpec.name,
               key.usage,
@@ -427,9 +428,7 @@ class NodeInitializer(
           keys = newKeysNE,
           retryFor = RetryFor.Automation,
         )
-      } yield logger.info(
-        s"Rotating OTK mapping keys that did not sign the OTK topology transaction."
-      )
+      } yield ()
     } else {
       Future.unit
     }

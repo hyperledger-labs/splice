@@ -23,8 +23,11 @@
     - [Handling Errors in Integration Tests](#handling-errors-in-integration-tests)
     - [Connecting external tools to the shared Canton instances](#connecting-external-tools-to-the-shared-canton-instances)
     - [Testing App Upgrades](#testing-app-upgrades)
-    - [Testing from a custom canton instance]
+    - [Testing from a custom canton instance](#testing-from-a-custom-canton-instance)
   - [Deployment Tests](#deployment-tests)
+    - [Helm checks](#helm-checks)
+    - [Pulumi tests](#pulumi-tests)
+    - [Pulumi state checks](#pulumi-state-checks)
 - [CI Without Approval](#ci-without-approval)
 
 # Testing in Splice
@@ -430,9 +433,56 @@ When writing or debugging Helm tests, it is often useful to run `helm unittest` 
 This produces rendered yaml files under a local `.debug` folder
 that can be inspected to understand errors or determine the correct paths for assertions.
 
-### Pulumi checks
+### Pulumi tests
 
-Our pulumi checks are based on checked in `expected` files that need to be updated whenever the expected deployment state changes.
+We use [jest](https://jestjs.io/) for unit tests in Pulumi projects. With these tests we aim to cover
+more complex parts of the deployment implementation and resource definitions. To do the latter we
+recommend using techniques described [here](https://www.pulumi.com/docs/iac/guides/testing/unit/).
+These tests are meant to be fast as they are run both in CI and in pre-commit hooks.
+
+#### Running tests
+To run unit tests from all Pulumi projects run `make -C $SPLICE_ROOT cluster/pulumi/unit-test`.
+Any more specific run requires using NPM directly. To do that the following prerequisites must be met:
+1. build the Pulumi codebase `make -C $SPLICE_ROOT cluster/pulumi/build`
+1. navigate to the root package with `cd $SPLICE_ROOT/cluster/pulumi`
+
+To run all tests from one or more Pulumi projects execute the following command.
+```
+npm exec -- jest --selectProjects <project> [project]...
+```
+Specific suites are selected by passing one or more patterns as positional arguments. For example
+the following matches `$SPLICE_ROOT/cluster/pulumi/common/src/retries.test.ts` but also any suite
+that contains `retries` in its path.
+```
+npm exec -- jest retries
+```
+Lastly, individual tests can be filtered using the `--testNamePattern` or `-t` for short as shown
+in the following example:
+```
+npm exec -- jest -t "retry runs the action again if it fails with an exception"
+```
+All the above ways of filtering tests can be combined to achieve the desired run. More information
+on jest CLI can be found [here](https://jestjs.io/docs/cli). One might also opt for an IDE extension.
+
+#### Adding new tests
+A new test can be added to an existing `*.test.ts` file or to a new `<module>.test.ts` suite where
+`<module>.ts` contains the unit to be tested. These suite files lie next to the module files which
+they cover. Please see the [jest "getting started"](https://jestjs.io/docs/getting-started) guide
+for tips on how to write tests. The type definitions for jest come from the `@jest/globals`
+package usage of which is described [here](https://jestjs.io/docs/getting-started#type-definitions).
+
+### Versioning resolved configuration
+To make sure that changes to cluster configuration are made consciously in light of various
+modularization and reuse mechanisms in the config loader a complete and fully resolved version of
+the cluster configuration file is versioned. Such a file is generated as `config.resolved.yaml`
+for each clusters' main `config.yaml` using `make cluster/deployment/update-resolved-config -j`.
+The `cluster/pulumi/update-expected` make target also includes resolved configuration update.
+Appropriate checks are conducted in pre-commit hooks and later in CI to make sure that these
+resolved configuration files are kept in sync with the original unresolved ones.
+
+### Pulumi state checks
+To make sure that the impact of changes in the Pulumi resource definitions is well understood we
+rely on checked in `expected` files that need to be updated whenever the expected deployment state changes.
 
 Please run `make cluster/pulumi/update-expected` whenever you intend to change Pulumi deployment scripts in a way that alters deployed state.
 Compare the diff of the resulting `expected` files to confirm that the changes are as intended.

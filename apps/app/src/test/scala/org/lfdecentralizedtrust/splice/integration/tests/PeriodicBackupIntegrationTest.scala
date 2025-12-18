@@ -4,6 +4,7 @@ import org.lfdecentralizedtrust.splice.config.{
   BackupDumpConfig,
   ConfigTransforms,
   GcpBucketConfig,
+  IdentityDumpTest,
   PeriodicBackupDumpConfig,
 }
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
@@ -98,7 +99,7 @@ final class DirectoryPeriodicBackupIntegrationTest
 final class GcpBucketPeriodicBackupIntegrationTest
     extends PeriodicBackupIntegrationTestBase[BackupDumpConfig.Gcp] {
   override def backupDumpLocation =
-    BackupDumpConfig.Gcp(GcpBucketConfig.inferForTesting, None)
+    BackupDumpConfig.Gcp(GcpBucketConfig.inferForTesting(IdentityDumpTest), None)
   val bucket = new GcpBucket(backupDumpLocation.bucket, loggerFactory)
   override def readDump(filename: String) = {
     bucket.readStringFromBucket(Paths.get(filename))

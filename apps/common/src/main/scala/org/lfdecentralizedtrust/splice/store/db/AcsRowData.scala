@@ -85,7 +85,7 @@ object AcsInterfaceViewRowData {
   trait AcsInterfaceViewRowDataFromContract extends AcsInterfaceViewRowData {
     val contract: Contract[?, ?]
     override val interfaceId: Identifier = contract.identifier
-    override val interfaceView: DamlRecord[_] = contract.payload
+    override val interfaceView: DamlRecord[?] = contract.payload
   }
 }
 

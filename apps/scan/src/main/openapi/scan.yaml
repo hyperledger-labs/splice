@@ -1899,7 +1899,7 @@ components:
             collected first
           type: array
           items:
-            $ref: "./scan.yaml#/components/schemas/ValidatorReceivedFaucets"
+            $ref: "#/components/schemas/ValidatorReceivedFaucets"
     GetTopValidatorsByPurchasedTrafficResponse:
       type: object
       required: ["validatorsByPurchasedTraffic"]
@@ -2348,7 +2348,6 @@ components:
         - update_id
         - migration_id
         - workflow_id
-        - command_id
         - record_time
         - synchronizer_id
         - effective_at
@@ -2413,7 +2412,6 @@ components:
         - update_id
         - migration_id
         - workflow_id
-        - command_id
         - record_time
         - synchronizer_id
         - effective_at

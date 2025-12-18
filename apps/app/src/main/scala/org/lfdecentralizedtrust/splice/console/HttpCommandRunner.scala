@@ -12,7 +12,7 @@ trait HttpCommandRunner {
     * HTTP variant of Canton’s AdminCommandRunner.
     */
   protected[console] def httpCommand[Result](
-      httpCommand: HttpCommand[_, Result],
+      httpCommand: HttpCommand[?, Result],
       basePath: Option[String] = None,
   ): ConsoleCommandResult[Result]
 }
