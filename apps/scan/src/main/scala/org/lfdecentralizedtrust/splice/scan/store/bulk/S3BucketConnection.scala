@@ -58,7 +58,7 @@ object S3BucketConnection {
         .endpointOverride(s3Config.endpoint)
         .region(s3Config.region)
         .credentialsProvider(StaticCredentialsProvider.create(s3Config.credentials))
-        // TODO: mockS3 supports only path style access. Do we need to make this configurable?
+        // TODO(#3429): mockS3 and GCS support only path style access. Do we need to make this configurable?
         .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
         .build(),
       bucketName,

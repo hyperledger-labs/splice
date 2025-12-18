@@ -84,7 +84,7 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
     }
   }
 
-  // TODO: consider running s3Mock container as a service in GHA instead of starting it here
+  // TODO(#3429): consider running s3Mock container as a service in GHA instead of starting it here
   def withS3Mock[A](test: => Future[A]): Future[A] = {
     Seq(
       "docker",

@@ -96,7 +96,11 @@ class AcsSnapshotBulkStorage(
       .mapAsync(1) { zstdObj =>
         val objectKey = s"snapshot_$idx.zstd"
         Future {
-          // TODO: error handling
+          // TODO(#3429): For now, we accumulate the full object in memory, then write it as a whole.
+          //    Consider streaming it to S3 instead. Need to make sure that it then handles crashes correctly,
+          //    i.e. that until we tell S3 that we're done writing, if we stop, then S3 throws away the
+          //    partially written object.
+          // TODO(#3429): Error handling
           val _ = s3Connection.writeFullObject(objectKey, ByteBuffer.wrap(zstdObj.toArrayUnsafe()))
           idx += 1
         }

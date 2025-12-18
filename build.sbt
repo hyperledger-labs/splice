@@ -2047,8 +2047,9 @@ updateTestConfigForParallelRuns := {
     ).exists(name.contains)
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
-  // TODO: if we keep it as-is, rename isLocalNetTest to be something like "withDockerWithoutCanton" (or maybe create a separate group for it, since this one e.g. builds the images which we don't need for the bulk-storage tests),
-  // otherwise move BulkStorageTest from here
+  // TODO(#3429): for now, we put bulk storage tests in isLocalNetTest, since it 1) requires docker to run s3mock, and 2) does not require canton.
+  // If we keep it here, we should rename isLocalNetTest to be something like "withDockerWithoutCanton".
+  // Alternatively, consider creating a separate group for it, since this one e.g. builds the images which we don't need for the bulk-storage tests.
   def isLocalNetTest(name: String): Boolean =
     name.contains("LocalNet") || name.contains("BulkStorageTest")
   def isCometBftTest(name: String): Boolean =
