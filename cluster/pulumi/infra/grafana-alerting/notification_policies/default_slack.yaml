@@ -37,7 +37,7 @@ group_wait: 30s
 # <duration> How long to wait before sending a notification about new alerts that
 #            are added to a group of alerts for which an initial notification has
 #            already been sent. (Usually ~5m or more), default = 5m
-group_interval: 30m
+group_interval: 10m
 # <duration>  How long to wait before sending a notification again if it has already
 #             been sent successfully for an alert. (Usually ~3h or more), default = 4h
 repeat_interval: 4h
