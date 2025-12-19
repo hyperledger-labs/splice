@@ -258,6 +258,7 @@ class AppUpgradeIntegrationTest
             ),
             java.util.Optional.empty(),
             java.util.Optional.empty(),
+            java.util.Optional.empty(),
           )
           val upgradeAction = new ARC_AmuletRules(
             new CRARC_SetConfig(

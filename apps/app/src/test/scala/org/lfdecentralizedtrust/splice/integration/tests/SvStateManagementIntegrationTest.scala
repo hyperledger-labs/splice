@@ -487,6 +487,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
       initialConfig.packageConfig,
       java.util.Optional.empty(),
       java.util.Optional.empty(),
+      java.util.Optional.empty(),
     )
 
     val (_, voteRequestCid) = actAndCheck(

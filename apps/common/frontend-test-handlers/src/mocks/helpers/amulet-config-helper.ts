@@ -158,6 +158,7 @@ export function getAmuletRulesConfig(
         amuletToIssuePerYear: '40000000000.0',
         validatorRewardCap: '0.2',
         optValidatorFaucetCap: '2.85',
+        optDevelopmentFundPercentage: '0.05',
       },
       futureValues: [
         {
@@ -172,6 +173,7 @@ export function getAmuletRulesConfig(
             amuletToIssuePerYear: '20000000000.0',
             validatorRewardCap: '0.2',
             optValidatorFaucetCap: '2.85',
+            optDevelopmentFundPercentage: '0.05',
           },
         },
         {
@@ -186,6 +188,7 @@ export function getAmuletRulesConfig(
             amuletToIssuePerYear: '10000000000.0',
             validatorRewardCap: '0.2',
             optValidatorFaucetCap: '2.85',
+            optDevelopmentFundPercentage: '0.05',
           },
         },
         {
@@ -200,6 +203,7 @@ export function getAmuletRulesConfig(
             amuletToIssuePerYear: '5000000000.0',
             validatorRewardCap: '0.2',
             optValidatorFaucetCap: '2.85',
+            optDevelopmentFundPercentage: '0.05',
           },
         },
         {
@@ -214,12 +218,14 @@ export function getAmuletRulesConfig(
             amuletToIssuePerYear: '2500000000.0',
             validatorRewardCap: '0.2',
             optValidatorFaucetCap: '2.85',
+            optDevelopmentFundPercentage: '0.05',
           },
         },
       ],
     },
     transferPreapprovalFee: null,
     featuredAppActivityMarkerAmount: null,
+    optDevelopmentFundManager: null,
   };
 }
 

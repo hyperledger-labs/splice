@@ -21,6 +21,7 @@ tickDuration = defaultAmuletConfig.tickDuration
 amuletPrice : Decimal
 amuletPrice = 0.005
 
+
 -- Issuance curve retrieval
 ---------------------------
 
@@ -66,6 +67,16 @@ expectedParameters_E1_0_0p5 = IssuingRoundParameters with
   unclaimedValidatorRewards = 7551.7503805175
   unclaimedAppRewards = 68395.2511415525
   unclaimedSvRewards = 0.0000000001
+  optAmuletsToIssueToDevelopmentFund = Some 0.0
+
+expectedParameters_E1_0_0p5_DevFund5 : IssuingRoundParameters
+expectedParameters_E1_0_0p5_DevFund5 =
+  expectedParameters_E1_0_0p5 with
+    issuancePerSvRewardCoupon = 5783.8660578387 -- decreased by ~5 % (expected linear scaling with 5 % fund allocation)
+    unclaimedValidatorRewards = 5649.1628614916 -- decreased by ~25 % (validator tranche near cap: small pool cut sharply reduces unclaimed remainder)
+    unclaimedAppRewards = 62687.4885844749 -- decreased by ~8.3 % (app tranche less constrained; closer to linear scaling)
+    unclaimedSvRewards = 0.0 -- decreased ~5 % (below rounding threshold)
+    optAmuletsToIssueToDevelopmentFund = Some 38051.7503805175
 
 expectedParameters_E1_0p5_1p5 : IssuingRoundParameters
 expectedParameters_E1_0p5_1p5 = IssuingRoundParameters with
@@ -77,6 +88,16 @@ expectedParameters_E1_0p5_1p5 = IssuingRoundParameters with
   unclaimedValidatorRewards = 15162.1004566210
   unclaimedAppRewards = 106447.0015220700
   unclaimedSvRewards = 0.000000004
+  optAmuletsToIssueToDevelopmentFund = Some 0.0
+
+expectedParameters_E1_0p5_1p5_DevFund5 : IssuingRoundParameters
+expectedParameters_E1_0p5_1p5_DevFund5 =
+  expectedParameters_E1_0p5_1p5 with
+    issuancePerSvRewardCoupon = 1735.1598173516 -- decreased by ~5 % (expected linear scaling with 5 % fund allocation)
+    unclaimedValidatorRewards = 12878.9954337899 -- decreased by ~15 % (validator tranche near cap: small pool cut sharply reduces unclaimed remainder)
+    unclaimedAppRewards = 98836.6514459665 -- decreased by ~10 % (app tranche less constrained; closer to linear scaling)
+    unclaimedSvRewards = 0.0 -- decreased ~5 % (below rounding threshold)
+    optAmuletsToIssueToDevelopmentFund = Some 19025.8751902588
 
 expectedParameters_E1_1p5_5 : IssuingRoundParameters
 expectedParameters_E1_1p5_5 = IssuingRoundParameters with
@@ -88,6 +109,16 @@ expectedParameters_E1_1p5_5 = IssuingRoundParameters with
   unclaimedValidatorRewards = 3746.5753424658
   unclaimedAppRewards = 72200.4261796042
   unclaimedSvRewards = 0.0
+  optAmuletsToIssueToDevelopmentFund = Some 0.0
+
+expectedParameters_E1_1p5_5_DevFund5 : IssuingRoundParameters
+expectedParameters_E1_1p5_5_DevFund5 =
+  expectedParameters_E1_1p5_5 with
+    issuancePerSvRewardCoupon = 361.4916286149 -- decreased by ~5 % (expected linear scaling with 5 % fund allocation)
+    unclaimedValidatorRewards = 2034.2465753425 -- decreased by ~45 % (validator tranche strongly cap-bound; small pool accentuates drop)
+    unclaimedAppRewards = 66302.4048706240 -- decreased by ~8.2 % (app tranche less constrained; close to linear scaling)
+    unclaimedSvRewards = 0.0000000016 -- minor rounding drift (below significance threshold)
+    optAmuletsToIssueToDevelopmentFund = Some 9512.9375951294
 
 expectedParameters_E1_5_10 : IssuingRoundParameters
 expectedParameters_E1_5_10 = IssuingRoundParameters with
@@ -99,6 +130,17 @@ expectedParameters_E1_5_10 = IssuingRoundParameters with
   unclaimedValidatorRewards = 0.0000000017
   unclaimedAppRewards = 19879.2694063927
   unclaimedSvRewards = 0.0
+  optAmuletsToIssueToDevelopmentFund = Some 0.0
+
+expectedParameters_E1_5_10_DevFund5 : IssuingRoundParameters
+expectedParameters_E1_5_10_DevFund5 =
+  expectedParameters_E1_5_10 with
+    issuancePerValidatorFaucetCoupon = 339.5662100457 -- decreased by ~5.6 % (slightly above 5 % due to faucet cap effects)
+    issuancePerSvRewardCoupon = 90.3729071537 -- decreased by ~5 % (expected linear scaling)
+    unclaimedValidatorRewards = 0.0 -- minor rounding drift (below significance threshold)
+    unclaimedAppRewards = 16597.3059360731 -- decreased by ~16.5 % (cap constraints amplify reduction)
+    unclaimedSvRewards = 0.0000000029 -- minor rounding drift (below significance threshold)
+    optAmuletsToIssueToDevelopmentFund = Some 4756.4687975647
 
 expectedParameters_E1_10plus : IssuingRoundParameters
 expectedParameters_E1_10plus = IssuingRoundParameters with
@@ -110,23 +152,45 @@ expectedParameters_E1_10plus = IssuingRoundParameters with
   unclaimedValidatorRewards = 0.0
   unclaimedAppRewards = 0.0000000152
   unclaimedSvRewards = 0.0000000023
+  optAmuletsToIssueToDevelopmentFund = Some 0.0
+
+expectedParameters_E1_10plus_DevFund5 : IssuingRoundParameters
+expectedParameters_E1_10plus_DevFund5 =
+  expectedParameters_E1_10plus with
+    issuancePerFeaturedAppRewardCoupon = 70.3246004566 -- decreased by ~6 % (slightly above 5 % since both featured and unfeatured tranches are below cap)
+    issuancePerValidatorFaucetCoupon = 140.7458143075 -- decreased by ~6.3 % (faucet below cap, reduced pool scales slightly more than linearly)
+    issuancePerSvRewardCoupon = 22.5932267884 -- decreased by ~5 % (expected linear scaling)
+    unclaimedAppRewards = 0.0000000084 -- decreased ~5 % (below rounding threshold)
+    unclaimedSvRewards = 0.0000000033 -- minor rounding drift (below significance threshold)
+    optAmuletsToIssueToDevelopmentFund = Some 2378.2343987823
+
+
 
 testE1 : Script ()
 testE1 = script do
   validateOpenMiningRoundSummary summaryExample1
 
+  -- 0% Development Fund
   expectedParameters_E1_0_0p5 === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_0_0p5 summaryExample1
   expectedParameters_E1_0p5_1p5 === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_0p5_1p5 summaryExample1
   expectedParameters_E1_1p5_5 === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_1p5_5 summaryExample1
   expectedParameters_E1_5_10 === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_5_10 summaryExample1
   expectedParameters_E1_10plus === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_10plus summaryExample1
 
+  -- 5% Development Fund
+  -- Most parameters decrease by ~5%; larger deviations occur when issuance caps bind or rounding applies.
+  expectedParameters_E1_0_0p5_DevFund5 === computeIssuingRoundParameters tickDuration amuletPrice (withDevFund5 issuanceConfig_0_0p5) summaryExample1
+  expectedParameters_E1_0p5_1p5_DevFund5 === computeIssuingRoundParameters tickDuration amuletPrice (withDevFund5 issuanceConfig_0p5_1p5) summaryExample1
+  expectedParameters_E1_1p5_5_DevFund5 === computeIssuingRoundParameters tickDuration amuletPrice (withDevFund5 issuanceConfig_1p5_5) summaryExample1
+  expectedParameters_E1_5_10_DevFund5 === computeIssuingRoundParameters tickDuration amuletPrice (withDevFund5 issuanceConfig_5_10) summaryExample1
+  expectedParameters_E1_10plus_DevFund5 === computeIssuingRoundParameters tickDuration amuletPrice (withDevFund5 issuanceConfig_10plus) summaryExample1
+
 
 -- Example 2: all zeros
 -----------------------
 
-summaryExamplNoActivity : OpenMiningRoundSummary
-summaryExamplNoActivity = OpenMiningRoundSummary with
+summaryExampleNoActivity : OpenMiningRoundSummary
+summaryExampleNoActivity = OpenMiningRoundSummary with
   totalValidatorRewardCoupons = 0.0
   totalFeaturedAppRewardCoupons = 0.0
   totalUnfeaturedAppRewardCoupons = 0.0
@@ -143,12 +207,28 @@ expectedParameters_NoActivity_0_0p5 = IssuingRoundParameters with
   unclaimedValidatorRewards = 38051.7503805175
   unclaimedAppRewards = 114155.2511415525
   unclaimedSvRewards = 608828.0060882801
+  optAmuletsToIssueToDevelopmentFund = Some 0.0
+
+expectedParameters_NoActivity_0_0p5_DevFund5 : IssuingRoundParameters
+expectedParameters_NoActivity_0_0p5_DevFund5 =
+  expectedParameters_NoActivity_0_0p5 with
+    issuancePerSvRewardCoupon = 578386.6057838661 -- decreased by ~5 % (expected linear scaling; no coupons active)
+    unclaimedValidatorRewards = 36149.1628614916 -- decreased by ~5 % (fund allocation directly reduces total issuance)
+    unclaimedAppRewards = 108447.4885844749 -- decreased by ~5 % (expected linear scaling)
+    unclaimedSvRewards = 578386.6057838661 -- decreased by ~5 % (identical scaling since all rewards remain unclaimed)
+    optAmuletsToIssueToDevelopmentFund = Some 38051.7503805175
+
 
 testNoActivity : Script ()
 testNoActivity = script do
-  validateOpenMiningRoundSummary summaryExamplNoActivity
+  validateOpenMiningRoundSummary summaryExampleNoActivity
 
-  expectedParameters_NoActivity_0_0p5 === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_0_0p5 summaryExamplNoActivity
+  -- 0% Development Fund
+  expectedParameters_NoActivity_0_0p5 === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_0_0p5 summaryExampleNoActivity
+
+  -- 5% Development Fund
+  -- Most parameters decrease by ~5%; larger deviations occur when issuance caps bind or rounding applies.
+  expectedParameters_NoActivity_0_0p5_DevFund5 === computeIssuingRoundParameters tickDuration amuletPrice (withDevFund5 issuanceConfig_0_0p5) summaryExampleNoActivity
 
 
 -- Example 3: low activity
@@ -173,17 +253,30 @@ expectedParameters_E3_0_0p5 = IssuingRoundParameters with
   unclaimedValidatorRewards = 9511.7503805175
   unclaimedAppRewards = 104095.2511415525
   unclaimedSvRewards = 0.0000000001
+  optAmuletsToIssueToDevelopmentFund = Some 0.0
+
+expectedParameters_E3_0_0p5_DevFund5 : IssuingRoundParameters
+expectedParameters_E3_0_0p5_DevFund5 =
+  expectedParameters_E3_0_0p5 with
+    issuancePerSvRewardCoupon = 289193.302891933 -- decreased by ~5 % (expected linear scaling; SV tranche not capped)
+    unclaimedValidatorRewards = 7609.1628614916 -- decreased by ~20 % (validator tranche near cap, amplifying reduction)
+    unclaimedAppRewards = 98387.4885844749 -- decreased by ~5.5 % (mostly linear scaling)
+    optAmuletsToIssueToDevelopmentFund = Some 38051.7503805175
 
 testE4 : Script ()
 testE4 = script do
   validateOpenMiningRoundSummary summaryExample3
 
+  -- 0% Development Fund
   expectedParameters_E3_0_0p5 === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_0_0p5 summaryExample3
+
+  -- 5% Development Fund
+  -- Most parameters decrease by ~5%; larger deviations occur when issuance caps bind or rounding applies.
+  expectedParameters_E3_0_0p5_DevFund5 === computeIssuingRoundParameters tickDuration amuletPrice (withDevFund5 issuanceConfig_0_0p5) summaryExample3
 
 
 -- Example 4: millions of SV reward weight
 -------------------------------------------
-
 
 summaryExampleLargeSvRewardWeight : OpenMiningRoundSummary
 summaryExampleLargeSvRewardWeight = OpenMiningRoundSummary with
@@ -203,13 +296,56 @@ expectedParameters_LargeSvRewardWeight_10plus = IssuingRoundParameters with
   unclaimedAppRewards = 35673.5159817352
   unclaimedValidatorRewards = 9512.9375951294
   unclaimedSvRewards = 0.0
+  optAmuletsToIssueToDevelopmentFund = Some 0.0
+
+expectedParameters_LargeSvRewardWeight_10plus_DevFund5 : IssuingRoundParameters
+expectedParameters_LargeSvRewardWeight_10plus_DevFund5 =
+  expectedParameters_LargeSvRewardWeight_10plus with
+    issuancePerSvRewardCoupon = 0.0009413844 -- decreased by ~5 % (expected linear scaling; SV weight dominates distribution)
+    unclaimedValidatorRewards = 9037.2907153729 -- decreased by ~5 % (linear with total issuance)
+    unclaimedAppRewards = 33889.8401826484 -- decreased by ~5 % (expected linear scaling)
+    unclaimedSvRewards = 0.0001188433 -- minor rounding drift (below significance threshold)
+    optAmuletsToIssueToDevelopmentFund = Some 2378.2343987823
 
 testLargeSvRewardWeight : Script ()
 testLargeSvRewardWeight = script do
-  validateOpenMiningRoundSummary summaryExamplNoActivity
+  validateOpenMiningRoundSummary summaryExampleNoActivity
 
-  let actual = computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_10plus summaryExampleLargeSvRewardWeight
-  expectedParameters_LargeSvRewardWeight_10plus === actual
+  -- 0% Development Fund
+  expectedParameters_LargeSvRewardWeight_10plus ===
+    computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_10plus summaryExampleLargeSvRewardWeight
+
+  -- 5% Development Fund
+  -- Most parameters decrease by ~5%; larger deviations occur when issuance caps bind or rounding applies.
+  expectedParameters_LargeSvRewardWeight_10plus_DevFund5 ===
+    computeIssuingRoundParameters tickDuration amuletPrice (withDevFund5 issuanceConfig_10plus) summaryExampleLargeSvRewardWeight
 
 
+-- Example 5: Development Fund receives the full issuance
+----------------------------------------------------------
 
+expectedParameters_AllIssuanceForFund : IssuingRoundParameters
+expectedParameters_AllIssuanceForFund = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.0
+  issuancePerFeaturedAppRewardCoupon = 0.0
+  issuancePerUnfeaturedAppRewardCoupon = 0.0
+  issuancePerValidatorFaucetCoupon = 0.0
+  issuancePerSvRewardCoupon = 0.0
+  unclaimedAppRewards = 0.0
+  unclaimedValidatorRewards = 0.0
+  unclaimedSvRewards = 0.0
+  optAmuletsToIssueToDevelopmentFund = Some 761035.0076103501
+
+testAllIssuanceForFund : Script ()
+testAllIssuanceForFund = script do
+  validateOpenMiningRoundSummary summaryExample3
+
+  -- 100% Development Fund
+  -- All issuance goes to the Development Fund; all reward-related fields are zero.
+  let issuanceConfig_0_0p5_fundOne = issuanceConfig_0_0p5 with optDevelopmentFundPercentage = Some 1.0
+  expectedParameters_AllIssuanceForFund === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_0_0p5_fundOne summaryExample1
+
+
+-- Utility: apply 5% Development Fund allocation
+withDevFund5 : IssuanceConfig -> IssuanceConfig
+withDevFund5 config = config with optDevelopmentFundPercentage = Some 0.05

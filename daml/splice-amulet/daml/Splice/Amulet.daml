@@ -81,8 +81,17 @@ data SvRewardCoupon_ArchiveAsBeneficiaryResult = SvRewardCoupon_ArchiveAsBenefic
 
 data UnclaimedActivityRecord_ArchiveAsBeneficiaryResult = UnclaimedActivityRecord_ArchiveAsBeneficiaryResult
 
-data UnclaimedActivityRecord_DsoExpireResult = UnclaimedActivityRecord_DsoExpireResult with 
+data UnclaimedActivityRecord_DsoExpireResult = UnclaimedActivityRecord_DsoExpireResult with
   unclaimedRewardCid : ContractId UnclaimedReward
+
+data DevelopmentFundCoupon_WithdrawResult = DevelopmentFundCoupon_WithdrawResult with
+  unclaimedDevelopmentFundCouponCid : ContractId UnclaimedDevelopmentFundCoupon
+
+data DevelopmentFundCoupon_RejectResult = DevelopmentFundCoupon_RejectResult with
+  unclaimedDevelopmentFundCouponCid : ContractId UnclaimedDevelopmentFundCoupon
+
+data DevelopmentFundCoupon_DsoExpireResult = DevelopmentFundCoupon_DsoExpireResult with
+  unclaimedDevelopmentFundCouponCid : ContractId UnclaimedDevelopmentFundCoupon
 
 -- | A amulet, which can be locked and whose amount expires over time.
 --
@@ -383,6 +392,65 @@ template SvRewardCoupon with
       do return SvRewardCoupon_ArchiveAsBeneficiaryResult
 
 
+-- | A coupon recording an emission for the Development Fund from CIP-0082 that
+-- was not yet assigned to a specific beneficiary.
+template UnclaimedDevelopmentFundCoupon
+  with
+    dso : Party
+    amount : Decimal -- ^ The total amount of `Amulet` to mint on collection.
+  where
+    signatory dso
+    ensure amount > 0.0
+
+-- | A coupon recording an emission for the Development Fund under CIP-0082,
+-- which can be collected by the designated beneficiary.
+template DevelopmentFundCoupon
+  with
+    dso : Party
+    beneficiary : Party -- ^ The owner of the `Amulet` to be minted.
+    fundManager : Party
+      -- ^ The party that executed the assignment of the coupon to the beneficiary
+      -- so they can mint from the development fund.
+    amount : Decimal -- ^ The total amount of `Amulet` to mint on collection.
+    expiresAt : Time -- ^ Until when the minting can be completed.
+    reason : Text -- ^ Reason for the emission of the coupon.
+  where
+    ensure amount > 0.0
+
+    signatory dso
+
+    -- The beneficiary is an observer of the coupon, as they need to be able to claim it.
+    observer beneficiary
+
+    -- The fundManager is an observer so they can see both the transaction creating and the one archiving the coupon.
+    observer fundManager
+
+    choice DevelopmentFundCoupon_Withdraw : DevelopmentFundCoupon_WithdrawResult
+      with
+        reason : Text -- ^ Reason for withdrawing the coupon.
+      controller fundManager
+      do
+        assertWithinDeadline "DevelopmentFundCoupon.expiresAt" expiresAt
+        unclaimedDevelopmentFundCouponCid <- create UnclaimedDevelopmentFundCoupon with dso; amount
+        return DevelopmentFundCoupon_WithdrawResult with unclaimedDevelopmentFundCouponCid
+
+    choice DevelopmentFundCoupon_Reject : DevelopmentFundCoupon_RejectResult
+      with
+        reason : Text -- ^ Reason for rejecting the coupon.
+      controller beneficiary
+      do
+        assertWithinDeadline "DevelopmentFundCoupon.expiresAt" expiresAt
+        unclaimedDevelopmentFundCouponCid <- create UnclaimedDevelopmentFundCoupon with dso; amount
+        return DevelopmentFundCoupon_RejectResult with unclaimedDevelopmentFundCouponCid
+
+    choice DevelopmentFundCoupon_DsoExpire : DevelopmentFundCoupon_DsoExpireResult
+      controller dso
+      do
+        assertDeadlineExceeded "DevelopmentFundCoupon.expiresAt" expiresAt
+        unclaimedDevelopmentFundCouponCid <- create UnclaimedDevelopmentFundCoupon with dso; amount
+        pure DevelopmentFundCoupon_DsoExpireResult with unclaimedDevelopmentFundCouponCid
+
+
 -- | Rewards that have not been claimed and are thus at the disposal of the foundation.
 template UnclaimedReward with
     dso : Party
@@ -392,29 +460,29 @@ template UnclaimedReward with
 
     signatory dso
 
--- | A record of activity that can be minted by the beneficiary. 
--- Note that these do not come out of the per-round issuance but are instead created by burning 
--- UnclaimedRewardCoupon as defined through a vote by the SVs. That's also why expiry is a separate 
+-- | A record of activity that can be minted by the beneficiary.
+-- Note that these do not come out of the per-round issuance but are instead created by burning
+-- UnclaimedRewardCoupon as defined through a vote by the SVs. That's also why expiry is a separate
 -- time-based expiry instead of being tied to a round like the other activity records.
 template UnclaimedActivityRecord
   with
     dso : Party
     beneficiary : Party -- ^ The owner of the `Amulet` to be minted.
     amount : Decimal -- ^ The amount of `Amulet` to be minted.
-    reason : Text -- ^ A reason to mint the `Amulet`. 
-    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the contract. 
-  where 
+    reason : Text -- ^ A reason to mint the `Amulet`.
+    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the contract.
+  where
     signatory dso
     observer beneficiary
     ensure amount > 0.0
 
     choice UnclaimedActivityRecord_DsoExpire : UnclaimedActivityRecord_DsoExpireResult
       controller dso
-      do 
+      do
         assertDeadlineExceeded "UnclaimedActivityRecord.expiresAt" expiresAt
         unclaimedRewardCid <- create UnclaimedReward with dso; amount
         pure UnclaimedActivityRecord_DsoExpireResult with unclaimedRewardCid
-  
+
 
 requireAmuletExpiredForAllOpenRounds : ContractId OpenMiningRound -> Amulet -> Update ()
 requireAmuletExpiredForAllOpenRounds roundCid amulet = do
@@ -457,3 +525,12 @@ instance HasCheckedFetch FeaturedAppActivityMarker ForDso where
 
 instance HasCheckedFetch UnclaimedActivityRecord ForOwner where
   contractGroupId UnclaimedActivityRecord{..} = ForOwner with dso; owner = beneficiary
+
+instance HasCheckedFetch UnclaimedDevelopmentFundCoupon ForDso where
+  contractGroupId UnclaimedDevelopmentFundCoupon{..} = ForDso with dso
+
+instance HasCheckedFetch DevelopmentFundCoupon ForOwner where
+  contractGroupId DevelopmentFundCoupon{..} = ForOwner with dso; owner = beneficiary
+
+instance HasCheckedFetch DevelopmentFundCoupon ForDso where
+  contractGroupId DevelopmentFundCoupon{..} = ForDso with dso

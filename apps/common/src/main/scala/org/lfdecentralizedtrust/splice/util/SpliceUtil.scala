@@ -223,6 +223,9 @@ object SpliceUtil {
 
     // validatorFaucetCap
     Some(damlDecimal(2.85)).toJava,
+
+    // developmentFundPercentage
+    Optional.empty(),
   )
 
   private def hours(h: Long): RelTime = new RelTime(TimeUnit.HOURS.toMicros(h))
@@ -389,6 +392,7 @@ object SpliceUtil {
       initialPackageConfig,
       transferPreapprovalFee.map(_.bigDecimal).toJava,
       featuredAppActivityMarkerAmount.map(_.bigDecimal).toJava,
+      Optional.empty(),
     )
 
   def defaultAnsConfig(
