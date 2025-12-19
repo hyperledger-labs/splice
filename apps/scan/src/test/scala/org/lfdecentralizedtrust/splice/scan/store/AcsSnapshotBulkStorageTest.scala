@@ -11,6 +11,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.github.luben.zstd.ZstdDirectBufferDecompressingStream
 import com.google.protobuf.ByteString
+import io.netty.buffer.PooledByteBufAllocator
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
 import org.lfdecentralizedtrust.splice.scan.store.bulk.{
@@ -19,7 +20,7 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.{
   S3BucketConnection,
   S3Config,
 }
-import org.lfdecentralizedtrust.splice.store.{Limit, StoreTest, HardLimit}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest}
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import org.lfdecentralizedtrust.splice.util.{EventId, PackageQualifiedName, ValueJsonCodecCodegen}
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
@@ -27,7 +28,6 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{ListObjectsRequest, S3Object}
 
 import java.net.URI
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import scala.concurrent.Future
 import scala.jdk.FutureConverters.*
@@ -113,15 +113,20 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
   def readUncompressAndDecode(
       s3BucketConnection: S3BucketConnection
   )(s3obj: S3Object): Array[httpApi.CreatedEvent] = {
+    val bufferAllocator = PooledByteBufAllocator.DEFAULT
     val compressed = s3BucketConnection.readFullObject(s3obj.key()).futureValue
-    val compressedDirect = ByteBuffer.allocateDirect(compressed.capacity())
-    val uncompressed = ByteBuffer.allocateDirect(compressed.capacity() * 200)
-    compressedDirect.put(compressed)
-    compressedDirect.flip()
-    Using(new ZstdDirectBufferDecompressingStream(compressedDirect)) { _.read(uncompressed) }
-    uncompressed.flip()
-    val allContractsStr = StandardCharsets.UTF_8.newDecoder().decode(uncompressed).toString
+    val compressedDirect = bufferAllocator.directBuffer(compressed.capacity())
+    val uncompressedDirect = bufferAllocator.directBuffer(compressed.capacity() * 200)
+    val uncompressedNio = uncompressedDirect.nioBuffer(0, uncompressedDirect.capacity())
+    compressedDirect.writeBytes(compressed)
+    Using(new ZstdDirectBufferDecompressingStream(compressedDirect.nioBuffer())) {
+      _.read(uncompressedNio)
+    }
+    uncompressedNio.flip()
+    val allContractsStr = StandardCharsets.UTF_8.newDecoder().decode(uncompressedNio).toString
     val allContracts = allContractsStr.split("\n")
+    compressedDirect.release()
+    uncompressedDirect.release()
     allContracts.map(io.circe.parser.decode[httpApi.CreatedEvent](_).value)
   }
 
