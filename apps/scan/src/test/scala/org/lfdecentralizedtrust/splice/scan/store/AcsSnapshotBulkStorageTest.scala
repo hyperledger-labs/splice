@@ -54,35 +54,12 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
       withS3Mock({
         val store = mockAcsSnapshotStore(acsSnapshotSize)
         val timestamp = CantonTimestamp.now()
-        val s3Config = S3Config(
-          URI.create("http://localhost:9090"),
-          "bucket",
-          Region.US_EAST_1,
-          AwsBasicCredentials.create("mock_id", "mock_key"),
-        )
-        val s3BucketConnection = S3BucketConnection(s3Config, "bucket", loggerFactory)
-        val s3BucketConnectionWithErrors = Mockito.spy(s3BucketConnection)
-        var failureCount = 0
-        val _ = doAnswer { (invocation: InvocationOnMock) =>
-          val args = invocation.getArguments
-          args.toList match {
-            case (key: String) :: _ if key.endsWith("2.zstd") =>
-              if (failureCount < 2) {
-                failureCount += 1
-                Future.failed(new RuntimeException("Simulated S3 write error"))
-              } else {
-                invocation.callRealMethod().asInstanceOf[Future[Unit]]
-              }
-            case _ =>
-              invocation.callRealMethod().asInstanceOf[Future[Unit]]
-          }
-        }.when(s3BucketConnectionWithErrors)
-          .writeFullObject(anyString(), any[ByteBuffer])(any[TraceContext], any[ExecutionContext])
+        val s3BucketConnection = getS3BucketConnectionWithInjectedErrors()
         for {
           _ <- new AcsSnapshotBulkStorage(
             bulkStorageTestConfig,
             store,
-            s3BucketConnectionWithErrors,
+            s3BucketConnection,
             loggerFactory,
           ).dumpAcsSnapshot(0, timestamp)
 
@@ -230,5 +207,33 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
         }
     }
     store
+  }
+
+  def getS3BucketConnectionWithInjectedErrors(): S3BucketConnection = {
+    val s3Config = S3Config(
+      URI.create("http://localhost:9090"),
+      "bucket",
+      Region.US_EAST_1,
+      AwsBasicCredentials.create("mock_id", "mock_key"),
+    )
+    val s3BucketConnection = S3BucketConnection(s3Config, "bucket", loggerFactory)
+    val s3BucketConnectionWithErrors = Mockito.spy(s3BucketConnection)
+    var failureCount = 0
+    val _ = doAnswer { (invocation: InvocationOnMock) =>
+      val args = invocation.getArguments
+      args.toList match {
+        case (key: String) :: _ if key.endsWith("2.zstd") =>
+          if (failureCount < 2) {
+            failureCount += 1
+            Future.failed(new RuntimeException("Simulated S3 write error"))
+          } else {
+            invocation.callRealMethod().asInstanceOf[Future[Unit]]
+          }
+        case _ =>
+          invocation.callRealMethod().asInstanceOf[Future[Unit]]
+      }
+    }.when(s3BucketConnectionWithErrors)
+      .writeFullObject(anyString(), any[ByteBuffer])(any[TraceContext], any[ExecutionContext])
+    s3BucketConnectionWithErrors
   }
 }
