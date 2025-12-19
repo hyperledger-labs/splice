@@ -243,7 +243,7 @@ tests:
       value: Deployment
     asserts:
       - matchRegex:
-          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL')].value
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_SYNCHRONIZER_URL')].value
           pattern: 'canton\.validator-apps\.validator_backend\.domains\.global\.url = "https://new-sequencer\.mock\.com"'
 
   - it: "uses synchronizer.sequencerNames as a JSON array when provided"
@@ -256,5 +256,5 @@ tests:
       value: Deployment
     asserts:
       - matchRegex:
-          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL')].value
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_SYNCHRONIZER_NAMES')].value
           pattern: 'canton\.validator-apps\.validator_backend\.domains\.global\.sequencer-names = \["sequencer-1","sequencer-2"\]'

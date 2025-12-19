@@ -134,10 +134,10 @@ spec:
           value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.decentralizedSynchronizerUrl | quote }}
         {{ else if .Values.synchronizer -}}
             {{- if eq .Values.synchronizer.synchronizerType "trusted-url" }}
-        - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
+        - name: ADDITIONAL_CONFIG_SYNCHRONIZER_URL
           value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.synchronizer.url | quote }}
             {{- else if eq .Values.synchronizer.synchronizerType "trusted-svs" }}
-        - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
+        - name: ADDITIONAL_CONFIG_SYNCHRONIZER_NAMES
           value: canton.validator-apps.validator_backend.domains.global.sequencer-names = {{ .Values.synchronizer.sequencerNames | toJson}}
             {{- end }}
         {{ end }}
