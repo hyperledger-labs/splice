@@ -221,3 +221,40 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
           pattern: 'canton.validator-apps.validator_backend.scan-client.seed-urls = \["https://custom-node-A.com","https://custom-node-B.com"\]'
+  - it: "uses decentralizedSynchronizerUrl when useSequencerConnectionsFromScan is false"
+    set:
+      useSequencerConnectionsFromScan: false
+      decentralizedSynchronizerUrl: "https://legacy-sequencer.mock.com"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL')].value
+          pattern: 'canton\.validator-apps\.validator_backend\.domains\.global\.url = "https://legacy-sequencer\.mock\.com"'
+
+  - it: "uses synchronizer.url when provided"
+    set:
+      synchronizer:
+        connectionType: "trusted-url"
+        url: "https://new-sequencer.mock.com"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_SYNCHRONIZER_URL')].value
+          pattern: 'canton\.validator-apps\.validator_backend\.domains\.global\.url = "https://new-sequencer\.mock\.com"'
+
+  - it: "uses synchronizer.sequencerNames as a JSON array when provided"
+    set:
+      synchronizer:
+        connectionType: "trusted-svs"
+        sequencerNames: [ "sequencer-1", "sequencer-2" ]
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_SYNCHRONIZER_NAMES')].value
+          pattern: 'canton\.validator-apps\.validator_backend\.domains\.global\.sequencer-names = \["sequencer-1","sequencer-2"\]'

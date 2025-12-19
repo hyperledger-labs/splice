@@ -9,6 +9,31 @@ import {
 import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { z } from 'zod';
 
+export const SynchronizerConfigSchema = z
+  .object({
+    connectionType: z.enum(['from-scan', 'trusted-url', 'trusted-svs']).default('from-scan'),
+    sequencerNames: z.array(z.string()).optional(),
+    url: z.string().optional(),
+  })
+  .refine(
+    data => {
+      if (data.connectionType === 'trusted-url') {
+        return !!data.url && (!data.sequencerNames || data.sequencerNames.length === 0);
+      }
+      if (data.connectionType === 'trusted-svs') {
+        return !!(data.sequencerNames && data.sequencerNames.length > 0) && !data.url;
+      }
+      return true;
+    },
+    {
+      message:
+        "Configuration mismatch: 'trusted-url' requires only a URL, and 'trusted-svs' requires only sequencerNames.",
+      path: ['type'],
+    }
+  );
+
+export type synchronizerConfigSchema = z.infer<typeof SynchronizerConfigSchema>;
+
 export const ScanClientConfigSchema = z
   .object({
     scanType: z.enum(['trust-single', 'bft', 'bft-custom']),
@@ -41,6 +66,7 @@ export const ValidatorAppConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
   additionalJvmOptions: z.string().optional(),
   scanClient: ScanClientConfigSchema.optional(),
+  synchronizer: SynchronizerConfigSchema.optional(),
 });
 
 export const ParticipantConfigSchema = z.object({
