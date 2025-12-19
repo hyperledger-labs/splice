@@ -4,11 +4,11 @@
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.github.luben.zstd.ZstdDirectBufferCompressingStreamNoFinalizer
+import io.netty.buffer.PooledByteBufAllocator
 import org.apache.pekko.stream.{Attributes, FlowShape, Inlet, Outlet}
 import org.apache.pekko.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import org.apache.pekko.util.ByteString
 
-import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicReference
 
 /** A Pekko GraphStage that zstd-compresses a stream of bytestrings, and splits the output into zstd objects of size (minWeight + delta).
@@ -41,45 +41,44 @@ case class ZstdGroupedWeight(minSize: Long) extends GraphStage[FlowShape[ByteStr
   }
 
   class ZSTD(
-      val tmpBuffer: ByteBuffer,
-      val compressionLevel: Int = 3,
+      val compressionLevel: Int = 3
   ) extends AutoCloseable {
 
+    val bufferAllocator = PooledByteBufAllocator.DEFAULT
+    val tmpBuffer = bufferAllocator.directBuffer(zstdTmpBufferSize)
+    val tmpNioBuffer = tmpBuffer.nioBuffer(0, tmpBuffer.capacity())
     val compressingStream =
-      new ZstdDirectBufferCompressingStreamNoFinalizer(tmpBuffer, compressionLevel)
+      new ZstdDirectBufferCompressingStreamNoFinalizer(tmpNioBuffer, compressionLevel)
 
     def compress(input: ByteString): ByteString = {
-      // TODO(#3429): use a buffer pool to avoid allocating a new ByteBuffer for each compress call
-      val inputBB = ByteBuffer.allocateDirect(input.size)
-      inputBB.put(input.toArrayUnsafe())
-      inputBB.flip()
-      compressingStream.compress(inputBB)
+      val inputBB = bufferAllocator.directBuffer(input.size)
+      inputBB.writeBytes(input.toArrayUnsafe())
+      compressingStream.compress(inputBB.nioBuffer())
+      inputBB.release()
       compressingStream.flush()
-      tmpBuffer.flip()
-      val result = ByteString.fromByteBuffer(tmpBuffer)
-      tmpBuffer.clear()
+      tmpNioBuffer.flip()
+      val result = ByteString.fromByteBuffer(tmpNioBuffer)
+      tmpNioBuffer.clear()
       result
     }
 
     def zstdFinish(): ByteString = {
-      tmpBuffer.flip()
-      val result = ByteString.fromByteBuffer(tmpBuffer)
-      tmpBuffer.clear()
+      tmpNioBuffer.flip()
+      val result = ByteString.fromByteBuffer(tmpNioBuffer)
+      tmpNioBuffer.clear()
       compressingStream.close()
       result
     }
 
     override def close(): Unit = {
       compressingStream.close()
+      val _ = tmpBuffer.release()
     }
   }
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new GraphStageLogic(shape) with InHandler with OutHandler {
-      // TODO(#3429): consider implementing a pool of tmp buffers to avoid allocating a new one for each stage,
-      //   and moving some initialization into preStart(), otherwise we allocate even if the stream never runs or fails before starting.
-      private val tmpBuffer = ByteBuffer.allocateDirect(zstdTmpBufferSize)
-      private val zstd = new AtomicReference[ZSTD](new ZSTD(tmpBuffer, 3))
+      private val zstd = new AtomicReference[ZSTD](new ZSTD(3))
       private val state: AtomicReference[State] = new AtomicReference[State](State.empty())
 
       override def postStop(): Unit = {
@@ -90,9 +89,8 @@ case class ZstdGroupedWeight(minSize: Long) extends GraphStage[FlowShape[ByteStr
       }
 
       private def reset(): Unit = {
-        tmpBuffer.clear()
         zstd.get().close()
-        zstd.set(new ZSTD(tmpBuffer, 3))
+        zstd.set(new ZSTD(3))
         state.set(State.empty())
       }
 
