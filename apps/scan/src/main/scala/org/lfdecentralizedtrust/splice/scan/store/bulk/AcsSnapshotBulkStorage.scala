@@ -87,10 +87,6 @@ class AcsSnapshotBulkStorage(
 
   def dumpAcsSnapshot(migrationId: Long, timestamp: CantonTimestamp): Future[Unit] = {
 
-    // TODO(#3429): currently, if this crashes half-way through, there is no indication in the S3 objects that
-    //  the snapshot is incomplete. We probably want to label the last object with `last` or something like that
-    //  so that we can detect incomplete snapshots and recreate them.
-
     def mksrc = {
       val idx = new AtomicInteger(0)
       val base = Source
@@ -105,19 +101,17 @@ class AcsSnapshotBulkStorage(
           1,
           OverflowStrategy.backpressure,
         )
-        .mapAsync(1) { zstdObj =>
-          {
-            val objectKey = s"snapshot_$idx.zstd"
-            // TODO(#3429): For now, we accumulate the full object in memory, then write it as a whole.
-            //    Consider streaming it to S3 instead. Need to make sure that it then handles crashes correctly,
-            //    i.e. that until we tell S3 that we're done writing, if we stop, then S3 throws away the
-            //    partially written object.
-            // TODO(#3429): Error handling
-            for {
-              _ <- s3Connection.writeFullObject(objectKey, ByteBuffer.wrap(zstdObj.toArrayUnsafe()))
-            } yield {
-              idx.addAndGet(1)
-            }
+        .mapAsync(1) { case ByteStringWithTermination(zstdObj, isLast) =>
+          val objectKey = if (isLast) s"snapshot_${idx}_last.zstd" else s"snapshot_$idx.zstd"
+          // TODO(#3429): For now, we accumulate the full object in memory, then write it as a whole.
+          //    Consider streaming it to S3 instead. Need to make sure that it then handles crashes correctly,
+          //    i.e. that until we tell S3 that we're done writing, if we stop, then S3 throws away the
+          //    partially written object.
+          // TODO(#3429): Error handling
+          for {
+            _ <- s3Connection.writeFullObject(objectKey, ByteBuffer.wrap(zstdObj.toArrayUnsafe()))
+          } yield {
+            idx.addAndGet(1)
           }
         }
       val withKs = base.viaMat(KillSwitches.single)(Keep.right)

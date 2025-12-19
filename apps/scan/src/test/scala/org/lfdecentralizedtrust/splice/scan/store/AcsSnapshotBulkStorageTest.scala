@@ -63,6 +63,7 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
             s3BucketConnection,
             loggerFactory,
           ).dumpAcsSnapshot(0, timestamp)
+
           s3Objects <- s3BucketConnection.s3Client
             .listObjects(
               ListObjectsRequest.builder().bucket("bucket").build()
@@ -80,13 +81,16 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
             )
             .map(_.createdEventsInPage)
         } yield {
-          val allContractsFromS3 = s3Objects.contents.asScala
+          val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
+          val allContractsFromS3 = objectKeys
             .map(readUncompressAndDecode(s3BucketConnection))
             .flatten
 
           allContractsFromS3.map(
             reconstructFromS3
           ) should contain theSameElementsInOrderAs allContracts.map(_.event)
+          objectKeys.take(objectKeys.size - 1).forall { !_.key().endsWith("_last.zstd") }
+          objectKeys.last.key() should endWith("_last.zstd")
         }
       })
     }

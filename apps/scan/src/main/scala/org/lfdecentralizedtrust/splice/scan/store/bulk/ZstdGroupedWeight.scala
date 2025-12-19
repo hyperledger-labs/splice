@@ -11,17 +11,23 @@ import org.apache.pekko.util.ByteString
 
 import java.util.concurrent.atomic.AtomicReference
 
+case class ByteStringWithTermination(
+    bytes: ByteString,
+    isLast: Boolean,
+)
+
 /** A Pekko GraphStage that zstd-compresses a stream of bytestrings, and splits the output into zstd objects of size (minWeight + delta).
   * Somewhat similar to Pekko's built-in GroupedWeight, but outputs valid zstd compressed objects.
   */
-case class ZstdGroupedWeight(minSize: Long) extends GraphStage[FlowShape[ByteString, ByteString]] {
+case class ZstdGroupedWeight(minSize: Long)
+    extends GraphStage[FlowShape[ByteString, ByteStringWithTermination]] {
   require(minSize > 0, "minSize must be greater than 0")
 
   val zstdTmpBufferSize = 10 * 1024 * 1024; // TODO(#3429): make configurable?
 
   val in = Inlet[ByteString]("ZstdGroupedWeight.in")
-  val out = Outlet[ByteString]("ZstdGroupedWeight.out")
-  override val shape: FlowShape[ByteString, ByteString] = FlowShape(in, out)
+  val out = Outlet[ByteStringWithTermination]("ZstdGroupedWeight.out")
+  override val shape: FlowShape[ByteString, ByteStringWithTermination] = FlowShape(in, out)
 
   override def initialAttributes: Attributes = Attributes.name("ZstdGroupedWeight")
 
@@ -100,7 +106,7 @@ case class ZstdGroupedWeight(minSize: Long) extends GraphStage[FlowShape[ByteStr
         state.set(state.get().append(compressed))
         if (state.get().left <= 0) {
           state.set(state.get().append(zstd.get().zstdFinish()))
-          push(out, state.get().bytes)
+          push(out, ByteStringWithTermination(state.get().bytes, false))
           reset()
         } else {
           pull(in)
@@ -112,7 +118,7 @@ case class ZstdGroupedWeight(minSize: Long) extends GraphStage[FlowShape[ByteStr
       override def onUpstreamFinish(): Unit = {
         if (state.get().bytes.nonEmpty) {
           state.set(state.get().append(zstd.get().zstdFinish()))
-          push(out, state.get().bytes)
+          push(out, ByteStringWithTermination(state.get().bytes, true))
         }
         completeStage()
       }
