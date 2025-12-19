@@ -635,6 +635,60 @@ function configurePublicInfo(ingressNs: k8s.core.v1.Namespace): k8s.apiextension
     : [];
 }
 
+function configureSequencerHighPerformanceGrpcDestinationRules(
+  ingressNs: k8s.core.v1.Namespace
+): Array<k8s.apiextensions.CustomResource> {
+  return [
+    ...(function* () {
+      for (const migration of DecentralizedSynchronizerUpgradeConfig.runningMigrations()) {
+        for (const sv of coreSvsToDeploy) {
+          yield configureSequencerHighPerformanceGrpcDestinationRule(
+            ingressNs,
+            sv.ingressName,
+            migration.id
+          );
+        }
+      }
+    })(),
+  ];
+}
+
+function configureSequencerHighPerformanceGrpcDestinationRule(
+  ingressNs: k8s.core.v1.Namespace,
+  ingressName: string,
+  migrationId: number
+): k8s.apiextensions.CustomResource {
+  const sequencerName = `global-domain-${migrationId}-sequencer`;
+  const ruleName = `${ingressName}-${sequencerName}-high-perf-grpc-rule`;
+  return new k8s.apiextensions.CustomResource(ruleName, {
+    apiVersion: 'networking.istio.io/v1beta1',
+    kind: 'DestinationRule',
+    metadata: {
+      name: ruleName,
+      namespace: ingressNs.metadata.name,
+    },
+    spec: {
+      host: `${sequencerName}.${ingressName}.svc.cluster.local`,
+      trafficPolicy: {
+        loadBalancer: {
+          simple: 'LEAST_REQUEST',
+        },
+        connectionPool: {
+          http: {
+            http1MaxPendingRequests: 10000,
+            http2MaxRequests: 10000,
+            maxConcurrentStreams: 10000,
+            maxRequestsPerConnection: 0,
+          },
+          tcp: {
+            maxConnections: 10000,
+          },
+        },
+      },
+    },
+  });
+}
+
 export function configureIstio(
   ingressNs: ExactNamespace,
   ingressIp: pulumi.Output<string>,
@@ -653,7 +707,10 @@ export function configureIstio(
   const gateways = configureGateway(ingressNs, gwSvc, cometBftSvc);
   const docsAndReleases = configureDocsAndReleases(true, gateways);
   const publicInfo = configurePublicInfo(ingressNs.ns);
-  return [...gateways, ...docsAndReleases, ...publicInfo];
+  const sequencerHighPerformanceGrpcRules = configureSequencerHighPerformanceGrpcDestinationRules(
+    ingressNs.ns
+  );
+  return [...gateways, ...docsAndReleases, ...publicInfo, ...sequencerHighPerformanceGrpcRules];
 }
 
 export function istioMonitoring(
