@@ -108,6 +108,7 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
   protected implicit val httpClient: HttpClient = HttpClient(
     parameters.monitoringConfig.logging.api,
     HttpClient.HttpRequestParameters(parameters.requestTimeout),
+    nodeMetrics.httpClientMetrics,
     logger,
   )
 
@@ -139,6 +140,7 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
     _ = logger.info("Creating ledger API auth token source")
     authTokenSource = AuthTokenSource.fromConfig(
       participantClient.ledgerApi.authConfig,
+      nodeMetrics.httpClientMetrics,
       loggerFactory,
     )
   } yield {

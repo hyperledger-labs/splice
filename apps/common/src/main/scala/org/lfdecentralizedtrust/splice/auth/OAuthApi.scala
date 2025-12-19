@@ -10,7 +10,7 @@ import org.apache.pekko.http.scaladsl.model.{FormData, HttpMethods, HttpRequest,
 import org.apache.pekko.http.scaladsl.unmarshalling.{Unmarshal, Unmarshaller}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.{HttpClient, HttpClientMetrics}
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
@@ -65,6 +65,7 @@ trait OAuthApiJson extends SprayJsonSupport with DefaultJsonProtocol {
 
 class OAuthApi(
     requestTimeout: NonNegativeDuration,
+    httpClientMetrics: HttpClientMetrics,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem)
     extends OAuthApiJson
@@ -75,6 +76,7 @@ class OAuthApi(
   private val httpClient = HttpClient(
     ApiLoggingConfig(),
     HttpClient.HttpRequestParameters(requestTimeout),
+    httpClientMetrics,
     logger,
   )
 

@@ -39,7 +39,7 @@ class SpliceEnvironment(
   // dump config (without sensitive data) to ease debugging
   logger.info(s"SpliceEnvironment with config = {\n${config.dumpString}\n}")
 
-  private lazy val metrics = SpliceMetricsFactory(
+  lazy val metrics = SpliceMetricsFactory(
     metricsRegistry,
     dbStorageHistograms,
     loggerFactory,
