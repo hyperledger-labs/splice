@@ -7,6 +7,9 @@
 
 .. release-notes:: upcoming
 
+  - Validator
+    - Added support for picking a custom name for new parties created when onboarding users via the `/v0/admin/users` API. See :ref:`docs <validator-users>`.
+
   - API security
 
     - Tightened authorization checks for all non-public API endpoints.
@@ -44,6 +47,11 @@
         - SV app ``/v0/dso`` is currently public, but will require authorization as SV operator,
           similar to most other SV app endpoints.
           Use the public ``/v0/dso`` endpoint in the scan app if you need to fetch DSO info.
+
+    - Added an optional ``excludeDebugFields``` boolean to the request body of allocation and transfer endpoints for the Token Standard component.
+      (``splice-api-token-allocation-v1`` and ``splice-api-token-transfer-instruction-v1``
+
+      Clients can now set this to true to omit debug information from the response.
 
 .. release-notes:: 0.5.4
 

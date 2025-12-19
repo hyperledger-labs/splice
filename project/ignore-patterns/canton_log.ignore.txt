@@ -165,5 +165,3 @@ Dynamic synchronizer parameters to compute earliest available pruning timestamp 
 
 # TODO(#3193): Likely a race in the shutdown of the actor system vs us scheduling something else on it
 java.lang.IllegalStateException: cannot enqueue after timer shutdown
-
-# Make sure to have a trailing newline

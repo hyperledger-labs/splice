@@ -186,7 +186,7 @@ function installDockerRunnerScaleSet(
             containers: [
               {
                 name: 'runner',
-                image: `${DOCKER_REPO}/splice-test-docker-runner:${ghaConfig.runnerHookVersion}`,
+                image: `${DOCKER_REPO}/splice-test-docker-runner:${ghaConfig.runnerVersion}`,
                 command: ['/home/runner/run.sh'],
                 env: [
                   {
@@ -576,7 +576,7 @@ function installK8sRunnerScaleSet(
                       storageClassName: 'hyperdisk-balanced-rwo',
                       resources: {
                         requests: {
-                          storage: '32Gi',
+                          storage: '16Gi',
                         },
                       },
                     },
