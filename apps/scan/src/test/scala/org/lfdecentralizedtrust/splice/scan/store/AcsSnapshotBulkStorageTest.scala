@@ -30,6 +30,7 @@ import java.net.URI
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import scala.concurrent.Future
+import scala.jdk.FutureConverters.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.sys.process.*
@@ -62,9 +63,11 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
             s3BucketConnection,
             loggerFactory,
           ).dumpAcsSnapshot(0, timestamp)
-          s3Objects = s3BucketConnection.s3Client.listObjects(
-            ListObjectsRequest.builder().bucket("bucket").build()
-          )
+          s3Objects <- s3BucketConnection.s3Client
+            .listObjects(
+              ListObjectsRequest.builder().bucket("bucket").build()
+            )
+            .asScala
           _ = resetCIdCounter()
           allContracts <- store
             .queryAcsSnapshot(
@@ -110,10 +113,12 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
   def readUncompressAndDecode(
       s3BucketConnection: S3BucketConnection
   )(s3obj: S3Object): Array[httpApi.CreatedEvent] = {
-    val compressed = s3BucketConnection.readFullObject(s3obj.key())
+    val compressed = s3BucketConnection.readFullObject(s3obj.key()).futureValue
+    val compressedDirect = ByteBuffer.allocateDirect(compressed.capacity())
     val uncompressed = ByteBuffer.allocateDirect(compressed.capacity() * 200)
-    compressed.flip()
-    Using(new ZstdDirectBufferDecompressingStream(compressed)) { ds => ds.read(uncompressed) }
+    compressedDirect.put(compressed)
+    compressedDirect.flip()
+    Using(new ZstdDirectBufferDecompressingStream(compressedDirect)) { _.read(uncompressed) }
     uncompressed.flip()
     val allContractsStr = StandardCharsets.UTF_8.newDecoder().decode(uncompressed).toString
     val allContracts = allContractsStr.split("\n")

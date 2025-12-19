@@ -25,6 +25,8 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration.FiniteDuration
 
+import Position.*
+
 case class BulkStorageConfig(
     dbReadChunkSize: Int,
     maxFileSize: Long,
@@ -33,14 +35,19 @@ case class BulkStorageConfig(
 object BulkStorageConfigs {
   val bulkStorageConfigV1 = BulkStorageConfig(
     1000,
-    (64 * 1024 * 1024).toLong,
+    64L * 1024 * 1024,
   )
 }
 
-sealed trait Position
-case object Start extends Position
-case object End extends Position
-final case class Index(value: Long) extends Position
+object Position {
+  sealed trait Position
+
+  case object Start extends Position
+
+  case object End extends Position
+
+  final case class Index(value: Long) extends Position
+}
 
 class AcsSnapshotBulkStorage(
     val config: BulkStorageConfig,
@@ -60,7 +67,7 @@ class AcsSnapshotBulkStorage(
         migrationId,
         snapshot = timestamp,
         after,
-        limit = HardLimit.tryCreate(config.dbReadChunkSize),
+        HardLimit.tryCreate(config.dbReadChunkSize),
         Seq.empty,
         Seq.empty,
       )
@@ -99,16 +106,18 @@ class AcsSnapshotBulkStorage(
           OverflowStrategy.backpressure,
         )
         .mapAsync(1) { zstdObj =>
-          val objectKey = s"snapshot_$idx.zstd"
-          Future {
+          {
+            val objectKey = s"snapshot_$idx.zstd"
             // TODO(#3429): For now, we accumulate the full object in memory, then write it as a whole.
             //    Consider streaming it to S3 instead. Need to make sure that it then handles crashes correctly,
             //    i.e. that until we tell S3 that we're done writing, if we stop, then S3 throws away the
             //    partially written object.
             // TODO(#3429): Error handling
-            val _ =
-              s3Connection.writeFullObject(objectKey, ByteBuffer.wrap(zstdObj.toArrayUnsafe()))
-            idx.addAndGet(1)
+            for {
+              _ <- s3Connection.writeFullObject(objectKey, ByteBuffer.wrap(zstdObj.toArrayUnsafe()))
+            } yield {
+              idx.addAndGet(1)
+            }
           }
         }
       val withKs = base.viaMat(KillSwitches.single)(Keep.right)
@@ -118,21 +127,18 @@ class AcsSnapshotBulkStorage(
     // TODO(#3429): tweak the retry parameters here
     val delay = FiniteDuration(5, "seconds")
     val policy = new RetrySourcePolicy[Unit, Int] {
+      // TODO(#3429): add a unit test for this retry logic
       override def shouldRetry(
           lastState: Unit,
           lastEmittedElement: Option[Int],
           lastFailure: Option[Throwable],
       ): Option[(scala.concurrent.duration.FiniteDuration, Unit)] = {
-        val prefixMsg =
-          s"RetrySourcePolicy for restart of AcsSnapshotBulkStorage with ${delay} delay:"
-        lastFailure match {
-          case Some(t) =>
-            logger.info(s"$prefixMsg Last failure: ${ErrorUtil.messageWithStacktrace(t)}")
-          case None =>
-            logger.debug(s"$prefixMsg No failure, normal restart.")
+        lastFailure.map { t =>
+          logger.warn(s"Writing ACS snapshot to bulk storage failed with : ${ErrorUtil
+              .messageWithStacktrace(t)}, will retry after delay of ${delay}")
+          // Always retry (TODO(#3429): consider a max number of retries?)
+          delay -> ()
         }
-        // Always retry (TODO(#3429): consider a max number of retries?)
-        Some(delay -> ())
       }
     }
 

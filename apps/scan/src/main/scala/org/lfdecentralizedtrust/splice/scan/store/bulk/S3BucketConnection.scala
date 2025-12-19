@@ -6,13 +6,19 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
-import software.amazon.awssdk.core.sync.RequestBody
+import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.model.{GetObjectRequest, PutObjectRequest}
-import software.amazon.awssdk.services.s3.{S3Client, S3Configuration}
+import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
+import software.amazon.awssdk.services.s3.model.{
+  GetObjectRequest,
+  GetObjectResponse,
+  PutObjectRequest,
+}
 
+import scala.jdk.FutureConverters.*
 import java.net.URI
 import java.nio.ByteBuffer
+import scala.concurrent.{ExecutionContext, Future}
 
 case class S3Config(
     endpoint: URI,
@@ -22,32 +28,38 @@ case class S3Config(
 )
 
 class S3BucketConnection(
-    val s3Client: S3Client,
+    val s3Client: S3AsyncClient,
     val bucketName: String,
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
   // Reads the full content of an s3 object into a ByteBuffer.
   // Use only for testing, when the object size is known to be small
-  def readFullObject(key: String): ByteBuffer = {
-    val obj = s3Client.getObject(GetObjectRequest.builder().bucket(bucketName).key(key).build())
-    val bytes = obj.readAllBytes()
-    val ret = ByteBuffer.allocateDirect(bytes.length)
-    ret.put(bytes)
+  def readFullObject(key: String)(implicit ec: ExecutionContext): Future[ByteBuffer] = {
+    val request = GetObjectRequest.builder().bucket(bucketName).key(key).build()
+    s3Client
+      .getObject(request, AsyncResponseTransformer.toBytes[GetObjectResponse])
+      .asScala
+      .map(_.asByteBuffer())
   }
 
-  // Writes a full object from memory into an s3 object (a blocking call)
-  def writeFullObject(key: String, content: ByteBuffer)(implicit tc: TraceContext): Unit = {
+  // Writes a full object from memory into an s3 object
+  def writeFullObject(key: String, content: ByteBuffer)(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Unit] = {
     logger.debug(s"Writing ${content.array().length} bytes to S3 object $key")
     val putObj: PutObjectRequest = PutObjectRequest
       .builder()
       .bucket(bucketName)
       .key(key)
       .build()
-    s3Client.putObject(
-      putObj,
-      RequestBody.fromBytes(content.array()),
-    )
-    ()
+    s3Client
+      .putObject(
+        putObj,
+        AsyncRequestBody.fromBytes(content.array()),
+      )
+      .asScala
+      .map(_ => ())
   }
 }
 
@@ -58,7 +70,7 @@ object S3BucketConnection {
       loggerFactory: NamedLoggerFactory,
   ): S3BucketConnection = {
     new S3BucketConnection(
-      S3Client
+      S3AsyncClient
         .builder()
         .endpointOverride(s3Config.endpoint)
         .region(s3Config.region)
