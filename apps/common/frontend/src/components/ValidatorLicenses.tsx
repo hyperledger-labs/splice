@@ -21,11 +21,12 @@ import {
   TableHead,
   Typography,
 } from '@mui/material';
+import CheckIcon from '@mui/icons-material/Check';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 
-import { ValidatorLicense } from '@daml.js/splice-amulet/lib/Splice/ValidatorLicense';
+import { LicenseKind, ValidatorLicense } from '@daml.js/splice-amulet/lib/Splice/ValidatorLicense';
 import { Party } from '@daml/types';
 
 export interface ValidatorLicensesPage {
@@ -80,6 +81,8 @@ const ValidatorLicenses: React.FC<ValidatorLicensesProps> = ({
               <TableCell>Created at</TableCell>
               <TableCell>Validator</TableCell>
               <TableCell>Sponsor</TableCell>
+              <TableCell>Weight</TableCell>
+              <TableCell>Operator</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -91,6 +94,8 @@ const ValidatorLicenses: React.FC<ValidatorLicensesProps> = ({
                   sponsor={license.payload.sponsor}
                   createdAt={new Date(license.createdAt)}
                   sv={dsoInfosQuery.data!.svPartyId}
+                  weight={license.payload.weight ?? undefined}
+                  kind={license.payload.kind ?? undefined}
                 />
               );
             })}
@@ -115,10 +120,22 @@ interface LicenseRowProps {
   sponsor: Party;
   createdAt: Date;
   sv: Party;
+  weight?: string;
+  kind?: LicenseKind;
 }
 
-const LicenseRow: React.FC<LicenseRowProps> = ({ validator, sponsor, createdAt, sv }) => {
+const LicenseRow: React.FC<LicenseRowProps> = ({
+  validator,
+  sponsor,
+  createdAt,
+  sv,
+  weight,
+  kind,
+}) => {
   const sponsoredByThisSv = sponsor === sv;
+  const isOperator = kind !== 'NonOperatorLicense';
+  const displayWeight = weight || '';
+
   return (
     <TableRow className="validator-licenses-table-row">
       <TableCell>
@@ -133,6 +150,8 @@ const LicenseRow: React.FC<LicenseRowProps> = ({ validator, sponsor, createdAt, 
           {sponsoredByThisSv && <Chip label="THIS SV" color="primary" size="small" />}
         </Stack>
       </TableCell>
+      <TableCell>{displayWeight}</TableCell>
+      <TableCell>{isOperator ? <CheckIcon fontSize="medium" /> : ''}</TableCell>
     </TableRow>
   );
 };
