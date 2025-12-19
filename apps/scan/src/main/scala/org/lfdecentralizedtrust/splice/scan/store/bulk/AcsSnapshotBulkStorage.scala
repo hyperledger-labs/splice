@@ -107,7 +107,6 @@ class AcsSnapshotBulkStorage(
           //    Consider streaming it to S3 instead. Need to make sure that it then handles crashes correctly,
           //    i.e. that until we tell S3 that we're done writing, if we stop, then S3 throws away the
           //    partially written object.
-          // TODO(#3429): Error handling
           for {
             _ <- s3Connection.writeFullObject(objectKey, ByteBuffer.wrap(zstdObj.toArrayUnsafe()))
           } yield {
@@ -121,7 +120,6 @@ class AcsSnapshotBulkStorage(
     // TODO(#3429): tweak the retry parameters here
     val delay = FiniteDuration(5, "seconds")
     val policy = new RetrySourcePolicy[Unit, Int] {
-      // TODO(#3429): add a unit test for this retry logic
       override def shouldRetry(
           lastState: Unit,
           lastEmittedElement: Option[Int],
