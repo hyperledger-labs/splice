@@ -3,5 +3,9 @@
   "tooling_sdk_version": "3.3.0-snapshot.20250415.13756.0.vafc5c867",
   "daml_release": "v3.3.0-snapshot.20250417.0",
   "enterprise_sha256": "sha256:15grarzl4vq71qbfiml5w040aamq63rkpkhzhjcxgyzprdjm5bgr",
-  "oss_sha256": "sha256:1bw9rsnn07w6xbp3fv3xnh1r8sc3abplj32d7lvkcwankyiwjf7c"
+  "oss_sha256": "sha256:1bw9rsnn07w6xbp3fv3xnh1r8sc3abplj32d7lvkcwankyiwjf7c",
+  "canton_base_image_sha256": "sha256:7dffeef0ccb92e7b2ee39825ab33052bd1717e8ddbe2b6bf35e4a6de60075ca2",
+  "canton_participant_image_sha256": "sha256:f20940aed9c6ce0735054b5ba21cef15d608e95c98f4a0615ddfdb5181162128",
+  "canton_sequencer_image_sha256": "sha256:43ceda090dcc30f644708d3f6039002fd089f20b95a14b5ab4a537009b8d4645",
+  "canton_mediator_image_sha256": "sha256:86cb366e5ed85fb4d8eefe68c71c4b9adb0b6218b73f89fc3cc637722dabae6b"
 }
