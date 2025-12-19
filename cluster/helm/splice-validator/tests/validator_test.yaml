@@ -236,7 +236,7 @@ tests:
   - it: "uses synchronizer.url when provided"
     set:
       synchronizer:
-        synchronizerType: "trusted-url"
+        connectionType: "trusted-url"
         url: "https://new-sequencer.mock.com"
     documentSelector:
       path: kind
@@ -249,7 +249,7 @@ tests:
   - it: "uses synchronizer.sequencerNames as a JSON array when provided"
     set:
       synchronizer:
-        synchronizerType: "trusted-svs"
+        connectionType: "trusted-svs"
         sequencerNames: [ "sequencer-1", "sequencer-2" ]
     documentSelector:
       path: kind

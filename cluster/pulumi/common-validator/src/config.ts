@@ -11,16 +11,16 @@ import { z } from 'zod';
 
 export const SynchronizerConfigSchema = z
   .object({
-    synchronizerType: z.enum(['from-scan', 'trusted-url', 'trusted-svs']).default('from-scan'),
+    connectionType: z.enum(['from-scan', 'trusted-url', 'trusted-svs']).default('from-scan'),
     sequencerNames: z.array(z.string()).optional(),
     url: z.string().optional(),
   })
   .refine(
     data => {
-      if (data.synchronizerType === 'trusted-url') {
+      if (data.connectionType === 'trusted-url') {
         return !!data.url && (!data.sequencerNames || data.sequencerNames.length === 0);
       }
-      if (data.synchronizerType === 'trusted-svs') {
+      if (data.connectionType === 'trusted-svs') {
         return !!(data.sequencerNames && data.sequencerNames.length > 0) && !data.url;
       }
       return true;
