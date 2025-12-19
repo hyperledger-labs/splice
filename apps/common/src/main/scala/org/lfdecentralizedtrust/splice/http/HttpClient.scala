@@ -272,7 +272,7 @@ object HttpClientMetrics {
 }
 
 class HttpClientMetrics(metricsFactory: LabeledMetricsFactory) {
-  private val prefix: MetricName = MetricName.Daml :+ "httpclient"
+  private val prefix: MetricName = MetricName.Daml :+ "http" :+ "client"
 
   private val requestTiming = metricsFactory.timer(
     MetricInfo(
