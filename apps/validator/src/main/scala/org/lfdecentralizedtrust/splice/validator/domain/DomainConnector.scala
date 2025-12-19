@@ -206,7 +206,6 @@ class DomainConnector(
         case None =>
           filteredSequencers
       }
-      logger.debug(s"Filtered Sequencers: ${svFilteredSequencers}")
       (
         svFilteredSequencers.map { domainSequencer =>
           config.domains.global.alias ->
