@@ -49,6 +49,7 @@ case class ZstdGroupedWeight(minSize: Long) extends GraphStage[FlowShape[ByteStr
       new ZstdDirectBufferCompressingStreamNoFinalizer(tmpBuffer, compressionLevel)
 
     def compress(input: ByteString): ByteString = {
+      // TODO(#3429): use a buffer pool to avoid allocating a new ByteBuffer for each compress call
       val inputBB = ByteBuffer.allocateDirect(input.size)
       inputBB.put(input.toArrayUnsafe())
       inputBB.flip()
@@ -75,7 +76,8 @@ case class ZstdGroupedWeight(minSize: Long) extends GraphStage[FlowShape[ByteStr
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new GraphStageLogic(shape) with InHandler with OutHandler {
-      // TODO(#3429): consider implementing a pool of tmp buffers to avoid allocating a new one for each stage
+      // TODO(#3429): consider implementing a pool of tmp buffers to avoid allocating a new one for each stage,
+      //   and moving some initialization into preStart(), otherwise we allocate even if the stream never runs or fails before starting.
       private val tmpBuffer = ByteBuffer.allocateDirect(zstdTmpBufferSize)
       private val zstd = new AtomicReference[ZSTD](new ZSTD(tmpBuffer, 3))
       private val state: AtomicReference[State] = new AtomicReference[State](State.empty())

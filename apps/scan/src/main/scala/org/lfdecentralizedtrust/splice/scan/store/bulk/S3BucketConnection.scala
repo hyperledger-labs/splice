@@ -59,6 +59,7 @@ class S3BucketConnection(
         AsyncRequestBody.fromBytes(content.array()),
       )
       .asScala
+      // TODO(#3429): consider checking the checksum from the response
       .map(_ => ())
   }
 }
