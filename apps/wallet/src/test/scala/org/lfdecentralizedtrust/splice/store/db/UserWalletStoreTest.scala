@@ -783,7 +783,7 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
 
         val actual =
           store
-            .listTransactions(previousEventId, limit = PageLimit.tryCreate(Limit.MaxPageSize))
+            .listTransactions(previousEventId, limit = PageLimit.tryCreate(Limit.DefaultMaxPageSize))
             .futureValue
         actual should have length expected.size.toLong
 
@@ -1267,8 +1267,8 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
   ): subsCodegen.SubscriptionPayData = {
     new subsCodegen.SubscriptionPayData(
       new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount).setScale(10), unit),
-      new RelTime(paymentIntervalSeconds * Limit.MaxPageSize * Limit.MaxPageSize),
-      new RelTime(paymentDurationSeconds * Limit.MaxPageSize * Limit.MaxPageSize),
+      new RelTime(paymentIntervalSeconds * Limit.DefaultMaxPageSize * Limit.DefaultMaxPageSize),
+      new RelTime(paymentDurationSeconds * Limit.DefaultMaxPageSize * Limit.DefaultMaxPageSize),
     )
   }
 

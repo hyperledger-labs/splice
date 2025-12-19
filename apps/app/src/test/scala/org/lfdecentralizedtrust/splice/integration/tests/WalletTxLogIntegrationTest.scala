@@ -1253,7 +1253,7 @@ class WalletTxLogIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val validatorTxLogBefore =
-        aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
+        aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
 
       val (offerCid, _) =
         actAndCheck(
@@ -1284,7 +1284,7 @@ class WalletTxLogIntegrationTest
       )
 
       // Only Alice should see notification (note that aliceValidator is shared between tests)
-      val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
+      val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
 
       withoutDevNetTopups(validatorTxLogBefore) should be(
         withoutDevNetTopups(validatorTxLogAfter)
@@ -1413,7 +1413,7 @@ class WalletTxLogIntegrationTest
       val aliceUserId = aliceWalletClient.config.ledgerApiUser
       val charlieUserId = charlieWalletClient.config.ledgerApiUser
       val validatorTxLogBefore =
-        aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
+        aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
 
       // Note: using Alice and Charlie because manually creating subscriptions requires both
       // the sender and the receiver to be hosted on the same participant.
@@ -1534,7 +1534,7 @@ class WalletTxLogIntegrationTest
 
           // Validator should not see any notification (note that aliceValidator is shared between tests)
           val validatorTxLogAfter =
-            aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
+            aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
           withoutDevNetTopups(validatorTxLogBefore) should be(
             withoutDevNetTopups(validatorTxLogAfter)
           )
@@ -1569,7 +1569,7 @@ class WalletTxLogIntegrationTest
       // Note: SV1 is reused between tests, ignore TxLog entries created by previous tests
       val previousEventId = withoutDevNetTopups(
         sv1WalletClient
-          .listTransactions(None, Limit.MaxPageSize)
+          .listTransactions(None, Limit.DefaultMaxPageSize)
       ).headOption
         .map(_.eventId)
 
@@ -1655,7 +1655,7 @@ class WalletTxLogIntegrationTest
         )
       )
 
-      aliceWalletClient.listTransactions(None, Limit.MaxPageSize) shouldBe empty
+      aliceWalletClient.listTransactions(None, Limit.DefaultMaxPageSize) shouldBe empty
     }
 
   }

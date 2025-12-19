@@ -47,7 +47,7 @@ import scala.util.{Success, Try}
 // this test sets fees to zero, and that only works from 0.1.14 onwards
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_14
 class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeTestUtil {
-  private val defaultPageSize = Limit.MaxPageSize
+  private val defaultPageSize = Limit.DefaultMaxPageSize
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
