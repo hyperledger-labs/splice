@@ -1,38 +1,40 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { PartyId } from '@lfdecentralizedtrust/splice-common-frontend';
-import { Box, Typography } from '@mui/material';
+import { Divider, Stack, Typography } from '@mui/material';
+import { PropsWithChildren } from 'react';
 
-interface DetailItemProps {
+interface DetailItemProps extends PropsWithChildren {
   label: string;
   value: React.ReactNode;
   labelId?: string;
   valueId?: string;
-  isPartyId?: boolean;
 }
 
 export const DetailItem: React.FC<DetailItemProps> = props => {
-  const { label, value, labelId, valueId, isPartyId } = props;
+  const { label, value, labelId, valueId } = props;
 
   return (
-    <Box sx={{ py: 1 }}>
+    <Stack gap={3}>
       <Typography
         variant="subtitle2"
-        color="text.secondary"
+        color="white"
+        fontWeight="bold"
+        fontSize={16}
+        lineHeight={1}
         id={labelId}
         data-testid={labelId}
-        gutterBottom
       >
         {label}
       </Typography>
-      {isPartyId ? (
-        <PartyId partyId={`${value}`} id={valueId} data-testid={valueId} />
-      ) : (
-        <Typography variant="body1" id={valueId} data-testid={valueId}>
+      {typeof value === 'string' ? (
+        <Typography variant="body1" lineHeight={1} fontSize={16} id={valueId} data-testid={valueId}>
           {value}
         </Typography>
+      ) : (
+        value
       )}
-    </Box>
+      <Divider sx={{ borderBottomWidth: 2 }} />
+    </Stack>
   );
 };

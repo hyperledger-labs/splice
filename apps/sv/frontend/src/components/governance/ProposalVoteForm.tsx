@@ -9,16 +9,7 @@ import { isValidUrl } from '../../utils/validations';
 import { ContractId } from '@daml/types';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ProposalVote, VoteStatus } from '../../utils/types';
-import {
-  Alert,
-  Box,
-  Button,
-  FormControlLabel,
-  Radio,
-  RadioGroup,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Alert, Box, Button, FormControlLabel, Radio, RadioGroup, TextField } from '@mui/material';
 interface CastVoteArgs {
   accepted: boolean;
   url: string;
@@ -87,10 +78,6 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
 
   return (
     <Box data-testid="your-vote-form">
-      <Typography variant="h6" component="h2" mb={2} gutterBottom>
-        Your Vote
-      </Typography>
-
       <form
         onSubmit={e => {
           e.preventDefault();

@@ -7,7 +7,6 @@ import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either.*
 import com.daml.ledger.api.v2.interactive
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
-import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   TransferPreapproval,
@@ -56,6 +55,7 @@ import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.auth.AdminAuthExtractor.AdminUserRequest
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.time.Instant
@@ -83,7 +83,7 @@ class HttpValidatorAdminHandler(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends v0.ValidatorAdminHandler[TracedUser]
+) extends v0.ValidatorAdminHandler[AdminUserRequest]
     with Spanning
     with NamedLogging {
 
@@ -109,23 +109,23 @@ class HttpValidatorAdminHandler(
       respond: v0.ValidatorAdminResource.OnboardUserResponse.type
   )(
       body: definitions.OnboardUserRequest
-  )(tuser: TracedUser): Future[v0.ValidatorAdminResource.OnboardUserResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+  )(tuser: AdminUserRequest): Future[v0.ValidatorAdminResource.OnboardUserResponse] = {
+    implicit val AdminUserRequest(tracedContext) = tuser
     withSpan(s"$workflowId.onboardUser") { _ => span =>
       val name = body.name
       span.setAttribute("name", name)
-      onboard(name, body.partyId.map(PartyId.tryFromProtoPrimitive)).map(p =>
-        definitions.OnboardUserResponse(p)
+      onboard(name, body.partyId.map(PartyId.tryFromProtoPrimitive), body.createPartyIfMissing).map(
+        p => definitions.OnboardUserResponse(p)
       )
     }
   }
 
   def listUsers(
       respond: v0.ValidatorAdminResource.ListUsersResponse.type
-  )()(tuser: TracedUser): Future[
+  )()(tuser: AdminUserRequest): Future[
     v0.ValidatorAdminResource.ListUsersResponse
   ] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     withSpan(s"$workflowId.listUsers") { _ => _ =>
       // TODO(DACH-NY/canton-network-node#12550): move away from tracking onboarded users via on-ledger contracts, and create only one WalletAppInstall per user-party
       store.listUsers().map(us => definitions.ListUsersResponse(us.toVector))
@@ -134,10 +134,10 @@ class HttpValidatorAdminHandler(
 
   def offboardUser(
       respond: v0.ValidatorAdminResource.OffboardUserResponse.type
-  )(username: String)(tuser: TracedUser): Future[
+  )(username: String)(tuser: AdminUserRequest): Future[
     v0.ValidatorAdminResource.OffboardUserResponse
   ] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     withSpan(s"$workflowId.offboardUser") { _ => _ =>
       offboardUser(username)
         .map(_ => v0.ValidatorAdminResource.OffboardUserResponse.OK)
@@ -152,9 +152,9 @@ class HttpValidatorAdminHandler(
   def dumpParticipantIdentities(
       respond: v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse.type
   )()(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     withSpan(s"$workflowId.dumpParticipantIdentities") { _ => _ =>
       for {
         response <- identitiesStore.getNodeIdentitiesDump()
@@ -165,9 +165,9 @@ class HttpValidatorAdminHandler(
   override def getValidatorDomainDataSnapshot(
       respond: v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse.type
   )(timestamp: String, migrationId: Option[Long], force: Option[Boolean])(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     withSpan(s"$workflowId.getValidatorDomainDataSnapshot") { _ => _ =>
       for {
         synchronizerId <- getAmuletRulesDomain()(tracedContext)
@@ -196,9 +196,9 @@ class HttpValidatorAdminHandler(
   override def getDecentralizedSynchronizerConnectionConfig(
       respond: v0.ValidatorAdminResource.GetDecentralizedSynchronizerConnectionConfigResponse.type
   )()(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.ValidatorAdminResource.GetDecentralizedSynchronizerConnectionConfigResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     withSpan(s"$workflowId.getDecentralizedSynchronizerConnectionConfig") { _ => _ =>
       for {
         connectionConfig <- participantAdminConnection.getSynchronizerConnectionConfig(
@@ -235,13 +235,18 @@ class HttpValidatorAdminHandler(
     }
   }
 
-  private def onboard(name: String, partyId: Option[PartyId])(implicit
+  private def onboard(
+      name: String,
+      partyId: Option[PartyId],
+      createPartyIfMissing: Option[Boolean],
+  )(implicit
       traceContext: TraceContext
   ): Future[String] = {
     ValidatorUtil
       .onboard(
         name,
         partyId,
+        createPartyIfMissing,
         storeWithIngestion,
         validatorUserName,
         getAmuletRulesDomain,
@@ -268,9 +273,9 @@ class HttpValidatorAdminHandler(
   override def generateExternalPartyTopology(
       respond: v0.ValidatorAdminResource.GenerateExternalPartyTopologyResponse.type
   )(body: definitions.GenerateExternalPartyTopologyRequest)(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.ValidatorAdminResource.GenerateExternalPartyTopologyResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     withSpan(s"$workflowId.generateExternalPartyTopology") { _ => _ =>
       requireWalletEnabled { _ =>
         val publicKey = ValidatorUtil.signingPublicKeyFromHexEd25119(body.publicKey)
@@ -346,9 +351,9 @@ class HttpValidatorAdminHandler(
   override def submitExternalPartyTopology(
       respond: v0.ValidatorAdminResource.SubmitExternalPartyTopologyResponse.type
   )(body: definitions.SubmitExternalPartyTopologyRequest)(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.ValidatorAdminResource.SubmitExternalPartyTopologyResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     withSpan(s"$workflowId.submitExternalPartyTopology") { _ => _ =>
       requireWalletEnabled { _ =>
         val publicKey = ValidatorUtil.signingPublicKeyFromHexEd25119(body.publicKey)
@@ -471,9 +476,9 @@ class HttpValidatorAdminHandler(
   override def createExternalPartySetupProposal(
       respond: v0.ValidatorAdminResource.CreateExternalPartySetupProposalResponse.type
   )(body: definitions.CreateExternalPartySetupProposalRequest)(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.ValidatorAdminResource.CreateExternalPartySetupProposalResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     requireWalletEnabled { walletManager =>
       val userParty = PartyId.tryFromProtoPrimitive(body.userPartyId)
       val validatorServiceParty = store.key.validatorParty
@@ -578,9 +583,9 @@ class HttpValidatorAdminHandler(
   override def listExternalPartySetupProposals(
       respond: v0.ValidatorAdminResource.ListExternalPartySetupProposalsResponse.type
   )()(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.ValidatorAdminResource.ListExternalPartySetupProposalsResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     requireWalletEnabled { _ =>
       for {
         proposals <- store.listExternalPartySetupProposals()
@@ -593,9 +598,9 @@ class HttpValidatorAdminHandler(
   override def prepareAcceptExternalPartySetupProposal(
       respond: v0.ValidatorAdminResource.PrepareAcceptExternalPartySetupProposalResponse.type
   )(body: definitions.PrepareAcceptExternalPartySetupProposalRequest)(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.ValidatorAdminResource.PrepareAcceptExternalPartySetupProposalResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     requireWalletEnabled { _ =>
       val userParty = PartyId.tryFromProtoPrimitive(body.userPartyId)
       for {
@@ -662,9 +667,9 @@ class HttpValidatorAdminHandler(
   override def submitAcceptExternalPartySetupProposal(
       respond: v0.ValidatorAdminResource.SubmitAcceptExternalPartySetupProposalResponse.type
   )(body: definitions.SubmitAcceptExternalPartySetupProposalRequest)(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.ValidatorAdminResource.SubmitAcceptExternalPartySetupProposalResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     requireWalletEnabled { _ =>
       val userParty = PartyId.tryFromProtoPrimitive(body.submission.partyId)
       for {
@@ -693,9 +698,9 @@ class HttpValidatorAdminHandler(
   )(
       receiverParty: String
   )(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.ValidatorAdminResource.LookupTransferPreapprovalByPartyResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     val receiverPartyId = PartyId.tryFromProtoPrimitive(receiverParty)
     store.lookupTransferPreapprovalByReceiverPartyWithOffset(receiverPartyId).map {
       case QueryResult(_, None) =>
@@ -714,9 +719,9 @@ class HttpValidatorAdminHandler(
   )(
       receiverParty: String
   )(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.ValidatorAdminResource.CancelTransferPreapprovalByPartyResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     val receiverPartyId = PartyId.tryFromProtoPrimitive(receiverParty)
     val validatorParty = store.key.validatorParty
     store.lookupTransferPreapprovalByReceiverPartyWithOffset(receiverPartyId).flatMap {
@@ -748,8 +753,10 @@ class HttpValidatorAdminHandler(
 
   override def listTransferPreapprovals(
       respond: v0.ValidatorAdminResource.ListTransferPreapprovalsResponse.type
-  )()(tuser: TracedUser): Future[v0.ValidatorAdminResource.ListTransferPreapprovalsResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+  )()(
+      tuser: AdminUserRequest
+  ): Future[v0.ValidatorAdminResource.ListTransferPreapprovalsResponse] = {
+    implicit val AdminUserRequest(tracedContext) = tuser
     for {
       preapprovals <- store.listTransferPreapprovals()
     } yield definitions.ListTransferPreapprovalsResponse(
@@ -760,9 +767,9 @@ class HttpValidatorAdminHandler(
   override def prepareTransferPreapprovalSend(
       respond: v0.ValidatorAdminResource.PrepareTransferPreapprovalSendResponse.type
   )(body: definitions.PrepareTransferPreapprovalSendRequest)(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.ValidatorAdminResource.PrepareTransferPreapprovalSendResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     requireWalletEnabled { _ =>
       val senderParty = PartyId.tryFromProtoPrimitive(body.senderPartyId)
       val receiverParty = PartyId.tryFromProtoPrimitive(body.receiverPartyId)
@@ -860,9 +867,9 @@ class HttpValidatorAdminHandler(
   override def submitTransferPreapprovalSend(
       respond: v0.ValidatorAdminResource.SubmitTransferPreapprovalSendResponse.type
   )(body: definitions.SubmitTransferPreapprovalSendRequest)(
-      tuser: TracedUser
+      tuser: AdminUserRequest
   ): Future[v0.ValidatorAdminResource.SubmitTransferPreapprovalSendResponse] = {
-    implicit val TracedUser(_, tracedContext) = tuser
+    implicit val AdminUserRequest(tracedContext) = tuser
     requireWalletEnabled { _ =>
       for {
         updateId <- ValidatorUtil.submitAsExternalParty(
@@ -898,8 +905,8 @@ class HttpValidatorAdminHandler(
       respond: v0.ValidatorAdminResource.GetExternalPartyBalanceResponse.type
   )(
       partyIdStr: String
-  )(tuser: TracedUser): Future[v0.ValidatorAdminResource.GetExternalPartyBalanceResponse] = {
-    implicit val TracedUser(_, tc) = tuser
+  )(tuser: AdminUserRequest): Future[v0.ValidatorAdminResource.GetExternalPartyBalanceResponse] = {
+    implicit val AdminUserRequest(tc) = tuser
     withSpan(s"$workflowId.getExternalPartyBalance") { implicit tc => _ =>
       requireWalletEnabled { _ =>
         val partyId = PartyId.tryFromProtoPrimitive(partyIdStr)

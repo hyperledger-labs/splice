@@ -80,7 +80,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
 
   val participantId: ParticipantId
 
-  val synchronizerId: ReassignmentTag[PhysicalSynchronizerId]
+  val psid: ReassignmentTag[PhysicalSynchronizerId]
 
   val protocolVersion: ReassignmentTag[ProtocolVersion]
 
@@ -88,7 +88,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
 
   protected implicit def ec: ExecutionContext
 
-  override type SubmissionSendError = ReassignmentProcessorError
+  override type SubmissionSendError = GenericStepsError[ProtocolProcessor.SubmissionProcessingError]
 
   override type PendingSubmissionId = RootHash
 
@@ -319,7 +319,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
       requestId = requestId,
       rootHash = rootHash,
       malformedPayloads = malformedPayloads,
-      synchronizerId = synchronizerId.unwrap,
+      synchronizerId = psid.unwrap,
       participantId = participantId,
       protocolVersion = protocolVersion.unwrap,
     )
@@ -348,7 +348,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
       Update.SequencedCommandRejected(
         completionInfo,
         rejection,
-        synchronizerId.unwrap.logical,
+        psid.unwrap.logical,
         ts,
       )
     )
@@ -378,7 +378,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
       Update.SequencedCommandRejected(
         info,
         rejection,
-        synchronizerId.unwrap.logical,
+        psid.unwrap.logical,
         pendingReassignment.requestId.unwrap,
       )
     )
@@ -397,9 +397,10 @@ private[reassignment] trait ReassignmentProcessingSteps[
 
     override def embedSubmissionError(
         err: ProtocolProcessor.SubmissionProcessingError
-    ): ReassignmentProcessorError =
+    ): SubmissionSendError =
       GenericStepsError(err)
-    override def toSubmissionError(err: ReassignmentProcessorError): ReassignmentProcessorError =
+
+    override def toSubmissionError(err: SubmissionSendError): ReassignmentProcessorError =
       err
   }
 
@@ -427,7 +428,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
           requestId = requestId,
           rootHash = validationResult.rootHash,
           malformedPayloads = malformedPayloads,
-          synchronizerId = synchronizerId.unwrap,
+          synchronizerId = psid.unwrap,
           participantId = participantId,
           protocolVersion = protocolVersion,
         )
@@ -453,7 +454,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
           ConfirmationResponses.tryCreate(
             requestId,
             rootHash,
-            synchronizerId.unwrap,
+            psid.unwrap,
             participantId,
             NonEmpty.mk(
               Seq,
@@ -530,7 +531,7 @@ private[reassignment] trait ReassignmentProcessingSteps[
             ConfirmationResponses.tryCreate(
               requestId,
               validationResult.rootHash,
-              synchronizerId.unwrap,
+              psid.unwrap,
               participantId,
               NonEmpty.mk(
                 Seq,
@@ -657,8 +658,9 @@ object ReassignmentProcessingSteps {
   /** Used to convert ReassignmentValidationError to ReassignmentValidationError */
   final case class SubmissionValidationError(message: String) extends ReassignmentProcessorError
 
-  final case class GenericStepsError(error: ProcessorError) extends ReassignmentProcessorError {
-    override def underlyingProcessorError(): Option[ProcessorError] = Some(error)
+  final case class GenericStepsError[+E <: ProcessorError](error: E)
+      extends ReassignmentProcessorError {
+    override def underlyingProcessorError(): Option[E] = Some(error)
 
     override def message: String = error.toString
   }

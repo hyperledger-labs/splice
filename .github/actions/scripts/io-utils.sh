@@ -11,7 +11,7 @@
 
 # Copy stdin to stdout, while removing all lines that start with '#' or consist of blanks
 remove_comment_and_blank_lines() {
-  while IFS= read -r # Read a file line by line; IFS= ensures that no separators other than newline are used
+  while IFS= read -r || [[ -n $REPLY ]] # Read a file line by line; IFS= ensures that no separators other than newline are used
   do
     if [[ -n "${REPLY// }" ]] && [[ "$REPLY" != "#"* ]] # Filter out comment lines and blank lines
     then

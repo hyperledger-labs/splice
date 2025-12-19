@@ -11,6 +11,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import com.digitalasset.canton.CantonAppDriver
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
+import com.digitalasset.canton.config.DefaultPorts
 import com.digitalasset.canton.environment.EnvironmentFactory
 
 // TODO(DACH-NY/canton-network-node#736): generalize. e.g. custom Cli class for Splice Node for the console
@@ -25,7 +26,8 @@ object SpliceApp extends CantonAppDriver {
   }
 
   override def loadConfig(
-      config: com.typesafe.config.Config
+      config: com.typesafe.config.Config,
+      defaultPorts: Option[DefaultPorts],
   ): Either[CantonConfigError, SpliceConfig] =
     SpliceConfig.load(config)
 

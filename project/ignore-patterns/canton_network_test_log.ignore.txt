@@ -132,5 +132,3 @@ Circuit breaker .* tripped after .* failures.*(Command|Splice)CircuitBreakerTest
 # See DACH-NY/cn-test-failures#6328: In rare cases, creating an index asynchronously can fail.
 # This is more likely in test code where we run multiple apps against the same database, all trying to create the same index.
 Index .* should be created and is invalid, dropping it
-
-# Make sure to have a trailing newline

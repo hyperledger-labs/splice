@@ -4,10 +4,10 @@
 package org.lfdecentralizedtrust.splice.auth
 
 import com.daml.jwt.{AuthServiceJWTCodec, Jwt, JwtDecoder, StandardJWTPayload}
+import com.digitalasset.canton.config.NonNegativeDuration
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.auth.OAuthApi.TokenResponse
 import org.lfdecentralizedtrust.splice.config.AuthTokenSourceConfig
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
@@ -74,11 +74,10 @@ case class AuthTokenSourceSelfSigned(
     audience: String,
     user: String,
     secret: String,
-    expiration: NonNegativeFiniteDuration,
 ) extends AuthTokenSource {
   override def getToken(implicit tc: TraceContext): Future[Option[AuthToken]] =
     Future.successful(
-      Some(AuthToken(AuthUtil.testTokenSecret(audience, user, secret, expiration)))
+      Some(AuthToken(AuthUtil.testTokenSecret(audience, user, secret)))
     )
 }
 
@@ -88,11 +87,12 @@ case class AuthTokenSourceOAuthClientCredentials(
     clientSecret: String,
     audience: String,
     scope: Option[String],
+    requestTimeout: NonNegativeDuration,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, ac: ActorSystem)
     extends AuthTokenSource
     with NamedLogging {
-  private val oauth = new OAuthApi(loggerFactory)
+  private val oauth = new OAuthApi(requestTimeout, loggerFactory)
 
   override def getToken(implicit tc: TraceContext): Future[Option[AuthToken]] = {
     for {
@@ -117,16 +117,17 @@ object AuthTokenSource {
   )(implicit ec: ExecutionContext, ac: ActorSystem): AuthTokenSource = config match {
     case AuthTokenSourceConfig.None() =>
       new AuthTokenSourceNone()
-    case AuthTokenSourceConfig.Static(token, _, _) =>
+    case AuthTokenSourceConfig.Static(token, _) =>
       new AuthTokenSourceStatic(token)
-    case AuthTokenSourceConfig.SelfSigned(audience, user, secret, _, expiration) =>
-      new AuthTokenSourceSelfSigned(audience, user, secret, expiration)
+    case AuthTokenSourceConfig.SelfSigned(audience, user, secret, _) =>
+      new AuthTokenSourceSelfSigned(audience, user, secret)
     case AuthTokenSourceConfig.ClientCredentials(
           wellKnownConfigUrl,
           clientId,
           clientSecret,
           audience,
           scope,
+          requestTimeout,
           _,
         ) =>
       new AuthTokenSourceOAuthClientCredentials(
@@ -136,6 +137,7 @@ object AuthTokenSource {
         loggerFactory = loggerFactory,
         audience = audience,
         scope = scope,
+        requestTimeout = requestTimeout,
       )
   }
 }

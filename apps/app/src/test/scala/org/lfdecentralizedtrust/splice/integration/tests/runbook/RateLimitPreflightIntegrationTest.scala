@@ -69,13 +69,13 @@ class RateLimitPreflightIntegrationTest extends IntegrationTestWithSharedEnviron
       forAll(_)(
         // This hits the Canton limit on concurrent requests
         _.message should include(
-          "Reached the limit of concurrent requests for com.digitalasset.canton.admin.participant.v30.ParticipantRepairService/ExportAcsOld"
+          "Reached the limit of concurrent requests for com.digitalasset.canton.admin.participant.v30.ParticipantRepairService/ExportAcs"
         )
       ),
     )
     // Note: failures are expected due to the Canton rate limiter.
     forAtLeast(1, results) {
-      _ shouldBe a[scala.util.Success[_]]
+      _ shouldBe a[scala.util.Success[?]]
     }
     // This now hits istio rate limit
     assertThrowsAndLogsCommandFailures(

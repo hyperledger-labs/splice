@@ -3,14 +3,17 @@
 
 package org.lfdecentralizedtrust.splice
 
-import com.daml.metrics.grpc.GrpcServerMetrics
 import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.{MetricName, MetricsContext}
-import com.digitalasset.canton.metrics.DeclarativeApiMetrics
-import org.lfdecentralizedtrust.splice.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
 import com.digitalasset.canton.environment.BaseMetrics
-import com.digitalasset.canton.metrics.{DbStorageHistograms, DbStorageMetrics}
+import com.digitalasset.canton.metrics.ActiveRequestsMetrics.GrpcServerMetricsX
+import com.digitalasset.canton.metrics.{
+  DbStorageHistograms,
+  DbStorageMetrics,
+  DeclarativeApiMetrics,
+}
+import org.lfdecentralizedtrust.splice.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
 import org.lfdecentralizedtrust.splice.http.HttpServerMetrics
 
 /** A shared trait to capture the commonalities across our amulet node metrics. */
@@ -20,7 +23,7 @@ trait SpliceMetrics extends BaseMetrics {
   def httpServerMetrics: HttpServerMetrics
 
   // Not used by splice
-  override def grpcMetrics: GrpcServerMetrics = ???
+  override def grpcMetrics: GrpcServerMetricsX = ???
   // Not used by splice
   override def declarativeApiMetrics: DeclarativeApiMetrics = ???
 }

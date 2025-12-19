@@ -3,6 +3,8 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
+.. _validator_upgrades:
+
 Upgrades
 ========
 

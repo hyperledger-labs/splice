@@ -904,7 +904,7 @@ object LedgerClient {
 
   object ReassignmentCommand {
     final case class Unassign(
-        contractId: ContractId[_],
+        contractId: ContractId[?],
         source: SynchronizerId,
         target: SynchronizerId,
     ) extends ReassignmentCommand {
@@ -1047,6 +1047,6 @@ object LedgerClient {
   }
 
   @inline
-  private def scalapbToJava[S, J](s: S)(companion: S => scalapb.JavaProtoSupport[_ >: S, J]): J =
+  private def scalapbToJava[S, J](s: S)(companion: S => scalapb.JavaProtoSupport[? >: S, J]): J =
     companion(s).toJavaProto(s)
 }

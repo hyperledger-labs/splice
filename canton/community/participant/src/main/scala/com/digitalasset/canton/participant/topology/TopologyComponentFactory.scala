@@ -44,6 +44,7 @@ class TopologyComponentFactory(
     futureSupervisor: FutureSupervisor,
     caching: CachingConfigs,
     batching: BatchingConfig,
+    topology: TopologyConfig,
     participantId: ParticipantId,
     unsafeOnlinePartyReplication: Option[UnsafeOnlinePartyReplicationConfig],
     exitOnFatalFailures: Boolean,
@@ -98,6 +99,7 @@ class TopologyComponentFactory(
         val processor = new TopologyTransactionProcessor(
           crypto.pureCrypto,
           topologyStore,
+          crypto.staticSynchronizerParameters,
           acsCommitmentScheduleEffectiveTime,
           terminateTopologyProcessing,
           futureSupervisor,
@@ -124,8 +126,9 @@ class TopologyComponentFactory(
     new InitialTopologySnapshotValidator(
       crypto.pureCrypto,
       topologyStore,
+      Some(crypto.staticSynchronizerParameters),
       validateInitialSnapshot = topologyConfig.validateInitialTopologySnapshot,
-      loggerFactory,
+      loggerFactory = loggerFactory,
     )
 
   def createCachingTopologyClient(
@@ -143,6 +146,7 @@ class TopologyComponentFactory(
       packageDependencyResolver,
       caching,
       batching,
+      topology,
       timeouts,
       futureSupervisor,
       loggerFactory,

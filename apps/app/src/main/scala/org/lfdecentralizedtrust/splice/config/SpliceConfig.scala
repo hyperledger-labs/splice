@@ -105,10 +105,11 @@ case class SpliceConfig(
     ),
     features: CantonFeatures = CantonFeatures(),
     override val pekkoConfig: Option[Config] = None,
-) extends ConfigDefaults[DefaultPorts, SpliceConfig]
+) extends ConfigDefaults[Option[DefaultPorts], SpliceConfig]
     with SharedCantonConfig[SpliceConfig] {
 
-  override def withDefaults(defaults: DefaultPorts, edition: CantonEdition): SpliceConfig = this
+  override def withDefaults(defaults: Option[DefaultPorts], edition: CantonEdition): SpliceConfig =
+    this
 
   // TODO(DACH-NY/canton-network-node#736): we want to remove all of the configurations options below:
   override val participants: Map[InstanceName, ParticipantNodeConfig] = Map.empty
@@ -329,7 +330,8 @@ object SpliceConfig {
       case Right(resolvedConfig) =>
         loadRawConfig(resolvedConfig)
           .flatMap { conf =>
-            val confWithDefaults = conf.withDefaults(new DefaultPorts(), CommunityCantonEdition)
+            val confWithDefaults =
+              conf.withDefaults(Some(DefaultPorts.create()), CommunityCantonEdition)
             confWithDefaults.validate.toEither
               .map(_ => confWithDefaults)
               .leftMap(causes => ConfigErrors.ValidationError.Error(causes.toList))
@@ -360,16 +362,17 @@ object SpliceConfig {
       loaded <- loadAndValidate(parsedAndMerged)
     } yield loaded
 
-  import CantonConfig.*
   import pureconfig.generic.semiauto.*
+
+  private val cantonConfigReaders = new CantonConfig.ConfigReaders()(elc)
 
   class ConfigReaders(implicit
       private val
       elc: ErrorLoggingContext
   ) {
-    import CantonConfig.ConfigReaders.*
     import BaseCantonConfig.Readers.*
-    import CantonConfig.ConfigReaders.dbConfigReader
+
+    import cantonConfigReaders.*
 
     implicit val configReader: ConfigReader[SynchronizerAlias] = ConfigReader.fromString(str =>
       SynchronizerAlias.create(str).left.map(err => CannotConvert(str, "SynchronizerAlias", err))

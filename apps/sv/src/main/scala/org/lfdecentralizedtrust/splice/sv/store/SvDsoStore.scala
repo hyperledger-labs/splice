@@ -44,7 +44,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
@@ -984,7 +984,7 @@ trait SvDsoStore
 object SvDsoStore {
   def apply(
       key: SvStore.Key,
-      storage: Storage,
+      storage: DbStorage,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
       domainMigrationInfo: DomainMigrationInfo,
@@ -995,19 +995,15 @@ object SvDsoStore {
       templateJsonDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
   ): SvDsoStore = {
-    storage match {
-      case db: DbStorage =>
-        new DbSvDsoStore(
-          key,
-          db,
-          loggerFactory,
-          retryProvider,
-          domainMigrationInfo,
-          participantId,
-          ingestionConfig,
-        )
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-    }
+    new DbSvDsoStore(
+      key,
+      storage,
+      loggerFactory,
+      retryProvider,
+      domainMigrationInfo,
+      participantId,
+      ingestionConfig,
+    )
   }
 
   /** Contract filter of an sv acs store for a specific acs party. */

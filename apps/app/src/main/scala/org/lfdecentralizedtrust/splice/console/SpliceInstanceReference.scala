@@ -109,7 +109,7 @@ trait HttpAppReference extends AppReference with HttpCommandRunner {
   override def keys: KeyAdministrationGroup = noGrpcError()
 
   override def adminCommand[Result](
-      grpcCommand: GrpcAdminCommand[_, _, Result]
+      grpcCommand: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] = noGrpcError()
 
   private def noGrpcError() = throw new NotImplementedError(
@@ -124,7 +124,7 @@ trait HttpAppReference extends AppReference with HttpCommandRunner {
   def httpClientConfig: NetworkAppClientConfig
 
   override protected[splice] def httpCommand[Result](
-      httpCommand: HttpCommand[_, Result],
+      httpCommand: HttpCommand[?, Result],
       basePath: Option[String] = None,
   ): ConsoleCommandResult[Result] =
     spliceConsoleEnvironment.httpCommandRunner.runCommand(

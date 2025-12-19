@@ -19,7 +19,12 @@ with the newly allocated party. As part of validator initialization, a party is 
 Validator Operator. The user provided during installation as the `validatorWalletUser` will be
 associated with this party as its primary party.
 
-More users can be configured such that their primary party is that of the validator operator.
+In addition to above approach, the validator API endpoint `/v0/admin/users` supports two additional modes for creating user and party associations:
+
+1. Association with Existing Party: Linking a user to an existing party.
+2. Custom Party Hint: Allocating a new party using a human-readable party hint and associating the user to this newly created party.
+
+Association with Existing Party: Users can be configured such that their primary party is that of the validator operator (or any other existing party).
 In effect, when such users login to the wallet UI, they will be accessing the wallet of the validator
 operator. Note that this will be the same wallet accessed by different users, with currently
 no support for finer grained permissions per user.
@@ -49,6 +54,18 @@ In order to associate a user with the party of the validator operator, the follo
    onboarded through the API call above. If you do see the button, it means that something has gone wrong
    in the process above (do not click the button!).
 
+Custom Party Hint: This mode allows providing a human-readable Party hint when creating a new party for a user.
+This is used to create parties with descriptive hints (e.g., treasury_dept::...) instead of OAuth IDs.
+
+1. Follow steps 1-3 from Mode ``Association with Existing Party`` to obtain the USER and TOKEN.
+2. Determine the desired, full PartyID ``(Hint::Namespace)``, e.g., ``alice::f3d917....``. Use the namespace of an existing party (like the validator operator's) for the namespace part. Save the full ID in a ``PARTY_ID`` environment variable: ``export PARTY_ID=alice::f3d917...``.
+3. Run the following command to create the new party and associate the user:
+
+.. code-block:: bash
+
+    curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+    --data-raw "{\"party_id\":\"$PARTY_ID\",\"name\":\"$USER\",\"createPartyIfMissing\":true}" \
+    https://<URL of your wallet>/api/validator/v0/admin/users
 
 Disable wallet and wallet automation
 -----------------------------------------------

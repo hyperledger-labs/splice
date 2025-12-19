@@ -252,7 +252,7 @@ class SvOffboardingIntegrationTest
         (_: Unit) =>
           sv1ScanBackend.lookupTransferCommandCounterByParty(
             sv1Backend.getDsoInfo().svParty
-          ) shouldBe a[Some[_]],
+          ) shouldBe a[Some[?]],
       )
 
       actAndCheck(

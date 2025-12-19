@@ -76,6 +76,8 @@ message Enums {
 // authorization: a namespace delegation is either signed by the root key, or is signed by
 //   a key for which there exists a series of properly authorized namespace delegations
 //   that are ultimately signed by the root key
+// revocation: a revoked namespace delegation cannot be re-created. While the delegation itself is revoked,
+//   valid transactions that have been signed using the authority of the delegation before its revocation stay valid.
 // UNIQUE(namespace, target_key)
 message NamespaceDelegation {
   // fingerprint of the root key defining the namespace
@@ -239,14 +241,24 @@ message VettedPackages {
   reserved 3; // was synchronizer_id = 3;
 }
 
-// mapping that maps a party to a participant
-// authorization: whoever controls the party and all the owners of the participants that
-//   were not already present in the tx with serial = n - 1
-//   exception:
-//     - a participant can disassociate itself with the party unilaterally as long there will be
-//       enough participants to reach "threshold" during confirmation. The disassociating participant
-//       must lower the threshold by one, if otherwise the number of hosting participants would go
-//       below the threshold.
+// Mapping that maps a party to a participant
+// The PartyToParticipant mapping may also specify a list of signing keys for setting up an external party, in which
+// case the keys and the threshold take precedence over any PartyToKeyMapping for the same party.
+// Additionally, the list of signing keys may contain the public key of the party's namespace, which allows this
+// mapping to authorize itself without the need of a NamespaceDelegation root certificate (called self-signed).
+// authorization: the required authorization of the mapping is a union of the authorization for individual changes
+//  - threshold change: party namespace
+//  - adding a signing key: party namespace + all the new signing key
+//  - removing a signing key: party namespace
+//  - changing the signing key threshold: party namespace
+//  - upgrading a participant permission or adding a new participant: namespaces from party and the participant namespace
+//  - downgrading a participant permission or removing a participant: party namespace OR the participant namespace
+//  - setting a participant's onboarding flag from false to true: party namespace
+//  - setting a participant's onboarding flag from true to false: participant namespace
+//  - the removal of a PTP must be authorized just by the party
+// revocation: Revoking a self-signed PTP does not prevent later re-creation of a PTP with the same partyId.
+//  To prevent further usage of the key associated with the party's namespace,
+//  revoke a NamespaceDelegation root certificate for that namespace.
 // UNIQUE(party)
 message PartyToParticipant {
   message HostingParticipant {
@@ -271,12 +283,19 @@ message PartyToParticipant {
   uint32 threshold = 2;
 
   // which participants will host the party.
-  // if threshold > 1, must be Confirmation or Observation
+  // if threshold > 1, must be Confirmation or Observation.
+  // if all participants have Observation permission, the confirmation treshold is ignored, making the party
+  // a purely observing party.
   repeated HostingParticipant participants = 3;
 
   reserved 4; // was group_addressing = 4;
 
   reserved 5; // was synchronizer = 5;
+
+  // Contains protocol signing keys for the party used to authorize externally signed Daml transactions,
+  // along with a signing threshold.
+  // The max number of keys is 20
+  optional com.digitalasset.canton.crypto.v30.SigningKeysWithThreshold party_signing_keys = 6;
 }
 
 // which dynamic synchronizer parameters are supposed to be used on the given synchronizer
@@ -411,7 +430,7 @@ message TopologyMapping {
 // [docs-entry-end: topology mapping]
 
 message TopologyTransaction {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
   Enums.TopologyChangeOp operation = 1;
 
@@ -437,7 +456,7 @@ message MultiTransactionSignatures {
 }
 
 message SignedTopologyTransaction {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
   // serialized topology transaction (protobuf bytestring)
   bytes transaction = 1;
@@ -460,7 +479,7 @@ message SignedTopologyTransaction {
 }
 
 message SignedTopologyTransactions {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
   // serialized signed topology transaction (protobuf bytestring)
   repeated bytes signed_transaction = 1;
@@ -473,7 +492,7 @@ message SignedTopologyTransactions {
  * including the member the submitted the broadcast.
  */
 message TopologyTransactionsBroadcast {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
   string physical_synchronizer_id = 1;
   SignedTopologyTransactions signed_transactions = 2;

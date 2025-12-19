@@ -6,6 +6,9 @@ deleteRules:
   - orgId: 1
     # wasted traffic (sustained)
     uid: adw5rd048zf9cb
+  - orgId: 1
+    # wasted traffic
+    uid: adw5rd048zf9ca
 deleteContactPoints:
   - uid: grafana-default-email
     orgId: 1

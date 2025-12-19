@@ -21,7 +21,7 @@ import org.lfdecentralizedtrust.splice.util.{
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
@@ -186,7 +186,7 @@ trait SplitwellStore extends AppStore {
 object SplitwellStore {
   def apply(
       key: Key,
-      storage: Storage,
+      storage: DbStorage,
       domainConfig: SplitwellSynchronizerConfig,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
@@ -198,20 +198,16 @@ object SplitwellStore {
       templateJsonDecoder: TemplateJsonDecoder,
       close: CloseContext,
   ): SplitwellStore =
-    storage match {
-      case dbStorage: DbStorage =>
-        new DbSplitwellStore(
-          key,
-          domainConfig,
-          dbStorage,
-          loggerFactory,
-          retryProvider,
-          domainMigrationInfo,
-          participantId,
-          ingestionConfig,
-        )
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-    }
+    new DbSplitwellStore(
+      key,
+      domainConfig,
+      storage,
+      loggerFactory,
+      retryProvider,
+      domainMigrationInfo,
+      participantId,
+      ingestionConfig,
+    )
 
   case class Key(
       providerParty: PartyId

@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import cats.data.{NonEmptyVector, OptionT}
 import cats.syntax.either.*
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -59,9 +60,10 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.admin.data.ActiveContractOld as ActiveContract
+import com.digitalasset.canton.participant.admin.data.ActiveContract
 import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.{ByteStringUtil, GrpcStreamingUtils, ResourceUtil}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -71,6 +73,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Try, Using}
+import java.io.ByteArrayInputStream
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
@@ -87,7 +90,14 @@ import org.lfdecentralizedtrust.splice.http.{
   UrlValidator,
 }
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
-import org.lfdecentralizedtrust.splice.store.{AppStore, PageLimit, SortOrder, VotesStore}
+import org.lfdecentralizedtrust.splice.store.{
+  AppStore,
+  AppStoreWithIngestion,
+  PageLimit,
+  SortOrder,
+  VotesStore,
+}
+import AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.time.Clock
@@ -108,7 +118,8 @@ class HttpScanHandler(
     spliceInstanceNames: SpliceInstanceNamesConfig,
     participantAdminConnection: ParticipantAdminConnection,
     sequencerAdminConnection: SequencerAdminConnection,
-    protected val store: ScanStore,
+    protected val storeWithIngestion: AppStoreWithIngestion[ScanStore],
+    updateHistory: UpdateHistory,
     snapshotStore: AcsSnapshotStore,
     eventStore: ScanEventStore,
     dsoAnsResolver: DsoAnsResolver,
@@ -126,7 +137,10 @@ class HttpScanHandler(
     with HttpVotesHandler
     with HttpValidatorLicensesHandler
     with HttpFeatureSupportHandler {
+
   import HttpScanHandler.*
+  private val store = storeWithIngestion.store
+
   override protected val workflowId: String = this.getClass.getSimpleName
   override protected val votesStore: VotesStore = store
   override protected val validatorLicensesStore: AppStore = store
@@ -762,7 +776,6 @@ class HttpScanHandler(
       extracted: TraceContext,
   ): Future[Vector[definitions.UpdateHistoryItem]] = {
     implicit val tc: TraceContext = extracted
-    val updateHistory = store.updateHistory
     val afterO = after.map { after =>
       val afterRecordTime = parseTimestamp(after.afterRecordTime)
       (
@@ -869,7 +882,7 @@ class HttpScanHandler(
     for {
       eventO <- eventStore.getEventByUpdateId(
         updateId,
-        store.updateHistory.domainMigrationInfo.currentMigrationId,
+        updateHistory.domainMigrationInfo.currentMigrationId,
       )
     } yield {
       eventO match {
@@ -911,7 +924,6 @@ class HttpScanHandler(
       extracted: TraceContext,
   ): Future[Vector[definitions.EventHistoryItem]] = {
     implicit val tc: TraceContext = extracted
-    val updateHistory = store.updateHistory
     val afterO = after.map { a =>
       val afterRecordTime = parseTimestamp(a.afterRecordTime)
       (a.afterMigrationId, afterRecordTime)
@@ -1263,7 +1275,7 @@ class HttpScanHandler(
           .sequentialTraverse(txLogEntryMap.view.toList) { case (cid, entry) =>
             // The update history ingests independently so this lookup can return None temporarily.
             // We just filter out those contracts.
-            store.updateHistory
+            updateHistory
               .lookupContractById(TransferCommand.COMPANION)(cid)
               .map(
                 _.map(c =>
@@ -1294,17 +1306,37 @@ class HttpScanHandler(
   /** Filter the given ACS snapshot to contracts the given party is a stakeholder on */
   // TODO(#828) Move this logic inside a Canton gRPC API.
   private def filterAcsSnapshot(input: ByteString, stakeholder: PartyId): ByteString = {
-    val contracts = ActiveContract
-      .loadFromByteString(input)
-      .valueOr(error =>
-        throw Status.INTERNAL
-          .withDescription(s"Failed to read ACS snapshot: ${error}")
-          .asRuntimeException()
-      )
+    val decompressedBytes =
+      ByteStringUtil
+        .decompressGzip(input, None)
+        .valueOr(err =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"Failed to decompress bytes: $err")
+            .asRuntimeException
+        )
+    val contracts = ResourceUtil.withResource(
+      new ByteArrayInputStream(decompressedBytes.toByteArray)
+    ) { inputSource =>
+      GrpcStreamingUtils
+        .parseDelimitedFromTrusted[ActiveContract](
+          inputSource,
+          ActiveContract,
+        )
+        .valueOr(err =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"Failed to parse contracts in acs snapshot: $err")
+            .asRuntimeException
+        )
+    }
     val output = ByteString.newOutput
     Using.resource(new GZIPOutputStream(output)) { outputStream =>
-      contracts.filter(c => c.contract.metadata.stakeholders.contains(stakeholder.toLf)).foreach {
-        c =>
+      contracts
+        .filter(c =>
+          c.contract.getCreatedEvent.signatories.contains(
+            stakeholder.toLf
+          ) || c.contract.getCreatedEvent.observers.contains(stakeholder.toLf)
+        )
+        .foreach { c =>
           c.writeDelimitedTo(outputStream) match {
             case Left(error) =>
               throw Status.INTERNAL
@@ -1312,7 +1344,7 @@ class HttpScanHandler(
                 .asRuntimeException()
             case Right(_) => outputStream.flush()
           }
-      }
+        }
     }
     output.toByteString
   }
@@ -1327,6 +1359,7 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getAcsSnapshot") { _ => _ =>
       val partyId = PartyId.tryFromProtoPrimitive(party)
       for {
+        synchronizerId <- store.getDecentralizedSynchronizerId()
         // The DSO party is a stakeholder on all "important" contracts, in particular, all amulet holdings and ANS entries.
         // This means the SV participants ingest data for that party and we can take a snapshot for that party.
         // To make sure the snapshot is the same regardless of which SV is queried, we filter it down to
@@ -1335,9 +1368,18 @@ class HttpScanHandler(
         // that users backup their own ACS.
         // As the DSO party is hosted on all SVs, an arbitrary scan instance can be chosen for the ACS snapshot.
         // BFT reads are usually not required since ACS commitments act as a check that the ACS was correct.
+        timestampOrOffset <- recordTime match {
+          case None =>
+            storeWithIngestion
+              .connection(SpliceLedgerConnectionPriority.Low)
+              .ledgerEnd()
+              .map(offset => Right(NonNegativeLong.tryCreate(offset)))
+          case Some(time) => Future.successful(Left(time.toInstant))
+        }
         acsSnapshot <- participantAdminConnection.downloadAcsSnapshotNonChunked(
           Set(partyId),
-          timestamp = recordTime.map(_.toInstant),
+          synchronizerId,
+          timestampOrOffset,
         )
       } yield {
         val filteredAcsSnapshot =
@@ -1413,7 +1455,7 @@ class HttpScanHandler(
                   .asRuntimeException(),
               )
             )
-          snapshotTime <- snapshotStore.updateHistory
+          snapshotTime <- updateHistory
             .getUpdatesBefore(
               snapshotStore.currentMigrationId,
               synchronizerId,
@@ -1715,7 +1757,7 @@ class HttpScanHandler(
   ): Future[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]] = {
     implicit val tc = extracted
     for {
-      tx <- store.updateHistory.getUpdate(updateId)
+      tx <- updateHistory.getUpdate(updateId)
     } yield {
       tx.fold[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]](
         Left(
@@ -2013,7 +2055,7 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetMigrationInfoResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getMigrationInfo") { _ => _ =>
-      val sourceHistory = store.updateHistory.sourceHistory
+      val sourceHistory = updateHistory.sourceHistory
       for {
         infoO <- sourceHistory.migrationInfo(body.migrationId)
       } yield infoO match {
@@ -2046,7 +2088,6 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetUpdatesBeforeResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getUpdatesBefore") { _ => _ =>
-      val updateHistory = store.updateHistory
       updateHistory
         .getUpdatesBefore(
           migrationId = body.migrationId,
@@ -2077,7 +2118,6 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetImportUpdatesResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getImportUpdates") { _ => _ =>
-      val updateHistory = store.updateHistory
       updateHistory
         .getImportUpdates(
           migrationId = body.migrationId,
@@ -2207,7 +2247,7 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.getBackfillingStatus") { _ => _ =>
       for {
-        updateHistoryStatus <- store.updateHistory.getBackfillingState()
+        updateHistoryStatus <- updateHistory.getBackfillingState()
         txLogStatus <- store.multiDomainAcsStore.getTxLogBackfillingState()
         updateHistoryComplete = updateHistoryStatus == BackfillingState.Complete
         txLogComplete = txLogStatus == TxLogBackfillingState.Complete

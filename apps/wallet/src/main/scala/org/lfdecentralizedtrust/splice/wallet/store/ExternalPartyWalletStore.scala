@@ -20,7 +20,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.ExternalPart
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
@@ -55,7 +55,7 @@ trait ExternalPartyWalletStore extends TransferInputStore with NamedLogging {
 object ExternalPartyWalletStore {
   def apply(
       key: Key,
-      storage: Storage,
+      storage: DbStorage,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
       domainMigrationInfo: DomainMigrationInfo,
@@ -66,19 +66,15 @@ object ExternalPartyWalletStore {
       templateJsonDecoder: TemplateJsonDecoder,
       close: CloseContext,
   ): ExternalPartyWalletStore = {
-    storage match {
-      case dbStorage: DbStorage =>
-        new DbExternalPartyWalletStore(
-          key,
-          dbStorage,
-          loggerFactory,
-          retryProvider,
-          domainMigrationInfo,
-          participantId,
-          ingestionConfig,
-        )
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-    }
+    new DbExternalPartyWalletStore(
+      key,
+      storage,
+      loggerFactory,
+      retryProvider,
+      domainMigrationInfo,
+      participantId,
+      ingestionConfig,
+    )
   }
 
   case class Key(

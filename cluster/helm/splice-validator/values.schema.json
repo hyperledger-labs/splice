@@ -9,6 +9,45 @@
       "type": "object",
       "description": "The authentication configuration for the application"
     },
+    "scanClient": {
+      "type": "object",
+      "description": "Configuration parameters for the scan client.",
+      "properties": {
+        "scanType": {
+          "type": "string",
+          "enum": [
+            "trust-single",
+            "bft",
+            "bft-custom"
+          ],
+          "description": "The type of scan client configuration."
+        },
+        "scanAddress": {
+          "type": "string",
+          "description": "scan address for trust single type."
+        },
+        "threshold": {
+          "type": "integer",
+          "default": 0,
+          "description": "bft-custom threshold. Optional unless scan-type is bft-custom."
+        },
+        "trustedSvs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of trusted scans. Optional unless scan-type is bft-custom."
+        },
+        "seedUrls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of seed URLs for the scan client."
+        }
+      }
+    },
     "svValidator": {
       "type": "boolean",
       "description": "Whether this validator is part of an SV node"
@@ -23,6 +62,52 @@
     }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": {
+          "scanClient": {
+            "type": "object"
+          }
+        },
+        "required": ["scanClient"]
+      },
+      "then": {
+        "properties": {
+          "scanClient": {
+            "properties": {
+              "seedUrls": {
+                "type": "array",
+                "minItems": 1,
+                "description": "List of seed URLs for the scan client. Must be non-empty if scanClient is set."
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scanClient": {
+            "type": "object",
+            "properties": {
+              "scanType": {
+                "const": "bft-custom"
+              }
+            },
+            "required": ["scanType"]
+          }
+        },
+        "required": ["scanClient"]
+      },
+      "then": {
+        "properties": {
+          "scanClient": {
+            "required": ["threshold", "trustedSvs"]
+          }
+        }
+      }
+    },
     {
       "if": {
         "properties": {
@@ -87,7 +172,6 @@
         "migration",
         "nodeIdentifier",
         "persistence",
-        "scanAddress",
         "spliceInstanceNames"
       ],
       "properties": {
@@ -452,6 +536,29 @@
           "not": { "required": ["validatorWalletUser"] }
         }
       ]
+    },
+    {
+      "if": {
+        "properties": {
+          "scanClient": {
+            "type": "object"
+          }
+        },
+        "required": ["scanClient"]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": ["scanAddress"]
+            },
+            {
+              "required": ["nonSvValidatorTrustSingleScan"]
+            }
+          ]
+        },
+        "errorMessage": "If 'scanClient' is set, 'scanAddress' and 'nonSvValidatorTrustSingleScan' must not be set. All the scan specific configuration must be done inside the 'scanClient' object."
+      }
     }
   ]
 }

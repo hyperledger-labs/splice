@@ -50,12 +50,14 @@ repos:
         language: system
         entry: "scripts/fix-ts.py"
         types_or: [javascript, jsx, ts, tsx]
-        exclude: "/[.]prettierrc[.]cjs$"
-      - id: pulumi_config
-        name: check pulumi configs
+        # TODO(#3334): The current implementation of fix-ts.py makes it impossible to format files
+        #              in the top level pulumi package.
+        exclude: "(/[.]prettierrc[.]cjs$|/pulumi/[^/]+.ts$)"
+      - id: pulumi_tests
+        name: run pulumi tests and check expected files
         language: system
         entry: "make cluster/pulumi/test -j8"
-        files: '^cluster/pulumi/.*[.]ts$'
+        files: '^(cluster/pulumi/.*[.]ts|cluster/.*[.](yaml|yml))$'
         pass_filenames: false
       - id: gha_lint
         name: static check github actions

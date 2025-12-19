@@ -110,6 +110,7 @@ export async function installSplitwell(
       failOnAppVersionMismatch: failOnAppVersionMismatch,
       maxDarVersion: splitwellConfig?.maxDarVersion,
       logLevel: splitwellConfig.logging?.level,
+      logAsyncFlush: splitwellConfig.logging?.async,
     },
     activeVersion,
     { dependsOn: imagePullDeps }
@@ -171,6 +172,7 @@ export async function installSplitwell(
     validatorPartyHint: 'digitalasset-splitwell-1',
     nodeIdentifier: 'splitwell',
     logLevel: splitwellConfig.logging?.level,
+    logAsync: splitwellConfig.logging?.async,
   });
 }
 

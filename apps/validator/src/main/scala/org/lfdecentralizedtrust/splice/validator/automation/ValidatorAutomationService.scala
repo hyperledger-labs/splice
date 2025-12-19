@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
+  UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.QualifiedName
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
@@ -36,7 +37,7 @@ import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -60,7 +61,8 @@ class ValidatorAutomationService(
     domainUnpausedSync: DomainUnpausedSynchronization,
     walletManagerOpt: Option[UserWalletManager], // None when config.enableWallet=false
     store: ValidatorStore,
-    storage: Storage,
+    val updateHistory: UpdateHistory,
+    storage: DbStorage,
     scanConnection: BftScanConnection,
     ledgerClient: SpliceLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
@@ -93,12 +95,16 @@ class ValidatorAutomationService(
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,
-      ingestUpdateHistoryFromParticipantBegin,
       params,
     ) {
   override def companion
       : org.lfdecentralizedtrust.splice.validator.automation.ValidatorAutomationService.type =
     ValidatorAutomationService
+
+  registerUpdateHistoryIngestion(
+    updateHistory,
+    ingestUpdateHistoryFromParticipantBegin,
+  )
 
   automationConfig.topologyMetricsPollingInterval.foreach(topologyPollingInterval =>
     registerTrigger(

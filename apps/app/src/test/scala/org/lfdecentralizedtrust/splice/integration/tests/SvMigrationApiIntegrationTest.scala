@@ -32,7 +32,7 @@ class SvMigrationApiIntegrationTest extends SvIntegrationTestBase {
         lines => forAll(lines)(_.errorMessage should include("HTTP 400 Bad Request")),
       )
     }
-    val dumpTimestamp = Instant.now().minus(30, ChronoUnit.SECONDS)
+    val dumpTimestamp = Instant.now().minus(1, ChronoUnit.MINUTES)
     val expectedDirectory = migrationDumpPathForSv(
       sv1Backend.name
     ).parent / s"export_at_${dumpTimestamp.toEpochMilli}"

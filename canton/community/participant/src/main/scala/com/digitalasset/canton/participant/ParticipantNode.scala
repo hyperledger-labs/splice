@@ -160,6 +160,7 @@ class ParticipantNodeBootstrap(
 
   override protected def customNodeStages(
       storage: Storage,
+      indexedStringStore: IndexedStringStore,
       crypto: Crypto,
       adminServerRegistry: CantonMutableHandlerRegistry,
       adminTokenDispenser: CantonAdminTokenDispenser,
@@ -170,6 +171,7 @@ class ParticipantNodeBootstrap(
   ): BootstrapStageOrLeaf[ParticipantNode] =
     new StartupNode(
       storage,
+      indexedStringStore,
       crypto,
       adminServerRegistry,
       adminTokenDispenser,
@@ -264,7 +266,6 @@ class ParticipantNodeBootstrap(
           nextPackageIds,
           packageMetadataView,
           dryRunSnapshot,
-          acsInspections = () => acsInspectionPerSynchronizer(),
           forceFlags,
           disableUpgradeValidation = parameters.disableUpgradeValidation,
         )
@@ -318,6 +319,7 @@ class ParticipantNodeBootstrap(
 
   private class StartupNode(
       storage: Storage,
+      indexedStringStore: IndexedStringStore,
       crypto: Crypto,
       adminServerRegistry: CantonMutableHandlerRegistry,
       adminTokenDispenser: CantonAdminTokenDispenser,
@@ -380,7 +382,6 @@ class ParticipantNodeBootstrap(
               .map(_.topologyManager),
           lookupActivePsidByLsid = lookupActivePSId,
         ),
-        nodeId = nodeId,
         initialProtocolVersion = ProtocolVersion.latest,
         loggerFactory = ParticipantNodeBootstrap.this.loggerFactory,
         timeouts = timeouts,
@@ -419,12 +420,6 @@ class ParticipantNodeBootstrap(
       // closed in SynchronizerAliasManager
       val registeredSynchronizersStore =
         RegisteredSynchronizersStore(storage, timeouts, loggerFactory)
-      val indexedStringStore = IndexedStringStore.create(
-        storage,
-        parameters.cachingConfigs.indexedStrings,
-        timeouts,
-        loggerFactory,
-      )
 
       for {
         synchronizerAliasManager <- EitherT
@@ -476,6 +471,7 @@ class ParticipantNodeBootstrap(
           indexedStringStore,
           persistentState.map(_.acsCounterParticipantConfigStore).value,
           parameters,
+          arguments.config.topology,
           synchronizerConnectionConfigStore,
           (staticSynchronizerParameters: StaticSynchronizerParameters) =>
             SynchronizerCrypto(crypto, staticSynchronizerParameters),
@@ -538,6 +534,7 @@ class ParticipantNodeBootstrap(
                 clock = clock,
                 commandProgressTracker = commandProgressTracker,
                 ledgerApiStore = persistentState.map(_.ledgerApiStore),
+                contractStore = persistentState.map(_.contractStore),
                 ledgerApiIndexerConfig = LedgerApiIndexerConfig(
                   storageConfig = config.storage,
                   processingTimeout = parameters.processingTimeouts,
@@ -1040,7 +1037,7 @@ class ParticipantNode(
 
   override def status: ParticipantStatus = {
     val ports = Map("ledger" -> config.ledgerApi.port, "admin" -> config.adminApi.port) ++
-      Option.when(config.httpLedgerApi.enabled)("json" -> config.httpLedgerApi.server.port)
+      Option.when(config.httpLedgerApi.enabled)("json" -> config.httpLedgerApi.port)
     val synchronizers = readySynchronizers
     val topologyQueues = identityPusher.queueStatus
 

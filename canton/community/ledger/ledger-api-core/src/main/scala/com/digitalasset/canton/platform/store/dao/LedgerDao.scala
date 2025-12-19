@@ -112,11 +112,17 @@ private[platform] trait LedgerReadDao extends ReportsHealth {
     * @return
     */
   def prune(
+      previousPruneUpToInclusive: Option[Offset],
+      previousIncompleteReassignmentOffsets: Vector[Offset],
       pruneUpToInclusive: Offset,
       incompletReassignmentOffsets: Vector[Offset],
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[Unit]
+
+  def indexDbPrunedUpTo(implicit
+      loggingContext: LoggingContextWithTrace
+  ): Future[Option[Offset]]
 
   /** Return the latest pruned offset inclusive (participant_pruned_up_to_inclusive) from the
     * parameters table (if defined)

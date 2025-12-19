@@ -66,7 +66,7 @@ class MediatorAdminConnection(
   )
   override type Status = MediatorStatus
 
-  override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[MediatorStatus]] =
+  override protected def getStatusRequest: GrpcAdminCommand[?, ?, NodeStatus[MediatorStatus]] =
     MediatorAdminCommands.Health.MediatorStatusCommand()
 
   def getMediatorId(implicit traceContext: TraceContext): Future[MediatorId] =

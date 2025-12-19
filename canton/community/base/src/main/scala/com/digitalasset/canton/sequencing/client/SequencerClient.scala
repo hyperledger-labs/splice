@@ -95,8 +95,8 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterAsyncOps
 import com.digitalasset.canton.util.TryUtil.*
 import com.digitalasset.canton.util.collection.IterableUtil
-import com.digitalasset.canton.util.retry.{AllExceptionRetryPolicy, NoExceptionRetryPolicy}
-import com.digitalasset.canton.{SequencerAlias, SequencerCounter, config, time}
+import com.digitalasset.canton.util.retry.AllExceptionRetryPolicy
+import com.digitalasset.canton.{SequencerAlias, SequencerCounter, config, lifecycle, time}
 import com.google.common.annotations.VisibleForTesting
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -107,9 +107,10 @@ import org.slf4j.event.Level
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.tailrec
+import scala.compat.java8.DurationConverters.FiniteDurationops
 import scala.concurrent.*
 import scala.concurrent.duration.*
-import scala.jdk.DurationConverters.*
+import scala.jdk.DurationConverters.JavaDurationOps
 import scala.util.{Failure, Success, Try}
 
 trait SequencerClient extends SequencerClientSend with FlagCloseable {
@@ -646,6 +647,19 @@ abstract class SequencerClientImpl(
               Left(error),
               nextState,
             )
+
+          case SendAsyncClientError.RequestRefused(sendAsyncError)
+              if sendAsyncError.isOverload && config.enableAmplificationImprovements =>
+            logger.debug(
+              s"Send request with message id $messageId was refused by $sequencerId because it is overloaded"
+            )
+            // Immediately try the next sequencer because the overload may be confined to that one sequencer
+            Either.cond(
+              patienceO.isEmpty,
+              Left(error),
+              nextState,
+            )
+
           case _: SendAsyncClientError.RequestRefused =>
             logger.debug(
               s"Send request with message id $messageId was refused by $sequencerId: $error"
@@ -687,14 +701,19 @@ abstract class SequencerClientImpl(
             FutureUnlessShutdown.abortedDueToShutdown
         }
 
-      def scheduleAmplification(): Unit =
+      def scheduleAmplification(durationOfPreviousAttempt: FiniteDuration): Unit =
         patienceO match {
           case Some(patience) =>
+            val durationToWait = if (config.enableAmplificationImprovements) {
+              (patience.asFiniteApproximation - durationOfPreviousAttempt).max(Duration.Zero)
+            } else patience.asFiniteApproximation
+
             logger.debug(
-              s"Scheduling amplification for message ID $messageId after $patience"
+              s"Scheduling amplification for message ID $messageId ${if (durationToWait <= Duration.Zero) "immediately"
+                else s"after ${LoggerUtil.roundDurationForHumans(durationToWait)}"}"
             )
             FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
-              clock.scheduleAfter(_ => maybeResendAfterPatience(), patience.asJava).flatten,
+              clock.scheduleAfter(_ => maybeResendAfterPatience(), durationToWait.toJava).flatten,
               s"Submission request amplification failed for message ID $messageId",
             )
           case None =>
@@ -720,13 +739,15 @@ abstract class SequencerClientImpl(
               metricsContext.withExtraLabels("target-sequencer" -> sequencerAlias.toString)
             )
 
+            val startTimeOfAttempt = clock.now
+
             val sendResultETUS = transportOrPoolConnection match {
               case Right(connection) => connection.sendAsync(signedRequest, timeout)
               case Left(transport) => transport.sendAsyncSigned(signedRequest, timeout)
             }
 
             // We are treating a shutdown result in the same way as a normal result, instead of propagating it up.
-            // Note that this is the shutdown of the transport, not the sequencer client (see `performUnlessClosingF` above).
+            // Note that this is the shutdown of the transport, not the sequencer client (see `synchronizeWithClosingF` above).
             // It can happen outside a regular shutdown when closing a connection for a fatal reason.
             //
             // If this send attempt is happening outside the application handler (e.g. a confirmation request),
@@ -738,13 +759,15 @@ abstract class SequencerClientImpl(
             // this information is global to the sequencer client, the reception of a new event on any sequencer subscription
             // will result in shutting down that subscription (because the handler has shut down), eventually leading to a
             // disconnect from the synchronizer when the trust threshold is no longer satisfied.
-            sendResultETUS.value.onShutdown(Either.unit)
+            sendResultETUS.value
+              .onShutdown(Either.unit)
+              .map(((clock.now - startTimeOfAttempt).toScala, _))
           }.map {
-            case Right(()) =>
+            case (durationOfAttempt, Right(())) =>
               // Do not await the patience. This would defeat the point of asynchronous send.
-              scheduleAmplification()
+              scheduleAmplification(durationOfAttempt)
               Right(Either.unit)
-            case Left(error) =>
+            case (_, Left(error)) =>
               handleSyncError(error, sequencerId)
           }
 
@@ -756,7 +779,7 @@ abstract class SequencerClientImpl(
           } else {
             // Otherwise, skip this step and retry later
             logger.debug(s"No connection available -- skip sending message $messageId")
-            scheduleAmplification()
+            scheduleAmplification(Duration.Zero)
             Either.unit
           }
 
@@ -921,6 +944,52 @@ abstract class SequencerClientImpl(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, GenericStoredTopologyTransactions] = {
     val triedSequencersRef = new AtomicReference[Set[SequencerId]](Set.empty)
+    val request = TopologyStateForInitRequest(member, protocolVersion)
+
+    def bftInitTopologyStateHash(
+        request: TopologyStateForInitRequest
+    ): EitherT[FutureUnlessShutdown, String, TopologyStateForInitHashResponse] =
+      if (config.useNewConnectionPool) {
+        NonEmpty
+          .from(connectionPool.getOneConnectionPerSequencer("init-topology-state-hash"))
+          .fold(
+            EitherT.leftT[FutureUnlessShutdown, TopologyStateForInitHashResponse](
+              "No connection available to get initial topology state hash"
+            )
+          )(sequencerConnections =>
+            BftSender
+              .makeRequest(
+                "init-topology-state-hash",
+                futureSupervisor,
+                logger,
+                sequencerConnections,
+                sequencerTransports.sequencerTrustThreshold,
+              )(
+                _.downloadTopologyStateForInitHash(request, timeouts.network.duration)
+              )(identity)
+              .leftMap(err => s"Failed to get initial topology state hash: $err")
+          )
+      } else {
+        EitherT
+          .liftF(
+            lifecycle.FutureUnlessShutdown.lift(
+              sequencersTransportState.allTransports
+            )
+          )
+          .flatMap(transportsMap =>
+            BftSender
+              .makeRequest(
+                "init-topology-state-hash",
+                futureSupervisor,
+                logger,
+                transportsMap,
+                sequencerTransports.sequencerTrustThreshold,
+              )(
+                _.downloadTopologyStateForInitHash(request)
+              )(identity)
+              .leftMap(err => s"Failed to get initial topology state hash: $err")
+          )
+      }
 
     def downloadSnapshot(
         request: TopologyStateForInitRequest
@@ -955,19 +1024,15 @@ abstract class SequencerClientImpl(
       resultET.map(_.topologyTransactions.value)
     }
 
-    val request = TopologyStateForInitRequest(member, protocolVersion)
-    val resultFUS = retry
-      .Pause(
-        logger = logger,
-        hasSynchronizeWithClosing = closeContext.context,
-        maxRetries = maxRetries,
-        delay = 1.second,
-        operationName = "Download topology state for init",
-        retryLogLevel = retryLogLevel,
-      )
-      .unlessShutdown(downloadSnapshot(request).value, NoExceptionRetryPolicy)
-
-    EitherT(resultFUS)
+    BftTopologyForInitDownloader.downloadAndVerifyTopologyTxs(
+      maxRetries,
+      retryLogLevel,
+      retryDelay = 1.second,
+      request,
+      loggerFactory,
+      bftInitTopologyStateHash,
+      downloadSnapshot,
+    )
   }
 
   override val timeFetcher =
@@ -1343,6 +1408,8 @@ class RichSequencerClientImpl(
           val sequencerSubscriptionPoolFactory = new SequencerSubscriptionPoolFactoryImpl(
             sequencerSubscriptionFactory,
             subscriptionHandlerFactory,
+            metrics.connectionPool,
+            metricsContext = MetricsContext.Empty,
             timeouts,
             loggerFactory,
           )

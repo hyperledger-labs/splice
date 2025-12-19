@@ -129,7 +129,8 @@ object DomainMigrationDump {
       )
       participantUsersDataExporter = new ParticipantUsersDataExporter(ledgerConnection)
       participantUsersData <- participantUsersDataExporter.exportParticipantUsersData()
-      snapshot <- domainDataSnapshotGenerator.getDomainDataSnapshot(atTime, None, force = false)
+      // we set force to true in order to bypass the timestamp equality check
+      snapshot <- domainDataSnapshotGenerator.getDomainDataSnapshot(atTime, None, force = true)
     } yield DomainMigrationDump(
       migrationId,
       identities,

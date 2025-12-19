@@ -16,7 +16,7 @@ final class Value[T](
   // Overridden to avoid equality on toValue. toValue is uniquely defined
   // for codegen values so this is safe.
   override def equals(obj: Any) = obj match {
-    case that: Value[_] => this.value == that.value
+    case that: Value[?] => this.value == that.value
     case _ => false
   }
 

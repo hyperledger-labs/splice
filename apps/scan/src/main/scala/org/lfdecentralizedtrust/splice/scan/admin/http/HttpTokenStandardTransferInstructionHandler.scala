@@ -57,7 +57,9 @@ class HttpTokenStandardTransferInstructionHandler(
                 .asRuntimeException()
             )
         }
-        (choiceContextBuilder, newestOpenRound) <- getAmuletRulesTransferContext()
+        (choiceContextBuilder, newestOpenRound) <- getAmuletRulesTransferContext(
+          body.excludeDebugFields.getOrElse(false)
+        )
         externalPartyAmuletRules <- store.getExternalPartyAmuletRules()
         // pre-approval and featured app rights are only provided if they exist and are required
         receiver = PartyId.tryFromProtoPrimitive(transferInstr.transfer.receiver)
@@ -107,6 +109,7 @@ class HttpTokenStandardTransferInstructionHandler(
         choiceContext <- getTransferInstructionChoiceContext(
           transferInstructionId,
           requireLockedAmulet = true,
+          excludeDebugFields = body.excludeDebugFields.getOrElse(false),
         )
       } yield {
         v1.Resource.GetTransferInstructionAcceptContextResponseOK(choiceContext)
@@ -125,6 +128,7 @@ class HttpTokenStandardTransferInstructionHandler(
         choiceContext <- getTransferInstructionChoiceContext(
           transferInstructionId,
           requireLockedAmulet = false,
+          excludeDebugFields = body.excludeDebugFields.getOrElse(false),
         )
       } yield {
         v1.Resource.GetTransferInstructionRejectContextResponseOK(choiceContext)
@@ -143,6 +147,7 @@ class HttpTokenStandardTransferInstructionHandler(
         choiceContext <- getTransferInstructionChoiceContext(
           transferInstructionId,
           requireLockedAmulet = false,
+          excludeDebugFields = body.excludeDebugFields.getOrElse(false),
         )
       } yield {
         v1.Resource.GetTransferInstructionWithdrawContextResponseOK(choiceContext)
@@ -150,7 +155,7 @@ class HttpTokenStandardTransferInstructionHandler(
     }
   }
 
-  private def getAmuletRulesTransferContext()(implicit
+  private def getAmuletRulesTransferContext(excludeDebugFields: Boolean)(implicit
       tc: TraceContext
   ): Future[(ChoiceContextBuilder, splice.round.OpenMiningRound)] = {
     val now = clock.now
@@ -170,7 +175,8 @@ class HttpTokenStandardTransferInstructionHandler(
         AmuletConfigSchedule(amuletRules.payload.configSchedule)
           .getConfigAsOf(now)
           .decentralizedSynchronizer
-          .activeSynchronizer
+          .activeSynchronizer,
+        excludeDebugFields,
       )
 
       (
@@ -187,6 +193,7 @@ class HttpTokenStandardTransferInstructionHandler(
   private def getTransferInstructionChoiceContext(
       transferInstructionId: String,
       requireLockedAmulet: Boolean,
+      excludeDebugFields: Boolean,
   )(implicit
       tc: TraceContext
   ): Future[definitions.ChoiceContext] = {
@@ -216,7 +223,7 @@ class HttpTokenStandardTransferInstructionHandler(
         None,
         store,
         clock,
-        new ChoiceContextBuilder(_),
+        new ChoiceContextBuilder(_, excludeDebugFields),
       )
     } yield context
   }
@@ -225,13 +232,13 @@ class HttpTokenStandardTransferInstructionHandler(
 
 object HttpTokenStandardTransferInstructionHandler {
 
-  final class ChoiceContextBuilder(activeSynchronizerId: String)(implicit
-      elc: ErrorLoggingContext
+  final class ChoiceContextBuilder(activeSynchronizerId: String, excludeDebugFields: Boolean)(
+      implicit elc: ErrorLoggingContext
   ) extends util.ChoiceContextBuilder[
         definitions.DisclosedContract,
         definitions.ChoiceContext,
         ChoiceContextBuilder,
-      ](activeSynchronizerId) {
+      ](activeSynchronizerId, excludeDebugFields) {
 
     def build(): definitions.ChoiceContext = definitions.ChoiceContext(
       choiceContextData = io.circe.parser
@@ -248,6 +255,7 @@ object HttpTokenStandardTransferInstructionHandler {
     override protected def toTokenStandardDisclosedContract[TCId, T](
         contract: Contract[TCId, T],
         synchronizerId: String,
+        excludeDebugFields: Boolean,
     ): definitions.DisclosedContract = {
       val asHttp = contract.toHttp
       definitions.DisclosedContract(
@@ -256,9 +264,15 @@ object HttpTokenStandardTransferInstructionHandler {
         createdEventBlob = asHttp.createdEventBlob,
         synchronizerId = synchronizerId,
         debugPackageName =
-          DarResources.lookupPackageId(contract.identifier.getPackageId).map(_.metadata.name),
-        debugPayload = Some(asHttp.payload),
-        debugCreatedAt = Some(contract.createdAt.atOffset(ZoneOffset.UTC)),
+          if (excludeDebugFields) None
+          else
+            DarResources
+              .lookupPackageId(contract.identifier.getPackageId)
+              .map(_.metadata.name),
+        debugPayload = if (excludeDebugFields) None else Some(asHttp.payload),
+        debugCreatedAt =
+          if (excludeDebugFields) None
+          else Some(contract.createdAt.atOffset(ZoneOffset.UTC)),
       )
     }
   }

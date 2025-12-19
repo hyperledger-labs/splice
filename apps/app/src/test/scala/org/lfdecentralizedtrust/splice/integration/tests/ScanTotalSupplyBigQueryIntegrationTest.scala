@@ -12,6 +12,7 @@ import com.digitalasset.daml.lf.data.Time.Timestamp as LfTimestamp
 import com.google.cloud.bigquery as bq
 import bq.{Field, FieldValueList, JobInfo, Schema, TableId, TableResult}
 import bq.storage.v1.{JsonStreamWriter, TableSchema}
+import org.scalatest.concurrent.TimeLimits.failAfter
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.*
 import slick.jdbc.GetResult
 
@@ -62,6 +63,11 @@ class ScanTotalSupplyBigQueryIntegrationTest
   }
   private val functionsDatasetName = s"functions_$uuid"
   private val dashboardsDatasetName = s"dashboards_$uuid"
+  private val allDatasetNames = Seq(
+    datasetName,
+    functionsDatasetName,
+    dashboardsDatasetName,
+  )
 
   // Test data parameters
   private val mintedAppRewardsAmount = BigDecimal(0)
@@ -80,9 +86,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
   // The test currently produces 80 transactions, which is 0.000926 tps over 24 hours,
   // so we assert for a range of 70-85 transactions, or 0.0008-0.00099 tps.
   private val avgTps = (0.0008, 0.00099)
-  // The peak is 22 transactions in a (simulated) minute, or 0.36667 tps over a minute,
-  // so we assert 19-25 transactions, or 0.31-0.42 tps
-  private val peakTps = (0.31, 0.42)
+  // The peak is 18 transactions in a (simulated) minute, or 0.3 tps over a minute,
+  // so we assert 15-21 transactions, or 0.25-0.35 tps
+  private val peakTps = (0.25, 0.35)
   private val totalRounds = 4
 
   override def beforeAll() = {
@@ -127,12 +133,31 @@ class ScanTotalSupplyBigQueryIntegrationTest
   }
 
   override def afterAll() = {
-    logger.info(s"Cleaning up BigQuery dataset: $datasetName")
+    val singleDeleteTryTime = 13.seconds
 
-    // Delete the temporary BigQuery datasets after tests
-    bigquery.delete(datasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
-    bigquery.delete(functionsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
-    bigquery.delete(dashboardsDatasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+    Future
+      .traverse(allDatasetNames) { dsName =>
+        val logMsg = s"Cleaning up BigQuery dataset: $dsName"
+        Future {
+          logger.info(logMsg)
+          // afterAll only has 60s to complete before its thread gets
+          // interrupted
+          eventuallySucceeds(timeUntilSuccess = 45.seconds, suppressErrors = false) {
+            failAfter(singleDeleteTryTime) {
+              // can hang, so we force retry after singleDeleteTryTime;
+              // even when it hangs it's still likely to succeed, and delete
+              // just succeeds with `false` if already deleted
+              bigquery.delete(dsName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+            }
+          }
+          logger.info(s"Finished $logMsg")
+        }.recoverWith { case util.control.NonFatal(e) =>
+          logger.warn(s"Failed $logMsg")
+          Future failed e
+        }
+      }
+      .futureValue
+
     super.afterAll()
   }
 
@@ -270,30 +295,26 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def createTestData(bobParty: PartyId)(implicit
       env: FixtureParam
   ): Unit = {
-    actAndCheck(
-      "step forward many rounds", {
-        actAndCheck(
-          "Advance the first round", {
-            advanceRoundsToNextRoundOpening
-          },
-        )(
-          "Wait for alice to report activity up to round 2",
-          _ =>
-            aliceValidatorWalletClient
-              .listValidatorLivenessActivityRecords()
-              .map(_.payload.round.number) should contain(2),
-        )
-
-        (3 to 6).foreach { _ =>
+    forAll(
+      Table(
+        ("round", "expected balance"),
+        (2, BigDecimal("0")),
+        (3, BigDecimal("6512.93759512940")),
+        (4, BigDecimal("13025.8751902588")),
+        (5, BigDecimal("19538.8127853882")),
+        (6, aliceValidatorMintedAmount),
+      )
+    ) { (expectRound, expectedBalance) =>
+      actAndCheck(timeUntilSuccess = 30.seconds)(
+        s"Advance round ${expectRound - 1}", {
           advanceRoundsToNextRoundOpening
-        }
-      },
-    )(
-      "alice validator receives rewards",
-      _ => {
-        aliceValidatorWalletClient.balance().unlockedQty shouldBe aliceValidatorMintedAmount
-      },
-    )
+          advanceTimeForRewardAutomationToRunForCurrentRound
+        },
+      )(
+        s"alice validator receives rewards up to round $expectRound",
+        _ => aliceValidatorWalletClient.balance().unlockedQty should be >= expectedBalance,
+      )
+    }
 
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
     val (lockingParty, lockingClient) = (aliceValidatorParty, aliceValidatorWalletClient)
@@ -325,7 +346,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
       case db: DbStorage => db
       case s => fail(s"non-DB storage configured, unsupported for BigQuery: ${s.getClass}")
     }
-    val sourceHistoryId = sv1ScanBackend.appState.store.updateHistory.historyId
+    val sourceHistoryId = sv1ScanBackend.appState.automation.updateHistory.historyId
 
     copyTableToBigQuery(
       "update_history_creates",

@@ -134,6 +134,10 @@ While doing so, please note the following:
 * No ingress rules need to be updated as part of this step.
   Once the redeployment is complete the existing ingress rules will apply to the updated pods.
 
+Once you have confirmed that the migration has been successful:
+
+* Please change the ``migration.migrating`` value on the ``sv`` chart back to ``false``.
+
 Recovering from a failed upgrade
 ++++++++++++++++++++++++++++++++
 

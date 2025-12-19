@@ -1,0 +1,46 @@
+name: Bump GHA runner version
+on:
+  schedule:
+    - cron: '30 6 1,15 * *'  # Monthly on the 1st and 15th at 06:30
+  workflow_dispatch:
+
+jobs:
+  bump_gha_runner_version:
+    name: Bump GHA runner version
+    runs-on: self-hosted-k8s-small
+    container:
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup
+        shell: bash
+        run: ./.github/actions/scripts/common_setup.sh
+
+      - name: Set up Nix (Self hosted)
+        uses: ./.github/actions/nix/setup_nix
+        with:
+          cache_version: 7
+          artifactory_user: dummy
+          artifactory_password: dummy
+      
+      - name: Check for the latest version and create a PR to splice
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: |
+            git config user.email "splice-maintainers@digitalasset.com"
+            git config user.name "DA Automation"
+            ./scripts/bump-gha-runner-version.sh
+          additional_nix_args: "--keep GH_TOKEN"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Report Failures on Slack & Github
+        if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+        uses: ./.github/actions/tests/failure_notifications
+        with:
+          workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'
+          service_account: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}'
+          notifications_url: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}'
+          slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'

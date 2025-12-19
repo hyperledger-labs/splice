@@ -125,6 +125,7 @@ class InMemoryPhysicalSyncPersistentState(
     staticSynchronizerParameters,
     topologyStore,
     synchronizerOutboxQueue,
+    dispatchQueueBackpressureLimit = parameters.general.dispatchQueueBackpressureLimit,
     disableOptionalTopologyChecks = parameters.disableOptionalTopologyChecks,
     exitOnFatalFailures = parameters.exitOnFatalFailures,
     timeouts,
@@ -145,8 +146,6 @@ class InMemoryPhysicalSyncPersistentState(
         nextPackageIds,
         packageMetadataView,
         dryRunSnapshot,
-        acsInspections =
-          () => Map(logicalSyncPersistentState.lsid -> logicalSyncPersistentState.acsInspection),
         forceFlags,
         disableUpgradeValidation = parameters.disableUpgradeValidation,
       )

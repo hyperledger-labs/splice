@@ -115,7 +115,7 @@
       "properties": {
         "limits": {
           "type": "object",
-          "required": [ "cpu", "memory" ],
+          "required": [ "memory" ],
           "properties": {
             "cpu": {
               "type": "string",

@@ -41,9 +41,11 @@ export const skipExtraSvs = config.envFlag('SPLICE_SKIP_EXTRA_SVS', false);
 function getAllSvNamesToDeploy(): string[] {
   const coreSvs = Array.from({ length: dsoSize }, (_, index) => `sv-${index + 1}`);
   const extraSvs = skipExtraSvs ? [] : configuredExtraSvs;
-  const svRunbook = DeploySvRunbook ? ['sv'] : [];
+  const svRunbook = DeploySvRunbook ? [svRunbookNodeName] : [];
   return [coreSvs, extraSvs, svRunbook].flat();
 }
+
+export const svRunbookNodeName = 'sv';
 
 // use this is if imporing `svConfigs` for `allSvsToDeploy` doesn't work for you because you don't have a pulumi runtime
 export const allSvNamesToDeploy = getAllSvNamesToDeploy();

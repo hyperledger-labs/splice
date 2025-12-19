@@ -433,14 +433,15 @@ function subcmd_logs() {
 
 function k8s_labels_for_app() {
     local global_domain_specific_apps=("global-domain-cometbft" "global-domain-sequencer" "global-domain-mediator")
-    local domain_specific_apps=("participant")
+    local domain_specific_apps="@(participant|multi-participant-[0-9][0-9])"
 
     # shellcheck disable=SC2076
+    # shellcheck disable=SC2053
     if [[ " ${global_domain_specific_apps[*]} " =~ " ${app} " ]]; then
        # If the app is in the list, append the domain to the app
        app_container=${app#"global-domain-"}
        app="global-domain-${domain}-${app#"global-domain-"}"
-    elif [[ " ${domain_specific_apps[*]} " =~ " ${app} " ]]; then
+    elif [[ "$app" == $domain_specific_apps ]]; then
        # If the app is in the list, append the domain to the app
        app="${app}-${domain}"
     fi
@@ -1517,12 +1518,20 @@ function subcmd_participant_console() {
 
     namespace="${1-}"
     domain=${2:-0}
+    app=${3:-"participant"}
+    participant_number=${4:-0}
 
     if [ -z "${namespace}" ]; then
-        _error "Usage: $SCRIPTNAME participant_console <namespace-name> [domain_migration_id]"
+        _error "Usage: $SCRIPTNAME participant_console <namespace-name> [domain_migration_id (Default: 0)]
+        [app <participant|multi-participant-X> (Default: participant)] [participant_number <0-9> (Default: 0)]
+
+              Example: opening sv-1 participant console
+                cncluster participant_console sv-1 7
+
+              Example: opening multi-participant-24 console
+                cncluster participant_console multi-validator 7 multi-participant-24 7"
     fi
 
-    app="participant"
     app_container="$app"
     k8s_labels_for_app
 
@@ -1584,7 +1593,7 @@ function subcmd_participant_console() {
     fi
 
     _info "Starting port forwarding from '$participant_pod'..."
-    kubectl port-forward -n "$namespace" "$participant_pod" 11001:5001 11002:5002 &
+    kubectl port-forward -n "$namespace" "$participant_pod" 11001:5"${participant_number}"01 11002:5"${participant_number}"02 &
     port_forwarding_pid=$!
 
     _info "Starting Canton console..."

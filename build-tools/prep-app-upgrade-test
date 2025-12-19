@@ -37,5 +37,4 @@ mkdir -p "daml/splitwell/src/main/resources/dar/"
 cp "${BUNDLE_DIR}/splice-node/dars/splitwell-current.dar" "daml/splitwell/src/main/resources/dar/splitwell-base.dar"
 mkdir -p "daml/splitwell/.daml/dist/"
 cp "${BUNDLE_DIR}/splice-node/dars/splitwell-current.dar" "daml/splitwell/.daml/dist/splitwell-base.dar"
-sed -i 's/splitwell-current.dar/splitwell-base.dar/g' "${BUNDLE_DIR}"/splice-node/examples/splitwell/splitwell-validator.conf
 sed -i 's/splitwell-current.dar/splitwell-base.dar/g' "${BUNDLE_DIR}"/splice-node/testResources/include/validators/splitwell-validator.conf

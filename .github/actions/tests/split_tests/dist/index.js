@@ -22,12 +22,18 @@ function getTestSuiteTimesFromXml(testReportsDir) {
     try {
         fs_1.default.readdirSync(testReportsDir).forEach(file => {
             if (file.endsWith('.xml')) {
-                const path = `${testReportsDir}/${file}`;
-                const XMLdata = fs_1.default.readFileSync(path);
-                const parsed = parser.parse(XMLdata);
-                const testSuiteName = parsed.testsuite['@_name'];
-                const testSuiteTime = parseFloat(parsed.testsuite['@_time']);
-                testTimes[testSuiteName] = testSuiteTime;
+                try {
+                    console.log(`Parsing xml report ${file}`);
+                    const path = `${testReportsDir}/${file}`;
+                    const XMLdata = fs_1.default.readFileSync(path);
+                    const parsed = parser.parse(XMLdata);
+                    const testSuiteName = parsed.testsuite['@_name'];
+                    const testSuiteTime = parseFloat(parsed.testsuite['@_time']);
+                    testTimes[testSuiteName] = testSuiteTime;
+                }
+                catch (e) {
+                    console.error(`Failed to parse xml report ${file}`);
+                }
             }
         });
     }
@@ -69,7 +75,7 @@ function computeBuckets(testReportsDir, testNamesFile, splitTotal) {
     // Build a sorted list of test names, sorted by their estimated test time.
     // We first sort alphabetically, so that tests with the same estimated time
     // are sorted in a deterministic way.
-    const sortedTestNames = testNames.sort().sort((a, b) => estimatedTestTimes[a] - estimatedTestTimes[b]);
+    const sortedTestNames = testNames.sort().sort((a, b) => estimatedTestTimes[a] - estimatedTestTimes[b]).reverse();
     const buckets = splitTests(sortedTestNames, estimatedTestTimes, splitTotal);
     buckets.forEach((bucket, i) => {
         console.log(`bucket ${i}: ${bucket.length} tests, total time: ${bucket.reduce((acc, testName) => acc + estimatedTestTimes[testName], 0)}`);

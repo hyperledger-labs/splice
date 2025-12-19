@@ -7,6 +7,7 @@ import cats.Functor
 import cats.data.EitherT
 import cats.implicits.*
 import com.daml.grpc.AuthCallCredentials
+import com.digitalasset.base.error.utils.DecodedCantonError
 import com.digitalasset.base.error.{
   ErrorCategory,
   ErrorCategoryRetry,
@@ -367,6 +368,14 @@ object CantonGrpcUtil {
       }
   }
 
+  /** Logs all errors except those for which `doNotLog` returns true */
+  class FilteredGrpcLogPolicy(doNotLog: DecodedCantonError => Boolean) extends GrpcLogPolicy {
+    def log(error: GrpcError, logger: TracedLogger)(implicit traceContext: TraceContext): Unit =
+      if (!error.decodedCantonError.exists(doNotLog)) {
+        error.log(logger)
+      }
+  }
+
   object RetryPolicy {
     lazy val noRetry: GrpcError => Boolean = _ => false
   }
@@ -403,20 +412,22 @@ object CantonGrpcUtil {
       }
     }
 
-    /** Error used by the Admin API server limits */
+    /** Error used by the API server limits */
     @Explanation(
       """The node is at capacity and therefore limits the number of parallel requests."""
     )
     @Resolution("""Retry with exponential backoff.""")
     object Overloaded
         extends ErrorCode(id = "SERVER_OVERLOADED", ErrorCategory.ContentionOnSharedResources) {
-      final case class TooManyStreams(methodName: String)(implicit
+      final case class TooManyConcurrentRequests(methodName: String, remoteAddr: String)(implicit
           val loggingContext: ErrorLoggingContext
       ) extends CantonError.Impl(
             cause =
-              s"Reached the limit of concurrent streams for $methodName. Please try again later"
+              s"Reached the limit of concurrent requests for $methodName. Please try again later"
           ) {
         override def retryable = Some(ErrorCategoryRetry(5.seconds))
+        // not logged automatically in order to throttle logging
+        override def logOnCreation: Boolean = false
       }
     }
 

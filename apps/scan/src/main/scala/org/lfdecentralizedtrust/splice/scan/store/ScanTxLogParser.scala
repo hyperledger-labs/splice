@@ -356,7 +356,7 @@ object ScanTxLogParser {
 
     private def getAmuletFromSummary(
         tx: Transaction,
-        ccsum: AmuletCreateSummary[_ <: codegen.ContractId[AmuletCreate.T]],
+        ccsum: AmuletCreateSummary[? <: codegen.ContractId[AmuletCreate.T]],
     ) = {
       val amuletCid = ccsum.amulet
       tx.findCreation(AmuletCreate.companion, amuletCid)
@@ -372,7 +372,7 @@ object ScanTxLogParser {
         tx: Transaction,
         event: Event,
         synchronizerId: SynchronizerId,
-        acsum: AmuletCreateSummary[_ <: codegen.ContractId[AmuletCreate.T]],
+        acsum: AmuletCreateSummary[? <: codegen.ContractId[AmuletCreate.T]],
         activityType: TransactionType,
     ): State = {
       val amulet = getAmuletFromSummary(tx, acsum)

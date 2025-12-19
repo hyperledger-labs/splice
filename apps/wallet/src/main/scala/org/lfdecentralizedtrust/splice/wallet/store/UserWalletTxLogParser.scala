@@ -1454,7 +1454,7 @@ object UserWalletTxLogParser {
     def fromAmuletCreateSummary(
         tx: Transaction,
         event: Event,
-        acsum: AmuletCreateSummary[_ <: ContractId[AmuletCreate.T]],
+        acsum: AmuletCreateSummary[? <: ContractId[AmuletCreate.T]],
         transactionSubtype: BalanceChangeTransactionSubtype,
     ): State = {
       // Note: AmuletCreateSummary only contains the contract id of the new amulet, but not the amulet payload.

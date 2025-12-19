@@ -12,17 +12,18 @@ import scala.concurrent.ExecutionContext
   */
 trait AppStore extends NamedLogging with AutoCloseable with StoreErrors {
 
+  val storeName: String
+
   implicit protected def ec: ExecutionContext
 
   /** Defines which create events are to be ingested into the store. */
-  protected def acsContractFilter
-      : MultiDomainAcsStore.ContractFilter[_ <: AcsRowData, _ <: AcsInterfaceViewRowData]
+  def acsContractFilter
+      : MultiDomainAcsStore.ContractFilter[? <: AcsRowData, ? <: AcsInterfaceViewRowData]
 
   def domains: SynchronizerStore
 
   def multiDomainAcsStore: MultiDomainAcsStore
 
-  def updateHistory: UpdateHistory
 }
 
 trait TxLogAppStore[TXE] extends AppStore {

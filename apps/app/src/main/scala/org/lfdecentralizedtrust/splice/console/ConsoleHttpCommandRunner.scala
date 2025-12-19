@@ -44,7 +44,7 @@ class ConsoleHttpCommandRunner(
 
   def runCommand[Result](
       instanceName: String,
-      command: HttpCommand[_, Result],
+      command: HttpCommand[?, Result],
       headers: List[HttpHeader],
       clientConfig: NetworkAppClientConfig,
   ): ConsoleCommandResult[Result] =

@@ -56,6 +56,7 @@ class HttpTokenStandardAllocationInstructionHandler(
             .getConfigAsOf(now)
             .decentralizedSynchronizer
             .activeSynchronizer
+        val excludeDebugFields = body.excludeDebugFields.getOrElse(false)
         v1.Resource.GetAllocationFactoryResponseOK(
           definitions.FactoryWithChoiceContext(
             externalPartyAmuletRules.contractId.contractId,
@@ -78,9 +79,18 @@ class HttpTokenStandardAllocationInstructionHandler(
                 toTokenStandardDisclosedContract(
                   externalPartyAmuletRules.contract,
                   activeSynchronizerId,
+                  excludeDebugFields,
                 ),
-                toTokenStandardDisclosedContract(amuletRules, activeSynchronizerId),
-                toTokenStandardDisclosedContract(newestOpenRound.contract, activeSynchronizerId),
+                toTokenStandardDisclosedContract(
+                  amuletRules,
+                  activeSynchronizerId,
+                  excludeDebugFields,
+                ),
+                toTokenStandardDisclosedContract(
+                  newestOpenRound.contract,
+                  activeSynchronizerId,
+                  excludeDebugFields,
+                ),
               ),
             ),
           )
@@ -93,6 +103,7 @@ class HttpTokenStandardAllocationInstructionHandler(
   private def toTokenStandardDisclosedContract[TCId, T](
       contract: Contract[TCId, T],
       synchronizerId: String,
+      excludeDebugFields: Boolean,
   )(implicit elc: ErrorLoggingContext): definitions.DisclosedContract = {
     val asHttp = contract.toHttp
     definitions.DisclosedContract(
@@ -101,9 +112,15 @@ class HttpTokenStandardAllocationInstructionHandler(
       createdEventBlob = asHttp.createdEventBlob,
       synchronizerId = synchronizerId,
       debugPackageName =
-        DarResources.lookupPackageId(contract.identifier.getPackageId).map(_.metadata.name),
-      debugPayload = Some(asHttp.payload),
-      debugCreatedAt = Some(contract.createdAt.atOffset(ZoneOffset.UTC)),
+        if (excludeDebugFields) None
+        else
+          DarResources
+            .lookupPackageId(contract.identifier.getPackageId)
+            .map(_.metadata.name),
+      debugPayload = if (excludeDebugFields) None else Some(asHttp.payload),
+      debugCreatedAt =
+        if (excludeDebugFields) None
+        else Some(contract.createdAt.atOffset(ZoneOffset.UTC)),
     )
   }
 

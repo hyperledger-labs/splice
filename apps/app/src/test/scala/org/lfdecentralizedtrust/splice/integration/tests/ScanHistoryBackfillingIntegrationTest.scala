@@ -279,8 +279,8 @@ class ScanHistoryBackfillingIntegrationTest
     )(
       "History marked as free of corrupt snapshots",
       _ => {
-        sv1ScanBackend.appState.store.updateHistory.corruptAcsSnapshotsDeleted shouldBe true
-        sv2ScanBackend.appState.store.updateHistory.corruptAcsSnapshotsDeleted shouldBe true
+        sv1ScanBackend.appState.automation.updateHistory.corruptAcsSnapshotsDeleted shouldBe true
+        sv2ScanBackend.appState.automation.updateHistory.corruptAcsSnapshotsDeleted shouldBe true
       },
     )
 
@@ -307,7 +307,7 @@ class ScanHistoryBackfillingIntegrationTest
     )(
       "Backfilling is complete only on the founding SV",
       _ => {
-        sv1ScanBackend.appState.store.updateHistory
+        sv1ScanBackend.appState.automation.updateHistory
           .getBackfillingState()
           .futureValue should be(BackfillingState.Complete)
         // Update history is complete at this point, but the status endpoint only reports
@@ -315,7 +315,7 @@ class ScanHistoryBackfillingIntegrationTest
         sv1ScanBackend.getBackfillingStatus().complete shouldBe false
         readUpdateHistoryFromScan(sv1ScanBackend) should not be empty
 
-        sv2ScanBackend.appState.store.updateHistory
+        sv2ScanBackend.appState.automation.updateHistory
           .getBackfillingState()
           .futureValue should be(BackfillingState.InProgress(false, false))
         sv2ScanBackend.getBackfillingStatus().complete shouldBe false
@@ -354,12 +354,12 @@ class ScanHistoryBackfillingIntegrationTest
     )(
       "All backfilling is complete",
       _ => {
-        sv1ScanBackend.appState.store.updateHistory
+        sv1ScanBackend.appState.automation.updateHistory
           .getBackfillingState()
           .futureValue should be(BackfillingState.Complete)
         // Update history is complete, TxLog is not
         sv1ScanBackend.getBackfillingStatus().complete shouldBe false
-        sv2ScanBackend.appState.store.updateHistory
+        sv2ScanBackend.appState.automation.updateHistory
           .getBackfillingState()
           .futureValue should be(BackfillingState.Complete)
         // Update history is complete, TxLog is not
@@ -444,7 +444,7 @@ class ScanHistoryBackfillingIntegrationTest
     clue("Compare scan history with participant update stream") {
       compareHistory(
         sv1Backend.participantClient,
-        sv1ScanBackend.appState.store.updateHistory,
+        sv1ScanBackend.appState.automation.updateHistory,
         ledgerBeginSv1,
       )
     }
@@ -554,7 +554,7 @@ class ScanHistoryBackfillingIntegrationTest
 
   private def allUpdatesFromScanBackend(scanBackend: ScanAppBackendReference) = {
     // Need to use the store directly, as the HTTP endpoint refuses to return data unless it's completely backfilled
-    scanBackend.appState.store.updateHistory
+    scanBackend.appState.automation.updateHistory
       .getAllUpdates(None, PageLimit.tryCreate(1000))
       .futureValue
   }

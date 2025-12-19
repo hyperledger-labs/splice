@@ -1731,6 +1731,7 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
@@ -1849,6 +1850,7 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
@@ -2439,6 +2441,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "metrics": {
@@ -2598,6 +2601,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "metrics": {
@@ -3881,6 +3885,7 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
@@ -3999,6 +4004,7 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
@@ -4614,6 +4620,7 @@
           "projectId": "da-cn-devnet",
           "type": "gcp"
         },
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "metrics": {
@@ -4798,6 +4805,7 @@
           "projectId": "da-cn-devnet",
           "type": "gcp"
         },
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "metrics": {
@@ -5535,6 +5543,7 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
@@ -5653,6 +5662,7 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
@@ -6243,6 +6253,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "metrics": {
@@ -6402,6 +6413,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "metrics": {

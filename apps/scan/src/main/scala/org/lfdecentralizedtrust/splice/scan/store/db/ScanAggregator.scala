@@ -142,7 +142,7 @@ final class ScanAggregator(
 
   private def skipAggregation(
       previousRoundTotals: Option[RoundTotals]
-  ): Future[_] = {
+  ): Future[?] = {
     previousRoundTotals
       .map { lastAggregated =>
         Future.failed(

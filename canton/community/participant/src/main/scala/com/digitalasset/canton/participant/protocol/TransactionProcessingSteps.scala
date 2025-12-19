@@ -25,7 +25,12 @@ import com.digitalasset.canton.lifecycle.{
   PromiseUnlessShutdown,
   UnlessShutdown,
 }
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, NamedLoggingContext}
+import com.digitalasset.canton.logging.{
+  ErrorLoggingContext,
+  NamedLoggerFactory,
+  NamedLogging,
+  NamedLoggingContext,
+}
 import com.digitalasset.canton.metrics.*
 import com.digitalasset.canton.participant.metrics.TransactionProcessingMetrics
 import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
@@ -95,7 +100,7 @@ import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, RoseTree}
+import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, LoggerUtil, RoseTree}
 import com.digitalasset.canton.{
   LedgerSubmissionId,
   LfKeyResolver,
@@ -350,20 +355,6 @@ class TransactionProcessingSteps(
               )
           )
 
-        lookupContractsWithDisclosed: ContractInstanceOfId =
-          (contractId: LfContractId) =>
-            disclosedContracts
-              .get(contractId)
-              .map(contract =>
-                EitherT.rightT[FutureUnlessShutdown, TransactionTreeFactory.ContractLookupError](
-                  contract: GenContractInstance
-                )
-              )
-              .getOrElse(
-                TransactionTreeFactory
-                  .contractInstanceLookup(contractLookup)(implicitly, implicitly)(contractId)
-              )
-
         confirmationRequestTimer = metrics.protocolMessages.confirmationRequestCreation
         // Perform phase 1 of the protocol that produces a transaction confirmation request
         request <- confirmationRequestTimer.timeEitherFUS(
@@ -376,7 +367,8 @@ class TransactionProcessingSteps(
               mediator,
               recentSnapshot,
               sessionKeyStore,
-              lookupContractsWithDisclosed,
+              TransactionProcessingSteps
+                .lookupContractsWithDisclosed(disclosedContracts, contractLookup),
               maxSequencingTime,
               protocolVersion,
             )
@@ -466,8 +458,8 @@ class TransactionProcessingSteps(
           existingSubmission.submissionId,
           existingSubmission.submissionSynchronizerId,
         )
-      case TimeoutTooLow(_submission, lowerBound) =>
-        TransactionProcessor.SubmissionErrors.TimeoutError.Error(lowerBound)
+      case TimeoutTooLow(_submission, _lowerBound) =>
+        TransactionProcessor.SubmissionErrors.TimeoutError.Error()
     }
 
     override def embedSequencerRequestError(
@@ -514,8 +506,12 @@ class TransactionProcessingSteps(
         error: SubmissionSendError
     )(implicit traceContext: TraceContext): TransactionSubmissionTrackingData = {
       val errorCode: TransactionError = error.sendError match {
-        case SendAsyncClientError.RequestRefused(error) if error.isOverload =>
-          TransactionProcessor.SubmissionErrors.SequencerBackpressure.Rejection(error.toString)
+        case refused @ SendAsyncClientError.RequestRefused(error) =>
+          if (error.isOverload)
+            TransactionProcessor.SubmissionErrors.SequencerBackpressure.Rejection(error.toString)
+          else if (error.hasMaxSequencingTimeElapsed)
+            TransactionProcessor.SubmissionErrors.TimeoutError.Error()
+          else TransactionProcessor.SubmissionErrors.SequencerRequest.Error(refused)
         case otherSendError =>
           TransactionProcessor.SubmissionErrors.SequencerRequest.Error(otherSendError)
       }
@@ -525,6 +521,13 @@ class TransactionProcessingSteps(
         rejectionCause,
         psid,
       )
+    }
+
+    override def logSubmissionSendError(error: SequencerRequest.Error)(implicit
+        errorLoggingContext: ErrorLoggingContext
+    ): Unit = {
+      val logLevel = SendAsyncClientError.logLevel(error.sendError)
+      LoggerUtil.logAtLevel(logLevel, s"Failed to submit transaction due to $error")
     }
   }
 
@@ -716,11 +719,11 @@ class TransactionProcessingSteps(
       case Some(viewsNE) =>
         // All views have the same root hash, so we can take the first one
         val firstView = viewsNE.head1._1.unwrap
-        val transactionId = firstView.transactionId
+        val updateId = firstView.updateId
         val ledgerTime = firstView.ledgerTime
         // TODO(#23971) Generate absolutization data based on the protocol version
         val absolutizationData = {
-          transactionId.discard
+          updateId.discard
           ledgerTime.discard
           ContractIdAbsolutizationDataV1
         }
@@ -1048,7 +1051,7 @@ class TransactionProcessingSteps(
 
       val usedAndCreated = parsedRequest.usedAndCreated
       validation.TransactionValidationResult(
-        transactionId = parsedRequest.transactionId,
+        updateId = parsedRequest.updateId,
         submitterMetadataO = parsedRequest.submitterMetadataO,
         workflowIdO = parsedRequest.workflowIdO,
         contractConsistencyResultE = parallelChecksResult.consistencyResultE,
@@ -1261,7 +1264,7 @@ class TransactionProcessingSteps(
 
     computeCommitAndContractsAndEvent(
       requestTime = pendingRequestData.requestTime,
-      txId = txValidationResult.transactionId,
+      updateId = txValidationResult.updateId,
       workflowIdO = txValidationResult.workflowIdO,
       commitSet = commitSet,
       createdContracts = txValidationResult.createdContracts,
@@ -1275,7 +1278,7 @@ class TransactionProcessingSteps(
 
   private def computeCommitAndContractsAndEvent(
       requestTime: CantonTimestamp,
-      txId: UpdateId,
+      updateId: UpdateId,
       workflowIdO: Option[WorkflowId],
       commitSet: CommitSet,
       createdContracts: Map[LfContractId, NewContractInstance],
@@ -1319,7 +1322,7 @@ class TransactionProcessingSteps(
               optByKeyNodes = None, // optByKeyNodes is unused by the indexer
             ),
             transaction = LfCommittedTransaction(lfTx.unwrap),
-            updateId = txId,
+            updateId = updateId,
             contractAuthenticationData = contractAuthenticationData,
             synchronizerId = psid.logical,
             recordTime = requestTime,
@@ -1370,7 +1373,7 @@ class TransactionProcessingSteps(
 
       commitAndContractsAndEvent = computeCommitAndContractsAndEvent(
         requestTime = pendingRequestData.requestTime,
-        txId = pendingRequestData.transactionValidationResult.transactionId,
+        updateId = pendingRequestData.transactionValidationResult.updateId,
         workflowIdO = pendingRequestData.transactionValidationResult.workflowIdO,
         commitSet = commitSet,
         createdContracts = createdContracts,
@@ -1571,6 +1574,23 @@ class TransactionProcessingSteps(
 
 object TransactionProcessingSteps {
 
+  private[canton] def lookupContractsWithDisclosed(
+      disclosedContracts: Map[LfContractId, ContractInstance],
+      contractLookup: ContractLookup { type ContractsCreatedAtTime <: CreationTime.CreatedAt },
+  )(implicit executionContext: ExecutionContext, traceContext: TraceContext): ContractInstanceOfId =
+    (contractId: LfContractId) =>
+      disclosedContracts
+        .get(contractId)
+        .map(contract =>
+          EitherT.rightT[FutureUnlessShutdown, TransactionTreeFactory.ContractLookupError](
+            contract: GenContractInstance
+          )
+        )
+        .getOrElse(
+          TransactionTreeFactory
+            .contractInstanceLookup(contractLookup)(implicitly, implicitly)(contractId)
+        )
+
   final case class SubmissionParam(
       submitterInfo: SubmitterInfo,
       transactionMeta: TransactionMeta,
@@ -1620,7 +1640,7 @@ object TransactionProcessingSteps {
 
     override def rootHash: RootHash = rootViewTrees.head1.rootHash
 
-    def transactionId: UpdateId = rootViewTrees.head1.transactionId
+    def updateId: UpdateId = rootViewTrees.head1.updateId
 
     def ledgerTime: CantonTimestamp = rootViewTrees.head1.ledgerTime
 
@@ -1659,7 +1679,7 @@ object TransactionProcessingSteps {
     */
   def tryCommonData(receivedViewTrees: NonEmpty[Seq[FullTransactionViewTree]]): CommonData = {
     val distinctCommonData = receivedViewTrees
-      .map(v => CommonData(v.transactionId, v.ledgerTime, v.preparationTime))
+      .map(v => CommonData(v.updateId, v.ledgerTime, v.preparationTime))
       .distinct
     if (distinctCommonData.lengthCompare(1) == 0) distinctCommonData.head1
     else
@@ -1669,7 +1689,7 @@ object TransactionProcessingSteps {
   }
 
   final case class CommonData(
-      transactionId: UpdateId,
+      updateId: UpdateId,
       ledgerTime: CantonTimestamp,
       preparationTime: CantonTimestamp,
   )

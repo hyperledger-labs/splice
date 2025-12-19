@@ -52,7 +52,7 @@ final class MediatorVerdictsClient(
       v30.MediatorInspectionServiceGrpc
         .stub(managedChannel.channel)
         .withInterceptors(
-          TraceContextGrpc.clientInterceptor,
+          TraceContextGrpc.clientInterceptor(None),
           new GrpcMetricsClientInterceptor(grpcClientMetrics),
         )
     )

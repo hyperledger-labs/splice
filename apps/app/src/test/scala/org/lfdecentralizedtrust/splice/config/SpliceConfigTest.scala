@@ -12,7 +12,7 @@ class SpliceConfigTest extends AsyncWordSpec with BaseTest {
   )
 
   "Validator config is rejected when topup interval < pollingInterval" in {
-    SpliceConfig.loadAndValidate(config) shouldBe a[Right[_, _]]
+    SpliceConfig.loadAndValidate(config) shouldBe a[Right[?, ?]]
     val overwrite = ConfigFactory.parseString(
       """
       |canton.validator-apps.aliceValidator.domains.global.buy-extra-traffic.target-throughput = 500000
@@ -65,7 +65,7 @@ class SpliceConfigTest extends AsyncWordSpec with BaseTest {
      """.stripMargin
       )
       val buggyConfig = CantonConfig.mergeConfigs(config, Seq(overwrite))
-      SpliceConfig.loadAndValidate(buggyConfig) shouldBe a[Right[_, _]]
+      SpliceConfig.loadAndValidate(buggyConfig) shouldBe a[Right[?, ?]]
     }
     "be accepted if set to true for sv validator and url is set" in {
       val overwrite = ConfigFactory.parseString(
@@ -75,7 +75,7 @@ class SpliceConfigTest extends AsyncWordSpec with BaseTest {
      """.stripMargin
       )
       val buggyConfig = CantonConfig.mergeConfigs(config, Seq(overwrite))
-      SpliceConfig.loadAndValidate(buggyConfig) shouldBe a[Right[_, _]]
+      SpliceConfig.loadAndValidate(buggyConfig) shouldBe a[Right[?, ?]]
     }
   }
 }

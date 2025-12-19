@@ -25,7 +25,10 @@ on:
 jobs:
 
   split_tests:
-    runs-on: ubuntu-24.04
+    # required to have access to the /cache directory to read test-reports
+    runs-on: self-hosted-k8s-small
+    container:
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
     name: Split the tests into parallel runs
     outputs:
       indices: ${{ steps.prep.outputs.indices }}

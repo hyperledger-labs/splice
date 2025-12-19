@@ -854,7 +854,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   )
 
   protected def toUnassignEvent(
-      contractId: ContractId[_],
+      contractId: ContractId[?],
       unassignId: String,
       source: SynchronizerId,
       target: SynchronizerId,
@@ -1369,8 +1369,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     */
   protected def contract[TCid, T](
       identifier: Identifier,
-      contractId: TCid & ContractId[_],
-      payload: T & CodegenDamlRecord[_],
+      contractId: TCid & ContractId[?],
+      payload: T & CodegenDamlRecord[?],
   ): Contract[TCid, T] = Contract(
     identifier,
     contractId,

@@ -1384,8 +1384,8 @@ abstract class TopologyAdminConnection(
     runCmd(VaultAdminCommands.ImportKeyPair(ByteString.copyFrom(keyPair), name, password = None))
   }
 
-  private def listSynchronizerTrustCertificate(synchronizerId: SynchronizerId, member: Member)(
-      implicit tc: TraceContext
+  def listSynchronizerTrustCertificate(synchronizerId: SynchronizerId, member: Member)(implicit
+      tc: TraceContext
   ): Future[Seq[TopologyResult[SynchronizerTrustCertificate]]] =
     runCmd(
       TopologyAdminCommands.Read.ListSynchronizerTrustCertificate(

@@ -51,7 +51,9 @@ class CommandCircuitBreakerTest
   val retryProvider = new RetryProvider(
     NamedLoggerFactory.root,
     ProcessingTimeout(),
-    new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds))(scheduledExecutor()),
+    new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds), loggerFactory)(
+      scheduledExecutor()
+    ),
     NoOpMetricsFactory,
   )(NoReportingTracerProvider.tracer)
 

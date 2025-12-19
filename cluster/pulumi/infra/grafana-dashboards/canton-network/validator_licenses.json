@@ -18,9 +18,73 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3562,
+  "id": 553,
   "links": [],
   "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "count by (version) (\n  topk by (validator_party) (1, splice_validator_last_active_at_us{namespace=\"sv-1\", version=~\"$validator_version\"})\n)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Validators by version",
+      "type": "stat"
+    },
     {
       "datasource": {
         "type": "prometheus",
@@ -43,7 +107,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -76,7 +141,7 @@
         "h": 19,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 6
       },
       "id": 2,
       "options": {
@@ -90,9 +155,14 @@
           "show": false
         },
         "showHeader": true,
-        "sortBy": []
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "version"
+          }
+        ]
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -169,7 +239,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -185,7 +256,7 @@
         "h": 18,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 25
       },
       "id": 1,
       "options": {
@@ -201,7 +272,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -233,8 +304,18 @@
       {
         "allValue": ".*",
         "current": {
-          "text": "All",
-          "value": "$__all"
+          "text": [
+            "0.5.4",
+            "0.5.1",
+            "0.4.23",
+            "0.4.25"
+          ],
+          "value": [
+            "0.5.4",
+            "0.5.1",
+            "0.4.23",
+            "0.4.25"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -313,5 +394,5 @@
   "timezone": "",
   "title": "Validator Licenses",
   "uid": "cdpcj4gxackcga",
-  "version": 1
+  "version": 2
 }

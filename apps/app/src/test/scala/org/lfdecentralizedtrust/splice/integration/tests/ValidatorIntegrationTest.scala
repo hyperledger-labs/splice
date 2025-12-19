@@ -265,77 +265,111 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
         .futureValue
     }
 
-    clue("Invalid user id gets rejected") {
-      loggerFactory.assertLogs(
-        {
-          val responseForInvalidUser = makeRequest("wrong_user")
-          responseForInvalidUser.status should be(StatusCodes.Forbidden)
-          responseForInvalidUser.entity.getContentType().toString should be("application/json")
-        },
-        _.warningMessage should include(
-          "Authorization Failed"
-        ),
-      )
-    }
-
-    clue("User without actAs permissions for validator party gets rejected") {
-      loggerFactory.assertLogs(
-        {
-          val validatorParty =
-            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
-              .get(aliceValidatorBackend.config.ledgerApiUser)
-              .primaryParty
-              .value
-          val testUser =
-            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.create(
-              s"testUser-${Random.nextInt()}",
-              actAs = Set.empty[PartyId],
-              primaryParty = Some(validatorParty),
-            )
-          val response = makeRequest(testUser.id)
-          response.status should be(StatusCodes.Forbidden)
-        },
-        _.warningMessage should include(
-          "Authorization Failed"
-        ),
-      )
-    }
-
-    clue("User without validator party as primaryParty gets rejected") {
-      loggerFactory.assertLogs(
-        {
-          val validatorParty =
-            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
-              .get(aliceValidatorBackend.config.ledgerApiUser)
-              .primaryParty
-              .value
-          val testUser =
-            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.create(
-              s"testUser-${Random.nextInt()}",
-              actAs = Set(validatorParty),
-              primaryParty = None,
-            )
-          val response = makeRequest(testUser.id)
-          response.status should be(StatusCodes.Forbidden)
-        },
-        _.warningMessage should include(
-          "Authorization Failed"
-        ),
-      )
-    }
-
-    clue("User with actas rights and primaryParty gets accepted") {
-      val validatorParty = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+    val validatorParty =
+      aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
         .get(aliceValidatorBackend.config.ledgerApiUser)
         .primaryParty
         .value
-      val testUser = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.create(
-        s"testUser-${Random.nextInt()}",
-        actAs = Set(validatorParty),
-        primaryParty = Some(validatorParty),
+
+    def assertRejectedAsUnauthorized(userId: String) = {
+      loggerFactory.assertLogs(
+        {
+          val response = makeRequest(userId)
+          response.status should be(StatusCodes.Forbidden)
+          response.entity.getContentType().toString should be(
+            "application/json"
+          )
+        },
+        _.warningMessage should include(
+          "Authorization Failed"
+        ),
       )
-      val response = makeRequest(testUser.id)
+    }
+
+    def assertAccepted(userId: String) = {
+      val response = makeRequest(userId)
       response.status should be(StatusCodes.OK)
+    }
+
+    clue("Invalid user id gets rejected") {
+      val userId = "wrong_user"
+      assertRejectedAsUnauthorized(userId)
+    }
+
+    clue("User without actAs permissions for validator party gets rejected") {
+      val userId = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+        .create(
+          s"testUser-${Random.nextInt()}",
+          actAs = Set.empty[PartyId],
+          primaryParty = Some(validatorParty),
+          participantAdmin = true,
+          isDeactivated = false,
+        )
+        .id
+      assertRejectedAsUnauthorized(userId)
+    }
+
+    clue("User without validator party as primaryParty gets rejected") {
+      val userId = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+        .create(
+          s"testUser-${Random.nextInt()}",
+          actAs = Set(validatorParty),
+          primaryParty = None,
+          participantAdmin = true,
+          isDeactivated = false,
+        )
+        .id
+      assertRejectedAsUnauthorized(userId)
+    }
+
+    clue("User without participant admin gets rejected") {
+      val userId = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+        .create(
+          s"testUser-${Random.nextInt()}",
+          actAs = Set(validatorParty),
+          primaryParty = Some(validatorParty),
+          participantAdmin = false,
+          isDeactivated = false,
+        )
+        .id
+      assertRejectedAsUnauthorized(userId)
+    }
+
+    clue("Deactivated user with correct authorization gets rejected") {
+      val userId = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+        .create(
+          s"testUser-${Random.nextInt()}",
+          actAs = Set(validatorParty),
+          primaryParty = Some(validatorParty),
+          participantAdmin = true,
+          isDeactivated = true,
+        )
+        .id
+      assertRejectedAsUnauthorized(userId)
+    }
+
+    clue(
+      "User with correct authorization (actAs, primary party, participant admin) gets accepted"
+    ) {
+      val userId = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+        .create(
+          s"testUser-${Random.nextInt()}",
+          actAs = Set(validatorParty),
+          primaryParty = Some(validatorParty),
+          participantAdmin = true,
+          isDeactivated = false,
+        )
+        .id
+      assertAccepted(userId)
+
+      actAndCheck(
+        "Revoke access by deactivating user in the participant user management",
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+          .update(userId, user => user.copy(isDeactivated = true)),
+      )(
+        "Check that user is now rejected",
+        _ => assertRejectedAsUnauthorized(userId),
+      )
     }
   }
 
@@ -542,6 +576,84 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     getUser.primaryParty shouldBe None
     validator.startSync()
     getUser.primaryParty.value.uid.identifier shouldBe validatorPartyHint
+  }
+
+  "onboard user with custom party hint and check assignment/creation modes" in { implicit env =>
+    initDso()
+    aliceValidatorBackend.startSync()
+
+    val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+    val testUser1 = s"test-1-${Random.nextInt(10000)}"
+    val testUser2 = s"test-2-${Random.nextInt(10000)}"
+    val testUser3 = s"test-3-${Random.nextInt(10000)}"
+    val testUser4 = s"test-4-${Random.nextInt(10000)}"
+    val customPartyHint = s"CustomHint${Random.nextInt(10000)}"
+
+    def onboard(
+        name: String,
+        partyId: Option[PartyId] = None,
+        createIfMissing: Option[Boolean] = None,
+    ): PartyId = {
+      aliceValidatorBackend.onboardUser(name, partyId, createIfMissing)
+    }
+
+    clue(
+      "Assign new user to existing Validator Party"
+    ) {
+      aliceValidatorBackend.listUsers() should not contain testUser1
+      val assignedPartyId = onboard(
+        name = testUser1,
+        partyId = Some(aliceValidatorParty),
+      )
+      assignedPartyId shouldBe aliceValidatorParty
+      aliceValidatorBackend.listUsers() should contain(testUser1)
+    }
+
+    clue("Use 'name' as hint") {
+      aliceValidatorBackend.listUsers() should not contain testUser2
+
+      val defaultPartyId = onboard(
+        name = testUser2,
+        createIfMissing = Some(true),
+      )
+
+      val expectedHint = BaseLedgerConnection.sanitizeUserIdToPartyString(testUser2)
+      defaultPartyId.toString.split("::").head shouldBe expectedHint
+      aliceValidatorBackend.listUsers() should contain(testUser2)
+    }
+
+    clue("Use partyId as hint") {
+      val desiredPartyId = PartyId.tryCreate(customPartyHint, aliceValidatorParty.uid.namespace)
+      aliceValidatorBackend.listUsers() should not contain testUser3
+      val customPartyId = onboard(
+        name = testUser3,
+        partyId = Some(desiredPartyId),
+        createIfMissing = Some(true),
+      )
+
+      customPartyId.toString.split("::").head shouldBe customPartyHint
+      customPartyId shouldBe desiredPartyId
+      aliceValidatorBackend.listUsers() should contain(testUser3)
+    }
+
+    clue("Fail when creation is disallowed but no party is provided to assign to") {
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+        intercept[com.digitalasset.canton.console.CommandFailure] {
+          onboard(
+            name = testUser4,
+            createIfMissing = Some(false),
+          )
+        },
+        entries => {
+          forAtLeast(1, entries)(
+            _.message should include(
+              s"party_id must be provided when createPartyIfMissing is false and no existing"
+            )
+          )
+        },
+      )
+      aliceValidatorBackend.listUsers() should not contain testUser4
+    }
   }
 
 }

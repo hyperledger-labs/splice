@@ -20,7 +20,7 @@ import MultiDomainAcsStore.ContractState
   */
 abstract class MultiDomainExpiredContractTrigger[
     C,
-    TCid <: ContractId[_],
+    TCid <: ContractId[?],
     T,
 ](
     store: MultiDomainAcsStore,
@@ -49,9 +49,9 @@ abstract class MultiDomainExpiredContractTrigger[
 }
 
 object MultiDomainExpiredContractTrigger {
-  type Template[TCid <: ContractId[_], T] =
+  type Template[TCid <: ContractId[?], T] =
     MultiDomainExpiredContractTrigger[Contract.Companion.Template[TCid, T], TCid, T]
-  type ListExpiredContracts[TCid <: ContractId[_], T] =
+  type ListExpiredContracts[TCid <: ContractId[?], T] =
     // we use PageLimit because this is always used in the context of a trigger, where the query will be re-run repeatedly
     (CantonTimestamp, PageLimit) => TraceContext => Future[Seq[AssignedContract[TCid, T]]]
 }

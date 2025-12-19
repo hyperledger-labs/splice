@@ -168,7 +168,9 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "gcpProjectId": "da-cn-example-project-id"
+    },
     "name": "da-cn-example-project-id",
     "provider": "",
     "type": "cn:gcp:project"

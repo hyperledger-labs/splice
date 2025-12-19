@@ -2,18 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { ContractId, Optional } from '@daml/types';
+import type { AmuletConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
 import type {
   ActionRequiringConfirmation,
   DsoRulesConfig,
   VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import type { ConfigFieldState } from '../components/form-components/ConfigField';
+import type { CreateUnallocatedUnclaimedActivityRecordFormData } from '../components/forms/CreateUnallocatedUnclaimedActivityRecordForm';
 import type { GrantRevokeFeaturedAppFormData } from '../components/forms/GrantRevokeFeaturedAppForm';
 import type { OffboardSvFormData } from '../components/forms/OffboardSvForm';
 import type { SetAmuletConfigCompleteFormData } from '../components/forms/SetAmuletConfigRulesForm';
 import type { SetDsoConfigCompleteFormData } from '../components/forms/SetDsoConfigRulesForm';
 import type { UpdateSvRewardWeightFormData } from '../components/forms/UpdateSvRewardWeightForm';
-import { AmuletConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
 
 export interface OffBoardMemberProposal {
   memberToOffboard: string;
@@ -195,7 +196,8 @@ export interface ProposalMutationArgs {
 export type NonConfigProposalFormData =
   | UpdateSvRewardWeightFormData
   | OffboardSvFormData
-  | GrantRevokeFeaturedAppFormData;
+  | GrantRevokeFeaturedAppFormData
+  | CreateUnallocatedUnclaimedActivityRecordFormData;
 
 export type ConfigProposalFormData = SetDsoConfigCompleteFormData | SetAmuletConfigCompleteFormData;
 

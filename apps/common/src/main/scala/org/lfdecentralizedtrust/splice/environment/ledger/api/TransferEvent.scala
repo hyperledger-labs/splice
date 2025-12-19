@@ -58,7 +58,7 @@ object ReassignmentEvent {
       override val source: SynchronizerId,
       override val target: SynchronizerId,
       unassignId: String,
-      contractId: ContractId[_],
+      contractId: ContractId[?],
       override val counter: Long,
   ) extends ReassignmentEvent {
     def pretty: Pretty[this.type] =

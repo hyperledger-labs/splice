@@ -25,7 +25,7 @@ import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.HexString
-import io.grpc.Status
+import io.grpc.{Status, StatusRuntimeException}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Base64
@@ -96,6 +96,7 @@ private[validator] object ValidatorUtil {
   def onboard(
       endUserName: String,
       knownParty: Option[PartyId],
+      createPartyIfMissing: Option[Boolean],
       storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
       getAmuletRulesDomain: ScanConnection.GetAmuletRulesDomain,
@@ -110,17 +111,77 @@ private[validator] object ValidatorUtil {
     for {
       userPartyId <- knownParty match {
         case Some(party) =>
-          connection.createUserWithPrimaryParty(
-            endUserName,
-            party,
-            Seq(),
-          )
+          if (createPartyIfMissing.getOrElse(false)) {
+            for {
+              newlyAllocatedPartyId <- connection.getOrAllocateParty(
+                party.uid.identifier.unwrap,
+                Seq(),
+                participantAdminConnection,
+              )
+              allocatedPartyId <- connection.createUserWithPrimaryParty(
+                endUserName,
+                newlyAllocatedPartyId,
+                Seq(),
+              )
+            } yield {
+              logger.debug(
+                s"Creation allowed. Allocated new party ID $allocatedPartyId for user $endUserName"
+              )
+              allocatedPartyId
+            }
+          } else {
+            connection
+              .createUserWithPrimaryParty(
+                endUserName,
+                party,
+                Seq(),
+              )
+              .map(newParty => {
+                logger.debug(
+                  s"Creation disallowed. Associating user $endUserName with existing party $newParty"
+                )
+                newParty
+              })
+          }
         case None =>
-          connection.getOrAllocateParty(
-            endUserName,
-            Seq(),
-            participantAdminConnection,
-          )
+          if (createPartyIfMissing.getOrElse(true)) {
+            connection
+              .getOrAllocateParty(
+                endUserName,
+                Seq(),
+                participantAdminConnection,
+              )
+              .map(allocatedParty => {
+                logger.debug(
+                  s"No party ID provided and creation allowed. Allocated $allocatedParty for user $endUserName"
+                )
+                allocatedParty
+              })
+          } else {
+            logger.debug(
+              s"No party ID provided and creation disallowed. Checking for existing party."
+            )
+            connection
+              .getOptionalPrimaryParty(endUserName)
+              .recover {
+                case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.NOT_FOUND =>
+                  None
+              }
+              .map {
+                case Some(existingParty) =>
+                  logger.debug(
+                    s"No party ID provided, creation disallowed, but user $endUserName has existing party $existingParty."
+                  )
+                  existingParty
+
+                case None =>
+                  throw Status.INVALID_ARGUMENT
+                    .withDescription(
+                      s"party_id must be provided when createPartyIfMissing is false and no existing party for user $endUserName is found."
+                    )
+                    .asRuntimeException()
+              }
+          }
       }
       _ <- retryProvider.ensureThatB(
         RetryFor.ClientCalls,

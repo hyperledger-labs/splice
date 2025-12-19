@@ -34,7 +34,6 @@ export const CreateUnallocatedUnclaimedActivityRecordSection: React.FC<
           labelId="proposal-details-amount-label"
           valueId="proposal-details-amount-value"
         />
-        <Divider sx={{ my: 1 }} />
 
         <Box sx={{ py: 1 }}>
           <Typography variant="subtitle2" color="text.secondary" gutterBottom>

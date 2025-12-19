@@ -4,8 +4,10 @@
 package com.digitalasset.canton.topology.transaction
 
 import cats.Monoid
+import cats.instances.order.*
 import cats.syntax.apply.*
 import cats.syntax.either.*
+import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError.{
@@ -45,6 +47,7 @@ import com.digitalasset.canton.topology.transaction.TopologyMapping.{
   Code,
   MappingHash,
   RequiredAuth,
+  newSigningKeys,
 }
 import com.digitalasset.canton.version.ProtoVersion
 import com.digitalasset.canton.{LfPackageId, ProtoDeserializationError, SequencerAlias}
@@ -105,6 +108,17 @@ sealed trait TopologyMapping extends Product with Serializable with PrettyPrinti
 }
 
 object TopologyMapping {
+  def newSigningKeys[T <: KeyMapping](
+      current: T,
+      previous: Option[TopologyTransaction[TopologyChangeOp.Replace, T]],
+  ): Set[SigningPublicKey] = {
+    val previouslyRegisteredKeys = previous.toList
+      .flatMap(transaction => transaction.mapping.mappedSigningKeys)
+      .toSet
+
+    current.mappedSigningKeys -- previouslyRegisteredKeys
+  }
+
   def participantIdFromProtoPrimitive(
       proto: String,
       fieldName: String,
@@ -259,11 +273,23 @@ object TopologyMapping {
     final def or(next: RequiredAuth): RequiredAuth =
       RequiredAuth.Or(this, next)
 
+    final def and(next: RequiredAuth): RequiredAuth = (this, next) match {
+      // simple optimization that squashes And(RequiredNamespaces, RequiredNamespaces) trivially into just RequiredNamespaces
+      case (a: RequiredNamespaces, b: RequiredNamespaces) =>
+        RequiredNamespaces(
+          namespaces = a.namespaces ++ b.namespaces,
+          extraKeys = a.extraKeys ++ b.extraKeys,
+        )
+      case _ =>
+        RequiredAuth.And(this, next)
+    }
+
     /** Authorizations referenced by this instance. Note that the result is not equivalent to this
       * instance, as an "or" gets translated to an "and". Instead, the result indicates which
       * authorization keys need to be evaluated in order to check if this RequiredAuth is met.
       */
     def referenced: ReferencedAuthorizations
+
   }
 
   object RequiredAuth {
@@ -284,12 +310,18 @@ object TopologyMapping {
         )
       }
 
-      override def referenced: ReferencedAuthorizations =
+      override lazy val referenced: ReferencedAuthorizations =
         ReferencedAuthorizations(namespaces = namespaces, extraKeys = extraKeys)
 
       override protected def pretty: Pretty[RequiredNamespaces.this.type] = prettyOfClass(
         unnamedParam(_.namespaces.toSeq.sortBy(_.toProtoPrimitive)),
         paramIfNonEmpty("extra keys", _.extraKeys.toSeq.sortBy(_.toProtoPrimitive)),
+      )
+    }
+
+    object RequiredNamespaces {
+      def apply(hasNamespace: HasNamespace*): RequiredNamespaces = RequiredNamespaces(
+        hasNamespace.map(_.namespace).toSet
       )
     }
 
@@ -304,12 +336,33 @@ object TopologyMapping {
           .satisfiedByActualAuthorizers(provided)
           .orElse(second.satisfiedByActualAuthorizers(provided))
 
-      override def referenced: ReferencedAuthorizations =
+      override lazy val referenced: ReferencedAuthorizations =
         ReferencedAuthorizations.monoid.combine(first.referenced, second.referenced)
 
       override protected def pretty: Pretty[Or.this.type] =
-        prettyOfClass(unnamedParam(_.first), unnamedParam(_.second))
+        prettyOfString(_ => show"($first || $second)")
     }
+
+    private[topology] final case class And(
+        first: RequiredAuth,
+        second: RequiredAuth,
+    ) extends RequiredAuth {
+      override def satisfiedByActualAuthorizers(
+          provided: ReferencedAuthorizations
+      ): Either[ReferencedAuthorizations, Unit] =
+        first
+          .satisfiedByActualAuthorizers(provided)
+          .toEitherNel
+          .combine(second.satisfiedByActualAuthorizers(provided).toEitherNel)
+          .leftMap(_.reduce)
+
+      override def referenced: ReferencedAuthorizations =
+        ReferencedAuthorizations.monoid.combine(first.referenced, second.referenced)
+
+      override protected def pretty: Pretty[And.this.type] =
+        prettyOfString(_ => show"($first && $second)")
+    }
+
   }
 
   def fromProtoV30(proto: v30.TopologyMapping): ParsingResult[TopologyMapping] =
@@ -704,9 +757,39 @@ object DecentralizedNamespaceDefinition extends TopologyMappingCompanion {
   }
 }
 
-/** A topology mapping that maps to a set of public keys for which ownership has to be proven. */
-sealed trait KeyMapping extends Product with Serializable {
-  def mappedKeys: NonEmpty[Seq[PublicKey]]
+/** A topology mapping that maps to a set of public keys for which ownership has to be proven. A
+  * KeyMapping can also specify a SigningPublicKey that can be used for authorizing the mappings
+  * namespace.
+  */
+sealed trait KeyMapping extends TopologyMapping with Product with Serializable {
+  def mappedKeys: Set[PublicKey]
+  final def mappedSigningKeys: Set[SigningPublicKey] = mappedKeys.collect {
+    case k: SigningPublicKey => k
+  }
+
+  def namespaceKeyForSelfAuthorization: Option[SigningPublicKey] = None
+
+  def isSelfSigned = namespaceKeyForSelfAuthorization.nonEmpty
+
+  require(namespaceKeyForSelfAuthorization.forall(_.fingerprint == namespace.fingerprint))
+}
+
+object KeyMapping {
+  val MaxKeys: Int = 20
+
+  def validateKeysSizeSet(
+      keys: NonEmpty[Set[SigningPublicKey]],
+      maxKeys: Int,
+  ): Either[String, Unit] =
+    Either.cond(keys.sizeIs <= maxKeys, (), s"At most $maxKeys can be specified.")
+
+  def validateKeysSize(
+      keys: NonEmpty[Seq[PublicKey]],
+      maxKeys: Int,
+  ): Either[String, Unit] =
+    for {
+      _ <- Either.cond(keys.sizeIs <= maxKeys, (), s"At most $maxKeys can be specified.")
+    } yield ()
 }
 
 /** A key owner (participant, mediator, sequencer) to key mapping
@@ -743,19 +826,15 @@ final case class OwnerToKeyMapping private (
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
   ): RequiredAuth = {
-    val previouslyRegisteredKeys = previous
-      .flatMap(_.selectOp[TopologyChangeOp.Replace])
-      .flatMap(_.selectMapping[OwnerToKeyMapping])
-      .toList
-      .flatMap(_.mapping.keys.map(_.fingerprint).forgetNE)
-      .toSet
-    val newKeys = keys.filter(_.isSigning).map(_.fingerprint).toSet -- previouslyRegisteredKeys
+    val newKeys =
+      newSigningKeys(this, previous.flatMap(_.select[TopologyChangeOp.Replace, OwnerToKeyMapping]))
+        .map(_.fingerprint)
     RequiredNamespaces(Set(member.namespace), extraKeys = newKeys)
   }
 
   override def uniqueKey: MappingHash = OwnerToKeyMapping.uniqueKey(member)
 
-  override def mappedKeys: NonEmpty[Seq[PublicKey]] = keys
+  override def mappedKeys: Set[PublicKey] = keys.forgetNE.toSet[PublicKey]
 
   @VisibleForTesting
   private[transaction] def copy(
@@ -767,7 +846,7 @@ final case class OwnerToKeyMapping private (
 
 object OwnerToKeyMapping extends TopologyMappingCompanion {
 
-  val MaxKeys: Int = 20
+  val MaxKeys: Int = KeyMapping.MaxKeys
 
   @VisibleForTesting
   val keysUnsafe: Lens[OwnerToKeyMapping, NonEmpty[Seq[PublicKey]]] =
@@ -786,11 +865,7 @@ object OwnerToKeyMapping extends TopologyMappingCompanion {
         (),
         s"All keys must be unique. Duplicate keys: $duplicateKeys",
       )
-      _ <- Either.cond(
-        keys.sizeIs <= MaxKeys,
-        (),
-        s"At most $MaxKeys can be specified.",
-      )
+      _ <- KeyMapping.validateKeysSize(keys, MaxKeys)
     } yield OwnerToKeyMapping(member, keys)
   }
 
@@ -819,8 +894,7 @@ object OwnerToKeyMapping extends TopologyMappingCompanion {
   */
 final case class PartyToKeyMapping private (
     party: PartyId,
-    threshold: PositiveInt,
-    signingKeys: NonEmpty[Seq[SigningPublicKey]],
+    signingKeysWithThreshold: SigningKeysWithThreshold,
 ) extends TopologyMapping
     with KeyMapping {
 
@@ -828,8 +902,8 @@ final case class PartyToKeyMapping private (
 
   def toProto: v30.PartyToKeyMapping = v30.PartyToKeyMapping(
     party = party.toProtoPrimitive,
-    threshold = threshold.unwrap,
-    signingKeys = signingKeys.map(_.toProtoV30),
+    threshold = signingKeysWithThreshold.threshold.unwrap,
+    signingKeys = signingKeysWithThreshold.keys.toSeq.sortBy(_.fingerprint).map(_.toProtoV30),
   )
 
   def toProtoV30: v30.TopologyMapping =
@@ -842,14 +916,18 @@ final case class PartyToKeyMapping private (
   @VisibleForTesting
   def tryCopy(
       party: PartyId = party,
-      threshold: PositiveInt = threshold,
-      signingKeys: NonEmpty[Seq[SigningPublicKey]] = signingKeys,
+      threshold: PositiveInt = signingKeysWithThreshold.threshold,
+      signingKeys: NonEmpty[Set[SigningPublicKey]] = signingKeysWithThreshold.keys,
   ): PartyToKeyMapping =
     PartyToKeyMapping.tryCreate(
       party,
       threshold,
-      signingKeys,
+      signingKeys.toSeq,
     )
+
+  def signingKeys: NonEmpty[Set[SigningPublicKey]] = signingKeysWithThreshold.keys
+
+  def threshold: PositiveInt = signingKeysWithThreshold.threshold
 
   override def namespace: Namespace = party.namespace
 
@@ -860,56 +938,48 @@ final case class PartyToKeyMapping private (
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
   ): RequiredAuth = {
-    val previouslyRegisteredKeys = previous
-      .flatMap(_.select[TopologyChangeOp.Replace, PartyToKeyMapping])
-      .toList
-      .flatMap(_.mapping.signingKeys.forgetNE)
-      .toSet
-    val newKeys = signingKeys.toSet -- previouslyRegisteredKeys
+    val newKeys = TopologyMapping.newSigningKeys(
+      this,
+      previous.flatMap(_.select[TopologyChangeOp.Replace, PartyToKeyMapping]),
+    )
+
     RequiredNamespaces(Set(party.namespace), newKeys.map(_.fingerprint))
   }
 
   override def uniqueKey: MappingHash = PartyToKeyMapping.uniqueKey(party)
 
-  override def mappedKeys: NonEmpty[Seq[PublicKey]] = signingKeys.toSeq
+  override def mappedKeys: Set[PublicKey] = signingKeysWithThreshold.keys.forgetNE.toSet[PublicKey]
 
   @VisibleForTesting
   private[transaction] def copy(
       party: PartyId = party,
-      threshold: PositiveInt = threshold,
-      signingKeys: NonEmpty[Seq[SigningPublicKey]] = signingKeys,
+      signingKeysWithThreshold: SigningKeysWithThreshold = signingKeysWithThreshold,
   ) =
-    new PartyToKeyMapping(party, threshold, signingKeys)
+    new PartyToKeyMapping(party, signingKeysWithThreshold)
+
+  @VisibleForTesting
+  def copySigningKeysUnsafe(signingKeysWithThreshold: SigningKeysWithThreshold): PartyToKeyMapping =
+    PartyToKeyMapping(
+      party = party,
+      signingKeysWithThreshold = signingKeysWithThreshold,
+    )
 }
 
 object PartyToKeyMapping extends TopologyMappingCompanion {
 
-  val MaxKeys: Int = OwnerToKeyMapping.MaxKeys
-
-  @VisibleForTesting
-  val signingKeysUnsafe: Lens[PartyToKeyMapping, NonEmpty[Seq[SigningPublicKey]]] =
-    GenLens[PartyToKeyMapping](_.signingKeys)
+  val MaxKeys: Int = KeyMapping.MaxKeys
 
   def create(
       partyId: PartyId,
       threshold: PositiveInt,
       signingKeys: NonEmpty[Seq[SigningPublicKey]],
   ): Either[String, PartyToKeyMapping] = {
-    val duplicateKeys = signingKeys.groupBy(_.fingerprint).values.filter(_.sizeIs > 1).toList
+    val signingKeysWithThreshold = SigningKeysWithThreshold(signingKeys.toSet, threshold)
     for {
-      _ <- Either.cond(
-        duplicateKeys.isEmpty,
-        (),
-        s"All signing keys must be unique. Duplicate keys: $duplicateKeys",
-      )
-      _ <- Either.cond(signingKeys.sizeIs <= MaxKeys, (), s"At most $MaxKeys can be specified.")
-      _ <- Either
-        .cond(
-          threshold.value <= signingKeys.size,
-          (),
-          s"Party $partyId cannot meet threshold of $threshold signing keys with participants ${signingKeys.size} keys",
-        )
-    } yield PartyToKeyMapping(partyId, threshold, signingKeys)
+      // The toSet removes duplicate signing keys before creating the SigningKeysWithThreshold
+      // This is on purpose here because legacy existing P2Ks may have duplicate keys and we must be able to deserialize them
+      _ <- KeyMapping.validateKeysSizeSet(signingKeysWithThreshold.keys, MaxKeys)
+    } yield PartyToKeyMapping(partyId, signingKeysWithThreshold)
   }
 
   def tryCreate(
@@ -983,7 +1053,7 @@ final case class SynchronizerTrustCertificate(
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
   ): RequiredAuth =
-    RequiredNamespaces(Set(participantId.namespace))
+    RequiredNamespaces(participantId)
 
   override def uniqueKey: MappingHash =
     SynchronizerTrustCertificate.uniqueKey(participantId, synchronizerId)
@@ -1170,7 +1240,7 @@ final case class ParticipantSynchronizerPermission(
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
   ): RequiredAuth =
-    RequiredNamespaces(Set(synchronizerId.namespace))
+    RequiredNamespaces(synchronizerId)
 
   override def uniqueKey: MappingHash =
     ParticipantSynchronizerPermission.uniqueKey(synchronizerId, participantId)
@@ -1261,7 +1331,7 @@ final case class PartyHostingLimits(
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
   ): RequiredAuth =
-    RequiredNamespaces(Set(synchronizerId.namespace))
+    RequiredNamespaces(synchronizerId)
 
   override def uniqueKey: MappingHash = PartyHostingLimits.uniqueKey(synchronizerId, partyId)
 }
@@ -1368,7 +1438,7 @@ final case class VettedPackages private (
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
   ): RequiredAuth =
-    RequiredNamespaces(Set(participantId.namespace))
+    RequiredNamespaces(participantId)
 
   override def uniqueKey: MappingHash = VettedPackages.uniqueKey(participantId)
 }
@@ -1484,11 +1554,17 @@ object HostingParticipant {
   } yield HostingParticipant(participantId, permission, value.onboarding.nonEmpty)
 }
 
+/** @param partySigningKeysWithThreshold
+  *   Signing keys for the party to authorize transactions. Previously captured via PartyToKey
+  *   mappings and party NamespaceDelegation. Added in 3.4, kept as option for compatibility
+  */
 final case class PartyToParticipant private (
     partyId: PartyId,
     threshold: PositiveInt,
     participants: Seq[HostingParticipant],
-) extends TopologyMapping {
+    partySigningKeysWithThreshold: Option[SigningKeysWithThreshold],
+) extends TopologyMapping
+    with KeyMapping {
 
   override def companion: PartyToParticipant.type = PartyToParticipant
 
@@ -1497,6 +1573,7 @@ final case class PartyToParticipant private (
       party = partyId.toProtoPrimitive,
       threshold = threshold.value,
       participants = participants.map(_.toProto),
+      partySigningKeys = partySigningKeysWithThreshold.map(_.toProto),
     )
 
   override def toProtoV30: v30.TopologyMapping =
@@ -1513,101 +1590,188 @@ final case class PartyToParticipant private (
 
   def participantIds: Seq[ParticipantId] = participants.map(_.participantId)
 
+  def partySigningKeys: Set[SigningPublicKey] =
+    // Signing keys have been added in 3.4 as Option, previously we didn't have them. So we fall back to an empty Seq.
+    partySigningKeysWithThreshold.map(_.keys.forgetNE).getOrElse(Set.empty)
+
+  override def mappedKeys: Set[PublicKey] = partySigningKeys.toSet[PublicKey]
+
+  override def namespaceKeyForSelfAuthorization: Option[SigningPublicKey] =
+    partySigningKeys.find(_.fingerprint == partyId.fingerprint)
+
+  /*
+   * See topology.proto for the specification of the authorization rules.
+   */
+  def requiredAuthInternal(
+      previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]],
+      legacyPermissionUpgradeRequirements: Boolean,
+  ): RequiredAuth = {
+
+    val current = this
+    val prev =
+      previous.flatMap(_.select[TopologyChangeOp.Replace, PartyToParticipant].map(_.mapping))
+    val prevConfirmationThreshold = prev.map(_.threshold)
+    val prevParticipants = prev.toList.flatMap(_.participants).toSeq
+    val prevPartySigningKeys = prev.flatMap(_.partySigningKeysWithThreshold)
+
+    // a change to the confirmation threshold needs to be authorized by the party
+    val confirmationThresholdAuth =
+      Option.when(!prevConfirmationThreshold.contains(threshold))(
+        RequiredNamespaces(partyId)
+      )
+
+    // a change to the party's signing keys needs to be authorized by the party and all new signing keys
+    val currentSigningKeys = current.partySigningKeysWithThreshold.toList
+      .flatMap(_.keys.map(_.fingerprint))
+      .toSet
+    val previousSigningKeys =
+      prevPartySigningKeys.toList.flatMap(_.keys).map(_.fingerprint).toSet
+    val addedSigningKeys = currentSigningKeys -- previousSigningKeys
+    val partySigningKeysAuth =
+      Option.when(current.partySigningKeysWithThreshold != prevPartySigningKeys)(
+        RequiredNamespaces(Set(partyId.namespace), extraKeys = addedSigningKeys)
+      )
+
+    val currentParticipantIds = current.participants.map(_.participantId).toSet
+    val prevParticipantIds = prevParticipants.map(_.participantId).toSet
+
+    // added participants need to be authorized by the party and the respective participants
+    val addedParticipants = currentParticipantIds -- prevParticipantIds
+    val addedParticipantsAuth =
+      Option.when(addedParticipants.nonEmpty)(
+        RequiredNamespaces(Set(partyId.namespace) ++ addedParticipants.map(_.namespace))
+      )
+
+    // removing a participant requires the authorization of either the party or the participant
+    val removedParticipantsAuth = {
+      val removedParticipants = prevParticipantIds -- currentParticipantIds
+      removedParticipants.map(removed =>
+        // a participant can unilaterally unhost a party
+        RequiredNamespaces(partyId).or(RequiredNamespaces(removed))
+      )
+    }
+
+    val currentPermissions = current.participants.map(h => h.participantId -> h.permission).toMap
+    val previousPermissions = prevParticipants.map(h => h.participantId -> h.permission).toMap
+
+    // permission upgrades require the authorization of the party and the participant.
+    // if legacyPermissionUpgradeRequirements is true, only the the party's authorization is required.
+    // permission downgrades require the authorization of the party or the participant.
+    val permissionChangesAuth =
+      currentParticipantIds.flatMap { pid =>
+        previousPermissions.get(pid).zip(currentPermissions.get(pid)).collect {
+          case (prevPerm, currPerm) if prevPerm < currPerm =>
+            if (legacyPermissionUpgradeRequirements) RequiredNamespaces(partyId)
+            else RequiredNamespaces(partyId, pid)
+          case (prevPerm, currPerm) if prevPerm > currPerm =>
+            RequiredNamespaces(partyId).or(RequiredNamespaces(pid))
+        }
+      }
+
+    // clearing the onboarding flag can only be done by the participant.
+    // setting the flag can only be done by party.
+    val onboardingFlagChangesAuth = {
+      val currentFlags = current.participants.map(p => p.participantId -> p.onboarding).toMap
+      val previousFlags = prevParticipants.map(p => p.participantId -> p.onboarding).toMap
+
+      // detect only changes to the onboarding flags. the required authorization for the addition or removal
+      // of a participant is handled above.
+      currentFlags.flatMap { case (pid, onboarding) =>
+        previousFlags.get(pid).flatMap { prevOnboarding =>
+          (prevOnboarding, onboarding) match {
+            case (_prev @ true, _curr @ false) => Some(RequiredNamespaces(pid))
+            case (_prev @ false, _curr @ true) =>
+              Some(RequiredNamespaces(partyId))
+            case _ => None
+          }
+        }
+      }
+    }
+
+    // the order of how the individual permissions are "and-ed" together matters slightly,
+    // because we can optimize nested
+    val allAuthorizations =
+      confirmationThresholdAuth.toList.toVector ++ partySigningKeysAuth ++
+        addedParticipantsAuth ++ onboardingFlagChangesAuth ++ removedParticipantsAuth ++
+        permissionChangesAuth
+    // all detected individual authorizations are required for the transaction to become authorized
+    val combinedAuthO = allAuthorizations.reduceOption(_.and(_))
+    // if no change was detected (which would be in the case of a REMOVE), fall back to requiring the following signatures:
+    // * the party
+    // * all added participants (for safety)
+    // * all added signing keys (for safety)
+    combinedAuthO.getOrElse(
+      RequiredNamespaces(
+        Set(partyId.namespace) ++ addedParticipants.map(_.namespace),
+        extraKeys = addedSigningKeys,
+      )
+    )
+  }
+
+  def requiredAuthBackwardsCompatible(
+      previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
+  ): RequiredAuth =
+    requiredAuthInternal(previous, legacyPermissionUpgradeRequirements = true)
+
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
   ): RequiredAuth =
-    previous
-      .collect {
-        case TopologyTransaction(
-              TopologyChangeOp.Replace,
-              _,
-              PartyToParticipant(_, prevThreshold, prevParticipants),
-            ) =>
-          val current = this
-          val currentParticipantIds = participants.map(_.participantId.uid).toSet
-          val prevParticipantIds = prevParticipants.map(_.participantId.uid).toSet
-          val removedParticipants = prevParticipantIds -- currentParticipantIds
-          val addedParticipants = currentParticipantIds -- prevParticipantIds
-
-          val thresholdChanged = prevThreshold != current.threshold
-          val noThresholdChange = false
-
-          // party's and the (possibly) new participants' signature are required
-          val defaultAuth =
-            RequiredNamespaces(Set(partyId.namespace) ++ addedParticipants.map(_.namespace))
-
-          (thresholdChanged, addedParticipants.toSeq, removedParticipants.toSeq) match {
-
-            // check whether a participant can unilaterally unhost a party
-            case (`noThresholdChange`, Seq(), Seq(removedId)) =>
-              RequiredNamespaces(Set(partyId.namespace)).or(
-                RequiredNamespaces(Set(removedId.namespace))
-              )
-
-            // check whether an onboarding participant can unilaterally clear the onboarding flag
-            case (`noThresholdChange`, Seq(), Seq()) =>
-              val changedOrAddedHosting = participants.diff(prevParticipants)
-              val changedOrRemovedHosting = prevParticipants.diff(participants)
-              (changedOrAddedHosting, changedOrRemovedHosting) match {
-                case (Seq(currentHosting), Seq(previousHosting))
-                    if currentHosting.participantId == previousHosting.participantId &&
-                      currentHosting.permission == previousHosting.permission &&
-                      !currentHosting.onboarding && previousHosting.onboarding =>
-                  RequiredNamespaces(Set(currentHosting.participantId.uid.namespace))
-                case _ => defaultAuth
-              }
-
-            case _ => defaultAuth
-          }
-
-      }
-      .getOrElse(
-        RequiredNamespaces(Set(partyId.namespace) ++ participants.map(_.participantId.namespace))
-      )
+    requiredAuthInternal(previous, legacyPermissionUpgradeRequirements = false)
 
   override def uniqueKey: MappingHash = PartyToParticipant.uniqueKey(partyId)
+
 }
 
 object PartyToParticipant extends TopologyMappingCompanion {
+
+  val MaxKeys: Int = KeyMapping.MaxKeys
 
   def create(
       partyId: PartyId,
       threshold: PositiveInt,
       participants: Seq[HostingParticipant],
+      partySigningKeysWithThreshold: Option[SigningKeysWithThreshold] = None,
   ): Either[String, PartyToParticipant] = {
-    val noDuplicatePParticipants = {
-      val duplicatePermissions =
-        participants.groupBy(_.participantId).values.filter(_.sizeIs > 1).toList
-      Either.cond(
-        duplicatePermissions.isEmpty,
-        (),
-        s"Participants may only be assigned one permission: $duplicatePermissions",
-      )
-    }
-    val thresholdCanBeMet = {
-      val numConfirmingParticipants =
-        participants.count(_.permission >= ParticipantPermission.Confirmation)
-      Either
-        .cond(
-          // we allow to not meet the threshold criteria if there are only observing participants.
-          // but as soon as there is 1 confirming participant, the threshold must theoretically be satisfiable,
-          // otherwise the party can never confirm a transaction.
-          numConfirmingParticipants == 0 || threshold.value <= numConfirmingParticipants,
-          (),
-          s"Party $partyId cannot meet threshold of $threshold confirming participants with participants $participants",
-        )
-        .map(_ => PartyToParticipant(partyId, threshold, participants))
-    }
 
-    noDuplicatePParticipants.flatMap(_ => thresholdCanBeMet)
+    // If a participant is listed several times with different permissions, take the one with the higher
+    // Needed for backwards compatibility with existing topologies
+    val deduplicateParticipantsWithDifferentPermissionsMap =
+      participants
+        .groupMapReduce(_.participantId)(identity) { case (first, second) =>
+          Ordering.by[HostingParticipant, ParticipantPermission](_.permission).max(first, second)
+        }
+
+    val deduplicateParticipantsWithDifferentPermissions = participants
+      .map(_.participantId)
+      .distinct
+      .flatMap(deduplicateParticipantsWithDifferentPermissionsMap.get)
+
+    val keysValid = partySigningKeysWithThreshold.traverse_(signingKeysWithThreshold =>
+      KeyMapping.validateKeysSizeSet(
+        signingKeysWithThreshold.keys,
+        MaxKeys,
+      )
+    )
+
+    for {
+      _ <- keysValid
+    } yield PartyToParticipant(
+      partyId,
+      threshold,
+      deduplicateParticipantsWithDifferentPermissions,
+      partySigningKeysWithThreshold,
+    )
   }
 
   def tryCreate(
       partyId: PartyId,
       threshold: PositiveInt,
       participants: Seq[HostingParticipant],
+      partySigningKeysWithThreshold: Option[SigningKeysWithThreshold] = None,
   ): PartyToParticipant =
-    create(partyId, threshold, participants).valueOr(err => throw new IllegalArgumentException(err))
+    create(partyId, threshold, participants, partySigningKeysWithThreshold).valueOr(err =>
+      throw new IllegalArgumentException(err)
+    )
 
   def uniqueKey(partyId: PartyId): MappingHash =
     TopologyMapping.buildUniqueKey(code)(_.add(partyId.toProtoPrimitive))
@@ -1621,7 +1785,13 @@ object PartyToParticipant extends TopologyMappingCompanion {
       partyId <- PartyId.fromProtoPrimitive(value.party, "party")
       threshold <- ProtoConverter.parsePositiveInt("threshold", value.threshold)
       participants <- value.participants.traverse(HostingParticipant.fromProtoV30)
-    } yield PartyToParticipant(partyId, threshold, participants)
+      partySigningKeys <- value.partySigningKeys.traverse(protoValue =>
+        SigningKeysWithThreshold.fromProtoV30(protoValue)
+      )
+      partyToParticipant <- PartyToParticipant
+        .create(partyId, threshold, participants, partySigningKeys)
+        .leftMap(ProtoDeserializationError.InvariantViolation(None, _))
+    } yield partyToParticipant
 }
 
 /** Dynamic synchronizer parameter settings for the synchronizer
@@ -1653,7 +1823,7 @@ final case class SynchronizerParametersState(
 
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
-  ): RequiredAuth = RequiredNamespaces(Set(synchronizerId.namespace))
+  ): RequiredAuth = RequiredNamespaces(synchronizerId)
 
   override def uniqueKey: MappingHash =
     SynchronizerParametersState.uniqueKey(synchronizerId)
@@ -1714,7 +1884,7 @@ final case class DynamicSequencingParametersState(
 
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
-  ): RequiredAuth = RequiredNamespaces(Set(synchronizerId.namespace))
+  ): RequiredAuth = RequiredNamespaces(synchronizerId)
 
   override def uniqueKey: MappingHash = SynchronizerParametersState.uniqueKey(synchronizerId)
 }
@@ -1783,7 +1953,7 @@ final case class MediatorSynchronizerState private (
 
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
-  ): RequiredAuth = RequiredNamespaces(Set(synchronizerId.namespace))
+  ): RequiredAuth = RequiredNamespaces(synchronizerId)
 
   override def uniqueKey: MappingHash = MediatorSynchronizerState.uniqueKey(synchronizerId, group)
 }
@@ -1884,7 +2054,7 @@ final case class SequencerSynchronizerState private (
 
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
-  ): RequiredAuth = RequiredNamespaces(Set(synchronizerId.namespace))
+  ): RequiredAuth = RequiredNamespaces(synchronizerId)
 
   override def uniqueKey: MappingHash = SequencerSynchronizerState.uniqueKey(synchronizerId)
 }
@@ -1973,7 +2143,7 @@ final case class SynchronizerUpgradeAnnouncement(
 
   override def requiredAuth(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
-  ): RequiredAuth = RequiredNamespaces(Set(successorSynchronizerId.namespace))
+  ): RequiredAuth = RequiredNamespaces(successorSynchronizerId)
 
   override def uniqueKey: MappingHash =
     SynchronizerUpgradeAnnouncement.uniqueKey(successorSynchronizerId.logical)

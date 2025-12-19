@@ -229,12 +229,12 @@ abstract class HttpAppConnection(
       val myVersion = BuildInfo.compiledVersion
       val compatibleVersion = BuildInfo.compatibleVersion
       if (versionInfo.version != myVersion && versionInfo.version != compatibleVersion) {
-        val errorMsg = s"Version mismatch detected, please download the latest bundle. " +
-          s"Your executable is on $myVersion, while the application you are connecting to is on ${versionInfo.version}"
+        val msg =
+          s"Version mismatch detected: your executable is on $myVersion, while the application you are connecting to is on ${versionInfo.version}."
         if (upgradesConfig.failOnVersionMismatch)
-          sys.error(errorMsg)
+          sys.error(s"$msg. Please download the latest bundle.")
         else
-          logger.info(errorMsg)(TraceContext.empty)
+          logger.info(s"$msg. Consider downloading the latest bundle.")(TraceContext.empty)
       } else {
         logger.debug(
           s"Version verification passed for $serviceName, server is on the same version as mine, or a compatible one: ${versionInfo}"

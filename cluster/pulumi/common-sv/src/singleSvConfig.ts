@@ -8,10 +8,12 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { ValidatorAppConfigSchema } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/config';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
-import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
+import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { merge } from 'lodash';
 import util from 'node:util';
 import { z } from 'zod';
+
+import { GCPBucketSchema } from './config';
 
 const SvCometbftConfigSchema = z
   .object({
@@ -117,12 +119,15 @@ const SingleSvConfigSchema = z
     logging: z
       .object({
         appsLogLevel: LogLevelSchema,
+        appsAsync: z.boolean().default(false),
         cantonLogLevel: LogLevelSchema,
         cantonStdoutLogLevel: LogLevelSchema.optional(),
+        cantonAsync: z.boolean().default(false),
         cometbftLogLevel: CometbftLogLevelSchema.optional(),
         cometbftExtraLogLevelFlags: z.string().optional(),
       })
       .optional(),
+    periodicSnapshots: z.object({ topology: GCPBucketSchema.optional() }).optional(),
   })
   .strict();
 const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema).and(

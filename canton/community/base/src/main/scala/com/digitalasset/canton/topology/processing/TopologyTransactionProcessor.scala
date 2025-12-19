@@ -10,7 +10,7 @@ import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.NonEmptyReturningOps.*
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervisor}
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{ProcessingTimeout, TopologyConfig}
 import com.digitalasset.canton.crypto.SynchronizerCryptoPureApi
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -60,6 +60,7 @@ import scala.math.Ordering.Implicits.*
 class TopologyTransactionProcessor(
     pureCrypto: SynchronizerCryptoPureApi,
     store: TopologyStore[TopologyStoreId.SynchronizerStore],
+    staticSynchronizerParameters: StaticSynchronizerParameters,
     acsCommitmentScheduleEffectiveTime: Traced[EffectiveTime] => Unit,
     val terminateProcessing: TerminateProcessing,
     futureSupervisor: FutureSupervisor,
@@ -75,7 +76,7 @@ class TopologyTransactionProcessor(
   protected lazy val stateProcessor: TopologyStateProcessor =
     TopologyStateProcessor.forTransactionProcessing(
       store,
-      new RequiredTopologyMappingChecks(store, loggerFactory),
+      RequiredTopologyMappingChecks(store, Some(staticSynchronizerParameters), loggerFactory),
       pureCrypto,
       loggerFactory,
     )
@@ -332,7 +333,7 @@ class TopologyTransactionProcessor(
                 )(wrongMsgs =>
                   TopologyManagerError.TopologyManagerAlarm
                     .Warn(
-                      s"received messages with wrong synchronizer ids: ${wrongMsgs.map(_.protocolMessage.synchronizerId)}"
+                      s"received messages with wrong synchronizer ids: ${wrongMsgs.map(_.protocolMessage.psid)}"
                     )
                     .report()
                 )
@@ -463,8 +464,8 @@ class TopologyTransactionProcessor(
             effectiveTimestamp,
             txs,
             expectFullAuthorization = false,
-            // during regular transaction processing, missing signing key signatures are never permitted
-            transactionMayHaveMissingSigningKeySignatures = false,
+            // during regular transaction processing, checks will not be relaxed
+            relaxChecksForBackwardsCompatibility = false,
           )
       )
       (validated, _) = validationResult
@@ -530,6 +531,7 @@ object TopologyTransactionProcessor {
       synchronizerPredecessor: Option[SynchronizerPredecessor],
       pureCrypto: SynchronizerCryptoPureApi,
       parameters: CantonNodeParameters,
+      topologyConfig: TopologyConfig,
       clock: Clock,
       staticSynchronizerParameters: StaticSynchronizerParameters,
       futureSupervisor: FutureSupervisor,
@@ -544,6 +546,7 @@ object TopologyTransactionProcessor {
     val processor = new TopologyTransactionProcessor(
       pureCrypto,
       topologyStore,
+      staticSynchronizerParameters,
       _ => (),
       TerminateProcessing.NoOpTerminateTopologyProcessing,
       futureSupervisor,
@@ -560,6 +563,7 @@ object TopologyTransactionProcessor {
       StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
       parameters.cachingConfigs,
       parameters.batchingConfig,
+      topologyConfig,
       parameters.processingTimeouts,
       futureSupervisor,
       loggerFactory,

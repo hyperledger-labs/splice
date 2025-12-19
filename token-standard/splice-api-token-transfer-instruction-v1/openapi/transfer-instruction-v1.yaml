@@ -7,7 +7,7 @@ info:
   description: |
     Implemented by token registries for the purpose of supporting the initiation
     of asset transfers; e.g. to settle off-ledger obligations.
-  version: 1.0.0
+  version: 1.1.0
 paths:
 
   /registry/transfer-instruction/v1/transfer-factory:
@@ -175,6 +175,10 @@ components:
           type: object
           additionalProperties:
             type: string
+        excludeDebugFields:
+          description: "If set to true, the response will not include debug fields."
+          default: false
+          type: boolean
 
     TransferFactoryWithChoiceContext:
       description: |

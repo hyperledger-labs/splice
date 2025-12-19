@@ -1,10 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { z } from 'zod';
-import { isValidUrl } from '../../utils/validations';
 import dayjs from 'dayjs';
-import { EffectivityType } from '../../utils/types';
+import { z } from 'zod';
+import type { EffectivityType } from '../../utils/types';
+import { isValidUrl } from '../../utils/validations';
 
 export const urlSchema = z.string().refine(url => isValidUrl(url), {
   message: 'Invalid URL',
@@ -14,9 +14,15 @@ export const summarySchema = z.string().min(1, { message: 'Summary is required' 
 
 export const svSelectionSchema = z.string().min(1, { message: 'SV is required' });
 
-export const expirationSchema = z.string().refine(date => dayjs(date).isAfter(dayjs()), {
-  message: 'Expiration must be in the future',
-});
+const getExpirationSchema = (errMessage: string) => {
+  return z.string().refine(date => dayjs(date).isAfter(dayjs()), {
+    message: errMessage,
+  });
+};
+
+export const expirationSchema = getExpirationSchema('Expiration must be in the future');
+
+export const mintBeforeSchema = getExpirationSchema('Date must be in the future');
 
 export const effectiveDateSchema = z.string().refine(date => dayjs(date).isAfter(dayjs()), {
   message: 'Effective Date must be in the future',
@@ -39,8 +45,18 @@ export const svWeightSchema = z
   .min(1, { message: 'Weight is required' })
   .regex(/^\d+$/, { message: 'Weight must be a valid number' });
 
+export const rewardAmountSchema = z
+  .string()
+  .min(1, { message: 'Amount is required' })
+  .regex(/^\d+$/, { message: 'Amount must be a valid number' });
+
 export const validateWeight = (value: string): string | false => {
   const result = svWeightSchema.safeParse(value);
+  return result.success ? false : result.error.issues[0].message;
+};
+
+export const validateRewardAmount = (value: string): string | false => {
+  const result = rewardAmountSchema.safeParse(value);
   return result.success ? false : result.error.issues[0].message;
 };
 
@@ -51,6 +67,18 @@ export const validateSvSelection = (value: string): string | false => {
 
 export const validateExpiration = (value: string): string | false => {
   const result = expirationSchema.safeParse(value);
+  return result.success ? false : result.error.issues[0].message;
+};
+
+export const validateMintBefore = (value: string): string | false => {
+  const result = mintBeforeSchema.safeParse(value);
+  return result.success ? false : result.error.issues[0].message;
+};
+
+export const validateMintedBeneficiary = (value: string): string | false => {
+  const schema = z.string().min(1, { message: 'Beneficiary is required' });
+
+  const result = schema.safeParse(value);
   return result.success ? false : result.error.issues[0].message;
 };
 
@@ -72,6 +100,26 @@ export const validateExpiryEffectiveDate = (value: {
   if (!value.effectiveDate) return false;
 
   const result = expiryEffectiveDateSchema.safeParse(value);
+  return result.success ? false : result.error.issues[0].message;
+};
+
+export const validateMintBeforeAndEffectiveDate = (value: {
+  effectiveDate?: string;
+  mintBefore: string;
+}): string | false => {
+  if (!value.effectiveDate) return false;
+
+  const schema = z
+    .object({
+      effectiveDate: z.string(),
+      mintBefore: z.string(),
+    })
+    .refine(({ effectiveDate, mintBefore }) => dayjs(effectiveDate).isBefore(dayjs(mintBefore)), {
+      message: 'Mint Before date must be after Effective Date',
+      path: ['mintBefore'],
+    });
+
+  const result = schema.safeParse(value);
   return result.success ? false : result.error.issues[0].message;
 };
 

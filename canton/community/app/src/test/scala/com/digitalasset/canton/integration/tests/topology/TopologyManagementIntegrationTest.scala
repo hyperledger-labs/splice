@@ -11,7 +11,11 @@ import com.daml.test.evidence.tag.Security.{Attack, SecurityTest, SecurityTestSu
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{DbConfig, PositiveDurationSeconds}
-import com.digitalasset.canton.console.{CommandFailure, LocalParticipantReference}
+import com.digitalasset.canton.console.{
+  CommandFailure,
+  LocalParticipantReference,
+  ParticipantReference,
+}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.admin.grpc.PrivateKeyMetadata
 import com.digitalasset.canton.data.CantonTimestamp
@@ -32,7 +36,10 @@ import com.digitalasset.canton.topology.ForceFlag.{
   AllowUnvalidatedSigningKeys,
   DisablePartyWithActiveContracts,
 }
-import com.digitalasset.canton.topology.TopologyManagerError.UnauthorizedTransaction
+import com.digitalasset.canton.topology.TopologyManagerError.{
+  NoAppropriateSigningKeyInStore,
+  UnauthorizedTransaction,
+}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.transaction.*
@@ -40,8 +47,13 @@ import com.digitalasset.canton.topology.transaction.DelegationRestriction.{
   CanSignAllButNamespaceDelegations,
   CanSignAllMappings,
 }
-import com.digitalasset.canton.topology.transaction.ParticipantPermission.{Observation, Submission}
+import com.digitalasset.canton.topology.transaction.ParticipantPermission.{
+  Confirmation,
+  Observation,
+  Submission,
+}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
+import com.digitalasset.canton.version.v1.UntypedVersionedMessage
 import org.slf4j.event.Level.DEBUG
 
 import scala.annotation.nowarn
@@ -62,7 +74,7 @@ trait TopologyManagementIntegrationTest
   // TODO(#16283): disable participant / roll keys while the affected nodes are busy
 
   override lazy val environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.P2_S1M1.withSetup { implicit env =>
+    EnvironmentDefinition.P3_S1M1.withSetup { implicit env =>
       import env.*
       participants.all.synchronizers.connect_local(sequencer1, alias = daName)
       participants.all.dars.upload(CantonExamplesPath)
@@ -404,31 +416,506 @@ trait TopologyManagementIntegrationTest
       offboardVladFromParticipants()
     }
 
-    "cannot disable a party if the threshold is not met anymore" in { implicit env =>
+    "deserialize a PTK with threshold > number of keys" in { implicit env =>
       import env.*
-      val alice2S = "Alice2"
-      val Seq(alice2) = PartiesAllocator(participants.all.toSet)(
-        Seq(alice2S -> participant1),
-        Map(
-          alice2S -> Map(
-            daId -> (PositiveInt.two, Set(
-              (participant1, Submission),
-              (participant2, Submission),
-            ))
+
+      val partyKey =
+        global_secret.keys.secret.generate_keys(PositiveInt.one, usage = SigningKeyUsage.All).head1
+
+      val party = PartyId.tryCreate("alice", Namespace(partyKey.fingerprint))
+
+      val ptkProto = com.digitalasset.canton.protocol.v30.PartyToKeyMapping(
+        party.toProtoPrimitive,
+        threshold = 5,
+        Seq(partyKey.toProtoV30),
+      )
+
+      PartyToKeyMapping.fromProtoV30(ptkProto).isRight shouldBe true
+    }
+
+    "deserialize a PTK with duplicate keys" in { implicit env =>
+      import env.*
+
+      val partyKey =
+        global_secret.keys.secret.generate_keys(PositiveInt.one, usage = SigningKeyUsage.All).head1
+
+      val party = PartyId.tryCreate("alice", Namespace(partyKey.fingerprint))
+
+      val ptkProto = com.digitalasset.canton.protocol.v30.PartyToKeyMapping(
+        party.toProtoPrimitive,
+        threshold = 1,
+        signingKeys = Seq(partyKey.toProtoV30, partyKey.toProtoV30),
+      )
+
+      val transaction = com.digitalasset.canton.protocol.v30.TopologyTransaction(
+        com.digitalasset.canton.protocol.v30.Enums.TopologyChangeOp.TOPOLOGY_CHANGE_OP_ADD_REPLACE,
+        serial = 1,
+        mapping = Some(
+          com.digitalasset.canton.protocol.v30.TopologyMapping(
+            com.digitalasset.canton.protocol.v30.TopologyMapping.Mapping.PartyToKeyMapping(ptkProto)
           )
         ),
       )
 
+      val wrapped = UntypedVersionedMessage(
+        UntypedVersionedMessage.Wrapper.Data(transaction.toByteString),
+        version = testedProtocolVersion.v,
+      )
+
+      val originalByteString = wrapped.toByteString
+
+      val deserialized: TopologyTransaction[TopologyChangeOp, TopologyMapping] =
+        TopologyTransaction.fromByteString(testedProtocolVersion, originalByteString).value
+      val ptkMappingDeserialized = deserialized.mapping.select[PartyToKeyMapping].value
+      ptkMappingDeserialized.signingKeys.forgetNE should have size 1
+      ptkMappingDeserialized.signingKeys.forgetNE.toSeq should contain theSameElementsAs Seq(
+        partyKey
+      )
+
+      // Sanity check that the memoized bytes are the same as the original
+      deserialized.getCryptographicEvidence shouldBe originalByteString
+    }
+
+    "deserialize a PTP with conflicting permissions for the same participant" in { implicit env =>
+      import env.*
+
+      val partyKey =
+        global_secret.keys.secret.generate_keys(PositiveInt.one, usage = SigningKeyUsage.All).head1
+
+      val party = PartyId.tryCreate("alice", Namespace(partyKey.fingerprint))
+
+      val ptpProto = com.digitalasset.canton.protocol.v30.PartyToParticipant(
+        party.toProtoPrimitive,
+        threshold = 1,
+        Seq(
+          // Participant 2 is listed twice with different permissions
+          com.digitalasset.canton.protocol.v30.PartyToParticipant.HostingParticipant(
+            participant2.toProtoPrimitive,
+            com.digitalasset.canton.protocol.v30.Enums.ParticipantPermission.PARTICIPANT_PERMISSION_CONFIRMATION,
+            None,
+          ),
+          com.digitalasset.canton.protocol.v30.PartyToParticipant.HostingParticipant(
+            participant2.toProtoPrimitive,
+            com.digitalasset.canton.protocol.v30.Enums.ParticipantPermission.PARTICIPANT_PERMISSION_SUBMISSION,
+            None,
+          ),
+        ),
+        None,
+      )
+
+      val transaction = com.digitalasset.canton.protocol.v30.TopologyTransaction(
+        com.digitalasset.canton.protocol.v30.Enums.TopologyChangeOp.TOPOLOGY_CHANGE_OP_ADD_REPLACE,
+        serial = 1,
+        mapping = Some(
+          com.digitalasset.canton.protocol.v30.TopologyMapping(
+            com.digitalasset.canton.protocol.v30.TopologyMapping.Mapping
+              .PartyToParticipant(ptpProto)
+          )
+        ),
+      )
+
+      val wrapped = UntypedVersionedMessage(
+        UntypedVersionedMessage.Wrapper.Data(transaction.toByteString),
+        version = testedProtocolVersion.v,
+      )
+
+      val originalByteString = wrapped.toByteString
+
+      val deserialized: TopologyTransaction[TopologyChangeOp, TopologyMapping] =
+        TopologyTransaction.fromByteString(testedProtocolVersion, originalByteString).value
+      val ptpMappingDeserialized = deserialized.mapping.select[PartyToParticipant].value
+      val hosting = ptpMappingDeserialized.participants
+      hosting should have size 1
+      // Submission is higher than confirmation - p2 should have submission
+      hosting
+        .find(_.participantId == participant2.id)
+        .value
+        .permission shouldBe ParticipantPermission.Submission
+
+      // Sanity check that the memoized bytes are the same as the original
+      deserialized.getCryptographicEvidence shouldBe originalByteString
+    }
+
+    "cannot submit a new PartyToParticipant with threshold > number of keys" in { implicit env =>
+      import env.*
+
+      val partyKey =
+        global_secret.keys.secret.generate_keys(PositiveInt.one, usage = SigningKeyUsage.All).head1
+
+      val partyToParticipantMapping = TopologyTransaction(
+        TopologyChangeOp.Replace,
+        PositiveInt.one,
+        PartyToParticipant.tryCreate(
+          PartyId.tryCreate("alice", Namespace(partyKey.fingerprint)),
+          threshold = PositiveInt.one,
+          participants = Seq(HostingParticipant(participant2, ParticipantPermission.Confirmation)),
+          partySigningKeysWithThreshold = Some(
+            SigningKeysWithThreshold(NonEmpty.mk(Set, partyKey), PositiveInt.two)
+          ),
+        ),
+        testedProtocolVersion,
+      )
+
+      val signed = SignedTopologyTransaction
+        .create(
+          partyToParticipantMapping,
+          NonEmpty.mk(
+            Set,
+            SingleTransactionSignature(
+              partyToParticipantMapping.hash,
+              global_secret.sign(
+                partyToParticipantMapping.hash.hash.getCryptographicEvidence,
+                partyKey.fingerprint,
+                SigningKeyUsage.All,
+              ),
+            ),
+          ),
+          isProposal = false,
+          testedProtocolVersion,
+        )
+        .value
+
+      val signedByParticipant2 = participant2.topology.transactions.sign(
+        Seq(signed),
+        store = daId,
+      )
+
       assertThrowsAndLogsCommandFailures(
-        participant2.topology.party_to_participant_mappings.propose_delta(
-          PartyId(alice2.uid),
-          removes = List(participant2.id),
+        participant2.topology.transactions.load(
+          signedByParticipant2,
           store = daId,
         ),
         _.message should include(
-          "cannot meet threshold of 2 confirming participants with participants"
+          "Tried to set a signing threshold (2) above the number of signing keys (1)"
         ),
       )
+    }
+
+    "cannot submit a new PartyToKeyMapping with threshold > number of keys" in { implicit env =>
+      import env.*
+
+      val partyKey =
+        global_secret.keys.secret.generate_keys(PositiveInt.one, usage = SigningKeyUsage.All).head1
+
+      val partyToKeyMapping = TopologyTransaction(
+        TopologyChangeOp.Replace,
+        PositiveInt.one,
+        PartyToKeyMapping.tryCreate(
+          PartyId.tryCreate("alice", Namespace(partyKey.fingerprint)),
+          threshold = PositiveInt.two,
+          signingKeys = NonEmpty.mk(Seq, partyKey),
+        ),
+        testedProtocolVersion,
+      )
+
+      val signed = SignedTopologyTransaction
+        .create(
+          partyToKeyMapping,
+          NonEmpty.mk(
+            Set,
+            SingleTransactionSignature(
+              partyToKeyMapping.hash,
+              global_secret.sign(
+                partyToKeyMapping.hash.hash.getCryptographicEvidence,
+                partyKey.fingerprint,
+                SigningKeyUsage.All,
+              ),
+            ),
+          ),
+          isProposal = false,
+          testedProtocolVersion,
+        )
+        .value
+
+      assertThrowsAndLogsCommandFailures(
+        participant2.topology.transactions.load(
+          Seq(signed),
+          store = daId,
+        ),
+        _.message should include(
+          "Tried to set a signing threshold (2) above the number of signing keys (1)"
+        ),
+      )
+    }
+
+    "cannot disable a party if the threshold is not met anymore without a force flag" in {
+      implicit env =>
+        import env.*
+        val alice2S = "Alice2"
+        val Seq(alice2) = PartiesAllocator(participants.all.toSet)(
+          Seq(alice2S -> participant1),
+          Map(
+            alice2S -> Map(
+              daId -> (PositiveInt.two, Set(
+                (participant1, Submission),
+                (participant2, Submission),
+              ))
+            )
+          ),
+        )
+
+        assertThrowsAndLogsCommandFailures(
+          participant2.topology.party_to_participant_mappings.propose_delta(
+            PartyId(alice2.uid),
+            removes = List(participant2.id),
+            store = daId,
+          ),
+          _.message should include(
+            "Tried to set a confirming threshold (2) above the number of hosting nodes (1)"
+          ),
+        )
+    }
+
+    "participant or party can unilaterally downgrade the hosting permission" in { implicit env =>
+      import env.*
+      val downgradePartyS = "Downgrade"
+      // start with hosting the party on participant2
+      val Seq(downgradeParty) = PartiesAllocator(participants.all.toSet)(
+        Seq(downgradePartyS -> participant1),
+        Map(downgradePartyS -> Map(daId -> (PositiveInt.one, Set((participant2, Submission))))),
+      )
+
+      def downgrade(
+          executing: ParticipantReference,
+          verifying: ParticipantReference,
+          targetParticipant: ParticipantId,
+          permission: Option[ParticipantPermission],
+      ) = {
+        val p2ChangedPermission = executing.topology.party_to_participant_mappings.propose(
+          downgradeParty,
+          permission.map(targetParticipant -> _).toList,
+          store = daId,
+          forceFlags = ForceFlags(
+            Option.when(permission.isEmpty)(ForceFlag.AllowConfirmingThresholdCanBeMet).toList*
+          ),
+        )
+        eventually() {
+          val updatedMapping = verifying.topology.party_to_participant_mappings
+            .list(daId, filterParty = downgradeParty.filterString)
+            .loneElement
+          updatedMapping.context.serial shouldBe p2ChangedPermission.serial
+          updatedMapping.item.participants
+            .find(_.participantId == targetParticipant)
+            .map(_.permission) shouldBe permission
+        }
+      }
+
+      // the participant can unilaterally downgrade
+      Seq(Some(Confirmation), Some(Observation), None).foreach { permission =>
+        downgrade(
+          executing = participant2,
+          verifying = participant1,
+          targetParticipant = participant2.id,
+          permission = permission,
+        )
+      }
+
+      // host the party on participant3
+      PartiesAllocator(participants.all.toSet)(
+        Seq(downgradePartyS -> participant1),
+        Map(downgradePartyS -> Map(daId -> (PositiveInt.one, Set((participant3, Submission))))),
+      )
+      // the party can unilaterally downgrade
+      Seq(Some(Confirmation), Some(Observation), None).foreach { permission =>
+        downgrade(
+          executing = participant1,
+          verifying = participant3,
+          targetParticipant = participant3.id,
+          permission = permission,
+        )
+      }
+    }
+
+    "parties or participants cannot unilaterally upgrade the hosting permission" in {
+      implicit env =>
+        import env.*
+        val upgradePartyS = "Upgrade"
+        val Seq(upgradeParty) = PartiesAllocator(participants.all.toSet)(
+          Seq(upgradePartyS -> participant1),
+          Map(upgradePartyS -> Map(daId -> (PositiveInt.one, Set((participant2, Observation))))),
+        )
+
+        Seq(Confirmation, Submission).foreach { p2permission =>
+          // the party's namespace tries to upgrade the hosting permission
+          loggerFactory.assertThrowsAndLogs[CommandFailure](
+            participant1.topology.party_to_participant_mappings.propose_delta(
+              upgradeParty,
+              adds = Seq(participant2.id -> p2permission),
+              mustFullyAuthorize = true,
+              store = daId,
+            ),
+            _.shouldBeCantonErrorCode(UnauthorizedTransaction),
+            _.errorMessage should include("Request failed for participant1"),
+          )
+          // the participant2 tries to upgrade the hosting permission
+          loggerFactory.assertThrowsAndLogs[CommandFailure](
+            participant2.topology.party_to_participant_mappings.propose_delta(
+              upgradeParty,
+              adds = Seq(participant2.id -> p2permission),
+              mustFullyAuthorize = true,
+              store = daId,
+            ),
+            _.shouldBeCantonErrorCode(UnauthorizedTransaction),
+            _.errorMessage should include("Request failed for participant2"),
+          )
+
+          // it works when both the party and the participant agree to upgrade the permission
+          val p2ChangedPermission = Seq(participant1, participant2)
+            .map(
+              _.topology.party_to_participant_mappings.propose_delta(
+                upgradeParty,
+                adds = Seq(participant2.id -> p2permission),
+                store = daId,
+              )
+            )
+            .headOption
+            .value
+          eventually() {
+            val updatedMapping = participant1.topology.party_to_participant_mappings
+              .list(daId, filterParty = upgradeParty.filterString)
+              .loneElement
+            updatedMapping.context.serial shouldBe p2ChangedPermission.serial
+            updatedMapping.item.participants
+              .map(_.permission)
+              .loneElement shouldBe p2permission
+          }
+        }
+    }
+
+    "clearing the onboarding flag requires the participant's authorization" in { implicit env =>
+      import env.*
+      val onboardingFlagParty =
+        PartyId(UniqueIdentifier.tryCreate("OnboardingFlag", participant1.namespace))
+
+      val onboardingFlagSet = Seq(participant1, participant2)
+        .map(
+          _.topology.party_to_participant_mappings.propose(
+            onboardingFlagParty,
+            Seq(participant2.id -> Submission),
+            threshold = PositiveInt.one,
+            store = daId,
+            participantsRequiringPartyToBeOnboarded = Seq(participant2),
+          )
+        )
+        .headOption
+        .value
+
+      eventually() {
+        val updatedMapping = participant1.topology.party_to_participant_mappings
+          .list(daId, filterParty = onboardingFlagParty.filterString)
+          .loneElement
+        updatedMapping.context.serial shouldBe onboardingFlagSet.serial
+        updatedMapping.item.participants.loneElement.onboarding shouldBe true
+      }
+
+      // the party cannot clear the onboarding flag
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        participant1.topology.party_to_participant_mappings.propose(
+          onboardingFlagParty,
+          Seq(participant2.id -> Submission),
+          threshold = PositiveInt.one,
+          store = daId,
+        ),
+        _.shouldBeCantonErrorCode(NoAppropriateSigningKeyInStore),
+      )
+
+      // the participant can clear its onboarding flag
+      participant2.topology.party_to_participant_mappings.propose(
+        onboardingFlagParty,
+        Seq(participant2.id -> Submission),
+        threshold = PositiveInt.one,
+        store = daId,
+      )
+
+      eventually() {
+        participant1.topology.party_to_participant_mappings
+          .list(daId, filterParty = onboardingFlagParty.filterString)
+          .loneElement
+          .item
+          .participants
+          .loneElement
+          .onboarding shouldBe false
+      }
+    }
+
+    "a mixture of changes are properly authorized" in { implicit env =>
+      import env.*
+      val downgradeAndOnboardFlagClearanceParty =
+        PartyId(
+          UniqueIdentifier.tryCreate("DowngradeAndOnboardFlagClearance", participant1.namespace)
+        )
+
+      Seq(participant1, participant2, participant3)
+        .foreach(
+          _.topology.party_to_participant_mappings.propose(
+            downgradeAndOnboardFlagClearanceParty,
+            Seq(participant2.id -> Submission, participant3.id -> Observation),
+            threshold = PositiveInt.one,
+            store = daId,
+            participantsRequiringPartyToBeOnboarded = Seq(participant3),
+          )
+        )
+
+      Seq(participant1, participant2, participant3).foreach { participant =>
+        eventually() {
+          val updatedMapping = participant.topology.party_to_participant_mappings
+            .list(daId, filterParty = downgradeAndOnboardFlagClearanceParty.filterString)
+            .loneElement
+          updatedMapping.item.participants should have size 2
+        }
+      }
+
+      def submitDowngradeAndClear(executing: ParticipantReference, mustFullyAuthorize: Boolean) =
+        executing.topology.party_to_participant_mappings.propose(
+          downgradeAndOnboardFlagClearanceParty,
+          Seq(participant2.id -> Confirmation, participant3.id -> Observation),
+          threshold = PositiveInt.one,
+          store = daId,
+          mustFullyAuthorize = mustFullyAuthorize,
+        )
+
+      // the downgrading participant cannot unilaterally fully authorize the combined change
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        // force the failure with mustFullyAuthorize=true
+        submitDowngradeAndClear(participant2, mustFullyAuthorize = true),
+        _.shouldBeCantonErrorCode(UnauthorizedTransaction),
+        _.errorMessage should include("Request failed for participant2"),
+      )
+      // the participant clearing the onboarding flag cannot unilaterally fully authorize the combined change
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        // force the failure with mustFullyAuthorize=true
+        submitDowngradeAndClear(participant3, mustFullyAuthorize = true),
+        _.shouldBeCantonErrorCode(UnauthorizedTransaction),
+        _.errorMessage should include("Request failed for participant3"),
+      )
+
+      // the party cannot cannot unilaterally fully authorize the combined change
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        // force the failure with mustFullyAuthorize=true
+        submitDowngradeAndClear(participant1, mustFullyAuthorize = true),
+        _.shouldBeCantonErrorCode(UnauthorizedTransaction),
+        _.errorMessage should include("Request failed for participant1"),
+      )
+
+      Seq(participant2, participant3).foreach { participant =>
+        submitDowngradeAndClear(participant, mustFullyAuthorize = false)
+      }
+
+      eventually() {
+        val ptp = participant1.topology.party_to_participant_mappings
+          .list(daId, filterParty = downgradeAndOnboardFlagClearanceParty.filterString)
+          .loneElement
+          .item
+
+        ptp.participants
+          .find(_.participantId == participant2.id)
+          .value
+          .permission shouldBe Confirmation
+        ptp.participants
+          .find(_.participantId == participant3.id)
+          .value
+          .onboarding shouldBe false
+      }
     }
 
     "Don't allow to change permission to pure observer only if the party is as signatory" in {
@@ -901,7 +1388,9 @@ trait TopologyManagementIntegrationTest
           ),
           _.shouldBeCantonError(
             UnauthorizedTransaction,
-            _ should include(s"No delegation found for keys ${key1.fingerprint}"),
+            _ should include(
+              s"Topology transaction authorization cannot be verified due to missing namespace delegations for keys ${key1.fingerprint}"
+            ),
           ),
           _.errorMessage should (include regex "INVALID_ARGUMENT.*Please contact the operator"),
         )
@@ -1362,6 +1851,81 @@ trait TopologyManagementIntegrationTest
       }
     }
   }
+
+  "correctly absorb additional signatures" in { implicit env =>
+    import env.*
+    // this test was used to reproduce and fix https://github.com/DACH-NY/canton-network-internal/issues/2116
+    val storeId = daId
+    val party = PartyId.tryCreate("AdditionalSiggy", participant1.id.namespace)
+
+    participant1.topology.party_to_participant_mappings.propose(
+      party,
+      newParticipants = Seq(
+        (participant1.id, ParticipantPermission.Submission),
+        (participant2.id, ParticipantPermission.Confirmation),
+      ),
+      store = storeId,
+    )
+
+    val proposal = eventually() {
+      participant2.topology.party_to_participant_mappings
+        .list_hosting_proposals(sequencer1.synchronizer_id, participant2.id)
+        .loneElement
+    }
+    val tx =
+      participant2.topology.transactions.authorize(sequencer1.synchronizer_id, proposal.txHash)
+
+    // now send the same tx but as a proposal with only one signature
+    val tx2 = tx.copy(isProposal = true, signatures = NonEmpty.from(tx.signatures.drop(1)).value)
+
+    logger.debug("Load transaction again")
+    participant2.topology.transactions.load(Seq(tx2), storeId)
+
+    eventually() {
+      participant1.ledger_api.parties.list().map(_.party) should contain(party)
+    }
+
+    eventually() {
+      val actualTx = participant2.topology.party_to_participant_mappings
+        .list(
+          TopologyStoreId.Synchronizer(sequencer1.synchronizer_id),
+          timeQuery = TimeQuery.Range(None, None),
+          filterParty = party.filterString,
+        )
+
+      val proposal = participant2.topology.party_to_participant_mappings
+        .list(
+          TopologyStoreId.Synchronizer(sequencer1.synchronizer_id),
+          proposals = true,
+          timeQuery = TimeQuery.Range(None, None),
+          filterParty = party.filterString,
+        )
+      logger.debug(
+        "Stored authorized\n  " + actualTx
+          .map { c =>
+            s"serial=${c.context.serial}, from=${c.context.validFrom}, until=${c.context.validUntil}, signedBy=${c.context.signedBy}, "
+          }
+          .mkString("\n  ")
+      )
+
+      logger.debug(
+        "Stored proposal\n  " + proposal
+          .map { c =>
+            s"serial=${c.context.serial}, from=${c.context.validFrom}, until=${c.context.validUntil}, signedBy=${c.context.signedBy}, "
+          }
+          .mkString("\n  ")
+      )
+
+      actualTx should have length (2)
+      forAll(actualTx.map(_.context.signedBy.forgetNE)) { sigs =>
+        sigs should have length (2)
+      }
+      proposal.loneElement.context.signedBy.forgetNE should have length (1)
+
+    }
+
+  }
+
 }
 
 class TopologyManagementReferenceIntegrationTestPostgres extends TopologyManagementIntegrationTest {

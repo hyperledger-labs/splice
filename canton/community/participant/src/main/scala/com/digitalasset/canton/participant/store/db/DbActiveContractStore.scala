@@ -14,7 +14,7 @@ import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ReassignmentCounter
 import com.digitalasset.canton.config.CantonRequireTypes.LengthLimitedString
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -55,21 +55,22 @@ import scala.concurrent.ExecutionContext
 /** Active contracts journal
   *
   * This database table has the following indexes to support scaling query performance:
-  *   - create index idx_par_active_contracts_dirty_request_reset on par_active_contracts
-  *     (synchronizer_idx, request_counter) used on startup of the ConnectedSynchronizer to delete
-  *     all inflight validation requests.
   *   - create index idx_par_active_contracts_contract_id on par_active_contracts (contract_id) used
   *     in conflict detection for point-wise lookup of the contract status.
   *   - create index idx_par_active_contracts_ts_synchronizer_idx on par_active_contracts (ts,
   *     synchronizer_idx) used on startup of the ConnectedSynchronizer to delete all inflight
   *     validation requests, and used on startup by the ConnectedSynchronizer to replay ACS changes
   *     to the ACS commitment processor.
+  *   - create index idx_par_active_contracts_pruning on par_active_contracts (synchronizer_idx, ts)
+  *     where change = 'deactivation' used for background-pruning of the ACS to efficiently find
+  *     contract deactivations.
   */
 class DbActiveContractStore(
     override protected val storage: DbStorage,
     protected[this] override val indexedSynchronizer: IndexedSynchronizer,
     enableAdditionalConsistencyChecks: Option[Long],
     batchingParametersConfig: PrunableByTimeParameters,
+    batchingConfig: BatchingConfig,
     val indexedStringStore: IndexedStringStore,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -167,11 +168,12 @@ class DbActiveContractStore(
             warnFrequency = warnFrequency,
           )
           synchronizeWithClosing("additional-consistency-check") {
-            activeContractsData.asSeq.parTraverse_ { tc =>
-              checkActivationsDeactivationConsistency(
-                tc.contractId,
-                tc.toc,
-              )
+            MonadUtil.parTraverseWithLimit_(batchingConfig.parallelism)(activeContractsData.asSeq) {
+              tc =>
+                checkActivationsDeactivationConsistency(
+                  tc.contractId,
+                  tc.toc,
+                )
             }
           }
         }
@@ -205,7 +207,9 @@ class DbActiveContractStore(
       )
       _ <- enableAdditionalConsistencyChecks.traverse_ { _ =>
         synchronizeWithClosing("additional-consistency-check")(
-          contracts.parTraverse_(checkActivationsDeactivationConsistency tupled)
+          MonadUtil.parTraverseWithLimit_(batchingConfig.parallelism)(contracts)(
+            checkActivationsDeactivationConsistency tupled
+          )
         )
       }
     } yield ()
@@ -324,9 +328,12 @@ class DbActiveContractStore(
 
             storage
               .query(query, functionFullName)
-              .flatMap(_.toList.parTraverse { case (id, contract) =>
-                contract.toContractState.map(cs => (id, cs))
-              })
+              .flatMap(result =>
+                MonadUtil.parTraverseWithLimit(batchingConfig.parallelism)(result) {
+                  case (id, contract) =>
+                    contract.toContractState.map(cs => (id, cs))
+                }
+              )
               .map(foundContracts => foundContracts.toMap)
         }
 
@@ -477,36 +484,20 @@ class DbActiveContractStore(
     val ordering = sql" order by ts asc, repair_counter asc"
 
     TimeOfChange.withMinAsNoneRepairCounter(tocToInclusive) { case (tsToInclusive, rcToInclusive) =>
-      storage.profile match {
-        case _: DbStorage.Profile.H2 =>
-          // Paraphrased SQL query: select all activations AC before or at tocToInclusive for which there is no:
-          // 1. other entry AC2 between AC (strictly <) and tocToInclusive or
-          // 2. deactivation AC2 at the same point in time.
-          (sql"""
+      // Paraphrased SQL query: select all activations AC before or at tocToInclusive for which there is no:
+      // 1. other entry AC2 between AC (strictly <) and tocToInclusive or
+      // 2. deactivation AC2 at the same point in time.
+      (sql"""
           select distinct(contract_id), ts, repair_counter, reassignment_counter
           from par_active_contracts AC
           where not exists(select * from par_active_contracts AC2 where synchronizer_idx = $indexedSynchronizer and AC.contract_id = AC2.contract_id
             and (AC2.ts, AC2.repair_counter) <= ($tsToInclusive, $rcToInclusive)
             and ((AC.ts, AC.repair_counter) < (AC2.ts, AC2.repair_counter)
-              or ((AC.ts, AC.repair_counter) = (AC2.ts, AC2.repair_counter) and AC2.change = ${ChangeType.Deactivation})))
+              or ((AC.ts, AC.repair_counter) = (AC2.ts, AC2.repair_counter) and AC2.change = CAST(${ChangeType.Deactivation} as change_type))))
             and (AC.ts, AC.repair_counter) <= ($tsToInclusive, $rcToInclusive)
-            and synchronizer_idx = $indexedSynchronizer and AC.change = ${ChangeType.Activation}""" ++
-            idsO.fold(sql"")(ids => sql" and AC.contract_id in " ++ ids) ++ ordering)
-            .as[(LfContractId, TimeOfChange, ReassignmentCounter)]
-        case _: DbStorage.Profile.Postgres =>
-          // More optimal Postgres SQL query paraphrased:
-          // select all contracts AC for which the last change AC3 before or at tocToInclusive is an activation.
-          (sql"""
-          select distinct(contract_id), AC3.ts, AC3.repair_counter, AC3.reassignment_counter from par_active_contracts AC1
-          join lateral
-            (select ts, repair_counter, change, reassignment_counter from par_active_contracts AC2 where synchronizer_idx = $indexedSynchronizer
-             and AC2.contract_id = AC1.contract_id
-             and (AC2.ts, AC2.repair_counter) <= ($tsToInclusive, $rcToInclusive)
-           order by ts desc, repair_counter desc, change asc #${storage.limit(1)}) as AC3 on true
-          where AC1.synchronizer_idx = $indexedSynchronizer and AC3.change = CAST(${ChangeType.Activation} as change_type)""" ++
-            idsO.fold(sql"")(ids => sql" and AC1.contract_id in " ++ ids) ++ ordering)
-            .as[(LfContractId, TimeOfChange, ReassignmentCounter)]
-      }
+            and synchronizer_idx = $indexedSynchronizer and AC.change = CAST(${ChangeType.Activation} as change_type)""" ++
+        idsO.fold(sql"")(ids => sql" and AC.contract_id in " ++ ids) ++ ordering)
+        .as[(LfContractId, TimeOfChange, ReassignmentCounter)]
     }
   }
 
@@ -541,24 +532,42 @@ class DbActiveContractStore(
             // flakily hanging indefinitely on the ACS pruning select/delete. The only workaround that also still makes
             // use of the partial index "active_contracts_pruning_idx" appears to be splitting the select and delete
             // into separate statements. See #11292.
+            //
+            // The order-by and limit clauses appear to be necessary to make use of the filtered pruning index.
+            // The row limit is large enough to not be a practical limitation, but low enough to not cause
+            // Postgres to favor a table scan when the ACS journal holds millions of rows.
+            //
+            // In addition, the join lateral with the second, nested, redundant distinct keeps postgres from "flipping"
+            // the join order, i.e. thereby keeping the "ac2"-lookups on the inner rather than the outer side of the
+            // nested loop join. See #28547.
+            //
+            // The order-by/limit and join-lateral/distinct clauses effectively "force" the following pseudo-query plan:
+            //   HashAggregate (outer distinct) ac
+            //     Nested Loop
+            //       Limit: Index Scan using idx_par_active_contracts_pruning dt
+            //       Unique (inner distinct): Index Only Scan using par_active_contracts_pkey ac2
             for {
               acsEntriesToPrune <- synchronizeWithClosing("Fetch ACS entries batch")(
                 storage.query(
                   (sql"""
-                  with deactivation_time(contract_id, ts, repair_counter, row_num) as (
-                    select contract_id, ts, repair_counter, ROW_NUMBER() OVER (
-                      partition by synchronizer_idx, contract_id
-                      order by ts desc, repair_counter desc
-                    )
+                  with deactivation_time(contract_id, ts, repair_counter) as (
+                    select contract_id, ts, repair_counter
                     from par_active_contracts
                     where synchronizer_idx = $indexedSynchronizer
                       and change = cast('deactivation' as change_type)
                       and ts <= $beforeAndIncluding
+                    order by ts #${storage.limit(
+                      batchingParametersConfig.maxItemsExpectedToPrunePerBatch.unwrap
+                    )}
                   )
-                    select ac.contract_id, ac.ts, ac.repair_counter, ac.change
+                    select distinct ac.contract_id, ac.ts, ac.repair_counter, ac.change
                     from deactivation_time dt
-                      join par_active_contracts ac on ac.synchronizer_idx = $indexedSynchronizer and ac.contract_id = dt.contract_id
-                    where dt.row_num = 1 and (ac.ts, ac.repair_counter) <= (dt.ts, dt.repair_counter)""")
+                      join lateral (
+                        select distinct ac2.contract_id, ac2.ts, ac2.repair_counter, ac2.change
+                        from par_active_contracts ac2
+                        where ac2.synchronizer_idx = $indexedSynchronizer and ac2.contract_id = dt.contract_id
+                          and (ac2.ts, ac2.repair_counter) <= (dt.ts, dt.repair_counter)
+                      ) ac on true""")
                     .as[(LfContractId, TimeOfChange, ChangeType)],
                   s"$functionFullName: Fetch ACS entries to be pruned",
                 )
@@ -727,26 +736,45 @@ class DbActiveContractStore(
             FutureUnlessShutdown
               .pure(Map.empty[(TimeOfChange, LfContractId), Option[ReassignmentCounter]])
           ) { cids =>
-            val inClause = DbStorage
-              .toInClause("contract_id", cids)(absCoidSetParameter)
-            val archivalCidsWithoutReassignmentCountersQueries =
-              // Note that the sql query does not filter entries with toc <= toExclusive,
-              // but it also includes the entries between (`fromExclusive`, `toInclusive`].
-              // This is an implementation choice purely to reuse code: we pass the query result into the
-              // function `reassignmentCounterForArchivals` and obtain the reassignment counters for (toc, cid) pairs.
-              // One could have a more restrictive query and compute the reassignment counters in some other way.
-              (sql"""select ts, repair_counter, contract_id, operation, reassignment_counter, remote_synchronizer_idx
+            val resultArchivalReassignmentCounters = MonadUtil.batchedSequentialTraverse[
+              LfContractId,
+              FutureUnlessShutdown,
+              (TimeOfChange, LfContractId, ActivenessChangeDetail),
+            ](
+              batchingConfig.parallelism,
+              batchingConfig.maxItemsInBatch,
+            )(cids) { chunk =>
+              NonEmpty.from(chunk) match {
+                case Some(chunkNE) =>
+                  val inClause = DbStorage.toInClause("contract_id", chunkNE)(absCoidSetParameter)
+                  val archivalCidsWithoutReassignmentCountersQueries =
+                    // Note that the sql query does not filter entries with toc <= toExclusive,
+                    // but it also includes the entries between (`fromExclusive`, `toInclusive`].
+                    // This is an implementation choice purely to reuse code: we pass the query result into the
+                    // function `reassignmentCounterForArchivals` and obtain the reassignment counters for (toc, cid) pairs.
+                    // One could have a more restrictive query and compute the reassignment counters in some other way.
+                    (sql"""select ts, repair_counter, contract_id, operation, reassignment_counter, remote_synchronizer_idx
                    from par_active_contracts where synchronizer_idx = $indexedSynchronizer
                      and (ts, repair_counter) <= ($toInclusiveTs, $toInclusiveRc)
                      and """ ++ inClause ++ sql" order by ts asc, repair_counter asc")
-                .as[(TimeOfChange, LfContractId, ActivenessChangeDetail)]
-            val resultArchivalReassignmentCounters = storage
-              .query(
-                archivalCidsWithoutReassignmentCountersQueries,
-                "ACS: get data to compute the reassignment counters for archived contracts",
-              )
+                      .as[(TimeOfChange, LfContractId, ActivenessChangeDetail)]
+                  storage
+                    .query(
+                      archivalCidsWithoutReassignmentCountersQueries,
+                      "ACS: get data to compute the reassignment counters for archived contracts",
+                    )
+                case None =>
+                  FutureUnlessShutdown.pure(
+                    Vector.empty[(TimeOfChange, LfContractId, ActivenessChangeDetail)]
+                  )
+              }
+            }
 
-            resultArchivalReassignmentCounters.map(reassignmentCounterForArchivals)
+            resultArchivalReassignmentCounters.map { result =>
+              // we need to sort again, because we fetch the data in parallel
+              val sorted = result.sortBy { case (toc, _, _) => (toc.timestamp, toc.counterO) }
+              reassignmentCounterForArchivals(sorted)
+            }
           }
       }
 
@@ -841,11 +869,12 @@ class DbActiveContractStore(
       traceContext: TraceContext
   ): CheckedT[FutureUnlessShutdown, AcsError, AcsWarning, Unit] =
     enableAdditionalConsistencyChecks.traverse_ { _ =>
-      reassignments.parTraverse_ { case ((contractId, toc), reassignment) =>
-        for {
-          _ <- checkReassignmentCountersShouldIncrease(contractId, toc, reassignment)
-          _ <- checkActivationsDeactivationConsistency(contractId, toc)
-        } yield ()
+      MonadUtil.parTraverseWithLimit_(batchingConfig.parallelism)(reassignments) {
+        case ((contractId, toc), reassignment) =>
+          for {
+            _ <- checkReassignmentCountersShouldIncrease(contractId, toc, reassignment)
+            _ <- checkActivationsDeactivationConsistency(contractId, toc)
+          } yield ()
       }
     }
 

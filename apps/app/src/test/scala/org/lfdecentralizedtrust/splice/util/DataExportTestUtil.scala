@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.util
 
-import org.lfdecentralizedtrust.splice.config.GcpBucketConfig
+import org.lfdecentralizedtrust.splice.config.{BucketName, GcpBucketConfig}
 import org.lfdecentralizedtrust.splice.identities.{NodeIdentitiesDump, NodeIdentitiesStore}
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
 import com.digitalasset.canton.topology.ParticipantId
@@ -15,8 +15,9 @@ trait DataExportTestUtil extends TestCommon {
       namespace: String,
       getFileName: Instant => Path,
       decode: String => Either[String, A],
+      bucketName: BucketName,
   ) = {
-    val bucket = new GcpBucket(GcpBucketConfig.inferForCluster, loggerFactory)
+    val bucket = new GcpBucket(GcpBucketConfig.inferForCluster(bucketName), loggerFactory)
     import java.time.Instant
     import java.time.temporal.ChronoUnit
     val cluster = sys.env("GCP_CLUSTER_BASENAME")
@@ -24,7 +25,7 @@ trait DataExportTestUtil extends TestCommon {
       s"$cluster/$namespace/${getFileName(instant)}"
     val now = Instant.now
     // Query everything within the last 20min and check that we have at least one.
-    val blobs = bucket.list(name(now.plus(-20, ChronoUnit.MINUTES)), name(now))
+    val blobs = bucket.listBlobsByOffset(name(now.plus(-20, ChronoUnit.MINUTES)), name(now))
     blobs should not be empty
     forAll(blobs) { blob =>
       val dump = bucket.readStringFromBucket(Paths.get(blob.getName))
@@ -33,10 +34,11 @@ trait DataExportTestUtil extends TestCommon {
     }
   }
 
-  def testRecentParticipantIdentitiesDump(namespace: String) =
+  def testRecentParticipantIdentitiesDump(namespace: String, bucketName: BucketName) =
     testRecentDump(
       namespace,
       NodeIdentitiesStore.dumpFilename(_),
       NodeIdentitiesDump.fromJsonString(ParticipantId.tryFromProtoPrimitive, _),
+      bucketName,
     )
 }

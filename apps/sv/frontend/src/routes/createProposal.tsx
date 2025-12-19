@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useSearchParams } from 'react-router-dom';
-import { createProposalActions } from '../utils/governance';
-import { SelectAction } from '../components/forms/SelectAction';
-import { SupportedActionTag } from '../utils/types';
-import { UpdateSvRewardWeightForm } from '../components/forms/UpdateSvRewardWeightForm';
-import { OffboardSvForm } from '../components/forms/OffboardSvForm';
+import { CreateUnallocatedUnclaimedActivityRecordForm } from '../components/forms/CreateUnallocatedUnclaimedActivityRecordForm';
 import { GrantRevokeFeaturedAppForm } from '../components/forms/GrantRevokeFeaturedAppForm';
-import { SetDsoConfigRulesForm } from '../components/forms/SetDsoConfigRulesForm';
+import { OffboardSvForm } from '../components/forms/OffboardSvForm';
+import { SelectAction } from '../components/forms/SelectAction';
 import { SetAmuletConfigRulesForm } from '../components/forms/SetAmuletConfigRulesForm';
+import { SetDsoConfigRulesForm } from '../components/forms/SetDsoConfigRulesForm';
+import { UpdateSvRewardWeightForm } from '../components/forms/UpdateSvRewardWeightForm';
+import { createProposalActions } from '../utils/governance';
+import type { SupportedActionTag } from '../utils/types';
 
 export const CreateProposal: React.FC = () => {
   const [searchParams, _] = useSearchParams();
@@ -27,6 +28,8 @@ export const CreateProposal: React.FC = () => {
         return <GrantRevokeFeaturedAppForm selectedAction={'SRARC_GrantFeaturedAppRight'} />;
       case 'SRARC_RevokeFeaturedAppRight':
         return <GrantRevokeFeaturedAppForm selectedAction={'SRARC_RevokeFeaturedAppRight'} />;
+      case 'SRARC_CreateUnallocatedUnclaimedActivityRecord':
+        return <CreateUnallocatedUnclaimedActivityRecordForm />;
       case 'SRARC_SetConfig':
         return <SetDsoConfigRulesForm />;
       case 'CRARC_SetConfig':

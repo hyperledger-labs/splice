@@ -16,7 +16,7 @@ import os
 import re
 import sys
 import urllib.parse
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Dict
 
 
 def parse_arguments():
@@ -47,6 +47,10 @@ def parse_arguments():
     parser.add_argument(
         "-y", "--yes-to-all", action="store_true",
         help="Skip initial confirmation prompt (useful for scripting)"
+    )
+    parser.add_argument(
+        "--output-json-file",
+        help="Path to a JSON file to save the details of deleted packages."
     )
     return parser.parse_args()
 
@@ -84,7 +88,7 @@ def get_version_ids(api_url: str, image_name: str, version_to_delete: str, gh_to
 
     # URL encode the image name
     encoded_image = urllib.parse.quote(image_name)
-    url = f"{api_url}/{encoded_image}/versions?per_page=100"
+    url = f"{api_url}%2F{encoded_image}/versions?per_page=100"
     matching_versions = []
 
     while url:
@@ -169,7 +173,7 @@ def delete_version(version_id: str, api_url: str, image_name: str, gh_token: str
 
     # URL encode the image name
     encoded_image = urllib.parse.quote(image_name)
-    url = f"{api_url}/{encoded_image}/versions/{version_id}"
+    url = f"{api_url}%2F{encoded_image}/versions/{version_id}"
 
     if dry_run:
         print(f"Would delete version {version_id} for {image_name}")
@@ -229,7 +233,7 @@ def prompt_for_confirmation(version_info, image_name, version_to_delete):
 
 
 def process_package(package_name: str, packages_repo: str, version_to_delete: str, gh_token: str,
-                   verbose: bool = False, dry_run: bool = False, interactive: bool = False):
+                   deleted_packages_log: List[Dict[str, str]], verbose: bool = False, dry_run: bool = False, interactive: bool = False):
     """Process a single package to find and delete matching versions."""
     print(f"Checking {package_name}")
 
@@ -258,6 +262,11 @@ def process_package(package_name: str, packages_repo: str, version_to_delete: st
             success = delete_version(version_id, packages_repo, package_name, gh_token, dry_run, verbose)
             if success:
                 print(f"Successfully {'would delete' if dry_run else 'deleted'} version {version_id}")
+                # Log the details for the JSON output
+                deleted_packages_log.append({
+                    "image_name": package_name,
+                    "package_version_id": version_id
+                })
             else:
                 print(f"Failed to delete version {version_id}")
     else:
@@ -273,6 +282,9 @@ def main():
     if not gh_token:
         print("Error: you need to set the GH_TOKEN environment variable.", file=sys.stderr)
         sys.exit(1)
+
+    # List to store details of deleted packages
+    deleted_packages_log = []
 
     splice_root = os.environ.get("SPLICE_ROOT")
     if not splice_root:
@@ -320,6 +332,7 @@ def main():
                     api_github_packages_repo_helm,
                     args.version,
                     gh_token,
+                    deleted_packages_log,
                     args.verbose,
                     args.dry_run,
                     args.interactive
@@ -336,6 +349,7 @@ def main():
                         api_github_packages_repo_helm,
                         args.version,
                         gh_token,
+                        deleted_packages_log,
                         args.verbose,
                         args.dry_run,
                         args.interactive
@@ -352,6 +366,7 @@ def main():
                     api_github_packages_repo_docker,
                     args.version,
                     gh_token,
+                    deleted_packages_log,
                     args.verbose,
                     args.dry_run,
                     args.interactive
@@ -368,10 +383,20 @@ def main():
                         api_github_packages_repo_docker,
                         args.version,
                         gh_token,
+                        deleted_packages_log,
                         args.verbose,
                         args.dry_run,
                         args.interactive
                     )
+
+    # Write the log of deleted packages to a JSON file if requested
+    if args.output_json_file and deleted_packages_log:
+        try:
+            with open(args.output_json_file, 'w') as f:
+                json.dump(deleted_packages_log, f, indent=2)
+            print(f"Successfully saved details of {len(deleted_packages_log)} deleted packages to '{args.output_json_file}'")
+        except IOError as e:
+            print(f"Error: Could not write to file '{args.output_json_file}': {e}", file=sys.stderr)
 
     print("Done.")
 

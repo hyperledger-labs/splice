@@ -168,7 +168,7 @@ class TokenStandardAllocationIntegrationTest
         actAndCheck("Venue self-features", splitwellWalletClient.selfGrantFeaturedAppRight())(
           "Scan shows featured app right",
           _ =>
-            sv1ScanBackend.lookupFeaturedAppRight(allocatedOtcTrade.venueParty) shouldBe a[Some[_]],
+            sv1ScanBackend.lookupFeaturedAppRight(allocatedOtcTrade.venueParty) shouldBe a[Some[?]],
         )
 
         val bobContext = clue("Get choice context for bob's allocation") {

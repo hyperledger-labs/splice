@@ -1,14 +1,15 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.bumpUrl
-import org.lfdecentralizedtrust.splice.config.{
-  AuthTokenSourceConfig,
-  NetworkAppClientConfig,
-  ParticipantBootstrapDumpConfig,
-  ParticipantClientConfig,
-  SpliceConfig,
-}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.{ForceFlag, ParticipantId, PartyId}
+import com.typesafe.config.ConfigValueFactory
+import org.apache.pekko.http.scaladsl.model.Uri
+import org.lfdecentralizedtrust.splice.config.*
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.bumpUrl
 import org.lfdecentralizedtrust.splice.environment.RetryFor
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -22,13 +23,8 @@ import org.lfdecentralizedtrust.splice.validator.config.{
   MigrateValidatorPartyConfig,
   ValidatorCantonIdentifierConfig,
 }
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
-import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{ForceFlag, ParticipantId, PartyId}
-import com.typesafe.config.ConfigValueFactory
-import org.apache.pekko.http.scaladsl.model.Uri
+import org.lfdecentralizedtrust.splice.validator.migration.ParticipantPartyMigrator
+import org.lfdecentralizedtrust.splice.validator.store.ValidatorConfigProvider
 import org.scalatest.time.{Minute, Span}
 import org.slf4j.event.Level
 
@@ -316,7 +312,11 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
       "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
       "EXTRA_PARTICIPANT_DB" -> newParticipantDb,
     ) {
-      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+      loggerFactory.assertLogsSeq(
+        SuppressionRule.forLogger[ParticipantPartyMigrator] || SuppressionRule
+          .forLogger[ValidatorConfigProvider] || SuppressionRule
+          .LevelAndAbove(Level.WARN)
+      )(
         {
           aliceValidatorLocalBackend.startSync()
         },
@@ -325,6 +325,16 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
           forExactly(1, entries) {
             _.warningMessage should include(
               "not be able to migrate due to an unsupported namespace"
+            )
+          }
+          forExactly(1, entries) {
+            _.message should include(
+              "Storing all the hosted parties (4) in the database to recover in case of failures"
+            )
+          }
+          forExactly(1, entries) {
+            _.message should include(
+              "Clearing parties that were migrated"
             )
           }
         },
@@ -418,7 +428,7 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
   // (which will fail unless we migrate all parties) despite migrating the operator party.
   // This can only work if there is no collision between the participant admin party and
   // the validator operator party.
-  override val aliceValidatorParticipantNameHint = s"${aliceValidatorPartyHint}-participant";
+  override val aliceValidatorParticipantNameHint = s"$aliceValidatorPartyHint-participant";
 
   // we bootstrap from dump so we can predict the party IDs
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
@@ -459,7 +469,7 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
         testResourcesPath / "standalone-participant-extra-no-auth.conf",
       ),
       Seq.empty,
-      "alice-participant",
+      "alice-reonboard-from-key-database",
       "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
       "EXTRA_PARTICIPANT_DB" -> oldParticipantDb,
     ) {

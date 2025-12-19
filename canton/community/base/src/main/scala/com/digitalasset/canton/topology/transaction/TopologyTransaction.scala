@@ -169,6 +169,7 @@ final case class TopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
       unnamedParam(_.mapping),
       param("serial", _.serial),
       param("operation", _.operation),
+      param("hash", _.hash.hash),
     )
 
   @transient override protected lazy val companionObj: TopologyTransaction.type =

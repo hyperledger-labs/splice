@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.4.0-snapshot.20251007.14274.0.ve2024cd6"
+  val version: String = "3.4.4"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -231,9 +231,10 @@ object CantonDependencies {
   lazy val slick = "com.typesafe.slick" %% "slick" % slick_version
   lazy val slick_hikaricp = "com.typesafe.slick" %% "slick-hikaricp" % slick_version
 
-  lazy val testcontainers_version = "1.15.3"
+  lazy val testcontainers_version = "2.0.2"
   lazy val testcontainers = "org.testcontainers" % "testcontainers" % testcontainers_version
-  lazy val testcontainers_postgresql = "org.testcontainers" % "postgresql" % testcontainers_version
+  lazy val testcontainers_postgresql =
+    "org.testcontainers" % "testcontainers-postgresql" % testcontainers_version
 
   lazy val sttp_version = "3.8.16"
   lazy val sttp = "com.softwaremill.sttp.client3" %% "core" % sttp_version

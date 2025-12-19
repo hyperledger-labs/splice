@@ -11,7 +11,7 @@ import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.{HttpAppConnection, RetryProvider}
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvAppClient
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -37,7 +37,7 @@ final class SvConnection private (
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[Unit] =
-    runHttpCmd(config.url, HttpSvAppClient.StartSvOnboarding(token))
+    runHttpCmd(config.url, HttpSvPublicAppClient.StartSvOnboarding(token))
 
   /** Ask the sponsoring SV to authorize hosting the DSO party at the candidate participant and to prepare the ACS snapshot.
     */
@@ -50,12 +50,12 @@ final class SvConnection private (
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[Either[
-    HttpSvAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound,
-    HttpSvAppClient.OnboardSvPartyMigrationAuthorizeResponse,
+    HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound,
+    HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeResponse,
   ]] =
     runHttpCmd(
       config.url,
-      HttpSvAppClient.OnboardSvPartyMigrationAuthorize(
+      HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorize(
         candidateParticipantId,
         candidateParty,
       ),
@@ -71,7 +71,7 @@ final class SvConnection private (
   ): Future[ByteString] =
     runHttpCmd(
       config.url,
-      HttpSvAppClient.OnboardSvSequencer(
+      HttpSvPublicAppClient.OnboardSvSequencer(
         sequencerId
       ),
     )
@@ -81,10 +81,10 @@ final class SvConnection private (
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[HttpSvAppClient.DsoInfo] =
+  ): Future[HttpSvPublicAppClient.DsoInfo] =
     runHttpCmd(
       config.url,
-      HttpSvAppClient.GetDsoInfo,
+      HttpSvPublicAppClient.GetDsoInfo,
     )
 
 }

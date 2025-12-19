@@ -32,7 +32,6 @@ import com.digitalasset.canton.networking.grpc.{
 import com.digitalasset.canton.sequencer.api.v30
 import com.digitalasset.canton.sequencer.api.v30.SequencerServiceGrpc.SequencerServiceStub
 import com.digitalasset.canton.sequencer.api.v30.SubscriptionResponse
-import com.digitalasset.canton.sequencing.SequencedEventHandler
 import com.digitalasset.canton.sequencing.client.SendAsyncClientError.SendAsyncClientResponseError
 import com.digitalasset.canton.sequencing.client.{
   SendAsyncClientError,
@@ -41,6 +40,7 @@ import com.digitalasset.canton.sequencing.client.{
 }
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.protocol.SendAsyncError.SendAsyncErrorGrpc
+import com.digitalasset.canton.sequencing.{SequencedEventHandler, UserSequencerConnectionXStub}
 import com.digitalasset.canton.topology.store.StoredTopologyTransaction.GenericStoredTopologyTransaction
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
@@ -115,6 +115,7 @@ private[transports] abstract class GrpcSequencerClientTransportCommon(
       requestDescription = s"$endpoint/$messageId",
       timeout = timeout,
       logger = logger,
+      logPolicy = UserSequencerConnectionXStub.DefaultSendAsyncLogPolicy,
       retryPolicy = sendAtMostOnce,
     )
     response.biflatMap(
@@ -234,9 +235,9 @@ private[transports] abstract class GrpcSequencerClientTransportCommon(
           Source.single,
         )
       }
-      .runFold(Vector.empty[GenericStoredTopologyTransaction])((acc, txs) =>
+      .runFold(Vector.empty[GenericStoredTopologyTransaction]) { (acc, txs) =>
         acc ++ txs.topologyTransactions.value.result
-      )
+      }
       .map { accumulated =>
         val storedTxs = StoredTopologyTransactions(accumulated)
         logger.debug(
@@ -286,6 +287,29 @@ private[transports] abstract class GrpcSequencerClientTransportCommon(
             .leftMap(_.message)
         )
     } yield timestampO
+
+  override def downloadTopologyStateForInitHash(request: TopologyStateForInitRequest)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, TopologyStateForInitHashResponse] =
+    for {
+      responseP <-
+        CantonGrpcUtil
+          .sendGrpcRequest(sequencerServiceClient, "sequencer")(
+            _.downloadTopologyStateForInitHash(request.toHashProtoV30),
+            requestDescription = s"downloadTopologyStateForInitHash",
+            timeout =
+              timeouts.unbounded.duration, // may take a while as it generates the full download to hash it
+            logger = logger,
+            retryPolicy = retryPolicy(retryOnUnavailable = false),
+          )
+          .leftMap(_.toString)
+      hash <-
+        EitherT.fromEither[FutureUnlessShutdown](
+          TopologyStateForInitHashResponse
+            .fromProtoV30(responseP)
+            .leftMap(_.message)
+        )
+    } yield hash
 }
 
 trait GrpcClientTransportHelpers {

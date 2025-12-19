@@ -21,6 +21,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
 }
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, wallet as http}
+import org.lfdecentralizedtrust.splice.http.v0.status.wallet as statusHttp
 import org.lfdecentralizedtrust.splice.http.v0.external.wallet as externalHttp
 import org.lfdecentralizedtrust.splice.http.v0.wallet.{
   CreateTokenStandardTransferResponse,
@@ -78,6 +79,21 @@ object HttpWalletAppClient {
         mat: Materializer,
     ): Client =
       externalHttp.WalletClient.httpClient(HttpClientBuilder().buildClient(), host)
+  }
+
+  abstract class StatusBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = statusHttp.WalletClient
+
+    def createClient(host: String)(implicit
+        httpClient: HttpClient,
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client =
+      statusHttp.WalletClient.httpClient(
+        HttpClientBuilder().buildClient(Set(StatusCodes.Conflict)),
+        host,
+      )
   }
 
   final case class AmuletPosition(
@@ -921,7 +937,7 @@ object HttpWalletAppClient {
     }
   }
 
-  case object UserStatus extends InternalBaseCommand[http.UserStatusResponse, UserStatusData] {
+  case object UserStatus extends StatusBaseCommand[statusHttp.UserStatusResponse, UserStatusData] {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
@@ -929,7 +945,7 @@ object HttpWalletAppClient {
       client.userStatus(headers = headers)
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.UserStatusResponse.OK(response) =>
+      case statusHttp.UserStatusResponse.OK(response) =>
         Right(
           UserStatusData(
             response.partyId,

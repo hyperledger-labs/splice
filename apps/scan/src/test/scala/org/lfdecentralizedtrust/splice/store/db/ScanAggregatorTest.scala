@@ -978,7 +978,6 @@ class ScanAggregatorTest
         None,
       ),
       participantId = mkParticipantId("ScanAggregatorTest"),
-      enableImportUpdateBackfill = true,
       ingestionConfig = IngestionConfig(),
       new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, ProcessingTimeout()),
       initialRound = initialRound,
