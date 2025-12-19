@@ -373,7 +373,7 @@ sealed trait ScanHttpEncodings {
   def templateIdString(templateId: javaApi.Identifier) =
     s"${templateId.getPackageId}:${templateId.getModuleName}:${templateId.getEntityName}"
 
-  def parseTemplateId(templateId: String) = {
+  def parseTemplateId(templateId: String): javaApi.Identifier = {
     val pattern = "(.*):(.*):(.*)".r
     val split = pattern
       .findFirstMatchIn(templateId)

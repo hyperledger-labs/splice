@@ -1084,7 +1084,13 @@ lazy val `apps-scan` =
       `splice-dso-governance-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(pekko_http_cors, scalapb_runtime_grpc, scalapb_runtime),
+      libraryDependencies ++= Seq(
+        pekko_http_cors,
+        scalapb_runtime_grpc,
+        scalapb_runtime,
+        zstd,
+        aws_s3,
+      ),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
@@ -2062,6 +2068,11 @@ updateTestConfigForParallelRuns := {
 
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
+    (
+      "Scan Bulk Storage PoC",
+      "test-full-class-names-bulk-storage-poc.log",
+      (t: String) => t.contains("ScanBulkStoragePoc"),
+    ),
     (
       "manual tests with custom canton instance",
       "test-full-class-names-signatures.log",

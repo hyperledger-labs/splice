@@ -12,7 +12,8 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     curl \
     netcat-openbsd \
-    jq
+    jq \
+    socat
 
 RUN curl -fL -LO https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 RUN curl -sSLO https://github.com/fullstorydev/grpcurl/releases/download/v1.9.2/grpcurl_1.9.2_linux_amd64.deb && dpkg -i grpcurl_1.9.2_linux_amd64.deb && rm grpcurl_1.9.2_linux_amd64.deb

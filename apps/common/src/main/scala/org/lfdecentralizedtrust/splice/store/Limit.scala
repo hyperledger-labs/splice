@@ -61,6 +61,13 @@ object PageLimit {
     )
 }
 
+/** Limit with no constraints. Must not be used for production, use only for testing.
+  */
+case class UnboundLimit private (limit: Int) extends Limit
+object UnboundLimit {
+  def apply(limit: Int): UnboundLimit = new UnboundLimit(limit)
+}
+
 trait LimitHelpers { _: NamedLogging =>
 
   protected final def applyLimit[CC[_], C](
@@ -71,8 +78,6 @@ trait LimitHelpers { _: NamedLogging =>
       traceContext: TraceContext
   ): C = {
     limit match {
-      case PageLimit(limit) =>
-        result.take(limit.intValue())
       case HardLimit(limit) =>
         val resultSize = result.size
         if (resultSize > limit) {
@@ -86,6 +91,8 @@ trait LimitHelpers { _: NamedLogging =>
         } else {
           result
         }
+      case _ =>
+        result.take(limit.limit.intValue())
     }
   }
 
@@ -95,8 +102,6 @@ trait LimitHelpers { _: NamedLogging =>
       result: C & scala.collection.IterableOps[?, CC, C],
   ): C = {
     limit match {
-      case PageLimit(limit) =>
-        result.take(limit.intValue())
       case HardLimit(limit) =>
         val resultSize = result.size
         if (resultSize > limit) {
@@ -108,13 +113,15 @@ trait LimitHelpers { _: NamedLogging =>
         } else {
           result
         }
+      case _ =>
+        result.take(limit.limit.intValue())
     }
   }
 
   protected def sqlLimit(limit: Limit): Int = {
     limit match {
       case HardLimit(limit) => limit + 1
-      case PageLimit(limit) => limit
+      case _ => limit.limit
     }
   }
 
