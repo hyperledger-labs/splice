@@ -2,7 +2,7 @@ receiver: cn-ci-channel-high-prio-notification
 object_matchers:
   - ['priority', '=', 'high']
 group_wait: 30s
-group_interval: 30m
+group_interval: 5m
 repeat_interval: 4h
 # continue to match other policies even if this policy was matched
 continue: true
