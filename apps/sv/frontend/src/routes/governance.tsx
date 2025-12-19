@@ -166,7 +166,12 @@ export const Governance: React.FC = () => {
       <PageHeader
         title="Governance"
         actionElement={
-          <Button variant="pill" component={RouterLink} to={`/governance-beta/proposals/create`}>
+          <Button
+            id="initiate-proposal-button"
+            variant="pill"
+            component={RouterLink}
+            to={`/governance-beta/proposals/create`}
+          >
             Initiate Proposal
           </Button>
         }
@@ -185,7 +190,7 @@ export const Governance: React.FC = () => {
             sectionTitle="Inflight Votes"
             data={inflightRequests}
             noDataMessage="No proposals are currently in flight. Proposals you have voted on will appear here while awaiting the voting threshold or deadline."
-            uniqueId="inflight-vote-requests"
+            uniqueId="inflight-proposals"
             showVoteStats
             showAcceptanceThreshold
             showThresholdDeadline

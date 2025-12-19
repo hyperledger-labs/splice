@@ -24,6 +24,7 @@ import org.openqa.selenium.By
 import org.openqa.selenium.support.ui.Select
 import org.slf4j.event.Level
 
+import scala.jdk.CollectionConverters.*
 import java.util.Optional
 
 class SvFrontendIntegrationTest
@@ -43,6 +44,8 @@ class SvFrontendIntegrationTest
         // We deliberately change votes quickly in this test
         (_, config) => ConfigTransforms.withNoVoteCooldown(config)
       )
+
+  def testId(id: String): By = By.cssSelector(s"[data-testid='$id']")
 
   "SV UIs" should {
     "have basic login functionality" in { implicit env =>
@@ -308,6 +311,155 @@ class SvFrontendIntegrationTest
       }
     }
 
+    def createProposal(action: String, effectiveAtThreshold: Boolean = true)(
+        extraFormOps: WebDriverType => Unit
+    )(implicit
+        env: SpliceTestConsoleEnvironment
+    ) = {
+      val requestReasonUrl = "https://new-proposal-url.com/"
+      val requestReasonBody = "This is a summary of the proposal"
+      val thresholdDeadline = "2034-07-12 00:12"
+      val effectiveDate = "2034-07-13 00:12"
+
+      withFrontEnd("sv1") { implicit webDriver =>
+        val previousInflightProposalsSize = getInflightProposals().size
+        previousInflightProposalsSize shouldBe 0
+
+        actAndCheck(
+          "sv1 operator can login and browse to the governance tab", {
+            go to s"http://localhost:$sv1UIPort/governance-beta"
+            loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
+          },
+        )(
+          "sv1 can navigate to the create proposal page",
+          _ => {
+            val initiateProposalButton = find(id("initiate-proposal-button"))
+            clue("initiate proposal button is visible") {
+              eventuallySucceeds() {
+                initiateProposalButton should not be empty
+                click on id("initiate-proposal-button")
+              }
+            }
+
+            eventually() {
+              val actionDropdown = webDriver.findElement(By.id("display-actions"))
+              val select = new Select(actionDropdown)
+
+              val currentSelection = select.getFirstSelectedOption.getAttribute("value")
+
+              if (currentSelection != action) {
+                select.selectByValue(action)
+
+                eventually() {
+                  click on id("action-change-dialog-proceed")
+                }
+              }
+            }
+          },
+        )
+
+        actAndCheck(
+          "sv1 operator can create a new proposal", {
+            eventually {
+              find(id("create-reason-summary")).foreach(_.underlying.sendKeys(requestReasonBody))
+            }
+
+            find(id("create-reason-url")).foreach(_.underlying.sendKeys(requestReasonUrl))
+            setThresholdDeadline(
+              "sv1",
+              thresholdDeadline,
+              "datetime-picker-vote-request-expiration",
+            )
+
+            val thresholdCheckbox =
+              webDriver.findElement(By.id("checkbox-set-effective-at-threshold"))
+            val isChecked = thresholdCheckbox.isSelected
+
+            if (effectiveAtThreshold) {
+              if (!isChecked) thresholdCheckbox.click()
+            } else {
+              if (isChecked) thresholdCheckbox.click()
+              webDriver
+                .findElement(By.id("datetime-picker-vote-request-effectivity"))
+                .sendKeys(effectiveDate)
+            }
+
+            extraFormOps(webDriver)
+
+            click on id("create-voterequest-submit-button")
+
+            eventually {
+              click on testId("vote-accept")
+            }
+          },
+        )(
+          "sv1 can see the new proposal",
+          _ => {
+            val currentInflightProposals = getInflightProposals()
+            currentInflightProposals.size shouldBe previousInflightProposalsSize + 1
+
+            clue("click the new proposal") {
+              click on testId("inflight-proposals-row-link")
+            }
+          },
+        )
+
+      }
+
+      withFrontEnd("sv2") { implicit webDriver =>
+        val (_, reviewButton) = actAndCheck(
+          "sv2 operator can login and browse to the governance page", {
+            go to s"http://localhost:$sv2UIPort/governance-beta"
+            loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
+          },
+        )(
+          "sv2 can see the new vote request",
+          _ => {
+            eventuallySucceeds() {
+              val actionsRequired = getActionRequiredElems()
+              actionsRequired.size shouldBe 1
+              webDriver.executeScript("arguments[0].click();", actionsRequired.asScala.head)
+            }
+
+            inside(find(id("your-vote-reason-input"))) { case Some(element) =>
+              element.underlying.sendKeys("A sample reason")
+            }
+
+            inside(find(id("your-vote-url-input"))) { case Some(element) =>
+              element.underlying.sendKeys("https://my-splice-vote-url.com")
+            }
+
+            click on testId("your-vote-accept")
+
+            eventuallyClickOn(id("submit-vote-button"))
+
+            clue("wait for the vote submission success message") {
+              eventuallySucceeds() {
+                inside(find(testId("vote-submission-success"))) { case Some(element) =>
+                  element.text shouldBe "Vote successfully updated!"
+                }
+              }
+            }
+          },
+        )
+      }
+
+      withFrontEnd("sv1") { implicit webDriver =>
+        clue("sv1 operator can see the new vote from sv2") {
+          val sv2PartyId = sv2Backend.getDsoInfo().svParty.toProtoPrimitive
+          eventuallySucceeds() {
+            val votes = webDriver.findElements(testId("proposal-details-vote"))
+            votes.size shouldBe 1
+
+            val voterInput = votes.asScala.head.findElement(
+              testId("proposal-details-voter-party-id-input")
+            )
+            voterInput.getAttribute("value") shouldBe sv2PartyId
+          }
+        }
+      }
+    }
+
     def testCreateAndVoteDsoRulesAction(action: String, effectiveAtThreshold: Boolean = true)(
         fillUpForm: WebDriverType => Unit
     )(validateRequestedActionInModal: WebDriverType => Unit)(implicit
@@ -559,6 +711,133 @@ class SvFrontendIntegrationTest
             inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
               element.text should matchText("2")
             }
+          }
+        }
+      }
+    }
+
+    // TODO: model, remove
+    // "NEW UI: Offboard" in { implicit env =>
+    //   val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+
+    //   createProposal("SRARC_OffboardSv") { implicit webDriver =>
+    //     // eventually() {
+    //     find(id("offboard-sv-member-dropdown")) match {
+    //       case Some(element) => element.underlying.click()
+    //       case None =>
+    //         fail("Could not find offboard-sv-member-dropdown")
+    //     }
+
+    //     val memberSelect = webDriver.findElement(By.cssSelector(s"[data-value='$sv3PartyId']"))
+    //     memberSelect.click()
+    //     webDriver.findElement(By.tagName("body")).click()
+    //     // }
+    //   }
+    // }
+
+    "NEW UI: Offboard member" in { implicit env =>
+      val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+
+      createProposal("SRARC_OffboardSv") { implicit webDriver =>
+        eventually() {
+          find(id("display-members")) match {
+            case Some(element) =>
+              val select = new Select(element.underlying)
+              select.selectByValue(sv3PartyId)
+
+            case None =>
+              fail(s"Could not find 'display-members' dropdown")
+          }
+        }
+      }
+    }
+
+    "NEW UI: Feature Application" in { implicit env =>
+      val providerId = "a-user-id"
+
+      createProposal("SRARC_GrantFeaturedAppRight") { implicit webDriver =>
+        eventually() {
+          find(id("set-application-provider")) match {
+            case Some(element) =>
+              element.underlying.sendKeys(providerId)
+            case None =>
+              fail("Could not find 'set-application-provider' input")
+          }
+        }
+      }
+    }
+
+    "NEW UI: Unfeature Application" in { implicit env =>
+      val rightCid = "a-contract-id"
+
+      createProposal("SRARC_RevokeFeaturedAppRight") { implicit webDriver =>
+        eventually() {
+          find(id("set-application-rightcid")) match {
+            case Some(element) =>
+              element.underlying.sendKeys(rightCid)
+            case None =>
+              fail("Could not find contract ID input 'set-application-rightcid'")
+          }
+        }
+      }
+    }
+
+    "NEW UI: Set Dso Rules Configuration" in { implicit env =>
+      createProposal("SRARC_SetConfig") { implicit webDriver =>
+        eventually() {
+          find(testId("set-dso-rules-config-header")) should not be empty
+
+        }
+      }
+    }
+
+    "NEW UI: Create Unclaimed Activity Record" in { implicit env =>
+      val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+      val amount = "100.0"
+
+      createProposal("SRARC_CreateUnallocatedUnclaimedActivityRecord") { implicit webDriver =>
+        eventually() {
+          find(testId("create-beneficiary")) match {
+            case Some(element) => element.underlying.sendKeys(beneficiary)
+            case None => fail("Could not find 'create-beneficiary' input")
+          }
+
+          find(testId("create-amount")) match {
+            case Some(element) => element.underlying.sendKeys(amount)
+            case None => fail("Could not find 'create-amount' input")
+          }
+        }
+      }
+    }
+
+    "NEW UI: Set Amulet Rules Configuration" in { implicit env =>
+      createProposal("CRARC_SetConfig") { implicit webDriver =>
+        eventually() {
+          find(testId("set-amulet-rules-config-header")) should not be empty
+
+        }
+      }
+    }
+
+    "NEW UI: Update SV Reward Weight" in { implicit env =>
+      val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+      val newWeight = "5000"
+
+      createProposal("SRARC_UpdateSvRewardWeight") { implicit webDriver =>
+        eventually() {
+          find(id("display-members")) match {
+            case Some(element) =>
+              new Select(element.underlying).selectByValue(sv3PartyId)
+            case None =>
+              fail("Could not find 'display-members' dropdown")
+          }
+
+          find(id("reward-weight")) match {
+            case Some(element) =>
+              element.underlying.clear()
+              element.underlying.sendKeys(newWeight)
+            case None =>
+              fail("Could not find 'reward-weight' input")
           }
         }
       }
@@ -1139,6 +1418,14 @@ class SvFrontendIntegrationTest
     tbodyInProgress
       .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
       .getOrElse(0)
+  }
+
+  def getInflightProposals()(implicit webDriver: WebDriverType) = {
+    webDriver.findElements(testId("inflight-proposals-row-link"))
+  }
+
+  def getActionRequiredElems()(implicit webDriver: WebDriverType) = {
+    webDriver.findElements(testId("action-required-card-link"))
   }
 
   def getVoteRequestsRejectedSize()(implicit webDriver: WebDriverType) = {

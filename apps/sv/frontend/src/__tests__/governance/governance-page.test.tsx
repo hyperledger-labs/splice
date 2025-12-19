@@ -80,7 +80,7 @@ describe.skip('Governance Page', () => {
 
     await navigateToGovernancePage(user);
 
-    expect(() => screen.getAllByTestId('inflight-vote-requests-row')).toThrowError(
+    expect(() => screen.getAllByTestId('inflight-proposals-row')).toThrowError(
       /Unable to find an element/
     );
   });
