@@ -783,7 +783,10 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
 
         val actual =
           store
-            .listTransactions(previousEventId, limit = PageLimit.tryCreate(Limit.DefaultMaxPageSize))
+            .listTransactions(
+              previousEventId,
+              limit = PageLimit.tryCreate(Limit.DefaultMaxPageSize),
+            )
             .futureValue
         actual should have length expected.size.toLong
 

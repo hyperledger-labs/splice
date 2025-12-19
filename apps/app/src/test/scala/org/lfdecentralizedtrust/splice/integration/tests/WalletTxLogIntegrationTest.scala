@@ -1284,7 +1284,8 @@ class WalletTxLogIntegrationTest
       )
 
       // Only Alice should see notification (note that aliceValidator is shared between tests)
-      val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
+      val validatorTxLogAfter =
+        aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
 
       withoutDevNetTopups(validatorTxLogBefore) should be(
         withoutDevNetTopups(validatorTxLogAfter)
