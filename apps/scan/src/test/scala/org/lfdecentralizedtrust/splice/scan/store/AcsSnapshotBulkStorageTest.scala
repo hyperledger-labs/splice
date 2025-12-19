@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.store
 import com.daml.ledger.javaapi.data as javaapi
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
@@ -23,13 +24,17 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.{
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest}
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import org.lfdecentralizedtrust.splice.util.{EventId, PackageQualifiedName, ValueJsonCodecCodegen}
+import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito
+import org.mockito.invocation.InvocationOnMock
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{ListObjectsRequest, S3Object}
 
 import java.net.URI
+import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.FutureConverters.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -49,13 +54,7 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
       withS3Mock({
         val store = mockAcsSnapshotStore(acsSnapshotSize)
         val timestamp = CantonTimestamp.now()
-        val s3Config = S3Config(
-          URI.create("http://localhost:9090"),
-          "bucket",
-          Region.US_EAST_1,
-          AwsBasicCredentials.create("mock_id", "mock_key"),
-        )
-        val s3BucketConnection = S3BucketConnection(s3Config, "bucket", loggerFactory)
+        val s3BucketConnection = getS3BucketConnectionWithInjectedErrors()
         for {
           _ <- new AcsSnapshotBulkStorage(
             bulkStorageTestConfig,
@@ -69,7 +68,6 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
               ListObjectsRequest.builder().bucket("bucket").build()
             )
             .asScala
-          _ = resetCIdCounter()
           allContracts <- store
             .queryAcsSnapshot(
               0,
@@ -82,15 +80,18 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
             .map(_.createdEventsInPage)
         } yield {
           val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
+          objectKeys should have length 6
+          objectKeys.take(objectKeys.size - 1).forall {
+            !_.key().endsWith("_last.zstd")
+          }
+          objectKeys.last.key() should endWith("_last.zstd")
+
           val allContractsFromS3 = objectKeys
             .map(readUncompressAndDecode(s3BucketConnection))
             .flatten
-
           allContractsFromS3.map(
             reconstructFromS3
           ) should contain theSameElementsInOrderAs allContracts.map(_.event)
-          objectKeys.take(objectKeys.size - 1).forall { !_.key().endsWith("_last.zstd") }
-          objectKeys.last.key() should endWith("_last.zstd")
         }
       })
     }
@@ -191,7 +192,13 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
               .range(0, numElems)
               .map(i => {
                 val idx = i + after.getOrElse(0L)
-                val amt = amulet(partyId, BigDecimal(idx), 0L, BigDecimal(0.1))
+                val amt = amulet(
+                  partyId,
+                  BigDecimal(idx),
+                  0L,
+                  BigDecimal(0.1),
+                  contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
+                )
                 SpliceCreatedEvent(s"#event_id_$idx:1", toCreatedEvent(amt))
               }),
             if (numElems < remaining) Some(after.getOrElse(0L) + numElems) else None,
@@ -200,5 +207,33 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
         }
     }
     store
+  }
+
+  def getS3BucketConnectionWithInjectedErrors(): S3BucketConnection = {
+    val s3Config = S3Config(
+      URI.create("http://localhost:9090"),
+      "bucket",
+      Region.US_EAST_1,
+      AwsBasicCredentials.create("mock_id", "mock_key"),
+    )
+    val s3BucketConnection = S3BucketConnection(s3Config, "bucket", loggerFactory)
+    val s3BucketConnectionWithErrors = Mockito.spy(s3BucketConnection)
+    var failureCount = 0
+    val _ = doAnswer { (invocation: InvocationOnMock) =>
+      val args = invocation.getArguments
+      args.toList match {
+        case (key: String) :: _ if key.endsWith("2.zstd") =>
+          if (failureCount < 2) {
+            failureCount += 1
+            Future.failed(new RuntimeException("Simulated S3 write error"))
+          } else {
+            invocation.callRealMethod().asInstanceOf[Future[Unit]]
+          }
+        case _ =>
+          invocation.callRealMethod().asInstanceOf[Future[Unit]]
+      }
+    }.when(s3BucketConnectionWithErrors)
+      .writeFullObject(anyString(), any[ByteBuffer])(any[TraceContext], any[ExecutionContext])
+    s3BucketConnectionWithErrors
   }
 }
