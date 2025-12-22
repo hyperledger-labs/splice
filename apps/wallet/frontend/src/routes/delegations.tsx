@@ -12,14 +12,17 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { DisableConditionally, Loading } from '@lfdecentralizedtrust/splice-common-frontend';
+import { DateDisplay, DisableConditionally, Loading } from '@lfdecentralizedtrust/splice-common-frontend';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useMutation } from '@tanstack/react-query';
 
 import { useMintingDelegations } from '../hooks/useMintingDelegations';
 import { useMintingDelegationProposals } from '../hooks/useMintingDelegationProposals';
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { MintingDelegationProposal } from '@daml.js/splice-wallet/lib/Splice/Wallet/MintingDelegation/module';
+import {
+  MintingDelegation,
+  MintingDelegationProposal,
+} from '@daml.js/splice-wallet/lib/Splice/Wallet/MintingDelegation/module';
 
 export const Delegations: React.FC = () => {
   const delegationsQuery = useMintingDelegations();
@@ -69,7 +72,8 @@ export const Delegations: React.FC = () => {
               <TableCell>Beneficiary</TableCell>
               <TableCell>Max Amulets</TableCell>
               <TableCell>Expiration</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell>Accept</TableCell>
+              <TableCell>Reject</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -99,32 +103,7 @@ export const Delegations: React.FC = () => {
           </TableHead>
           <TableBody>
             {delegations.map(delegation => (
-              <TableRow
-                key={delegation.contractId}
-                id={`delegation-row-${delegation.contractId}`}
-                className="delegation-row"
-              >
-                <TableCell>
-                  <Typography className="delegation-beneficiary">
-                    {delegation.payload.beneficiary}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography className="delegation-max-amulets">
-                    {delegation.payload.amuletMergeLimit}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography className="delegation-expiration">
-                    {delegation.payload.expiresAt}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Button variant="outlined" size="small" className="delegation-withdraw">
-                    Withdraw
-                  </Button>
-                </TableCell>
-              </TableRow>
+              <DelegationRow key={delegation.contractId} delegation={delegation} />
             ))}
           </TableBody>
         </Table>
@@ -133,12 +112,72 @@ export const Delegations: React.FC = () => {
   );
 };
 
+interface DelegationRowProps {
+  delegation: Contract<MintingDelegation>;
+}
+
+const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
+  const { withdrawMintingDelegation } = useWalletClient();
+
+  const withdrawMutation = useMutation({
+    mutationFn: async () => {
+      return await withdrawMintingDelegation(delegation.contractId);
+    },
+    onError: error => {
+      console.error('Failed to withdraw minting delegation', error);
+    },
+  });
+
+  return (
+    <TableRow
+      key={delegation.contractId}
+      id={`delegation-row-${delegation.contractId}`}
+      className="delegation-row"
+    >
+      <TableCell>
+        <Typography className="delegation-beneficiary">
+          {delegation.payload.beneficiary}
+        </Typography>
+      </TableCell>
+      <TableCell>
+        <Typography className="delegation-max-amulets">
+          {delegation.payload.amuletMergeLimit}
+        </Typography>
+      </TableCell>
+      <TableCell>
+        <Typography className="delegation-expiration">
+          <DateDisplay datetime={delegation.payload.expiresAt} />
+        </Typography>
+      </TableCell>
+      <TableCell>
+        <DisableConditionally
+          conditions={[
+            {
+              disabled: withdrawMutation.isPending,
+              reason: 'Withdrawing delegation...',
+            },
+          ]}
+        >
+          <Button
+            variant="outlined"
+            size="small"
+            className="delegation-withdraw"
+            onClick={() => withdrawMutation.mutate()}
+          >
+            Withdraw
+          </Button>
+        </DisableConditionally>
+      </TableCell>
+    </TableRow>
+  );
+};
+
 interface ProposalRowProps {
   proposal: Contract<MintingDelegationProposal>;
 }
 
 const ProposalRow: React.FC<ProposalRowProps> = ({ proposal }) => {
-  const { acceptMintingDelegationProposal } = useWalletClient();
+  const { acceptMintingDelegationProposal, rejectMintingDelegationProposal } = useWalletClient();
 
   const acceptMutation = useMutation({
     mutationFn: async () => {
@@ -146,6 +185,15 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal }) => {
     },
     onError: error => {
       console.error('Failed to accept minting delegation proposal', error);
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async () => {
+      return await rejectMintingDelegationProposal(proposal.contractId);
+    },
+    onError: error => {
+      console.error('Failed to reject minting delegation proposal', error);
     },
   });
 
@@ -164,7 +212,9 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal }) => {
         <Typography className="proposal-max-amulets">{delegation.amuletMergeLimit}</Typography>
       </TableCell>
       <TableCell>
-        <Typography className="proposal-expiration">{delegation.expiresAt}</Typography>
+        <Typography className="proposal-expiration">
+          <DateDisplay datetime={delegation.expiresAt} />
+        </Typography>
       </TableCell>
       <TableCell>
         <DisableConditionally
@@ -182,6 +232,25 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal }) => {
             onClick={() => acceptMutation.mutate()}
           >
             Accept
+          </Button>
+        </DisableConditionally>
+      </TableCell>
+      <TableCell>
+        <DisableConditionally
+          conditions={[
+            {
+              disabled: rejectMutation.isPending,
+              reason: 'Rejecting proposal...',
+            },
+          ]}
+        >
+          <Button
+            variant="outlined"
+            size="small"
+            className="proposal-reject"
+            onClick={() => rejectMutation.mutate()}
+          >
+            Reject
           </Button>
         </DisableConditionally>
       </TableCell>
