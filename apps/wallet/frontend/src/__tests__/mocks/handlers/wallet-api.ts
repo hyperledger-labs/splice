@@ -252,4 +252,16 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
       })
     );
   }),
+
+  rest.post(`${walletUrl}/v0/wallet/minting-delegations/:cid/reject`, (_, res, ctx) => {
+    return res(ctx.status(200));
+  }),
+
+  rest.post(`${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/accept`, (_, res, ctx) => {
+    return res(ctx.status(200));
+  }),
+
+  rest.post(`${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/reject`, (_, res, ctx) => {
+    return res(ctx.status(200));
+  }),
 ];

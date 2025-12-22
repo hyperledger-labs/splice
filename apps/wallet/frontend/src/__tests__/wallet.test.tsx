@@ -20,7 +20,7 @@ import {
 import {
   mockMintingDelegations,
   mockMintingDelegationProposals,
-  delegationExpiresAt,
+  delegationExpiresAtFormatted,
 } from './mocks/delegation-constants';
 import { requestMocks } from './mocks/handlers/transfers-api';
 import { server } from './setup/setup';
@@ -538,11 +538,11 @@ describe('Wallet user can', () => {
       expect(proposalMaxAmulets[index].textContent).toBe(proposal.delegation.amuletMergeLimit);
     });
 
-    // Verify proposal expiration values
+    // Verify proposal expiration values (DateDisplay formats as 'YYYY-MM-DD HH:mm')
     const proposalExpirations = document.querySelectorAll('.proposal-expiration');
     expect(proposalExpirations.length).toBe(mockMintingDelegationProposals.length);
     proposalExpirations.forEach(expiration => {
-      expect(expiration.textContent).toBe(delegationExpiresAt);
+      expect(expiration.textContent).toBe(delegationExpiresAtFormatted);
     });
 
     // Verify Accept buttons are present for each proposal
@@ -570,11 +570,11 @@ describe('Wallet user can', () => {
       expect(maxAmulets[index].textContent).toBe(delegation.amuletMergeLimit);
     });
 
-    // Verify expiration values are displayed (all same date in 2050)
+    // Verify expiration values are displayed (DateDisplay formats as 'YYYY-MM-DD HH:mm')
     const expirations = document.querySelectorAll('.delegation-expiration');
     expect(expirations.length).toBe(mockMintingDelegations.length);
     expirations.forEach(expiration => {
-      expect(expiration.textContent).toBe(delegationExpiresAt);
+      expect(expiration.textContent).toBe(delegationExpiresAtFormatted);
     });
 
     // Verify withdraw buttons are present for each delegation
@@ -620,6 +620,71 @@ describe('Wallet user can', () => {
     // Verify the tables are NOT rendered
     expect(screen.queryByRole('table', { name: 'proposals table' })).toBeNull();
     expect(screen.queryByRole('table', { name: 'delegations table' })).toBeNull();
+  });
+
+  test('can withdraw a minting delegation', async () => {
+    server.use(featureSupportHandler(true, true));
+
+    // Track the withdraw API call
+    const calledWithdrawArgs: string[] = [];
+    server.use(
+      rest.post(`${walletUrl}/v0/wallet/minting-delegations/:cid/reject`, (req, res, ctx) => {
+        calledWithdrawArgs.push(req.params.cid.toString());
+        return res(ctx.status(200));
+      })
+    );
+
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+
+    // Navigate to delegations tab
+    const delegationsLink = await screen.findByRole('link', { name: 'Delegations' });
+    await user.click(delegationsLink);
+
+    // Find and click the first Withdraw button
+    const withdrawButtons = await screen.findAllByRole('button', { name: 'Withdraw' });
+    expect(withdrawButtons.length).toBe(mockMintingDelegations.length);
+
+    await user.click(withdrawButtons[0]);
+
+    // Assert the withdraw API was called once
+    expect(calledWithdrawArgs).toHaveLength(1);
+  });
+
+  test.each([
+    { action: 'accept', buttonName: 'Accept' },
+    { action: 'reject', buttonName: 'Reject' },
+  ])('can $action a minting delegation proposal', async ({ action, buttonName }) => {
+    server.use(featureSupportHandler(true, true));
+
+    const calledArgs: string[] = [];
+    server.use(
+      rest.post(`${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/${action}`, (req, res, ctx) => {
+        calledArgs.push(req.params.cid.toString());
+        return res(ctx.status(200));
+      })
+    );
+
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+
+    const delegationsLink = await screen.findByRole('link', { name: 'Delegations' });
+    await user.click(delegationsLink);
+
+    const buttons = await screen.findAllByRole('button', { name: buttonName });
+    expect(buttons.length).toBe(mockMintingDelegationProposals.length);
+
+    await user.click(buttons[0]);
+
+    expect(calledArgs).toHaveLength(1);
   });
 
   test('transfer preapproval (without token standard) does not show nor send description if not supported', async () => {

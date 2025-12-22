@@ -111,6 +111,10 @@ export interface WalletClient {
   acceptMintingDelegationProposal: (
     proposalContractId: ContractId<MintingDelegationProposal>
   ) => Promise<void>;
+  rejectMintingDelegationProposal: (
+    proposalContractId: ContractId<MintingDelegationProposal>
+  ) => Promise<void>;
+  withdrawMintingDelegation: (delegationContractId: ContractId<MintingDelegation>) => Promise<void>;
   rejectAllocationRequest: (allocationRequestCid: ContractId<AllocationRequest>) => Promise<void>;
   createAllocation: (allocateAmuletRequest: AllocateAmuletRequest) => Promise<void>;
   withdrawAllocation: (allocationCid: ContractId<AmuletAllocation>) => Promise<void>;
@@ -352,6 +356,12 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       acceptMintingDelegationProposal: async proposalContractId => {
         await walletClient.acceptMintingDelegationProposal(proposalContractId);
+      },
+      rejectMintingDelegationProposal: async proposalContractId => {
+        await walletClient.rejectMintingDelegationProposal(proposalContractId);
+      },
+      withdrawMintingDelegation: async delegationContractId => {
+        await walletClient.rejectMintingDelegation(delegationContractId);
       },
       rejectAllocationRequest: async allocationRequestCid => {
         await walletClient.rejectAllocationRequest(allocationRequestCid);

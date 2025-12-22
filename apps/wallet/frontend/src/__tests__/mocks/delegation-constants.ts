@@ -9,6 +9,8 @@ import { alicePartyId, bobPartyId } from './constants';
 
 // All delegations expire on the same date in 2050
 export const delegationExpiresAt = '2050-01-01T00:00:00.000000Z';
+// Formatted version as displayed by DateDisplay component
+export const delegationExpiresAtFormatted = '2050-01-01 00:00';
 
 export const dsoPartyId =
   'DSO::1220fb89d62774bd5b3fd8a11c1b22c8c5453e8286c3cf7add515c98d7bca192ef18';
