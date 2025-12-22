@@ -24,6 +24,14 @@ import {
   MintingDelegationProposal,
 } from '@daml.js/splice-wallet/lib/Splice/Wallet/MintingDelegation/module';
 
+export const shortenPartyId = (partyId: string): string => {
+  const elements = partyId.split('::');
+  if (elements.length == 2) {
+    return `${elements[0]}::${elements[1].slice(0, 10)}…`;
+  }
+  return partyId;
+};
+
 export const Delegations: React.FC = () => {
   const delegationsQuery = useMintingDelegations();
   const proposalsQuery = useMintingDelegationProposals();
@@ -136,7 +144,7 @@ const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
     >
       <TableCell>
         <Typography className="delegation-beneficiary">
-          {delegation.payload.beneficiary}
+          {shortenPartyId(delegation.payload.beneficiary)}
         </Typography>
       </TableCell>
       <TableCell>
@@ -206,7 +214,7 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal }) => {
       className="proposal-row"
     >
       <TableCell>
-        <Typography className="proposal-beneficiary">{delegation.beneficiary}</Typography>
+        <Typography className="proposal-beneficiary">{shortenPartyId(delegation.beneficiary)}</Typography>
       </TableCell>
       <TableCell>
         <Typography className="proposal-max-amulets">{delegation.amuletMergeLimit}</Typography>
