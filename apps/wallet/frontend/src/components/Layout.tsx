@@ -29,6 +29,7 @@ export const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
             { name: 'Transfer', path: 'transfer' },
             { name: 'Allocations', path: 'allocations' },
             { name: 'Subscriptions', path: 'subscriptions' },
+            { name: 'Delegations', path: 'delegations' },
             { name: 'FAQs', path: 'faqs' },
           ]}
         >
