@@ -17,6 +17,10 @@ import {
   nameServiceEntries,
   userLogin,
 } from './mocks/constants';
+import {
+  mockMintingDelegations,
+  delegationExpiresAt,
+} from './mocks/delegation-constants';
 import { requestMocks } from './mocks/handlers/transfers-api';
 import { server } from './setup/setup';
 import {
@@ -491,6 +495,99 @@ describe('Wallet user can', () => {
     expect(await screen.findByText('(Transfer offer 009a97ffdf… withdrawn)')).toBeDefined();
     // The withdraw has a dummy conversion rate of 0 so no amulet conversion rate is displayed
     expect(await screen.findAllByText('@')).toHaveLength(3);
+  });
+
+  test('navigate to delegations tab and see delegations table', async () => {
+    server.use(featureSupportHandler(true, true));
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+
+    expect(await screen.findByText('Delegations')).toBeDefined();
+
+    const delegationsLink = screen.getByRole('link', { name: 'Delegations' });
+    await user.click(delegationsLink);
+
+    // Wait for the delegations content to load
+    expect(await screen.findByRole('heading', { name: 'Active' })).toBeDefined();
+
+    // Now verify the table exists with correct structure
+    expect(screen.getByRole('table', { name: 'delegations table' })).toBeDefined();
+
+    // Verify table headers
+    expect(screen.getByRole('columnheader', { name: 'Beneficiary' })).toBeDefined();
+    expect(screen.getByRole('columnheader', { name: 'Max Amulets' })).toBeDefined();
+    expect(screen.getByRole('columnheader', { name: 'Expiration' })).toBeDefined();
+    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeDefined();
+
+    // Verify all delegation rows are rendered
+    const delegationRows = document.querySelectorAll('.delegation-row');
+    expect(delegationRows.length).toBe(mockMintingDelegations.length);
+
+    // Verify beneficiary values are displayed
+    const beneficiaries = document.querySelectorAll('.delegation-beneficiary');
+    expect(beneficiaries.length).toBe(mockMintingDelegations.length);
+    mockMintingDelegations.forEach((delegation, index) => {
+      expect(beneficiaries[index].textContent).toBe(delegation.beneficiary);
+    });
+
+    // Verify max amulets values are displayed
+    const maxAmulets = document.querySelectorAll('.delegation-max-amulets');
+    expect(maxAmulets.length).toBe(mockMintingDelegations.length);
+    mockMintingDelegations.forEach((delegation, index) => {
+      expect(maxAmulets[index].textContent).toBe(delegation.amuletMergeLimit);
+    });
+
+    // Verify expiration values are displayed (all same date in 2050)
+    const expirations = document.querySelectorAll('.delegation-expiration');
+    expect(expirations.length).toBe(mockMintingDelegations.length);
+    expirations.forEach(expiration => {
+      expect(expiration.textContent).toBe(delegationExpiresAt);
+    });
+
+    // Verify withdraw buttons are present for each delegation
+    const withdrawButtons = document.querySelectorAll('.delegation-withdraw');
+    expect(withdrawButtons.length).toBe(mockMintingDelegations.length);
+    withdrawButtons.forEach(button => {
+      expect(button.textContent).toBe('Withdraw');
+    });
+  });
+
+  test('navigate to delegations tab and see empty state when no delegations', async () => {
+    server.use(featureSupportHandler(true, true));
+    // Override the minting-delegations endpoint to return empty list
+    server.use(
+      rest.get(
+        `${walletUrl}/v0/wallet/minting-delegations`,
+        (_, res, ctx) => {
+          return res(ctx.json({ delegations: [] }));
+        }
+      )
+    );
+
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+
+    expect(await screen.findByText('Delegations')).toBeDefined();
+
+    const delegationsLink = screen.getByRole('link', { name: 'Delegations' });
+    await user.click(delegationsLink);
+
+    // Verify the heading is present
+    expect(screen.getByRole('heading', { name: 'Active' })).toBeDefined();
+
+    // Verify the "No delegations" message is displayed
+    expect(await screen.findByText('None active')).toBeDefined();
+
+    // Verify the table is NOT rendered
+    expect(screen.queryByRole('table', { name: 'delegations table' })).toBeNull();
   });
 
   test('transfer preapproval (without token standard) does not show nor send description if not supported', async () => {

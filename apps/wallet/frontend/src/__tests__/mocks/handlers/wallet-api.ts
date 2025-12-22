@@ -10,9 +10,11 @@ import {
 import { ListTransferOffersResponse } from '@lfdecentralizedtrust/wallet-external-openapi';
 import {
   GetBalanceResponse,
+  ListMintingDelegationsResponse,
   ListTransactionsResponse,
   UserStatusResponse,
 } from '@lfdecentralizedtrust/wallet-openapi';
+import { MintingDelegation } from '@daml.js/splice-wallet/lib/Splice/Wallet/MintingDelegation/module';
 
 import {
   aliceEntry,
@@ -23,6 +25,8 @@ import {
   miningRounds,
   nameServiceEntries,
 } from '../constants';
+import { mockMintingDelegations } from '../delegation-constants';
+import { mkContract } from '../contract';
 
 export const buildWalletMock = (walletUrl: string): RestHandler[] => [
   rest.get(`${walletUrl}/v0/wallet/user-status`, (_, res, ctx) => {
@@ -219,5 +223,16 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
 
   rest.get(`${walletUrl}/v0/scan-proxy/featured-apps/:party`, (_, res, ctx) => {
     return res(ctx.status(404), ctx.json({}));
+  }),
+
+  rest.get(`${walletUrl}/v0/wallet/minting-delegations`, (_, res, ctx) => {
+    return res(
+      ctx.json<ListMintingDelegationsResponse>({
+        delegations: mockMintingDelegations.map(delegation => ({
+          contract: mkContract(MintingDelegation, delegation),
+          beneficiary_onboarded: true,
+        })),
+      })
+    );
   }),
 ];
