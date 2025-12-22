@@ -1882,13 +1882,13 @@ components:
       type: object
       required:
         - contract
-        - beneficiary_onboarded
+        - beneficiary_hosted
       properties:
         contract:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        beneficiary_onboarded:
+        beneficiary_hosted:
           type: boolean
-          description: Whether the beneficiary party is currently onboarded
+          description: Whether the beneficiary party is currently hosted on this validator
 
     ListMintingDelegationProposalsResponse:
       type: object
@@ -1919,13 +1919,13 @@ components:
       type: object
       required:
         - contract
-        - beneficiary_onboarded
+        - beneficiary_hosted
       properties:
         contract:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        beneficiary_onboarded:
+        beneficiary_hosted:
           type: boolean
-          description: Whether the beneficiary party is currently onboarded
+          description: Whether the beneficiary party is currently hosted on this validator
 
     ListMintingDelegationsResponse:
       type: object

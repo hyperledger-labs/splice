@@ -113,12 +113,12 @@ class WalletMintingDelegationTimeBasedIntegrationTest
         }
 
         // Test 1
-        clue("Test beneficiaryOnboarded status") {
+        clue("Test beneficiaryHosted status") {
           val (_, proposalBeforeOnboardingCid) = actAndCheck(
-            "Create minting delegation proposal before beneficiary is onboarded",
+            "Create minting delegation proposal before beneficiary is hosted",
             createMintingDelegationProposal(beneficiaryParty, validatorParty, expiresAt),
           )(
-            "Proposal is visible with beneficiaryOnboarded = false",
+            "Proposal is visible with beneficiaryHosted = false",
             _ => {
               val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
               proposals.proposals should have size 2
@@ -130,17 +130,17 @@ class WalletMintingDelegationTimeBasedIntegrationTest
                     .contains(beneficiaryParty.party.toProtoPrimitive)
                 )
                 .value
-              beneficiaryProposal.beneficiaryOnboarded shouldBe false
+              beneficiaryProposal.beneficiaryHosted shouldBe false
               beneficiaryProposal.contract.contractId
             },
           )
 
-          // Accept the proposal before onboarding and verify beneficiaryOnboarded = false in delegations
+          // Accept the proposal before hosting and verify beneficiaryHosted = false in delegations
           actAndCheck(
-            "Accept proposal before beneficiary is onboarded",
+            "Accept proposal before beneficiary is hosted",
             aliceValidatorWalletClient.acceptMintingDelegationProposal(proposalBeforeOnboardingCid),
           )(
-            "Delegation is visible with beneficiaryOnboarded = false",
+            "Delegation is visible with beneficiaryHosted = false",
             _ => {
               val delegations = aliceValidatorWalletClient.listMintingDelegations()
               delegations.delegations should have size 2
@@ -151,7 +151,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
                     .contains(beneficiaryParty.party.toProtoPrimitive)
                 )
                 .value
-              beneficiaryDelegation.beneficiaryOnboarded shouldBe false
+              beneficiaryDelegation.beneficiaryHosted shouldBe false
             },
           )
         }
@@ -159,7 +159,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
         // Onboard beneficiary
         createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiaryParty)
 
-        clue("After onboarding, beneficiaryOnboarded should be true in delegations") {
+        clue("After hosting, beneficiaryHosted should be true in delegations") {
           val delegations = aliceValidatorWalletClient.listMintingDelegations()
           val beneficiaryDelegation = delegations.delegations
             .find(
@@ -168,7 +168,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
                 .contains(beneficiaryParty.party.toProtoPrimitive)
             )
             .value
-          beneficiaryDelegation.beneficiaryOnboarded shouldBe true
+          beneficiaryDelegation.beneficiaryHosted shouldBe true
         }
 
         // Test 2: Creates a proposal and test reject
