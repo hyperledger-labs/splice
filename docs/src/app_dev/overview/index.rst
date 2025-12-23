@@ -65,7 +65,7 @@ defined in Daml code is a public API that you should develop against because the
 These public APIs are used in interoperability standards,
 like the :ref:`Canton Network Token Standard <app_dev_token_standard_overview>`.
 Use these Daml APIs to minimize the coupling between your application's Daml code and the Daml code of your dependencies.
-For example, the ``Interfaces`` in the Splice implementaiton loosely
+For example, the ``Interfaces`` in the Splice implementation loosely
 couple an application with the implementation so that a Splice upgrade avoids forcing a corresponding upgrade of an application's Daml code.
 
 See the :ref:`app_dev_daml_api` for an overview of the Daml APIs defined in Splice and their purpose.
