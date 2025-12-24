@@ -63,8 +63,13 @@ export const Delegations: React.FC = () => {
     );
   }
 
-  const delegations = delegationsQuery.data || [];
-  const proposals = proposalsQuery.data || [];
+  // Sort by expiration date, earliest first
+  const delegations = [...(delegationsQuery.data || [])].sort((a, b) =>
+    a.contract.payload.expiresAt.localeCompare(b.contract.payload.expiresAt)
+  );
+  const proposals = [...(proposalsQuery.data || [])].sort((a, b) =>
+    a.contract.payload.delegation.expiresAt.localeCompare(b.contract.payload.delegation.expiresAt)
+  );
 
   const hasNoDelegations = delegations.length === 0;
   const hasNoProposals = proposals.length === 0;
