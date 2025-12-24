@@ -5,6 +5,9 @@ module Splice.Wallet.MintingDelegation where
 
 import DA.Assert
 import Splice.AmuletRules
+import Splice.Types (ForOwner(..))
+import Splice.Util
+
 -- | Proposal by the user to setup a minting delegation.
 template MintingDelegationProposal
   with
@@ -15,8 +18,17 @@ template MintingDelegationProposal
     observer delegation.delegate
 
     choice MintingDelegationProposal_Accept : MintingDelegationProposal_AcceptResult
+      with
+        existingDelegationCid : Optional (ContractId MintingDelegation)
+          -- ^ Optional existing delegation to archive while creating the new one.
       controller delegation.delegate
-      do MintingDelegationProposal_AcceptResult <$> create delegation
+      do
+        case existingDelegationCid of
+          Some cid -> do
+            existingDelegation <- fetchAndArchive (ForOwner with dso = delegation.dso; owner = delegation.beneficiary) cid
+            existingDelegation.delegate === delegation.delegate
+          None -> pure ()
+        MintingDelegationProposal_AcceptResult <$> create delegation
 
     choice MintingDelegationProposal_Reject : MintingDelegationProposal_RejectResult
       controller delegation.delegate
@@ -99,3 +111,9 @@ data MintingDelegation_MintResult = MintingDelegation_MintResult
   with
     transferResult : TransferResult
   deriving (Show, Eq)
+
+instance HasCheckedFetch MintingDelegation ForOwner where
+  contractGroupId MintingDelegation{beneficiary, dso} = ForOwner with owner = beneficiary; dso
+
+instance HasCheckedFetch MintingDelegationProposal ForOwner where
+  contractGroupId MintingDelegationProposal{delegation = MintingDelegation{beneficiary, dso}} = ForOwner with owner = beneficiary; dso

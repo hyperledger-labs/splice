@@ -34,7 +34,8 @@ testMintingDelegation = do
       expiresAt = now `addRelTime` days 30
       amuletMergeLimit = 10
 
-  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submit delegate $ exerciseCmd proposalCid MintingDelegationProposal_Accept
+  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submit delegate $ exerciseCmd proposalCid MintingDelegationProposal_Accept with
+    existingDelegationCid = None
 
   -- Create a ValidatorRight for beneficiary (needed for ValidatorRewardCoupon)
   validatorRightCid <- submit beneficiary $ createCmd ValidatorRight with
@@ -134,7 +135,8 @@ testMintingDelegation_checksExpiry = do
       expiresAt = now `addRelTime` delegationLifetime
       amuletMergeLimit = 10
 
-  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submit delegate $ exerciseCmd proposalCid MintingDelegationProposal_Accept
+  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submit delegate $ exerciseCmd proposalCid MintingDelegationProposal_Accept with
+    existingDelegationCid = None
 
   validatorLicenseCid <- submit app.dso $ createCmd ValidatorLicense with
     validator = beneficiary
@@ -167,5 +169,80 @@ testMintingDelegation_checksExpiry = do
     context = PaymentTransferContext with
       context
       amuletRules = amuletRulesCid
+
+  pure ()
+
+-- Archival of existing delegation succeeds only if the delegation parties match
+-- with the new delegation being proposed
+testMintingDelegation_AcceptWithExistingDelegationArchival : Script ()
+testMintingDelegation_AcceptWithExistingDelegationArchival = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  beneficiary1 <- allocateParty "beneficiary1"
+  let delegate1 = aliceValidator.primaryParty
+
+  now <- getTime
+
+  proposalCid1 <- submit beneficiary1 $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary = beneficiary1
+      delegate = delegate1
+      expiresAt = now `addRelTime` days 30
+      amuletMergeLimit = 10
+
+  MintingDelegationProposal_AcceptResult mintingDelegationCid1 <- submit delegate1 $ exerciseCmd proposalCid1 MintingDelegationProposal_Accept with
+    existingDelegationCid = None
+
+  proposalSameParties <- submit beneficiary1 $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary = beneficiary1
+      delegate = delegate1
+      expiresAt = now `addRelTime` days 60
+      amuletMergeLimit = 20
+
+  -- Happy path, should archive mintingDelegationCid1
+  MintingDelegationProposal_AcceptResult mintingDelegationCid2 <- submit delegate1 $ exerciseCmd proposalSameParties MintingDelegationProposal_Accept with
+    existingDelegationCid = Some mintingDelegationCid1
+
+  oldDelegation <- queryContractId beneficiary1 mintingDelegationCid1
+  require "Old delegation should be archived" (oldDelegation == None)
+
+  -- Test 1: Should fail for wrong beneficiary
+  proposalWrongBeneficiary <- submit bobValidator.primaryParty $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary = bobValidator.primaryParty -- mismatch
+      delegate = delegate1
+      expiresAt = now `addRelTime` days 60
+      amuletMergeLimit = 20
+
+  submitMustFail delegate1 $ exerciseCmd proposalWrongBeneficiary MintingDelegationProposal_Accept with
+    existingDelegationCid = Some mintingDelegationCid2
+
+  -- Test 2: Should fail for wrong DSO
+  proposalWrongDso <- submit beneficiary1 $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = bobValidator.primaryParty -- mismatch
+      beneficiary = beneficiary1
+      delegate = delegate1
+      expiresAt = now `addRelTime` days 60
+      amuletMergeLimit = 20
+
+  submitMustFail delegate1 $ exerciseCmd proposalWrongDso MintingDelegationProposal_Accept with
+    existingDelegationCid = Some mintingDelegationCid2
+
+  -- Test 3: Should fail for wrong delegate
+  proposalWrongDelegate <- submit beneficiary1 $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary = beneficiary1
+      delegate = bobValidator.primaryParty -- mismatch
+      expiresAt = now `addRelTime` days 60
+      amuletMergeLimit = 20
+
+  submitMustFail bobValidator.primaryParty $ exerciseCmd proposalWrongDelegate MintingDelegationProposal_Accept with
+    existingDelegationCid = Some mintingDelegationCid2
 
   pure ()
