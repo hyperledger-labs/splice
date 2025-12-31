@@ -8,6 +8,9 @@
 Overview
 ========
 
+If you are a new Canton Network developer, please check out the
+`TL;DR for new Canton Network developers <https://docs.digitalasset.com/build/3.4/overview/tldr.html>`__.
+
 Canton Network Applications
 ---------------------------
 
