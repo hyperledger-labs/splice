@@ -128,7 +128,7 @@ components:
           additionalProperties:
             type: string
         excludeDebugFields:
-          description: "If set to true, the response will not include debug fields."
+          description: "If set to true, the response will not include fields prefixed with 'debug'. Useful to save bandwidth."
           default: false
           type: boolean
 

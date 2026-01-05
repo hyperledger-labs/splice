@@ -155,7 +155,7 @@ components:
             The choice arguments are provided so that the registry can also provide choice-argument
             specific contracts, e.g., the configuration for a specific instrument-id.
         excludeDebugFields:
-          description: "If set to true, the response will not include debug fields."
+          description: "If set to true, the response will not include fields prefixed with 'debug'. Useful to save bandwidth."
           default: false
           type: boolean
       required:
@@ -176,7 +176,7 @@ components:
           additionalProperties:
             type: string
         excludeDebugFields:
-          description: "If set to true, the response will not include debug fields."
+          description: "If set to true, the response will not include fields prefixed with 'debug'. Useful to save bandwidth."
           default: false
           type: boolean
 
