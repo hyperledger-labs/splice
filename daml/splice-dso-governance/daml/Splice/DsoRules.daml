@@ -1325,7 +1325,7 @@ template DsoRules with
           unclaimedReward = result.unclaimedRewardCid
 
     nonconsuming choice DsoRules_MergeUnclaimedDevelopmentFundCoupons : DsoRules_MergeUnclaimedDevelopmentFundCouponsResult
-      -- ^ Batch merge of of development fund coupons
+      -- ^ Batch merge of of development fund coupons.
       with
         amuletRulesCid : ContractId AmuletRules
         choiceArg : AmuletRules_MergeUnclaimedDevelopmentFundCoupons
@@ -1337,7 +1337,7 @@ template DsoRules with
         return DsoRules_MergeUnclaimedDevelopmentFundCouponsResult with result
 
     nonconsuming choice DsoRules_ExpireDevelopmentFundCoupon : DsoRules_ExpireDevelopmentFundCouponResult
-      -- ^ Expires a DevelopmentFundCoupon and produces an UnclaimedDevelopmentFundCoupon with the same anount
+      -- ^ Expires a DevelopmentFundCoupon and produces an UnclaimedDevelopmentFundCoupon with the same amount.
       with
         developmentFundCouponCid : ContractId DevelopmentFundCoupon
         sv : Party
