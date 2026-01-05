@@ -714,6 +714,11 @@
             "prefix": "mock/validator"
           }
         },
+        "participantPruningConfig": {
+          "cron": "0 /10 * * * ?",
+          "maxDuration": "5m",
+          "retention": "30d"
+        },
         "persistence": {
           "host": "postgres",
           "postgresName": "postgres",
