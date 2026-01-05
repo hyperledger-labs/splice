@@ -84,15 +84,21 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
               title="Member"
               value={props.svRewardWeightMember}
             />
-            <ConfigValuesChanges
-              changes={[
-                {
-                  label: 'SV Reward Weight',
-                  fieldName: 'svRewardWeight',
-                  currentValue: props.currentWeight,
-                  newValue: props.svRewardWeight,
-                },
-              ]}
+            <ProposalField
+              id="configChange"
+              title="Proposed Changes"
+              value={
+                <ConfigValuesChanges
+                  changes={[
+                    {
+                      label: 'SV Reward Weight',
+                      fieldName: 'svRewardWeight',
+                      currentValue: props.currentWeight,
+                      newValue: props.svRewardWeight,
+                    },
+                  ]}
+                />
+              }
             />
           </>
         )}
@@ -125,7 +131,11 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
 
         <Box mt={4}>
           {formType === 'config-change' && (
-            <ConfigValuesChanges changes={props.configFormData} isSummaryView />
+            <ProposalField
+              id="configChange"
+              title="Proposed Changes"
+              value={<ConfigValuesChanges changes={props.configFormData} isSummaryView />}
+            />
           )}
         </Box>
       </Box>
@@ -137,7 +147,7 @@ interface ProposalFieldProps {
   id: string;
   title: string;
   subtitle?: string;
-  value: string;
+  value: React.ReactNode;
 }
 
 const ProposalField: React.FC<ProposalFieldProps> = props => {
@@ -167,9 +177,13 @@ const ProposalField: React.FC<ProposalFieldProps> = props => {
           </Typography>
         )}
 
-        <Typography variant="body2" data-testid={`${id}-field`} color="grey">
-          {value}
-        </Typography>
+        {typeof value === 'string' ? (
+          <Typography variant="body2" data-testid={`${id}-field`} color="grey">
+            {value}
+          </Typography>
+        ) : (
+          value
+        )}
       </Box>
     </Box>
   );
