@@ -160,7 +160,7 @@ describe('Proposal Details Content', () => {
     const summary = screen.getByTestId('proposal-details-summary-value');
     expect(summary.textContent).toMatch(/Summary of the proposal/);
 
-    const url = screen.getByTestId('proposal-details-url-value');
+    const url = screen.getByTestId('proposal-details-url');
     expect(url.textContent).toMatch(/https:\/\/example.com/);
 
     const votingInformationSection = screen.getByTestId('proposal-details-voting-information');
@@ -330,10 +330,8 @@ describe('Proposal Details Content', () => {
     const action = screen.getByTestId('proposal-details-action-value');
     expect(action.textContent).toMatch(/Create Unclaimed Activity Record/);
 
-    const beneficiary = screen
-      .getByTestId('proposal-details-beneficiary-input')
-      .getAttribute('value');
-    expect(beneficiary).toMatch(/sv1/);
+    const beneficiary = screen.getByTestId('proposal-details-beneficiary');
+    expect(beneficiary.textContent).toMatch(/sv1/);
 
     const amount = screen.getByTestId('proposal-details-amount-value');
     expect(amount.textContent).toMatch(/10/);
@@ -804,7 +802,7 @@ describe('Proposal Details > Votes & Voting', () => {
     expect(screen.queryByTestId('your-vote-form')).not.toBeInTheDocument();
   });
 
-  test('submit button says Submit if sv has not voted', async () => {
+  test('renders accept and reject buttons with correct labels', async () => {
     const votes: ProposalVote[] = [
       {
         sv: 'sv1',
@@ -823,39 +821,13 @@ describe('Proposal Details > Votes & Voting', () => {
     );
 
     const votingForm = screen.getByTestId('your-vote-form');
-    const submitButton = within(votingForm).getByTestId('submit-vote-button');
+    const acceptButton = within(votingForm).getByTestId('your-vote-accept');
+    const rejectButton = within(votingForm).getByTestId('your-vote-reject');
 
-    expect(submitButton).toBeInTheDocument();
-    expect(submitButton.textContent).toMatch(/Submit/);
-  });
-
-  test('submit button says Update if sv has already voted', async () => {
-    const votes: ProposalVote[] = [
-      {
-        sv: 'sv1',
-        vote: 'accepted',
-        reason: {
-          url: 'https://sv1.example.com',
-          body: 'SV1 Reason',
-        },
-      },
-    ];
-
-    render(
-      <Wrapper>
-        <ProposalVoteForm
-          voteRequestContractId={voteRequest.contractId}
-          currentSvPartyId={'sv1'}
-          votes={votes}
-        />
-      </Wrapper>
-    );
-
-    const votingForm = screen.getByTestId('your-vote-form');
-    const submitButton = within(votingForm).getByTestId('submit-vote-button');
-
-    expect(submitButton).toBeInTheDocument();
-    expect(submitButton.textContent).toMatch(/Update/);
+    expect(acceptButton).toBeInTheDocument();
+    expect(acceptButton.textContent).toMatch(/Accept/);
+    expect(rejectButton).toBeInTheDocument();
+    expect(rejectButton.textContent).toMatch(/Reject/);
   });
 
   test('render success message after api returns success', async () => {
@@ -901,20 +873,16 @@ describe('Proposal Details > Votes & Voting', () => {
     const reasonInput = within(votingForm).getByTestId('your-vote-reason-input');
     expect(reasonInput).toBeInTheDocument();
 
-    const acceptRadio = within(votingForm).getByTestId('your-vote-accept');
-    expect(acceptRadio).toBeInTheDocument();
+    const acceptButton = within(votingForm).getByTestId('your-vote-accept');
+    expect(acceptButton).toBeInTheDocument();
 
-    await user.click(acceptRadio);
-
-    const submitButton = within(votingForm).getByTestId('submit-vote-button');
-    expect(submitButton).toBeInTheDocument();
-
+    // Clicking the Accept button both selects the vote and submits
     // It's usually a good idea to await this click action. However this happens to be one where we shouldn't
     // This is because awaiting the button click makes it very difficult for the test runner to see the loading state
-    user.click(submitButton);
+    user.click(acceptButton);
 
     await waitFor(async () => {
-      expect(submitButton.getAttribute('disabled')).toBeDefined();
+      expect(acceptButton.getAttribute('disabled')).toBeDefined();
     });
 
     const submissionMessage = await screen.findByTestId('submission-message');
@@ -968,20 +936,16 @@ describe('Proposal Details > Votes & Voting', () => {
     const reasonInput = within(votingForm).getByTestId('your-vote-reason-input');
     expect(reasonInput).toBeInTheDocument();
 
-    const acceptRadio = within(votingForm).getByTestId('your-vote-accept');
-    expect(acceptRadio).toBeInTheDocument();
+    const acceptButton = within(votingForm).getByTestId('your-vote-accept');
+    expect(acceptButton).toBeInTheDocument();
 
-    await user.click(acceptRadio);
-
-    const submitButton = within(votingForm).getByTestId('submit-vote-button');
-    expect(submitButton).toBeInTheDocument();
-
+    // Clicking the Accept button both selects the vote and submits
     // It's usually a good idea to await this click action. However this happens to be one where we shouldn't
     // This is because awaiting the button click makes it very difficult for the test runner to see the loading state
-    user.click(submitButton);
+    user.click(acceptButton);
 
     await waitFor(async () => {
-      expect(submitButton.getAttribute('disabled')).toBeDefined();
+      expect(acceptButton.getAttribute('disabled')).toBeDefined();
     });
 
     const submissionMessage = await screen.findByTestId('submission-message');
@@ -1028,17 +992,17 @@ describe('Proposal Details > Votes & Voting', () => {
 
     await user.type(urlInput, 'invalid_url');
 
-    const acceptRadio = within(votingForm).getByTestId('your-vote-accept');
-    user.click(acceptRadio);
+    const acceptButton = within(votingForm).getByTestId('your-vote-accept');
+    const rejectButton = within(votingForm).getByTestId('your-vote-reject');
 
-    const submitButton = screen.getByTestId('submit-vote-button');
-    expect(submitButton.getAttribute('disabled')).toBeDefined();
+    expect(acceptButton).toBeDisabled();
+    expect(rejectButton).toBeDisabled();
 
     const urlHelperText = within(votingForm).getByTestId('your-vote-url-helper-text');
     expect(urlHelperText.textContent).toMatch(/Invalid URL/);
   });
 
-  test('prevent submission if vote has not been chosen', async () => {
+  test('renders accept and reject buttons', async () => {
     const votes: ProposalVote[] = [
       {
         sv: 'sv1',
@@ -1054,8 +1018,6 @@ describe('Proposal Details > Votes & Voting', () => {
       },
     ];
 
-    const user = userEvent.setup();
-
     render(
       <Wrapper>
         <ProposalVoteForm
@@ -1069,12 +1031,12 @@ describe('Proposal Details > Votes & Voting', () => {
     const votingForm = screen.getByTestId('your-vote-form');
     expect(votingForm).toBeInTheDocument();
 
-    const submitButton = screen.getByTestId('submit-vote-button');
-    expect(submitButton.getAttribute('disabled')?.valueOf()).toBe('');
+    const acceptButton = within(votingForm).getByTestId('your-vote-accept');
+    const rejectButton = within(votingForm).getByTestId('your-vote-reject');
 
-    const rejectRadio = within(votingForm).getByTestId('your-vote-reject');
-    await user.click(rejectRadio);
-
-    expect(submitButton.getAttribute('disabled')?.valueOf()).toBe(undefined);
+    expect(acceptButton).toBeInTheDocument();
+    expect(rejectButton).toBeInTheDocument();
+    expect(acceptButton).not.toBeDisabled();
+    expect(rejectButton).not.toBeDisabled();
   });
 });
