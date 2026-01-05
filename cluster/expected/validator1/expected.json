@@ -945,6 +945,11 @@
             "prefix": "mock/validator1"
           }
         },
+        "participantPruningSchedule": {
+          "cron": "0 /10 * * * ?",
+          "maxDuration": "5m",
+          "retention": "30d"
+        },
         "persistence": {
           "databaseName": "validator1",
           "port": 5432,
