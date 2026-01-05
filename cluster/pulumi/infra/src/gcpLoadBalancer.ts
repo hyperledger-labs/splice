@@ -11,11 +11,17 @@ const gcpGatewayClass = 'gke-l7-regional-external-managed';
 interface L7GatewayConfig {
   gatewayName: string;
   ingressNs: ExactNamespace;
-  classicIstioGateway: k8s.helm.v3.Release;
+  // should be the name of the Service (k8s resource) that is the backend target;
+  // see backendTargetRef for mapping from gateway name
+  backendServiceName: pulumi.Input<string>;
   serviceTarget: {
     port: number;
   };
-  securityPolicy: gcp.compute.SecurityPolicy;
+  // if omitted, no GCPBackendPolicy will be created
+  readonly securityPolicy?: gcp.compute.SecurityPolicy;
+  // if provided, an HTTPS listener will be created on port 443 that
+  // terminates TLS using this secret
+  tlsSecretName?: pulumi.Input<string>;
 }
 
 /**
@@ -50,6 +56,34 @@ function createL7Gateway(
               ],
             },
           },
+          // if a TLS secret is provided, terminate TLS at this layer
+          ...(config.tlsSecretName
+            ? [
+                {
+                  name: 'https',
+                  protocol: 'HTTPS',
+                  port: 443,
+                  allowedRoutes: {
+                    kinds: [
+                      {
+                        kind: 'HTTPRoute',
+                      },
+                    ],
+                  },
+                  tls: {
+                    mode: 'Terminate',
+                    certificateRefs: [
+                      {
+                        // see https://gateway-api.sigs.k8s.io/reference/spec/#secretobjectreference
+                        name: config.tlsSecretName,
+                        group: '',
+                        kind: 'Secret',
+                      },
+                    ],
+                  },
+                },
+              ]
+            : []),
         ],
       },
     },
@@ -57,7 +91,14 @@ function createL7Gateway(
   );
 }
 
-function backendTargetRef(config: L7GatewayConfig) {
+type BackendTargetRef = {
+  group: string;
+  kind: string;
+  name: pulumi.Input<string>;
+  namespace: pulumi.Input<string>;
+};
+
+function backendTargetRef(config: L7GatewayConfig): BackendTargetRef {
   return {
     group: '',
     kind: 'Service',
@@ -66,7 +107,7 @@ function backendTargetRef(config: L7GatewayConfig) {
     // For a classic istio gateway this is the same as the 'name' set on the gateway helm chart;
     // for a k8s istio gateway this is <gateway-name>-istio.
     // Can be identified by the apiVersion of the Gateway k8s resource
-    name: config.classicIstioGateway.name,
+    name: config.backendServiceName,
     namespace: config.ingressNs.ns.metadata.name,
   };
 }
@@ -75,7 +116,7 @@ function backendTargetRef(config: L7GatewayConfig) {
  * Creates a GCPBackendPolicy for Cloud Armor integration
  */
 function createGCPBackendPolicy(
-  config: L7GatewayConfig,
+  config: L7GatewayConfig & Required<Pick<L7GatewayConfig, 'securityPolicy'>>,
   gateway: k8s.apiextensions.CustomResource,
   opts?: pulumi.CustomResourceOptions
 ): k8s.apiextensions.CustomResource {
@@ -164,7 +205,7 @@ function createHTTPRoute(
           {
             backendRefs: [
               {
-                name: config.classicIstioGateway.name,
+                name: config.backendServiceName,
                 namespace: config.ingressNs.ns.metadata.name,
                 port: config.serviceTarget.port,
               },
@@ -191,10 +232,12 @@ export function configureGKEL7Gateway(
 } {
   const gateway = createL7Gateway(config, opts);
 
-  const backendPolicy = createGCPBackendPolicy(config, gateway, {
-    ...opts,
-    dependsOn: [gateway],
-  });
+  const backendPolicy = config.securityPolicy
+    ? createGCPBackendPolicy(config, gateway, {
+        ...opts,
+        dependsOn: [gateway],
+      })
+    : undefined;
 
   const healthCheckPolicy = createHealthCheckPolicy(config, {
     ...opts,
