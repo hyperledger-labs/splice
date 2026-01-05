@@ -132,6 +132,8 @@ export async function installSplitwell(
     await installLedgerApiSecret(auth0Client, xns, 'splitwell')
   );
 
+  const participantPruningConfig = splitwellConfig?.participantPruningSchedule;
+
   return await installValidatorApp({
     xns,
     extraDependsOn,
@@ -156,6 +158,7 @@ export async function installSplitwell(
     participantAddress: participant.participantAddress,
     topupConfig: topupConfig,
     svValidator: false,
+    participantPruningConfig: participantPruningConfig,
     persistenceConfig: {
       host: validatorPostgres.address,
       databaseName: pulumi.Output.create(validatorDbName),

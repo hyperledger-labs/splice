@@ -7,7 +7,7 @@ info:
   description: |
     Implemented by token registries for the purpose of the use and management of
     allocations by wallets and apps orchestrating the settlement of asset transfers.
-  version: 1.0.0
+  version: 1.1.0
 paths:
 
   /registry/allocations/v1/{allocationId}/choice-contexts/execute-transfer:
@@ -127,6 +127,10 @@ components:
           type: object
           additionalProperties:
             type: string
+        excludeDebugFields:
+          description: "If set to true, the response will not include fields prefixed with 'debug'. Useful to save bandwidth."
+          default: false
+          type: boolean
 
     ChoiceContext:
       description: |

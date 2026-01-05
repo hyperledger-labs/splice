@@ -1084,7 +1084,13 @@ lazy val `apps-scan` =
       `splice-dso-governance-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(pekko_http_cors, scalapb_runtime_grpc, scalapb_runtime),
+      libraryDependencies ++= Seq(
+        pekko_http_cors,
+        scalapb_runtime_grpc,
+        scalapb_runtime,
+        zstd,
+        aws_s3,
+      ),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
@@ -2041,8 +2047,11 @@ updateTestConfigForParallelRuns := {
     ).exists(name.contains)
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
+  // TODO(#3429): for now, we put bulk storage tests in isLocalNetTest, since it 1) requires docker to run s3mock, and 2) does not require canton.
+  // If we keep it here, we should rename isLocalNetTest to be something like "withDockerWithoutCanton".
+  // Alternatively, consider creating a separate group for it, since this one e.g. builds the images which we don't need for the bulk-storage tests.
   def isLocalNetTest(name: String): Boolean =
-    name contains "LocalNet"
+    name.contains("LocalNet") || name.contains("BulkStorageTest")
   def isCometBftTest(name: String): Boolean =
     name contains "CometBft"
   def isRecordTimeToleranceTest(name: String): Boolean =
@@ -2066,6 +2075,11 @@ updateTestConfigForParallelRuns := {
       "manual tests with custom canton instance",
       "test-full-class-names-signatures.log",
       (t: String) => isManualSignatureIntegrationTest(t),
+    ),
+    (
+      "tests for localnet",
+      "test-full-class-names-local-net-based.log",
+      (t: String) => isLocalNetTest(t),
     ),
     (
       "Unit tests",
@@ -2146,11 +2160,6 @@ updateTestConfigForParallelRuns := {
       "resource intensive tests",
       "test-full-class-names-resource-intensive.log",
       (t: String) => isResourceIntensiveTest(t),
-    ),
-    (
-      "tests for localnet",
-      "test-full-class-names-local-net-based.log",
-      (t: String) => isLocalNetTest(t),
     ),
     (
       "tests using docker images",

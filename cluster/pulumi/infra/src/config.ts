@@ -93,6 +93,7 @@ export const InfraConfigSchema = z.object({
         extraWhitelistedIngress: z.array(z.string()).default([]),
       })
       .optional(),
+    enableGCReaperJob: z.boolean().default(false),
     prometheus: z.object({
       storageSize: z.string(),
       retentionDuration: z.string(),
@@ -102,6 +103,7 @@ export const InfraConfigSchema = z.object({
     istio: z.object({
       enableIngressAccessLogging: z.boolean(),
       enableClusterAccessLogging: z.boolean().default(false),
+      istiodValues: z.object({}).catchall(z.any()).default({}),
     }),
     extraCustomResources: z.object({}).catchall(z.any()).default({}),
   }),
@@ -116,7 +118,7 @@ export type Config = z.infer<typeof InfraConfigSchema>;
 // eslint-disable-next-line
 // @ts-ignore
 const fullConfig = InfraConfigSchema.parse(clusterYamlConfig);
-
+export const enableGCReaperJob = fullConfig.infra.enableGCReaperJob;
 console.error(
   `Loaded infra config: ${util.inspect(fullConfig, {
     depth: null,

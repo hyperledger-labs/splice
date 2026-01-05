@@ -10,6 +10,7 @@ import {
 import { cometBFTExternalPort } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from '@lfdecentralizedtrust/splice-pulumi-common/src/metrics';
+import { mergeWith } from 'lodash';
 
 import {
   CLUSTER_HOSTNAME,
@@ -27,11 +28,11 @@ import {
 import { clusterBasename, infraConfig, loadIPRanges } from './config';
 
 export const istioVersion = {
-  istio: '1.26.1',
+  istio: '1.28.1',
   //   updated from https://grafana.com/orgs/istio/dashboards, must be updated on each istio version
   dashboards: {
-    general: 259,
-    wasm: 216,
+    general: 280,
+    wasm: 237,
   },
 };
 
@@ -69,6 +70,60 @@ function configureIstiod(
   ingressNs: k8s.core.v1.Namespace,
   base: k8s.helm.v3.Release
 ): k8s.helm.v3.Release {
+  // https://artifacthub.io/packages/helm/istio-official/istiod
+  const defaultValues = {
+    autoscaleMin: 2,
+    autoscaleMax: 30,
+    ...infraAffinityAndTolerations,
+    global: {
+      istioNamespace: ingressNs.metadata.name,
+      logAsJson: true,
+      proxy: {
+        // disable traffic proxying for the postgres port and CometBFT RPC port
+        excludeInboundPorts: '5432,26657',
+        excludeOutboundPorts: '5432,26657',
+        resources: {
+          limits: {
+            memory: '4096Mi',
+          },
+        },
+      },
+    },
+    // https://istio.io/latest/docs/reference/config/istio.mesh.v1alpha1/
+    meshConfig: {
+      // taken from https://github.com/istio/istio/issues/37682
+      accessLogFile: infraConfig.istio.enableClusterAccessLogging ? '/dev/stdout' : '',
+      accessLogEncoding: 'JSON',
+      // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging  disable as we don't use annotations
+      enablePrometheusMerge: false,
+      defaultConfig: {
+        // It is expected that a single load balancer (GCP NLB) is used in front of K8s.
+        // https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#http-https
+        // Also see:
+        // https://istio.io/latest/docs/ops/configuration/traffic-management/network-topologies/#configuring-x-forwarded-for-headers
+        // This controls the value populated by the ingress gateway in the X-Envoy-External-Address header which can be reliably used
+        // by the upstream services to access client’s original IP address.
+        gatewayTopology: {
+          numTrustedProxies: 1,
+        },
+        // wait for the istio container to start before starting apps to avoid network errors
+        holdApplicationUntilProxyStarts: true,
+      },
+      // We have clients retry so we disable istio’s automatic retries.
+      defaultHttpRetryPolicy: {
+        attempts: 0,
+      },
+    },
+    telemetry: {
+      enabled: true,
+      v2: {
+        enabled: true,
+        prometheus: {
+          enabled: true,
+        },
+      },
+    },
+  };
   const istiodRelease = new k8s.helm.v3.Release(
     'istiod',
     {
@@ -79,60 +134,12 @@ function configureIstiod(
       repositoryOpts: {
         repo: 'https://istio-release.storage.googleapis.com/charts',
       },
-      // https://artifacthub.io/packages/helm/istio-official/istiod
-      values: {
-        autoscaleMin: 2,
-        autoscaleMax: 30,
-        ...infraAffinityAndTolerations,
-        global: {
-          istioNamespace: ingressNs.metadata.name,
-          logAsJson: true,
-          proxy: {
-            // disable traffic proxying for the postgres port and CometBFT RPC port
-            excludeInboundPorts: '5432,26657',
-            excludeOutboundPorts: '5432,26657',
-            resources: {
-              limits: {
-                memory: '4096Mi',
-              },
-            },
-          },
-        },
-        // https://istio.io/latest/docs/reference/config/istio.mesh.v1alpha1/
-        meshConfig: {
-          // taken from https://github.com/istio/istio/issues/37682
-          accessLogFile: infraConfig.istio.enableClusterAccessLogging ? '/dev/stdout' : '',
-          accessLogEncoding: 'JSON',
-          // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging  disable as we don't use annotations
-          enablePrometheusMerge: false,
-          defaultConfig: {
-            // It is expected that a single load balancer (GCP NLB) is used in front of K8s.
-            // https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#http-https
-            // Also see:
-            // https://istio.io/latest/docs/ops/configuration/traffic-management/network-topologies/#configuring-x-forwarded-for-headers
-            // This controls the value populated by the ingress gateway in the X-Envoy-External-Address header which can be reliably used
-            // by the upstream services to access client’s original IP address.
-            gatewayTopology: {
-              numTrustedProxies: 1,
-            },
-            // wait for the istio container to start before starting apps to avoid network errors
-            holdApplicationUntilProxyStarts: true,
-          },
-          // We have clients retry so we disable istio’s automatic retries.
-          defaultHttpRetryPolicy: {
-            attempts: 0,
-          },
-        },
-        telemetry: {
-          enabled: true,
-          v2: {
-            enabled: true,
-            prometheus: {
-              enabled: true,
-            },
-          },
-        },
-      },
+      values: mergeWith(
+        defaultValues,
+        infraConfig.istio.istiodValues,
+        (_default: unknown, override: unknown) =>
+          Array.isArray(_default) || Array.isArray(override) ? override : undefined
+      ),
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {

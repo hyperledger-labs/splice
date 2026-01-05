@@ -362,7 +362,7 @@ class AcsSnapshotStore(
         recordTime,
         None,
         // if the limit is exceeded by the results from the DB, an exception will be thrown
-        HardLimit.tryCreate(Limit.MaxPageSize),
+        HardLimit.tryCreate(Limit.DefaultMaxPageSize),
         partyIds,
       )
       .map { result =>

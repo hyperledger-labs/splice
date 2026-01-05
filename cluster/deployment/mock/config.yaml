@@ -4,6 +4,10 @@ validator1:
     locationId: us-central1
     projectId: da-cn-devnet
     keyRingId: validator1_mock
+  participantPruningSchedule:
+    cron: "0 /10 * * * ?" # Run every 10min
+    maxDuration: "5m"
+    retention: "30d"
 multiValidator:
   postgresPvcSize: '100Gi'
   # Dummy values for testing
@@ -12,6 +16,13 @@ multiValidator:
       value: |
         canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += "org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger"
         canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += "org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger"
+    - name: MULTI_VALIDATOR_ADDITIONAL_CONFIG_PARTICIPANT_PRUNING
+      value: |
+        canton.validator-apps.validator_backend_INDEX.participant-pruning-schedule {
+          cron = "0 /10 * * * ?"
+          max-duration = "5m"
+          retention = "25h"
+        }
   extraParticipantEnvVars:
     - name: MULTI_PARTICIPANT_ADDITIONAL_CONFIG_MAX_CONNECTIONS
       value: canton.participants.participant_INDEX.storage.parameters.max-connections = 33
@@ -20,6 +31,10 @@ sv:
     skipInitialization: true
 splitwell:
   maxDarVersion: '0.1.8'
+  participantPruningSchedule:
+    cron: "0 /10 * * * ?" # Run every 10min
+    maxDuration: "5m"
+    retention: "30d"
 synchronizerMigration:
   archived:
     - id: 1
@@ -181,6 +196,9 @@ svs:
       bigQuery:
         dataset: mock_da2_scan
         prefix: da2
+    validatorApp:
+      sweep:
+        fromEnv: SV1
   sv-da-1: # non "sv-X" key => additional SV that is always deployed (key == node name == k8s namespace)
     publicName: Digital-Asset-1
     subdomain: sv-1
@@ -233,6 +251,17 @@ infra:
       spec:
         key: value
         anotherKey: anotherValue
+  istio:
+    istiodValues: # example istiod overrides
+      global:
+        proxy:
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
 cluster:
   nodePools:
     apps:
@@ -247,6 +276,10 @@ validators:
       parallelism: 321
       preapprovalRetries: 9876
       preapprovalRetryDelayMs: 42
+    participantPruningSchedule:
+      cron: "0 /10 * * * ?" # Run every 10min
+      maxDuration: "5m"
+      retention: "30d"
     participant:
       additionalEnvVars:
         - name: ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_NAME

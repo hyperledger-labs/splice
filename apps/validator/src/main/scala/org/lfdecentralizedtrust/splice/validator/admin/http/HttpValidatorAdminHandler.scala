@@ -114,8 +114,8 @@ class HttpValidatorAdminHandler(
     withSpan(s"$workflowId.onboardUser") { _ => span =>
       val name = body.name
       span.setAttribute("name", name)
-      onboard(name, body.partyId.map(PartyId.tryFromProtoPrimitive)).map(p =>
-        definitions.OnboardUserResponse(p)
+      onboard(name, body.partyId.map(PartyId.tryFromProtoPrimitive), body.createPartyIfMissing).map(
+        p => definitions.OnboardUserResponse(p)
       )
     }
   }
@@ -235,13 +235,18 @@ class HttpValidatorAdminHandler(
     }
   }
 
-  private def onboard(name: String, partyId: Option[PartyId])(implicit
+  private def onboard(
+      name: String,
+      partyId: Option[PartyId],
+      createPartyIfMissing: Option[Boolean],
+  )(implicit
       traceContext: TraceContext
   ): Future[String] = {
     ValidatorUtil
       .onboard(
         name,
         partyId,
+        createPartyIfMissing,
         storeWithIngestion,
         validatorUserName,
         getAmuletRulesDomain,
