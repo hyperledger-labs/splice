@@ -221,7 +221,7 @@ testMintingDelegation_AcceptWithExistingDelegationArchival = do
   submitMustFail delegate1 $ exerciseCmd proposalWrongBeneficiary MintingDelegationProposal_Accept with
     existingDelegationCid = Some mintingDelegationCid2
 
-  -- Test 2: Should fail for wrong DSO
+  -- Test 2: Should fail for wrong DSO party
   proposalWrongDso <- submit beneficiary1 $ createCmd MintingDelegationProposal with
     delegation = MintingDelegation with
       dso = bobValidator.primaryParty -- mismatch
