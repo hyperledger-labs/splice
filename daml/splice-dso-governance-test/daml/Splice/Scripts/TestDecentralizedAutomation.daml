@@ -133,7 +133,7 @@ testDevelopmentFundCouponExpiry = do
 
   -- Happy
   setTime $ addRelTime expiresAt (minutes 1)
-  unclaimedDevelopmentFundCouponCid <- (.unclaimedDevelopmentFundCouponCid) <$>
+  unclaimedDevelopmentFundCouponCid <- (.unclaimedDevelopmentFundCouponCid) . (.result) <$>
     submitMulti [sv1] [app.dso] do
       exerciseCmd dsoRulesCid DsoRules_ExpireDevelopmentFundCoupon with
         developmentFundCouponCid

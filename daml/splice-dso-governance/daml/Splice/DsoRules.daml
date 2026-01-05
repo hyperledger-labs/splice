@@ -257,7 +257,7 @@ data DsoRules_MergeUnclaimedDevelopmentFundCouponsResult = DsoRules_MergeUnclaim
     result : AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult
 
 data DsoRules_ExpireDevelopmentFundCouponResult = DsoRules_ExpireDevelopmentFundCouponResult with
-    unclaimedDevelopmentFundCouponCid : ContractId UnclaimedDevelopmentFundCoupon
+    result : DevelopmentFundCoupon_DsoExpireResult
 
 data DsoRules_MiningRound_CloseResult = DsoRules_MiningRound_CloseResult with
     closedRound : ContractId ClosedMiningRound
@@ -1344,9 +1344,8 @@ template DsoRules with
       controller sv
       do
         _ <- getAndValidateSvParty this (Some sv)
-        DevelopmentFundCoupon_DsoExpireResult unclaimedDevelopmentFundCouponCid <-
-          exercise developmentFundCouponCid DevelopmentFundCoupon_DsoExpire
-        pure $ DsoRules_ExpireDevelopmentFundCouponResult with unclaimedDevelopmentFundCouponCid
+        result <- exercise developmentFundCouponCid DevelopmentFundCoupon_DsoExpire
+        pure $ DsoRules_ExpireDevelopmentFundCouponResult with result
 
     nonconsuming choice DsoRules_MiningRound_Close : DsoRules_MiningRound_CloseResult
       with
