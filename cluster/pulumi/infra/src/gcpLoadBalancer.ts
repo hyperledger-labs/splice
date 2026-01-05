@@ -11,8 +11,8 @@ const gcpGatewayClass = 'gke-l7-regional-external-managed';
 interface L7GatewayConfig {
   gatewayName: string;
   ingressNs: ExactNamespace;
+  classicIstioGateway: k8s.helm.v3.Release;
   serviceTarget: {
-    name: string;
     port: number;
   };
   securityPolicy: gcp.compute.SecurityPolicy;
@@ -61,12 +61,12 @@ function backendTargetRef(config: L7GatewayConfig) {
   return {
     group: '',
     kind: 'Service',
-    // TODO (#2723) must be the name of the Service set up by the gateway
+    // must be the name of the Service set up by the gateway
     // *that is the backend of the L7 ALB gateway for which this is configured*.
-    // For a classic istio gateway this is the same (?) as the gateway name;
+    // For a classic istio gateway this is the same as the 'name' set on the gateway helm chart;
     // for a k8s istio gateway this is <gateway-name>-istio.
     // Can be identified by the apiVersion of the Gateway k8s resource
-    name: config.serviceTarget.name,
+    name: config.classicIstioGateway.name,
     namespace: config.ingressNs.ns.metadata.name,
   };
 }
@@ -164,7 +164,7 @@ function createHTTPRoute(
           {
             backendRefs: [
               {
-                name: config.serviceTarget.name,
+                name: config.classicIstioGateway.name,
                 namespace: config.ingressNs.ns.metadata.name,
                 port: config.serviceTarget.port,
               },
