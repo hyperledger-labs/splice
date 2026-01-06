@@ -37,10 +37,16 @@ const cloudArmorSecurityPolicy = configureCloudArmorPolicy(cloudArmorConfig, net
 
 const istio = configureIstio(network.ingressNs, ingressIp, network.cometbftIngressIp.address);
 
-const gcpGateway = configureGKEL7Gateway({
-  ingressNs: network.ingressNs,
-  securityPolicy: cloudArmorSecurityPolicy,
-});
+if (cloudArmorSecurityPolicy) {
+  configureGKEL7Gateway({
+    ingressNs: network.ingressNs,
+    gatewayName: 'cn-gke-l7-gateway',
+    backendServiceName: 'cn-http-gateway',
+    serviceTarget: { port: 443 },
+    tlsSecretName: `cn-${clusterBasename}net-tls`,
+    securityPolicy: cloudArmorSecurityPolicy,
+  });
+}
 
 // Ensures that images required from Quay for observability can be pulled
 const observabilityDependsOn = istio.concat([network]);
