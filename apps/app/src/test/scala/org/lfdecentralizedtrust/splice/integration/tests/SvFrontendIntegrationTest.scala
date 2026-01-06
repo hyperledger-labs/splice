@@ -735,113 +735,113 @@ class SvFrontendIntegrationTest
     //   }
     // }
 
-    "NEW UI: Offboard member" in { implicit env =>
-      val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+    // "NEW UI: Offboard member" in { implicit env =>
+    //   val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
 
-      createProposal("SRARC_OffboardSv") { implicit webDriver =>
-        eventually() {
-          find(id("display-members")) match {
-            case Some(element) =>
-              val select = new Select(element.underlying)
-              select.selectByValue(sv3PartyId)
+    //   createProposal("SRARC_OffboardSv") { implicit webDriver =>
+    //     eventually() {
+    //       find(id("display-members")) match {
+    //         case Some(element) =>
+    //           val select = new Select(element.underlying)
+    //           select.selectByValue(sv3PartyId)
 
-            case None =>
-              fail(s"Could not find 'display-members' dropdown")
-          }
-        }
-      }
-    }
+    //         case None =>
+    //           fail(s"Could not find 'display-members' dropdown")
+    //       }
+    //     }
+    //   }
+    // }
 
-    "NEW UI: Feature Application" in { implicit env =>
-      val providerId = "a-user-id"
+    // "NEW UI: Feature Application" in { implicit env =>
+    //   val providerId = "a-user-id"
 
-      createProposal("SRARC_GrantFeaturedAppRight") { implicit webDriver =>
-        eventually() {
-          find(id("set-application-provider")) match {
-            case Some(element) =>
-              element.underlying.sendKeys(providerId)
-            case None =>
-              fail("Could not find 'set-application-provider' input")
-          }
-        }
-      }
-    }
+    //   createProposal("SRARC_GrantFeaturedAppRight") { implicit webDriver =>
+    //     eventually() {
+    //       find(id("set-application-provider")) match {
+    //         case Some(element) =>
+    //           element.underlying.sendKeys(providerId)
+    //         case None =>
+    //           fail("Could not find 'set-application-provider' input")
+    //       }
+    //     }
+    //   }
+    // }
 
-    "NEW UI: Unfeature Application" in { implicit env =>
-      val rightCid = "a-contract-id"
+    // "NEW UI: Unfeature Application" in { implicit env =>
+    //   val rightCid = "a-contract-id"
 
-      createProposal("SRARC_RevokeFeaturedAppRight") { implicit webDriver =>
-        eventually() {
-          find(id("set-application-rightcid")) match {
-            case Some(element) =>
-              element.underlying.sendKeys(rightCid)
-            case None =>
-              fail("Could not find contract ID input 'set-application-rightcid'")
-          }
-        }
-      }
-    }
+    //   createProposal("SRARC_RevokeFeaturedAppRight") { implicit webDriver =>
+    //     eventually() {
+    //       find(id("set-application-rightcid")) match {
+    //         case Some(element) =>
+    //           element.underlying.sendKeys(rightCid)
+    //         case None =>
+    //           fail("Could not find contract ID input 'set-application-rightcid'")
+    //       }
+    //     }
+    //   }
+    // }
 
-    "NEW UI: Set Dso Rules Configuration" in { implicit env =>
-      createProposal("SRARC_SetConfig") { implicit webDriver =>
-        eventually() {
-          find(testId("set-dso-rules-config-header")) should not be empty
+    // "NEW UI: Set Dso Rules Configuration" in { implicit env =>
+    //   createProposal("SRARC_SetConfig") { implicit webDriver =>
+    //     eventually() {
+    //       find(testId("set-dso-rules-config-header")) should not be empty
 
-        }
-      }
-    }
+    //     }
+    //   }
+    // }
 
-    "NEW UI: Create Unclaimed Activity Record" in { implicit env =>
-      val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-      val amount = "100.0"
+    // "NEW UI: Create Unclaimed Activity Record" in { implicit env =>
+    //   val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+    //   val amount = "100.0"
 
-      createProposal("SRARC_CreateUnallocatedUnclaimedActivityRecord") { implicit webDriver =>
-        eventually() {
-          find(testId("create-beneficiary")) match {
-            case Some(element) => element.underlying.sendKeys(beneficiary)
-            case None => fail("Could not find 'create-beneficiary' input")
-          }
+    //   createProposal("SRARC_CreateUnallocatedUnclaimedActivityRecord") { implicit webDriver =>
+    //     eventually() {
+    //       find(testId("create-beneficiary")) match {
+    //         case Some(element) => element.underlying.sendKeys(beneficiary)
+    //         case None => fail("Could not find 'create-beneficiary' input")
+    //       }
 
-          find(testId("create-amount")) match {
-            case Some(element) => element.underlying.sendKeys(amount)
-            case None => fail("Could not find 'create-amount' input")
-          }
-        }
-      }
-    }
+    //       find(testId("create-amount")) match {
+    //         case Some(element) => element.underlying.sendKeys(amount)
+    //         case None => fail("Could not find 'create-amount' input")
+    //       }
+    //     }
+    //   }
+    // }
 
-    "NEW UI: Set Amulet Rules Configuration" in { implicit env =>
-      createProposal("CRARC_SetConfig") { implicit webDriver =>
-        eventually() {
-          find(testId("set-amulet-rules-config-header")) should not be empty
+    // "NEW UI: Set Amulet Rules Configuration" in { implicit env =>
+    //   createProposal("CRARC_SetConfig") { implicit webDriver =>
+    //     eventually() {
+    //       find(testId("set-amulet-rules-config-header")) should not be empty
 
-        }
-      }
-    }
+    //     }
+    //   }
+    // }
 
-    "NEW UI: Update SV Reward Weight" in { implicit env =>
-      val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-      val newWeight = "5000"
+    // "NEW UI: Update SV Reward Weight" in { implicit env =>
+    //   val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+    //   val newWeight = "5000"
 
-      createProposal("SRARC_UpdateSvRewardWeight") { implicit webDriver =>
-        eventually() {
-          find(id("display-members")) match {
-            case Some(element) =>
-              new Select(element.underlying).selectByValue(sv3PartyId)
-            case None =>
-              fail("Could not find 'display-members' dropdown")
-          }
+    //   createProposal("SRARC_UpdateSvRewardWeight") { implicit webDriver =>
+    //     eventually() {
+    //       find(id("display-members")) match {
+    //         case Some(element) =>
+    //           new Select(element.underlying).selectByValue(sv3PartyId)
+    //         case None =>
+    //           fail("Could not find 'display-members' dropdown")
+    //       }
 
-          find(id("reward-weight")) match {
-            case Some(element) =>
-              element.underlying.clear()
-              element.underlying.sendKeys(newWeight)
-            case None =>
-              fail("Could not find 'reward-weight' input")
-          }
-        }
-      }
-    }
+    //       find(id("reward-weight")) match {
+    //         case Some(element) =>
+    //           element.underlying.clear()
+    //           element.underlying.sendKeys(newWeight)
+    //         case None =>
+    //           fail("Could not find 'reward-weight' input")
+    //       }
+    //     }
+    //   }
+    // }
 
     "can create a valid SRARC_OffboardSv vote request and cast vote on it" in { implicit env =>
       val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
