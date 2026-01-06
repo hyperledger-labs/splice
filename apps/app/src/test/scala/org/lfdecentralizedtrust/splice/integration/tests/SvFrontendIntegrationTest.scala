@@ -744,17 +744,17 @@ class SvFrontendIntegrationTest
       }
     }
 
-    // "NEW UI: Revoke Featured App Right" in { implicit env =>
-    //   val rightCid = "a-contract-id"
+    "NEW UI: Revoke Featured App Right" in { implicit env =>
+      val rightCid = "test-contract-id"
 
-    //   createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
-    //     eventually() {
-    //       inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
-    //         element.underlying.sendKeys(rightCid)
-    //       }
-    //     }
-    //   }
-    // }
+      createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
+        eventually() {
+          inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
+            element.underlying.sendKeys(rightCid)
+          }
+        }
+      }
+    }
 
     // "NEW UI: Set Dso Rules Configuration" in { implicit env =>
     //   createProposal("SRARC_SetConfig") { implicit webDriver =>
