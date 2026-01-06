@@ -424,6 +424,7 @@ function configureGateway(
     getDnsNames().daDnsName,
     `*.${getDnsNames().daDnsName}`,
   ];
+  const withSeparateGcpGateway = false;
   const httpGw = new k8s.apiextensions.CustomResource(
     'cn-http-gateway',
     {
@@ -446,9 +447,7 @@ function configureGateway(
               number: 80,
               protocol: 'HTTP',
             },
-            tls: {
-              httpsRedirect: true,
-            },
+            ...(withSeparateGcpGateway ? {} : { tls: { httpsRedirect: true } }),
           },
           {
             hosts,
