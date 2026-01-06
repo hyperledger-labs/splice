@@ -786,14 +786,11 @@ class SvFrontendIntegrationTest
       }
     }
 
-    // "NEW UI: Set Amulet Rules Configuration" in { implicit env =>
-    //   createProposal("CRARC_SetConfig") { implicit webDriver =>
-    //     eventually() {
-    //       find(testId("set-amulet-rules-config-header")) should not be empty
-
-    //     }
-    //   }
-    // }
+    "NEW UI: Set Amulet Rules Configuration" in { implicit env =>
+      createProposal("CRARC_SetConfig", "set-amulet-config-rules") { _ =>
+        // Config fields default to current values, no extra form operations needed
+      }
+    }
 
     // "NEW UI: Update SV Reward Weight" in { implicit env =>
     //   val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
