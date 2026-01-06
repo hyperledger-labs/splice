@@ -17,12 +17,15 @@ interface L7GatewayConfig {
   serviceTarget: {
     port: number;
   };
-  // if omitted, no GCPBackendPolicy will be created
-  readonly securityPolicy?: gcp.compute.SecurityPolicy;
+  // the Cloud Armor policy to attach
+  securityPolicy: gcp.compute.SecurityPolicy;
   // if provided, an HTTPS listener will be created on port 443 that
   // terminates TLS using this secret
   tlsSecretName?: pulumi.Input<string>;
 }
+
+const httpListenerName = 'http';
+const httpsListenerName = 'https';
 
 /**
  * Creates a GKE L7 Gateway
@@ -45,7 +48,7 @@ function createL7Gateway(
         gatewayClassName: gcpGatewayClass,
         listeners: [
           {
-            name: 'http',
+            name: httpListenerName,
             protocol: 'HTTP',
             port: 80,
             allowedRoutes: {
@@ -60,7 +63,7 @@ function createL7Gateway(
           ...(config.tlsSecretName
             ? [
                 {
-                  name: 'https',
+                  name: httpsListenerName,
                   protocol: 'HTTPS',
                   port: 443,
                   allowedRoutes: {
@@ -183,9 +186,66 @@ function createHTTPRoute(
   config: L7GatewayConfig,
   gateway: k8s.apiextensions.CustomResource,
   opts?: pulumi.CustomResourceOptions
-): k8s.apiextensions.CustomResource {
+): void {
   const routeName = `${config.gatewayName}-http-route`;
-  return new k8s.apiextensions.CustomResource(
+
+  const parentRef = {
+    name: config.gatewayName,
+    namespace: config.ingressNs.ns.metadata.name,
+  };
+
+  const routeOpts = { ...opts, dependsOn: [gateway] };
+
+  let sectionExtension: { sectionName: typeof httpsListenerName } | Record<string, never> = {};
+
+  // if we terminate TLS, make an extra redirect route and limit the main route
+  // to the https listener
+  if (config.tlsSecretName) {
+    // Redirect route: parentRef points to the http listener (sectionName 'http')
+    const redirectRouteName = `${config.gatewayName}-http-redirect`;
+    new k8s.apiextensions.CustomResource(
+      redirectRouteName,
+      {
+        apiVersion: 'gateway.networking.k8s.io/v1',
+        kind: 'HTTPRoute',
+        metadata: {
+          name: redirectRouteName,
+          namespace: config.ingressNs.ns.metadata.name,
+        },
+        spec: {
+          parentRefs: [
+            {
+              ...parentRef,
+              sectionName: httpListenerName,
+            },
+          ],
+          rules: [
+            {
+              // no matches are specified, so the default is a prefix path match on `/`
+              // redirect all requests to https on port 443
+              filters: [
+                {
+                  type: 'RequestRedirect',
+                  requestRedirect: {
+                    // https://gateway-api.sigs.k8s.io/reference/spec/#httprequestredirectfilter
+                    scheme: 'https',
+                    port: 443,
+                    statusCode: 308, // Permanent Redirect
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      },
+      routeOpts
+    );
+
+    sectionExtension = { sectionName: httpsListenerName };
+  }
+
+  // Main route, limited to https listener if enabled
+  new k8s.apiextensions.CustomResource(
     routeName,
     {
       apiVersion: 'gateway.networking.k8s.io/v1',
@@ -197,12 +257,13 @@ function createHTTPRoute(
       spec: {
         parentRefs: [
           {
-            name: config.gatewayName,
-            namespace: config.ingressNs.ns.metadata.name,
+            ...parentRef,
+            ...sectionExtension,
           },
         ],
         rules: [
           {
+            // default match, prefix path `/`
             backendRefs: [
               {
                 name: config.backendServiceName,
@@ -214,7 +275,7 @@ function createHTTPRoute(
         ],
       },
     },
-    { ...opts, dependsOn: [gateway] }
+    routeOpts
   );
 }
 
@@ -226,30 +287,20 @@ export function configureGKEL7Gateway(
   opts?: pulumi.ComponentResourceOptions
 ): {
   gateway: k8s.apiextensions.CustomResource;
-  backendPolicy: k8s.apiextensions.CustomResource;
-  healthCheckPolicy: k8s.apiextensions.CustomResource;
-  httpRoute: k8s.apiextensions.CustomResource;
 } {
   const gateway = createL7Gateway(config, opts);
 
-  const backendPolicy = config.securityPolicy
-    ? createGCPBackendPolicy(config, gateway, {
-        ...opts,
-        dependsOn: [gateway],
-      })
-    : undefined;
-
-  const healthCheckPolicy = createHealthCheckPolicy(config, {
+  createGCPBackendPolicy(config, gateway, {
     ...opts,
     dependsOn: [gateway],
   });
 
-  const httpRoute = createHTTPRoute(config, gateway, opts);
+  createHealthCheckPolicy(config, {
+    ...opts,
+    dependsOn: [gateway],
+  });
 
-  return {
-    gateway,
-    backendPolicy,
-    healthCheckPolicy,
-    httpRoute,
-  };
+  createHTTPRoute(config, gateway, opts);
+
+  return { gateway };
 }
