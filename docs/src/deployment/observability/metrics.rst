@@ -52,7 +52,7 @@ Enabling metrics
 Configuring a helm deployment to enable metrics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-To enable metrics in a helm deployment, set the `metrics.enabled` value to `true` (default `false`) in the helm values. This will create a `ServiceMonitor` kubernetes custom resource. For this to work it would require that the Prometheus operator is installed in the cluster.
+To enable metrics in a helm deployment, set the `metrics.enable` value to `true` (default `false`) in the helm values. This will create a `ServiceMonitor` kubernetes custom resource. For this to work it would require that the Prometheus operator is installed in the cluster.
 
 Alternatively you can add prometheus scrape annotations to the charts that are configured to scrape port 10013.
 
