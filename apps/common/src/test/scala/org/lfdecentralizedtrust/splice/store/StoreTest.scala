@@ -139,10 +139,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     LfContractId.assertFromString("00" + f"$cIdCounter%064x").coid
   }
 
-  protected def resetCIdCounter() = {
-    cIdCounter = 0
-  }
-
   protected def time(n: Long): CantonTimestamp = CantonTimestamp.ofEpochSecond(n)
 
   private def schedule(
@@ -298,6 +294,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       ratePerRound: BigDecimal,
       version: DarResource = DarResources.amulet_current,
       dso: PartyId = dsoParty,
+      contractId: String = nextCid(),
   ) = {
     val templateId = new Identifier(
       version.packageId,
@@ -315,7 +312,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
     contract(
       identifier = templateId,
-      contractId = new amuletCodegen.Amulet.ContractId(nextCid()),
+      contractId = new amuletCodegen.Amulet.ContractId(contractId),
       payload = template,
     )
   }
