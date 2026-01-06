@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.http
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as vl
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ListValidatorLicensesResponse
-import org.lfdecentralizedtrust.splice.store.{AppStore, PageLimit, SortOrder}
+import org.lfdecentralizedtrust.splice.store.{AppStore, Limit, PageLimit, SortOrder}
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
@@ -29,7 +29,9 @@ trait HttpValidatorLicensesHandler extends Spanning with NamedLogging {
           .listContractsPaginated(
             vl.ValidatorLicense.COMPANION,
             after,
-            limit.fold(PageLimit.Max)(PageLimit.tryCreate),
+            limit.fold(PageLimit.Max)(limit =>
+              PageLimit.tryCreate(limit, Limit.DefaultMaxPageSize)
+            ),
             SortOrder.Descending,
           )
           .map(_.mapResultsInPage(_.contract))

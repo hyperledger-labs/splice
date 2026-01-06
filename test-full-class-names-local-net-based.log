@@ -1,1 +1,2 @@
 org.lfdecentralizedtrust.splice.integration.tests.LocalNetFrontendIntegrationTest
+org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotBulkStorageTest

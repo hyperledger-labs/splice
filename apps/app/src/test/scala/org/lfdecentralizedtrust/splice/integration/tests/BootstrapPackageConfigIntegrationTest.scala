@@ -158,13 +158,18 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
       // This simulates an app vetting newer versions of their own DARs depending on newer splice-amulet versions
       // before the SVs do so. Topology aware package selection will then force the old splice-amulet and old splitwell versions
       // for composed transactions. Note that for this to work splitwell contracts must be downgradeable.
+
+      // Split into batches to avoid gRPC message size limit (10 MB)
+      val batchSize = 12
+      val versionBatches =
+        DarResources.splitwell.all.map(_.metadata.version).distinct.grouped(batchSize).toSeq
+
       Seq(aliceValidatorBackend, bobValidatorBackend, splitwellValidatorBackend).foreach { p =>
-        p.participantClient.dars.upload_many(
-          DarResources.splitwell.all
-            .map(_.metadata.version)
-            .distinct
-            .map((v: PackageVersion) => s"daml/dars/splitwell-$v.dar")
-        )
+        versionBatches.foreach { batch =>
+          p.participantClient.dars.upload_many(
+            batch.map((v: PackageVersion) => s"daml/dars/splitwell-$v.dar")
+          )
+        }
       }
     }
 
