@@ -792,29 +792,33 @@ class SvFrontendIntegrationTest
       }
     }
 
-    // "NEW UI: Update SV Reward Weight" in { implicit env =>
-    //   val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-    //   val newWeight = "5000"
+    "NEW UI: Update SV Reward Weight" in { implicit env =>
+      val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+      val newWeight = "5000"
 
-    //   createProposal("SRARC_UpdateSvRewardWeight") { implicit webDriver =>
-    //     eventually() {
-    //       find(id("display-members")) match {
-    //         case Some(element) =>
-    //           new Select(element.underlying).selectByValue(sv3PartyId)
-    //         case None =>
-    //           fail("Could not find 'display-members' dropdown")
-    //       }
+      createProposal("SRARC_UpdateSvRewardWeight", "update-sv-reward-weight") {
+        implicit webDriver =>
+          // Click on the member dropdown to open it
+          eventually() {
+            val dropdown = webDriver.findElement(By.id("update-sv-reward-weight-member-dropdown"))
+            dropdown.click()
+          }
 
-    //       find(id("reward-weight")) match {
-    //         case Some(element) =>
-    //           element.underlying.clear()
-    //           element.underlying.sendKeys(newWeight)
-    //         case None =>
-    //           fail("Could not find 'reward-weight' input")
-    //       }
-    //     }
-    //   }
-    // }
+          // Select the SV member from the dropdown menu
+          eventually() {
+            val memberOption =
+              webDriver.findElement(By.cssSelector(s"[data-value='$sv3PartyId']"))
+            memberOption.click()
+          }
+
+          // Enter the new weight
+          eventually() {
+            inside(find(id("update-sv-reward-weight-weight"))) { case Some(element) =>
+              element.underlying.sendKeys(newWeight)
+            }
+          }
+      }
+    }
 
     "can create a valid SRARC_OffboardSv vote request and cast vote on it" in { implicit env =>
       val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
