@@ -35,7 +35,7 @@ import scala.util.control.NonFatal
 trait HttpClient {
   val requestParameters: HttpClient.HttpRequestParameters
   def withOverrideParameters(newParameters: HttpClient.HttpRequestParameters): HttpClient
-  def executeRequest(request: HttpRequest): Future[HttpResponse]
+  def executeRequest(clientName: String, operationName: String)(request: HttpRequest): Future[HttpResponse]
   def getToken(authConfig: AuthTokenSourceConfig): Future[Option[AuthToken]]
 }
 
@@ -68,7 +68,7 @@ object HttpClient {
       authTokenSource.getToken(traceContext)
     }
 
-    override def executeRequest(request: HttpRequest): Future[HttpResponse] = {
+    override def executeRequest(clientName: String, operationName: String)(request: HttpRequest): Future[HttpResponse] = {
       implicit val traceContext: TraceContext = traceContextFromHeaders(request.headers)
       import apiLoggingConfig.*
       val logPayload = messagePayloads
@@ -77,7 +77,7 @@ object HttpClient {
       def msg(message: String): String =
         s"HTTP client (${request.method.name} ${pathLimited}): ${message}"
 
-      implicit val mc: MetricsContext = HttpClientMetrics.context(request, pathLimited.toString)
+      implicit val mc: MetricsContext = HttpClientMetrics.context(clientName, operationName, request.uri.authority.host.address)
 
       val timing = metrics.startTiming()
       metrics.incInFlight()
@@ -260,8 +260,8 @@ object HttpClient {
 }
 
 object HttpClientMetrics {
-  def context(request: HttpRequest, path: String) =
-    MetricsContext("method" -> request.method.name, "path" -> path)
+  def context(clientName: String, operationName: String, host: String) =
+    MetricsContext("clientName" -> clientName, "operationName" -> operationName, "target_host" -> host)
   val FailureStatus = MetricsContext("status" -> "failure")
   def completedStatus(response: HttpResponse) = MetricsContext(
     "status_code" -> response.status.intValue().toString,
@@ -272,9 +272,9 @@ object HttpClientMetrics {
 }
 
 class HttpClientMetrics(metricsFactory: LabeledMetricsFactory) {
-  private val prefix: MetricName = MetricName.Daml :+ "http" :+ "client"
+  val prefix: MetricName = MetricName.Daml :+ "http" :+ "client"
 
-  private val requestTiming = metricsFactory.timer(
+  val requestTiming = metricsFactory.timer(
     MetricInfo(
       name = prefix :+ "requests" :+ "duration",
       summary = "Histogram for http client request durations",
@@ -286,7 +286,7 @@ class HttpClientMetrics(metricsFactory: LabeledMetricsFactory) {
       ),
     )
   )
-  private val inFlightRequests = metricsFactory.counter(
+  val inFlightRequests = metricsFactory.counter(
     MetricInfo(
       name = prefix :+ "requests" :+ "inflight",
       summary = "Histogram for http client request durations",

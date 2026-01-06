@@ -43,14 +43,14 @@ object HttpAdminAppClient {
   abstract class BaseCommand[Res, Result](basePath: String) extends HttpCommand[Res, Result] {
     override type Client = PrefixedCommonAdminClient
 
-    override def createClient(host: String)(implicit
+    override def createClient(host: String, clientName: String, operationName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
       PrefixedCommonAdminClient.httpClient(
-        HttpClientBuilder().buildClient(),
+        HttpClientBuilder().buildClient(clientName, operationName),
         host,
         basePath,
       )
@@ -78,7 +78,7 @@ object HttpAdminAppClient {
   case class GetVersion(basePath: String)
       extends BaseCommand[externalHttp.GetVersionResponse, VersionInfo](basePath) {
 
-    override def createClient(host: String)(implicit
+    override def createClient(host: String, clientName: String, operationName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
@@ -92,7 +92,7 @@ object HttpAdminAppClient {
         ),
         ec,
         mat,
-      ).buildClient(),
+      ).buildClient(clientName, operationName),
       host,
       basePath,
     )

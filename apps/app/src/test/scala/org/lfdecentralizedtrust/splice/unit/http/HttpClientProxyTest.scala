@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.unit.http
 
 import com.auth0.jwk.{JwkProvider, JwkProviderBuilder}
 import com.daml.metrics.api.MetricsContext
+import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.digitalasset.canton.config.{ApiLoggingConfig, NonNegativeDuration}
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.metrics.ScopedInMemoryMetricsFactory
@@ -255,7 +256,7 @@ class HttpClientProxyTest
     }
   }
   private val metricsFactoryProvider = new ScopedInMemoryMetricsFactory()
-  private val metricsFactory = metricsFactoryProvider.generateMetricsFactory(MetricsContext.Empty)
+  private val metricsFactory: InMemoryMetricsFactory = metricsFactoryProvider.generateMetricsFactory(MetricsContext.Empty)
 
   private def executeRequest(
       serverBinding: ServerBinding

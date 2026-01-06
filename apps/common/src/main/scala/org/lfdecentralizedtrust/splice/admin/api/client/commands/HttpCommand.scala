@@ -44,7 +44,7 @@ trait HttpCommand[Res, Result] {
 
   type Client
 
-  def createClient(host: String)(implicit
+  def createClient(host: String, clientName: String, operationName: String)(implicit
       httpClient: HttpClient,
       tc: TraceContext,
       ec: ExecutionContext,
@@ -73,12 +73,12 @@ trait HttpCommand[Res, Result] {
     new HttpCommand[Res, Res] {
       type Client = self.Client
 
-      override def createClient(host: String)(implicit
+      override def createClient(host: String, clientName: String, operationName: String)(implicit
           httpClient: HttpClient,
           tc: TraceContext,
           ec: ExecutionContext,
           mat: Materializer,
-      ) = self.createClient(host)
+      ) = self.createClient(host, clientName, operationName)
 
       override def submitRequest(
           client: Client,
@@ -152,10 +152,12 @@ final class HttpClientBuilder()(implicit
   }
 
   def buildClient(
+      clientName: String,
+      operationName: String,
       nonErrorStatusCode: Set[StatusCode] = Set.empty
   ): HttpRequest => Future[HttpResponse] = {
     httpClientWithErrors(
-      httpClient.executeRequest,
+      httpClient.executeRequest(clientName, operationName),
       {
         case code @ (StatusCodes.ServerError(_) | StatusCodes.ClientError(_))
             if !nonErrorStatusCode.contains(code) =>
