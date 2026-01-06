@@ -21,6 +21,7 @@ template MintingDelegationProposal
       with
         existingDelegationCid : Optional (ContractId MintingDelegation)
           -- ^ Optional existing delegation to archive while creating the new one.
+          -- Useful for changing the parameters of the delegation.
       controller delegation.delegate
       do
         case existingDelegationCid of
@@ -38,7 +39,7 @@ template MintingDelegationProposal
       controller delegation.beneficiary
       do pure MintingDelegationProposal_WithdrawResult with dummyUnitField = ()
 
--- | The right allowing delegate to record liveness activity and mint rewards on behalf of the beneficiary.
+-- | The right allowing the delegate to mint rewards on behalf of the beneficiary.
 template MintingDelegation
   with
     beneficiary : Party
