@@ -72,6 +72,7 @@ canton.participants.participant_$index = {
 
     ledger-api {
         address = "0.0.0.0"
+        admin-token-config.admin-claim = true
         port = $ledger_port
         user-management-service.additional-admin-user-id = ${user}
         auth-services = [{
