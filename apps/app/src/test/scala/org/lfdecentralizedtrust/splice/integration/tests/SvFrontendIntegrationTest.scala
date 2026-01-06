@@ -396,7 +396,8 @@ class SvFrontendIntegrationTest
             }
 
             clue("click the new proposal") {
-              click on testId("inflight-proposals-row-link")
+              val proposals = getInflightProposals()
+              webDriver.executeScript("arguments[0].click();", proposals.asScala.head)
             }
           },
         )
