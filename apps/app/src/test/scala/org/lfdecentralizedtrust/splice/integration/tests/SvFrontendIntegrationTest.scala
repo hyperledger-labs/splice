@@ -756,14 +756,11 @@ class SvFrontendIntegrationTest
       }
     }
 
-    // "NEW UI: Set Dso Rules Configuration" in { implicit env =>
-    //   createProposal("SRARC_SetConfig") { implicit webDriver =>
-    //     eventually() {
-    //       find(testId("set-dso-rules-config-header")) should not be empty
-
-    //     }
-    //   }
-    // }
+    "NEW UI: Set Dso Rules Configuration" in { implicit env =>
+      createProposal("SRARC_SetConfig", "set-dso-config-rules") { _ =>
+        // Config fields default to current values, no extra form operations needed
+      }
+    }
 
     // "NEW UI: Create Unclaimed Activity Record" in { implicit env =>
     //   val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
