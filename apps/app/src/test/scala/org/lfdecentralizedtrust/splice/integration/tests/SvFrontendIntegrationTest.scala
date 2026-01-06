@@ -732,31 +732,25 @@ class SvFrontendIntegrationTest
       }
     }
 
-    // "NEW UI: Feature Application" in { implicit env =>
-    //   val providerId = "a-user-id"
+    "NEW UI: Grant Featured App Right" in { implicit env =>
+      val providerId = "test-provider-party-id"
 
-    //   createProposal("SRARC_GrantFeaturedAppRight") { implicit webDriver =>
-    //     eventually() {
-    //       find(id("set-application-provider")) match {
-    //         case Some(element) =>
-    //           element.underlying.sendKeys(providerId)
-    //         case None =>
-    //           fail("Could not find 'set-application-provider' input")
-    //       }
-    //     }
-    //   }
-    // }
+      createProposal("SRARC_GrantFeaturedAppRight", "grant-featured-app") { implicit webDriver =>
+        eventually() {
+          inside(find(id("grant-featured-app-idValue"))) { case Some(element) =>
+            element.underlying.sendKeys(providerId)
+          }
+        }
+      }
+    }
 
-    // "NEW UI: Unfeature Application" in { implicit env =>
+    // "NEW UI: Revoke Featured App Right" in { implicit env =>
     //   val rightCid = "a-contract-id"
 
-    //   createProposal("SRARC_RevokeFeaturedAppRight") { implicit webDriver =>
+    //   createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
     //     eventually() {
-    //       find(id("set-application-rightcid")) match {
-    //         case Some(element) =>
-    //           element.underlying.sendKeys(rightCid)
-    //         case None =>
-    //           fail("Could not find contract ID input 'set-application-rightcid'")
+    //       inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
+    //         element.underlying.sendKeys(rightCid)
     //       }
     //     }
     //   }
