@@ -99,5 +99,4 @@ groups:
           summary: Status report creation time lag too high
         labels:
           "team": $TEAM_LABEL
-          "priority": high
         isPaused: false
