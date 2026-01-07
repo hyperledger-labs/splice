@@ -450,6 +450,9 @@ Optional inputs:
 - ``--loglevel`` (default: ``INFO``)
   Logging level.
 
+- ``--log-file-path`` (default: ``log/unclaimed_sv_rewards.log``)
+  File path to save application log to.
+
 - ``--grace-period-for-mining-rounds-in-minutes`` (default: ``60``)
   Additional time added to ``end-record-time`` when retrieving mining rounds.
   Mining rounds contain the issuance information required to compute the final reward amount.
@@ -516,6 +519,7 @@ Example with optional parameters:
       https://scan.sv.global.canton.network.sv-nodeops.com \
       https://scan.sv-1.global.canton.network.tradeweb.com \
       --loglevel DEBUG \
+      --log-file-path 'log/unclaimed_sv_rewards_2.log' \
       --page-size 200 \
       --grace-period-for-mining-rounds-in-minutes 70 \
       --concurrency 117 \

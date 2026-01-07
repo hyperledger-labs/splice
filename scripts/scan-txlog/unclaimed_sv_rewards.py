@@ -31,12 +31,12 @@ import colorlog
 getcontext().prec = 38
 getcontext().rounding = ROUND_HALF_EVEN
 
-# Ensure log directory exists before logger initialization
-log_directory = "log"
-if not os.path.exists(log_directory):
-    os.makedirs(log_directory)
+def _setup_logger(name, loglevel, file_path):
+    # Ensure the log directory exists
+    log_directory = os.path.dirname(file_path)
+    if log_directory and not os.path.exists(log_directory):
+        os.makedirs(log_directory)
 
-def _default_logger(name, loglevel):
     cli_handler = colorlog.StreamHandler()
     cli_handler.setFormatter(
         colorlog.ColoredFormatter(
@@ -51,7 +51,7 @@ def _default_logger(name, loglevel):
             datefmt="%Y-%m-%d %H:%M:%S",
         )
     )
-    file_handler = logging.FileHandler("log/unclaimed_sv_rewards.log")
+    file_handler = logging.FileHandler(file_path)
     file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s:%(name)s:%(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
 
     logger = colorlog.getLogger(name)
@@ -60,10 +60,6 @@ def _default_logger(name, loglevel):
     logger.setLevel(loglevel)
 
     return logger
-
-
-# Global logger, always accessible
-LOG = _default_logger("global", "INFO")
 
 def non_negative_int(value):
     ivalue = int(value)
@@ -91,6 +87,12 @@ def _parse_cli_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--loglevel", help="Sets the log level", default="INFO")
+    parser.add_argument(
+        "--log-file-path",
+        default="log/unclaimed_sv_rewards.log",
+        help="File path to save application log to. "
+        "If the file exists, processing will append to file.",
+    )
     parser.add_argument(
         "--page-size",
         type=int,
@@ -1238,10 +1240,10 @@ def split_into_chunks(begin_time: datetime, end_time: datetime, chunk_size: time
 
 
 async def main():
+    global file_handler, LOG
     args = _parse_cli_args()
 
-    # Set up logging
-    LOG.setLevel(args.loglevel.upper())
+    LOG = _setup_logger("global", args.loglevel.upper(), args.log_file_path)
     _log_uncaught_exceptions()
 
     LOG.info(f"Starting unclaimed_sv_rewards with arguments: {args}")
