@@ -19,6 +19,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
+  mintingdelegation as mintingDelegationCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
@@ -28,7 +29,14 @@ import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.*
-import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit, TransferInputStore, TxLogAppStore}
+import org.lfdecentralizedtrust.splice.store.{
+  Limit,
+  PageLimit,
+  ResultsPage,
+  SortOrder,
+  TransferInputStore,
+  TxLogAppStore,
+}
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore.*
 import org.lfdecentralizedtrust.splice.wallet.store.db.DbUserWalletStore
@@ -181,6 +189,44 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
   ] = for {
     requests <- multiDomainAcsStore.listContracts(subsCodegen.SubscriptionRequest.COMPANION, limit)
   } yield requests map (_.contract)
+
+  final def listMintingDelegationProposals(
+      after: Option[Long],
+      limit: PageLimit,
+  )(implicit tc: TraceContext): Future[
+    ResultsPage[
+      Contract[
+        mintingDelegationCodegen.MintingDelegationProposal.ContractId,
+        mintingDelegationCodegen.MintingDelegationProposal,
+      ]
+    ]
+  ] = for {
+    page <- multiDomainAcsStore.listContractsPaginated(
+      mintingDelegationCodegen.MintingDelegationProposal.COMPANION,
+      after,
+      limit,
+      SortOrder.Ascending,
+    )
+  } yield page.mapResultsInPage(_.contract)
+
+  final def listMintingDelegations(
+      after: Option[Long],
+      limit: PageLimit,
+  )(implicit tc: TraceContext): Future[
+    ResultsPage[
+      Contract[
+        mintingDelegationCodegen.MintingDelegation.ContractId,
+        mintingDelegationCodegen.MintingDelegation,
+      ]
+    ]
+  ] = for {
+    page <- multiDomainAcsStore.listContractsPaginated(
+      mintingDelegationCodegen.MintingDelegation.COMPANION,
+      after,
+      limit,
+      SortOrder.Ascending,
+    )
+  } yield page.mapResultsInPage(_.contract)
 
   def getAmuletBalanceWithHoldingFees(asOfRound: Long, deductHoldingFees: Boolean)(implicit
       tc: TraceContext
@@ -708,6 +754,20 @@ object UserWalletStore {
         } { contract =>
           UserWalletAcsStoreRowData(contract)
         },
+        // Minting delegations for user as the delegate
+        mkFilter(mintingDelegationCodegen.MintingDelegationProposal.COMPANION)(co =>
+          co.payload.delegation.dso == dso &&
+            co.payload.delegation.delegate == endUser
+        )(UserWalletAcsStoreRowData(_)),
+        mkFilter(mintingDelegationCodegen.MintingDelegation.COMPANION)(co =>
+          co.payload.dso == dso &&
+            co.payload.delegate == endUser
+        )(contract =>
+          UserWalletAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          )
+        ),
       ),
       Map(
         mkFilterInterface(allocationrequestv1.AllocationRequest.INTERFACE)(co =>
