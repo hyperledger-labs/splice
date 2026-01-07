@@ -63,8 +63,9 @@ trait TimeTestUtil extends TestCommon {
         val now = sv1Backend.participantClient.ledger_api.time.get()
         try {
           // actually advance the time
-          logger.info(s"advancing time by $duration ...")
-          sv1Backend.participantClient.ledger_api.time.set(now, now.plus(duration))
+          val timeToAdvanceTo = now.plus(duration)
+          logger.info(s"advancing time by $duration to $timeToAdvanceTo")
+          sv1Backend.participantClient.ledger_api.time.set(now, timeToAdvanceTo)
         } catch {
           case _: CommandFailure =>
             fail(
