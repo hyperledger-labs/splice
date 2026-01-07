@@ -876,6 +876,7 @@ class ValidatorApp(
             config.ingestFromParticipantBegin,
             config.ingestUpdateHistoryFromParticipantBegin,
             config.parameters,
+            scanConnection,
           )
           val walletManager = new UserWalletManager(
             ledgerClient,
