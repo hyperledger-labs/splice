@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpiredAmuletTrigger,
   ExpiredLockedAmuletTrigger,
+  UpdateExternalPartyConfigStateTrigger,
 }
 import org.lfdecentralizedtrust.splice.util.*
 import org.slf4j.event.Level
@@ -36,13 +37,21 @@ class AmuletExpiryIntegrationTest
     EnvironmentDefinition
       // TODO(#2885): switch to a 4 SV topology once we have contention avoidance in place
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .addConfigTransform((_, config) =>
-        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
+      .addConfigTransforms(
+        (_, config) =>
+          ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(
+            config
+          ),
+        (_, config) =>
+          ConfigTransforms.updateInitialExternalPartyConfigStateTickDuration(
+            NonNegativeFiniteDuration.ofMillis(500)
+          )(config),
       )
       // Start rounds trigger in paused state
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Sv)(sv => {
           sv.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
+            .withPausedTrigger[UpdateExternalPartyConfigStateTrigger]
         })(config)
       )
       // disable the reward collection to avoid accidental creation or merging of amulet
@@ -106,6 +115,8 @@ class AmuletExpiryIntegrationTest
         advanceRoundsByOneTickViaAutomation()
         advanceRoundsByOneTickViaAutomation()
         advanceRoundsByOneTickViaAutomation()
+        updateExternalPartyConfigStatesViaAutomation()
+        updateExternalPartyConfigStatesViaAutomation()
 
         env.svs.local.foreach(sv => {
           sv.dsoDelegateBasedAutomation.trigger[ExpiredAmuletTrigger].resume()

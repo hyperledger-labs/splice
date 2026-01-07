@@ -301,7 +301,9 @@ case class EnvironmentDefinition(
     addConfigTransforms((_, conf) =>
       ConfigTransforms.updateAllSvAppConfigs_(config =>
         config.copy(
-          delegatelessAutomationFeaturedAppActivityMarkerMaxAge = NonNegativeFiniteDuration.Zero
+          delegatelessAutomationFeaturedAppActivityMarkerMaxAge = NonNegativeFiniteDuration.Zero,
+          // In simtime the time bound does not trigger so we also set batch size to 1.
+          delegatelessAutomationFeaturedAppActivityMarkerBatchSize = 1,
         )
       )(conf)
     )

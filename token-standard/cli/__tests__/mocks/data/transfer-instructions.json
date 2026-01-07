@@ -4,7 +4,7 @@
       "JsActiveContract" : {
         "createdEvent" : {
           "acsDelta" : true,
-          "contractId" : "38",
+          "contractId" : "39",
           "contractKey" : null,
           "createArgument" : {
             "lockedAmulet" : "1",
@@ -80,7 +80,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
+          "representativePackageId" : "824add7ab499224f58b9e9e59f0c011d0df1e0ae480baf09e20f2547094c415c",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -101,15 +101,15 @@
       "JsActiveContract" : {
         "createdEvent" : {
           "acsDelta" : true,
-          "contractId" : "50",
+          "contractId" : "51",
           "contractKey" : null,
           "createArgument" : {
-            "lockedAmulet" : "51",
+            "lockedAmulet" : "52",
             "transfer" : {
               "amount" : "200.0000000000",
               "executeBefore" : "2025-06-18T00:00:00.000000Z",
               "inputHoldingCids" : [
-                "51"
+                "52"
               ],
               "instrumentId" : {
                 "admin" : "dso::normalized",
@@ -153,7 +153,7 @@
                   "amount" : "200.0000000000",
                   "executeBefore" : "2025-06-18T00:00:00.000000Z",
                   "inputHoldingCids" : [
-                    "51"
+                    "52"
                   ],
                   "instrumentId" : {
                     "admin" : "dso::normalized",
@@ -177,7 +177,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
+          "representativePackageId" : "824add7ab499224f58b9e9e59f0c011d0df1e0ae480baf09e20f2547094c415c",
           "signatories" : [
             "dso::normalized",
             "bob::normalized"

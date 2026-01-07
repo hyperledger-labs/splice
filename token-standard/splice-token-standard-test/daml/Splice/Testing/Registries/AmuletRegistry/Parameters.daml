@@ -87,6 +87,7 @@ defaultAmuletConfig = AmuletConfig with
 
   -- Amount of the AppRewardCoupon contract that a FeaturedAppActivityMarker is converted to.
   featuredAppActivityMarkerAmount = Some defaultFeaturedAppActivityMarkerAmount
+  externalPartyConfigStateTickDuration = None
 
   optDevelopmentFundManager = None
 

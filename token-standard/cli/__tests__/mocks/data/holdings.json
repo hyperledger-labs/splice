@@ -10,7 +10,7 @@
             "amulet" : {
               "amount" : {
                 "createdAt" : {
-                  "number" : "1"
+                  "number" : "0"
                 },
                 "initialAmount" : "1000.0000000000",
                 "ratePerRound" : {
@@ -55,7 +55,7 @@
                 },
                 "meta" : {
                   "values" : {
-                    "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
+                    "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "0",
                     "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
                   }
                 },
@@ -68,7 +68,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
+          "representativePackageId" : "824add7ab499224f58b9e9e59f0c011d0df1e0ae480baf09e20f2547094c415c",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -94,7 +94,7 @@
           "createArgument" : {
             "amount" : {
               "createdAt" : {
-                "number" : "1"
+                "number" : "0"
               },
               "initialAmount" : "1.0000000000",
               "ratePerRound" : {
@@ -124,7 +124,7 @@
                 "lock" : null,
                 "meta" : {
                   "values" : {
-                    "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
+                    "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "0",
                     "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
                   }
                 },
@@ -137,7 +137,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
+          "representativePackageId" : "824add7ab499224f58b9e9e59f0c011d0df1e0ae480baf09e20f2547094c415c",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -163,7 +163,7 @@
           "createArgument" : {
             "amount" : {
               "createdAt" : {
-                "number" : "1"
+                "number" : "0"
               },
               "initialAmount" : "4289.0000000000",
               "ratePerRound" : {
@@ -193,7 +193,7 @@
                 "lock" : null,
                 "meta" : {
                   "values" : {
-                    "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
+                    "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "0",
                     "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
                   }
                 },
@@ -206,7 +206,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
+          "representativePackageId" : "824add7ab499224f58b9e9e59f0c011d0df1e0ae480baf09e20f2547094c415c",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -275,7 +275,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
-          "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
+          "representativePackageId" : "824add7ab499224f58b9e9e59f0c011d0df1e0ae480baf09e20f2547094c415c",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"

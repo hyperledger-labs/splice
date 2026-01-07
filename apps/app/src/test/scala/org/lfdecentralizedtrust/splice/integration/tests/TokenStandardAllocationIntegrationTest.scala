@@ -28,7 +28,7 @@ import org.lfdecentralizedtrust.splice.util.{
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
 import com.digitalasset.canton.util.ShowUtil.*
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppActivityMarker
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletallocationCodegen
 import org.lfdecentralizedtrust.splice.console.{
   ParticipantClientReference,
@@ -237,9 +237,9 @@ class TokenStandardAllocationIntegrationTest
         forExactly(1, events) {
           inside(_) { case c: CreatedEvent =>
             val decoded = JavaDecodeUtil
-              .decodeCreated(AppRewardCoupon.COMPANION)(c)
+              .decodeCreated(FeaturedAppActivityMarker.COMPANION)(c)
               .value
-            decoded.data.featured shouldBe true
+            decoded.data.provider shouldBe allocatedOtcTrade.venueParty.toProtoPrimitive
           }
         }
       },

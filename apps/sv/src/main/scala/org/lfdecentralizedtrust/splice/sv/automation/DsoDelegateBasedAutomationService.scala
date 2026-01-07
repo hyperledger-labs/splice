@@ -48,6 +48,7 @@ class DsoDelegateBasedAutomationService(
 
   def start(): Unit = {
     registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svTaskContext))
+    registerTrigger(new UpdateExternalPartyConfigStateTrigger(triggerContext, svTaskContext))
     registerTrigger(new CompletedSvOnboardingTrigger(triggerContext, svTaskContext))
     if (config.automation.enableDsoGovernance) {
       registerTrigger(
@@ -128,6 +129,7 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
   // but created later by the restart trigger
   override protected[this] def expectedTriggerClasses: Seq[TriggerClass] = Seq(
     aTrigger[AdvanceOpenMiningRoundTrigger],
+    aTrigger[UpdateExternalPartyConfigStateTrigger],
     aTrigger[CompletedSvOnboardingTrigger],
     aTrigger[ExecuteConfirmedActionTrigger],
     aTrigger[MergeMemberTrafficContractsTrigger],

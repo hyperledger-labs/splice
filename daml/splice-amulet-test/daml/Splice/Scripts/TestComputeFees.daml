@@ -4,6 +4,7 @@
 module Splice.Scripts.TestComputeFees where
 
 import DA.Assert
+import DA.Time
 import DA.TextMap as TextMap
 import Daml.Script
 
@@ -46,10 +47,16 @@ testScaledHoldingFees = do
 
   -- skip 202 rounds so that the amulet expires
   skipNRounds app 202
+  -- advance external party config state contracts to current
+  -- rounds
+  updateExternalPartyConfigState app
+  passTime (hours 24)
+  updateExternalPartyConfigState app
 
-  openRoundCid <- getLatestActiveOpenRound app
-  result <- submit app.dso $ exerciseCmd curAmuletCid Amulet_Expire with
-    roundCid = openRoundCid._1
+  (config0Cid, config1Cid) <- getExternalPartyConfigStates app
+  result <- submit app.dso $ exerciseCmd curAmuletCid Amulet_ExpireV2 with
+    externalPartyConfigState0Cid = config0Cid
+    externalPartyConfigState1Cid = config1Cid
 
   -- Check the expire result. In particular, actual holding fee should be based
   -- on the amulet price when the amulet was created, not the current one.
@@ -58,7 +65,7 @@ testScaledHoldingFees = do
         round = curAmulet.amount.createdAt
         changeToInitialAmountAsOfRoundZero = negate (getValueAsOfRound0 curAmulet.amount)
         changeToHoldingFeesRate = negate scaledHoldingFee
-      expectedMeta = Some $ Metadata $ TextMap.fromList
+      expectedMeta = Metadata $ TextMap.fromList
         [ ("splice.lfdecentralizedtrust.org/burned", show curAmulet.amount.initialAmount)
         , ("splice.lfdecentralizedtrust.org/tx-kind","expire-dust")
         ]
