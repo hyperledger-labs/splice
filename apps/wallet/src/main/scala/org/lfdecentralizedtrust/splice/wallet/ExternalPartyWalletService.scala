@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.wallet
 import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -42,6 +43,7 @@ class ExternalPartyWalletService(
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
     params: SpliceParametersConfig,
+    scanConnection: BftScanConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -89,6 +91,7 @@ class ExternalPartyWalletService(
     ingestFromParticipantBegin,
     ingestUpdateHistoryFromParticipantBegin,
     params,
+    scanConnection,
     loggerFactory,
   )
 

@@ -19,6 +19,8 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AllocateDevelopmentFundCouponResponse,
   GetBuyTrafficRequestStatusResponse,
   GetTransferOfferStatusResponse,
+  ListMintingDelegationProposalsResponse,
+  ListMintingDelegationsResponse,
   TransferInstructionResultResponse,
   WithdrawDevelopmentFundCouponResponse,
 }
@@ -651,6 +653,57 @@ abstract class WalletAppReference(
       httpCommand(
         HttpWalletAppClient.WithdrawDevelopmentFundCoupon(developmentFundCouponContractId, reason)
       )
+    }
+
+  @Help.Summary("List MintingDelegationProposals")
+  @Help.Description(
+    "List all MintingDelegationProposal contracts where the user is the delegate."
+  )
+  def listMintingDelegationProposals(
+      after: Option[Long] = None,
+      limit: Option[Int] = None,
+  ): ListMintingDelegationProposalsResponse =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.ListMintingDelegationProposals(after, limit))
+    }
+
+  @Help.Summary("Accept MintingDelegationProposal")
+  @Help.Description(
+    "Accept a MintingDelegationProposal, creating a MintingDelegation contract and archiving an existing contract."
+  )
+  def acceptMintingDelegationProposal(contractId: String): String =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.AcceptMintingDelegationProposal(contractId))
+    }
+
+  @Help.Summary("Reject MintingDelegationProposal")
+  @Help.Description(
+    "Reject a MintingDelegationProposal."
+  )
+  def rejectMintingDelegationProposal(contractId: String): Unit =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.RejectMintingDelegationProposal(contractId))
+    }
+
+  @Help.Summary("List MintingDelegations")
+  @Help.Description(
+    "List all MintingDelegation contracts where the user is the delegate."
+  )
+  def listMintingDelegations(
+      after: Option[Long] = None,
+      limit: Option[Int] = None,
+  ): ListMintingDelegationsResponse =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.ListMintingDelegations(after, limit))
+    }
+
+  @Help.Summary("Reject MintingDelegation")
+  @Help.Description(
+    "Reject/terminate a MintingDelegation contract."
+  )
+  def rejectMintingDelegation(contractId: String): Unit =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.RejectMintingDelegation(contractId))
     }
 }
 
