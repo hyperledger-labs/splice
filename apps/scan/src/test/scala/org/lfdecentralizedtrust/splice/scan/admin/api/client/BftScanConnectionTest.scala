@@ -104,6 +104,7 @@ class BftScanConnectionTest
                     synchronizerId,
                   ),
                   false,
+                  java.util.Optional.empty(),
                 ),
                 ByteString.EMPTY,
                 Instant.EPOCH,

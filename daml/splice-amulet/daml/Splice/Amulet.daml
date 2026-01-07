@@ -16,6 +16,7 @@ import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 
 import Splice.Amulet.TokenApiUtils
 import Splice.Expiry
+import Splice.ExternalPartyConfigState
 import Splice.Fees
 import qualified Splice.Api.FeaturedAppRightV1
 import qualified Splice.Api.FeaturedAppRightV2
@@ -46,17 +47,33 @@ data Amulet_ExpireResult = Amulet_ExpireResult with
   expireSum : AmuletExpireSummary
   meta : Optional Api.Token.MetadataV1.Metadata
 
+data Amulet_ExpireV2Result = Amulet_ExpireV2Result with
+  expireSum : AmuletExpireSummary -- FIXME: Consider trimming this down, scan and wallet tx log parser do currently need the non-round values though
+  meta : Api.Token.MetadataV1.Metadata
+
 data LockedAmulet_UnlockResult = LockedAmulet_UnlockResult with
   amuletSum : AmuletCreateSummary (ContractId Amulet)
   meta : Optional Api.Token.MetadataV1.Metadata
+
+data LockedAmulet_UnlockV2Result = LockedAmulet_UnlockV2Result with
+  amuletCid : ContractId Amulet
+  meta : Api.Token.MetadataV1.Metadata
 
 data LockedAmulet_OwnerExpireLockResult = LockedAmulet_OwnerExpireLockResult with
   amuletSum : AmuletCreateSummary (ContractId Amulet)
   meta : Optional Api.Token.MetadataV1.Metadata
 
+data LockedAmulet_OwnerExpireLockV2Result = LockedAmulet_OwnerExpireLockV2Result with
+  amuletCid : ContractId Amulet
+  meta : Api.Token.MetadataV1.Metadata
+
 data LockedAmulet_ExpireAmuletResult = LockedAmulet_ExpireAmuletResult with
   expireSum : AmuletExpireSummary
   meta : Optional Api.Token.MetadataV1.Metadata
+
+data LockedAmulet_ExpireAmuletV2Result = LockedAmulet_ExpireAmuletV2Result with
+  expireSum : AmuletExpireSummary
+  meta : Api.Token.MetadataV1.Metadata
 
 data ValidatorRight_ArchiveAsValidatorResult = ValidatorRight_ArchiveAsValidatorResult
 
@@ -111,14 +128,21 @@ template Amulet
       with
         roundCid : ContractId OpenMiningRound
       controller dso
-      do  requireAmuletExpiredForAllOpenRounds roundCid this
+      do deprecatedChoice "splice-amulet" "FIXME" "Amulet_Expire"
+
+    choice Amulet_ExpireV2 : Amulet_ExpireV2Result
+      with
+        externalPartyConfigState0Cid : ContractId ExternalPartyConfigState
+        externalPartyConfigState1Cid : ContractId ExternalPartyConfigState
+      controller dso
+      do  requireAmuletExpiredForAllRounds externalPartyConfigState0Cid externalPartyConfigState1Cid this
           let expireSum = AmuletExpireSummary with
                 owner = owner
                 round = amount.createdAt
                 changeToInitialAmountAsOfRoundZero = - getValueAsOfRound0 amount
                 changeToHoldingFeesRate = - (amount.ratePerRound.rate)
-          return Amulet_ExpireResult with
-            meta = Some (simpleHoldingTxMeta TxKind_ExpireDust None (Some amount.initialAmount))
+          return Amulet_ExpireV2Result with
+            meta = simpleHoldingTxMeta TxKind_ExpireDust None (Some amount.initialAmount)
             ..
 
     interface instance Api.Token.HoldingV1.Holding for Amulet where
@@ -160,43 +184,47 @@ template LockedAmulet
       with
         openRoundCid : ContractId OpenMiningRound
       controller amulet.owner :: lock.holders
-      do openMiningRound <- fetchReferenceData (ForDso with dso = amulet.dso) openRoundCid
-         amuletCid <- create amulet
-         let amuletSum = AmuletCreateSummary with
-               amulet = amuletCid
-               amuletPrice = openMiningRound.amuletPrice
-               round = openMiningRound.round
-         return LockedAmulet_UnlockResult with
-           meta = Some (simpleHoldingTxMeta TxKind_Unlock (Some "holders released lock") None), ..
+      do deprecatedChoice "splice-amulet" "FIXME" "LockedAmulet_Unlock"
+
+    choice LockedAmulet_UnlockV2 : LockedAmulet_UnlockV2Result
+      controller amulet.owner :: lock.holders
+      do amuletCid <- create amulet
+         return LockedAmulet_UnlockV2Result with
+           meta = simpleHoldingTxMeta TxKind_Unlock (Some "holders released lock") None, ..
 
     choice LockedAmulet_OwnerExpireLock : LockedAmulet_OwnerExpireLockResult
       with
         openRoundCid : ContractId OpenMiningRound
       controller amulet.owner
-      do openMiningRound <- fetchReferenceData (ForDso with dso = amulet.dso) openRoundCid
-         assertDeadlineExceeded "Lock.expiresAt" lock.expiresAt
+      do deprecatedChoice "splice-amulet" "FIXME" "LockedAmulet_OwnerExpireLock"
+
+    choice LockedAmulet_OwnerExpireLockV2 : LockedAmulet_OwnerExpireLockV2Result
+      controller amulet.owner
+      do assertDeadlineExceeded "Lock.expiresAt" lock.expiresAt
          amuletCid <- create amulet
-         let amuletSum = AmuletCreateSummary with
-               amulet = amuletCid
-               amuletPrice = openMiningRound.amuletPrice
-               round = openMiningRound.round
-         return LockedAmulet_OwnerExpireLockResult with
-          meta = Some (simpleHoldingTxMeta TxKind_Unlock (Some "lock expired") None), ..
+         return LockedAmulet_OwnerExpireLockV2Result with
+          meta = simpleHoldingTxMeta TxKind_Unlock (Some "lock expired") None, ..
 
     choice LockedAmulet_ExpireAmulet : LockedAmulet_ExpireAmuletResult
       with
         roundCid : ContractId OpenMiningRound
       controller amulet.dso
+      do deprecatedChoice "splice-amulet" "FIXME" "LockedAmulet_ExpireAmulet"
+
+    choice LockedAmulet_ExpireAmuletV2 : LockedAmulet_ExpireAmuletV2Result
+      with
+        externalPartyConfigState0Cid : ContractId ExternalPartyConfigState
+        externalPartyConfigState1Cid : ContractId ExternalPartyConfigState
+      controller amulet.dso
       do
-         assertDeadlineExceeded "Lock.expiresAt" lock.expiresAt
-         requireAmuletExpiredForAllOpenRounds roundCid amulet
+         requireAmuletExpiredForAllRounds externalPartyConfigState0Cid externalPartyConfigState1Cid amulet
          let expireSum = AmuletExpireSummary with
                owner = amulet.owner
                round = amulet.amount.createdAt
                changeToInitialAmountAsOfRoundZero = -(getValueAsOfRound0 amulet.amount)
                changeToHoldingFeesRate = - (amulet.amount.ratePerRound.rate)
-         return LockedAmulet_ExpireAmuletResult with
-           meta = Some (simpleHoldingTxMeta TxKind_ExpireDust None (Some amulet.amount.initialAmount))
+         return LockedAmulet_ExpireAmuletV2Result with
+           meta = simpleHoldingTxMeta TxKind_ExpireDust None (Some amulet.amount.initialAmount)
            ..
 
 
@@ -510,12 +538,12 @@ template UnclaimedActivityRecord
         pure UnclaimedActivityRecord_DsoExpireResult with unclaimedRewardCid
 
 
-requireAmuletExpiredForAllOpenRounds : ContractId OpenMiningRound -> Amulet -> Update ()
-requireAmuletExpiredForAllOpenRounds roundCid amulet = do
-  round <- fetchReferenceData (ForDso with dso = amulet.dso) roundCid
-  -- Note: we exploit that there are exactly three open rounds active at any
-  -- point in time; and we ensure that a amulet can be expired as soon as it can
-  -- definitely not be used as an input to transfer anymore.
+requireAmuletExpiredForAllRounds : ContractId ExternalPartyConfigState -> ContractId ExternalPartyConfigState -> Amulet -> Update ()
+requireAmuletExpiredForAllRounds externalPartyConfigState0Cid externalPartyConfigState1Cid amulet = do
+  require "externalPartyConfigState0Cid /= externalPartyConfigState1Cid" (externalPartyConfigState0Cid /= externalPartyConfigState1Cid)
+  config0 <- fetchReferenceData (ForDso with dso = amulet.dso) externalPartyConfigState0Cid
+  config1 <- fetchReferenceData (ForDso with dso = amulet.dso) externalPartyConfigState1Cid
+  let round = min config0.holdingFeesOpenRoundNumber config1.holdingFeesOpenRoundNumber
   require "Amulet is expired" (isAmuletExpired round amulet.amount)
 
 

@@ -229,7 +229,8 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
         ),
         amuletConfig.transferPreapprovalFee,
         amuletConfig.featuredAppActivityMarkerAmount,
-        java.util.Optional.empty(),
+        amuletConfig.optDevelopmentFundManager,
+        amuletConfig.externalPartyConfigStateTickDuration,
       )
 
       val upgradeAction = new ARC_AmuletRules(
@@ -371,6 +372,7 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
         amuletConfig.transferPreapprovalFee,
         amuletConfig.featuredAppActivityMarkerAmount,
         amuletConfig.optDevelopmentFundManager,
+        amuletConfig.externalPartyConfigStateTickDuration,
       )
 
       val upgradeAction = new ARC_AmuletRules(

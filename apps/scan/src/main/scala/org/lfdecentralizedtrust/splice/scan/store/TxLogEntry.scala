@@ -286,11 +286,11 @@ object TxLogEntry extends StoreErrors {
   }
 
   def parseSenderAmount(
-      arg: splice.amuletrules.AmuletRules_Transfer,
+      sender: String,
+      outputs: Seq[splice.amuletrules.TransferOutput],
       res: splice.amuletrules.TransferResult,
   ): SenderAmount = {
-    val sender = arg.transfer.sender
-    val senderFee = parseOutputAmounts(arg, res)
+    val senderFee = parseOutputAmounts(outputs, res)
       .map(_.senderFee)
       .sum
 
@@ -310,14 +310,14 @@ object TxLogEntry extends StoreErrors {
   }
 
   def parseReceiverAmounts(
-      arg: splice.amuletrules.AmuletRules_Transfer,
+      outputs: Seq[splice.amuletrules.TransferOutput],
       res: splice.amuletrules.TransferResult,
   ): Seq[ReceiverAmount] = {
 
     // Note: the same receiver party can appear multiple times in the transfer result
     // The code below merges amounts and fees for the same receiver, while preserving
     // the order of receivers.
-    parseOutputAmounts(arg, res)
+    parseOutputAmounts(outputs, res)
       .map(o =>
         new ReceiverAmount(
           party = PartyId.tryFromProtoPrimitive(o.output.receiver),
@@ -352,14 +352,14 @@ object TxLogEntry extends StoreErrors {
   )
 
   private def parseOutputAmounts(
-      arg: splice.amuletrules.AmuletRules_Transfer,
+      outputs: Seq[splice.amuletrules.TransferOutput],
       res: splice.amuletrules.TransferResult,
   ): Seq[OutputWithFees] = {
     assert(
-      arg.transfer.outputs.size() == res.summary.outputFees.size(),
+      outputs.size == res.summary.outputFees.size(),
       "Each output should have a corresponding fee",
     )
-    val outputsWithFees = arg.transfer.outputs.asScala.toSeq.zip(res.summary.outputFees.asScala)
+    val outputsWithFees = outputs.zip(res.summary.outputFees.asScala)
 
     outputsWithFees
       .map { case (out, fee) =>

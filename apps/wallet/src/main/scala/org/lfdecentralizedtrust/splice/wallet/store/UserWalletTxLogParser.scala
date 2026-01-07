@@ -53,6 +53,7 @@ import org.lfdecentralizedtrust.splice.history.{
   AmuletArchive,
   AmuletCreate,
   AmuletExpire,
+  AmuletExpireV2,
   AmuletRules_BuyMemberTraffic,
   AmuletRules_CreateExternalPartySetupProposal,
   AmuletRules_CreateTransferPreapproval,
@@ -64,9 +65,13 @@ import org.lfdecentralizedtrust.splice.history.{
   DevelopmentFundCoupon_Expire,
   DevelopmentFundCoupon_Reject,
   DevelopmentFundCoupon_Withdraw,
+  DirectTokenStandardTransfer,
   LockedAmuletExpireAmulet,
+  LockedAmuletExpireAmuletV2,
   LockedAmuletOwnerExpireLock,
+  LockedAmuletOwnerExpireLockV2,
   LockedAmuletUnlock,
+  LockedAmuletUnlockV2,
   Mint,
   Tap,
   Transfer,
@@ -76,6 +81,9 @@ import org.lfdecentralizedtrust.splice.history.{
   TransferInstruction_Withdraw,
   TransferPreapproval_Renew,
   TransferPreapproval_Send,
+  TransferPreapproval_SendV2,
+  AllocationFactoryAllocate,
+  AllocationExecuteTransfer,
 }
 import org.lfdecentralizedtrust.splice.store.TxLogStore
 import org.lfdecentralizedtrust.splice.util.{
@@ -108,7 +116,12 @@ class UserWalletTxLogParser(
     with NamedLogging {
   import UserWalletTxLogParser.*
 
-  private def parseTree(tree: Transaction, root: Event, synchronizerId: SynchronizerId)(implicit
+  private def parseTree(
+      tree: Transaction,
+      root: Event,
+      synchronizerId: SynchronizerId,
+      ignoreUnexpectedAmuletCreateArchive: Boolean,
+  )(implicit
       tc: TraceContext
   ): Eval[State] = {
     import Eval.{now, defer}
@@ -267,11 +280,15 @@ class UserWalletTxLogParser(
               // Tag wallet automation (amulet merging, reward collection) as such, to distinguish from
               // explicit self-transfers
               case ((_, _: COO_MergeTransferInputs, Right(Seq(childEvent))), _) =>
-                defer(parseTree(tree, childEvent, synchronizerId))
+                defer(
+                  parseTree(tree, childEvent, synchronizerId, ignoreUnexpectedAmuletCreateArchive)
+                )
                   .map(_.setTransferSubtype(TransferTransactionSubtype.WalletAutomation))
               // All other successful operations are handled by parsing their subtree
               case ((_, _, Right(childEvents)), _) =>
-                childEvents.foldMap(parseTree(tree, _, synchronizerId))
+                childEvents.foldMap(
+                  parseTree(tree, _, synchronizerId, ignoreUnexpectedAmuletCreateArchive)
+                )
               // The above cases should be exhaustive
               case ((op, outcome, child), _) =>
                 throw new RuntimeException(
@@ -332,6 +349,7 @@ class UserWalletTxLogParser(
                   tree,
                   tree.getChildNodeIds(exercised).asScala.toList,
                   synchronizerId,
+                  ignoreUnexpectedAmuletCreateArchive,
                 )
               }.map(_.setTransferSubtype(TransferTransactionSubtype.P2PPaymentCompleted))
             } yield stateFromOfferCompletion.appended(stateFromChildren)
@@ -387,6 +405,7 @@ class UserWalletTxLogParser(
                   tree,
                   tree.getChildNodeIds(exercised).asScala.toList,
                   synchronizerId,
+                  ignoreUnexpectedAmuletCreateArchive,
                 )
               }
             } yield stateFromRequestCompletion.appended(stateFromChildren)
@@ -422,6 +441,7 @@ class UserWalletTxLogParser(
                 tree,
                 tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive,
               )
             }.map(_.setTransferSubtype(TransferTransactionSubtype.AppPaymentAccepted))
 
@@ -432,6 +452,7 @@ class UserWalletTxLogParser(
                 tree,
                 tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive,
               )
             }.map(
               _.mergeBalanceChangesIntoTransfer(
@@ -471,6 +492,7 @@ class UserWalletTxLogParser(
                 tree,
                 tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive,
               )
             }.map(
               _.setTransferSubtype(TransferTransactionSubtype.SubscriptionInitialPaymentAccepted)
@@ -483,6 +505,7 @@ class UserWalletTxLogParser(
                 tree,
                 tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive,
               )
             }.map(
               _.mergeBalanceChangesIntoTransfer(
@@ -517,6 +540,7 @@ class UserWalletTxLogParser(
                 tree,
                 tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive,
               )
             }.map(_.setTransferSubtype(TransferTransactionSubtype.SubscriptionPaymentAccepted))
 
@@ -538,6 +562,7 @@ class UserWalletTxLogParser(
                 tree,
                 tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive,
               )
             }.map(
               _.mergeBalanceChangesIntoTransfer(
@@ -582,26 +607,99 @@ class UserWalletTxLogParser(
                 )
                 ""
             }
+
             defer {
               parseTrees(
                 tree,
                 tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive = true,
               )
-            }.map { x =>
-              x.mergeBalanceChangesIntoTransfer(
-                TransferTransactionSubtype.CreateTokenStandardTransferInstruction,
-                Some(EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)),
-              ).setTransferDescription(
-                node.argument.value.transfer.meta.values
-                  .getOrDefault(TokenStandardMetadata.reasonMetaKey, "")
-              ).setTransferInstructionReceiver(
-                node.argument.value.transfer.receiver
-              ).setTransferInstructionAmount(
-                node.argument.value.transfer.amount
-              ).setTransferInstructionCid(
-                cid
+            }.map { childState =>
+              val childStateWithTransfer =
+                if (childState.hasTransfer) {
+                  // Legacy choice that calls into AmuletRules_Transfer
+                  childState
+                } else {
+                  val sender = node.argument.value.transfer.sender
+                  val transferEntry = TransferTxLogEntry(
+                    eventId =
+                      EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                    // This is slightly off. The receiver does not actually see this exercised event.
+                    // But our tx log infrastructure does not support putting in created events here.
+                    subtype = Some(
+                      TransferTransactionSubtype.CreateTokenStandardTransferInstruction.toProto
+                    ),
+                    date = Some(tree.getEffectiveAt),
+                    sender = Some(PartyAndAmount(sender, -node.argument.value.transfer.amount)),
+                    receivers =
+                      Seq.empty, // This only locks CC so there is not actually any receiver
+                    senderHoldingFees = BigDecimal(0.0),
+                    appRewardsUsed = BigDecimal(0.0),
+                    validatorRewardsUsed = BigDecimal(0.0),
+                    svRewardsUsed = Some(BigDecimal(0.0)),
+                  )
+                  childState.appended(State(entries = immutable.Queue[TxLogEntry](transferEntry)))
+                }
+              childStateWithTransfer
+                .mergeBalanceChangesIntoTransfer(
+                  TransferTransactionSubtype.CreateTokenStandardTransferInstruction,
+                  Some(EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)),
+                )
+                .setTransferDescription(
+                  node.argument.value.transfer.meta.values
+                    .getOrDefault(TokenStandardMetadata.reasonMetaKey, "")
+                )
+                .setTransferInstructionReceiver(
+                  node.argument.value.transfer.receiver
+                )
+                .setTransferInstructionAmount(
+                  node.argument.value.transfer.amount
+                )
+                .setTransferInstructionCid(
+                  cid
+                )
+            }
+
+          case DirectTokenStandardTransfer(node) =>
+            defer {
+              parseTrees(
+                tree,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive = true,
               )
+            }.map { childState =>
+              val childStateWithTransfer =
+                if (childState.hasTransfer) {
+                  childState
+                } else {
+                  // We hit this only for self-transfers after the 24 submission delay change.
+                  val sender = node.argument.value.transfer.sender
+                  val transferEntry = TransferTxLogEntry(
+                    eventId =
+                      EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                    date = Some(tree.getEffectiveAt),
+                    sender = Some(
+                      PartyAndAmount(sender, 0)
+                    ), // This is the net amount, without fees this is always zero.
+                    receivers = Seq.empty, // receivers never includes the sender
+                    senderHoldingFees = BigDecimal(0.0),
+                    appRewardsUsed = BigDecimal(0.0),
+                    validatorRewardsUsed = BigDecimal(0.0),
+                    svRewardsUsed = Some(BigDecimal(0.0)),
+                  )
+                  childState.appended(State(entries = immutable.Queue[TxLogEntry](transferEntry)))
+                }
+              childStateWithTransfer
+                .mergeBalanceChangesIntoTransfer(
+                  TransferTransactionSubtype.Transfer,
+                  Some(EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)),
+                )
+                .setTransferDescription(
+                  node.argument.value.transfer.meta.values
+                    .getOrDefault(TokenStandardMetadata.reasonMetaKey, "")
+                )
             }
 
           case TransferInstruction_Accept(node) =>
@@ -610,14 +708,64 @@ class UserWalletTxLogParser(
                 tree,
                 tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive,
               )
-            }.map { x =>
-              x.mergeBalanceChangesIntoTransfer(
-                TransferTransactionSubtype.TransferInstruction_Accept,
-                Some(EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)),
-              ).setTransferInstructionCid(
-                exercised.getContractId
-              )
+            }.map { childState =>
+              val childStateWithTransfer = if (childState.hasTransfer) {
+                childState
+              } else {
+                // Unlock + transfer
+                val coinCid = node.result.value.output match {
+                  case output: splice.api.token.transferinstructionv1.transferinstructionresult_output.TransferInstructionResult_Completed =>
+                    assert(output.receiverHoldingCids.size == 1)
+                    output.receiverHoldingCids.get(0)
+                  case output =>
+                    throw new RuntimeException(
+                      s"Unexpected transfer instruction result output, expected completed but got: $output"
+                    )
+                }
+                val coin = tree
+                  .findCreation(
+                    splice.amulet.Amulet.COMPANION,
+                    new splice.amulet.Amulet.ContractId(coinCid.contractId),
+                  )
+                  .getOrElse(
+                    throw new RuntimeException(
+                      s"The amulet contract ${coinCid} was not found in transaction ${tree.getUpdateId}"
+                    )
+                  )
+                val sender = node.result.value.meta.values.get(TokenStandardMetadata.senderMetaKey)
+                val receiver = coin.payload.owner
+                val amount = coin.payload.amount.initialAmount
+
+                val transferEntry = TransferTxLogEntry(
+                  eventId =
+                    EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                  subtype = Some(TransferTransactionSubtype.TransferInstruction_Accept.toProto),
+                  date = Some(tree.getEffectiveAt),
+                  // The sender input comes from the locked amulet which we don't count into the balance so the sender amount is 0.
+                  sender = Some(
+                    PartyAndAmount(sender, 0)
+                  ),
+                  receivers = Seq(PartyAndAmount(receiver, amount)),
+                  senderHoldingFees = BigDecimal(0.0),
+                  appRewardsUsed = BigDecimal(0.0),
+                  validatorRewardsUsed = BigDecimal(0.0),
+                  svRewardsUsed = Some(BigDecimal(0.0)),
+                  transferInstructionCid = exercised.getContractId,
+                )
+                childState.appended(
+                  State(entries = immutable.Queue[TxLogEntry](transferEntry))
+                )
+              }
+              childStateWithTransfer
+                .mergeBalanceChangesIntoTransfer(
+                  TransferTransactionSubtype.TransferInstruction_Accept,
+                  Some(EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)),
+                )
+                .setTransferInstructionCid(
+                  exercised.getContractId
+                )
             }
 
           case TransferInstruction_Withdraw(node) =>
@@ -626,6 +774,7 @@ class UserWalletTxLogParser(
                 tree,
                 tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive,
               )
             }.map {
               _.ensureBalanceChangeTxLogEntry(tree, endUserParty)
@@ -644,6 +793,7 @@ class UserWalletTxLogParser(
                 tree,
                 tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive,
               )
             }.map {
               _.ensureBalanceChangeTxLogEntry(tree, endUserParty)
@@ -686,6 +836,7 @@ class UserWalletTxLogParser(
                     tree,
                     developmentFundCouponArchiveNodeIds,
                     synchronizerId,
+                    ignoreUnexpectedAmuletCreateArchive,
                   )
               }
             } yield stateFromTransfer.appended(stateFromDevelopmentFundCouponArchives)
@@ -728,12 +879,32 @@ class UserWalletTxLogParser(
               )
             )
 
+          case LockedAmuletUnlockV2(node) =>
+            now(
+              State.fromAmuletCreate(
+                tree,
+                root,
+                node.result.value.amuletCid,
+                BalanceChangeTransactionSubtype.LockedAmuletUnlocked,
+              )
+            )
+
           case LockedAmuletOwnerExpireLock(node) =>
             now(
               State.fromAmuletCreateSummary(
                 tree,
                 root,
                 node.result.value.amuletSum,
+                BalanceChangeTransactionSubtype.LockedAmuletOwnerExpired,
+              )
+            )
+
+          case LockedAmuletOwnerExpireLockV2(node) =>
+            now(
+              State.fromAmuletCreate(
+                tree,
+                root,
+                node.result.value.amuletCid,
                 BalanceChangeTransactionSubtype.LockedAmuletOwnerExpired,
               )
             )
@@ -752,7 +923,27 @@ class UserWalletTxLogParser(
               )
             )
 
+          case AmuletExpireV2(node) =>
+            now(
+              State.fromAmuletExpire(
+                tree,
+                exercised,
+                node.result.value.expireSum.owner,
+                BalanceChangeTransactionSubtype.AmuletExpired,
+              )
+            )
+
           case LockedAmuletExpireAmulet(node) =>
+            now(
+              State.fromAmuletExpire(
+                tree,
+                exercised,
+                node.result.value.expireSum.owner,
+                BalanceChangeTransactionSubtype.LockedAmuletExpired,
+              )
+            )
+
+          case LockedAmuletExpireAmuletV2(node) =>
             now(
               State.fromAmuletExpire(
                 tree,
@@ -810,6 +1001,7 @@ class UserWalletTxLogParser(
                 tree,
                 tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive,
               )
             }.map(
               _.setTransferSubtype(TransferTransactionSubtype.TransferPreapprovalSend)
@@ -819,6 +1011,113 @@ class UserWalletTxLogParser(
                     .getOrElse("")
                 )
             )
+
+          case TransferPreapproval_SendV2(node) =>
+            val receiver = (node.result.value.result.summary.balanceChanges.asScala.keySet
+              .diff(Set(node.argument.value.sender)))
+              .headOption
+              .getOrElse(node.argument.value.sender)
+            val output = new splice.amuletrules.TransferOutput(
+              receiver,
+              BigDecimal(0).bigDecimal, // receiver fee ratio is irrelevant, there are no fees
+              node.argument.value.amount,
+              java.util.Optional.empty(), // lock
+            )
+            now {
+              State
+                .fromTransferResult(
+                  tree,
+                  exercised,
+                  sender = node.argument.value.sender,
+                  outputs = Seq(output),
+                  result = node.result.value.result,
+                  TransferTransactionSubtype.TransferPreapprovalSend,
+                )
+                .setTransferDescription(node.argument.value.description.orElse(""))
+            }
+          case AllocationFactoryAllocate(node) =>
+            defer {
+              parseTrees(
+                tree,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive,
+              )
+            }.map { state =>
+              if (state.hasTransfer) {
+                // Could be nice to actually mark it as an allocation but limiting investments into the wallet tx log parser at this point
+                state
+              } else {
+                // After the change to support a 24h submisison delay there is no internal call to AmuletRules_Transfer anymore.
+                val transferEntry = TransferTxLogEntry(
+                  eventId =
+                    EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                  subtype = Some(
+                    TransferTransactionSubtype.Transfer.toProto
+                  ),
+                  date = Some(tree.getEffectiveAt),
+                  sender = Some(
+                    PartyAndAmount(
+                      node.argument.value.allocation.transferLeg.sender,
+                      -node.argument.value.allocation.transferLeg.amount,
+                    )
+                  ),
+                  receivers = Seq.empty, // This only locks CC so there is not actually any receiver
+                  senderHoldingFees = BigDecimal(0.0),
+                  appRewardsUsed = BigDecimal(0.0),
+                  validatorRewardsUsed = BigDecimal(0.0),
+                  svRewardsUsed = Some(BigDecimal(0.0)),
+                )
+                state.appended(State(immutable.Queue(transferEntry)))
+              }
+            }
+          case AllocationExecuteTransfer(node) =>
+            defer {
+              parseTrees(
+                tree,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive,
+              )
+            }.map { state =>
+              if (state.hasTransfer) {
+                // Could be nice to actually mark it as an allocation but limiting investments into the wallet tx log parser at this point
+                state
+              } else {
+                // After the change to support a 24h submisison delay there is no internal call to AmuletRules_Transfer anymore.
+                // Note: This is only the transfer, the unlock step is represented as a separate tx log entry.
+                assert(node.result.value.receiverHoldingCids.size == 1)
+                val coinCid = node.result.value.receiverHoldingCids.get(0)
+                val coin = tree
+                  .findCreation(
+                    splice.amulet.Amulet.COMPANION,
+                    new splice.amulet.Amulet.ContractId(coinCid.contractId),
+                  )
+                  .getOrElse(
+                    throw new RuntimeException(
+                      s"The amulet contract ${coinCid} was not found in transaction ${tree.getUpdateId}"
+                    )
+                  )
+                val sender = node.result.value.meta.values.get(TokenStandardMetadata.senderMetaKey)
+                val receiver = coin.payload.owner
+                val amount = coin.payload.amount.initialAmount
+                val transferEntry = TransferTxLogEntry(
+                  eventId =
+                    EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                  subtype = Some(
+                    TransferTransactionSubtype.Transfer.toProto
+                  ),
+                  date = Some(tree.getEffectiveAt),
+                  sender = Some(PartyAndAmount(sender, -amount)),
+                  receivers = Seq(PartyAndAmount(receiver, amount)),
+                  senderHoldingFees = BigDecimal(0.0),
+                  appRewardsUsed = BigDecimal(0.0),
+                  validatorRewardsUsed = BigDecimal(0.0),
+                  svRewardsUsed = Some(BigDecimal(0.0)),
+                )
+                state.appended(State(immutable.Queue(transferEntry)))
+              }
+            }
 
           // ------------------------------------------------------------------
           // Development fund coupons
@@ -843,13 +1142,21 @@ class UserWalletTxLogParser(
           // The parser should never reach this leaf event, it should instead make sure to exhaustively match on
           // all possible exercise events that archive amulets.
           case AmuletArchive(_) =>
-            throw new RuntimeException(
-              s"Unexpected amulet archive event for amulet ${exercised.getContractId} in transaction ${tree.getUpdateId}"
-            )
-
+            if (!ignoreUnexpectedAmuletCreateArchive) {
+              throw new RuntimeException(
+                s"Unexpected amulet archive event for amulet ${exercised.getContractId} in transaction ${tree.getUpdateId}"
+              )
+            } else {
+              now(State.empty)
+            }
           case _ =>
             defer {
-              parseTrees(tree, tree.getChildNodeIds(exercised).asScala.toList, synchronizerId)
+              parseTrees(
+                tree,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
+                ignoreUnexpectedAmuletCreateArchive,
+              )
             }
         }
 
@@ -858,15 +1165,19 @@ class UserWalletTxLogParser(
           // The parser should never reach this leaf event, it should instead make sure to exhaustively match on
           // all possible exercise events that produce new amulets.
           case AmuletCreate(amulet) =>
-            throw new RuntimeException(
-              s"Unexpected amulet create event for amulet ${amulet.contractId.contractId} in transaction ${tree.getUpdateId}"
-            )
+            if (!ignoreUnexpectedAmuletCreateArchive) {
+              throw new RuntimeException(
+                s"Unexpected amulet create event for amulet ${amulet.contractId.contractId} in transaction ${tree.getUpdateId}"
+              )
+            } else {
+              now(State.empty)
+            }
 
           case TransferInstructionCreate(create)
               if create.payload.transfer.receiver == endUserParty.toProtoPrimitive =>
             val sender = create.payload.transfer.sender
             val receiver = create.payload.transfer.receiver
-            // We hit this for the receiver.
+            // We hit this for the receiver which does not see the TransferFactory_Transfer choice.
             // While it doesn't change the balance of the receiver it still seems useful to include
             // so we parse it as a synthetic transfer with all amounts set to zero.
             val entry = TransferTxLogEntry(
@@ -906,17 +1217,23 @@ class UserWalletTxLogParser(
       tree: Transaction,
       rootsEventIds: List[Integer],
       synchronizerId: SynchronizerId,
+      ignoreUnexpectedAmuletCreateArchive: Boolean,
   )(implicit
       tc: TraceContext
   ): Eval[State] = {
     val roots = rootsEventIds.map(tree.getEventsById.get(_))
-    roots.foldMap(parseTree(tree, _, synchronizerId))
+    roots.foldMap(parseTree(tree, _, synchronizerId, ignoreUnexpectedAmuletCreateArchive))
   }
 
   override def tryParse(tx: Transaction, synchronizerId: SynchronizerId)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
-    parseTrees(tx, tx.getRootNodeIds.asScala.toList, synchronizerId).value
+    parseTrees(
+      tx,
+      tx.getRootNodeIds.asScala.toList,
+      synchronizerId,
+      ignoreUnexpectedAmuletCreateArchive = false,
+    ).value
       .filterByParty(endUserParty)
       .entries
   }
@@ -950,7 +1267,12 @@ class UserWalletTxLogParser(
         }
 
     defer(
-      parseTree(tree, paymentCollectionEvent, synchronizerId).map { stateFromPaymentCollection =>
+      parseTree(
+        tree,
+        paymentCollectionEvent,
+        synchronizerId,
+        ignoreUnexpectedAmuletCreateArchive = false,
+      ).map { stateFromPaymentCollection =>
         State.fromCollectEntryPayment(
           tree,
           exercised,
@@ -976,6 +1298,12 @@ object UserWalletTxLogParser {
     def appended(other: State): State = State(
       entries = entries.appendedAll(other.entries)
     )
+
+    def hasTransfer: Boolean =
+      entries.exists {
+        case _: TransferTxLogEntry => true
+        case _ => false
+      }
 
     /** Removes all entries that are not relevant to the given user. */
     def filterByParty(party: PartyId): State = {
@@ -1289,22 +1617,39 @@ object UserWalletTxLogParser {
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
         transactionSubtype: TransferTransactionSubtype,
     ): State = {
-      val sender = parseSender(node.argument.value, node.result.value)
-      val receivers = parseReceivers(node.argument.value, node.result.value)
+      fromTransferResult(
+        tx,
+        event,
+        node.argument.value.transfer.sender,
+        node.argument.value.transfer.outputs.asScala.toSeq,
+        node.result.value,
+        transactionSubtype,
+      )
+    }
+
+    def fromTransferResult(
+        tx: Transaction,
+        event: ExercisedEvent,
+        sender: String,
+        outputs: Seq[splice.amuletrules.TransferOutput],
+        result: splice.amuletrules.TransferResult,
+        transactionSubtype: TransferTransactionSubtype,
+    ): State = {
+      val senderWithAmount = parseSender(sender, outputs, result)
+      val receivers = parseReceivers(sender, outputs, result)
       val transferEntry =
         TransferTxLogEntry(
           eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
           subtype = Some(transactionSubtype.toProto),
           date = Some(tx.getEffectiveAt),
-          provider = node.argument.value.transfer.provider,
-          sender = Some(sender),
+          sender = Some(senderWithAmount),
           receivers = receivers,
-          senderHoldingFees = node.result.value.summary.holdingFees,
-          appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
-          validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
-          svRewardsUsed = Some(BigDecimal(node.result.value.summary.inputSvRewardAmount)),
+          senderHoldingFees = result.summary.holdingFees,
+          appRewardsUsed = BigDecimal(result.summary.inputAppRewardAmount),
+          validatorRewardsUsed = BigDecimal(result.summary.inputValidatorRewardAmount),
+          svRewardsUsed = Some(BigDecimal(result.summary.inputSvRewardAmount)),
           developmentFundCouponsUsed = BigDecimal(
-            node.result.value.summary.inputDevelopmentFundAmount.orElse(java.math.BigDecimal.ZERO)
+            result.summary.inputDevelopmentFundAmount.orElse(java.math.BigDecimal.ZERO)
           ),
         )
 
@@ -1517,6 +1862,20 @@ object UserWalletTxLogParser {
       // Instead of including the amulet price and owner in AmuletCreateSummary,
       // we locate the corresponding amulet create event in the transaction tree.
       val amuletCid = acsum.amulet
+      fromAmuletCreate(
+        tx,
+        event,
+        amuletCid,
+        transactionSubtype,
+      )
+    }
+
+    def fromAmuletCreate(
+        tx: Transaction,
+        event: Event,
+        amuletCid: ContractId[AmuletCreate.T],
+        transactionSubtype: BalanceChangeTransactionSubtype,
+    ): State = {
       val amulet = getAmuletCreateEvent(tx, amuletCid)
       val newEntry = BalanceChangeTxLogEntry(
         eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
@@ -1662,16 +2021,15 @@ object UserWalletTxLogParser {
   }
 
   private def parseSender(
-      arg: splice.amuletrules.AmuletRules_Transfer,
+      sender: String,
+      outputs: Seq[splice.amuletrules.TransferOutput],
       res: splice.amuletrules.TransferResult,
   ): PartyAndAmount = {
-    val sender = arg.transfer.sender
-
     // Input amulets, excluding holding fees
     val netInput = res.summary.inputAmuletAmount - res.summary.holdingFees
 
     // Output amulets going back to the sender, after deducting transfer fees
-    val netOutput = parseOutputAmounts(arg, res)
+    val netOutput = parseOutputAmounts(outputs, res)
       .filter(o => o.output.receiver == sender && o.output.lock.isEmpty)
       .map(o => o.output.amount - o.senderFee)
       .sum
@@ -1688,7 +2046,8 @@ object UserWalletTxLogParser {
 
   /** Returns a list of receivers and their net balance changes */
   private def parseReceivers(
-      arg: splice.amuletrules.AmuletRules_Transfer,
+      sender: String,
+      outputs: Seq[splice.amuletrules.TransferOutput],
       res: splice.amuletrules.TransferResult,
   ): Seq[PartyAndAmount] = {
     def netBalanceChange(o: OutputWithFees) =
@@ -1701,8 +2060,8 @@ object UserWalletTxLogParser {
     // Note: the same receiver party can appear multiple times in the transfer result
     // The code below merges balance changes for the same receiver, while preserving
     // the order of receivers.
-    parseOutputAmounts(arg, res)
-      .filter(_.output.receiver != arg.transfer.sender)
+    parseOutputAmounts(outputs, res)
+      .filter(_.output.receiver != sender)
       .map(o => o.output.receiver -> netBalanceChange(o))
       .foldLeft(immutable.ListMap.empty[String, BigDecimal])((acc, receiver) =>
         acc.updatedWith(receiver._1)(prev => Some(prev.fold(receiver._2)(_ + receiver._2)))
@@ -1724,14 +2083,14 @@ object UserWalletTxLogParser {
   )
 
   private def parseOutputAmounts(
-      arg: splice.amuletrules.AmuletRules_Transfer,
+      outputs: Seq[splice.amuletrules.TransferOutput],
       res: splice.amuletrules.TransferResult,
   ): Seq[OutputWithFees] = {
     assert(
-      arg.transfer.outputs.size() == res.summary.outputFees.size(),
+      outputs.length == res.summary.outputFees.size(),
       "Each output should have a corresponding fee",
     )
-    val outputsWithFees = arg.transfer.outputs.asScala.toSeq.zip(res.summary.outputFees.asScala)
+    val outputsWithFees = outputs.zip(res.summary.outputFees.asScala)
 
     outputsWithFees
       .map { case (out, fee) =>

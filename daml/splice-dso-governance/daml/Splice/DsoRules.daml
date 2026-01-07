@@ -21,6 +21,7 @@ import Splice.Amulet
 import Splice.AmuletRules
 import Splice.ExternalPartyAmuletRules
 
+import Splice.ExternalPartyConfigState
 import Splice.Round
 import Splice.Types
 import Splice.ValidatorLicense
@@ -226,12 +227,22 @@ data DsoRules_ExpireSvOnboardingConfirmedResult = DsoRules_ExpireSvOnboardingCon
 data DsoRules_Amulet_ExpireResult = DsoRules_Amulet_ExpireResult with
     expireSum : AmuletExpireSummary
 
+data DsoRules_Amulet_ExpireV2Result = DsoRules_Amulet_ExpireV2Result with
+  expireSum : AmuletExpireSummary
+
 data DsoRules_LockedAmulet_ExpireAmuletResult = DsoRules_LockedAmulet_ExpireAmuletResult with
+    expireSum : AmuletExpireSummary
+
+data DsoRules_LockedAmulet_ExpireAmuletV2Result = DsoRules_LockedAmulet_ExpireAmuletV2Result with
     expireSum : AmuletExpireSummary
 
 data DsoRules_AdvanceOpenMiningRoundsResult = DsoRules_AdvanceOpenMiningRoundsResult with
     summarizingRound: ContractId SummarizingMiningRound
     openRound : ContractId OpenMiningRound
+
+data DsoRules_UpdateExternalPartyConfigStatesResult = DsoRules_UpdateExternalPartyConfigStatesResult with
+    newExternalPartyConfigStateCid : ContractId ExternalPartyConfigState
+  deriving (Show, Eq)
 
 data DsoRules_CollectEntryRenewalPaymentResult = DsoRules_CollectEntryRenewalPaymentResult with
     ansEntry : ContractId AnsEntry
@@ -432,6 +443,7 @@ data DsoRulesConfig = DsoRulesConfig with
 -- | Read the `voteCooldownTime` from the `DsoRulesConfig` with a default value of 1 minute.
 getVoteCooldownTime : DsoRulesConfig -> RelTime
 getVoteCooldownTime config = fromOptional (minutes 1) config.voteCooldownTime
+
 
 data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     time : Time
@@ -1104,10 +1116,18 @@ template DsoRules with
         choiceArg : Amulet_Expire
         sv : Optional Party
       controller sv
+      do deprecatedChoice "splice-dso-governance" "FIXME" "DsoRules_Amulet_Expire"
+
+    nonconsuming choice DsoRules_Amulet_ExpireV2 : DsoRules_Amulet_ExpireV2Result
+      with
+        cid : ContractId Amulet
+        choiceArg : Amulet_ExpireV2
+        sv : Optional Party
+      controller sv
       do
         _ <- getAndValidateSvParty this sv
         result <- exercise cid choiceArg
-        return DsoRules_Amulet_ExpireResult with
+        return DsoRules_Amulet_ExpireV2Result with
           expireSum = result.expireSum
 
     nonconsuming choice DsoRules_LockedAmulet_ExpireAmulet : DsoRules_LockedAmulet_ExpireAmuletResult
@@ -1120,6 +1140,18 @@ template DsoRules with
         _ <- getAndValidateSvParty this sv
         result <- exercise cid choiceArg
         return DsoRules_LockedAmulet_ExpireAmuletResult with
+          expireSum = result.expireSum
+
+    nonconsuming choice DsoRules_LockedAmulet_ExpireAmuletV2 : DsoRules_LockedAmulet_ExpireAmuletV2Result
+      with
+        cid : ContractId LockedAmulet
+        choiceArg : LockedAmulet_ExpireAmuletV2
+        sv : Optional Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this sv
+        result <- exercise cid choiceArg
+        return DsoRules_LockedAmulet_ExpireAmuletV2Result with
           expireSum = result.expireSum
 
 
@@ -1142,6 +1174,21 @@ template DsoRules with
         return DsoRules_AdvanceOpenMiningRoundsResult with
           summarizingRound = result.summarizingRoundCid
           openRound = result.openRoundCid
+
+    nonconsuming choice DsoRules_UpdateExternalPartyConfigStates : DsoRules_UpdateExternalPartyConfigStatesResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+        externalPartyConfigStateCid0 : ContractId ExternalPartyConfigState
+        externalPartyConfigStateCid1 : ContractId ExternalPartyConfigState
+        openMiningRoundTriple : OpenMiningRoundTriple
+        sv : Party
+      controller sv
+      do
+        -- FIXME: Why do we not need to check the dso party on amulet rules cid?
+        _ <- getAndValidateSvParty this (Some sv)
+        result <- exercise amuletRulesCid AmuletRules_UpdateExternalPartyConfigStates with ..
+        return DsoRules_UpdateExternalPartyConfigStatesResult with
+          newExternalPartyConfigStateCid = result.newExternalPartyConfigStateCid
 
 
     -- ANS entry and payment management driven directly by the DSO delegates
@@ -1531,7 +1578,6 @@ template DsoRules with
         UnclaimedActivityRecord_DsoExpireResult unclaimedRewardCid <-
           exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
-
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =
