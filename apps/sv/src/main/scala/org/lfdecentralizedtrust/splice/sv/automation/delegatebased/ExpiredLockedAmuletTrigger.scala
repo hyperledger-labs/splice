@@ -42,15 +42,18 @@ class ExpiredLockedAmuletTrigger(
       task: Task,
       controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
-    latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
+    // latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
+    externalPartyConfigStates <- store.getExternalPartyConfigStatesPair()
     dsoRules <- store.getDsoRules()
     cmds = task.work.expiredContracts.flatMap(co =>
+      // FIXME: make it conditional on the version
       dsoRules
         .exercise(
-          _.exerciseDsoRules_LockedAmulet_ExpireAmulet(
+          _.exerciseDsoRules_LockedAmulet_ExpireAmuletV2(
             co.contractId,
-            new splice.amulet.LockedAmulet_ExpireAmulet(
-              latestOpenMiningRound.contractId
+            new splice.amulet.LockedAmulet_ExpireAmuletV2(
+              externalPartyConfigStates.oldest.contractId,
+              externalPartyConfigStates.newest.contractId,
             ),
             Optional.of(controller),
           )

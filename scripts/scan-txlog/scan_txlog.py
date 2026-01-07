@@ -845,14 +845,6 @@ class LfValue:
     def get_mint_result_amulet_sum(self):
         return self.__get_record_field("amuletSum")
 
-    # data LockedAmulet_UnlockResult -> amuletSum
-    def get_locked_amulet_unlock_result_amulet_sum(self):
-        return self.__get_record_field("amuletSum")
-
-    # data LockedAmulet_OwnerExpireLock -> amuletSum
-    def get_locked_amulet_owner_expire_lock_result_amulet_sum(self):
-        return self.__get_record_field("amuletSum")
-
     # data AmuletCreateSummary -> amulet
     def get_amulet_summary_amulet(self):
         return self.__get_record_field("amulet").get_contract_id()
@@ -3004,9 +2996,8 @@ class State:
         return HandleTransactionResult.empty()
 
     def handle_locked_amulet_unlock(self, transaction, event, log_prefix="Unlock"):
-        summary = event.exercise_result.get_locked_amulet_unlock_result_amulet_sum()
-        amulet_cid = summary.get_amulet_summary_amulet()
-        round_number = summary.get_amulet_summary_round()
+        assert len(event.child_event_ids) == 1
+        amulet_cid = transaction.events_by_id[event.child_event_ids[0]].contract_id
         amulet = transaction.by_contract_id[amulet_cid]
         owner = amulet.payload.get_amulet_owner()
         del self.active_contracts[event.contract_id]
@@ -3018,16 +3009,13 @@ class State:
             f"Amulet {formatted_amulet} was unlocked",
             parties=[owner],
         )
-        return HandleTransactionResult.for_open_round(round_number)
+        return HandleTransactionResult.empty()
 
     def handle_locked_owner_expire_lock(
         self, transaction, event, log_prefix="ExpireUnlock"
     ):
-        summary = (
-            event.exercise_result.get_locked_amulet_owner_expire_lock_result_amulet_sum()
-        )
-        amulet_cid = summary.get_amulet_summary_amulet()
-        round_number = summary.get_amulet_summary_round()
+        assert len(event.child_event_ids) == 1
+        amulet_cid = transaction.events_by_id[event.child_event_ids[0]].contract_id
         amulet = transaction.by_contract_id[amulet_cid]
         del self.active_contracts[event.contract_id]
         self.active_contracts[amulet_cid] = amulet
@@ -3037,7 +3025,7 @@ class State:
             log_prefix,
             f"Amulet {formatted_amulet} was unlocked because lock expired",
         )
-        return HandleTransactionResult.for_open_round(round_number)
+        return HandleTransactionResult.empty()
 
     def handle_dso_rules_amulet_expire(self, transaction, event):
         contract_id = event.exercise_argument.get_dso_rules_amulet_expire_cid()
@@ -3187,14 +3175,13 @@ class State:
             assert event.choice_name == "SubscriptionInitialPayment_Collect"
         for event_id in event.child_event_ids:
             event = transaction.events_by_id[event_id]
-            if (
-                isinstance(event, ExercisedEvent)
-                and event.choice_name == "LockedAmulet_Unlock"
+            if isinstance(event, ExercisedEvent) and (
+                event.choice_name == "LockedAmulet_Unlock"
+                or event.choice_name == "LockedAmulet_UnlockV2"
             ):
                 del self.active_contracts[event.contract_id]
-                cid = (
-                    event.exercise_result.get_locked_amulet_unlock_result_amulet_sum().get_amulet_summary_amulet()
-                )
+                assert len(event.child_event_ids) == 1
+                cid = transaction.events_by_id[event.child_event_ids[0]].contract_id
                 amulet = transaction.by_contract_id[cid]
                 # Not adding amulet to active_contracts because it gets archived immediately again.
             if (
@@ -3312,9 +3299,9 @@ class State:
                         )
                     case "ANSRARC_RejectEntryInitialPayment":
                         for event_id, unlock_event in transaction.events_by_id.items():
-                            if (
-                                isinstance(unlock_event, ExercisedEvent)
-                                and unlock_event.choice_name == "LockedAmulet_Unlock"
+                            if isinstance(unlock_event, ExercisedEvent) and (
+                                unlock_event.choice_name == "LockedAmulet_Unlock"
+                                or unlock_event.choice_name == "LockedAmulet_UnlockV2"
                             ):
                                 return self.handle_locked_amulet_unlock(
                                     transaction,
@@ -3629,9 +3616,9 @@ class State:
     def handle_transfer_instruction_accept(self, transaction, event):
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
-            if (
-                isinstance(child_event, ExercisedEvent)
-                and child_event.choice_name == "LockedAmulet_Unlock"
+            if isinstance(child_event, ExercisedEvent) and (
+                child_event.choice_name == "LockedAmulet_Unlock"
+                or child_event.choice_name == "LockedAmulet_UnlockV2"
             ):
                 self.handle_locked_amulet_unlock(
                     transaction,
@@ -3654,9 +3641,9 @@ class State:
     def handle_transfer_instruction_reject(self, transaction, event):
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
-            if (
-                isinstance(child_event, ExercisedEvent)
-                and child_event.choice_name == "LockedAmulet_Unlock"
+            if isinstance(child_event, ExercisedEvent) and (
+                child_event.choice_name == "LockedAmulet_Unlock"
+                or child_event.choice_name == "LockedAmulet_UnlockV2"
             ):
                 return self.handle_locked_amulet_unlock(
                     transaction,
@@ -3669,9 +3656,9 @@ class State:
     def handle_transfer_instruction_withdraw(self, transaction, event):
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
-            if (
-                isinstance(child_event, ExercisedEvent)
-                and child_event.choice_name == "LockedAmulet_Unlock"
+            if isinstance(child_event, ExercisedEvent) and (
+                child_event.choice_name == "LockedAmulet_Unlock"
+                or child_event.choice_name == "LockedAmulet_UnlockV2"
             ):
                 return self.handle_locked_amulet_unlock(
                     transaction,
@@ -3701,9 +3688,9 @@ class State:
     def handle_allocation_execute_transfer(self, transaction, event):
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
-            if (
-                isinstance(child_event, ExercisedEvent)
-                and child_event.choice_name == "LockedAmulet_Unlock"
+            if isinstance(child_event, ExercisedEvent) and (
+                child_event.choice_name == "LockedAmulet_Unlock"
+                or child_event.choice_name == "LockedAmulet_UnlockV2"
             ):
                 self.handle_locked_amulet_unlock(
                     transaction,
@@ -3726,9 +3713,9 @@ class State:
     def handle_allocation_withdraw(self, transaction, event):
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
-            if (
-                isinstance(child_event, ExercisedEvent)
-                and child_event.choice_name == "LockedAmulet_Unlock"
+            if isinstance(child_event, ExercisedEvent) and (
+                child_event.choice_name == "LockedAmulet_Unlock"
+                or child_event.choice_name == "LockedAmulet_UnlockV2"
             ):
                 return self.handle_locked_amulet_unlock(
                     transaction,
@@ -3741,9 +3728,9 @@ class State:
     def handle_allocation_cancel(self, transaction, event):
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
-            if (
-                isinstance(child_event, ExercisedEvent)
-                and child_event.choice_name == "LockedAmulet_Unlock"
+            if isinstance(child_event, ExercisedEvent) and (
+                child_event.choice_name == "LockedAmulet_Unlock"
+                or child_event.choice_name == "LockedAmulet_UnlockV2"
             ):
                 return self.handle_locked_amulet_unlock(
                     transaction,
@@ -3796,11 +3783,19 @@ class State:
                 return self.handle_transfer_command_send(transaction, event)
             case "LockedAmulet_Unlock":
                 return self.handle_locked_amulet_unlock(transaction, event)
+            case "LockedAmulet_UnlockV2":
+                return self.handle_locked_amulet_unlock(transaction, event)
             case "LockedAmulet_OwnerExpireLock":
+                return self.handle_locked_owner_expire_lock(transaction, event)
+            case "LockedAmulet_OwnerExpireLockV2":
                 return self.handle_locked_owner_expire_lock(transaction, event)
             case "DsoRules_Amulet_Expire":
                 return self.handle_dso_rules_amulet_expire(transaction, event)
+            case "DsoRules_Amulet_ExpireV2":
+                return self.handle_dso_rules_amulet_expire(transaction, event)
             case "DsoRules_LockedAmulet_ExpireAmulet":
+                return self.handle_dso_rules_locked_amulet_expire(transaction, event)
+            case "DsoRules_LockedAmulet_ExpireAmuletV2":
                 return self.handle_dso_rules_locked_amulet_expire(transaction, event)
             case "AnsRules_RequestEntry":
                 return self.handle_request_entry(transaction, event)
@@ -3919,6 +3914,8 @@ class State:
                 return self.handle_convert_featured_app_activity_markers(
                     transaction, event
                 )
+            case "DsoRules_UpdateExternalPartyConfigStates":
+                return HandleTransactionResult.empty()
             case "TransferFactory_Transfer":
                 return self.handle_transfer_factory_transfer(transaction, event)
             case "TransferFactory_PublicFetch":

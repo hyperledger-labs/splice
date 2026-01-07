@@ -23,6 +23,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
 }
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   AppRewardCoupon,
@@ -56,7 +57,14 @@ class WalletTxLogTimeBasedIntegrationTest
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndAmuletMerging
       // Set a non-unit amulet price to better test CC-USD conversion.
-      .addConfigTransform((_, config) => ConfigTransforms.setAmuletPrice(amuletPrice)(config))
+      .addConfigTransforms(
+        (_, config) => ConfigTransforms.setAmuletPrice(amuletPrice)(config),
+        // Sync up ExternalPartyConfigState and OpenMiningRound cycles to ensure we can consistently advance rounds for expiry.
+        (_, config) =>
+          ConfigTransforms.updateInitialExternalPartyConfigStateTickDuration(
+            NonNegativeFiniteDuration.ofSeconds(600)
+          )(config),
+      )
   }
 
   override protected lazy val sanityChecksIgnoredRootCreates = Seq(
@@ -93,9 +101,9 @@ class WalletTxLogTimeBasedIntegrationTest
 
         // it takes 3 ticks for the IssuingMiningRound 1 to be created and open.
         clue("Advance rounds by 3 ticks.") {
-          advanceRoundsToNextRoundOpening
-          advanceRoundsToNextRoundOpening
-          advanceRoundsToNextRoundOpening
+          advanceRoundsToNextRoundOpening(synchronizeExternalPartyConfigStates = true)
+          advanceRoundsToNextRoundOpening(synchronizeExternalPartyConfigStates = true)
+          advanceRoundsToNextRoundOpening(synchronizeExternalPartyConfigStates = true)
         }
 
         clue("Everyone still has their reward coupons") {
@@ -168,7 +176,7 @@ class WalletTxLogTimeBasedIntegrationTest
 
         // Advance time to make sure we capture at least one round change in the tx history.
         val latestRound = eventuallySucceeds() {
-          advanceRoundsToNextRoundOpening
+          advanceRoundsToNextRoundOpening(synchronizeExternalPartyConfigStates = true)
           sv1ScanBackend.getOpenAndIssuingMiningRounds()._1.last.contract.payload.round.number
         }
 
@@ -189,8 +197,8 @@ class WalletTxLogTimeBasedIntegrationTest
         }
 
         clue("Advance rounds to accumulate holding fees") {
-          advanceRoundsToNextRoundOpening
-          advanceRoundsToNextRoundOpening
+          advanceRoundsToNextRoundOpening(synchronizeExternalPartyConfigStates = true)
+          advanceRoundsToNextRoundOpening(synchronizeExternalPartyConfigStates = true)
         }
 
         val balance0 = charlieWalletClient.balance().unlockedQty
@@ -281,8 +289,11 @@ class WalletTxLogTimeBasedIntegrationTest
           activeSvs.map(_.dsoDelegateBasedAutomation.trigger[ExpiredAmuletTrigger]),
       ) {
         actAndCheck(
-          "Advance 4 ticks to expire the amulet",
-          Range(0, 4).foreach(_ => advanceRoundsToNextRoundOpening),
+          "Advance 5 ticks to expire the amulet", {
+            Range(0, 5).foreach(_ =>
+              advanceRoundsToNextRoundOpening(synchronizeExternalPartyConfigStates = true)
+            )
+          },
         )(
           "Wait for amulet to disappear",
           _ => aliceWalletClient.list().amulets should have size (0),
@@ -338,8 +349,11 @@ class WalletTxLogTimeBasedIntegrationTest
           activeSvs.map(_.dsoDelegateBasedAutomation.trigger[ExpiredLockedAmuletTrigger]),
       ) {
         actAndCheck(
-          "Advance 4 ticks to expire the locked amulet",
-          Range(0, 4).foreach(_ => advanceRoundsToNextRoundOpening),
+          "Advance 5 ticks to expire the locked amulet", {
+            Range(0, 5).foreach(_ =>
+              advanceRoundsToNextRoundOpening(synchronizeExternalPartyConfigStates = true)
+            )
+          },
         )(
           "Wait for locked amulet to disappear",
           _ => aliceWalletClient.list().lockedAmulets should have size (0),
@@ -369,7 +383,7 @@ class WalletTxLogTimeBasedIntegrationTest
         val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
-        advanceRoundsToNextRoundOpening
+        advanceRoundsToNextRoundOpening(synchronizeExternalPartyConfigStates = true)
 
         val expiryMinutes = 1L
         val tapAmount = 10_000L
@@ -491,7 +505,7 @@ class WalletTxLogTimeBasedIntegrationTest
                 forExactly(1, trees) {
                   case TreeEvent.members.ExercisedEvent(value) =>
                     value.choice should be(
-                      splice.amulet.LockedAmulet.CHOICE_LockedAmulet_OwnerExpireLock.name
+                      splice.amulet.LockedAmulet.CHOICE_LockedAmulet_OwnerExpireLockV2.name
                     )
                   case _ => fail("irrelevant")
                 }

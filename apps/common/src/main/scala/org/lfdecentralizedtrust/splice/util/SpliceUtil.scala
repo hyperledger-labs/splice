@@ -356,6 +356,7 @@ object SpliceUtil {
       nextSynchronizerId: Option[SynchronizerId] = None,
       developmentFundPercentage: Option[BigDecimal] = None,
       developmentFundManager: Option[PartyId] = None,
+      initialExternalPartyConfigStateTickDuration: Option[NonNegativeFiniteDuration] = None,
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.AmuletConfig(
       // transferConfig
@@ -381,6 +382,9 @@ object SpliceUtil {
       transferPreapprovalFee.map(_.bigDecimal).toJava,
       featuredAppActivityMarkerAmount.map(_.bigDecimal).toJava,
       developmentFundManager.map(_.toProtoPrimitive).toJava,
+      initialExternalPartyConfigStateTickDuration
+        .map(t => new RelTime(TimeUnit.NANOSECONDS.toMicros(t.duration.toNanos)))
+        .toJava,
     )
 
   def defaultAnsConfig(

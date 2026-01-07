@@ -46,23 +46,19 @@ testLocking = do
   [(lockedCid1, _), (lockedCid2, _)] <- query @LockedAmulet alice.primaryParty
 
   submitMultiMustFail [alice.primaryParty] [app.dso] $
-    exerciseCmd lockedCid1 LockedAmulet_OwnerExpireLock with
-      openRoundCid = context.context.openMiningRound
+    exerciseCmd lockedCid1 LockedAmulet_OwnerExpireLockV2
 
   submitMultiMustFail [alice.primaryParty] [app.dso] $
-    exerciseCmd lockedCid1 LockedAmulet_Unlock with
-      openRoundCid = context.context.openMiningRound
+    exerciseCmd lockedCid1 LockedAmulet_UnlockV2
 
-  checkTxMetadata app TxKind_Unlock alice.primaryParty $
+  checkTxMetadata' app TxKind_Unlock alice.primaryParty $
     submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $
-      exerciseCmd lockedCid1 LockedAmulet_Unlock with
-        openRoundCid = context.context.openMiningRound
+      exerciseCmd lockedCid1 LockedAmulet_UnlockV2
 
   passTime (days 2)
 
-  checkTxMetadata app TxKind_Unlock alice.primaryParty $
+  checkTxMetadata' app TxKind_Unlock alice.primaryParty $
     submitMulti [alice.primaryParty] [app.dso] $
-      exerciseCmd lockedCid2 LockedAmulet_OwnerExpireLock with
-        openRoundCid = context.context.openMiningRound
+      exerciseCmd lockedCid2 LockedAmulet_OwnerExpireLockV2
 
   pure ()

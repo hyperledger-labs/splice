@@ -22,6 +22,7 @@ import Splice.Types
 import Splice.Util
 
 
+
 import DA.Exception
 
 -- | Rules contract that can be used in transactions that require signatures
@@ -105,12 +106,10 @@ instance HasCheckedFetch TransferCommandCounter ForOwner where
       owner = sender
       dso
 
--- | One-time delegation to execute a transfer to the given receiver
--- for the given amount.
+-- | Deprecated: The token standard transfer APIs now support 24h signing delays so this contract is no longer required.
 --
--- We externally sign this instead of the transfer itself to support a longer delay between
--- prepare/execute which would be prevented by signing the transfer directly as that one pins
--- down the mining rounds that are relatively short lived.
+-- One-time delegation to execute a transfer to the given receiver
+-- for the given amount.
 template TransferCommand
   with
     dso : Party
@@ -284,8 +283,8 @@ amulet_transferFactory_transferImpl this _self arg = do
       | transfer.receiver == transfer.sender -> do
           -- execute a self-transfer
           paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
-          inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.inputHoldingCids
-          result <- exercisePaymentTransfer dso paymentContext Transfer with
+          inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) transfer.inputHoldingCids
+          result <- executeExternalPartyTransfer dso paymentContext Transfer with
             sender = transfer.sender
             provider = transfer.sender
             inputs
@@ -324,8 +323,8 @@ amulet_transferFactory_transferImpl this _self arg = do
       -- use a payment context with featuring so the preapproval provider can be featured
       paymentContext <- paymentFromChoiceContext dso extraArgs.context
       -- execute a direct transfer
-      inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.inputHoldingCids
-      result <- exercise preapprovalCid TransferPreapproval_Send
+      inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) transfer.inputHoldingCids
+      result <- exercise preapprovalCid TransferPreapproval_SendV2
         with
           sender = transfer.sender
           context = paymentContext
@@ -338,7 +337,7 @@ amulet_transferFactory_transferImpl this _self arg = do
         senderChangeCids = toInterfaceContractId <$> optionalToList result.result.senderChangeAmulet
         output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
           receiverHoldingCids = createdAmuletToHolding <$> result.result.createdAmulets
-        meta = copyOnlyBurnMeta result.meta
+        meta = copyOnlyBurnMeta (Some result.meta)
 
 
 -- Token standard allocation factory

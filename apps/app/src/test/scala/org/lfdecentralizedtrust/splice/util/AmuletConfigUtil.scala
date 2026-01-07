@@ -62,6 +62,7 @@ trait AmuletConfigUtil extends TestCommon {
       existingAmuletConfig.transferPreapprovalFee,
       existingAmuletConfig.featuredAppActivityMarkerAmount,
       existingAmuletConfig.optDevelopmentFundManager,
+      existingAmuletConfig.externalPartyConfigStateTickDuration,
     )
   }
 

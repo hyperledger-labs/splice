@@ -79,7 +79,7 @@ trait MiningRoundsStore extends AppStore {
   ): Future[Option[MiningRoundsStore.OpenMiningRound[AssignedContract]]] =
     lookupOpenMiningRoundTriple().map(_.flatMap { triple =>
       Seq(triple.newest, triple.middle, triple.oldest)
-        .find(r => CantonTimestamp.assertFromInstant(r.payload.opensAt) < asOf)
+        .find(r => CantonTimestamp.assertFromInstant(r.payload.opensAt) <= asOf)
         .map(c => AssignedContract(c, triple.domain))
     })
 

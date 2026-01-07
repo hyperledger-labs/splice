@@ -5,11 +5,9 @@
 module Splice.Expiry
   ( BoundedSet(..)
   , TimeLock(..)
-  , doesLockExpireBeforeAmulet
   , isAmuletExpired
   -- for testing
   , amountExpiresAt
-  , estimateOpenRoundCreatedAt
   , maxInt
   , maxDecimalDiv10
   , minTime
@@ -22,7 +20,6 @@ import Splice.Amulet.TokenApiUtils
 
 import Splice.Fees
 import Splice.Types
-import Splice.Round
 import Splice.RelRound
 
 import DA.Date
@@ -64,15 +61,6 @@ addBoundedInt x
       | y <= maxInt - x = Singleton (x + y)
       | otherwise = AfterMaxBound
 
--- | Multiply two positive integers and represent its result as bounded set.
-boundedTimes : Int -> Int -> BoundedSet Int
-boundedTimes x y
-  | x < 0 = error $ "boundedTimes: negative first operand " <> show x
-  | y < 0 = error $ "boundedTimes: negative second operand " <> show y
-  | x > maxInt / y = AfterMaxBound
-  | otherwise = Singleton (x * y)
-
-
 -- BoundedSet Decimal
 ---------------------
 
@@ -111,11 +99,6 @@ boundedCeiling AfterMaxBound = AfterMaxBound
 addBoundedRelRound : Round -> BoundedSet RelRound -> BoundedSet Round
 addBoundedRelRound (Round x) y = Round <$> addBoundedInt x ((.diff) <$> y)
 
--- | Add a positive RelRound to BoundedSet of Round.
-addToBoundedRound : BoundedSet Round -> RelRound -> BoundedSet Round
-addToBoundedRound x (RelRound y) = Round <$> addBoundedInt y ((.number) <$> x)
-
-
 -- BoundedSet Time
 ------------------
 
@@ -125,20 +108,6 @@ minTime = time (date 1 Jan 1) 0 0 0
 -- | The largest time point that can be represented by the `Time` type.
 maxTime = let oneSecMinusOneMicro = convertMicrosecondsToRelTime ( convertRelTimeToMicroseconds (seconds 1) - 1 )
           in addRelTime (time (date 9999 Dec 31) 23 59 59) oneSecMinusOneMicro
-
--- | Add a RelTime to a Time such that the addition will not result in
--- an overflow , but is instead captured as a bounded set.
-addBoundedRelTime : Time -> BoundedSet RelTime -> BoundedSet Time
-addBoundedRelTime d (Singleton rt)
-  | rt > subTime maxTime d = AfterMaxBound
-  | otherwise = Singleton (addRelTime d rt)
-addBoundedRelTime _ AfterMaxBound = AfterMaxBound
-
--- | Check if a time is less than a bounded set.
--- If the bounded set is a `AfterMaxBound`, it will already return true.
-boundedLessTime : Time -> BoundedSet Time -> Bool
-boundedLessTime t1 (Singleton t2) = t1 < t2
-boundedLessTime _ AfterMaxBound = True
 
 
 -- Amount expiry
@@ -156,20 +125,6 @@ amountExpiresAt : ExpiringAmount -> BoundedSet Round
 amountExpiresAt e =
   e.createdAt `addBoundedRelRound` spentWithRatePerRound e.ratePerRound e.initialAmount
 
--- | `estimateOpenRoundCreatedAt tickDuration currentMiningRound targetRound` estimates
--- creation `Time` of a specified `targetRound` provided that one is in the future.
-estimateOpenRoundCreatedAt : RelTime -> OpenMiningRound -> BoundedSet Round -> Optional (BoundedSet Time)
-estimateOpenRoundCreatedAt tickDuration currentMiningRound (Singleton targetRound)
-  | currentMiningRound.round >= targetRound = None
-  | otherwise =
-    let relRound = subRound targetRound currentMiningRound.round
-    -- Note: To estimate the time when the target open mining round is being created but not yet open,
-    -- We can estimate the `opensAt` of the target open mining round and then subtract it by 1 tick duration
-        relMicros = (relRound.diff - 1) `boundedTimes` (convertRelTimeToMicroseconds tickDuration)
-        relTime = convertMicrosecondsToRelTime <$> relMicros
-    in Some (addBoundedRelTime currentMiningRound.opensAt relTime)
-estimateOpenRoundCreatedAt _ _ AfterMaxBound = Some AfterMaxBound
-
 
 -- | A lock held by multiple parties until its expiry.
 data TimeLock = TimeLock with
@@ -182,28 +137,15 @@ data TimeLock = TimeLock with
       -- the string here will be public information.
   deriving (Eq, Show, Ord)
 
--- | `doesLockExpireBeforeAmulet` computes whether a `TimeLock` expires before a `Amulet`
-doesLockExpireBeforeAmulet : OpenMiningRound -> TimeLock -> ExpiringAmount -> RelTime -> Bool
-doesLockExpireBeforeAmulet currentOpenRound lock e tickDuration =
-  let r = amountExpiresAt e
-      -- Note: we exploit that there are exactly three open rounds active at any
-      -- point in time;(Singleton  and we ensure that a amulet can be expired as soon as it can
-      -- definitely not be used as an input to transfer anymore.
-      expiringRound = addToBoundedRound r (RelRound 2)
-      optAmuletExpiresAt = estimateOpenRoundCreatedAt tickDuration currentOpenRound expiringRound
-  in case optAmuletExpiresAt of
-    None -> False -- as the amulet is already expired
-    Some amuletExpiresAt -> lock.expiresAt `boundedLessTime` amuletExpiresAt
-
 -- | `isAmuletExpired openRound amuletAmount` computes whether the expiring `amuletAmount`
 -- is definitely expired in case the `openRound` is open.
-isAmuletExpired : OpenMiningRound -> ExpiringAmount -> Bool
+isAmuletExpired : Round -> ExpiringAmount -> Bool
 isAmuletExpired round amuletAmount =
   let expiresAtRound = amountExpiresAt amuletAmount
   in case expiresAtRound of
     -- Expiring round cannot be represented by Round due to amulet amount is too large.
     -- This amulet will never expire unless it is broken into smaller amount.
-    Singleton x -> x.number <= round.round.number - 2
+    Singleton x -> x.number <= round.number
     AfterMaxBound -> False
 
 

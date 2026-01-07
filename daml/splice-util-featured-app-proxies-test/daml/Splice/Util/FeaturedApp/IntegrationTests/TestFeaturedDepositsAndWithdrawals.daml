@@ -120,8 +120,8 @@ test_featured_two_step_deposit = do
     transfer = depositTransfer
     extraArgs = emptyExtraArgs
 
-  TextMap.size enrichedChoice.arg.extraArgs.context.values === 2
-  Map.size enrichedChoice.disclosures.disclosures === 3
+  TextMap.size enrichedChoice.arg.extraArgs.context.values === 1
+  Map.size enrichedChoice.disclosures.disclosures === 2
 
   -- Trigger a two-step transfer via the token standard
   submitWithDisclosures' alice enrichedChoice.disclosures $

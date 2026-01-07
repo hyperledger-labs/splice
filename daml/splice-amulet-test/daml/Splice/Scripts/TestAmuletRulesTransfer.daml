@@ -19,6 +19,7 @@ import Splice.AmuletRules
 import Splice.Expiry
 import Splice.Fees
 import Splice.Testing.Registries.AmuletRegistry.Parameters
+import Splice.Testing.Registries.AmuletRegistry (convertAllFeaturedAppActivityMarkers)
 import Splice.Scripts.Util
 
 testUsageFees: Script ()
@@ -467,6 +468,8 @@ testAppRewardBeneficiaries = do
       context = context.context
       expectedDso = Some app.dso
 
+    convertAllFeaturedAppActivityMarkers app.dso
+
     if featured
       then do
         [(rewardCid, aliceAppRewardCouponUnfeaturedNoBeneficiary)] <- query @AppRewardCoupon alice.primaryParty
@@ -491,6 +494,8 @@ testAppRewardBeneficiaries = do
               beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2, AppRewardBeneficiary bob.primaryParty 0.7, AppRewardBeneficiary bob.primaryParty 0.1]
             context = context.context
             expectedDso = Some app.dso
+
+        convertAllFeaturedAppActivityMarkers app.dso
 
         [(rewardCid1, aliceAppRewardCouponUnfeaturedBeneficiary)] <- queryFilter @AppRewardCoupon alice.primaryParty (\r -> r.beneficiary == Some alice.primaryParty)
 

@@ -182,6 +182,7 @@ abstract class StoreTestBase
       dsoParty.toProtoPrimitive,
       schedule(initialTickDuration),
       false,
+      java.util.Optional.empty(), // contractStateSchemaVersion
     )
     contract(
       identifier = templateId,

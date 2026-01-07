@@ -60,7 +60,7 @@ final object CreateTokenStandardTransferInstruction
     super
       .unapply(event)
       .flatMap(node =>
-        // We only parse transfer instructions. Direct transfers are just parsed as the underlying transfer.
+        // We only parse transfer instructions. Direct transfers are parsed through DirectTokenStandardTransfer
         Option.when(
           node.result.value.output.isInstanceOf[
             splice.api.token.transferinstructionv1.transferinstructionresult_output.TransferInstructionResult_Pending
@@ -69,6 +69,47 @@ final object CreateTokenStandardTransferInstruction
       )
   }
 }
+
+object DirectTokenStandardTransfer
+    extends InterfaceExerciseNodeCompanion.Mk(
+      interface = splice.api.token.transferinstructionv1.TransferFactory.INTERFACE,
+      template = splice.externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION,
+      choice =
+        splice.api.token.transferinstructionv1.TransferFactory.CHOICE_TransferFactory_Transfer,
+    ) {
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
+  override def unapply(
+      event: ExercisedEvent
+  )(implicit lc: ErrorLoggingContext): Option[ExerciseNode[
+    splice.api.token.transferinstructionv1.TransferFactory_Transfer,
+    splice.api.token.transferinstructionv1.TransferInstructionResult,
+  ]] = {
+    super
+      .unapply(event)
+      .flatMap(node =>
+        Option.when(
+          node.result.value.output.isInstanceOf[
+            splice.api.token.transferinstructionv1.transferinstructionresult_output.TransferInstructionResult_Completed
+          ]
+        )(node)
+      )
+  }
+}
+
+final object AllocationFactoryAllocate
+    extends InterfaceExerciseNodeCompanion.Mk(
+      interface = splice.api.token.allocationinstructionv1.AllocationFactory.INTERFACE,
+      template = splice.externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION,
+      choice =
+        splice.api.token.allocationinstructionv1.AllocationFactory.CHOICE_AllocationFactory_Allocate,
+    )
+
+final object AllocationExecuteTransfer
+    extends InterfaceExerciseNodeCompanion.Mk(
+      interface = splice.api.token.allocationv1.Allocation.INTERFACE,
+      template = splice.amuletallocation.AmuletAllocation.COMPANION,
+      choice = splice.api.token.allocationv1.Allocation.CHOICE_Allocation_ExecuteTransfer,
+    )
 
 final case class TransferInstruction_Accept(
     node: ExerciseNode[
@@ -137,16 +178,34 @@ object LockedAmuletUnlock
       choice = splice.amulet.LockedAmulet.CHOICE_LockedAmulet_Unlock,
     )
 
+object LockedAmuletUnlockV2
+    extends ExerciseNodeCompanion.Mk(
+      template = splice.amulet.LockedAmulet.COMPANION,
+      choice = splice.amulet.LockedAmulet.CHOICE_LockedAmulet_UnlockV2,
+    )
+
 object LockedAmuletOwnerExpireLock
     extends ExerciseNodeCompanion.Mk(
       template = splice.amulet.LockedAmulet.COMPANION,
       choice = splice.amulet.LockedAmulet.CHOICE_LockedAmulet_OwnerExpireLock,
     )
 
+object LockedAmuletOwnerExpireLockV2
+    extends ExerciseNodeCompanion.Mk(
+      template = splice.amulet.LockedAmulet.COMPANION,
+      choice = splice.amulet.LockedAmulet.CHOICE_LockedAmulet_OwnerExpireLockV2,
+    )
+
 object LockedAmuletExpireAmulet
     extends ExerciseNodeCompanion.Mk(
       template = amuletCodegen.LockedAmulet.COMPANION,
       choice = amuletCodegen.LockedAmulet.CHOICE_LockedAmulet_ExpireAmulet,
+    )
+
+object LockedAmuletExpireAmuletV2
+    extends ExerciseNodeCompanion.Mk(
+      template = amuletCodegen.LockedAmulet.COMPANION,
+      choice = amuletCodegen.LockedAmulet.CHOICE_LockedAmulet_ExpireAmuletV2,
     )
 
 object AmuletRules_BuyMemberTraffic
@@ -176,6 +235,12 @@ object TransferPreapproval_Renew
 object TransferPreapproval_Send
     extends ExerciseNodeCompanion.Mk(
       choice = splice.amuletrules.TransferPreapproval.CHOICE_TransferPreapproval_Send,
+      template = splice.amuletrules.TransferPreapproval.COMPANION,
+    )
+
+object TransferPreapproval_SendV2
+    extends ExerciseNodeCompanion.Mk(
+      choice = splice.amuletrules.TransferPreapproval.CHOICE_TransferPreapproval_SendV2,
       template = splice.amuletrules.TransferPreapproval.COMPANION,
     )
 
@@ -316,6 +381,12 @@ case object DevelopmentFundCoupon_Archive
     extends ExerciseNodeCompanion.Mk(
       template = amuletCodegen.DevelopmentFundCoupon.COMPANION,
       choice = amuletCodegen.DevelopmentFundCoupon.CHOICE_Archive,
+    )
+
+object AmuletExpireV2
+    extends ExerciseNodeCompanion.Mk(
+      template = amuletCodegen.Amulet.COMPANION,
+      choice = amuletCodegen.Amulet.CHOICE_Amulet_ExpireV2,
     )
 
 // TODO(DACH-NY/canton-network-node#2930): This is not really a Amulet event - consider either renaming the file, or splitting it into different ones based on event "types"

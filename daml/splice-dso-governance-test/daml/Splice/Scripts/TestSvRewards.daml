@@ -18,6 +18,7 @@ import Splice.Scripts.Util
 import Splice.DsoRules
 import Splice.DSO.SvState
 import Splice.Scripts.DsoTestUtils
+import Splice.Testing.Registries.AmuletRegistry (getActiveOpenRoundsSorted)
 import Splice.Util
 
 test_SvRewards_With_InitialRound_In_FirstIssuanceCurve : Script ()
@@ -80,7 +81,7 @@ test_SvRewards_With_InitialRound_In_FirstIssuanceCurve = do
 
     [(rulesCid, _)] <- query @DsoRules dso
 
-    [round0, round1, _round2] <- getActiveOpenRoundsSorted app
+    [round0, round1, _round2] <- getActiveOpenRoundsSorted app.dso
     [(_, openRound)] <- queryFilter @OpenMiningRound app.dso (\r -> r.round == round0._2.round)
     let createFee = openRound.transferConfigUsd.createFee.fee * openRound.amuletPrice
 
@@ -133,7 +134,7 @@ test_SvRewards_With_InitialRound_In_FirstIssuanceCurve = do
     -------------------
 
     -- get the new active rounds
-    [round2, round3, _] <- getActiveOpenRoundsSorted app
+    [round2, round3, _] <- getActiveOpenRoundsSorted app.dso
 
     -- skip one day
     passTime (days 1)
@@ -225,7 +226,7 @@ test_SvRewards_With_InitialRound_In_SecondIssuanceCurve = do
 
     [(rulesCid, _)] <- query @DsoRules dso
 
-    [round0, round1, _round2] <- getActiveOpenRoundsSorted app
+    [round0, round1, _round2] <- getActiveOpenRoundsSorted app.dso
     [(_, openRound)] <- queryFilter @OpenMiningRound app.dso (\r -> r.round == round0._2.round)
     let createFee = openRound.transferConfigUsd.createFee.fee * openRound.amuletPrice
 
@@ -278,7 +279,7 @@ test_SvRewards_With_InitialRound_In_SecondIssuanceCurve = do
     -------------------
 
     -- get the new active rounds
-    [round2, round3, _] <- getActiveOpenRoundsSorted app
+    [round2, round3, _] <- getActiveOpenRoundsSorted app.dso
 
     -- skip one day
     passTime (days 1)
@@ -348,7 +349,7 @@ test_SvRewardUpdatedWeight = do
 
     -- check that coupons are claimed with the new weight
     [(rulesCid, _)] <- query @DsoRules app.dso
-    [(roundCid, round), _, _] <- getActiveOpenRoundsSorted app
+    [(roundCid, round), _, _] <- getActiveOpenRoundsSorted app.dso
     [(rewardStateCid, _)] <- queryFilter @SvRewardState dso (\s -> s.svName == before.name)
     -- collect reward coupon
     void $ submitMulti [sv2] [dso] $ exerciseCmd rulesCid DsoRules_ReceiveSvRewardCoupon with

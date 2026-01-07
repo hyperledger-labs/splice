@@ -61,14 +61,13 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
     )(
       "Wait for all reward coupons to be created",
       _ => {
-        // advance rounds for the reward triggers to run
-        advanceRoundsToNextRoundOpening
         getRewardCoupons(round)
           .filterNot(c =>
             leftoverRewardIds(c.id)
           ) should have length 6 // 4 featured app rewards + 2 validator from setting up preapprovals
       },
     )
+    advanceRoundsToNextRoundOpening
     actAndCheck(
       timeUntilSuccess = 30.seconds
     )(

@@ -34,6 +34,7 @@ import org.lfdecentralizedtrust.splice.store.{
   AppStore,
   DsoRulesStore,
   Limit,
+  ExternalPartyConfigStateStore,
   MiningRoundsStore,
   MultiDomainAcsStore,
   PageLimit,
@@ -57,7 +58,8 @@ trait ScanStore
     with PackageIdResolver.HasAmuletRules
     with DsoRulesStore
     with MiningRoundsStore
-    with VotesStore {
+    with VotesStore
+    with ExternalPartyConfigStateStore {
 
   def aggregate()(implicit
       tc: TraceContext
@@ -519,6 +521,13 @@ object ScanStore {
             contract = contract,
             contractExpiresAt =
               Some(Timestamp.assertFromInstant(contract.payload.transfer.executeBefore)),
+          )
+        },
+        mkFilter(splice.externalpartyconfigstate.ExternalPartyConfigState.COMPANION)(co =>
+          co.payload.dso == dso
+        ) { contract =>
+          ScanAcsStoreRowData(
+            contract = contract
           )
         },
       ),

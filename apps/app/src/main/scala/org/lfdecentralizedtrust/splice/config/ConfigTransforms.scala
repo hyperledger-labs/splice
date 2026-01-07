@@ -349,6 +349,14 @@ object ConfigTransforms {
     )
   }
 
+  def updateInitialExternalPartyConfigStateTickDuration(
+      tick: NonNegativeFiniteDuration
+  ): ConfigTransform = {
+    ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+      _.copy(initialExternalPartyConfigStateTickDuration = Some(tick))
+    )
+  }
+
   def noDevNet: ConfigTransform =
     updateAllSvAppFoundDsoConfigs_(_.focus(_.isDevNet).replace(false))
 
