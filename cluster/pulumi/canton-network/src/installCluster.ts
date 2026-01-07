@@ -6,7 +6,6 @@ import {
   DecentralizedSynchronizerUpgradeConfig,
   ExpectedValidatorOnboarding,
   isDevNet,
-  sequencerPruningConfig,
   svOnboardingPollingInterval,
   svValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
@@ -65,7 +64,6 @@ export async function installCluster(
     ...backupConfig,
     topupConfig: svValidatorTopupConfig,
     splitPostgresInstances: SplitPostgresInstances,
-    sequencerPruningConfig,
     decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerUpgradeConfig,
     onboardingPollingInterval: svOnboardingPollingInterval,
     disableOnboardingParticipantPromotionDelay,

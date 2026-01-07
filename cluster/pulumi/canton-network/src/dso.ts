@@ -7,14 +7,14 @@ import {
   BackupLocation,
   BootstrappingDumpConfig,
   CnInput,
-  ExpectedValidatorOnboarding,
-  SvIdKey,
-  SvCometBftGovernanceKey,
-  ValidatorTopupConfig,
-  svKeyFromSecret,
-  svCometBftGovernanceKeyFromSecret,
-  DecentralizedSynchronizerMigrationConfig,
   config,
+  DecentralizedSynchronizerMigrationConfig,
+  ExpectedValidatorOnboarding,
+  SvCometBftGovernanceKey,
+  svCometBftGovernanceKeyFromSecret,
+  SvIdKey,
+  svKeyFromSecret,
+  ValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   approvedSvIdentities,
@@ -22,9 +22,6 @@ import {
   coreSvsToDeploy,
   initialRound,
   StaticCometBftConfigWithNodeName,
-} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
-import {
-  SequencerPruningConfig,
   StaticSvConfig,
   SvOnboarding,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
@@ -40,7 +37,6 @@ interface DsoArgs {
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   topupConfig?: ValidatorTopupConfig;
   splitPostgresInstances: boolean;
-  sequencerPruningConfig: SequencerPruningConfig;
   decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig;
   onboardingPollingInterval?: string;
   disableOnboardingParticipantPromotionDelay: boolean;
@@ -93,7 +89,6 @@ export class Dso extends pulumi.ComponentResource {
         topupConfig: this.args.topupConfig,
         splitPostgresInstances: this.args.splitPostgresInstances,
         scanBigQuery: svConf.scanBigQuery,
-        sequencerPruningConfig: this.args.sequencerPruningConfig,
         disableOnboardingParticipantPromotionDelay:
           this.args.disableOnboardingParticipantPromotionDelay,
         onboardingPollingInterval: this.args.onboardingPollingInterval,
@@ -169,10 +164,9 @@ export class Dso extends pulumi.ComponentResource {
       cometBftGovernanceKeys[sv1Conf.onboardingName]
     );
 
-    const useCantonBft =
-      this.args.decentralizedSynchronizerUpgradeConfig.active.sequencer.enableBftSequencer;
     // TODO(#893): long-term CantonBFT deployments should be robust enough to onboard in parallel again?
-    const incrementalOnboarding = useCantonBft;
+    const incrementalOnboarding =
+      this.args.decentralizedSynchronizerUpgradeConfig.active.sequencer.enableBftSequencer;
 
     // recursive install function to allow injecting dependencies on previous svs
     const installSvNodes = async (
