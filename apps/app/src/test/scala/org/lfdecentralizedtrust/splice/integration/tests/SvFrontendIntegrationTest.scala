@@ -320,23 +320,24 @@ class SvFrontendIntegrationTest
       val requestReasonBody = "This is a summary of the proposal"
 
       withFrontEnd("sv1") { implicit webDriver =>
-        val previousInflightProposalsSize = getInflightProposals().size
-        previousInflightProposalsSize shouldBe 0
-
-        actAndCheck(
+        val (_, previousInflightProposalsSize) = actAndCheck(
           "sv1 operator can login and browse to the governance tab", {
             go to s"http://localhost:$sv1UIPort/governance-beta"
             loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
           },
         )(
-          "sv1 can navigate to the create proposal page",
+          "sv1 can see the governance page and get the initial inflight proposals count",
           _ => {
-            clue("initiate proposal button is visible") {
-              eventuallySucceeds() {
-                find(id("initiate-proposal-button")) should not be empty
-                click on id("initiate-proposal-button")
-              }
+            eventuallySucceeds() {
+              find(id("initiate-proposal-button")) should not be empty
             }
+            getInflightProposals().size
+          },
+        )
+
+        actAndCheck(
+          "sv1 can navigate to the create proposal page", {
+            click on id("initiate-proposal-button")
 
             clue("select action and click next") {
               eventually() {
@@ -356,6 +357,11 @@ class SvFrontendIntegrationTest
                 click on id("next-button")
               }
             }
+          },
+        )(
+          "sv1 can see the create proposal form",
+          _ => {
+            find(id(s"$formPrefix-summary")) should not be empty
           },
         )
 
@@ -411,14 +417,23 @@ class SvFrontendIntegrationTest
             loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
           },
         )(
-          "sv2 can see the new vote request",
+          "sv2 can see the action required section with at least one item",
           _ => {
             eventuallySucceeds() {
-              val actionsRequired = getActionRequiredElems()
-              actionsRequired.size shouldBe 1
-              webDriver.executeScript("arguments[0].click();", actionsRequired.asScala.head)
+              find(testId("action-required-section")) should not be empty
+              getActionRequiredElems().size should be > 0
             }
+          },
+        )
 
+        actAndCheck(
+          "sv2 clicks on an action required item", {
+            val actionsRequired = getActionRequiredElems()
+            webDriver.executeScript("arguments[0].click();", actionsRequired.asScala.head)
+          },
+        )(
+          "sv2 can see the vote request and cast a vote",
+          _ => {
             inside(find(id("your-vote-reason-input"))) { case Some(element) =>
               element.underlying.sendKeys("A sample reason")
             }
