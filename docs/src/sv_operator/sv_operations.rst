@@ -737,7 +737,7 @@ When using the ``unclaimed_sv_rewards.py`` script in the context of CIP-0066 rew
 calculations, SV operators should keep the following considerations in mind:
 
 - **Expiration vs. claiming.**
-  In the intended GSF multi-tenant escrow setup, SV reward coupons for the beneficiary
+  In the intended escrow setup, SV reward coupons for the beneficiary
   should always expire. Any claimed coupon indicates a configuration issue on the
   GSF-operated SV node and must be investigated before proceeding with a CIP-0066
   governance proposal.
