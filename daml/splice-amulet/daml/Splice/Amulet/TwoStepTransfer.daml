@@ -16,7 +16,7 @@ module Splice.Amulet.TwoStepTransfer (
 ) where
 
 import DA.Assert
-import DA.Optional (optionalToList)
+import DA.Optional (fromOptional, optionalToList)
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1
@@ -25,7 +25,6 @@ import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletRules
 import Splice.Expiry
-import Splice.Round
 import Splice.Types
 import Splice.Util
 
@@ -47,35 +46,32 @@ data TwoStepTransfer = TwoStepTransfer with
 
 -- | Converting a set of holding inputs to inputs for an amulet transfer,
 -- unlocking any expired LockedAmulet holdings on the fly.
-holdingToTransferInputs : ForOwner -> PaymentTransferContext -> [ContractId Holding] -> Update [TransferInput]
-holdingToTransferInputs forOwner paymentContext inputHoldingCids =
+holdingToTransferInputs : ForOwner -> [ContractId Holding] -> Update [TransferInput]
+holdingToTransferInputs forOwner inputHoldingCids =
   forA inputHoldingCids $ \holdingCid -> do
     holding <- fetchCheckedInterface @Holding forOwner holdingCid
     case fromInterface holding of
       Some (LockedAmulet {}) -> do
         let lockedAmuletCid : ContractId LockedAmulet = fromInterfaceContractId holdingCid
-        -- We assume the lock is expired, and if not then we rely `LockedAmulet_OwnerExpireLock` to fail
-        result <- exercise lockedAmuletCid LockedAmulet_OwnerExpireLock with
-          openRoundCid = paymentContext.context.openMiningRound
-        pure $ InputAmulet result.amuletSum.amulet
+        -- We assume the lock is expired, and if not then we rely `LockedAmulet_OwnerExpireLockV2` to fail
+        result <- exercise lockedAmuletCid LockedAmulet_OwnerExpireLockV2
+        pure $ InputAmulet result.amuletCid
       None -> pure $ InputAmulet $ coerceContractId holdingCid
 
 -- | Prepare a two-step transfer of amulet by locking the funds.
-prepareTwoStepTransfer
-  : TwoStepTransfer -> Time -> [ContractId Holding] -> PaymentTransferContext
-  -> Update (ContractId LockedAmulet, [ContractId Holding], Metadata)
+prepareTwoStepTransfer : TwoStepTransfer -> Time -> [ContractId Holding] -> ExternalPartyTransferContext -> Update (ContractId LockedAmulet, [ContractId Holding], Metadata)
 prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids paymentContext = do
   require "requestedAt < transferBefore" (requestedAt < transferBefore)
   -- lock the amulet
-  transferInputs <- holdingToTransferInputs (ForOwner with dso; owner = sender) paymentContext inputHoldingCids
+  transferInputs <- holdingToTransferInputs (ForOwner with dso; owner = sender) inputHoldingCids
   let transfer = Splice.AmuletRules.Transfer with
         sender
         provider = sender -- the sender is serving as its own "app provider"
         outputs =
           [ TransferOutput with
               receiver = sender
-              amount
-              receiverFeeRatio = 0.0 -- locking fees are paid by the sender
+              amount = amount
+              receiverFeeRatio = 0.0 -- irrelevant as fees are always zero
               lock = Some TimeLock with
                 expiresAt = transferBefore
                 holders = [dso]
@@ -84,12 +80,12 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids paymentC
         inputs = transferInputs
         beneficiaries = None
 
-  result <- exercisePaymentTransfer dso paymentContext transfer
+  result <- executeExternalPartyTransfer dso paymentContext transfer
   let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
   pure
     ( lockedAmulet
     , toInterfaceContractId <$> optionalToList result.senderChangeAmulet
-    , copyOnlyBurnMeta result.meta
+    , fromOptional emptyMetadata result.meta
     )
 
 executeTwoStepTransfer
@@ -107,10 +103,9 @@ executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
         -- ignore beneficiaries in case we are not allowing featuring
         context <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
         pure (context, None)
-  let openRoundCid = paymentContext.context.openMiningRound
   -- unlock amulet
-  unlockResult <- exercise lockedAmuletCid LockedAmulet_Unlock with openRoundCid
-  let amuletCid = unlockResult.amuletSum.amulet
+  unlockResult <- exercise lockedAmuletCid LockedAmulet_UnlockV2
+  let amuletCid = unlockResult.amuletCid
   -- execute transfer
   let receiverOutput = TransferOutput with
         receiver = receiver
@@ -123,11 +118,11 @@ executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
         inputs = [InputAmulet amuletCid]
         outputs = [receiverOutput]
         beneficiaries
-  result <- exercisePaymentTransfer dso paymentContext amuletRulesTransfer
+  result <- executeExternalPartyTransfer dso paymentContext amuletRulesTransfer
   pure
     ( optionalToList (toInterfaceContractId <$> result.senderChangeAmulet)
     , createdAmuletToHolding <$> result.createdAmulets
-    , copyOnlyBurnMeta result.meta
+    , fromOptional emptyMetadata result.meta
     )
 
 abortTwoStepTransfer : TwoStepTransfer -> ContractId LockedAmulet -> ExtraArgs -> Update [ContractId Holding]
@@ -135,11 +130,8 @@ abortTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
   expireLockedAmulet <- getFromContextU @Bool extraArgs.context expireLockKey
   if expireLockedAmulet
     then do
-      openRoundCid <- getFromContextU @(ContractId OpenMiningRound) extraArgs.context openRoundContextKey
-      -- prudent engineering: check the DSO party
-      _ <- fetchChecked (ForDso with dso) openRoundCid
-      result <- exercise lockedAmuletCid LockedAmulet_Unlock with openRoundCid
-      pure [toInterfaceContractId result.amuletSum.amulet]
+      result <- exercise lockedAmuletCid LockedAmulet_UnlockV2
+      pure [toInterfaceContractId result.amuletCid]
     else do
       -- scan is telling us to not expire the lock, this is OK if the transfer expired
       assertDeadlineExceeded transferBeforeDeadline transferBefore

@@ -16,9 +16,8 @@ import Splice.Fees
 import Splice.Expiry
 import Splice.Round
 import Splice.Types
-import Splice.RelRound
-import Splice.Schedule
 import Splice.Testing.Registries.AmuletRegistry.Parameters
+import Splice.Testing.Registries.AmuletRegistry (advanceToNextRoundChange)
 import Splice.Scripts.Util
 
 import DA.Foldable (forA_)
@@ -34,39 +33,14 @@ scaleAmuletConfig amuletPrice config = AmuletConfig with
   transferPreapprovalFee = fmap (/ amuletPrice) config.transferPreapprovalFee
   featuredAppActivityMarkerAmount = fmap (/ amuletPrice) config.featuredAppActivityMarkerAmount
   optDevelopmentFundManager = config.optDevelopmentFundManager
+  externalPartyConfigStateTickDuration = config.externalPartyConfigStateTickDuration
 
 test : Script ()
 test = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
-  advanceToNextRoundChange app -- advance time so we're out of the initial mining round
-  currentTime <- getTime
+  advanceToNextRoundChange app.dso -- advance time so we're out of the initial mining round
   let amuletPrice = 2.5
       config = scaleAmuletConfig amuletPrice defaultAmuletConfig
-      tickDuration = config.tickDuration
-
-      t00_00 = currentTime
-      t05_00 = addRelRoundN 2 currentTime tickDuration
-      t07_30 = addRelRoundN 3 currentTime tickDuration
-      t12_30 = addRelRoundN 5 currentTime tickDuration
-      t15_00 = addRelRoundN 6 currentTime tickDuration
-      t17_30 = addRelRoundN 7 currentTime tickDuration
-
-      issuingFor0 = days 0
-      issuingFor3 = issuingFor0 + tickDuration + tickDuration + tickDuration
-
-      amuletConfigUsd = defaultAmuletConfig
-      transferConfigUsd = amuletConfigUsd.transferConfig
-      issuanceConfig0 = getValueAsOf issuingFor0 amuletConfigUsd.issuanceCurve
-      issuanceConfig3 = getValueAsOf issuingFor3 amuletConfigUsd.issuanceCurve
-      openRound0 = OpenMiningRound with dso = app.dso; round = Round 0; amuletPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
-      openRound3 = openRound0 with round = Round 3; opensAt = t07_30 ; targetClosesAt = t12_30; issuanceConfig = issuanceConfig3
-
-  -- Lock expires at T00:12:30
-  let lockExpiresAt12_30 = TimeLock with holders = [alice.primaryParty]; expiresAt = t12_30; optContext = None
-  -- Lock expires at T00:15:00
-  let lockExpiresAt15_00 = TimeLock with holders = [alice.primaryParty]; expiresAt = t15_00; optContext = None
-  -- Lock expires at T00:17:30
-  let lockExpiresAt17_30 = TimeLock with holders = [alice.primaryParty]; expiresAt = t17_30; optContext = None
 
   -- This amulet is estimated to expire at round 5.
   -- we exploit that there are exactly three open rounds active at any point in time.
@@ -76,97 +50,50 @@ test = script do
   let amountExpiresAtRound5 = ExpiringAmount with initialAmount = config.transferConfig.holdingFee.rate * 3.5; createdAt = Round 1; ratePerRound = config.transferConfig.holdingFee
   let bounded = amountExpiresAt amountExpiresAtRound5
   bounded === Singleton (Round 5)
-  let (Singleton r) = bounded
-  estimateOpenRoundCreatedAt config.tickDuration openRound3 (Singleton(addRelRound r (RelRound 2))) === Some (Singleton t15_00)
-
-  -- lock expires at T00:12:30 before amulet expires at T00:15:00
-  let lockExpireBeforeAmulet = doesLockExpireBeforeAmulet openRound3 lockExpiresAt12_30 amountExpiresAtRound5 config.tickDuration
-  assert lockExpireBeforeAmulet
-
-  -- lock expires at T00:15:00 while amulet expires at T00:15:00
-  let lockExpiresAsAmulet = doesLockExpireBeforeAmulet openRound3 lockExpiresAt15_00 amountExpiresAtRound5 config.tickDuration
-  assert $ not lockExpiresAsAmulet
-
-  -- lock expires at T00:17:30 after amulet expires at T00:15:00
-  let lockExpiresAfterAmulet = doesLockExpireBeforeAmulet openRound3 lockExpiresAt17_30 amountExpiresAtRound5 config.tickDuration
-  assert $ not lockExpiresAfterAmulet
-
-  let largeAmount = ExpiringAmount with initialAmount = 10000.0; createdAt = Round 1; ratePerRound = config.transferConfig.holdingFee
-  -- lock expires at T00:12:30 before amulet with large amount, which is regarded as never expires (EstimatedTime.AfterMaxTime)
-  let lockExpiresBeforeLargeAmulet = doesLockExpireBeforeAmulet openRound3 lockExpiresAt12_30 largeAmount config.tickDuration
-  assert lockExpiresBeforeLargeAmulet
-
-  pure ()
-
--- From #2336, This test case is to make sure we handle DA.Time overflow
--- in estimateOpenRoundCreatedAt when the amulet amount is too large
-testLargeAmuletExpiry : Script ()
-testLargeAmuletExpiry = script do
-  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
-  now <- getTime
-
-  let amuletPrice = 2.5
-      configUsd = defaultAmuletConfig
-      transferConfigAmulet = scaleFees (1.0 / amuletPrice) configUsd.transferConfig
-      e = ExpiringAmount with initialAmount = 10000.0; createdAt = Round 1; ratePerRound = transferConfigAmulet.holdingFee
-      Singleton r = amountExpiresAt e
-      expiringRound = Singleton $ addRelRound r (RelRound 2)
-      issuingFor = minutes 5
-      currentMiningRound = OpenMiningRound with
-        dso = app.dso
-        round = Round 1
-        amuletPrice = 1.0
-        opensAt = now
-        targetClosesAt = addRelTime now (minutes 5)
-        issuingFor
-        transferConfigUsd = configUsd.transferConfig
-        issuanceConfig = getValueAsOf issuingFor configUsd.issuanceCurve
-        tickDuration = configUsd.tickDuration
-
-  estimateOpenRoundCreatedAt configUsd.tickDuration currentMiningRound expiringRound === Some AfterMaxBound
   pure ()
 
 testExpireLockedAmulet : Script ()
 testExpireLockedAmulet = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
-  advanceToNextRoundChange app -- advance time so we're out of the initial mining round
+  advanceToNextRoundChange app.dso -- advance time so we're out of the initial mining round
   passTime (minutes 10) -- pass enough time so that round 2 expires in 10 minutes
 
-  -- Locking the amulet with with initialAmount 0.000005 and created at round 2 but with a
-  -- lock for 10 minutes should fail, as round 2 ends in 10 minutes
-  getLockedAmuletMustFail app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (minutes 10)
+  -- We don't enforce that locks expire before the underlying amulet does so locking an amulet with with initialAmount 0.000005 and created at round 2 but with a
+  -- lock for 10 minutes should succeed even if round 2 ends in 10 minutes.
+  cid0 <- getLockedAmulet app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (minutes 10)
   -- Lock the amulet with initialAmount 0.000005 and created at round 2
   -- As the amulet amount is equal to one round's holding fee, it will be expired at round 3
   cid <- getLockedAmulet app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (seconds 90 - convertMicrosecondsToRelTime 1)
   Some(lockedAmulet) <- queryContractId @LockedAmulet alice.primaryParty cid
 
-  roundCid <- advanceRound app (Round 3)
+  _ <- advanceRound app (Round 3)
+
+  -- Current round is 4
+  _ <- advanceRound app (Round 4)
 
   -- Lock is not yet expired
   -- DSO party fails to expire the amulet
+  (externalPartyConfigState0Cid, externalPartyConfigState1Cid) <- getExternalPartyConfigStates app
   testChoiceFailed [app.dso] [app.dso] $
-    exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
+    exerciseCmd cid (LockedAmulet_ExpireAmuletV2 with
+      externalPartyConfigState0Cid
+      externalPartyConfigState1Cid)
 
-  -- Current round is 4
-  roundCid <- advanceRound app (Round 4)
-
-  -- Amulet is not yet expired
-  -- 2 rounds before current round = 4 - 2 = 2 which is before round 3 when the amulet expires
-  -- DSO party fails to expire the amulet
-  testChoiceFailed [app.dso] [app.dso] $
-    exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
 
   -- Current round is 5
-  roundCid <- advanceRound app (Round 5)
+  _ <- advanceRound app (Round 5)
 
   normalizedBalanceBeforeExpiry <- getNormalizedBalance app.dso
 
   -- Amulet is expired
   -- 2 rounds before current round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
   -- DSO party expires the amulet
-  result <- checkTxMetadata app TxKind_ExpireDust alice.primaryParty $
+  (externalPartyConfigState0Cid, externalPartyConfigState1Cid) <- getExternalPartyConfigStates app
+  result <- checkTxMetadata' app TxKind_ExpireDust alice.primaryParty $
     testChoice [app.dso] [app.dso] $
-      exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
+      exerciseCmd cid $ LockedAmulet_ExpireAmuletV2 with
+        externalPartyConfigState0Cid
+        externalPartyConfigState1Cid
   let expireSummary = result.expireSum
 
   normalizedBalanceAfterExpiry <- getNormalizedBalance app.dso
@@ -174,7 +101,7 @@ testExpireLockedAmulet = do
   expireSummary.changeToHoldingFeesRate === - (lockedAmulet.amulet.amount.ratePerRound.rate)
 
   lockedAmulets <- query @LockedAmulet bob.primaryParty
-  lockedAmulets === []
+  map fst lockedAmulets === [cid0]
 
   pure ()
 
@@ -195,31 +122,39 @@ testExpireAmulet = do
   amulet.amount.createdAt === Round 1
 
   -- current latest active round is 3
-  latestActiveRoundCid <- advanceRound app (Round 3)
+  _ <- advanceRound app (Round 3)
 
   -- 2 rounds before latest active round = 3 - 2 = 1 which is before round 3 when the amulet expires
   -- DSO party fails to expire the amulet
+  (externalPartyConfigState0Cid, externalPartyConfigState1Cid) <- getExternalPartyConfigStates app
   testChoiceFailed [app.dso] [app.dso] $
-    exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
+    exerciseCmd cid Amulet_ExpireV2 with
+      externalPartyConfigState0Cid
+      externalPartyConfigState1Cid
 
   -- current latest active round is 4
-  latestActiveRoundCid <- advanceRound app (Round 4)
+  _ <- advanceRound app (Round 4)
 
   -- 2 rounds before current latest active round => 4 - 2 = 2 which is before round 3 when the amulet expires
   -- DSO party fails to expire the amulet
+  (externalPartyConfigState0Cid, externalPartyConfigState1Cid) <- getExternalPartyConfigStates app
   testChoiceFailed [app.dso] [app.dso] $
-    exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
+    exerciseCmd cid Amulet_ExpireV2 with
+      externalPartyConfigState0Cid
+      externalPartyConfigState1Cid
 
-  -- current latest active round is 5
-  latestActiveRoundCid <- advanceRound app (Round 5)
+  _ <- advanceRound app (Round 5)
 
   normalizedBalanceBeforeExpiry <- getNormalizedBalance app.dso
 
   -- 2 rounds before current latest active round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
   -- DSO party expires the amulet
-  result <- checkTxMetadata app TxKind_ExpireDust alice.primaryParty $
+  (externalPartyConfigState0Cid, externalPartyConfigState1Cid) <- getExternalPartyConfigStates app
+  result <- checkTxMetadata' app TxKind_ExpireDust alice.primaryParty $
     testChoice [app.dso] [app.dso] $
-    exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
+    exerciseCmd cid $ Amulet_ExpireV2 with
+      externalPartyConfigState0Cid
+      externalPartyConfigState1Cid
   let expireSummary = result.expireSum
 
   normalizedBalanceAfterExpiry <- getNormalizedBalance app.dso
@@ -243,7 +178,15 @@ advanceRound app expectedRound  = do
   (latestActiveRoundCid, _) <- getLatestActiveOpenRound app
   Some(currentRound) <- queryContractId @OpenMiningRound app.dso latestActiveRoundCid
   currentRound.round === expectedRound
+  syncExternalPartyConfigStatesWithRounds app
   pure latestActiveRoundCid
+
+syncExternalPartyConfigStatesWithRounds : AmuletApp -> Script ()
+syncExternalPartyConfigStatesWithRounds app = do
+  passTime (hours 24)
+  updateExternalPartyConfigState app
+  passTime (hours 24)
+  updateExternalPartyConfigState app
 
 addRelRoundN : Int -> Time -> RelTime -> Time
 addRelRoundN n t relTime

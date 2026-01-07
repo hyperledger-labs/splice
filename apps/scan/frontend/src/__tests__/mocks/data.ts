@@ -176,9 +176,11 @@ export function amuletRules(zeroTransferFees: boolean): any {
         transferPreapprovalFee: null,
         featuredAppActivityMarkerAmount: null,
         optDevelopmentFundManager: null,
+        externalPartyConfigStateTickDuration: null,
       },
       futureValues: [],
     },
     isDevNet: true,
+    contractStateSchemaVersion: null,
   });
 }

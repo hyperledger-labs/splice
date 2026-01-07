@@ -64,6 +64,7 @@ trait SvDsoStore
     with PackageIdResolver.HasAmuletRules
     with DsoRulesStore
     with MiningRoundsStore
+    with ExternalPartyConfigStateStore
     with ActiveVotesStore {
   protected val outerLoggerFactory: NamedLoggerFactory
   protected def templateJsonDecoder: TemplateJsonDecoder
@@ -1381,6 +1382,13 @@ object SvDsoStore {
             contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
           )
+      },
+      mkFilter(splice.externalpartyconfigstate.ExternalPartyConfigState.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract
+        )
       },
     )
 

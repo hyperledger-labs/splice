@@ -25,14 +25,15 @@ import Splice.Amulet.TokenApiUtils
 import Splice.AmuletRules
 import Splice.AmuletConfig (AmuletConfig(..))
 import qualified Splice.AmuletConfig as Unit
+import Splice.ExternalPartyConfigState
 import Splice.Expiry
 import Splice.ExternalPartyAmuletRules
-import Splice.Issuance
 import Splice.Round
 import Splice.Fees
 import Splice.Types
 import Splice.RelRound
 import Splice.Schedule
+import Splice.Testing.Registries.AmuletRegistry qualified as Registry
 import Splice.ValidatorLicense
 
 import Splice.Testing.Registries.AmuletRegistry.Parameters
@@ -72,11 +73,12 @@ genericSetupApp dsoPrefix = do
   _ <- submit dso $ createCmd AmuletRules with
     configSchedule = defaultAmuletConfigSchedule
     isDevNet = True
+    contractStateSchemaVersion = None
     ..
 
   _ <- submit dso $ createCmd ExternalPartyAmuletRules with dso
 
-  submitExerciseAmuletRulesByKey app [dso] [] AmuletRules_Bootstrap_Rounds with
+  _ <- submitExerciseAmuletRulesByKey app [dso] [] AmuletRules_Bootstrap_Rounds with
       amuletPrice = 1.0
       round0Duration = hours 24 -- extra time for all initial svs to join
       initialRound = None
@@ -217,73 +219,11 @@ runNextIssuance : AmuletApp -> Script ()
 runNextIssuance app = do
   runNextIssuanceInternal app 1.0
 
--- | Advance time to next round change
-advanceToNextRoundChange : AmuletApp -> Script ()
-advanceToNextRoundChange app = do
-  [(_, oldest), _, (_, newest)] <- getActiveOpenRoundsSorted app
-  now <- getTime
-  let roundChangePossibleAt = max oldest.targetClosesAt newest.opensAt
-  when (now < roundChangePossibleAt) $ setTime roundChangePossibleAt
-
 -- Only directly call this function if you know what you are doing.
 -- Due to effective-dating, the price you give here is not the amulet price that can be used immediately
 runNextIssuanceInternal : AmuletApp -> Decimal -> Script ()
 runNextIssuanceInternal app amuletPrice = do
-    -- now <- getTime
-    -- passTime (minutes 10)
-    advanceToNextRoundChange app
-    -- expire rewards for closed rounds
-    closedRounds <- query @ClosedMiningRound app.dso
-    forA_ closedRounds $ \(closedRoundCid, miningRound) -> do
-      -- app rewards
-      rewards <- queryFilter @AppRewardCoupon app.dso (\r -> r.round == miningRound.round)
-      forA_ rewards $ \(rcid, _) ->
-        submit app.dso $ exerciseCmd rcid AppRewardCoupon_DsoExpire with closedRoundCid
-      -- validator rewards
-      rewards <- queryFilter @ValidatorRewardCoupon app.dso (\r -> r.round == miningRound.round)
-      forA_ rewards $ \(rcid, _) ->
-        submit app.dso $ exerciseCmd rcid ValidatorRewardCoupon_DsoExpire with closedRoundCid
-      -- the closed round
-      submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_MiningRound_Archive with
-        closedRoundCid
-
-    -- close issuing rounds that are ready for close
-    now <- getTime
-    imcs <- queryFilter @IssuingMiningRound app.dso (\r -> r.targetClosesAt <= now)
-    forA_ imcs $ \(issuingRoundCid, _) ->
-      submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_MiningRound_Close with
-        issuingRoundCid
-
-    -- transition the oldest OpenMiningRound into a SummarizingMiningRound and
-    -- create a new OpenMiningRound
-    [(roundToArchiveCid, roundToArchive), (r2Cid, _), (r3Cid, _)] <- getActiveOpenRoundsSorted app
-    advanceResult <- submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_AdvanceOpenMiningRounds with
-      amuletPrice
-      roundToArchiveCid
-      middleRoundCid = r2Cid
-      latestRoundCid = r3Cid
-    let closingRoundCid = advanceResult.summarizingRoundCid
-
-    -- compute total burn
-    appRewardCoupons <- queryFilter @AppRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
-    validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
-    validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.dso (\bc -> bc.round == roundToArchive.round)
-    validatorLivenessActivityRecords <- queryFilter @ValidatorLivenessActivityRecord app.dso (\bc -> bc.round == roundToArchive.round)
-    svRewardCoupons <- queryFilter @SvRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
-
-    let summary = OpenMiningRoundSummary with
-          totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
-          totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
-          totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
-          totalSvRewardWeight = sum [ c.weight | (_, c) <- svRewardCoupons]
-          optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons + length validatorLivenessActivityRecords)
-
-    -- create issuing mining round
-    submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_MiningRound_StartIssuing with
-      miningRoundCid = closingRoundCid
-      summary
-
-    pure ()
+    Registry.runNextIssuance app.dso amuletPrice
 
 -- Set time so that at least one mining round is open and usable
 passTimeToRoundOpen : AmuletApp -> Script ()
@@ -298,7 +238,7 @@ passTimeToRoundOpen app = do
 -- Skip over the next n rounds. This is used in tests because actually calling runNextIssuance a few thousand times is too slow.
 skipNRounds : AmuletApp -> Int -> Script ()
 skipNRounds app n = do
-  [(r1Cid, r1), (r2Cid, r2), (r3Cid, r3)] <- getActiveOpenRoundsSorted app
+  [(r1Cid, r1), (r2Cid, r2), (r3Cid, r3)] <- Registry.getActiveOpenRoundsSorted app.dso
 
   let newRound1 = addRelRound r1.round (RelRound n)
   let newRound2 = addRelRound r2.round (RelRound n)
@@ -310,6 +250,19 @@ skipNRounds app n = do
     *> createCmd r2 with round = newRound2
     *> archiveCmd r3Cid
     *> createCmd r3 with round = newRound3
+  pure ()
+
+updateExternalPartyConfigState : AmuletApp -> Script ()
+updateExternalPartyConfigState app = do
+  (externalPartyConfigStateCid0, externalPartyConfigStateCid1) <- getExternalPartyConfigStates app
+  [(round0Cid, _), (round1Cid, _), (round2Cid, _)] <- Registry.getActiveOpenRoundsSorted app.dso
+  submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_UpdateExternalPartyConfigStates with
+    externalPartyConfigStateCid0
+    externalPartyConfigStateCid1
+    openMiningRoundTriple = OpenMiningRoundTriple with
+      round0Cid
+      round1Cid
+      round2Cid
   pure ()
 
 -- Asset handling utilities
@@ -523,6 +476,15 @@ getLatestOpenRound app = do
     None -> abort "No open open mining rounds"
     Some r-> pure r
 
+getExternalPartyConfigStates : AmuletApp -> Script (ContractId ExternalPartyConfigState, ContractId ExternalPartyConfigState)
+getExternalPartyConfigStates app = do
+  externalPartyConfigStates <- query @ExternalPartyConfigState app.dso
+  case externalPartyConfigStates of
+    [config0, config1] -> if config0._2.targetArchiveAfter < config1._2.targetArchiveAfter
+      then pure (config0._1, config1._1)
+      else pure (config1._1, config0._1)
+    _ -> abort ("Expected exactly two ExternalPartyConfigState contracts but got: " <> show externalPartyConfigStates)
+
 getLatestActiveOpenRound : AmuletApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
 getLatestActiveOpenRound app = do
   -- get active rounds
@@ -536,11 +498,6 @@ getOpenRoundsSorted app = do
   now <- getTime
   -- only get rounds that are actually open as-of now
   rounds <- queryFilter @OpenMiningRound app.dso (\round -> now >= round.opensAt)
-  return $ sortOn (\(_, openRound) -> openRound.round) rounds
-
-getActiveOpenRoundsSorted : AmuletApp -> Script [(ContractId OpenMiningRound, OpenMiningRound)]
-getActiveOpenRoundsSorted app = do
-  rounds <- query @OpenMiningRound app.dso
   return $ sortOn (\(_, openRound) -> openRound.round) rounds
 
 getFeaturedAppRight : AmuletApp -> Party -> Script (Optional (ContractId FeaturedAppRight))
@@ -687,6 +644,9 @@ checkTransferMetadata = genericCheckTxMetadata (.meta) (Some . (.summary))
 
 checkTxMetadata : HasField "meta" a (Optional Metadata) => AmuletApp -> TxKind -> Party -> Script a -> Script a
 checkTxMetadata = genericCheckTxMetadata (.meta) (const None)
+
+checkTxMetadata' : HasField "meta" a Metadata => AmuletApp -> TxKind -> Party -> Script a -> Script a
+checkTxMetadata' = genericCheckTxMetadata (\a -> Some a.meta) (const None)
 
 genericCheckTxMetadata
   : (a -> Optional Metadata) -> (a -> Optional TransferSummary) -> AmuletApp -> TxKind -> Party -> Script a -> Script a

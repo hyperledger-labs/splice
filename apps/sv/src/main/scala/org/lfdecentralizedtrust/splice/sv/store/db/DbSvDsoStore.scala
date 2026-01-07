@@ -888,8 +888,19 @@ class DbSvDsoStore(
                     and template_id_qualified_name = ${QualifiedName(
                   splice.round.OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
                 )}
+                  and mining_round is not null
+                order by mining_round desc limit 1)
+                and coalesce(acs.amulet_round_of_expiry <= (
+                  select (create_arguments->'holdingFeesOpenRoundNumber'->>'number')::bigint as mining_round
+                  from dso_acs_store
+                  where store_id = $acsStoreId
+                    and migration_id = $domainMigrationId
+                    and package_name = ${splice.externalpartyconfigstate.ExternalPartyConfigState.PACKAGE_NAME}
+                    and template_id_qualified_name = ${QualifiedName(
+                  splice.externalpartyconfigstate.ExternalPartyConfigState.TEMPLATE_ID_WITH_PACKAGE_ID
+                )}
                     and mining_round is not null
-                  order by mining_round desc limit 1)""" ++ extraFilter).toActionBuilder,
+                  order by mining_round asc limit 1), true)""" ++ extraFilter).toActionBuilder,
               orderLimit = sql"""order by mining_round desc limit ${sqlLimit(limit)}""",
             ),
             "listExpiredRoundBased",

@@ -17,6 +17,7 @@ import Splice.Api.FeaturedAppRightV1 (FeaturedAppRight_CreateActivityMarkerResul
 import Splice.Scripts.Util
 import Splice.Scripts.DsoTestUtils
 import Splice.Testing.Registries.AmuletRegistry.Parameters (defaultFeaturedAppActivityMarkerAmount)
+import Splice.Testing.Registries.AmuletRegistry (advanceToNextRoundChange)
 
 testFeaturedAppActivityMarkers : Script ()
 testFeaturedAppActivityMarkers = do
@@ -136,7 +137,7 @@ testFeaturedAppActivityMarkers = do
   runNextIssuanceD app amuletPrice
   runNextIssuanceD app amuletPrice
   -- advance until the opensAt
-  advanceToNextRoundChange app
+  advanceToNextRoundChange app.dso
   -- Check that coupons are archived, we don't check the detailed minting computations
   -- as these are identical to any other app reward coupons.
   runAmuletDepositBots app

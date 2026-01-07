@@ -181,25 +181,31 @@ class WalletTimeBasedIntegrationTest
       advanceRoundsToNextRoundOpening
 
       clue("Check wallet after advancing to next 2 round") {
-        eventually()(aliceWalletClient.list().lockedAmulets.head.round shouldBe startRound + 2)
+        val lockedAmulet =
+          eventually() {
+            val response = aliceWalletClient.list()
+            val lockedAmulet = response.lockedAmulets.loneElement
+            lockedAmulet.round shouldBe startRound + 2
+            lockedAmulet
+          }
         logger.debug(
-          s"lockedAmulet has round: ${aliceWalletClient.list().lockedAmulets.head.round}"
+          s"lockedAmulet has round: ${lockedAmulet.round}"
         )
-        aliceWalletClient.list().lockedAmulets should have length 1
 
         // The locked amulet is expired but not yet archived.
         // It will be archived when no amulets can be used as transfer input.
         // ie, in 2 rounds
-        aliceWalletClient.list().lockedAmulets.head.accruedHoldingFee shouldBe aliceWalletClient
-          .list()
-          .lockedAmulets
-          .head
-          .effectiveAmount
+        lockedAmulet.accruedHoldingFee shouldBe lockedAmulet.effectiveAmount
       }
 
       // advance 2 more rounds.
       advanceRoundsToNextRoundOpening
       advanceRoundsToNextRoundOpening
+
+      waitForUpdateExternalPartyConfigStatesAutomation
+
+      advanceTimeAndUpdateExternalPartyConfigStates
+      advanceTimeAndUpdateExternalPartyConfigStates
 
       setTriggersWithin(
         Seq.empty,

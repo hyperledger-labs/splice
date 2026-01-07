@@ -1,0 +1,26 @@
+module Splice.ExternalPartyConfigState where
+
+import Splice.AmuletConfig
+import qualified Splice.AmuletConfig as Unit
+import Splice.Util
+import Splice.Types
+
+-- | `ExternalPartyConfigState` stores the configuration required for transfer, allocations, traffic purchases and taps.
+-- While it exposes a subset of the information also available on `OpenMiningRound`, `ExternalPartyConfigState` contracts
+-- are active much longer allowing for a 24 delay between preparing and executing a transaction.
+--
+-- There are always two `ExternalPartyConfigState` contracts created approximately `externalPartyConfigStateTickDuration` apart from each other
+-- and each is active for `2 * externalPartyConfigStateTickDuration`.
+template ExternalPartyConfigState
+  with
+    dso : Party
+    holdingFeesOpenRoundNumber : Round -- ^ The round number to use for charging holding fees for newly created contracts.
+    amuletPrice : Decimal -- ^ Amulet price at the time the config state was created. 
+    transferConfig : TransferConfigV2 Unit.USD -- ^ Transfer config at the time the config state was created.
+    targetArchiveAfter : Time -- ^ Lower bound on the time the contract gets archived, not enforced as a strict upper bound but the SVs will archive it shortly after this time has been reached.
+  where
+    signatory dso
+
+instance HasCheckedFetch ExternalPartyConfigState ForDso where
+  contractGroupId ExternalPartyConfigState {..} = ForDso with
+    dso = dso

@@ -143,11 +143,8 @@ instance Monoid Metadata  where
 -- Choice context keys for splice
 ---------------------------------
 
-amuletRulesContextKey : Text
-amuletRulesContextKey = "amulet-rules"
-
-openRoundContextKey : Text
-openRoundContextKey = "open-round"
+externalPartyConfigStateContextKey : Text
+externalPartyConfigStateContextKey = "external-party-config-state"
 
 featuredAppRightContextKey : Text
 featuredAppRightContextKey = "featured-app-right"

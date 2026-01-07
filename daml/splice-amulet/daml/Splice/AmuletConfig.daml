@@ -3,6 +3,7 @@
 
 module Splice.AmuletConfig where
 
+import DA.Optional
 import DA.Time
 
 import Splice.Fees
@@ -31,6 +32,21 @@ data TransferConfig unit = TransferConfig with
     maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked amulet.
   deriving (Eq, Show)
 
+transferConfigToTransferConfigV2 : TransferConfig unit -> TransferConfigV2 unit
+transferConfigToTransferConfigV2 tc = TransferConfigV2 with
+    holdingFee = tc.holdingFee
+    maxNumInputs = tc.maxNumInputs
+    maxNumOutputs = tc.maxNumOutputs
+    maxNumLockHolders = tc.maxNumLockHolders
+
+-- | Stripped down TransferConfig after CIP 78 removed fees.
+data TransferConfigV2 unit = TransferConfigV2 with
+    holdingFee : RatePerRound
+    maxNumInputs : Int
+    maxNumOutputs : Int
+    maxNumLockHolders : Int
+  deriving (Eq, Show)
+
 -- | Configuration includes TransferConfig, issuance curve and tickDuration
 --
 -- See Splice.Scripts.Parameters for concrete values.
@@ -47,7 +63,11 @@ data AmuletConfig unit = AmuletConfig with
     featuredAppActivityMarkerAmount : Optional Decimal -- ^ $-amount used for the conversion from FeaturedAppActivityMarker -> AppRewardCoupon
     optDevelopmentFundManager : Optional Party
       -- ^ Party authorized to manage and allocate minting rights from the Development Fund.
+    externalPartyConfigStateTickDuration : Optional RelTime -- ^ Half the lifetime of an `ExternalPartyConfigState` contract and the overlap between two successive contracts.
   deriving (Eq, Show)
+
+getExternalPartyConfigStateTickDuration : AmuletConfig a -> RelTime
+getExternalPartyConfigStateTickDuration config = fromOptional (hours 24) config.externalPartyConfigStateTickDuration
 
 -- $1/year specified as a daily rate
 defaultTransferPreapprovalFee : Decimal
@@ -125,6 +145,7 @@ instance Patchable (AmuletConfig USD) where
     transferPreapprovalFee = patch new.transferPreapprovalFee base.transferPreapprovalFee current.transferPreapprovalFee
     featuredAppActivityMarkerAmount = patch new.featuredAppActivityMarkerAmount base.featuredAppActivityMarkerAmount current.featuredAppActivityMarkerAmount
     optDevelopmentFundManager = patch new.optDevelopmentFundManager base.optDevelopmentFundManager current.optDevelopmentFundManager
+    externalPartyConfigStateTickDuration = patch new.externalPartyConfigStateTickDuration base.externalPartyConfigStateTickDuration current.externalPartyConfigStateTickDuration
 
 instance Patchable (TransferConfig USD) where
   patch new base current = TransferConfig with

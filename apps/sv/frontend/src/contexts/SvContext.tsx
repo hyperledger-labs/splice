@@ -30,15 +30,13 @@ export const useDsoInfos = (): UseQueryResult<DsoInfo> => {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export const useFeatureSupport = (): UseQueryResult<{
-}> => {
+export const useFeatureSupport = (): UseQueryResult<{}> => {
   const { featureSupport } = useSvAdminClient();
   return useQuery({
     queryKey: ['featureSupport'],
     queryFn: async () => {
       await featureSupport();
-      return {
-      };
+      return {};
     },
   });
 };

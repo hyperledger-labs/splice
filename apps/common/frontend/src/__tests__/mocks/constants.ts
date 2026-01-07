@@ -192,6 +192,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                 transferPreapprovalFee: null,
                 featuredAppActivityMarkerAmount: null,
                 optDevelopmentFundManager: null,
+                externalPartyConfigStateTickDuration: null,
               },
             },
           },

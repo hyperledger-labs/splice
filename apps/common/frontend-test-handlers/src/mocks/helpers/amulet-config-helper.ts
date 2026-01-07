@@ -226,6 +226,7 @@ export function getAmuletRulesConfig(
     transferPreapprovalFee: null,
     featuredAppActivityMarkerAmount: null,
     optDevelopmentFundManager: null,
+    externalPartyConfigStateTickDuration: null,
   };
 }
 
@@ -298,7 +299,10 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
   "_values": [
     {}
   ]
-}</pre></div></li></ul></li></ul></li><li data-key="featuredAppActivityMarkerAmount"
+}</pre></div></li></ul></li></ul></li><li data-key="externalPartyConfigStateTickDuration"
+    class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">externalPartyConfigStateTickDuration</div><div
+      class="jsondiffpatch-value"><pre>null</pre></div></li><li data-key="featuredAppActivityMarkerAmount"
     class="jsondiffpatch-unchanged"><div
       class="jsondiffpatch-property-name">featuredAppActivityMarkerAmount</div><div
       class="jsondiffpatch-value"><pre>null</pre></div></li><li

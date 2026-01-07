@@ -222,6 +222,7 @@ testDvP = script do
   WalletClient.checkBalanceApprox bob amuletId 1079.8  -- around 0.2 $ of fees paid
 
   -- check that the provider got their featured app reward coupons
+  AmuletRegistry.convertAllFeaturedAppActivityMarkers registry.dso
   coupons <- map snd <$> query @AppRewardCoupon provider
   let couponWithAmount : Decimal -> AppRewardCoupon -> Bool
       couponWithAmount amount coupon =
@@ -232,20 +233,19 @@ testDvP = script do
 
       extraAppReward = 2.0 -- 1 $ (at 0.5 Amulet per $)
       providerWeight = 0.8
-      aliceAmount = providerWeight * extraAppReward
-      bobAmount = providerWeight * extraAppReward
+      aliceAmount = providerWeight * extraAppReward * 2.0
+      bobAmount = providerWeight * extraAppReward * 2.0
 
       checkNumCouponsFor b expectedNumCoupons = do
         let numCoupons = length $ filter (\c -> c.beneficiary == Some b) coupons
         unless (numCoupons == expectedNumCoupons ) $
           fail $ "Expected " <> show expectedNumCoupons <> " coupons for " <> show b <> ", but got " <> show numCoupons
 
-
   checkCouponExists aliceAmount
   checkCouponExists bobAmount
 
-  checkNumCouponsFor providerBeneficiary1 2
-  checkNumCouponsFor providerBeneficiary2 2
+  checkNumCouponsFor providerBeneficiary1 1
+  checkNumCouponsFor providerBeneficiary2 1
 
   -- TODO (DACH-NY/canton-network-node#17541):early abortion of settlement, unwinding of expired settlements, etc.
   pure ()

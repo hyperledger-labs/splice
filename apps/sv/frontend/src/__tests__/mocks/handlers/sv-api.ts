@@ -186,7 +186,7 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
   }),
 
   rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
-    return res(ctx.json<FeatureSupportResponse>({ }));
+    return res(ctx.json<FeatureSupportResponse>({}));
   }),
 
   validatorLicensesHandler(svUrl),

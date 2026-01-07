@@ -111,6 +111,8 @@ object ChoiceContextBuilder {
               .asRuntimeException()
           )
         )
+      // TODO(#3630) Don't include amulet rules and newest open round when informees all have vetted the newest version.
+      externalPartyConfigStateO <- store.lookupLatestExternalPartyConfigState()
     } yield {
       val choiceContextBuilder: Builder = newBuilder(
         AmuletConfigSchedule(amuletRules.payload.configSchedule)
@@ -120,10 +122,12 @@ object ChoiceContextBuilder {
       )
 
       (
-        choiceContextBuilder.addContracts(
-          "amulet-rules" -> amuletRules,
-          "open-round" -> newestOpenRound.contract,
-        ),
+        choiceContextBuilder
+          .addContracts(
+            "amulet-rules" -> amuletRules,
+            "open-round" -> newestOpenRound.contract,
+          )
+          .addOptionalContract("external-party-config-state" -> externalPartyConfigStateO),
         newestOpenRound.contract.payload,
       )
     }
