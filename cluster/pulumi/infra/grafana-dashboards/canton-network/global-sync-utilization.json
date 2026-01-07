@@ -607,7 +607,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "percentunit"
         },
         "overrides": []
       },
@@ -646,6 +647,7 @@
     }
   ],
   "preload": false,
+  "refresh": "30s",
   "schemaVersion": 41,
   "tags": [],
   "templating": {
@@ -673,12 +675,12 @@
     ]
   },
   "time": {
-    "from": "now-30d",
+    "from": "now-90d",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "UTC",
   "title": "Global Synchronizer Utilization",
   "uid": "fe8wt04z620aof",
-  "version": 1
+  "version": 3
 }
