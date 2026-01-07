@@ -194,6 +194,22 @@ class UserWalletAutomationService(
       )
     )
   }
+
+  registerTrigger(
+    new ExpireMintingDelegationTrigger(
+      triggerContext,
+      store,
+      connection(SpliceLedgerConnectionPriority.Low),
+    )
+  )
+
+  registerTrigger(
+    new ExpireMintingDelegationProposalTrigger(
+      triggerContext,
+      store,
+      connection(SpliceLedgerConnectionPriority.Low),
+    )
+  )
 }
 
 object UserWalletAutomationService extends AutomationServiceCompanion {
@@ -219,5 +235,7 @@ object UserWalletAutomationService extends AutomationServiceCompanion {
       aTrigger[AutoAcceptTransferOffersTrigger],
       aTrigger[AmuletMetricsTrigger],
       aTrigger[TxLogBackfillingTrigger[TxLogEntry]],
+      aTrigger[ExpireMintingDelegationTrigger],
+      aTrigger[ExpireMintingDelegationProposalTrigger],
     )
 }
