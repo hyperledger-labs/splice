@@ -148,6 +148,8 @@ svs:
     pruning:
       cometbft:
         retainBlocks: 2000
+      sequencer:
+        enabled: false
     scanApp:
       resources:
         limits:
