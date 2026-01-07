@@ -30,7 +30,7 @@ const EnvVarConfigSchema = z.object({
   value: z.string(),
 });
 export type EnvVarConfig = z.infer<typeof EnvVarConfigSchema>;
-const AppPruningSchema = z
+const CantonPruningSchema = z
   .object({
     enabled: z.boolean().optional(),
     cron: z.string().optional(),
@@ -139,8 +139,8 @@ const SingleSvConfigSchema = z
             retentionPeriod: z.string().optional(),
           })
           .optional(),
-        mediator: AppPruningSchema,
-        participant: AppPruningSchema,
+        mediator: CantonPruningSchema,
+        participant: CantonPruningSchema,
       })
       .optional(),
     logging: z

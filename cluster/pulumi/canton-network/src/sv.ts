@@ -420,8 +420,6 @@ function installSvApp(
     decentralizedSynchronizer
   );
 
-  console.error(`INstall with ${JSON.stringify(commonSvAppValues)}`);
-
   const svValues = {
     ...commonSvAppValues,
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
