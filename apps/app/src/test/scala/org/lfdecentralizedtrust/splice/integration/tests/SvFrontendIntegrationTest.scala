@@ -319,6 +319,8 @@ class SvFrontendIntegrationTest
       val requestReasonUrl = "https://new-proposal-url.com/"
       val requestReasonBody = "This is a summary of the proposal"
 
+      var proposalDetailsUrl: String = ""
+
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "sv1 operator can login and browse to the governance tab", {
@@ -407,6 +409,7 @@ class SvFrontendIntegrationTest
             eventually() {
               val currentUrl = webDriver.getCurrentUrl
               currentUrl should include("/governance-beta/proposals/")
+              proposalDetailsUrl = currentUrl
             }
           },
         )
@@ -461,25 +464,31 @@ class SvFrontendIntegrationTest
       }
 
       withFrontEnd("sv1") { implicit webDriver =>
-        clue("sv1 operator can see the new vote from sv2") {
-          val sv2PartyId = sv2Backend.getDsoInfo().svParty.toProtoPrimitive
-          eventuallySucceeds() {
-            val votes =
-              webDriver.findElements(By.cssSelector("[data-testid='proposal-details-vote']"))
-            // There should be at least one vote (sv2's)
-            votes.size should be >= 1
+        actAndCheck(
+          "sv1 navigates back to the proposal details page", {
+            go to proposalDetailsUrl
+          },
+        )(
+          "sv1 can see the new vote from sv2",
+          _ => {
+            val sv2PartyId = sv2Backend.getDsoInfo().svParty.toProtoPrimitive
+            val sv2PartyHint = sv2PartyId.split("::").head
+            eventuallySucceeds() {
+              val votes =
+                webDriver.findElements(By.cssSelector("[data-testid='proposal-details-vote']"))
+              votes.size should be >= 1
 
-            // Verify that sv2's vote is among the votes
-            val voterPartyIds = votes.asScala.map { vote =>
-              vote
-                .findElement(
-                  By.cssSelector("[data-testid='proposal-details-voter-party-id-input']")
-                )
-                .getAttribute("value")
+              val voterPartyTexts = votes.asScala.map { vote =>
+                vote
+                  .findElement(
+                    By.cssSelector("[data-testid='proposal-details-voter-party-id-value']")
+                  )
+                  .getText
+              }
+              voterPartyTexts.exists(_.startsWith(sv2PartyHint)) shouldBe true
             }
-            voterPartyIds should contain(sv2PartyId)
-          }
-        }
+          },
+        )
       }
     }
 
