@@ -144,6 +144,7 @@ class UserWalletService(
     txLogBackfillEnabled = txLogBackfillEnabled,
     txLogBackfillingBatchSize = txLogBackfillingBatchSize,
     params,
+    walletManager.externalPartyWalletManager,
   )
 
   /** The connection to use when submitting commands based on reads from the WalletStore.
