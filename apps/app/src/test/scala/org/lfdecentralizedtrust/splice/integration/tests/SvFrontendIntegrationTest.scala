@@ -387,6 +387,12 @@ class SvFrontendIntegrationTest
               click on id("submit-button")
             }
 
+            // Wait for confirmation view (button text changes to "Submit Proposal")
+            eventually() {
+              val submitButton = webDriver.findElement(By.id("submit-button"))
+              submitButton.getText shouldBe "Submit Proposal"
+            }
+
             eventually() {
               click on id("submit-button")
             }
