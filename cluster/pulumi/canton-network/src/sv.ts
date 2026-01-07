@@ -48,7 +48,7 @@ import {
   installSvLoopback,
   SvParticipant,
   valuesForSvApp,
-  valuesForValidatorApp,
+  valuesForSvValidatorApp,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { SvConfig, svsConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
 import { installValidatorApp } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
@@ -358,7 +358,7 @@ async function installValidator(
   scan: Resource
 ) {
   const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
-  const commonValidatorAppValues = valuesForValidatorApp(
+  const commonValidatorAppValues = valuesForSvValidatorApp(
     decentralizedSynchronizerMigrationConfig,
     svConfig
   );

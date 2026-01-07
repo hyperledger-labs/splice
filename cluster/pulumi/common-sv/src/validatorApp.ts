@@ -7,7 +7,7 @@ import {
 
 import { EnvVarConfig, SingleSvConfiguration } from './singleSvConfig';
 
-export function valuesForValidatorApp(
+export function valuesForSvValidatorApp(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   config: SingleSvConfiguration
 ): {

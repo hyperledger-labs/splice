@@ -59,7 +59,7 @@ import {
   installSvLoopback,
   svsConfig,
   valuesForSvApp,
-  valuesForValidatorApp,
+  valuesForSvValidatorApp,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import {
@@ -405,7 +405,7 @@ async function installSvAndValidator(
 
   installInfoEndpoint(xns, decentralizedSynchronizerMigrationConfig, scan);
 
-  const commonValidatorAppValues = valuesForValidatorApp(
+  const commonValidatorAppValues = valuesForSvValidatorApp(
     decentralizedSynchronizerMigrationConfig,
     svConfig
   );
