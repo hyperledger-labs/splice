@@ -16,9 +16,8 @@ import Splice.Fees
 import Splice.Expiry
 import Splice.Round
 import Splice.Types
-import Splice.RelRound
-import Splice.Schedule
 import Splice.Testing.Registries.AmuletRegistry.Parameters
+import Splice.Testing.Registries.AmuletRegistry (advanceToNextRoundChange)
 import Splice.Scripts.Util
 
 import DA.Foldable (forA_)
@@ -33,39 +32,14 @@ scaleAmuletConfig amuletPrice config = AmuletConfig with
   packageConfig = config.packageConfig
   transferPreapprovalFee = fmap (/ amuletPrice) config.transferPreapprovalFee
   featuredAppActivityMarkerAmount = fmap (/ amuletPrice) config.featuredAppActivityMarkerAmount
+  externalPartyConfigStateTickDuration = config.externalPartyConfigStateTickDuration
 
 test : Script ()
 test = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
-  advanceToNextRoundChange app -- advance time so we're out of the initial mining round
-  currentTime <- getTime
+  advanceToNextRoundChange app.dso -- advance time so we're out of the initial mining round
   let amuletPrice = 2.5
       config = scaleAmuletConfig amuletPrice defaultAmuletConfig
-      tickDuration = config.tickDuration
-
-      t00_00 = currentTime
-      t05_00 = addRelRoundN 2 currentTime tickDuration
-      t07_30 = addRelRoundN 3 currentTime tickDuration
-      t12_30 = addRelRoundN 5 currentTime tickDuration
-      t15_00 = addRelRoundN 6 currentTime tickDuration
-      t17_30 = addRelRoundN 7 currentTime tickDuration
-
-      issuingFor0 = days 0
-      issuingFor3 = issuingFor0 + tickDuration + tickDuration + tickDuration
-
-      amuletConfigUsd = defaultAmuletConfig
-      transferConfigUsd = amuletConfigUsd.transferConfig
-      issuanceConfig0 = getValueAsOf issuingFor0 amuletConfigUsd.issuanceCurve
-      issuanceConfig3 = getValueAsOf issuingFor3 amuletConfigUsd.issuanceCurve
-      openRound0 = OpenMiningRound with dso = app.dso; round = Round 0; amuletPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
-      openRound3 = openRound0 with round = Round 3; opensAt = t07_30 ; targetClosesAt = t12_30; issuanceConfig = issuanceConfig3
-
-  -- Lock expires at T00:12:30
-  let lockExpiresAt12_30 = TimeLock with holders = [alice.primaryParty]; expiresAt = t12_30; optContext = None
-  -- Lock expires at T00:15:00
-  let lockExpiresAt15_00 = TimeLock with holders = [alice.primaryParty]; expiresAt = t15_00; optContext = None
-  -- Lock expires at T00:17:30
-  let lockExpiresAt17_30 = TimeLock with holders = [alice.primaryParty]; expiresAt = t17_30; optContext = None
 
   -- This amulet is estimated to expire at round 5.
   -- we exploit that there are exactly three open rounds active at any point in time.
@@ -75,60 +49,12 @@ test = script do
   let amountExpiresAtRound5 = ExpiringAmount with initialAmount = config.transferConfig.holdingFee.rate * 3.5; createdAt = Round 1; ratePerRound = config.transferConfig.holdingFee
   let bounded = amountExpiresAt amountExpiresAtRound5
   bounded === Singleton (Round 5)
-  let (Singleton r) = bounded
-  estimateOpenRoundCreatedAt config.tickDuration openRound3 (Singleton(addRelRound r (RelRound 2))) === Some (Singleton t15_00)
-
-  -- lock expires at T00:12:30 before amulet expires at T00:15:00
-  let lockExpireBeforeAmulet = doesLockExpireBeforeAmulet openRound3 lockExpiresAt12_30 amountExpiresAtRound5 config.tickDuration
-  assert lockExpireBeforeAmulet
-
-  -- lock expires at T00:15:00 while amulet expires at T00:15:00
-  let lockExpiresAsAmulet = doesLockExpireBeforeAmulet openRound3 lockExpiresAt15_00 amountExpiresAtRound5 config.tickDuration
-  assert $ not lockExpiresAsAmulet
-
-  -- lock expires at T00:17:30 after amulet expires at T00:15:00
-  let lockExpiresAfterAmulet = doesLockExpireBeforeAmulet openRound3 lockExpiresAt17_30 amountExpiresAtRound5 config.tickDuration
-  assert $ not lockExpiresAfterAmulet
-
-  let largeAmount = ExpiringAmount with initialAmount = 10000.0; createdAt = Round 1; ratePerRound = config.transferConfig.holdingFee
-  -- lock expires at T00:12:30 before amulet with large amount, which is regarded as never expires (EstimatedTime.AfterMaxTime)
-  let lockExpiresBeforeLargeAmulet = doesLockExpireBeforeAmulet openRound3 lockExpiresAt12_30 largeAmount config.tickDuration
-  assert lockExpiresBeforeLargeAmulet
-
-  pure ()
-
--- From #2336, This test case is to make sure we handle DA.Time overflow
--- in estimateOpenRoundCreatedAt when the amulet amount is too large
-testLargeAmuletExpiry : Script ()
-testLargeAmuletExpiry = script do
-  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
-  now <- getTime
-
-  let amuletPrice = 2.5
-      configUsd = defaultAmuletConfig
-      transferConfigAmulet = scaleFees (1.0 / amuletPrice) configUsd.transferConfig
-      e = ExpiringAmount with initialAmount = 10000.0; createdAt = Round 1; ratePerRound = transferConfigAmulet.holdingFee
-      Singleton r = amountExpiresAt e
-      expiringRound = Singleton $ addRelRound r (RelRound 2)
-      issuingFor = minutes 5
-      currentMiningRound = OpenMiningRound with
-        dso = app.dso
-        round = Round 1
-        amuletPrice = 1.0
-        opensAt = now
-        targetClosesAt = addRelTime now (minutes 5)
-        issuingFor
-        transferConfigUsd = configUsd.transferConfig
-        issuanceConfig = getValueAsOf issuingFor configUsd.issuanceCurve
-        tickDuration = configUsd.tickDuration
-
-  estimateOpenRoundCreatedAt configUsd.tickDuration currentMiningRound expiringRound === Some AfterMaxBound
   pure ()
 
 testExpireLockedAmulet : Script ()
 testExpireLockedAmulet = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
-  advanceToNextRoundChange app -- advance time so we're out of the initial mining round
+  advanceToNextRoundChange app.dso -- advance time so we're out of the initial mining round
   passTime (minutes 10) -- pass enough time so that round 2 expires in 10 minutes
 
   -- Locking the amulet with with initialAmount 0.000005 and created at round 2 but with a

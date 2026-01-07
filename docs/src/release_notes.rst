@@ -5,6 +5,42 @@
 
 .. _release_notes:
 
+.. release-notes:: upcoming
+
+  - Daml
+
+    - Support 24h signing delays for CC transfers and allocations
+
+      - This is exposed through the existing token standard APIs so no
+        change is required. Scan returns a slightly different choice
+        context so make sure to just pass that along opaquely.
+      - As part of this change additional restrictions are imposed on ``AmuletConfig``. All of these restrictions
+        already hold on the current configs on DevNet, TestNet and MainNet:
+
+        - CC usage fees can no longer be set to non-zero values. They were set to zero in CIP 78.
+
+        - ``extraFeaturedAppRewardAmount`` can no longer be set to a different value than ``featuredAppActivityMarkerAmount``.
+          Both of those are currently set to $1.
+
+        - The config schedule on ``AmuletRules`` can no longer contain ``futureValues``. The ability to do so through the UI was removed in CIP 51 but
+          in theory it would have still been possible to set this through internal APIs.
+
+    - ``TransferCommand`` is deprecated and will removed in a future
+      version. It was originally introduced to support 24h signing
+      delays and is no longer required now that this is also available
+      through the token standard APIs. This also applies to the
+      corresponding validator APIs
+      ``/v0/admin/external-party/transfer-preapproval/prepare-send``
+      and
+      ``/v0/admin/external-party/transfer-preapproval/submit-send``
+      which should be replaced by the :ref:`Token Standard APIs
+      <token_standard>`.
+
+    - FIXME: Add versions required for this change
+
+  - Validator
+    - Added support for picking a custom name for new parties created when onboarding users via the `/v0/admin/users` API. See :ref:`docs <validator-users>`.
+
 .. release-notes:: 0.5.5
 
   - API security

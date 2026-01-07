@@ -14,6 +14,7 @@ import Splice.AmuletRules
 import Splice.Types
 import Splice.Wallet.Payment
 import Splice.Wallet.Subscriptions
+import Splice.Testing.Registries.AmuletRegistry (convertAllFeaturedAppActivityMarkers)
 
 import Splice.Scripts.Util
 
@@ -172,6 +173,8 @@ testUSDSubscription = script do
 
   amulets0 <- query @Amulet pizzeria.primaryParty
   (_subscriptionCid, subscriptionStateCid, _pizzeriasAmulet) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
+
+  convertAllFeaturedAppActivityMarkers app.dso
 
   [(_, reward)] <- query @Splice.Amulet.AppRewardCoupon provider.primaryParty
   reward.amount === expectedAppRewardInUnlockLeg

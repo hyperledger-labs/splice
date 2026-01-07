@@ -24,10 +24,17 @@ module Splice.Testing.Registries.AmuletRegistry
   , expireLockAsOwner
   , tapLockedAndUnlockedFunds
 
+  -- ** round management
+  , runNextIssuance
+  , getActiveOpenRoundsSorted
+  , advanceToNextRoundChange
+  , convertAllFeaturedAppActivityMarkers
   ) where
 
-import DA.Action (unless)
+import DA.Action (unless, when)
 import DA.Date
+import DA.Foldable (forA_)
+import qualified DA.Traversable as Traversable
 import qualified DA.TextMap as TextMap
 import DA.Optional (isSome)
 import DA.List.Total
@@ -46,10 +53,13 @@ import Splice.AmuletAllocation
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
 import Splice.Expiry
+import Splice.ExternalPartyConfigState
 import Splice.ExternalPartyAmuletRules
 import Splice.Fees
+import Splice.Issuance
 import Splice.Schedule
 import Splice.Round
+import Splice.ValidatorLicense
 
 import Splice.Testing.Utils
 import Splice.Testing.Registries.AmuletRegistry.Parameters
@@ -113,12 +123,13 @@ initialize config = do
   _ <- submit dso $ createCmd AmuletRules with
     configSchedule = defaultAmuletConfigSchedule
     isDevNet = True
+    contractStateSchemaVersion = None
     ..
 
   _ <- submit dso $ createCmd ExternalPartyAmuletRules with dso
 
   (amuletRulesCid, _) <- getAmuletRules registry
-  submit registry.dso $ exerciseCmd amuletRulesCid AmuletRules_Bootstrap_Rounds with
+  _ <- submit registry.dso $ exerciseCmd amuletRulesCid AmuletRules_Bootstrap_Rounds with
       amuletPrice = config.initialAmuletPrice
       round0Duration = minutes 10 -- no special setup for normal tests
       initialRound = None
@@ -305,8 +316,11 @@ mkAmuletContext values = ChoiceContext with
   values
 
 getAmuletRules : AmuletRegistry -> Script (ContractId AmuletRules, AmuletRules)
-getAmuletRules registry = do
-  rules <- query @AmuletRules registry.dso
+getAmuletRules registry = getAmuletRules' registry.dso
+
+getAmuletRules' : Party -> Script (ContractId AmuletRules, AmuletRules)
+getAmuletRules' dso = do
+  rules <- query @AmuletRules dso
   case rules of
     [rule] -> return rule
     [] -> failNotInitialized "No AmuletRules found"
@@ -314,10 +328,13 @@ getAmuletRules registry = do
 
 -- Primarily used by submitters to decide against which round they should try to transact.
 getLatestOpenRound : AmuletRegistry -> Script (ContractId OpenMiningRound, OpenMiningRound)
-getLatestOpenRound registry = do
+getLatestOpenRound registry = getLatestOpenRound' registry.dso
+
+getLatestOpenRound' : Party -> Script (ContractId OpenMiningRound, OpenMiningRound)
+getLatestOpenRound' dso = do
   now <- getTime
   -- only get open rounds
-  rounds <- queryFilter @OpenMiningRound registry.dso (\round -> now >= round.opensAt)
+  rounds <- queryFilter @OpenMiningRound dso (\round -> now >= round.opensAt)
   case maximumOn (\(_, r) -> r.round) rounds of
     None -> failNotInitialized "No open open mining round found"
     Some r-> pure r
@@ -350,12 +367,29 @@ getOpenRoundContext registry = do
         [(openRoundContextKey, AV_ContractId $ coerceContractId openRoundCid)]
     disclosures = openRoundD
 
+lookupExternalPartyConfigStateContext : AmuletRegistry -> Script (Optional OpenApiChoiceContext)
+lookupExternalPartyConfigStateContext registry = do
+  extPartyConfigs <- query @ExternalPartyConfigState registry.dso
+  Traversable.forA (DA.List.Total.maximumOn (\(_, c) -> c.targetArchiveAfter) extPartyConfigs) $ \(extConfigId, _) -> do
+    extConfigDD <- queryDisclosure' @ExternalPartyConfigState registry.dso extConfigId
+    pure OpenApiChoiceContext with
+      choiceContext = mkAmuletContext $ TextMap.fromList
+          [(externalPartyConfigStateContextKey, AV_ContractId $ coerceContractId extConfigId)]
+      disclosures = extConfigDD
+
+getExternalPartyConfigStateWithFallbackContext : AmuletRegistry -> Script OpenApiChoiceContext
+getExternalPartyConfigStateWithFallbackContext registry = do
+  optContext <- lookupExternalPartyConfigStateContext registry
+  case optContext of
+    Some ctx -> pure ctx
+    None -> getOpenRoundContext registry
+
 -- | Context required to call an amulet rules transfer choice.
 getAmuletRulesTransferContext : AmuletRegistry -> Script OpenApiChoiceContext
 getAmuletRulesTransferContext registry = do
   rulesC <- getAmuletRulesContext registry
-  roundC <- getOpenRoundContext registry
-  pure $ rulesC <> roundC
+  extConfigC <- getExternalPartyConfigStateWithFallbackContext registry
+  pure $ rulesC <> extConfigC
 
 lookupPreapprovalWithContext : AmuletRegistry -> Party -> Script (Optional TransferPreapproval, OpenApiChoiceContext)
 lookupPreapprovalWithContext registry receiver = do
@@ -393,11 +427,9 @@ expireLockAsOwner : AmuletRegistry -> ContractId Holding -> Script (ContractId H
 expireLockAsOwner  registry lockedHoldingCid = do
   let lockedAmuletCid = coerceContractId lockedHoldingCid
   Some lockedAmulet <- queryContractId @LockedAmulet registry.dso lockedAmuletCid
-  (openRoundCid, _) <- getLatestOpenRound registry
-  openRoundD <- queryDisclosure' @OpenMiningRound registry.dso openRoundCid
-  result <- submitWithDisclosures' lockedAmulet.amulet.owner openRoundD $ exerciseCmd lockedAmuletCid
-    LockedAmulet_OwnerExpireLock with openRoundCid
-  pure (toInterfaceContractId result.amuletSum.amulet)
+  result <- submit lockedAmulet.amulet.owner $ exerciseCmd lockedAmuletCid
+    LockedAmulet_OwnerExpireLockV2
+  pure (toInterfaceContractId result.amuletCid)
 
 -- | Get funds in equal splits as locked and unlocked holdings to test using
 -- expired locked holdings as transfer inputs.
@@ -412,3 +444,88 @@ tapLockedAndUnlockedFunds registry user amount = do
    expiresAt = now -- we want these funds to already be expired
    optContext = Some "test expired lock"
   pure [unlockedCid, lockedCid]
+
+-- | Advance time to next round change
+advanceToNextRoundChange : Party -> Script ()
+advanceToNextRoundChange dso = do
+  [(_, oldest), _, (_, newest)] <- getActiveOpenRoundsSorted dso
+  now <- getTime
+  let roundChangePossibleAt = max oldest.targetClosesAt newest.opensAt
+  when (now < roundChangePossibleAt) $ setTime roundChangePossibleAt
+
+getActiveOpenRoundsSorted : Party -> Script [(ContractId OpenMiningRound, OpenMiningRound)]
+getActiveOpenRoundsSorted dso = do
+  rounds <- query @OpenMiningRound dso
+  return $ sortOn (\(_, openRound) -> openRound.round) rounds
+
+convertAllFeaturedAppActivityMarkers : Party -> Script ()
+convertAllFeaturedAppActivityMarkers dso = do
+  markers <- queryFilter @FeaturedAppActivityMarker dso (\m -> m.dso == dso)
+  (latestOpenRoundCid, _) <- getLatestOpenRound' dso
+  (amuletRulesCid, _) <- getAmuletRules' dso
+  submit dso $ exerciseCmd amuletRulesCid AmuletRules_ConvertFeaturedAppActivityMarkers with
+    markerCids = map fst markers
+    openMiningRoundCid = latestOpenRoundCid
+  pure ()
+
+
+-- Only directly call this function if you know what you are doing.
+-- Due to effective-dating, the price you give here is not the amulet price that can be used immediately
+runNextIssuance : Party -> Decimal -> Script ()
+runNextIssuance dso amuletPrice = do
+    [(amuletRulesCid, _)] <- query @AmuletRules dso
+    advanceToNextRoundChange dso
+    -- expire rewards for closed rounds
+    closedRounds <- query @ClosedMiningRound dso
+    forA_ closedRounds $ \(closedRoundCid, miningRound) -> do
+      -- app rewards
+      rewards <- queryFilter @AppRewardCoupon dso (\r -> r.round == miningRound.round)
+      forA_ rewards $ \(rcid, _) ->
+        submit dso $ exerciseCmd rcid AppRewardCoupon_DsoExpire with closedRoundCid
+      -- validator rewards
+      rewards <- queryFilter @ValidatorRewardCoupon dso (\r -> r.round == miningRound.round)
+      forA_ rewards $ \(rcid, _) ->
+        submit dso $ exerciseCmd rcid ValidatorRewardCoupon_DsoExpire with closedRoundCid
+      -- the closed round
+
+
+      submit dso $ exerciseCmd amuletRulesCid AmuletRules_MiningRound_Archive with
+        closedRoundCid
+
+    -- close issuing rounds that are ready for close
+    now <- getTime
+    imcs <- queryFilter @IssuingMiningRound dso (\r -> r.targetClosesAt <= now)
+    forA_ imcs $ \(issuingRoundCid, _) ->
+      submit dso $ exerciseCmd amuletRulesCid AmuletRules_MiningRound_Close with
+        issuingRoundCid
+
+    -- transition the oldest OpenMiningRound into a SummarizingMiningRound and
+    -- create a new OpenMiningRound
+    [(roundToArchiveCid, roundToArchive), (r2Cid, _), (r3Cid, _)] <- getActiveOpenRoundsSorted dso
+    advanceResult <- submit dso $ exerciseCmd amuletRulesCid AmuletRules_AdvanceOpenMiningRounds with
+      amuletPrice
+      roundToArchiveCid
+      middleRoundCid = r2Cid
+      latestRoundCid = r3Cid
+    let closingRoundCid = advanceResult.summarizingRoundCid
+
+    -- compute total burn
+    appRewardCoupons <- queryFilter @AppRewardCoupon dso (\bc -> bc.round == roundToArchive.round)
+    validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon dso (\bc -> bc.round == roundToArchive.round)
+    validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon dso (\bc -> bc.round == roundToArchive.round)
+    validatorLivenessActivityRecords <- queryFilter @ValidatorLivenessActivityRecord dso (\bc -> bc.round == roundToArchive.round)
+    svRewardCoupons <- queryFilter @SvRewardCoupon dso (\bc -> bc.round == roundToArchive.round)
+
+    let summary = OpenMiningRoundSummary with
+          totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
+          totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
+          totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
+          totalSvRewardWeight = sum [ c.weight | (_, c) <- svRewardCoupons]
+          optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons + length validatorLivenessActivityRecords)
+
+    -- create issuing mining round
+    submit dso $ exerciseCmd amuletRulesCid AmuletRules_MiningRound_StartIssuing with
+      miningRoundCid = closingRoundCid
+      summary
+
+    pure ()

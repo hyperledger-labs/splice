@@ -49,6 +49,7 @@ template DsoBootstrap with
             initialValue = amuletConfig
             futureValues = []
           isDevNet
+          contractStateSchemaVersion = None
         _ <- create ExternalPartyAmuletRules with dso
         _ <- create AnsRules with
           dso
