@@ -641,10 +641,10 @@ function configureSequencerHighPerformanceGrpcDestinationRules(
   return [
     ...(function* () {
       for (const migration of DecentralizedSynchronizerUpgradeConfig.runningMigrations()) {
-        for (const sv of coreSvsToDeploy) {
+        for (const sv of allSvsToDeploy) {
           yield configureSequencerHighPerformanceGrpcDestinationRule(
             ingressNs,
-            sv.ingressName,
+            sv.nodeName,
             migration.id
           );
         }
@@ -655,11 +655,11 @@ function configureSequencerHighPerformanceGrpcDestinationRules(
 
 function configureSequencerHighPerformanceGrpcDestinationRule(
   ingressNs: k8s.core.v1.Namespace,
-  ingressName: string,
+  nodeName: string,
   migrationId: number
 ): k8s.apiextensions.CustomResource {
   const sequencerName = `global-domain-${migrationId}-sequencer`;
-  const ruleName = `${ingressName}-${sequencerName}-high-perf-grpc-rule`;
+  const ruleName = `${nodeName}-${sequencerName}-high-perf-grpc-rule`;
   return new k8s.apiextensions.CustomResource(ruleName, {
     apiVersion: 'networking.istio.io/v1beta1',
     kind: 'DestinationRule',
@@ -668,7 +668,7 @@ function configureSequencerHighPerformanceGrpcDestinationRule(
       namespace: ingressNs.metadata.name,
     },
     spec: {
-      host: `${sequencerName}.${ingressName}.svc.cluster.local`,
+      host: `${sequencerName}.${nodeName}.svc.cluster.local`,
       trafficPolicy: {
         loadBalancer: {
           simple: 'LEAST_REQUEST',
