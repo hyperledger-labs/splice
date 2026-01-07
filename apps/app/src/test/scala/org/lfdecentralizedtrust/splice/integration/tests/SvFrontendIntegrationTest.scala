@@ -315,11 +315,12 @@ class SvFrontendIntegrationTest
         extraFormOps: WebDriverType => Unit
     )(implicit
         env: SpliceTestConsoleEnvironment
-    ) = {
+    ): String = {
       val requestReasonUrl = "https://new-proposal-url.com/"
       val requestReasonBody = "This is a summary of the proposal"
 
       var proposalDetailsUrl: String = ""
+      var proposalContractId: String = ""
 
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
@@ -418,6 +419,9 @@ class SvFrontendIntegrationTest
               val currentUrl = webDriver.getCurrentUrl
               currentUrl should include("/governance-beta/proposals/")
               proposalDetailsUrl = currentUrl
+              // Extract contract ID from URL: /governance-beta/proposals/{contractId}
+              proposalContractId =
+                currentUrl.split("/governance-beta/proposals/")(1).split("\\?")(0)
             }
           },
         )
@@ -498,6 +502,8 @@ class SvFrontendIntegrationTest
           },
         )
       }
+
+      proposalContractId
     }
 
     def testCreateAndVoteDsoRulesAction(action: String, effectiveAtThreshold: Boolean = true)(
@@ -774,25 +780,24 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "NEW UI: Grant Featured App Right" in { implicit env =>
-      val providerId = "test-provider-party-id"
-
-      createProposal("SRARC_GrantFeaturedAppRight", "grant-featured-app") { implicit webDriver =>
+    "NEW UI: Grant and Revoke Featured App Right" in { implicit env =>
+      // First, create a Grant proposal and capture the contract ID
+      val grantProposalContractId = createProposal(
+        "SRARC_GrantFeaturedAppRight",
+        "grant-featured-app",
+      ) { implicit webDriver =>
         eventually() {
           inside(find(id("grant-featured-app-idValue"))) { case Some(element) =>
-            element.underlying.sendKeys(providerId)
+            element.underlying.sendKeys("test-provider-party-id")
           }
         }
       }
-    }
 
-    "NEW UI: Revoke Featured App Right" in { implicit env =>
-      val rightCid = "test-contract-id"
-
+      // Now create a Revoke proposal using the Grant proposal's contract ID
       createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
         eventually() {
           inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
-            element.underlying.sendKeys(rightCid)
+            element.underlying.sendKeys(grantProposalContractId)
           }
         }
       }
@@ -806,7 +811,7 @@ class SvFrontendIntegrationTest
 
     "NEW UI: Create Unclaimed Activity Record" in { implicit env =>
       val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-      val amount = "100.0"
+      val amount = "100"
 
       createProposal(
         "SRARC_CreateUnallocatedUnclaimedActivityRecord",
