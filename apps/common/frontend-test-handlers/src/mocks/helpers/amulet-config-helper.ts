@@ -312,7 +312,8 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
     "validatorRewardCap": "0.2",
     "featuredAppRewardCap": "100.0",
     "unfeaturedAppRewardCap": "0.6",
-    "optValidatorFaucetCap": "2.85"
+    "optValidatorFaucetCap": "2.85",
+    "optDevelopmentFundPercentage": "0.05"
   },
   "futureValues": [
     {
@@ -326,7 +327,8 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
         "validatorRewardCap": "0.2",
         "featuredAppRewardCap": "100.0",
         "unfeaturedAppRewardCap": "0.6",
-        "optValidatorFaucetCap": "2.85"
+        "optValidatorFaucetCap": "2.85",
+        "optDevelopmentFundPercentage": "0.05"
       }
     },
     {
@@ -340,7 +342,8 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
         "validatorRewardCap": "0.2",
         "featuredAppRewardCap": "100.0",
         "unfeaturedAppRewardCap": "0.6",
-        "optValidatorFaucetCap": "2.85"
+        "optValidatorFaucetCap": "2.85",
+        "optDevelopmentFundPercentage": "0.05"
       }
     },
     {
@@ -354,7 +357,8 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
         "validatorRewardCap": "0.2",
         "featuredAppRewardCap": "100.0",
         "unfeaturedAppRewardCap": "0.6",
-        "optValidatorFaucetCap": "2.85"
+        "optValidatorFaucetCap": "2.85",
+        "optDevelopmentFundPercentage": "0.05"
       }
     },
     {
@@ -368,12 +372,16 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
         "validatorRewardCap": "0.2",
         "featuredAppRewardCap": "100.0",
         "unfeaturedAppRewardCap": "0.6",
-        "optValidatorFaucetCap": "2.85"
+        "optValidatorFaucetCap": "2.85",
+        "optDevelopmentFundPercentage": "0.05"
       }
     }
   ]
-}</pre></div></li><li data-key="packageConfig"
+}</pre></div></li><li data-key="optDevelopmentFundManager"
     class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">optDevelopmentFundManager</div><div
+      class="jsondiffpatch-value"><pre>null</pre></div></li><li
+      data-key="packageConfig" class="jsondiffpatch-unchanged"><div
       class="jsondiffpatch-property-name">packageConfig</div><div
       class="jsondiffpatch-value"><pre>{
   "amulet": "0.1.8",

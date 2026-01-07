@@ -71,7 +71,7 @@ export function buildAmuletRulesConfigFromChanges(
       unfeaturedAppRewardCap: getValue(`issuanceCurveFutureValues${i}UnfeaturedAppRewardCap`),
       optValidatorFaucetCap: getValue(`issuanceCurveFutureValues${i}OptValidatorFaucetCap`),
       optDevelopmentFundPercentage: getValue(
-        `issuanceCurveFutureValues${i}optDevelopmentFundPercentage`
+        `issuanceCurveFutureValues${i}OptDevelopmentFundPercentage`
       ),
     };
     futureValues.push({ _1: time, _2: config });
