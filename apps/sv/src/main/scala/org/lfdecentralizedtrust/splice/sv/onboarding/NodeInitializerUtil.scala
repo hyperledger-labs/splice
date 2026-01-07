@@ -287,6 +287,10 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       mat: Materializer,
   ): Future[Long] = {
     for {
+      bootstrapWithNonZeroRound <- packageVersionSupport.supportBootstrapWithNonZeroRound(
+        Seq(svParty),
+        clock.now,
+      )
       initialRound <- connection
         // On restarts, use the user's metadata initial round
         // On resets, the initial SV set it to its configuration, followers learn it from their sponsor
@@ -296,59 +300,49 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
             logger.info(s"Initial round $round is already set in user's metadata.")
             Future.successful(round.toLong)
           case None =>
-            packageVersionSupport
-              .supportBootstrapWithNonZeroRound(
-                Seq(svParty),
-                clock.now,
-              )
-              .flatMap { bootstrapWithNonZeroRound =>
-                config.onboarding match {
-                  case Some(onboardingConfig) if bootstrapWithNonZeroRound.supported =>
-                    onboardingConfig match {
-                      case onboardingConfig: FoundDso =>
+            config.onboarding match {
+              case Some(onboardingConfig) if bootstrapWithNonZeroRound.supported =>
+                onboardingConfig match {
+                  case onboardingConfig: FoundDso =>
+                    logger.info(
+                      s"Setting the configured initial round ${onboardingConfig.initialRound}."
+                    )
+                    setInitialRound(connection, onboardingConfig.initialRound)
+                  case onboardingConfig: JoinWithKey =>
+                    logger.info("Setting the initial round given by my sponsor.")
+                    setInitialRoundFromSponsor(
+                      connection,
+                      onboardingConfig,
+                      upgradesConfig,
+                    )
+                  case domainMigrationConfig: DomainMigration =>
+                    val migrationDump = loadDomainMigrationDump(domainMigrationConfig.dumpFilePath)
+                    val initialRound = migrationDump.participantUsers.users.collectFirst {
+                      case user if user.id == config.ledgerApiUser =>
+                        user.annotations.get(INITIAL_ROUND_USER_METADATA_KEY)
+                    }.flatten match {
+                      case None =>
                         logger.info(
-                          s"Setting the configured initial round ${onboardingConfig.initialRound}."
+                          "Initial round not found in user's metadata dump, defaulting to 0."
                         )
-                        setInitialRound(connection, onboardingConfig.initialRound)
-                      case onboardingConfig: JoinWithKey =>
-                        logger.info("Setting the initial round given by my sponsor.")
-                        setInitialRoundFromSponsor(
-                          connection,
-                          onboardingConfig,
-                          upgradesConfig,
+                        "0"
+                      case Some(rnd) =>
+                        logger.info(
+                          s"Setting the initial round to $rnd from migration user's metadata dump."
                         )
-                      case domainMigrationConfig: DomainMigration =>
-                        val migrationDump =
-                          loadDomainMigrationDump(domainMigrationConfig.dumpFilePath)
-                        val initialRound = migrationDump.participantUsers.users.collectFirst {
-                          case user if user.id == config.ledgerApiUser =>
-                            user.annotations.get(INITIAL_ROUND_USER_METADATA_KEY)
-                        }.flatten match {
-                          case None =>
-                            logger.info(
-                              "Initial round not found in user's metadata dump, defaulting to 0."
-                            )
-                            "0"
-                          case Some(rnd) =>
-                            logger.info(
-                              s"Setting the initial round to $rnd from migration user's metadata dump."
-                            )
-                            rnd
-                        }
-                        setInitialRound(connection, initialRound.toLong)
+                        rnd
                     }
-                  case Some(_) =>
-                    logger.debug(
-                      "Feature to set initial round to non-zero not supported, setting it to 0."
-                    )
-                    setInitialRound(connection, 0L)
-                  case None =>
-                    logger.debug(
-                      "No SV onboarding config was found, setting the initial round to 0."
-                    )
-                    setInitialRound(connection, 0L)
+                    setInitialRound(connection, initialRound.toLong)
                 }
-              }
+              case Some(_) =>
+                logger.debug(
+                  "Feature to set initial round to non-zero not supported, setting it to 0."
+                )
+                setInitialRound(connection, 0L)
+              case None =>
+                logger.debug("No SV onboarding config was found, setting the initial round to 0.")
+                setInitialRound(connection, 0L)
+            }
         }
     } yield initialRound
   }

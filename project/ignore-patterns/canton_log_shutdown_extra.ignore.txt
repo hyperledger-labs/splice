@@ -3,7 +3,7 @@
 
 c.d.l.c.s.c.CommandTrackerFlow\$ - Completion Stream failed with an error.
 ledger subscription for admin service .* has completed with error
-UNAVAILABLE: Channel shutdownNow invoked
+io.grpc.StatusRuntimeException: UNAVAILABLE: Channel shutdownNow invoked
 INDEX_DB_SQL_NON_TRANSIENT_ERROR.*\(this database is empty\)
 INDEX_DB_SQL_NON_TRANSIENT_ERROR.*Database is already closed
 Error while running indexer
