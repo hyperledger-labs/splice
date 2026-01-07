@@ -1339,7 +1339,7 @@ async def main():
                         global_state.process_events(tx, [event_id])
 
                 # Drop unresolved pending events — after the global merge and re-processing, they are known to be
-                # irrelevant (cannot be attributed to the beneficiary).
+                # irrelevant (created before the time range or for a different beneficiary).
                 # Chunk 0: discard pending exercises of the beneficiary - they correspond to rewards created before begin_record_time.
                 global_state.exercise_pending_events.clear()
 
