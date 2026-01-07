@@ -57,21 +57,6 @@ export function getDnsNames(): { daDnsName: string; cantonDnsName: string } {
 
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 
-export const ENABLE_COMETBFT_PRUNING = config.envFlag('ENABLE_COMETBFT_PRUNING', false);
-
-export const COMETBFT_RETAIN_BLOCKS = ENABLE_COMETBFT_PRUNING
-  ? parseInt(config.requireEnv('COMETBFT_RETAIN_BLOCKS'))
-  : 0;
-
-const enableSequencerPruning = config.envFlag('ENABLE_SEQUENCER_PRUNING', false);
-export const sequencerPruningConfig = enableSequencerPruning
-  ? {
-      enabled: true,
-      pruningInterval: config.requireEnv('SEQUENCER_PRUNING_INTERVAL', ''),
-      retentionPeriod: config.requireEnv('SEQUENCER_RETENTION_PERIOD', ''),
-    }
-  : { enabled: false };
-
 export const sequencerTokenExpirationTime: string | undefined = config.optionalEnv(
   'SEQUENCER_TOKEN_EXPIRATION_TIME'
 );

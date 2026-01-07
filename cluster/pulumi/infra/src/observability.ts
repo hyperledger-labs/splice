@@ -10,9 +10,7 @@ import {
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
   clusterProdLike,
-  COMETBFT_RETAIN_BLOCKS,
   commandScriptPath,
-  ENABLE_COMETBFT_PRUNING,
   ExactNamespace,
   GCP_PROJECT,
   GrafanaKeys,
@@ -23,7 +21,11 @@ import {
   ObservabilityReleaseName,
   SPLICE_ROOT,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { extraSvConfigs, standardSvConfigs } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import {
+  allSvsConfiguration,
+  extraSvConfigs,
+  standardSvConfigs,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import { local } from '@pulumi/command';
@@ -754,6 +756,11 @@ function createGrafanaAlerting(namespace: Input<string>) {
     .concat(standardSvConfigs)
     .map(sv => sv.sweep!)
     .filter(e => e != undefined);
+  const cometbftPruningHighestBlockRetain = allSvsConfiguration
+    .map(sv => sv.pruning?.cometbft?.retainBlocks)
+    .filter((retainBlocks): retainBlocks is number => retainBlocks !== undefined)
+    .sort((a, b) => a - b)
+    .pop();
   new k8s.core.v1.ConfigMap(
     'grafana-alerting',
     {
@@ -813,8 +820,14 @@ function createGrafanaAlerting(namespace: Input<string>) {
                 '$EXPECTED_MAX_BLOCK_RATE_PER_SECOND',
                 monitoringConfig.alerting.alerts.cometbft.expectedMaxBlocksPerSecond.toString()
               )
-              .replaceAll('$ENABLE_COMETBFT_PRUNING', (!ENABLE_COMETBFT_PRUNING).toString())
-              .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
+              .replaceAll(
+                '$COMETBFT_PRUNING_DISABLED',
+                (cometbftPruningHighestBlockRetain === undefined).toString()
+              )
+              .replaceAll(
+                '$COMETBFT_RETAIN_BLOCKS',
+                String((cometbftPruningHighestBlockRetain || 0) * 1.05)
+              ),
             'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml')
               .replaceAll(
                 '$CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE',
