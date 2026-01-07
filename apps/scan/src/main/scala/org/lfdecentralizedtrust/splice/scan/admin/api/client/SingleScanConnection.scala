@@ -5,6 +5,8 @@ package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import cats.data.OptionT
 import cats.syntax.either.*
+import com.daml.metrics.api.MetricsContext
+import com.daml.metrics.api.MetricsContext.Implicits.empty
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
@@ -31,7 +33,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   LookupTransferCommandStatusResponse,
   MigrationSchedule,
 }
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.{HttpScanAppClient}
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
@@ -67,12 +69,17 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   VoteRequest,
 }
 import io.grpc.Status
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, Uri}
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.Allocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
+import org.lfdecentralizedtrust.splice.metrics.ScanConnectionMetrics
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BftSequencer
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.TransferFactoryWithChoiceContext
+
+import scala.util.{Failure, Success}
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the DSO party id.
@@ -83,6 +90,7 @@ class SingleScanConnection private[client] (
     protected val clock: Clock,
     retryProvider: RetryProvider,
     outerLoggerFactory: NamedLoggerFactory,
+    connectionMetrics: Option[ScanConnectionMetrics],
 )(implicit
     protected val ec: ExecutionContextExecutor,
     tc: TraceContext,
@@ -100,6 +108,38 @@ class SingleScanConnection private[client] (
     with BackfillingScanConnection
     with HasUrl {
   import ScanRoundAggregatesDecoder.*
+
+  override def runHttpCmd[Res, Result](
+      url: Uri,
+      command: HttpCommand[Res, Result],
+      headers: List[HttpHeader] = List.empty[HttpHeader],
+  )(implicit
+      templateDecoder: TemplateJsonDecoder,
+      httpClient: HttpClient,
+      tc: TraceContext,
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[Result] = {
+    connectionMetrics match {
+      case Some(metrics) =>
+        MetricsContext.withExtraMetricLabels(
+          ("scan_connection", url.scheme),
+          ("request", command.fullName),
+        ) { m =>
+          val timer = metrics.latencyPerConnection.startAsync()(m)
+          super
+            .runHttpCmd(url, command, headers)
+            .andThen {
+              case Failure(_) =>
+                metrics.failuresPerConnection.mark()(m)
+                timer.stop()(m)
+              case Success(_) =>
+                timer.stop()(m)
+            }
+        }
+      case None => super.runHttpCmd(url, command, headers)
+    }
+  }
 
   def url = config.adminApi.url
 
@@ -743,13 +783,21 @@ class CachedScanConnection private[client] (
     clock: Clock,
     retryProvider: RetryProvider,
     outerLoggerFactory: NamedLoggerFactory,
+    connectionMetrics: Option[ScanConnectionMetrics],
 )(implicit
     ec: ExecutionContextExecutor,
     tc: TraceContext,
     mat: Materializer,
     httpClient: HttpClient,
     templateDecoder: TemplateJsonDecoder,
-) extends SingleScanConnection(config, upgradesConfig, clock, retryProvider, outerLoggerFactory)
+) extends SingleScanConnection(
+      config,
+      upgradesConfig,
+      clock,
+      retryProvider,
+      outerLoggerFactory,
+      connectionMetrics,
+    )
     with CachingScanConnection {
 
   override protected val amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
