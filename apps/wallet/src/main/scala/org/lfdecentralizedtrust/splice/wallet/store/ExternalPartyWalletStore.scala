@@ -7,9 +7,15 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   Amulet,
   AppRewardCoupon,
   LockedAmulet,
+  UnclaimedActivityRecord,
   ValidatorRewardCoupon,
+  ValidatorRight,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommandCounter
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as validatorCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.mintingdelegation as mintingDelegationCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRound
+import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.*
@@ -49,6 +55,48 @@ trait ExternalPartyWalletStore extends TransferInputStore with NamedLogging {
   ): Future[Option[Contract[TransferCommandCounter.ContractId, TransferCommandCounter]]] =
     multiDomainAcsStore
       .findAnyContractWithOffset(TransferCommandCounter.COMPANION)
+      .map(_.value.map(_.contract))
+
+  def listMintingDelegations(limit: Limit = Limit.DefaultLimit)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[
+    mintingDelegationCodegen.MintingDelegation.ContractId,
+    mintingDelegationCodegen.MintingDelegation,
+  ]]] =
+    multiDomainAcsStore
+      .listContracts(mintingDelegationCodegen.MintingDelegation.COMPANION, limit)
+      .map(_.map(_.contract))
+
+  def listSortedLivenessActivityRecords(
+      issuingRoundsMap: Map[Round, IssuingMiningRound],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit tc: TraceContext): Future[Seq[
+    (
+        Contract[
+          validatorCodegen.ValidatorLivenessActivityRecord.ContractId,
+          validatorCodegen.ValidatorLivenessActivityRecord,
+        ],
+        BigDecimal,
+    )
+  ]]
+
+  def listUnclaimedActivityRecords(
+      limit: Limit = Limit.DefaultLimit
+  )(implicit tc: TraceContext): Future[Seq[
+    Contract[
+      UnclaimedActivityRecord.ContractId,
+      UnclaimedActivityRecord,
+    ]
+  ]] =
+    multiDomainAcsStore
+      .listContracts(UnclaimedActivityRecord.COMPANION, limit)
+      .map(_.map(_.contract))
+
+  def lookupValidatorRight()(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[ValidatorRight.ContractId, ValidatorRight]]] =
+    multiDomainAcsStore
+      .findAnyContractWithOffset(ValidatorRight.COMPANION)
       .map(_.value.map(_.contract))
 }
 
@@ -103,6 +151,7 @@ object ExternalPartyWalletStore {
   ] = {
     val externalParty = key.externalParty.toProtoPrimitive
     val dso = key.dsoParty.toProtoPrimitive
+    val validator = key.validatorParty.toProtoPrimitive
 
     SimpleContractFilter(
       key.externalParty,
@@ -130,6 +179,28 @@ object ExternalPartyWalletStore {
         mkFilter(TransferCommandCounter.COMPANION) { co =>
           co.payload.dso == dso &&
           co.payload.sender == externalParty
+        }(ExternalPartyWalletAcsStoreRowData(_)),
+        mkFilter(mintingDelegationCodegen.MintingDelegation.COMPANION) { co =>
+          co.payload.dso == dso &&
+          co.payload.delegate == validator &&
+          co.payload.beneficiary == externalParty
+        }(ExternalPartyWalletAcsStoreRowData(_)),
+        mkFilter(validatorCodegen.ValidatorLivenessActivityRecord.COMPANION) { co =>
+          co.payload.dso == dso &&
+          co.payload.validator == externalParty
+        }(co =>
+          ExternalPartyWalletAcsStoreRowData(co, rewardCouponRound = Some(co.payload.round.number))
+        ),
+        mkFilter(UnclaimedActivityRecord.COMPANION) { co =>
+          co.payload.dso == dso &&
+          co.payload.beneficiary == externalParty
+        }(ExternalPartyWalletAcsStoreRowData(_)),
+        // ValidatorRight needed for collecting ValidatorRewardCoupons via MintingDelegation
+        // The external party is both the user AND the "validator" in this case
+        mkFilter(ValidatorRight.COMPANION) { co =>
+          co.payload.dso == dso &&
+          co.payload.user == externalParty &&
+          co.payload.validator == externalParty
         }(ExternalPartyWalletAcsStoreRowData(_)),
       ),
     )
