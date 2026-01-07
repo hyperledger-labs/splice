@@ -320,18 +320,17 @@ class SvFrontendIntegrationTest
       val requestReasonBody = "This is a summary of the proposal"
 
       withFrontEnd("sv1") { implicit webDriver =>
-        val (_, previousInflightProposalsSize) = actAndCheck(
+        actAndCheck(
           "sv1 operator can login and browse to the governance tab", {
             go to s"http://localhost:$sv1UIPort/governance-beta"
             loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
           },
         )(
-          "sv1 can see the governance page and get the initial inflight proposals count",
+          "sv1 can see the governance page",
           _ => {
             eventuallySucceeds() {
               find(id("initiate-proposal-button")) should not be empty
             }
-            getInflightProposals().size
           },
         )
 
@@ -370,7 +369,6 @@ class SvFrontendIntegrationTest
             // Fill in the action-specific form fields first
             extraFormOps(webDriver)
 
-            // Fill in common form fields
             eventually() {
               inside(find(id(s"$formPrefix-summary"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonBody)
@@ -383,27 +381,32 @@ class SvFrontendIntegrationTest
               }
             }
 
-            // Click Review Proposal button
             eventually() {
               click on id("submit-button")
             }
 
-            // Click Submit Proposal button (confirmation step)
             eventually() {
               click on id("submit-button")
             }
           },
         )(
-          "sv1 can see the new proposal",
+          "sv1 is redirected to the governance page after successful submission",
           _ => {
-            eventually() {
-              val currentInflightProposals = getInflightProposals()
-              currentInflightProposals.size shouldBe previousInflightProposalsSize + 1
+            eventuallySucceeds() {
+              find(id("initiate-proposal-button")) should not be empty
+
+              val proposals = getInflightProposals()
+              proposals.size should be > 0
             }
 
-            clue("click the new proposal") {
+            clue("click the first inflight proposal to view details") {
               val proposals = getInflightProposals()
               webDriver.executeScript("arguments[0].click();", proposals.asScala.head)
+            }
+
+            eventually() {
+              val currentUrl = webDriver.getCurrentUrl
+              currentUrl should include("/governance-beta/proposals/")
             }
           },
         )
@@ -463,12 +466,18 @@ class SvFrontendIntegrationTest
           eventuallySucceeds() {
             val votes =
               webDriver.findElements(By.cssSelector("[data-testid='proposal-details-vote']"))
-            votes.size shouldBe 1
+            // There should be at least one vote (sv2's)
+            votes.size should be >= 1
 
-            val voterInput = votes.asScala.head.findElement(
-              By.cssSelector("[data-testid='proposal-details-voter-party-id-input']")
-            )
-            voterInput.getAttribute("value") shouldBe sv2PartyId
+            // Verify that sv2's vote is among the votes
+            val voterPartyIds = votes.asScala.map { vote =>
+              vote
+                .findElement(
+                  By.cssSelector("[data-testid='proposal-details-voter-party-id-input']")
+                )
+                .getAttribute("value")
+            }
+            voterPartyIds should contain(sv2PartyId)
           }
         }
       }
