@@ -436,7 +436,7 @@ The ``unclaimed_sv_rewards.py`` script accepts the following inputs:
 - ``--weight``
   The weight to apply when calculating the amount associated with each coupon.
   In CIPs, weights appear as values such as 0.5, 1, 2, etc.
-  In the script, these are expressed as integers by multiplying the CIP weight by 10,000
+  In the script, these are expressed as basis points by multiplying the CIP weight by 10,000
   (e.g., 0.5 → 5,000; 1 → 10,000; 2 → 20,000).
 
 - ``--already-minted-weight``
