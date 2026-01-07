@@ -384,7 +384,8 @@ class SvFrontendIntegrationTest
             }
 
             eventually() {
-              click on id("submit-button")
+              val submitButton = webDriver.findElement(By.id("submit-button"))
+              webDriver.executeScript("arguments[0].click();", submitButton)
             }
 
             // Wait for confirmation view (button text changes to "Submit Proposal")
@@ -394,7 +395,8 @@ class SvFrontendIntegrationTest
             }
 
             eventually() {
-              click on id("submit-button")
+              val submitButton = webDriver.findElement(By.id("submit-button"))
+              webDriver.executeScript("arguments[0].click();", submitButton)
             }
           },
         )(
