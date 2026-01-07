@@ -195,13 +195,12 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
   )(implicit env: SpliceTestConsoleEnvironment): Assertion = {
     val transaction = readTransactionFromRow(transactionRow)
 
-    transaction.action should matchText(expectedAction)
-    transaction.subtype should matchText(expectedSubtype)
-    (transaction.partyDescription, expectedPartyDescription) match {
-      case (None, None) => ()
+    transaction.action should matchText(expectedAction) withClue "action"
+    transaction.subtype should matchText(expectedSubtype) withClue "subtype"
+    inside((transaction.partyDescription, expectedPartyDescription)) {
+      case (None, None) => succeed
       case (Some(party), Some(ep)) => party should matchText(ep)
-      case _ => fail(s"Unexpected party in transaction: $transaction")
-    }
+    } withClue s"Unexpected party in transaction: $transaction"
     transaction.ccAmount should beWithin(expectedAmountAmulet._1, expectedAmountAmulet._2)
     transaction.usdAmount should beWithin(
       expectedAmountUSD._1,
