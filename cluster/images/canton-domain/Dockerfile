@@ -21,3 +21,6 @@ HEALTHCHECK --start-period=10m \
 
 # Not upstreamed on purpose, this is the Splice part to allow easy overrides from within Splice:
 COPY additional-config.conf /app/
+USER root
+RUN chown -R nonroot:nonroot /app/additional-config.conf
+USER nonroot
