@@ -1447,11 +1447,11 @@ class SvFrontendIntegrationTest
   }
 
   def getInflightProposals()(implicit webDriver: WebDriverType) = {
-    webDriver.findElements(By.cssSelector("[data-testid='inflight-proposals-row-link']"))
+    webDriver.findElements(By.cssSelector("[data-testid='inflight-proposals-row']"))
   }
 
   def getActionRequiredElems()(implicit webDriver: WebDriverType) = {
-    webDriver.findElements(By.cssSelector("[data-testid='action-required-card-link']"))
+    webDriver.findElements(By.cssSelector("[data-testid='action-required-card']"))
   }
 
   def getVoteRequestsRejectedSize()(implicit webDriver: WebDriverType) = {
