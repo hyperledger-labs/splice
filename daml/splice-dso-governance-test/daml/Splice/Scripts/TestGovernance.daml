@@ -730,6 +730,7 @@ testAmuletRulesTickDurationChange = do
 testAmuletRulesConfigChange : Script ()
 testAmuletRulesConfigChange = do
   (app, dso, (sv1, sv2, sv3, _)) <- initMainNet
+  let Some fundManager = partyFromText "FundManager"
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
@@ -766,6 +767,7 @@ testAmuletRulesConfigChange = do
         amuletToIssuePerYear = 40e9
         validatorRewardPercentage = 0.05
         appRewardPercentage = 0.15
+        optDevelopmentFundPercentage = Some 0.05
 
   let defaultIssuanceCurve2 = Schedule with
         initialValue = issuanceConfig_0p5_1p5_2
@@ -778,6 +780,7 @@ testAmuletRulesConfigChange = do
         transferConfig = defaultTransferConfig2
         issuanceCurve = defaultIssuanceCurve2
         tickDuration = seconds 200
+        optDevelopmentFundManager = Some fundManager
 
   -- second config that changes the other half of the parameters
   let newConfig2 = amuletRules.configSchedule.initialValue with

@@ -1993,6 +1993,7 @@ trait AmuletTransferUtil { self: StoreTest =>
     // TODO(#968): track faucet coupon inputs separately
     java.util.Optional.empty(),
     java.util.Optional.empty(),
+    java.util.Optional.empty(),
   )
 
   def mkTransferResult(
