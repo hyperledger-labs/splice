@@ -9,28 +9,27 @@ import {
 import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { z } from 'zod';
 
-export const SynchronizerConfigSchema = z
-  .object({
-    connectionType: z.enum(['from-scan', 'trusted-url', 'trusted-svs']).default('from-scan'),
-    sequencerNames: z.array(z.string()).optional(),
-    url: z.string().optional(),
-  })
-  .refine(
-    data => {
-      if (data.connectionType === 'trusted-url') {
-        return !!data.url && (!data.sequencerNames || data.sequencerNames.length === 0);
-      }
-      if (data.connectionType === 'trusted-svs') {
-        return !!(data.sequencerNames && data.sequencerNames.length > 0) && !data.url;
-      }
-      return true;
-    },
-    {
-      message:
-        "Configuration mismatch: 'trusted-url' requires only a URL, and 'trusted-svs' requires only sequencerNames.",
-      path: ['type'],
+export const SynchronizerConfigSchema = z.preprocess(
+  val => {
+    if (typeof val === 'object' && val !== null && !('connectionType' in val)) {
+      return { ...val, connectionType: 'from-scan' };
     }
-  );
+    return val;
+  },
+  z.discriminatedUnion('connectionType', [
+    z.object({
+      connectionType: z.literal('from-scan'),
+    }),
+    z.object({
+      connectionType: z.literal('trusted-url'),
+      url: z.string().min(1),
+    }),
+    z.object({
+      connectionType: z.literal('trusted-svs'),
+      sequencerNames: z.array(z.string()).min(1),
+    }),
+  ])
+);
 
 export type synchronizerConfigSchema = z.infer<typeof SynchronizerConfigSchema>;
 
