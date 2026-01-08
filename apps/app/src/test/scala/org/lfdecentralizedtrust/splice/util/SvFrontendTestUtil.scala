@@ -3,7 +3,6 @@ package org.lfdecentralizedtrust.splice.util
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendTestCommon
 import org.openqa.selenium.By
-import scala.concurrent.duration.DurationInt
 
 trait SvFrontendTestUtil extends TestCommon {
   this: CommonAppInstanceReferences & FrontendTestCommon =>
