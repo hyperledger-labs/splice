@@ -212,13 +212,11 @@ const VoteRow: React.FC<VoteRowProps> = props => {
         )}
         {showVoteStats && (
           <TableCell data-testid={`${uniqueId}-row-all-votes`}>
-            <TableBodyTypography>
-              <AllVotes
-                acceptedVotes={voteStats['accepted']}
-                rejectedVotes={voteStats['rejected']}
-                data-testid={`${uniqueId}-row-all-votes-stats`}
-              />
-            </TableBodyTypography>
+            <AllVotes
+              acceptedVotes={voteStats['accepted']}
+              rejectedVotes={voteStats['rejected']}
+              data-testid={`${uniqueId}-row-all-votes-stats`}
+            />
           </TableCell>
         )}
         {showAcceptanceThreshold && (
