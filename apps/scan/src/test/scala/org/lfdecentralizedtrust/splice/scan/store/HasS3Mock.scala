@@ -101,4 +101,4 @@ trait HasS3Mock extends FutureHelpers with EitherValues {
 }
 
 case object CompactJsonScanHttpEncodingsWithFieldLabels
-  extends CompactJsonScanHttpEncodingsWithOrWithoutFieldLabels(true)
+    extends CompactJsonScanHttpEncodingsWithOrWithoutFieldLabels(true)

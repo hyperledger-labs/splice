@@ -9,9 +9,19 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
-import org.lfdecentralizedtrust.splice.scan.store.bulk.{BulkStorageConfig, Result, UpdateHistoryBulkStorage}
+import org.lfdecentralizedtrust.splice.scan.store.bulk.{
+  BulkStorageConfig,
+  Result,
+  UpdateHistoryBulkStorage,
+}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
-import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest, TreeUpdateWithMigrationId, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
+  Limit,
+  StoreTest,
+  TreeUpdateWithMigrationId,
+  UpdateHistory,
+}
 import org.scalatest.concurrent.PatienceConfiguration
 import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
@@ -82,17 +92,19 @@ class UpdateHistoryBulkStorageTest
         } yield {
           val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
           objectKeys should have length 2
-          val allUpdatesFromS3 = objectKeys.flatMap(readUncompressAndDecode(bucketConnection, io.circe.parser.decode[UpdateHistoryItemV2]))
+          val allUpdatesFromS3 = objectKeys.flatMap(
+            readUncompressAndDecode(bucketConnection, io.circe.parser.decode[UpdateHistoryItemV2])
+          )
 //          allUpdatesFromS3.map(CompactJsonScanHttpEncodingsWithFieldLabels.httpToLapiUpdate) should contain theSameElementsAs allUpdates
           allUpdatesFromS3.length shouldBe allUpdates.length
 //          allUpdatesFromS3.map(CompactJsonScanHttpEncodingsWithFieldLabels.httpToLapiUpdate).head should be(allUpdates.head)
-          allUpdatesFromS3.map(CompactJsonScanHttpEncodingsWithFieldLabels.httpToLapiUpdate)(1) should be(allUpdates(1))
+          allUpdatesFromS3.map(CompactJsonScanHttpEncodingsWithFieldLabels.httpToLapiUpdate)(
+            1
+          ) should be(allUpdates(1))
         }
       }
     }
   }
-
-
 
   class MockUpdateHistoryStore(val initialStoreSize: Int) {
 

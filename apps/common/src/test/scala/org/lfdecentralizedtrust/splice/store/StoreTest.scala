@@ -936,7 +936,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
       updateId: String = nextUpdateId(),
-    ): Transaction = mkTx(
+  ): Transaction = mkTx(
     offset,
     createRequests.map[Event] { case (contract, implementedInterfaces, failedInterfaces) =>
       toCreatedEvent(
