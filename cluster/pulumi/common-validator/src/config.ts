@@ -9,36 +9,25 @@ import {
 import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { z } from 'zod';
 
-export const SynchronizerConfigSchema = z.preprocess(
-  val => {
-    if (typeof val !== 'object' || val === null) {
-      return val;
-    }
-    if (!('connectionType' in val)) {
-      return { ...val, connectionType: 'from-scan' };
-    }
-    return val;
-  },
-  z.discriminatedUnion('connectionType', [
-    z
-      .object({
-        connectionType: z.literal('trusted-url'),
-        url: z.string().min(1),
-      })
-      .strict(),
-    z
-      .object({
-        connectionType: z.literal('trusted-svs'),
-        sequencerNames: z.array(z.string()).min(1),
-      })
-      .strict(),
-    z
-      .object({
-        connectionType: z.literal('from-scan'),
-      })
-      .strict(),
-  ])
-);
+export const SynchronizerConfigSchema = z.union([
+  z
+    .object({
+      connectionType: z.literal('trusted-url'),
+      url: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      connectionType: z.literal('trusted-svs'),
+      sequencerNames: z.array(z.string()).min(1),
+    })
+    .strict(),
+  z
+    .object({
+      connectionType: z.literal('from-scan').default('from-scan'),
+    })
+    .strict(),
+]);
 
 export type synchronizerConfigSchema = z.infer<typeof SynchronizerConfigSchema>;
 
