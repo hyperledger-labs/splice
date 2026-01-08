@@ -3399,6 +3399,74 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "DestinationRule",
+      "metadata": {
+        "name": "sv-1-global-domain-3-sequencer-high-perf-grpc-rule",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "host": "global-domain-3-sequencer.sv-1.svc.cluster.local",
+        "trafficPolicy": {
+          "connectionPool": {
+            "http": {
+              "http1MaxPendingRequests": 10000,
+              "http2MaxRequests": 10000,
+              "maxConcurrentStreams": 10000,
+              "maxRequestsPerConnection": 0
+            },
+            "tcp": {
+              "maxConnections": 10000
+            }
+          },
+          "loadBalancer": {
+            "simple": "LEAST_REQUEST"
+          }
+        }
+      }
+    },
+    "name": "sv-1-global-domain-3-sequencer-high-perf-grpc-rule",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1beta1:DestinationRule"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "DestinationRule",
+      "metadata": {
+        "name": "sv-1-global-domain-4-sequencer-high-perf-grpc-rule",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "host": "global-domain-4-sequencer.sv-1.svc.cluster.local",
+        "trafficPolicy": {
+          "connectionPool": {
+            "http": {
+              "http1MaxPendingRequests": 10000,
+              "http2MaxRequests": 10000,
+              "maxConcurrentStreams": 10000,
+              "maxRequestsPerConnection": 0
+            },
+            "tcp": {
+              "maxConnections": 10000
+            }
+          },
+          "loadBalancer": {
+            "simple": "LEAST_REQUEST"
+          }
+        }
+      }
+    },
+    "name": "sv-1-global-domain-4-sequencer-high-perf-grpc-rule",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1beta1:DestinationRule"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "security.istio.io/v1",
       "kind": "AuthorizationPolicy",
       "metadata": {
@@ -3430,6 +3498,142 @@
     "name": "sv-2-deny-onboard-prepare-endpoint",
     "provider": "",
     "type": "kubernetes:security.istio.io/v1:AuthorizationPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "DestinationRule",
+      "metadata": {
+        "name": "sv-da-1-global-domain-3-sequencer-high-perf-grpc-rule",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "host": "global-domain-3-sequencer.sv-da-1.svc.cluster.local",
+        "trafficPolicy": {
+          "connectionPool": {
+            "http": {
+              "http1MaxPendingRequests": 10000,
+              "http2MaxRequests": 10000,
+              "maxConcurrentStreams": 10000,
+              "maxRequestsPerConnection": 0
+            },
+            "tcp": {
+              "maxConnections": 10000
+            }
+          },
+          "loadBalancer": {
+            "simple": "LEAST_REQUEST"
+          }
+        }
+      }
+    },
+    "name": "sv-da-1-global-domain-3-sequencer-high-perf-grpc-rule",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1beta1:DestinationRule"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "DestinationRule",
+      "metadata": {
+        "name": "sv-da-1-global-domain-4-sequencer-high-perf-grpc-rule",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "host": "global-domain-4-sequencer.sv-da-1.svc.cluster.local",
+        "trafficPolicy": {
+          "connectionPool": {
+            "http": {
+              "http1MaxPendingRequests": 10000,
+              "http2MaxRequests": 10000,
+              "maxConcurrentStreams": 10000,
+              "maxRequestsPerConnection": 0
+            },
+            "tcp": {
+              "maxConnections": 10000
+            }
+          },
+          "loadBalancer": {
+            "simple": "LEAST_REQUEST"
+          }
+        }
+      }
+    },
+    "name": "sv-da-1-global-domain-4-sequencer-high-perf-grpc-rule",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1beta1:DestinationRule"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "DestinationRule",
+      "metadata": {
+        "name": "sv-global-domain-3-sequencer-high-perf-grpc-rule",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "host": "global-domain-3-sequencer.sv.svc.cluster.local",
+        "trafficPolicy": {
+          "connectionPool": {
+            "http": {
+              "http1MaxPendingRequests": 10000,
+              "http2MaxRequests": 10000,
+              "maxConcurrentStreams": 10000,
+              "maxRequestsPerConnection": 0
+            },
+            "tcp": {
+              "maxConnections": 10000
+            }
+          },
+          "loadBalancer": {
+            "simple": "LEAST_REQUEST"
+          }
+        }
+      }
+    },
+    "name": "sv-global-domain-3-sequencer-high-perf-grpc-rule",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1beta1:DestinationRule"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "networking.istio.io/v1beta1",
+      "kind": "DestinationRule",
+      "metadata": {
+        "name": "sv-global-domain-4-sequencer-high-perf-grpc-rule",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "host": "global-domain-4-sequencer.sv.svc.cluster.local",
+        "trafficPolicy": {
+          "connectionPool": {
+            "http": {
+              "http1MaxPendingRequests": 10000,
+              "http2MaxRequests": 10000,
+              "maxConcurrentStreams": 10000,
+              "maxRequestsPerConnection": 0
+            },
+            "tcp": {
+              "maxConnections": 10000
+            }
+          },
+          "loadBalancer": {
+            "simple": "LEAST_REQUEST"
+          }
+        }
+      }
+    },
+    "name": "sv-global-domain-4-sequencer-high-perf-grpc-rule",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1beta1:DestinationRule"
   },
   {
     "custom": true,
