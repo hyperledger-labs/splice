@@ -518,7 +518,6 @@ class SvFrontendIntegrationTest
 
       val (createdVoteRequestAction, createdVoteRequestRequester) = withFrontEnd("sv1") {
         implicit webDriver =>
-          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
               go to s"http://localhost:$sv1UIPort/votes"
@@ -531,6 +530,9 @@ class SvFrontendIntegrationTest
               find(id("display-actions")) should not be empty
             },
           )
+
+          eventuallyClickOn(id("tab-panel-in-progress"))
+          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
 
           val (_, (createdVoteRequestAction, createdVoteRequestRequester)) = actAndCheck(
             "sv1 operator can create a new vote request", {
@@ -759,111 +761,6 @@ class SvFrontendIntegrationTest
             }
           }
         }
-      }
-    }
-
-    "NEW UI: Offboard SV" in { implicit env =>
-      val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-
-      createProposal("SRARC_OffboardSv", "offboard-sv") { implicit webDriver =>
-        // Click on the member dropdown to open it
-        eventually() {
-          val dropdown = webDriver.findElement(By.id("offboard-sv-member-dropdown"))
-          dropdown.click()
-        }
-
-        // Select the SV to offboard from the dropdown menu
-        eventually() {
-          val memberOption = webDriver.findElement(By.cssSelector(s"[data-value='$sv3PartyId']"))
-          memberOption.click()
-        }
-      }
-    }
-
-    "NEW UI: Grant and Revoke Featured App Right" in { implicit env =>
-      // First, create a Grant proposal and capture the contract ID
-      val grantProposalContractId = createProposal(
-        "SRARC_GrantFeaturedAppRight",
-        "grant-featured-app",
-      ) { implicit webDriver =>
-        eventually() {
-          inside(find(id("grant-featured-app-idValue"))) { case Some(element) =>
-            element.underlying.sendKeys("test-provider-party-id")
-          }
-        }
-      }
-
-      // Now create a Revoke proposal using the Grant proposal's contract ID
-      createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
-        eventually() {
-          inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
-            element.underlying.sendKeys(grantProposalContractId)
-          }
-        }
-      }
-    }
-
-    "NEW UI: Set Dso Rules Configuration" in { implicit env =>
-      createProposal("SRARC_SetConfig", "set-dso-config-rules") { _ =>
-        // Config fields default to current values, no extra form operations needed
-      }
-    }
-
-    "NEW UI: Create Unclaimed Activity Record" in { implicit env =>
-      val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-      val amount = "100"
-
-      createProposal(
-        "SRARC_CreateUnallocatedUnclaimedActivityRecord",
-        "create-unallocated-unclaimed-activity-record",
-      ) { implicit webDriver =>
-        eventually() {
-          inside(find(id("create-unallocated-unclaimed-activity-record-beneficiary"))) {
-            case Some(element) =>
-              element.underlying.sendKeys(beneficiary)
-          }
-        }
-
-        eventually() {
-          inside(find(id("create-unallocated-unclaimed-activity-record-amount"))) {
-            case Some(element) =>
-              element.underlying.sendKeys(amount)
-          }
-        }
-      }
-    }
-
-    "NEW UI: Set Amulet Rules Configuration" in { implicit env =>
-      createProposal("CRARC_SetConfig", "set-amulet-config-rules") { _ =>
-        // Config fields default to current values, no extra form operations needed
-      }
-    }
-
-    "NEW UI: Update SV Reward Weight" in { implicit env =>
-      val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-      val newWeight = "5000"
-
-      createProposal("SRARC_UpdateSvRewardWeight", "update-sv-reward-weight") {
-        implicit webDriver =>
-          // Click on the member dropdown to open it
-          eventually() {
-            val dropdown = webDriver.findElement(By.id("update-sv-reward-weight-member-dropdown"))
-            dropdown.click()
-          }
-
-          // Select the SV member from the dropdown menu
-          eventually() {
-            val memberOption =
-              webDriver.findElement(By.cssSelector(s"[data-value='$sv3PartyId']"))
-            memberOption.click()
-          }
-
-          // Enter the new weight
-          eventually() {
-            inside(find(id("update-sv-reward-weight-weight"))) { case Some(element) =>
-              element.underlying.sendKeys(newWeight)
-            }
-          }
       }
     }
 
@@ -1418,6 +1315,111 @@ class SvFrontendIntegrationTest
             },
           )
         }
+    }
+
+    "NEW UI: Offboard SV" in { implicit env =>
+      val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+
+      createProposal("SRARC_OffboardSv", "offboard-sv") { implicit webDriver =>
+        // Click on the member dropdown to open it
+        eventually() {
+          val dropdown = webDriver.findElement(By.id("offboard-sv-member-dropdown"))
+          dropdown.click()
+        }
+
+        // Select the SV to offboard from the dropdown menu
+        eventually() {
+          val memberOption = webDriver.findElement(By.cssSelector(s"[data-value='$sv3PartyId']"))
+          memberOption.click()
+        }
+      }
+    }
+
+    "NEW UI: Grant and Revoke Featured App Right" in { implicit env =>
+      // First, create a Grant proposal and capture the contract ID
+      val grantProposalContractId = createProposal(
+        "SRARC_GrantFeaturedAppRight",
+        "grant-featured-app",
+      ) { implicit webDriver =>
+        eventually() {
+          inside(find(id("grant-featured-app-idValue"))) { case Some(element) =>
+            element.underlying.sendKeys("test-provider-party-id")
+          }
+        }
+      }
+
+      // Now create a Revoke proposal using the Grant proposal's contract ID
+      createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
+        eventually() {
+          inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
+            element.underlying.sendKeys(grantProposalContractId)
+          }
+        }
+      }
+    }
+
+    "NEW UI: Set Dso Rules Configuration" in { implicit env =>
+      createProposal("SRARC_SetConfig", "set-dso-config-rules") { _ =>
+        // Config fields default to current values, no extra form operations needed
+      }
+    }
+
+    "NEW UI: Create Unclaimed Activity Record" in { implicit env =>
+      val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+      val amount = "100"
+
+      createProposal(
+        "SRARC_CreateUnallocatedUnclaimedActivityRecord",
+        "create-unallocated-unclaimed-activity-record",
+      ) { implicit webDriver =>
+        eventually() {
+          inside(find(id("create-unallocated-unclaimed-activity-record-beneficiary"))) {
+            case Some(element) =>
+              element.underlying.sendKeys(beneficiary)
+          }
+        }
+
+        eventually() {
+          inside(find(id("create-unallocated-unclaimed-activity-record-amount"))) {
+            case Some(element) =>
+              element.underlying.sendKeys(amount)
+          }
+        }
+      }
+    }
+
+    "NEW UI: Set Amulet Rules Configuration" in { implicit env =>
+      createProposal("CRARC_SetConfig", "set-amulet-config-rules") { _ =>
+        // Config fields default to current values, no extra form operations needed
+      }
+    }
+
+    "NEW UI: Update SV Reward Weight" in { implicit env =>
+      val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+      val newWeight = "5000"
+
+      createProposal("SRARC_UpdateSvRewardWeight", "update-sv-reward-weight") {
+        implicit webDriver =>
+          // Click on the member dropdown to open it
+          eventually() {
+            val dropdown = webDriver.findElement(By.id("update-sv-reward-weight-member-dropdown"))
+            dropdown.click()
+          }
+
+          // Select the SV member from the dropdown menu
+          eventually() {
+            val memberOption =
+              webDriver.findElement(By.cssSelector(s"[data-value='$sv3PartyId']"))
+            memberOption.click()
+          }
+
+          // Enter the new weight
+          eventually() {
+            inside(find(id("update-sv-reward-weight-weight"))) { case Some(element) =>
+              element.underlying.sendKeys(newWeight)
+            }
+          }
+      }
     }
   }
 

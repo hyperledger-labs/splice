@@ -42,7 +42,7 @@ trait SvFrontendTestUtil extends TestCommon {
       enabled: Boolean = true
   )(implicit webDriver: WebDriverType) = {
     clue("wait for the submit button to become clickable") {
-      eventually(5.seconds)(
+      eventually()(
         find(id("create-voterequest-submit-button")).value.isEnabled shouldBe enabled
       )
     }
