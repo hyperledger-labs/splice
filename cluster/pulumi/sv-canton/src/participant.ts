@@ -13,6 +13,7 @@ import {
   installSpliceHelmChart,
   loadYamlFromFile,
   SPLICE_ROOT,
+  spliceConfig,
   SpliceCustomResourceOptions,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { SingleSvConfiguration } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
@@ -86,6 +87,12 @@ export function installSvParticipant(
       enablePostgresMetrics: true,
       serviceAccountName: imagePullServiceAccountName,
       resources: svConfig.participant?.resources,
+      pvc: spliceConfig.configuration.persistentHeapDumps
+        ? {
+            size: '10Gi',
+            volumeStorageClass: 'standard-rwo',
+          }
+        : undefined,
     },
     version,
     {
