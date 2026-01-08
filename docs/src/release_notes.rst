@@ -50,7 +50,7 @@
 
     - Added an optional ``excludeDebugFields``` boolean to the request body of allocation and transfer endpoints for the Token Standard component
       (``splice-api-token-allocation-v1`` and ``splice-api-token-transfer-instruction-v1``).
-      Clients can now set this to true to omit debug information from the response.
+      Clients can now set this to true to omit debug information from the response in order to save on bandwidth.
 
 .. release-notes:: 0.5.4
 
