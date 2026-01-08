@@ -27,18 +27,6 @@ import scala.concurrent.duration.FiniteDuration
 
 import Position.*
 
-case class BulkStorageConfig(
-    dbReadChunkSize: Int,
-    maxFileSize: Long,
-)
-
-object BulkStorageConfigs {
-  val bulkStorageConfigV1 = BulkStorageConfig(
-    1000,
-    64L * 1024 * 1024,
-  )
-}
-
 object Position {
   sealed trait Position
 

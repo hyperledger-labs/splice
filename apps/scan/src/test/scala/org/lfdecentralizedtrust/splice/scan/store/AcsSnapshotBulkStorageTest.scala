@@ -19,29 +19,20 @@ import org.lfdecentralizedtrust.splice.scan.store.bulk.{
   AcsSnapshotBulkStorage,
   BulkStorageConfig,
   S3BucketConnection,
-  S3Config,
 }
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest}
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import org.lfdecentralizedtrust.splice.util.{EventId, PackageQualifiedName, ValueJsonCodecCodegen}
-import org.mockito.ArgumentMatchers.anyString
-import org.mockito.Mockito
-import org.mockito.invocation.InvocationOnMock
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
-import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.{ListObjectsRequest, S3Object}
 
-import java.net.URI
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 import scala.jdk.FutureConverters.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-import scala.sys.process.*
 import scala.util.Using
 
-class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with HasActorSystem {
+class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with HasActorSystem with HasS3Mock {
 
   val acsSnapshotSize = 48500
   val bulkStorageTestConfig = BulkStorageConfig(
@@ -49,12 +40,12 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
     50000L,
   )
 
-  "AcsSnapshotSourceTest" should {
+  "AcsSnapshotBulkStorage" should {
     "work" in {
-      withS3Mock({
+      withS3Mock {
         val store = mockAcsSnapshotStore(acsSnapshotSize)
         val timestamp = CantonTimestamp.now()
-        val s3BucketConnection = getS3BucketConnectionWithInjectedErrors()
+        val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(loggerFactory)
         for {
           _ <- new AcsSnapshotBulkStorage(
             bulkStorageTestConfig,
@@ -93,31 +84,13 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
             reconstructFromS3
           ) should contain theSameElementsInOrderAs allContracts.map(_.event)
         }
-      })
+      }
     }
   }
 
-  // TODO(#3429): consider running s3Mock container as a service in GHA instead of starting it here
-  def withS3Mock[A](test: => Future[A]): Future[A] = {
-    Seq(
-      "docker",
-      "run",
-      "-p",
-      "9090:9090",
-      "-e",
-      "COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS=bucket",
-      "-d",
-      "--rm",
-      "--name",
-      "s3mock",
-      "adobe/s3mock",
-    ).!
-    test.andThen({ case _ => Seq("docker", "stop", "s3mock").! })
-  }
-
   def readUncompressAndDecode(
-      s3BucketConnection: S3BucketConnection
-  )(s3obj: S3Object): Array[httpApi.CreatedEvent] = {
+                               s3BucketConnection: S3BucketConnection
+                             )(s3obj: S3Object): Array[httpApi.CreatedEvent] = {
     val bufferAllocator = PooledByteBufAllocator.DEFAULT
     val compressed = s3BucketConnection.readFullObject(s3obj.key()).futureValue
     val compressedDirect = bufferAllocator.directBuffer(compressed.capacity())
@@ -175,12 +148,12 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
       )(any[TraceContext])
     ).thenAnswer {
       (
-          migration: Long,
-          timestamp: CantonTimestamp,
-          after: Option[Long],
-          limit: Limit,
-          _: Seq[PartyId],
-          _: Seq[PackageQualifiedName],
+        migration: Long,
+        timestamp: CantonTimestamp,
+        after: Option[Long],
+        limit: Limit,
+        _: Seq[PartyId],
+        _: Seq[PackageQualifiedName],
       ) =>
         Future {
           val remaining = snapshotSize - after.getOrElse(0L)
@@ -209,31 +182,4 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
     store
   }
 
-  def getS3BucketConnectionWithInjectedErrors(): S3BucketConnection = {
-    val s3Config = S3Config(
-      URI.create("http://localhost:9090"),
-      "bucket",
-      Region.US_EAST_1,
-      AwsBasicCredentials.create("mock_id", "mock_key"),
-    )
-    val s3BucketConnection = S3BucketConnection(s3Config, "bucket", loggerFactory)
-    val s3BucketConnectionWithErrors = Mockito.spy(s3BucketConnection)
-    var failureCount = 0
-    val _ = doAnswer { (invocation: InvocationOnMock) =>
-      val args = invocation.getArguments
-      args.toList match {
-        case (key: String) :: _ if key.endsWith("2.zstd") =>
-          if (failureCount < 2) {
-            failureCount += 1
-            Future.failed(new RuntimeException("Simulated S3 write error"))
-          } else {
-            invocation.callRealMethod().asInstanceOf[Future[Unit]]
-          }
-        case _ =>
-          invocation.callRealMethod().asInstanceOf[Future[Unit]]
-      }
-    }.when(s3BucketConnectionWithErrors)
-      .writeFullObject(anyString(), any[ByteBuffer])(any[TraceContext], any[ExecutionContext])
-    s3BucketConnectionWithErrors
-  }
 }
