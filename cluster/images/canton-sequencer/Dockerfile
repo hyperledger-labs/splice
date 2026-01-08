@@ -13,3 +13,6 @@ EXPOSE 5010
 EXPOSE 10013
 
 COPY app.conf /app/
+
+# Not upstreamed on purpose, this is the Splice part to allow easy overrides from within Splice:
+COPY additional-config.conf /app/
