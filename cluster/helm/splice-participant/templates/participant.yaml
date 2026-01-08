@@ -124,7 +124,7 @@ spec:
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
-        {{- if and .Values.extraVolumeMounts (gt (len .Values.extraVolumeMounts) 0) }}
+        {{- if or (and .Values.extraVolumeMounts (gt (len .Values.extraVolumeMounts) 0)) .Values.pvc }}
         volumeMounts:
           {{- range .Values.extraVolumeMounts }}
           - name: {{ .name }}
@@ -136,6 +136,10 @@ spec:
             readOnly: {{ .readOnly }}
             {{- end }}
           {{- end }}
+        {{- if .Values.pvc }}
+          - name: participant-volume
+            mountPath: /persistent-data
+        {{- end }}
         {{- end }}
       {{- if or (.Values.persistence.enablePgInitContainer) (.Values.extraInitContainers) }}
       initContainers:
@@ -178,7 +182,7 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if and .Values.extraVolumes (gt (len .Values.extraVolumes) 0) }}
+      {{- if or (and .Values.extraVolumes (gt (len .Values.extraVolumes) 0)) .Values.pvc }}
       volumes:
         {{- range .Values.extraVolumes }}
         - name: {{ .name }}
@@ -191,7 +195,31 @@ spec:
             claimName: {{ .persistentVolumeClaim.claimName }}
           {{- end }}
         {{- end }}
+        {{- if .Values.pvc }}
+          - name: participant-volume
+            persistentVolumeClaim:
+              claimName: {{ .Release.Name }}-participant-pvc
+        {{- end }}
       {{- end }}
+---
+{{-  if .Values.pvc }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-participant-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "splice-util-lib.default-labels" (set . "app" $.Release.Name) | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.pvc.size }}
+  storageClassName: {{ .Values.pvc.volumeStorageClass }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service

@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
-import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Config,
   ChartValues,
@@ -14,27 +13,20 @@ import {
   installSpliceHelmChart,
   loadYamlFromFile,
   SPLICE_ROOT,
+  spliceConfig,
   SpliceCustomResourceOptions,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { SingleSvConfiguration } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
 import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
-
-import { SingleSvConfiguration } from './singleSvConfig';
-
-export interface SvParticipant {
-  readonly asDependencies: pulumi.Resource[];
-  readonly internalClusterAddress: pulumi.Output<string>;
-}
 
 export function installSvParticipant(
   xns: ExactNamespace,
   svConfig: SingleSvConfiguration,
   migrationId: DomainMigrationIndex,
   auth0Config: Auth0Config,
-  isActive: boolean,
   db: Postgres,
   version: CnChartVersion,
-  onboardingName: string,
   participantAdminUserNameFrom?: k8s.types.input.core.v1.EnvVarSource,
   imagePullServiceAccountName?: string,
   customOptions?: SpliceCustomResourceOptions
@@ -95,6 +87,12 @@ export function installSvParticipant(
       enablePostgresMetrics: true,
       serviceAccountName: imagePullServiceAccountName,
       resources: svConfig.participant?.resources,
+      pvc: spliceConfig.configuration.persistentHeapDumps
+        ? {
+            size: '10Gi',
+            volumeStorageClass: 'standard-rwo',
+          }
+        : undefined,
     },
     version,
     {

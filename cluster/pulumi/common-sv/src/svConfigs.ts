@@ -14,7 +14,6 @@ import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/
 import { StaticSvConfig } from './config';
 import { dsoSize, skipExtraSvs } from './dsoConfig';
 import { configForSv, configuredExtraSvs } from './singleSvConfig';
-import { cometbftRetainBlocks } from './synchronizer/cometbftConfig';
 
 const sv1ScanBigQuery = spliceEnvConfig.envFlag('SV1_SCAN_BIGQUERY', false);
 
@@ -61,7 +60,6 @@ const fromSingleSvConfig = (nodeName: string, cometBftNodeIndex: number): Static
       nodeIndex: cometBftNodeIndex,
       id: config.cometbft!.nodeId!,
       privateKey: svCometBftSecrets.nodePrivateKey,
-      retainBlocks: cometbftRetainBlocks,
       validator: {
         keyAddress: config.cometbft!.validatorKeyAddress!,
         privateKey: svCometBftSecrets.validatorPrivateKey,
@@ -94,7 +92,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 1,
           id: '4c7c99516fb3309b89b7f8ed94690994c8ec0ab0',
           privateKey: svCometBftSecrets[0].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: '9473617BBC80C12F68CC25B5A754D1ED9035886C',
             privateKey: svCometBftSecrets[0].validatorPrivateKey,
@@ -122,7 +119,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 1,
           id: '5af57aa83abcec085c949323ed8538108757be9c',
           privateKey: svCometBftSecrets[0].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
             privateKey: svCometBftSecrets[0].validatorPrivateKey,
@@ -144,7 +140,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 2,
           id: 'c36b3bbd969d993ba0b4809d1f587a3a341f22c1',
           privateKey: svCometBftSecrets[1].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: '04A57312179F1E0C93B868779EE4C7FAC41666F0',
             privateKey: svCometBftSecrets[1].validatorPrivateKey,
@@ -163,7 +158,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 3,
           id: '0d8e87c54d199e85548ccec123c9d92966ec458c',
           privateKey: svCometBftSecrets[2].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: 'FFF137F42421B0257CDC8B2E41F777B81A081E80',
             privateKey: svCometBftSecrets[2].validatorPrivateKey,
@@ -182,7 +176,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 4,
           id: 'ee738517c030b42c3ff626d9f80b41dfc4b1a3b8',
           privateKey: svCometBftSecrets[3].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: 'DE36D23DE022948A11200ABB9EE07F049D17D903',
             privateKey: svCometBftSecrets[3].validatorPrivateKey,
@@ -201,7 +194,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 5,
           id: '205437468610305149d131bbf9bf1f47658d861b',
           privateKey: svCometBftSecrets[4].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: '1A6C9E60AFD830682CBEF5496F6E5515B20B0F2D',
             privateKey: svCometBftSecrets[4].validatorPrivateKey,
@@ -220,7 +212,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 6,
           id: '60c21490e82d6a1fb0c35b9a04e4f64ae00ce5c0',
           privateKey: svCometBftSecrets[5].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: 'DC41F08916D8C41B931F9037E6F2571C58D0E01A',
             privateKey: svCometBftSecrets[5].validatorPrivateKey,
@@ -239,7 +230,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 7,
           id: '81f3b7d26ae796d369fbf42481a65c6265b41e8c',
           privateKey: svCometBftSecrets[6].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: '66FA9399FF2E7AF2517E7CE2EDCA11F51C573F61',
             privateKey: svCometBftSecrets[6].validatorPrivateKey,
@@ -258,7 +248,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 8,
           id: '404371a5f62773ca07925555c9fbb6287861947c',
           privateKey: svCometBftSecrets[7].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: '5E35AE8D464FA92525BCC408C7827A943BDF4900',
             privateKey: svCometBftSecrets[7].validatorPrivateKey,
@@ -277,7 +266,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 9,
           id: 'aeee969d0efb0784ea36b9ad743a2e5964828325',
           privateKey: svCometBftSecrets[8].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: '06070D2FD47073BE1635C3DEB862A88669906847',
             privateKey: svCometBftSecrets[8].validatorPrivateKey,
@@ -296,7 +284,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 10,
           id: 'cc8e74ca2c3c66820266dc6cca759f5368dd9924',
           privateKey: svCometBftSecrets[9].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: 'E71220096CC607150D56914B9175A5D4B70B00E6',
             privateKey: svCometBftSecrets[9].validatorPrivateKey,
@@ -315,7 +302,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 11,
           id: '21f60b2667972ff943fbd46ea9ca82ddf0905948',
           privateKey: svCometBftSecrets[10].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: '14474E591E9C75E5FCA4520B36CD4963E2FBAA2C',
             privateKey: svCometBftSecrets[10].validatorPrivateKey,
@@ -334,7 +320,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 12,
           id: '817bb28c471d7a8631e701c914fc7e9a65e74be2',
           privateKey: svCometBftSecrets[11].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: '1E5F191A4E2C4DD5026A3B26F1F66A809D5D4E8C',
             privateKey: svCometBftSecrets[11].validatorPrivateKey,
@@ -353,7 +338,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 13,
           id: '254dd73eb4cee23d439c2f2e706ccdbeac52f06c',
           privateKey: svCometBftSecrets[12].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: 'CFF50F6EFD5DFDD8DAD7A468D5FB5DA2D43CF281',
             privateKey: svCometBftSecrets[12].validatorPrivateKey,
@@ -372,7 +356,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 14,
           id: '9de44f8ddac42901c094371e867bb0db60ab03b8',
           privateKey: svCometBftSecrets[13].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: 'F691F4CA91B972A6B291C09BADA9970AAAC86C84',
             privateKey: svCometBftSecrets[13].validatorPrivateKey,
@@ -391,7 +374,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 15,
           id: '7a5f4f9ee97ec24bb4a1a6ed22ec3676805fa494',
           privateKey: svCometBftSecrets[14].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: 'AAE830BF1289910D20E646D9B69561D9E0F965EA',
             privateKey: svCometBftSecrets[14].validatorPrivateKey,
@@ -410,7 +392,6 @@ export const standardSvConfigs: StaticSvConfig[] = isMainNet
           nodeIndex: 16,
           id: '9831eeb365f221034e70f27c5073ee0857bdc945',
           privateKey: svCometBftSecrets[15].nodePrivateKey,
-          retainBlocks: cometbftRetainBlocks,
           validator: {
             keyAddress: '0C77119A80F4B4305729D49EC76FC7D4C0576229',
             privateKey: svCometBftSecrets[15].validatorPrivateKey,
@@ -441,7 +422,6 @@ export const svRunbookConfig: StaticSvConfig = {
     ? 'auth0|64b16b9ff7a0dfd00ea3704e'
     : 'auth0|64553aa683015a9687d9cc2e',
   cometBft: {
-    retainBlocks: cometbftRetainBlocks,
     id: '9116f5faed79dcf98fa79a2a40865ad9b493f463',
     nodeIndex: 0,
     validator: {

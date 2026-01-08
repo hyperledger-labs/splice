@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { activeVersion } from '@lfdecentralizedtrust/splice-pulumi-common';
 
-export const Version = versionFromDefault();
-
-function versionFromDefault() {
+export function versionFromDefault(): string {
   if (activeVersion.type == 'remote') {
     return activeVersion.version;
   } else {

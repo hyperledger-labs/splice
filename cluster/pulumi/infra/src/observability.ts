@@ -10,19 +10,23 @@ import {
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
   clusterProdLike,
-  COMETBFT_RETAIN_BLOCKS,
   commandScriptPath,
-  ENABLE_COMETBFT_PRUNING,
   ExactNamespace,
   GCP_PROJECT,
   GrafanaKeys,
   HELM_MAX_HISTORY_SIZE,
+  infraAffinityAndTolerations,
   isMainNet,
   loadTesterConfig,
   ObservabilityReleaseName,
   SPLICE_ROOT,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { infraAffinityAndTolerations } from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  allSvsConfiguration,
+  extraSvConfigs,
+  standardSvConfigs,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import { local } from '@pulumi/command';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
@@ -735,7 +739,28 @@ function defaultAlertSubstitutions(alert: string): string {
   );
 }
 
+// AmuletMetrics was previously using owner.toString instead of owner.toProtoPrimitive
+// This function makes it compatible for both.
+function partyIdTransform(partyId: string) {
+  const parts = partyId.split('::');
+  const hint = parts[0];
+  const namespace = parts[1];
+  return {
+    regex: `${hint}::${namespace.substring(0, 8)}.*`,
+    hint: hint,
+  };
+}
+
 function createGrafanaAlerting(namespace: Input<string>) {
+  const sweepConfigs: SweepConfig[] = extraSvConfigs
+    .concat(standardSvConfigs)
+    .map(sv => sv.sweep!)
+    .filter(e => e != undefined);
+  const cometbftPruningHighestBlockRetain = allSvsConfiguration
+    .map(sv => sv.pruning?.cometbft?.retainBlocks)
+    .filter((retainBlocks): retainBlocks is number => retainBlocks !== undefined)
+    .sort((a, b) => a - b)
+    .pop();
   new k8s.core.v1.ConfigMap(
     'grafana-alerting',
     {
@@ -795,8 +820,14 @@ function createGrafanaAlerting(namespace: Input<string>) {
                 '$EXPECTED_MAX_BLOCK_RATE_PER_SECOND',
                 monitoringConfig.alerting.alerts.cometbft.expectedMaxBlocksPerSecond.toString()
               )
-              .replaceAll('$ENABLE_COMETBFT_PRUNING', (!ENABLE_COMETBFT_PRUNING).toString())
-              .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
+              .replaceAll(
+                '$COMETBFT_PRUNING_DISABLED',
+                (cometbftPruningHighestBlockRetain === undefined).toString()
+              )
+              .replaceAll(
+                '$COMETBFT_RETAIN_BLOCKS',
+                String((cometbftPruningHighestBlockRetain || 0) * 1.05)
+              ),
             'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml')
               .replaceAll(
                 '$CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE',
@@ -865,6 +896,20 @@ function createGrafanaAlerting(namespace: Input<string>) {
             'templates.yaml': substituteSlackNotificationTemplate(
               readGrafanaAlertingFile('templates.yaml')
             ),
+            'wallet-sweep_alerts.yaml': readAndSetAlertRulesGrafanaAlertingFile(
+              'wallet-sweep_alerts.yaml',
+              sweepConfigs.map((config, i) => {
+                const fromParty = partyIdTransform(config.fromParty);
+                const toParty = partyIdTransform(config.toParty);
+                return {
+                  subtitle: `Wallet sweep from ${fromParty.hint} to ${toParty.hint}`,
+                  ownerPrefixRegex: fromParty.regex,
+                  // trigger if it goes above 10% of the defined maxBalance
+                  maxBalanceThreshold: `${config.maxBalance * 1.1}`,
+                  uid: `df6rim37tocud${i}`,
+                };
+              })
+            ),
           },
         }).map(([k, v]) => [k, defaultAlertSubstitutions(v)])
       ),
@@ -928,14 +973,16 @@ type ReportPublisherList = 'Digital-Asset-1|Digital-Asset-2|DA-Helm-Test-Node';
 type ReportPublisherFormula = `${ReportMatchOperator}"${ReportPublisherList}"`;
 type NotificationDelay = '5m' | '15m';
 type TeamLabel = 'canton-network' | 'support' | 'da';
-type RulesUID = 'adlmhpz5iv4sgc' | 'bdlmhpz5iv4sgc' | 'cdlmhpz5iv4sgc';
+type RulesUID = 'adlmhpz5iv4sgc' | 'bdlmhpz5iv4sgc' | 'cdlmhpz5iv4sgc' | `df6rim37tocud${number}`;
 
 interface AlertRulesConfig {
-  reportPublisherFormula: ReportPublisherFormula;
-  notificationDelay: NotificationDelay;
-  teamLabel: TeamLabel;
-  subtitle: string;
-  uid: RulesUID;
+  reportPublisherFormula?: ReportPublisherFormula;
+  notificationDelay?: NotificationDelay;
+  teamLabel?: TeamLabel;
+  subtitle?: string;
+  uid?: RulesUID;
+  ownerPrefixRegex?: string;
+  maxBalanceThreshold?: string;
 }
 
 interface GrafanaRule {
@@ -972,11 +1019,13 @@ function readAndSetAlertRulesGrafanaAlertingFile(file: string, rules: AlertRules
 
   content.groups[0].rules = rules.map(rule => {
     const newRuleString = genericAlertRule
-      .replace('$REPORT_PUBLISHER_FORMULA', rule.reportPublisherFormula)
-      .replace('$NOTIFICATION_DELAY', rule.notificationDelay)
-      .replace('$TEAM_LABEL', rule.teamLabel)
-      .replace('$SUB_TITLE', rule.subtitle)
-      .replace('$RULE_UID', rule.uid);
+      .replace('$REPORT_PUBLISHER_FORMULA', rule.reportPublisherFormula ?? 'NOT_REPLACED')
+      .replace('$NOTIFICATION_DELAY', rule.notificationDelay ?? 'NOT_REPLACED')
+      .replace('$TEAM_LABEL', rule.teamLabel ?? 'NOT_REPLACED')
+      .replace('$SUB_TITLE', rule.subtitle ?? 'NOT_REPLACED')
+      .replace('$RULE_UID', rule.uid ?? 'NOT_REPLACED')
+      .replace('$OWNER_PREFIX_REGEX', rule.ownerPrefixRegex ?? 'NOT_REPLACED')
+      .replace('$MAX_BALANCE_THRESHOLD', rule.maxBalanceThreshold ?? 'NOT_REPLACED');
     return yaml.load(newRuleString) as GrafanaRule;
   });
   const newFileContent = yaml.dump(content);

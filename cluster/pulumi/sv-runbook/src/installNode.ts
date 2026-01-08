@@ -27,7 +27,6 @@ import {
   SvIdKey,
   imagePullSecret,
   CnInput,
-  sequencerPruningConfig,
   DecentralizedSynchronizerMigrationConfig,
   ValidatorTopupConfig,
   svValidatorTopupConfig,
@@ -59,6 +58,8 @@ import {
   getChainIdSuffix,
   installSvLoopback,
   svsConfig,
+  valuesForSvApp,
+  valuesForSvValidatorApp,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import {
@@ -245,20 +246,6 @@ async function installSvAndValidator(
 
   const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', 'postgres-values-apps.yaml');
 
-  const bftSequencerConnection =
-    !svConfig.participant || svConfig.participant.bftSequencerConnection;
-  const disableBftSequencerConnectionEnvVars = bftSequencerConnection
-    ? []
-    : [
-        {
-          name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
-          value: 'canton.sv-apps.sv.bft-sequencer-connection = false',
-        },
-      ];
-  const svAppAdditionalEnvVars = (svConfig.svApp?.additionalEnvVars || []).concat(
-    disableBftSequencerConnectionEnvVars
-  );
-
   const valuesFromYamlFile = loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
     {
@@ -271,6 +258,11 @@ async function installSvAndValidator(
     }
   );
 
+  const commonSvAppValues = valuesForSvApp(decentralizedSynchronizerMigrationConfig, {
+    ...svConfig,
+    cometBftGovernanceKey,
+  });
+
   const extraBeneficiaries = resolveValidator1PartyId
     ? [
         {
@@ -282,36 +274,22 @@ async function installSvAndValidator(
   const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
   const svValues: ChartValues = {
     ...valuesFromYamlFile,
+    ...commonSvAppValues,
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
     approvedSvIdentities: approvedSvIdentities(),
     domain: {
       ...(valuesFromYamlFile.domain || {}),
-      sequencerPruningConfig,
+      ...(commonSvAppValues.domain || {}),
       skipInitialization:
         svsConfig?.synchronizer?.skipInitialization &&
         !svsConfig?.synchronizer.forceSvRunbookInitialization,
-      ...(useCantonBft
-        ? {
-            enableBftSequencer: true,
-          }
-        : {}),
     },
-    ...(useCantonBft
-      ? {
-          cometBFT: {
-            enabled: false,
-          },
-        }
-      : {
-          cometBFT: {
-            ...(valuesFromYamlFile.cometBFT || {}),
-            externalGovernanceKey: cometBftGovernanceKey
-              ? true
-              : valuesFromYamlFile.cometBFT?.externalGovernanceKey,
-          },
-        }),
+    cometBFT: {
+      ...(valuesFromYamlFile.cometBFT || {}),
+      ...(commonSvAppValues.cometBFT || {}),
+    },
     migration: {
       ...valuesFromYamlFile.migration,
       migrating: decentralizedSynchronizerMigrationConfig.isRunningMigration()
@@ -330,7 +308,6 @@ async function installSvAndValidator(
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: svConfig.logging?.appsLogLevel,
     logAsyncFlush: svConfig.logging?.appsAsync,
-    additionalEnvVars: svAppAdditionalEnvVars,
     additionalJvmOptions: getAdditionalJvmOptions(svConfig.svApp?.additionalJvmOptions),
     resources: svConfig.svApp?.resources,
   };
@@ -428,6 +405,11 @@ async function installSvAndValidator(
 
   installInfoEndpoint(xns, decentralizedSynchronizerMigrationConfig, scan);
 
+  const commonValidatorAppValues = valuesForSvValidatorApp(
+    decentralizedSynchronizerMigrationConfig,
+    svConfig
+  );
+
   const validatorValues = {
     ...loadYamlFromFile(`${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
@@ -458,6 +440,7 @@ async function installSvAndValidator(
 
   const validatorValuesWithSpecifiedAud: ChartValues = {
     ...validatorValues,
+    ...commonValidatorAppValues,
     ...persistenceForPostgres(appsPg, validatorValues),
     auth: {
       ...validatorValues.auth,
@@ -475,35 +458,14 @@ async function installSvAndValidator(
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
-  const validatorValuesWithMaybeNoBftSequencerConnection: ChartValues = {
-    ...validatorValuesWithMaybeTopups,
-    ...(bftSequencerConnection
-      ? {}
-      : {
-          decentralizedSynchronizerUrl: svValues.decentralizedSynchronizerUrl,
-          useSequencerConnectionsFromScan: false,
-        }),
-    additionalEnvVars: [
-      ...(validatorValuesWithMaybeTopups.additionalEnvVars || []),
-      ...(bftSequencerConnection
-        ? []
-        : [
-            {
-              name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
-              value:
-                'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
-            },
-          ]),
-      ...(svConfig.validatorApp?.additionalEnvVars || []),
-    ],
-    additionalJvmOptions: getAdditionalJvmOptions(svConfig.validatorApp?.additionalJvmOptions),
-  };
-
   const validator = installSpliceRunbookHelmChart(
     xns,
     'validator',
     'splice-validator',
-    validatorValuesWithMaybeNoBftSequencerConnection,
+    {
+      ...validatorValuesWithMaybeTopups,
+      additionalJvmOptions: getAdditionalJvmOptions(svConfig.validatorApp?.additionalJvmOptions),
+    },
     activeVersion,
     {
       dependsOn: imagePullDeps

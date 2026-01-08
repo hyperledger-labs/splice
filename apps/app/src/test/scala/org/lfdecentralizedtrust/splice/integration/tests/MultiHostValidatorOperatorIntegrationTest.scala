@@ -196,7 +196,11 @@ class MultiHostValidatorOperatorIntegrationTest
         splitwellWalletClient.balance().unlockedQty should beWithin(47, 48)
         // Alice's wallet is stopped, so we confirm the transaction via scan
         sv1ScanBackend
-          .listTransactions(None, TransactionHistoryRequest.SortOrder.Desc, Limit.MaxPageSize)
+          .listTransactions(
+            None,
+            TransactionHistoryRequest.SortOrder.Desc,
+            Limit.DefaultMaxPageSize,
+          )
           .flatMap(_.transfer)
           .filter(tf => tf.description == transferDescription) should not be empty
       },

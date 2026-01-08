@@ -225,7 +225,7 @@ class SvTimeBasedRewardCouponIntegrationTest
             .listTransactions(
               None,
               TransactionHistoryRequest.SortOrder.Desc,
-              Limit.MaxPageSize,
+              Limit.DefaultMaxPageSize,
             )
             .flatMap(_.transfer)
             .filter(tf =>
@@ -256,7 +256,7 @@ class SvTimeBasedRewardCouponIntegrationTest
             sv1WalletClient
               .listTransactions(
                 None,
-                Limit.MaxPageSize,
+                Limit.DefaultMaxPageSize,
               )
           )
             .collect {

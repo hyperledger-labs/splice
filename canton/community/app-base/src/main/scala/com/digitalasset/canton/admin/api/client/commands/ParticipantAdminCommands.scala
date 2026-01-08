@@ -877,13 +877,13 @@ object ParticipantAdminCommands {
     }
 
     final case class ImportAcs(
-        acsChunk: ByteString,
+        acsChunk: Seq[ByteString],
         workflowIdPrefix: String,
         contractImportMode: ContractImportMode,
         representativePackageIdOverride: RepresentativePackageIdOverride,
         excludedStakeholders: Set[PartyId],
     ) extends GrpcAdminCommand[
-          v30.ImportAcsRequest,
+          Seq[v30.ImportAcsRequest],
           v30.ImportAcsResponse,
           Unit,
         ] {
@@ -893,32 +893,26 @@ object ParticipantAdminCommands {
       override def createService(channel: ManagedChannel): ParticipantRepairServiceStub =
         v30.ParticipantRepairServiceGrpc.stub(channel)
 
-      override protected def createRequest(): Either[String, v30.ImportAcsRequest] =
+      override protected def createRequest(): Either[String, Seq[v30.ImportAcsRequest]] =
         Right(
-          v30.ImportAcsRequest(
-            acsChunk,
-            workflowIdPrefix,
-            contractImportMode.toProtoV30,
-            excludedStakeholders.map(_.toProtoPrimitive).toSeq,
-            Some(representativePackageIdOverride.toProtoV30),
+          acsChunk.map(bytes =>
+            v30.ImportAcsRequest(
+              bytes,
+              workflowIdPrefix,
+              contractImportMode.toProtoV30,
+              excludedStakeholders.map(_.toProtoPrimitive).toSeq,
+              Some(representativePackageIdOverride.toProtoV30),
+            )
           )
         )
 
       override protected def submitRequest(
           service: ParticipantRepairServiceStub,
-          request: v30.ImportAcsRequest,
+          request: Seq[v30.ImportAcsRequest],
       ): Future[v30.ImportAcsResponse] =
-        GrpcStreamingUtils.streamToServer(
+        GrpcStreamingUtils.streamToServerChunked(
           service.importAcs,
-          (bytes: Array[Byte]) =>
-            v30.ImportAcsRequest(
-              ByteString.copyFrom(bytes),
-              workflowIdPrefix,
-              contractImportMode.toProtoV30,
-              excludedStakeholders.map(_.toProtoPrimitive).toSeq,
-              Some(representativePackageIdOverride.toProtoV30),
-            ),
-          request.acsSnapshot,
+          request,
         )
 
       override protected def handleResponse(

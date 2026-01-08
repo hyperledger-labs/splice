@@ -1253,7 +1253,7 @@ class WalletTxLogIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val validatorTxLogBefore =
-        aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
+        aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
 
       val (offerCid, _) =
         actAndCheck(
@@ -1284,7 +1284,8 @@ class WalletTxLogIntegrationTest
       )
 
       // Only Alice should see notification (note that aliceValidator is shared between tests)
-      val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
+      val validatorTxLogAfter =
+        aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
 
       withoutDevNetTopups(validatorTxLogBefore) should be(
         withoutDevNetTopups(validatorTxLogAfter)
@@ -1413,7 +1414,7 @@ class WalletTxLogIntegrationTest
       val aliceUserId = aliceWalletClient.config.ledgerApiUser
       val charlieUserId = charlieWalletClient.config.ledgerApiUser
       val validatorTxLogBefore =
-        aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
+        aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
 
       // Note: using Alice and Charlie because manually creating subscriptions requires both
       // the sender and the receiver to be hosted on the same participant.
@@ -1534,7 +1535,7 @@ class WalletTxLogIntegrationTest
 
           // Validator should not see any notification (note that aliceValidator is shared between tests)
           val validatorTxLogAfter =
-            aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
+            aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
           withoutDevNetTopups(validatorTxLogBefore) should be(
             withoutDevNetTopups(validatorTxLogAfter)
           )
@@ -1569,7 +1570,7 @@ class WalletTxLogIntegrationTest
       // Note: SV1 is reused between tests, ignore TxLog entries created by previous tests
       val previousEventId = withoutDevNetTopups(
         sv1WalletClient
-          .listTransactions(None, Limit.MaxPageSize)
+          .listTransactions(None, Limit.DefaultMaxPageSize)
       ).headOption
         .map(_.eventId)
 
@@ -1638,24 +1639,33 @@ class WalletTxLogIntegrationTest
     }
 
     "not blow up with failed CO_TransferPreapprovalSend" in { implicit env =>
-      // Note: using Alice and Charlie because manually creating subscriptions requires both
-      // the sender and the receiver to be hosted on the same participant.
-      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+      // the renewal of the preapproval can cause a LOCAL_VERDICT_LOCKED_CONTRACTS conflict with the send
+      setTriggersWithin(
+        triggersToPauseAtStart =
+          Seq(aliceValidatorBackend.validatorAutomation.trigger[RenewTransferPreapprovalTrigger]),
+        triggersToResumeAtStart = Seq.empty,
+      ) {
+        // Note: using Alice and Charlie because manually creating subscriptions requires both
+        // the sender and the receiver to be hosted on the same participant.
+        onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
-      aliceValidatorWalletClient.tap(100) // funds to create preapproval
-      createTransferPreapprovalEnsuringItExists(charlieWalletClient, aliceValidatorBackend)
+        aliceValidatorWalletClient.tap(100) // funds to create preapproval
+        createTransferPreapprovalEnsuringItExists(charlieWalletClient, aliceValidatorBackend)
 
-      assertCommandFailsDueToInsufficientFunds(
-        aliceWalletClient.transferPreapprovalSend(
-          charlieUserParty,
-          BigDecimal(10000000),
-          UUID.randomUUID().toString,
-          Some("this should not go through"),
+        val dedupId = UUID.randomUUID().toString
+
+        assertCommandFailsDueToInsufficientFunds(
+          aliceWalletClient.transferPreapprovalSend(
+            charlieUserParty,
+            BigDecimal(10000000),
+            dedupId,
+            Some("this should not go through"),
+          )
         )
-      )
 
-      aliceWalletClient.listTransactions(None, Limit.MaxPageSize) shouldBe empty
+        aliceWalletClient.listTransactions(None, Limit.DefaultMaxPageSize) shouldBe empty
+      }
     }
 
   }

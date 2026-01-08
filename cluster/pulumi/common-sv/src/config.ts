@@ -58,12 +58,6 @@ export interface StaticSvConfig {
   cometBftGovernanceKeySecretName?: string;
 }
 
-export type SequencerPruningConfig = {
-  enabled: boolean;
-  pruningInterval?: string;
-  retentionPeriod?: string;
-};
-
 export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
   isFirstSv: boolean;
   auth0Client: Auth0Client;
@@ -78,7 +72,6 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
   identitiesBackupLocation: BackupLocation;
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   topupConfig?: ValidatorTopupConfig;
-  sequencerPruningConfig: SequencerPruningConfig;
   splitPostgresInstances: boolean;
   disableOnboardingParticipantPromotionDelay: boolean;
   onboardingPollingInterval?: string;
