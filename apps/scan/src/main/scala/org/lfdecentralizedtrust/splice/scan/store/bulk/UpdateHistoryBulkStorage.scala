@@ -53,7 +53,7 @@ class UpdateHistoryBulkStorage(
         OverflowStrategy.backpressure,
       )
       .mapAsync(1) { case ByteStringWithTermination(zstdObj, isLast) =>
-        val objectKey = if (isLast) s"updates_${s3ObjIdx}_last.zstd" else s"snapshot_$s3ObjIdx.zstd"
+        val objectKey = if (isLast) s"updates_${s3ObjIdx}_last.zstd" else s"updates_$s3ObjIdx.zstd"
         // TODO(#3429): For now, we accumulate the full object in memory, then write it as a whole.
         //    Consider streaming it to S3 instead. Need to make sure that it then handles crashes correctly,
         //    i.e. that until we tell S3 that we're done writing, if we stop, then S3 throws away the
@@ -92,8 +92,6 @@ class UpdateHistoryBulkStorage(
         }
       } else Future.successful(())
     }
-
-    def watchCompletion(): Future[Unit] = queue.watchCompletion().map(_ => ())
 
     def next(): Future[Result.Result] = {
       for {
@@ -137,12 +135,17 @@ class UpdateHistoryBulkStorage(
         } else if (updatesInSegment.length < config.dbReadChunkSize) {
           Result.NotReady
         } else {
-          val last = updatesInSegment.lastOption.getOrElse(throw new RuntimeException("No updates added, unexpectedly"))
+          val last = updatesInSegment.lastOption.getOrElse(
+            throw new RuntimeException("No updates added, unexpectedly")
+          )
           position.set(Some((last.migrationId, last.update.update.recordTime)))
           Result.NotDone
         }
       }
     }
+
+    def watchCompletion(): Future[Unit] =
+      pipeline.map(_ => ())
   }
 
   object UpdateHistorySegmentBulkStorage {

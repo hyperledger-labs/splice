@@ -3,36 +3,28 @@
 
 package org.lfdecentralizedtrust.splice.scan.store
 
-import com.daml.ledger.javaapi.data as javaapi
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import com.github.luben.zstd.ZstdDirectBufferDecompressingStream
-import com.google.protobuf.ByteString
-import io.netty.buffer.PooledByteBufAllocator
-import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
-import org.lfdecentralizedtrust.splice.scan.store.bulk.{
-  AcsSnapshotBulkStorage,
-  BulkStorageConfig,
-  S3BucketConnection,
-}
+import org.lfdecentralizedtrust.splice.scan.store.bulk.{AcsSnapshotBulkStorage, BulkStorageConfig}
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest}
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
-import org.lfdecentralizedtrust.splice.util.{EventId, PackageQualifiedName, ValueJsonCodecCodegen}
-import software.amazon.awssdk.services.s3.model.{ListObjectsRequest, S3Object}
+import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
+import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
-import java.nio.charset.StandardCharsets
 import scala.concurrent.Future
 import scala.jdk.FutureConverters.*
 import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.*
-import scala.util.Using
 
-class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with HasActorSystem with HasS3Mock {
+class AcsSnapshotBulkStorageTest
+    extends StoreTest
+    with HasExecutionContext
+    with HasActorSystem
+    with HasS3Mock {
 
   val acsSnapshotSize = 48500
   val bulkStorageTestConfig = BulkStorageConfig(
@@ -77,63 +69,46 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
           }
           objectKeys.last.key() should endWith("_last.zstd")
 
-          val allContractsFromS3 = objectKeys
-            .map(readUncompressAndDecode(s3BucketConnection))
-            .flatten
+          val allContractsFromS3 = objectKeys.flatMap(
+            readUncompressAndDecode(
+              s3BucketConnection,
+              io.circe.parser.decode[httpApi.CreatedEvent],
+            )
+          )
           allContractsFromS3.map(
-            reconstructFromS3
+            CompactJsonScanHttpEncodingsWithFieldLabels.httpToJavaCreatedEvent
           ) should contain theSameElementsInOrderAs allContracts.map(_.event)
         }
       }
     }
   }
 
-  def readUncompressAndDecode(
-                               s3BucketConnection: S3BucketConnection
-                             )(s3obj: S3Object): Array[httpApi.CreatedEvent] = {
-    val bufferAllocator = PooledByteBufAllocator.DEFAULT
-    val compressed = s3BucketConnection.readFullObject(s3obj.key()).futureValue
-    val compressedDirect = bufferAllocator.directBuffer(compressed.capacity())
-    val uncompressedDirect = bufferAllocator.directBuffer(compressed.capacity() * 200)
-    val uncompressedNio = uncompressedDirect.nioBuffer(0, uncompressedDirect.capacity())
-    compressedDirect.writeBytes(compressed)
-    Using(new ZstdDirectBufferDecompressingStream(compressedDirect.nioBuffer())) {
-      _.read(uncompressedNio)
-    }
-    uncompressedNio.flip()
-    val allContractsStr = StandardCharsets.UTF_8.newDecoder().decode(uncompressedNio).toString
-    val allContracts = allContractsStr.split("\n")
-    compressedDirect.release()
-    uncompressedDirect.release()
-    allContracts.map(io.circe.parser.decode[httpApi.CreatedEvent](_).value)
-  }
-
-  // Similar to CompactJsonScanHttpEncodings.httpToJavaCreatedEvent, but does preserve field names, as we want to assert on their equality.
-  def reconstructFromS3(createdEvent: httpApi.CreatedEvent): javaapi.CreatedEvent = {
-    val templateId = CompactJsonScanHttpEncodings.parseTemplateId(createdEvent.templateId)
-    new javaapi.CreatedEvent(
-      /*witnessParties = */ java.util.Collections.emptyList(),
-      /*offset = */ 0, // not populated
-      /*nodeId = */ EventId.nodeIdFromEventId(createdEvent.eventId),
-      templateId,
-      createdEvent.packageName,
-      createdEvent.contractId,
-      ValueJsonCodecCodegen
-        .deserializableContractPayload(templateId, createdEvent.createArguments.noSpaces)
-        .value,
-      /*createdEventBlob = */ ByteString.EMPTY,
-      /*interfaceViews = */ java.util.Collections.emptyMap(),
-      /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
-      /* contractKey = */ None.toJava,
-      createdEvent.signatories.asJava,
-      createdEvent.observers.asJava,
-      createdEvent.createdAt.toInstant,
-      /* acsDelta = */ false,
-      /* representativePackageId = */ templateId.getPackageId,
-    )
-
-  }
-
+//  // Similar to CompactJsonScanHttpEncodings.httpToJavaCreatedEvent, but does preserve field names, as we want to assert on their equality.
+//  def reconstructFromS3(createdEvent: httpApi.CreatedEvent): javaapi.CreatedEvent = {
+//    val templateId = CompactJsonScanHttpEncodings.parseTemplateId(createdEvent.templateId)
+//    new javaapi.CreatedEvent(
+//      /*witnessParties = */ java.util.Collections.emptyList(),
+//      /*offset = */ 0, // not populated
+//      /*nodeId = */ EventId.nodeIdFromEventId(createdEvent.eventId),
+//      templateId,
+//      createdEvent.packageName,
+//      createdEvent.contractId,
+//      ValueJsonCodecCodegen
+//        .deserializableContractPayload(templateId, createdEvent.createArguments.noSpaces)
+//        .value,
+//      /*createdEventBlob = */ ByteString.EMPTY,
+//      /*interfaceViews = */ java.util.Collections.emptyMap(),
+//      /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
+//      /* contractKey = */ None.toJava,
+//      createdEvent.signatories.asJava,
+//      createdEvent.observers.asJava,
+//      createdEvent.createdAt.toInstant,
+//      /* acsDelta = */ false,
+//      /* representativePackageId = */ templateId.getPackageId,
+//    )
+//
+//  }
+//
   def mockAcsSnapshotStore(snapshotSize: Int): AcsSnapshotStore = {
     val store = mock[AcsSnapshotStore]
     val partyId = mkPartyId("alice")
@@ -148,12 +123,12 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
       )(any[TraceContext])
     ).thenAnswer {
       (
-        migration: Long,
-        timestamp: CantonTimestamp,
-        after: Option[Long],
-        limit: Limit,
-        _: Seq[PartyId],
-        _: Seq[PackageQualifiedName],
+          migration: Long,
+          timestamp: CantonTimestamp,
+          after: Option[Long],
+          limit: Limit,
+          _: Seq[PartyId],
+          _: Seq[PackageQualifiedName],
       ) =>
         Future {
           val remaining = snapshotSize - after.getOrElse(0L)

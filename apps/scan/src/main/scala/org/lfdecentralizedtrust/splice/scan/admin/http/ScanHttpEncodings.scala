@@ -320,7 +320,7 @@ sealed trait ScanHttpEncodings {
       httpToJavaExercisedEvent(nodesWithChildren, exercisedHttp)
   }
 
-  private def httpToJavaCreatedEvent(http: httpApi.CreatedEvent): javaApi.CreatedEvent = {
+  def httpToJavaCreatedEvent(http: httpApi.CreatedEvent): javaApi.CreatedEvent = {
     val templateId = parseTemplateId(http.templateId)
     new javaApi.CreatedEvent(
       /*witnessParties = */ java.util.Collections.emptyList(),
@@ -672,8 +672,8 @@ object ScanHttpEncodings {
   }
 }
 
-// A lossy, but much easier to process, encoding. Should be used for all endpoints not used for backfilling Scan.
-case object CompactJsonScanHttpEncodings extends ScanHttpEncodings {
+class CompactJsonScanHttpEncodingsWithOrWithoutFieldLabels(withFieldLabels: Boolean)
+    extends ScanHttpEncodings {
   import org.lfdecentralizedtrust.splice.util.ValueJsonCodecCodegen
   override def encodeContractPayload(
       event: javaApi.CreatedEvent
@@ -725,7 +725,7 @@ case object CompactJsonScanHttpEncodings extends ScanHttpEncodings {
           throw new RuntimeException(
             s"Failed to decode contract payload '${json.noSpaces}': $error"
           ),
-        withoutFieldLabels,
+        maybeWithoutFieldLabels,
       )
 
   override def decodeChoiceArgument(
@@ -741,7 +741,7 @@ case object CompactJsonScanHttpEncodings extends ScanHttpEncodings {
           throw new RuntimeException(
             s"Failed to decode choice argument '${json.noSpaces}': $error"
           ),
-        withoutFieldLabels,
+        maybeWithoutFieldLabels,
       )
 
   override def decodeExerciseResult(
@@ -755,35 +755,49 @@ case object CompactJsonScanHttpEncodings extends ScanHttpEncodings {
       .fold(
         error =>
           throw new RuntimeException(s"Failed to decode choice result '${json.noSpaces}': $error"),
-        withoutFieldLabels,
+        maybeWithoutFieldLabels,
       )
 
   /** Recursively removes all field labels from a value.
     * ValueJsonCodecCodegen returns values with field labels, but we generally don't store field labels in databases.
     * The labels are removed to make values comparable.
     */
-  private def withoutFieldLabels(value: javaApi.Value): javaApi.Value = {
-    value match {
-      case record: javaApi.DamlRecord => withoutFieldLabels(record)
-      case list: javaApi.DamlList => javaApi.DamlList.of(list.toList(withoutFieldLabels))
-      case tmap: javaApi.DamlTextMap => javaApi.DamlTextMap.of(tmap.toMap(withoutFieldLabels))
-      case gmap: javaApi.DamlGenMap =>
-        javaApi.DamlGenMap.of(gmap.toMap(withoutFieldLabels, withoutFieldLabels))
-      case opt: javaApi.DamlOptional =>
-        javaApi.DamlOptional.of(opt.getValue.map(withoutFieldLabels))
-      case variant: javaApi.Variant =>
-        new javaApi.Variant(variant.getConstructor, withoutFieldLabels(variant.getValue))
-      case _ => value
+  private def maybeWithoutFieldLabels(value: javaApi.Value): javaApi.Value = {
+    if (withFieldLabels) {
+      value
+    } else {
+      value match {
+        case record: javaApi.DamlRecord => maybeWithoutFieldLabels(record)
+        case list: javaApi.DamlList => javaApi.DamlList.of(list.toList(maybeWithoutFieldLabels))
+        case tmap: javaApi.DamlTextMap =>
+          javaApi.DamlTextMap.of(tmap.toMap(maybeWithoutFieldLabels))
+        case gmap: javaApi.DamlGenMap =>
+          javaApi.DamlGenMap.of(gmap.toMap(maybeWithoutFieldLabels, maybeWithoutFieldLabels))
+        case opt: javaApi.DamlOptional =>
+          javaApi.DamlOptional.of(opt.getValue.map(maybeWithoutFieldLabels))
+        case variant: javaApi.Variant =>
+          new javaApi.Variant(variant.getConstructor, maybeWithoutFieldLabels(variant.getValue))
+        case _ => value
+      }
     }
   }
-  private def withoutFieldLabels(value: javaApi.DamlRecord): javaApi.DamlRecord = {
-    val fields = value.getFields.asScala.toList
-    val fieldsWithoutLabels = fields.map { f =>
-      new javaApi.DamlRecord.Field(withoutFieldLabels(f.getValue))
+  private def maybeWithoutFieldLabels(value: javaApi.DamlRecord): javaApi.DamlRecord = {
+    if (withFieldLabels) {
+      value
+    } else {
+      val fields = value.getFields.asScala.toList
+      val fieldsWithoutLabels = fields.map { f =>
+        new javaApi.DamlRecord.Field(maybeWithoutFieldLabels(f.getValue))
+      }
+      new javaApi.DamlRecord(fieldsWithoutLabels.asJava)
     }
-    new javaApi.DamlRecord(fieldsWithoutLabels.asJava)
   }
+
 }
+
+// A lossy, but much easier to process, encoding. Should be used for all endpoints not used for backfilling Scan.
+case object CompactJsonScanHttpEncodings
+    extends CompactJsonScanHttpEncodingsWithOrWithoutFieldLabels(false)
 
 // A lossless, but harder to process, encoding. Should be used only for backfilling Scan.
 case object ProtobufJsonScanHttpEncodings extends ScanHttpEncodings {

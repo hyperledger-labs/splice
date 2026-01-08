@@ -893,6 +893,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def nextOffset(): Long = blocking {
     synchronized {
+      println("in nextOffset")
       val offset = offsetCounter
       offsetCounter += 1
       offset
@@ -908,6 +909,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       workflowId: String,
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
+      updateId: String = nextUpdateId(),
   ): Transaction = mkCreateTxWithInterfaces(
     offset,
     createRequests.map(cr =>
@@ -919,6 +921,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     workflowId,
     recordTime,
     createdEventObservers,
+    updateId,
   )
 
   protected def mkCreateTxWithInterfaces(
@@ -932,7 +935,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       workflowId: String,
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
-  ): Transaction = mkTx(
+      updateId: String = nextUpdateId(),
+    ): Transaction = mkTx(
     offset,
     createRequests.map[Event] { case (contract, implementedInterfaces, failedInterfaces) =>
       toCreatedEvent(
@@ -947,6 +951,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     effectiveAt,
     workflowId,
     recordTime = recordTime,
+    updateId = updateId,
   )
 
   protected def acs(
@@ -1276,8 +1281,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       workflowId: String = "",
       commandId: String = "",
       recordTime: Instant = defaultEffectiveAt,
+      updateId: String = nextUpdateId(),
   ): Transaction = {
-    val updateId = nextUpdateId()
     val eventsWithId = events.zipWithIndex.map { case (e, i) =>
       withNodeId(e, i)
     }
