@@ -11,7 +11,6 @@
 
     - Added support for picking a custom name for new parties created when onboarding users via the `/v0/admin/users` API. See :ref:`docs <validator-users>`.
 
-    - Added support for specifying trusted scan and synchronizer connections, with configurable thresholds.
 
   - API security
 
