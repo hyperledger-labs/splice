@@ -21,19 +21,20 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletru
 import scala.concurrent.{ExecutionContext, Future}
 
 object HttpScanProxyAppClient {
-
+  val clientName = "HttpScanProxyAppClient"
   abstract class ScanProxyBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = scanProxy.ScanproxyClient
 
-    def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
-    ): Client = scanProxy.ScanproxyClient.httpClient(
-      HttpClientBuilder().buildClient(Set(StatusCodes.NotFound)),
-      host,
-    )
+    ): Client =
+      scanProxy.ScanproxyClient.httpClient(
+        HttpClientBuilder().buildClient(clientName, commandName, Set(StatusCodes.NotFound)),
+        host,
+      )
   }
 
   case object GetDsoParty extends ScanProxyBaseCommand[scanProxy.GetDsoPartyIdResponse, PartyId] {

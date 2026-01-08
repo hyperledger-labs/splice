@@ -73,6 +73,8 @@ class OAuthApi(
   implicit val ec: ExecutionContext = actorSystem.dispatcher
   import OAuthApi.*
 
+  private val clientName = "OAuthApi"
+
   private val httpClient = HttpClient(
     ApiLoggingConfig(),
     HttpClient.HttpRequestParameters(requestTimeout),
@@ -100,7 +102,7 @@ class OAuthApi(
     logger.debug(s"Loading OIDC Well-Known Configuration from $url")
 
     for {
-      res <- httpClient.executeRequest(
+      res <- httpClient.executeRequest(clientName, "getWellKnown")(
         HttpRequest(
           method = HttpMethods.GET,
           uri = url,
@@ -124,13 +126,14 @@ class OAuthApi(
 
     val payload = ClientCredentialRequest(clientId, clientSecret, audience, scope)
 
-    val responseFuture: Future[HttpResponse] = httpClient.executeRequest(
-      HttpRequest(
-        method = HttpMethods.POST,
-        uri = tokenUrl,
-        entity = payload.toFormData.toEntity,
+    val responseFuture: Future[HttpResponse] =
+      httpClient.executeRequest(clientName, "requestToken")(
+        HttpRequest(
+          method = HttpMethods.POST,
+          uri = tokenUrl,
+          entity = payload.toFormData.toEntity,
+        )
       )
-    )
 
     for {
       res <- responseFuture

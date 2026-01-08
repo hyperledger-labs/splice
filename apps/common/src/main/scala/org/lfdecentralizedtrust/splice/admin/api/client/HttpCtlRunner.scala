@@ -37,7 +37,7 @@ class HttpCtlRunner(
       mat: Materializer,
   ): EitherT[Future, String, Result] = {
 
-    val client: command.Client = command.createClient(host)
+    val client: command.Client = command.createClient(host, command.commandName)
 
     for {
       response <- command

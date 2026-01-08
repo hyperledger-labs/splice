@@ -33,17 +33,18 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
 object HttpSvOperatorAppClient {
+  val clientName = "HttpSvOperatorAppClient"
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = http.SvOperatorClient
 
-    def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
       http.SvOperatorClient.httpClient(
-        HttpClientBuilder().buildClient(),
+        HttpClientBuilder().buildClient(clientName, commandName),
         host,
       )
   }

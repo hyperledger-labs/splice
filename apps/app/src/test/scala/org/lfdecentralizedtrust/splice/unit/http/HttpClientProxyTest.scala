@@ -256,7 +256,8 @@ class HttpClientProxyTest
     }
   }
   private val metricsFactoryProvider = new ScopedInMemoryMetricsFactory()
-  private val metricsFactory: InMemoryMetricsFactory = metricsFactoryProvider.generateMetricsFactory(MetricsContext.Empty)
+  private val metricsFactory: InMemoryMetricsFactory =
+    metricsFactoryProvider.generateMetricsFactory(MetricsContext.Empty)
 
   private def executeRequest(
       serverBinding: ServerBinding
@@ -271,7 +272,7 @@ class HttpClientProxyTest
     val uriString = s"http://localhost:$serverPort"
 
     httpClient
-      .executeRequest(
+      .executeRequest("http-client-proxy-test", "test-request")(
         HttpRequest(uri = Uri(uriString))
       )
   }

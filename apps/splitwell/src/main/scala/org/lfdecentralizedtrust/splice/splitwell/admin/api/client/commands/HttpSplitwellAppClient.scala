@@ -30,14 +30,14 @@ object HttpSplitwellAppClient {
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = http.SplitwellClient
 
-    def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
       http.SplitwellClient.httpClient(
-        HttpClientBuilder().buildClient(),
+        HttpClientBuilder().buildClient(clientName, commandName),
         host,
       )
   }

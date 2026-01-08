@@ -35,7 +35,9 @@ import scala.util.control.NonFatal
 trait HttpClient {
   val requestParameters: HttpClient.HttpRequestParameters
   def withOverrideParameters(newParameters: HttpClient.HttpRequestParameters): HttpClient
-  def executeRequest(clientName: String, operationName: String)(request: HttpRequest): Future[HttpResponse]
+  def executeRequest(clientName: String, operationName: String)(
+      request: HttpRequest
+  ): Future[HttpResponse]
   def getToken(authConfig: AuthTokenSourceConfig): Future[Option[AuthToken]]
 }
 
@@ -68,7 +70,9 @@ object HttpClient {
       authTokenSource.getToken(traceContext)
     }
 
-    override def executeRequest(clientName: String, operationName: String)(request: HttpRequest): Future[HttpResponse] = {
+    override def executeRequest(clientName: String, operationName: String)(
+        request: HttpRequest
+    ): Future[HttpResponse] = {
       implicit val traceContext: TraceContext = traceContextFromHeaders(request.headers)
       import apiLoggingConfig.*
       val logPayload = messagePayloads
@@ -77,7 +81,8 @@ object HttpClient {
       def msg(message: String): String =
         s"HTTP client (${request.method.name} ${pathLimited}): ${message}"
 
-      implicit val mc: MetricsContext = HttpClientMetrics.context(clientName, operationName, request.uri.authority.host.address)
+      implicit val mc: MetricsContext =
+        HttpClientMetrics.context(clientName, operationName, request.uri.authority.host.address)
 
       val timing = metrics.startTiming()
       metrics.incInFlight()
@@ -118,7 +123,7 @@ object HttpClient {
           .completionTimeout(requestParameters.requestTimeout.asFiniteApproximation)
           .runWith(Sink.head)
           .recoverWith { case NonFatal(e) =>
-            timing.stop()(HttpClientMetrics.FailureStatus)
+            timing.stop()(HttpClientMetrics.failedStatus)
             metrics.decInFlight()
             logger.debug(msg("HTTP request failed"), e)(traceContext)
             Future.failed(e)
@@ -260,40 +265,58 @@ object HttpClient {
 }
 
 object HttpClientMetrics {
+  object LabelNames {
+    val status = "status"
+    val statusCode = "status_code"
+    val operation = "operation"
+    val httpClient = "http_client"
+    val targetHost = "target_host"
+  }
+  import LabelNames.*
   def context(clientName: String, operationName: String, host: String) =
-    MetricsContext("clientName" -> clientName, "operationName" -> operationName, "target_host" -> host)
-  val FailureStatus = MetricsContext("status" -> "failure")
+    MetricsContext(
+      httpClient -> clientName,
+      operation -> operationName,
+      targetHost -> host,
+    )
   def completedStatus(response: HttpResponse) = MetricsContext(
-    "status_code" -> response.status.intValue().toString,
-    "status" -> "completed",
+    statusCode -> response.status.intValue().toString,
+    status -> "completed",
   )
   def apply(metricsFactory: LabeledMetricsFactory): HttpClientMetrics =
     new HttpClientMetrics(metricsFactory)
+  val failedStatus = MetricsContext(status -> "failure")
+  val prefix: MetricName = MetricName.Daml :+ "http" :+ "client"
 }
 
 class HttpClientMetrics(metricsFactory: LabeledMetricsFactory) {
-  val prefix: MetricName = MetricName.Daml :+ "http" :+ "client"
+  import HttpClientMetrics.*
+  import LabelNames.*
 
-  val requestTiming = metricsFactory.timer(
+  private val requestsSegment = "requests"
+  val requestTiming: MetricHandle.Timer = metricsFactory.timer(
     MetricInfo(
-      name = prefix :+ "requests" :+ "duration",
+      name = prefix :+ requestsSegment :+ "duration",
       summary = "Histogram for http client request durations",
       qualification = Latency,
       labelsWithDescription = Map(
-        "method" -> "HTTP method of the request",
-        "path" -> "path of the HTTP request, limited in length",
-        "status" -> "Status of the HTTP request: completed, failure",
+        httpClient -> "The name of the HTTP client",
+        operation -> "The operation requested by the HTTP client",
+        targetHost -> "The target host of the HTTP request",
+        statusCode -> "HTTP status code of the response",
+        status -> "Status of the HTTP request: completed, failure",
       ),
     )
   )
-  val inFlightRequests = metricsFactory.counter(
+  val inFlightRequests: MetricHandle.Counter = metricsFactory.counter(
     MetricInfo(
-      name = prefix :+ "requests" :+ "inflight",
-      summary = "Histogram for http client request durations",
+      name = prefix :+ requestsSegment :+ "inflight",
+      summary = "Count of in-flight http client requests",
       qualification = Latency,
       labelsWithDescription = Map(
-        "method" -> "HTTP method of the request",
-        "path" -> "path of the HTTP request, limited in length",
+        httpClient -> "The name of the HTTP client",
+        operation -> "The operation requested by the HTTP client",
+        targetHost -> "The target host of the HTTP request",
       ),
     )
   )

@@ -33,6 +33,8 @@ import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 
 object HttpSvPublicAppClient {
+  val clientName = "HttpSvPublicAppClient"
+
   final case class DsoInfo(
       svUser: String,
       svParty: PartyId,
@@ -264,14 +266,14 @@ object HttpSvPublicAppClient {
         ],
       ] {
 
-    override def createClient(host: String)(implicit
+    override def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): http.SvPublicClient =
       http.SvPublicClient.httpClient(
-        HttpClientBuilder().buildClient(Set(StatusCodes.BadRequest)),
+        HttpClientBuilder().buildClient(clientName, commandName, Set(StatusCodes.BadRequest)),
         host,
       )
 

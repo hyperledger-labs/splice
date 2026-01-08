@@ -41,10 +41,14 @@ object HttpCommandException {
   * native HTTP APIs.
   */
 trait HttpCommand[Res, Result] {
+  lazy val commandName: String = {
+    // not using getClass.getSimpleName because it ignores the hierarchy of nested classes, and it also throws unexpected exceptions
+    getClass.getName.split('.').last.replace("$", ".")
+  }
 
   type Client
 
-  def createClient(host: String, clientName: String, operationName: String)(implicit
+  def createClient(host: String, clientName: String)(implicit
       httpClient: HttpClient,
       tc: TraceContext,
       ec: ExecutionContext,
@@ -73,12 +77,12 @@ trait HttpCommand[Res, Result] {
     new HttpCommand[Res, Res] {
       type Client = self.Client
 
-      override def createClient(host: String, clientName: String, operationName: String)(implicit
+      override def createClient(host: String, clientName: String)(implicit
           httpClient: HttpClient,
           tc: TraceContext,
           ec: ExecutionContext,
           mat: Materializer,
-      ) = self.createClient(host, clientName, operationName)
+      ) = self.createClient(host, clientName)
 
       override def submitRequest(
           client: Client,
@@ -89,14 +93,9 @@ trait HttpCommand[Res, Result] {
           decoder: TemplateJsonDecoder
       ) = { case res => Right(res) }
 
-      override def fullName = self.fullName
+      override lazy val commandName: String = self.commandName
     }
   }
-
-  def fullName: String =
-    // not using getClass.getSimpleName because it ignores the hierarchy of nested classes, and it also throws unexpected exceptions
-    getClass.getName.split('.').last.replace("$", ".")
-
 }
 
 object HttpClientBuilder {
@@ -154,7 +153,7 @@ final class HttpClientBuilder()(implicit
   def buildClient(
       clientName: String,
       operationName: String,
-      nonErrorStatusCode: Set[StatusCode] = Set.empty
+      nonErrorStatusCode: Set[StatusCode] = Set.empty,
   ): HttpRequest => Future[HttpResponse] = {
     httpClientWithErrors(
       httpClient.executeRequest(clientName, operationName),

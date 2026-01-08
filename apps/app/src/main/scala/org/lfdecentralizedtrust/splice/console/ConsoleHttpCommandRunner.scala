@@ -45,35 +45,36 @@ class ConsoleHttpCommandRunner(
       headers: List[HttpHeader],
       clientConfig: NetworkAppClientConfig,
   ): ConsoleCommandResult[Result] =
-    withNewTrace[ConsoleCommandResult[Result]](command.fullName) { implicit traceContext => span =>
-      span.setAttribute("instance_name", instanceName)
-      val commandDescription =
-        s"Running on $instanceName command $command against $clientConfig"
-      logger.debug(commandDescription)(
-        traceContext
-      )
-      val commandTimeout = commandTimeouts.bounded
+    withNewTrace[ConsoleCommandResult[Result]](command.commandName) {
+      implicit traceContext => span =>
+        span.setAttribute("instance_name", instanceName)
+        val commandDescription =
+          s"Running on $instanceName command $command against $clientConfig"
+        logger.debug(commandDescription)(
+          traceContext
+        )
+        val commandTimeout = commandTimeouts.bounded
 
-      val url = clientConfig.url
-      try {
-        val start = System.currentTimeMillis()
-        val apiResult =
-          commandTimeout.await(commandDescription)(
-            httpRunner.run(url.toString(), command, headers).value
-          )
-        val end = System.currentTimeMillis()
-        logger.trace(s"$commandDescription, HTTP request took ${end - start} ms to complete")
-        apiResult.toResult
-      } catch {
-        case httpErr: HttpCommandException =>
-          CommandErrors.GenericCommandError(httpErr.toString())
-        case _: TimeoutException =>
-          logger.debug(
-            s"$commandDescription, HTTP request timed out on commandTimeout: ${commandTimeout} "
-          )(
-            traceContext
-          )
-          CommandErrors.ConsoleTimeout.Error(commandTimeout.asJavaApproximation)
-      }
+        val url = clientConfig.url
+        try {
+          val start = System.currentTimeMillis()
+          val apiResult =
+            commandTimeout.await(commandDescription)(
+              httpRunner.run(url.toString(), command, headers).value
+            )
+          val end = System.currentTimeMillis()
+          logger.trace(s"$commandDescription, HTTP request took ${end - start} ms to complete")
+          apiResult.toResult
+        } catch {
+          case httpErr: HttpCommandException =>
+            CommandErrors.GenericCommandError(httpErr.toString())
+          case _: TimeoutException =>
+            logger.debug(
+              s"$commandDescription, HTTP request timed out on commandTimeout: ${commandTimeout} "
+            )(
+              traceContext
+            )
+            CommandErrors.ConsoleTimeout.Error(commandTimeout.asJavaApproximation)
+        }
     }
 }

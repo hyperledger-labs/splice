@@ -24,17 +24,18 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 object HttpSvAdminAppClient {
+  val clientName = "HttpSvAdminAppClient"
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = http.SvAdminClient
 
-    def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
       http.SvAdminClient.httpClient(
-        HttpClientBuilder().buildClient(),
+        HttpClientBuilder().buildClient(clientName, commandName),
         host,
       )
   }

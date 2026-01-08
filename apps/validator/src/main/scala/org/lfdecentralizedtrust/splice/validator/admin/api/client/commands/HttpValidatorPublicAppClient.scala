@@ -22,18 +22,19 @@ final case class UserInfo(
 )
 
 object HttpValidatorPublicAppClient {
+  val clientName = "HttpValidatorPublicAppClient"
 
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = http.ValidatorPublicClient
 
-    def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
       http.ValidatorPublicClient.httpClient(
-        HttpClientBuilder().buildClient(),
+        HttpClientBuilder().buildClient(clientName, commandName),
         host,
       )
   }

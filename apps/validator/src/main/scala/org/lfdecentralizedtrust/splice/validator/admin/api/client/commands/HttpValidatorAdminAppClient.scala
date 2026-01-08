@@ -29,17 +29,19 @@ import java.time.{Instant, ZoneOffset}
 import scala.concurrent.{ExecutionContext, Future}
 
 object HttpValidatorAdminAppClient {
+  val clientName = "HttpValidatorAdminAppClient"
+
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = http.ValidatorAdminClient
 
-    def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
       http.ValidatorAdminClient.httpClient(
-        HttpClientBuilder().buildClient(Set(StatusCodes.NotFound)),
+        HttpClientBuilder().buildClient(clientName, commandName, Set(StatusCodes.NotFound)),
         host,
       )
   }

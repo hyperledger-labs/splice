@@ -18,16 +18,21 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future}
 
 object HttpAnsAppClient {
+  val clientName = "HttpAnsAppClient"
 
   abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = externalHttp.AnsClient
 
-    def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
-    ): Client = externalHttp.AnsClient.httpClient(HttpClientBuilder().buildClient(), host)
+    ): Client =
+      externalHttp.AnsClient.httpClient(
+        HttpClientBuilder().buildClient(clientName, commandName),
+        host,
+      )
   }
 
   case class CreateAnsEntryResponse(

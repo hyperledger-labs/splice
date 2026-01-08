@@ -93,80 +93,89 @@ import scala.jdk.OptionConverters.*
 import scala.util.Try
 
 object HttpScanAppClient {
-
+  val clientName = "HttpScanAppClient"
   abstract class InternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = http.ScanClient
 
-    def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      http.ScanClient.httpClient(HttpClientBuilder().buildClient(Set(StatusCodes.NotFound)), host)
+      http.ScanClient.httpClient(
+        HttpClientBuilder().buildClient(clientName, commandName, Set(StatusCodes.NotFound)),
+        host,
+      )
   }
 
   abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = http.ScanClient
 
-    def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      http.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
+      http.ScanClient.httpClient(HttpClientBuilder().buildClient(clientName, commandName), host)
   }
 
   abstract class TokenStandardTransferInstructionBaseCommand[Res, Result]
       extends HttpCommand[Res, Result] {
     override type Client = transferinstruction.v1.Client
 
-    override def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      transferinstruction.v1.Client.httpClient(HttpClientBuilder().buildClient(), host)
+      transferinstruction.v1.Client
+        .httpClient(HttpClientBuilder().buildClient(clientName, commandName), host)
   }
 
   abstract class TokenStandardAllocationInstructionBaseCommand[Res, Result]
       extends HttpCommand[Res, Result] {
     override type Client = allocationinstruction.v1.Client
 
-    override def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      allocationinstruction.v1.Client.httpClient(HttpClientBuilder().buildClient(), host)
+      allocationinstruction.v1.Client
+        .httpClient(HttpClientBuilder().buildClient(clientName, commandName), host)
   }
 
   abstract class TokenStandardMetadataBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = metadata.v1.Client
 
-    override def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
       metadata.v1.Client
-        .httpClient(HttpClientBuilder().buildClient(Set(StatusCodes.NotFound)), host)
+        .httpClient(
+          HttpClientBuilder().buildClient(clientName, commandName, Set(StatusCodes.NotFound)),
+          host,
+        )
   }
 
   abstract class TokenStandardAllocationBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = allocation.v1.Client
 
-    override def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      allocation.v1.Client.httpClient(HttpClientBuilder().buildClient(), host)
+      allocation.v1.Client
+        .httpClient(HttpClientBuilder().buildClient(clientName, commandName), host)
   }
 
   case class GetDsoPartyId(headers: List[HttpHeader])

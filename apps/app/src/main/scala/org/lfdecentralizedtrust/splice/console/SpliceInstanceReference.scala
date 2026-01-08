@@ -242,7 +242,9 @@ trait AppBackendReference extends AppReference with LocalInstanceReference {
     )
   }
 
-  protected def getParticipantClient()(implicit ec: ExecutionContext): ParticipantClientReference = {
+  protected def getParticipantClient()(implicit
+      ec: ExecutionContext
+  ): ParticipantClientReference = {
     val remoteParticipantClientConfig = getRemoteParticipantConfigWithToken(
       config.participantClient
     )

@@ -56,42 +56,48 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 object HttpWalletAppClient {
-
+  val clientName = "HttpWalletAppClient"
   abstract class InternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = http.WalletClient
 
-    def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      http.WalletClient.httpClient(HttpClientBuilder().buildClient(Set(StatusCodes.Conflict)), host)
+      http.WalletClient.httpClient(
+        HttpClientBuilder().buildClient(clientName, commandName, Set(StatusCodes.Conflict)),
+        host,
+      )
   }
 
   abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = externalHttp.WalletClient
 
-    def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      externalHttp.WalletClient.httpClient(HttpClientBuilder().buildClient(), host)
+      externalHttp.WalletClient.httpClient(
+        HttpClientBuilder().buildClient(clientName, commandName),
+        host,
+      )
   }
 
   abstract class StatusBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = statusHttp.WalletClient
 
-    def createClient(host: String)(implicit
+    def createClient(host: String, clientName: String)(implicit
         httpClient: HttpClient,
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
       statusHttp.WalletClient.httpClient(
-        HttpClientBuilder().buildClient(Set(StatusCodes.Conflict)),
+        HttpClientBuilder().buildClient(clientName, commandName, Set(StatusCodes.Conflict)),
         host,
       )
   }

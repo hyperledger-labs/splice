@@ -67,7 +67,7 @@ abstract class BaseAppConnection(
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[Result] = {
-    val client: command.Client = command.createClient(url.toString())
+    val client: command.Client = command.createClient(url.toString(), s"$serviceName client")
     for {
       response <- EitherTUtil.toFuture(
         command.submitRequest(client, tc.propagate(headers)).leftMap[Throwable] {
