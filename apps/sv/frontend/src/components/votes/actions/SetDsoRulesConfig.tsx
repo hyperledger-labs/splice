@@ -104,7 +104,8 @@ const SetDsoRulesConfig: React.FC<{
     }
   }, [
     configuration,
-    dsoInfosQuery,
+    dsoInfosQuery.isSuccess,
+    dsoInfosQuery.data,
     expiration,
     nextScheduledSynchronizerUpgrade.time,
     setIsValidSynchronizerPauseTime,

@@ -34,7 +34,7 @@ const UpdateSvRewardWeight: React.FC<{
 
   const svs = useMemo(
     () => dsoInfosQuery.data?.dsoRules.payload.svs.entriesArray() || [],
-    [dsoInfosQuery]
+    [dsoInfosQuery.data]
   );
 
   const updateAction = useCallback(
