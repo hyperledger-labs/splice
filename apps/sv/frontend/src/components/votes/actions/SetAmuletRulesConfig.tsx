@@ -4,7 +4,7 @@ import { Loading } from '@lfdecentralizedtrust/splice-common-frontend';
 import { JsonEditor, JSONValue } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { FormControl, Stack, Typography } from '@mui/material';
 
@@ -24,6 +24,15 @@ const SetAmuletRulesConfig: React.FC<{
   // TODO (#967): remove this intermediate state by lifting it to VoteRequest.tsx
   const [configuration, setConfiguration] = useState<Record<string, JSONValue>>();
 
+  useEffect(() => {
+    if (configuration == null && dsoInfosQuery.data) {
+      const amuletConfig = dsoInfosQuery.data.amuletRules.payload.configSchedule.initialValue;
+      const currentConfig = AmuletConfig(USD).encode(amuletConfig) as Record<string, JSONValue>;
+      setConfiguration(currentConfig);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dsoInfosQuery.data]);
+
   if (dsoInfosQuery.isLoading) {
     return <Loading />;
   }
@@ -37,9 +46,7 @@ const SetAmuletRulesConfig: React.FC<{
   }
 
   if (configuration == null) {
-    const amuletConfig = dsoInfosQuery.data?.amuletRules.payload.configSchedule.initialValue;
-    const currentConfig = AmuletConfig(USD).encode(amuletConfig) as Record<string, JSONValue>;
-    setConfiguration(currentConfig);
+    return <Loading />;
   }
 
   function setAmuletConfigAction(config: Record<string, JSONValue>) {
@@ -83,7 +90,7 @@ const SetAmuletRulesConfig: React.FC<{
         <Typography variant="h6" mt={4} data-testid="set-amulet-rules-config-header">
           Configuration
         </Typography>
-        <JsonEditor data={configuration!} onChange={setAmuletConfigAction} />
+        <JsonEditor data={configuration} onChange={setAmuletConfigAction} />
       </FormControl>
     </Stack>
   );
