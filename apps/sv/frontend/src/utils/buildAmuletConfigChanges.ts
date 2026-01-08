@@ -35,6 +35,12 @@ export function buildAmuletConfigChanges(
       newValue: after?.featuredAppActivityMarkerAmount || '',
     },
     {
+      fieldName: 'optDevelopmentFundManager',
+      label: 'Development Fund Manager',
+      currentValue: before?.optDevelopmentFundManager || '',
+      newValue: after?.optDevelopmentFundManager || '',
+    },
+    {
       fieldName: 'transferConfigCreateFee',
       label: 'Transfer (Create Fee)',
       currentValue: before?.transferConfig.createFee.fee || '',
@@ -227,6 +233,12 @@ function buildIssuanceCurveChanges(
       currentValue: before?.initialValue?.optValidatorFaucetCap || '',
       newValue: after?.initialValue?.optValidatorFaucetCap || '',
     },
+    {
+      fieldName: 'issuanceCurveInitialValueOptDevelopmentFundPercentage',
+      label: 'Issuance Curve Initial Value (Development Fund Percentage)',
+      currentValue: before?.initialValue?.optDevelopmentFundPercentage || '',
+      newValue: after?.initialValue?.optDevelopmentFundPercentage || '',
+    },
   ] as ConfigChange[];
 
   const futureValues =
@@ -280,6 +292,12 @@ function buildIssuanceCurveChanges(
             label: `Issuance Curve Future Value (Validator Faucet Cap) (${idx})`,
             currentValue: fv._2.optValidatorFaucetCap || '',
             newValue: after?.futureValues[idx]._2.optValidatorFaucetCap || '',
+          },
+          {
+            fieldName: `issuanceCurveFutureValues${idx}OptDevelopmentFundPercentage`,
+            label: `Issuance Curve Future Value (Development Fund Percentage) (${idx})`,
+            currentValue: fv._2.optDevelopmentFundPercentage || '',
+            newValue: after?.futureValues[idx]._2.optDevelopmentFundPercentage || '',
           },
         ] as ConfigChange[];
       })
