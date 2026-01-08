@@ -5,10 +5,7 @@
 
 .. _release_notes:
 
-.. release-notes:: upcoming
-
-  - Validator
-    - Added support for picking a custom name for new parties created when onboarding users via the `/v0/admin/users` API. See :ref:`docs <validator-users>`.
+.. release-notes:: 0.5.5
 
   - API security
 
@@ -19,7 +16,7 @@
       Revoking user rights on the participant will revoke access to the corresponding API endpoints.
 
       In general, endpoints that required authentication before will now check that the authenticated user
-      is not deactivated on the participant has ``actAs`` rights for the relevant party
+      is not deactivated on the participant and has ``actAs`` rights for the relevant party
       (wallet party for the wallet app API, SV operator party for the SV app API, etc).
 
     - Administrative SV app endpoints now require participant admin rights.
@@ -29,7 +26,6 @@
 
         - ``/v0/admin/domain/pause``
         - ``/v0/admin/domain/unpause``
-        - ``/v0/admin/domain/migration-dump``
         - ``/v0/admin/domain/migration-dump``
         - ``/v0/admin/domain/identities-dump``
         - ``/v0/admin/domain/data-snapshot``
@@ -48,9 +44,12 @@
           similar to most other SV app endpoints.
           Use the public ``/v0/dso`` endpoint in the scan app if you need to fetch DSO info.
 
-    - Added an optional ``excludeDebugFields``` boolean to the request body of allocation and transfer endpoints for the Token Standard component.
-      (``splice-api-token-allocation-v1`` and ``splice-api-token-transfer-instruction-v1``
+  - Validator
 
+    - Added support for picking a custom name for new parties created when onboarding users via the `/v0/admin/users` API. See :ref:`docs <validator-users>`.
+
+    - Added an optional ``excludeDebugFields``` boolean to the request body of allocation and transfer endpoints for the Token Standard component
+      (``splice-api-token-allocation-v1`` and ``splice-api-token-transfer-instruction-v1``).
       Clients can now set this to true to omit debug information from the response.
 
 .. release-notes:: 0.5.4
