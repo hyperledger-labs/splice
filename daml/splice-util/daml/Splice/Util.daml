@@ -206,6 +206,9 @@ instance Patchable RelTime where
 instance Patchable Time where
   patch = patchScalar
 
+instance Patchable Party where
+  patch = patchScalar
+
 mapDifference : Ord k => Map k a -> Map k a -> Map k k
 mapDifference = Map.merge (\_ _ -> None) (\k _ -> Some k) (\_ _ _ -> None)
 
