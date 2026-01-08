@@ -95,12 +95,7 @@ class UpdateHistoryBulkStorage(
 
     def watchCompletion(): Future[Unit] = queue.watchCompletion().map(_ => ())
 
-    sealed trait Result
-    case object Done extends Result
-    case object NotDone extends Result
-    case object NotReady extends Result
-
-    def next(): Future[Result] = {
+    def next(): Future[Result.Result] = {
       for {
         updates <- position
           .get()
@@ -138,13 +133,13 @@ class UpdateHistoryBulkStorage(
       } yield {
         if (updatesInSegment.length < updates.length) {
           queue.complete()
-          Done
+          Result.Done
         } else if (updatesInSegment.length < config.dbReadChunkSize) {
-          NotReady
+          Result.NotReady
         } else {
           val last = updatesInSegment.lastOption.getOrElse(throw new RuntimeException("No updates added, unexpectedly"))
           position.set(Some((last.migrationId, last.update.update.recordTime)))
-          NotDone
+          Result.NotDone
         }
       }
     }
@@ -163,4 +158,11 @@ class UpdateHistoryBulkStorage(
       toTimestamp,
     )
   }
+}
+
+case object Result {
+  sealed trait Result
+  case object Done extends Result
+  case object NotDone extends Result
+  case object NotReady extends Result
 }
