@@ -18,7 +18,7 @@ If you make intentional changes in Daml code, run `sbt damlDarsLockFileUpdate` a
 
 ### Backwards-compatible Daml changes
 
-All Daml changes must be backwards-compatible. See the [Upgrading and Extending Daml Applications section of the Canton docs](https://docs.digitalasset.com/build/3.3/sdlc-howtos/smart-contracts/upgrade/).
+All Daml changes must be backwards-compatible. See the [Upgrading and Extending Daml Applications section of the Canton docs](https://docs.digitalasset.com/build/3.4/sdlc-howtos/smart-contracts/upgrade/).
 
 When adding to enums, make sure to only add further nullary constructors to types that only have nullary constructors.
 
