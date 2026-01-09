@@ -893,7 +893,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def nextOffset(): Long = blocking {
     synchronized {
-      println("in nextOffset")
       val offset = offsetCounter
       offsetCounter += 1
       offset
