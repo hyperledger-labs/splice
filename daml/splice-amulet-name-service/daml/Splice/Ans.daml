@@ -301,13 +301,13 @@ template AnsEntry
   where
     signatory user, dso
 
-    interface instance RegistryV1.CredentialRecord for AnsEntry where
-      view = RegistryV1.CredentialRecordView with
+    interface instance RegistryV1.Credential for AnsEntry where
+      view = RegistryV1.CredentialView with
         admin = dso
         issuer = dso
         holder = user
-        credential = RegistryV1.Credential with
-          claims = TM.fromList [
+        claims = RegistryV1.Claims with
+          values = TM.fromList [
               ("ans.name", name),
               -- Make the URL and Description fields properties with the CNS name as the subject
               -- Not namespaced as we expect them to be defined in a CIP
