@@ -263,6 +263,7 @@ class DomainMigrationInitializer(
       )
       latestKnownSynchronizerParameters <- participantAdminConnection
         .getSynchronizerParametersState(decentralizedSynchronizerId)
+      // TODO(#3504) - remove once no longer needed
       // trigger more or less a noop topology transaction so that the ledger api event notifier is initialized for the sync and propagates all the parties from the genesis import to the ledger api
       // this will basically be reverted in the trigger
       _ <- participantAdminConnection
