@@ -343,6 +343,13 @@ template AnsEntry
         expiresAt = Some expiresAt
         meta = emptyMetadata
 
+      credential_publicFetchImpl _self _arg = pure (view (toInterface @RegistryV1.Credential this))
+
+      credential_archiveAsHolderImpl _self _arg = do
+        pure RegistryV1.Credential_ArchiveAsHolderResult with
+          archivedCredential = view (toInterface @RegistryV1.Credential this)
+          meta = emptyMetadata
+
     choice AnsEntry_Expire : AnsEntry_ExpireResult
       with
         actor : Party
