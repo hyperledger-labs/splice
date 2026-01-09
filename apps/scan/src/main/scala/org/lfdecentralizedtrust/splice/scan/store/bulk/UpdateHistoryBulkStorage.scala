@@ -93,6 +93,20 @@ class UpdateHistoryBulkStorage(
       } else Future.successful(())
     }
 
+    /**
+     * Should be called repeatedly. Each call attempts to fetch `config.dbReadChunkSize` updates from the DB and push
+     * them to the stream. Once the segment is finished, will close the stream and must not be called again
+     *
+     * @return
+     *   Result.NotReady: not enough updates in the DB yet, did not push any data to the stream.
+     *                    The caller should retry later (after some time, so that more updates will be ingested)
+     *
+     *   Result.NotDone:  Updates were read and pushed to the stream, but the segment has not finished yet.
+     *                    More data could be available in the DB already, so the called usually wants to call next() again immediately.
+     *
+     *   Result.Done:     Done reading and pushing updates to this segment. The pipeline is closed, and next() must not be called again
+     *                    for this segment.
+     */
     def next(): Future[Result.Result] = {
       for {
         updates <- position
