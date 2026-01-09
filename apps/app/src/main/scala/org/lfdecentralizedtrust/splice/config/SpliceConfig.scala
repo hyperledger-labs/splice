@@ -707,6 +707,16 @@ object SpliceConfig {
             ),
           )
           _ <- Either.cond(
+            !(conf.domains.global.sequencerNames.isDefined && conf.domains.global.threshold.isDefined &&
+              conf.domains.global.sequencerNames
+                .map(x => x.length)
+                .getOrElse(0) > conf.domains.global.threshold.getOrElse(0)),
+            (),
+            ConfigValidationFailed(
+              "Configuration error: Length of sequencerNames should be less than or equal to threshold."
+            ),
+          )
+          _ <- Either.cond(
             !conf.svValidator || conf.validatorPartyHint.isEmpty,
             (),
             ConfigValidationFailed("Validator party hint must not be specified for SV validators"),
