@@ -91,6 +91,7 @@ export const InfraConfigSchema = z.object({
     ipWhitelisting: z
       .object({
         extraWhitelistedIngress: z.array(z.string()).default([]),
+        excludedIps: z.array(z.string()).default([]),
       })
       .optional(),
     prometheus: z.object({
@@ -162,8 +163,12 @@ export function loadIPRanges(svsOnly: boolean = false): pulumi.Output<string[]> 
   });
 
   const configWhitelistedIps = infraConfig.ipWhitelisting?.extraWhitelistedIngress || [];
+  const excludedIps = infraConfig.ipWhitelisting?.excludedIps || [];
 
   return internalWhitelistedIps.apply(whitelists =>
-    whitelists.concat(externalIpRanges).concat(configWhitelistedIps)
+    whitelists
+      .concat(externalIpRanges)
+      .concat(configWhitelistedIps)
+      .filter(ip => excludedIps.indexOf(ip) < 0)
   );
 }
