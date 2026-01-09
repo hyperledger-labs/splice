@@ -12,8 +12,6 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
-import com.digitalasset.canton.time
-import com.digitalasset.canton.sequencing
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.{OwnerToKeyMapping, TopologyChangeOp}
@@ -162,16 +160,16 @@ def bootstrapDomainWithUnsignedKeys(
           threshold,
           NonNegativeInt.zero,
           // This should match the SV app defaults so that the SV app does not try to change the connection.
-          sequencing.SubmissionRequestAmplification(
+          SubmissionRequestAmplification(
             PositiveInt.tryCreate(5),
-            time.NonNegativeFiniteDuration.tryOfSeconds(10),
+            NonNegativeFiniteDuration.ofSeconds(10),
           ),
-          sequencing.SequencerConnectionPoolDelays.default,
+          SequencerConnectionPoolDelays.default,
         ),
         // if we run bootstrap ourselves, we should have been able to reach the nodes
         // so we don't want the bootstrapping to fail spuriously here in the middle of
         // the setup
-        sequencing.SequencerConnectionValidation.Disabled,
+        SequencerConnectionValidation.Disabled,
       )
     }
 

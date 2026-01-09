@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration
 
+import cats.implicits.catsSyntaxApplicativeByName
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import org.lfdecentralizedtrust.splice.config.{
@@ -57,9 +58,11 @@ import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInitialization}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
@@ -258,12 +261,29 @@ class DomainMigrationInitializer(
         packageVersionSupport,
         svStore.key.svParty,
       )
+      latestKnownSynchronizerParameters <- participantAdminConnection
+        .getSynchronizerParametersState(decentralizedSynchronizerId)
+      // TODO(#3504) - remove once no longer needed
+      // trigger more or less a noop topology transaction so that the ledger api event notifier is initialized for the sync and propagates all the parties from the genesis import to the ledger api
+      // this will basically be reverted in the trigger
+      _ <- participantAdminConnection
+        .ensureDomainParameters(
+          decentralizedSynchronizerId,
+          _.tryUpdate(confirmationRequestsMaxRate =
+            DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate + NonNegativeInt.one
+          ),
+        )
+        // only if the synchronizer was not paused during the migration and the latest topology state is before the disaster recovery timestamp
+        .whenA(
+          !migrationDump.domainDataSnapshot.synchronizerWasPaused && latestKnownSynchronizerParameters.base.sequenced
+            .isBefore(migrationDump.domainDataSnapshot.acsTimestamp)
+        )
       _ <- newJoiningNodeInitializer(None, newCometBftNode).onboard(
         decentralizedSynchronizerId,
         dsoAutomationService,
         svAutomation,
         skipTrafficReconciliationTriggers = true,
-        unpauseSynchronizer = true,
+        unpauseSynchronizer = migrationDump.domainDataSnapshot.synchronizerWasPaused,
       )
     } yield (
       decentralizedSynchronizerId,
