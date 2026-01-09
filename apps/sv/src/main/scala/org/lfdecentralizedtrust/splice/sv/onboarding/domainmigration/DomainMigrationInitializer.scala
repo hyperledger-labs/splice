@@ -261,6 +261,8 @@ class DomainMigrationInitializer(
         packageVersionSupport,
         svStore.key.svParty,
       )
+      latestKnownSynchronizerParameters <- participantAdminConnection
+        .getSynchronizerParametersState(decentralizedSynchronizerId)
       // trigger more or less a noop topology transaction so that the ledger api event notifier is initialized for the sync and propagates all the parties from the genesis import to the ledger api
       // this will basically be reverted in the trigger
       _ <- participantAdminConnection
@@ -270,7 +272,11 @@ class DomainMigrationInitializer(
             DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate + NonNegativeInt.one
           ),
         )
-        .unlessA(migrationDump.domainDataSnapshot.synchronizerWasPaused)
+        // only if the synchronizer was not paused during the migration and the latest topology state is before the disaster recovery timestamp
+        .whenA(
+          !migrationDump.domainDataSnapshot.synchronizerWasPaused && latestKnownSynchronizerParameters.base.sequenced
+            .isBefore(migrationDump.domainDataSnapshot.acsTimestamp)
+        )
       _ <- newJoiningNodeInitializer(None, newCometBftNode).onboard(
         decentralizedSynchronizerId,
         dsoAutomationService,
