@@ -9,6 +9,28 @@ import {
 import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { z } from 'zod';
 
+export const SynchronizerConfigSchema = z.union([
+  z
+    .object({
+      connectionType: z.literal('trusted-url'),
+      url: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      connectionType: z.literal('trusted-svs'),
+      sequencerNames: z.array(z.string()).min(1),
+    })
+    .strict(),
+  z
+    .object({
+      connectionType: z.literal('from-scan').default('from-scan'),
+    })
+    .strict(),
+]);
+
+export type synchronizerConfigSchema = z.infer<typeof SynchronizerConfigSchema>;
+
 export const ScanClientConfigSchema = z
   .object({
     scanType: z.enum(['trust-single', 'bft', 'bft-custom']),
@@ -41,6 +63,7 @@ export const ValidatorAppConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
   additionalJvmOptions: z.string().optional(),
   scanClient: ScanClientConfigSchema.optional(),
+  synchronizer: SynchronizerConfigSchema.optional(),
 });
 
 export const ParticipantConfigSchema = z.object({
