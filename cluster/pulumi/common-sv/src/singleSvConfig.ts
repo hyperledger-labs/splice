@@ -103,30 +103,28 @@ const SvValidatorAppConfigSchema = z
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
 // things here are declared optional even when they aren't, to allow partial overrides of defaults
-const SingleSvConfigSchema = z
-  .object({
-    publicName: z.string().optional(),
-    subdomain: z.string().optional(),
-    cometbft: SvCometbftConfigSchema.optional(),
-    participant: SvParticipantConfigSchema.optional(),
-    sequencer: SvSequencerConfigSchema.optional(),
-    mediator: SvMediatorConfigSchema.optional(),
-    svApp: SvAppConfigSchema.optional(),
-    scanApp: ScanAppConfigSchema.optional(),
-    validatorApp: SvValidatorAppConfigSchema.optional(),
-    logging: z
-      .object({
-        appsLogLevel: LogLevelSchema,
-        appsAsync: z.boolean().default(false),
-        cantonLogLevel: LogLevelSchema,
-        cantonStdoutLogLevel: LogLevelSchema.optional(),
-        cantonAsync: z.boolean().default(false),
-        cometbftLogLevel: CometbftLogLevelSchema.optional(),
-        cometbftExtraLogLevelFlags: z.string().optional(),
-      })
-      .optional(),
-  })
-  .strict();
+const SingleSvConfigSchema = z.object({
+  publicName: z.string().optional(),
+  subdomain: z.string().optional(),
+  cometbft: SvCometbftConfigSchema.optional(),
+  participant: SvParticipantConfigSchema.optional(),
+  sequencer: SvSequencerConfigSchema.optional(),
+  mediator: SvMediatorConfigSchema.optional(),
+  svApp: SvAppConfigSchema.optional(),
+  scanApp: ScanAppConfigSchema.optional(),
+  validatorApp: SvValidatorAppConfigSchema.optional(),
+  logging: z
+    .object({
+      appsLogLevel: LogLevelSchema,
+      appsAsync: z.boolean().default(false),
+      cantonLogLevel: LogLevelSchema,
+      cantonStdoutLogLevel: LogLevelSchema.optional(),
+      cantonAsync: z.boolean().default(false),
+      cometbftLogLevel: CometbftLogLevelSchema.optional(),
+      cometbftExtraLogLevelFlags: z.string().optional(),
+    })
+    .optional(),
+});
 const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema).and(
   z.object({
     default: SingleSvConfigSchema,
