@@ -4,11 +4,10 @@
 package org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands
 
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
-import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletAllocationCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
@@ -19,7 +18,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOfferCodegen,
 }
-import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, wallet as http}
 import org.lfdecentralizedtrust.splice.http.v0.status.wallet as statusHttp
 import org.lfdecentralizedtrust.splice.http.v0.external.wallet as externalHttp
@@ -42,7 +40,6 @@ import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1.AllocationRequest
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
@@ -51,55 +48,27 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   transferinstructionv1,
 }
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 object HttpWalletAppClient {
-  val clientName = "HttpWalletAppClient"
-  abstract class InternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = http.WalletClient
+  import http.WalletClient as Client
+  import externalHttp.WalletClient as EClient
+  import statusHttp.WalletClient as SClient
 
-    def createClient(host: String, clientName: String)(implicit
-        httpClient: HttpClient,
-        tc: TraceContext,
-        ec: ExecutionContext,
-        mat: Materializer,
-    ): Client =
-      http.WalletClient.httpClient(
-        HttpClientBuilder().buildClient(clientName, commandName, Set(StatusCodes.Conflict)),
-        host,
-      )
+  abstract class InternalBaseCommand[Res, Result] extends HttpCommand[Res, Result, Client] {
+    val createGenClientFn = (fn, host, ec, mat) => Client.httpClient(fn, host)(ec, mat)
+    override val nonErrorStatusCodes = Set(StatusCodes.Conflict)
   }
 
-  abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = externalHttp.WalletClient
-
-    def createClient(host: String, clientName: String)(implicit
-        httpClient: HttpClient,
-        tc: TraceContext,
-        ec: ExecutionContext,
-        mat: Materializer,
-    ): Client =
-      externalHttp.WalletClient.httpClient(
-        HttpClientBuilder().buildClient(clientName, commandName),
-        host,
-      )
+  abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result, EClient] {
+    val createGenClientFn = (fn, host, ec, mat) => EClient.httpClient(fn, host)(ec, mat)
   }
 
-  abstract class StatusBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = statusHttp.WalletClient
-
-    def createClient(host: String, clientName: String)(implicit
-        httpClient: HttpClient,
-        tc: TraceContext,
-        ec: ExecutionContext,
-        mat: Materializer,
-    ): Client =
-      statusHttp.WalletClient.httpClient(
-        HttpClientBuilder().buildClient(clientName, commandName, Set(StatusCodes.Conflict)),
-        host,
-      )
+  abstract class StatusBaseCommand[Res, Result] extends HttpCommand[Res, Result, SClient] {
+    val createGenClientFn = (fn, host, ec, mat) => SClient.httpClient(fn, host)(ec, mat)
+    override val nonErrorStatusCodes = Set(StatusCodes.Conflict)
   }
 
   final case class AmuletPosition(
@@ -597,7 +566,7 @@ object HttpWalletAppClient {
         transferOfferCodegen.TransferOffer.ContractId,
       ] {
     def submitRequest(
-        client: Client,
+        client: EClient,
         headers: List[HttpHeader],
     ): EitherT[
       Future,
@@ -630,7 +599,7 @@ object HttpWalletAppClient {
         definitions.GetTransferOfferStatusResponse,
       ] {
     def submitRequest(
-        client: Client,
+        client: EClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -654,7 +623,7 @@ object HttpWalletAppClient {
         ]],
       ] {
     def submitRequest(
-        client: Client,
+        client: EClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], externalHttp.ListTransferOffersResponse] =
       client.listTransferOffers(headers = headers)
@@ -763,7 +732,7 @@ object HttpWalletAppClient {
         trafficRequestCodegen.BuyTrafficRequest.ContractId,
       ] {
     def submitRequest(
-        client: Client,
+        client: EClient,
         headers: List[HttpHeader],
     ): EitherT[
       Future,
@@ -795,7 +764,7 @@ object HttpWalletAppClient {
         definitions.GetBuyTrafficRequestStatusResponse,
       ] {
     def submitRequest(
-        client: Client,
+        client: EClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -945,7 +914,7 @@ object HttpWalletAppClient {
 
   case object UserStatus extends StatusBaseCommand[statusHttp.UserStatusResponse, UserStatusData] {
     override def submitRequest(
-        client: Client,
+        client: SClient,
         headers: List[HttpHeader],
     ) =
       client.userStatus(headers = headers)

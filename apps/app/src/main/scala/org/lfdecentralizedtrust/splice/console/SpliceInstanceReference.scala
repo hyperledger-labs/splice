@@ -127,8 +127,8 @@ trait HttpAppReference extends AppReference with HttpCommandRunner {
 
   def httpClientConfig: NetworkAppClientConfig
 
-  override protected[splice] def httpCommand[Result](
-      httpCommand: HttpCommand[?, Result],
+  override protected[splice] def httpCommand[Res, Result, Client](
+      httpCommand: HttpCommand[Res, Result, Client],
       basePath: Option[String] = None,
   ): ConsoleCommandResult[Result] =
     spliceConsoleEnvironment.httpCommandRunner.runCommand(

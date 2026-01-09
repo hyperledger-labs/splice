@@ -4,10 +4,8 @@
 package org.lfdecentralizedtrust.splice.sv.admin.api.client.commands
 
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
-import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TriggerDomainMigrationDumpRequest
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin.TriggerDomainMigrationDumpResponse
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin as http
@@ -18,26 +16,15 @@ import org.lfdecentralizedtrust.splice.sv.migration.{
 }
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 object HttpSvAdminAppClient {
-  val clientName = "HttpSvAdminAppClient"
-  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = http.SvAdminClient
+  import http.SvAdminClient as Client
 
-    def createClient(host: String, clientName: String)(implicit
-        httpClient: HttpClient,
-        tc: TraceContext,
-        ec: ExecutionContext,
-        mat: Materializer,
-    ): Client =
-      http.SvAdminClient.httpClient(
-        HttpClientBuilder().buildClient(clientName, commandName),
-        host,
-      )
+  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result, Client] {
+    val createGenClientFn = (fn, host, ec, mat) => Client.httpClient(fn, host)(ec, mat)
   }
 
   case class PauseDecentralizedSynchronizer()

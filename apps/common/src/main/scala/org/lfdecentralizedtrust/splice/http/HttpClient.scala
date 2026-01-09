@@ -17,13 +17,20 @@ import org.apache.pekko.http.scaladsl.model.{
   HttpHeader,
   HttpRequest,
   HttpResponse,
+  StatusCode,
+  StatusCodes,
 }
 import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 import com.digitalasset.canton.util.ShowUtil.*
+import io.circe.parser.parse
 import org.apache.pekko.http.scaladsl.model.headers.BasicHttpCredentials
 import org.apache.pekko.http.scaladsl.settings.{ClientConnectionSettings, HttpsProxySettings}
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
 import org.lfdecentralizedtrust.splice.auth.{AuthToken, AuthTokenSource}
 import org.lfdecentralizedtrust.splice.config.AuthTokenSourceConfig
+import org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
 
 import java.net.InetSocketAddress
 import javax.net.ssl.SSLContext
@@ -35,15 +42,71 @@ import scala.util.control.NonFatal
 trait HttpClient {
   val requestParameters: HttpClient.HttpRequestParameters
   def withOverrideParameters(newParameters: HttpClient.HttpRequestParameters): HttpClient
-  def executeRequest(clientName: String, operationName: String)(
+  def executeRequest(client: String, operation: String)(
       request: HttpRequest
   ): Future[HttpResponse]
   def getToken(authConfig: AuthTokenSourceConfig): Future[Option[AuthToken]]
 }
 
 object HttpClient {
+  def createHttpFn(
+      clientName: String,
+      operationName: String,
+      nonErrorStatusCode: Set[StatusCode] = Set.empty,
+  )(implicit
+      httpClient: HttpClient,
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): HttpRequest => Future[HttpResponse] = {
+    httpClientWithErrors(
+      httpClient.executeRequest(clientName, operationName),
+      {
+        case code @ (StatusCodes.ServerError(_) | StatusCodes.ClientError(_))
+            if !nonErrorStatusCode.contains(code) =>
+      },
+    )
+  }
+
+  private def getApiErrorFromResponse(
+      request: HttpRequest,
+      response: HttpResponse,
+  )(implicit ec: ExecutionContext, mat: Materializer): Future[HttpCommandException] = {
+    Unmarshal(response)
+      .to[String]
+      .map { body =>
+        val decoded = for {
+          parsed <- parse(body)
+          errorResponse <- parsed.as[ErrorResponse]
+        } yield errorResponse
+
+        // Fallback to original response string if deserializing to ErrorResponse fails
+        decoded.fold[HttpCommandException.ResponseBody](
+          _ => HttpCommandException.RawResponse(body),
+          HttpCommandException.ErrorResponseBody(_),
+        )
+      }
+      .map { errorMessage => HttpCommandException(request, response.status, errorMessage) }
+  }
+
+  private def httpClientWithErrors(
+      nextClient: HttpRequest => Future[HttpResponse],
+      errors: PartialFunction[StatusCode, Unit],
+  )(
+      req: HttpRequest
+  )(implicit ec: ExecutionContext, mat: Materializer) = {
+    nextClient(req).flatMap { _resp =>
+      errors
+        .andThen(_ =>
+          getApiErrorFromResponse(req, _resp).flatMap { error =>
+            Future.failed[HttpResponse](error)
+          }
+        )
+        .applyOrElse(_resp.status, (_: StatusCode) => Future.successful(_resp))
+    }
+  }
+
   case class HttpRequestParameters(requestTimeout: NonNegativeDuration)
-  class HttpClientImpl(
+  private class HttpClientImpl(
       apiLoggingConfig: ApiLoggingConfig,
       outerRequestParameters: HttpClient.HttpRequestParameters,
       httpClientMetrics: HttpClientMetrics,
@@ -70,7 +133,7 @@ object HttpClient {
       authTokenSource.getToken(traceContext)
     }
 
-    override def executeRequest(clientName: String, operationName: String)(
+    override def executeRequest(client: String, operation: String)(
         request: HttpRequest
     ): Future[HttpResponse] = {
       implicit val traceContext: TraceContext = traceContextFromHeaders(request.headers)
@@ -82,7 +145,7 @@ object HttpClient {
         s"HTTP client (${request.method.name} ${pathLimited}): ${message}"
 
       implicit val mc: MetricsContext =
-        HttpClientMetrics.context(clientName, operationName, request.uri.authority.host.address)
+        HttpClientMetrics.context(client, operation, request.uri.authority.host.address)
 
       val timing = metrics.startTiming()
       metrics.incInFlight()

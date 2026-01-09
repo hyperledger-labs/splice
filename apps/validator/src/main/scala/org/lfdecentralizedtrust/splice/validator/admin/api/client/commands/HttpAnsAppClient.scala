@@ -4,35 +4,20 @@
 package org.lfdecentralizedtrust.splice.validator.admin.api.client.commands
 
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
-import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as codegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.SubscriptionRequest
-import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.external.ans as externalHttp
 import org.lfdecentralizedtrust.splice.util.{Codec, TemplateJsonDecoder}
-import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 object HttpAnsAppClient {
-  val clientName = "HttpAnsAppClient"
-
-  abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = externalHttp.AnsClient
-
-    def createClient(host: String, clientName: String)(implicit
-        httpClient: HttpClient,
-        tc: TraceContext,
-        ec: ExecutionContext,
-        mat: Materializer,
-    ): Client =
-      externalHttp.AnsClient.httpClient(
-        HttpClientBuilder().buildClient(clientName, commandName),
-        host,
-      )
+  import externalHttp.AnsClient as Client
+  abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result, Client] {
+    val createGenClientFn = (fn, host, ec, mat) => Client.httpClient(fn, host)(ec, mat)
   }
 
   case class CreateAnsEntryResponse(
