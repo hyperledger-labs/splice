@@ -147,7 +147,7 @@ class UpdateHistoryBulkStorageTest
                   contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
                 )
                 val tx = mkCreateTx(
-                  1, // not used in updates v2 (TODO: double-check what the actual value in the updateHistory is). The parser in read (httpToLapiTransaction) sets this to 1, so for now we use 1 here too.
+                  1, // not used in updates v2 (TODO(#3429): double-check what the actual value in the updateHistory is. The parser in read (httpToLapiTransaction) sets this to 1, so for now we use 1 here too.)
                   Seq(contract),
                   Instant.ofEpochMilli(idx),
                   Seq(alicePartyId, bobPartyId),
