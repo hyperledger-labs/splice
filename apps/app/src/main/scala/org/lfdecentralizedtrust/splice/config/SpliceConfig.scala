@@ -700,10 +700,10 @@ object SpliceConfig {
           ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(conf).participant
         for {
           _ <- Either.cond(
-            !(conf.domains.global.url.isDefined && conf.domains.global.sequencerNames.isDefined),
+            !(conf.domains.global.url.isDefined && (conf.domains.global.sequencerNames.isDefined || conf.domains.global.threshold.isDefined)),
             (),
             ConfigValidationFailed(
-              "Configuration error: `url` and `sequencerNames` cannot both be specified for the global domain."
+              "Configuration error: `url` and `sequencerNames/threshold` are mutually exclusive parameters."
             ),
           )
           _ <- Either.cond(
