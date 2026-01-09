@@ -104,7 +104,10 @@ case class ValidatorDecentralizedSynchronizerConfig(
       */
     sequencerNames: Option[NonEmptyList[String]] = None,
 
-    // TODO(#3059): Add a threshold parameter to configure the number of sequencers that must be connected
+    /** An optional parameter to specify the BFT threshold for the domain connections.
+      * If not specified, length(sequencerNames) / 3 +1 will be used.
+      */
+    threshold: Option[Int] = None,
 ) {
 
   /** Converts the reservedTraffic into an Option that is set to None if the validator is not
