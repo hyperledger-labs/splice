@@ -22,7 +22,8 @@ export function installInfo(
   gateway: string,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   scanUrl: string,
-  scanDependency: Resource
+  scanDependency: Resource,
+  version: CnChartVersion
 ): void {
   function md5(str: string): string {
     return createHash('md5').update(str).digest('hex');
@@ -86,14 +87,7 @@ export function installInfo(
     },
   };
 
-  installSpliceHelmChart(
-    xns,
-    'info',
-    'splice-info',
-    infoValues,
-    decentralizedSynchronizerMigrationConfig.active.version,
-    {
-      dependsOn: [scanDependency],
-    }
-  );
+  installSpliceHelmChart(xns, 'info', 'splice-info', infoValues, version, {
+    dependsOn: [scanDependency],
+  });
 }
