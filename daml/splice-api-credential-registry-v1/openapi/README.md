@@ -28,3 +28,14 @@ The fallback order can be used to page through all records in the order in which
 they were created; and it can also be used to tail the table to ingest all records as
 they are created.
 
+
+#### On deterministic responses when reading from multiple registry services
+
+The Scan proxy should implement a BFT read strategy where it queries
+multiple scan endpoints. The following tricks might help to achieve
+deterministic responses:
+
+- Determine a record_time cutoff based on discretizing record time
+  and choosing the end of a previous time slice to query up to.
+
+

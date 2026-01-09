@@ -11,6 +11,6 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SWAGGER_JSON: /spec/credential-registry.yaml
+      SWAGGER_JSON: /spec/credential-registry-v1.yaml
     volumes:
-      - ./credential-registry.yaml:/spec/credential-registry.yaml
+      - ./credential-registry-v1.yaml:/spec/credential-registry-v1.yaml
