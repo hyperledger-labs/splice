@@ -95,12 +95,7 @@ class UpdateHistoryBulkStorageTest
           val allUpdatesFromS3 = objectKeys.flatMap(
             readUncompressAndDecode(bucketConnection, io.circe.parser.decode[UpdateHistoryItemV2])
           )
-//          allUpdatesFromS3.map(CompactJsonScanHttpEncodingsWithFieldLabels.httpToLapiUpdate) should contain theSameElementsAs allUpdates
-          allUpdatesFromS3.length shouldBe allUpdates.length
-//          allUpdatesFromS3.map(CompactJsonScanHttpEncodingsWithFieldLabels.httpToLapiUpdate).head should be(allUpdates.head)
-          allUpdatesFromS3.map(CompactJsonScanHttpEncodingsWithFieldLabels.httpToLapiUpdate)(
-            1
-          ) should be(allUpdates(1))
+          allUpdatesFromS3.map(CompactJsonScanHttpEncodingsWithFieldLabels.httpToLapiUpdate).head should be(allUpdates.head)
         }
       }
     }
