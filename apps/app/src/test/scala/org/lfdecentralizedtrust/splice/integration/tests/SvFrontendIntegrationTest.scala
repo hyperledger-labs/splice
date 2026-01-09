@@ -24,6 +24,7 @@ import org.openqa.selenium.By
 import org.openqa.selenium.support.ui.Select
 import org.slf4j.event.Level
 
+import scala.jdk.CollectionConverters.*
 import java.util.Optional
 
 class SvFrontendIntegrationTest
@@ -310,200 +311,200 @@ class SvFrontendIntegrationTest
       }
     }
 
-    // def createProposal(action: String, formPrefix: String)(
-    //     extraFormOps: WebDriverType => Unit
-    // )(implicit
-    //     env: SpliceTestConsoleEnvironment
-    // ): String = {
-    //   val requestReasonUrl = "https://new-proposal-url.com/"
-    //   val requestReasonBody = "This is a summary of the proposal"
+    def createProposal(action: String, formPrefix: String)(
+        extraFormOps: WebDriverType => Unit
+    )(implicit
+        env: SpliceTestConsoleEnvironment
+    ): String = {
+      val requestReasonUrl = "https://new-proposal-url.com/"
+      val requestReasonBody = "This is a summary of the proposal"
 
-    //   var proposalDetailsUrl: String = ""
-    //   var proposalContractId: String = ""
+      var proposalDetailsUrl: String = ""
+      var proposalContractId: String = ""
 
-    //   withFrontEnd("sv1") { implicit webDriver =>
-    //     actAndCheck(
-    //       "sv1 operator can login and browse to the governance tab", {
-    //         go to s"http://localhost:$sv1UIPort/governance-beta"
-    //         loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
-    //       },
-    //     )(
-    //       "sv1 can see the governance page",
-    //       _ => {
-    //         eventuallySucceeds() {
-    //           find(id("initiate-proposal-button")) should not be empty
-    //         }
-    //       },
-    //     )
+      withFrontEnd("sv1") { implicit webDriver =>
+        actAndCheck(
+          "sv1 operator can login and browse to the governance tab", {
+            go to s"http://localhost:$sv1UIPort/governance-beta"
+            loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
+          },
+        )(
+          "sv1 can see the governance page",
+          _ => {
+            eventuallySucceeds() {
+              find(id("initiate-proposal-button")) should not be empty
+            }
+          },
+        )
 
-    //     actAndCheck(
-    //       "sv1 can navigate to the create proposal page", {
-    //         click on id("initiate-proposal-button")
+        actAndCheck(
+          "sv1 can navigate to the create proposal page", {
+            click on id("initiate-proposal-button")
 
-    //         clue("select action and click next") {
-    //           eventually() {
-    //             // Click on MUI Select to open dropdown
-    //             val actionDropdown = webDriver.findElement(By.id("select-action"))
-    //             actionDropdown.click()
-    //           }
+            clue("select action and click next") {
+              eventually() {
+                // Click on MUI Select to open dropdown
+                val actionDropdown = webDriver.findElement(By.id("select-action"))
+                actionDropdown.click()
+              }
 
-    //           eventually() {
-    //             // Click on the menu item with the action value
-    //             val actionOption =
-    //               webDriver.findElement(By.cssSelector(s"[data-testid='$action']"))
-    //             actionOption.click()
-    //           }
+              eventually() {
+                // Click on the menu item with the action value
+                val actionOption =
+                  webDriver.findElement(By.cssSelector(s"[data-testid='$action']"))
+                actionOption.click()
+              }
 
-    //           eventually() {
-    //             click on id("next-button")
-    //           }
-    //         }
-    //       },
-    //     )(
-    //       "sv1 can see the create proposal form",
-    //       _ => {
-    //         find(id(s"$formPrefix-summary")) should not be empty
-    //       },
-    //     )
+              eventually() {
+                click on id("next-button")
+              }
+            }
+          },
+        )(
+          "sv1 can see the create proposal form",
+          _ => {
+            find(id(s"$formPrefix-summary")) should not be empty
+          },
+        )
 
-    //     actAndCheck(
-    //       "sv1 operator can create a new proposal", {
-    //         // Fill in the action-specific form fields first
-    //         extraFormOps(webDriver)
+        actAndCheck(
+          "sv1 operator can create a new proposal", {
+            // Fill in the action-specific form fields first
+            extraFormOps(webDriver)
 
-    //         eventually() {
-    //           inside(find(id(s"$formPrefix-summary"))) { case Some(element) =>
-    //             element.underlying.sendKeys(requestReasonBody)
-    //           }
-    //         }
+            eventually() {
+              inside(find(id(s"$formPrefix-summary"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonBody)
+              }
+            }
 
-    //         eventually() {
-    //           inside(find(id(s"$formPrefix-url"))) { case Some(element) =>
-    //             element.underlying.sendKeys(requestReasonUrl)
-    //           }
-    //         }
+            eventually() {
+              inside(find(id(s"$formPrefix-url"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonUrl)
+              }
+            }
 
-    //         eventually() {
-    //           val submitButton = webDriver.findElement(By.id("submit-button"))
-    //           webDriver.executeScript("arguments[0].click();", submitButton)
-    //         }
+            eventually() {
+              val submitButton = webDriver.findElement(By.id("submit-button"))
+              webDriver.executeScript("arguments[0].click();", submitButton)
+            }
 
-    //         // Wait for confirmation view (button text changes to "Submit Proposal")
-    //         eventually() {
-    //           val submitButton = webDriver.findElement(By.id("submit-button"))
-    //           submitButton.getText shouldBe "Submit Proposal"
-    //         }
+            // Wait for confirmation view (button text changes to "Submit Proposal")
+            eventually() {
+              val submitButton = webDriver.findElement(By.id("submit-button"))
+              submitButton.getText shouldBe "Submit Proposal"
+            }
 
-    //         eventually() {
-    //           val submitButton = webDriver.findElement(By.id("submit-button"))
-    //           webDriver.executeScript("arguments[0].click();", submitButton)
-    //         }
-    //       },
-    //     )(
-    //       "sv1 is redirected to the governance page after successful submission",
-    //       _ => {
-    //         eventuallySucceeds() {
-    //           find(id("initiate-proposal-button")) should not be empty
+            eventually() {
+              val submitButton = webDriver.findElement(By.id("submit-button"))
+              webDriver.executeScript("arguments[0].click();", submitButton)
+            }
+          },
+        )(
+          "sv1 is redirected to the governance page after successful submission",
+          _ => {
+            eventuallySucceeds() {
+              find(id("initiate-proposal-button")) should not be empty
 
-    //           val proposals = getInflightProposals()
-    //           proposals.size should be > 0
-    //         }
+              val proposals = getInflightProposals()
+              proposals.size should be > 0
+            }
 
-    //         clue("click the first inflight proposal to view details") {
-    //           val proposals = getInflightProposals()
-    //           webDriver.executeScript("arguments[0].click();", proposals.asScala.head)
-    //         }
+            clue("click the first inflight proposal to view details") {
+              val proposals = getInflightProposals()
+              webDriver.executeScript("arguments[0].click();", proposals.asScala.head)
+            }
 
-    //         eventually() {
-    //           val currentUrl = webDriver.getCurrentUrl
-    //           currentUrl should include("/governance-beta/proposals/")
-    //           proposalDetailsUrl = currentUrl
-    //           // Extract contract ID from URL: /governance-beta/proposals/{contractId}
-    //           proposalContractId =
-    //             currentUrl.split("/governance-beta/proposals/")(1).split("\\?")(0)
-    //         }
-    //       },
-    //     )
+            eventually() {
+              val currentUrl = webDriver.getCurrentUrl
+              currentUrl should include("/governance-beta/proposals/")
+              proposalDetailsUrl = currentUrl
+              // Extract contract ID from URL: /governance-beta/proposals/{contractId}
+              proposalContractId =
+                currentUrl.split("/governance-beta/proposals/")(1).split("\\?")(0)
+            }
+          },
+        )
 
-    //   }
+      }
 
-    //   withFrontEnd("sv2") { implicit webDriver =>
-    //     actAndCheck(
-    //       "sv2 operator can login and browse to the governance page", {
-    //         go to s"http://localhost:$sv2UIPort/governance-beta"
-    //         loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
-    //       },
-    //     )(
-    //       "sv2 can see the action required section with at least one item",
-    //       _ => {
-    //         eventuallySucceeds() {
-    //           find(testId("action-required-section")) should not be empty
-    //           getActionRequiredElems().size should be > 0
-    //         }
-    //       },
-    //     )
+      withFrontEnd("sv2") { implicit webDriver =>
+        actAndCheck(
+          "sv2 operator can login and browse to the governance page", {
+            go to s"http://localhost:$sv2UIPort/governance-beta"
+            loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
+          },
+        )(
+          "sv2 can see the action required section with at least one item",
+          _ => {
+            eventuallySucceeds() {
+              find(testId("action-required-section")) should not be empty
+              getActionRequiredElems().size should be > 0
+            }
+          },
+        )
 
-    //     actAndCheck(
-    //       "sv2 clicks on an action required item", {
-    //         val actionsRequired = getActionRequiredElems()
-    //         webDriver.executeScript("arguments[0].click();", actionsRequired.asScala.head)
-    //       },
-    //     )(
-    //       "sv2 can see the vote request and cast a vote",
-    //       _ => {
-    //         inside(find(id("your-vote-reason-input"))) { case Some(element) =>
-    //           element.underlying.sendKeys("A sample reason")
-    //         }
+        actAndCheck(
+          "sv2 clicks on an action required item", {
+            val actionsRequired = getActionRequiredElems()
+            webDriver.executeScript("arguments[0].click();", actionsRequired.asScala.head)
+          },
+        )(
+          "sv2 can see the vote request and cast a vote",
+          _ => {
+            inside(find(id("your-vote-reason-input"))) { case Some(element) =>
+              element.underlying.sendKeys("A sample reason")
+            }
 
-    //         inside(find(id("your-vote-url-input"))) { case Some(element) =>
-    //           element.underlying.sendKeys("https://my-splice-vote-url.com")
-    //         }
+            inside(find(id("your-vote-url-input"))) { case Some(element) =>
+              element.underlying.sendKeys("https://my-splice-vote-url.com")
+            }
 
-    //         click on testId("your-vote-accept")
+            click on testId("your-vote-accept")
 
-    //         eventuallyClickOn(id("submit-vote-button"))
+            eventuallyClickOn(id("submit-vote-button"))
 
-    //         clue("wait for the vote submission success message") {
-    //           eventuallySucceeds() {
-    //             inside(find(testId("vote-submission-success"))) { case Some(element) =>
-    //               element.text shouldBe "Vote successfully updated!"
-    //             }
-    //           }
-    //         }
-    //       },
-    //     )
-    //   }
+            clue("wait for the vote submission success message") {
+              eventuallySucceeds() {
+                inside(find(testId("vote-submission-success"))) { case Some(element) =>
+                  element.text shouldBe "Vote successfully updated!"
+                }
+              }
+            }
+          },
+        )
+      }
 
-    //   withFrontEnd("sv1") { implicit webDriver =>
-    //     actAndCheck(
-    //       "sv1 navigates back to the proposal details page", {
-    //         go to proposalDetailsUrl
-    //       },
-    //     )(
-    //       "sv1 can see the new vote from sv2",
-    //       _ => {
-    //         val sv2PartyId = sv2Backend.getDsoInfo().svParty.toProtoPrimitive
-    //         val sv2PartyHint = sv2PartyId.split("::").head
-    //         eventuallySucceeds() {
-    //           val votes =
-    //             webDriver.findElements(By.cssSelector("[data-testid='proposal-details-vote']"))
-    //           votes.size should be >= 1
+      withFrontEnd("sv1") { implicit webDriver =>
+        actAndCheck(
+          "sv1 navigates back to the proposal details page", {
+            go to proposalDetailsUrl
+          },
+        )(
+          "sv1 can see the new vote from sv2",
+          _ => {
+            val sv2PartyId = sv2Backend.getDsoInfo().svParty.toProtoPrimitive
+            val sv2PartyHint = sv2PartyId.split("::").head
+            eventuallySucceeds() {
+              val votes =
+                webDriver.findElements(By.cssSelector("[data-testid='proposal-details-vote']"))
+              votes.size should be >= 1
 
-    //           val voterPartyTexts = votes.asScala.map { vote =>
-    //             vote
-    //               .findElement(
-    //                 By.cssSelector("[data-testid='proposal-details-voter-party-id-value']")
-    //               )
-    //               .getText
-    //           }
-    //           voterPartyTexts.exists(_.startsWith(sv2PartyHint)) shouldBe true
-    //         }
-    //       },
-    //     )
-    //   }
+              val voterPartyTexts = votes.asScala.map { vote =>
+                vote
+                  .findElement(
+                    By.cssSelector("[data-testid='proposal-details-voter-party-id-value']")
+                  )
+                  .getText
+              }
+              voterPartyTexts.exists(_.startsWith(sv2PartyHint)) shouldBe true
+            }
+          },
+        )
+      }
 
-    //   proposalContractId
-    // }
+      proposalContractId
+    }
 
     def testCreateAndVoteDsoRulesAction(action: String, effectiveAtThreshold: Boolean = true)(
         fillUpForm: WebDriverType => Unit
@@ -1316,23 +1317,23 @@ class SvFrontendIntegrationTest
         }
     }
 
-    // "NEW UI: Offboard SV" in { implicit env =>
-    //   val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+    "NEW UI: Offboard SV" in { implicit env =>
+      val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
 
-    //   createProposal("SRARC_OffboardSv", "offboard-sv") { implicit webDriver =>
-    //     // Click on the member dropdown to open it
-    //     eventually() {
-    //       val dropdown = webDriver.findElement(By.id("offboard-sv-member-dropdown"))
-    //       dropdown.click()
-    //     }
+      createProposal("SRARC_OffboardSv", "offboard-sv") { implicit webDriver =>
+        // Click on the member dropdown to open it
+        eventually() {
+          val dropdown = webDriver.findElement(By.id("offboard-sv-member-dropdown"))
+          dropdown.click()
+        }
 
-    //     // Select the SV to offboard from the dropdown menu
-    //     eventually() {
-    //       val memberOption = webDriver.findElement(By.cssSelector(s"[data-value='$sv3PartyId']"))
-    //       memberOption.click()
-    //     }
-    //   }
-    // }
+        // Select the SV to offboard from the dropdown menu
+        eventually() {
+          val memberOption = webDriver.findElement(By.cssSelector(s"[data-value='$sv3PartyId']"))
+          memberOption.click()
+        }
+      }
+    }
 
     // "NEW UI: Grant and Revoke Featured App Right" in { implicit env =>
     //   // First, create a Grant proposal and capture the contract ID
