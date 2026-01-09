@@ -44,7 +44,7 @@ trait WalletTxLogTestUtil extends TestCommon with WalletTestUtil with TimeTestUt
   ): Unit = {
 
     eventually() {
-      val actual = wallet.listTransactions(None, pageSize = Limit.MaxPageSize)
+      val actual = wallet.listTransactions(None, pageSize = Limit.DefaultMaxPageSize)
       val withoutIgnored = actual
         .takeWhile(e => !previousEventId.contains(e.eventId))
         .filterNot(ignore)

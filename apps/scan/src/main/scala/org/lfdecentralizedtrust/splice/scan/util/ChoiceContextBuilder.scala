@@ -21,19 +21,23 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
 
 abstract class ChoiceContextBuilder[DisclosedContract, ChoiceContext, Self](
-    val activeSynchronizerId: String
+    val activeSynchronizerId: String,
+    val excludeDebugFields: Boolean,
 ) { self: Self =>
 
   protected def toTokenStandardDisclosedContract[TCid, T](
       contract: Contract[TCid, T],
       synchronizerId: String,
+      excludeDebugFields: Boolean,
   ): DisclosedContract
 
   val disclosedContracts: ListBuffer[DisclosedContract] = ListBuffer.empty
   val contextEntries: mutable.Map[String, metadatav1.AnyValue] = mutable.Map.empty
 
   def disclose(contract: Contract[?, ?]): Self = {
-    disclosedContracts.addOne(toTokenStandardDisclosedContract(contract, activeSynchronizerId))
+    disclosedContracts.addOne(
+      toTokenStandardDisclosedContract(contract, activeSynchronizerId, excludeDebugFields)
+    )
     this
   }
 

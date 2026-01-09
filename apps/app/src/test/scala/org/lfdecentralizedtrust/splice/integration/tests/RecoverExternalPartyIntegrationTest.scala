@@ -22,11 +22,9 @@ import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 
 import java.nio.file.Files
 import java.time.Duration
-import scala.annotation.nowarn
 import scala.concurrent.duration.*
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
-@nowarn("cat=deprecation")
 class RecoverExternalPartyIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with ExternallySignedPartyTestUtil
@@ -176,7 +174,7 @@ class RecoverExternalPartyIntegrationTest
       }
       val acsSnapshotFile = Files.createTempFile("acs", ".snapshot")
       Files.write(acsSnapshotFile, acsSnapshot.toByteArray())
-      bobValidatorBackend.participantClient.repair.import_acs_old(acsSnapshotFile.toString)
+      bobValidatorBackend.participantClient.repair.import_acs(acsSnapshotFile.toString)
       bobValidatorBackend.participantClient.synchronizers.reconnect_all()
     }
 

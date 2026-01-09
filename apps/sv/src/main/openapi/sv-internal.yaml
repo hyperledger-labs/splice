@@ -1081,6 +1081,11 @@ components:
           type: boolean
           description: |
             If set to true, genesis_state and acs_snapshot are filenames
+        acs_format:
+          type: string
+          enum:
+            - admin_api
+            - ledger_api
 
     Dar:
       type: object

@@ -148,6 +148,9 @@ svs:
       cantonLogLevel: DEBUG
       cantonAsync: false
       cometbftLogLevel: debug
+    pruning:
+      sequencer:
+        enabled: false
     participant:
       bftSequencerConnection: true
       resources:

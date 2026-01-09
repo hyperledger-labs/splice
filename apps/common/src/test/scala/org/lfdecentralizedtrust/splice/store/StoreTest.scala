@@ -294,6 +294,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       ratePerRound: BigDecimal,
       version: DarResource = DarResources.amulet_current,
       dso: PartyId = dsoParty,
+      contractId: String = nextCid(),
   ) = {
     val templateId = new Identifier(
       version.packageId,
@@ -311,7 +312,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
     contract(
       identifier = templateId,
-      contractId = new amuletCodegen.Amulet.ContractId(nextCid()),
+      contractId = new amuletCodegen.Amulet.ContractId(contractId),
       payload = template,
     )
   }

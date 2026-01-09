@@ -714,12 +714,28 @@
             "prefix": "mock/validator"
           }
         },
+        "participantPruningConfig": {
+          "cron": "0 /10 * * * ?",
+          "maxDuration": "5m",
+          "retention": "30d"
+        },
         "persistence": {
           "host": "postgres",
           "postgresName": "postgres",
           "secretName": "postgres-secrets"
         },
-        "scanAddress": "https://scan.sv-2.mock.global.canton.network.digitalasset.com",
+        "scanClient": {
+          "scanType": "bft-custom",
+          "seedUrls": [
+            "https://scan.sv-2-eng.test.network.canton.global",
+            "https://scan.sv-3-eng.test.network.canton.global"
+          ],
+          "threshold": 2,
+          "trustedSvs": [
+            "Digital-Asset-Eng-2",
+            "Digital-Asset-Eng-3"
+          ]
+        },
         "spliceInstanceNames": {
           "amuletName": "Amulet",
           "amuletNameAcronym": "AMT",

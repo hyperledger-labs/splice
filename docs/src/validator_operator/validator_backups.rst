@@ -11,8 +11,11 @@ Backups
 While all components in the system are designed to be crash-fault-tolerant,
 there is always a chance of failures from which the system cannot immediately
 recover, e.g. due to misconfiguration or bugs. In such cases, you will need to
-restore a component or the a full validator node from
+restore a component or a full validator node from
 backups or from dumps of the components that are still operational.
+
+Node operators should take **both** Node Identity backups and Postgres Instance
+Backups to protect their node from the widest range of disaster scenarios.
 
 .. _validator-identities-backup:
 

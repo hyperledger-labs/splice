@@ -17,10 +17,14 @@ import com.digitalasset.canton.admin.api.client.data.{
   ParticipantStatus,
 }
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
-import com.digitalasset.canton.admin.participant.v30.{ExportAcsOldResponse, PruningServiceGrpc}
+import com.digitalasset.canton.admin.participant.v30.{ExportAcsResponse, PruningServiceGrpc}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.participant.admin.data.{
+  ContractImportMode,
+  RepresentativePackageIdOverride,
+}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
@@ -46,6 +50,7 @@ import com.digitalasset.canton.topology.{
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.github.blemale.scaffeine.Scaffeine
 import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -61,7 +66,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
 }
 
 import java.time.Instant
-import scala.annotation.nowarn
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -99,6 +104,12 @@ class ParticipantAdminConnection(
       _.getSchedule(_),
     )
 
+  private val synchronizerIdCache =
+    Scaffeine()
+      .expireAfterWrite(10.minutes)
+      .maximumSize(100)
+      .buildAsync[SynchronizerAlias, SynchronizerId]()
+
   override type Status = ParticipantStatus
 
   override protected def getStatusRequest: GrpcAdminCommand[?, ?, NodeStatus[ParticipantStatus]] =
@@ -119,10 +130,14 @@ class ParticipantAdminConnection(
 
   def getSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
-  ): Future[SynchronizerId] =
-    getPhysicalSynchronizerId(synchronizerAlias).map(_.logical)
+  ): Future[SynchronizerId] = {
+    synchronizerIdCache.getFuture(
+      synchronizerAlias,
+      alias => getPhysicalSynchronizerId(alias).map(_.logical),
+    )
+  }
 
-  def getPhysicalSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
+  private def getPhysicalSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
   ): Future[PhysicalSynchronizerId] =
     // We avoid ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId which tries to make
@@ -311,40 +326,61 @@ class ParticipantAdminConnection(
     )
   }
 
+  private def offsetByTimestamp(synchronizerId: SynchronizerId, timestamp: Instant, force: Boolean)(
+      implicit tc: TraceContext
+  ): Future[Long] =
+    runCmd(
+      ParticipantAdminCommands.PartyManagement
+        .GetHighestOffsetByTimestamp(synchronizerId, timestamp, force)
+    )
+
   def downloadAcsSnapshot(
       parties: Set[PartyId],
-      filterSynchronizerId: Option[SynchronizerId] = None,
-      timestamp: Option[Instant] = None,
+      synchronizerId: SynchronizerId,
+      timestampOrOffset: Either[Instant, Long],
       force: Boolean = false,
   )(implicit traceContext: TraceContext): Future[Seq[ByteString]] = {
-    logger.debug(
-      show"Downloading ACS snapshot from domain $filterSynchronizerId, for parties $parties at timestamp $timestamp"
+    logger.info(
+      show"Downloading ACS snapshot from domain $synchronizerId, for parties $parties at $timestampOrOffset"
     )
-    @nowarn("cat=deprecation")
-    val observer = new SeqAccumulatingObserver[ExportAcsOldResponse]
-    runCmd(
-      ParticipantAdminCommands.ParticipantRepairManagement.ExportAcsOld(
-        parties = parties,
-        partiesOffboarding = false,
-        filterSynchronizerId,
-        timestamp,
-        observer,
-        force,
+    val observer = new SeqAccumulatingObserver[ExportAcsResponse]
+
+    for {
+      offset <- timestampOrOffset match {
+        case Right(offset) => Future.successful(offset)
+        case Left(timestamp) =>
+          offsetByTimestamp(synchronizerId, timestamp, force).map { offset =>
+            logger.debug(
+              s"Resolved timestamp $timestamp to offset $offset for $synchronizerId, force=$force"
+            )
+            offset
+          }
+      }
+      _ <- runCmd(
+        ParticipantAdminCommands.ParticipantRepairManagement.ExportAcs(
+          parties = parties,
+          filterSynchronizerId = Some(synchronizerId),
+          offset,
+          observer,
+          excludedStakeholders = Set.empty,
+          contractSynchronizerRenames = Map.empty,
+        )
       )
-    ).flatMap(_ => observer.resultFuture).map(_.map(_.chunk))
+      responses <- observer.resultFuture
+    } yield responses.map(_.chunk)
   }
 
   def downloadAcsSnapshotNonChunked(
       parties: Set[PartyId],
-      filterSynchronizerId: Option[SynchronizerId] = None,
-      timestamp: Option[Instant] = None,
+      filterSynchronizerId: SynchronizerId,
+      timestampOrOffset: Either[Instant, Long],
       force: Boolean = false,
   )(implicit traceContext: TraceContext): Future[ByteString] =
-    downloadAcsSnapshot(parties, filterSynchronizerId, timestamp, force).map(chunks =>
+    downloadAcsSnapshot(parties, filterSynchronizerId, timestampOrOffset, force).map(chunks =>
       ByteString.copyFrom(chunks.asJava)
     )
 
-  def uploadAcsSnapshot(acsBytes: Seq[ByteString])(implicit
+  def uploadAcsSnapshotLegacy(acsBytes: Seq[ByteString])(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
     val chunkedAcsBytes: Seq[ByteString] = acsBytes match {
@@ -362,6 +398,34 @@ class ParticipantAdminConnection(
           .ImportAcsOld(
             chunkedAcsBytes,
             IMPORT_ACS_WORKFLOW_ID_PREFIX,
+          ),
+        timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
+      ).map(_ => ()),
+      logger,
+    )
+  }
+
+  def uploadAcsSnapshot(acsBytes: Seq[ByteString])(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    val chunkedAcsBytes: Seq[ByteString] = acsBytes match {
+      case Seq(bytes) =>
+        // Caller has not chunked the bytes, this is possible for SVs that try to onboard or for validator recovery.
+        // The chuning logic here matches what GrpcStreamingUtils.streamToServer does
+        bytes.toByteArray.grouped(1024 * 1024 * 2).map(ByteString.copyFrom(_)).toSeq
+      case _ => acsBytes
+    }
+    retryProvider.retryForClientCalls(
+      "import_acs",
+      "Imports the acs in the participantl",
+      runCmd(
+        ParticipantAdminCommands.ParticipantRepairManagement
+          .ImportAcs(
+            chunkedAcsBytes,
+            IMPORT_ACS_WORKFLOW_ID_PREFIX,
+            contractImportMode = ContractImportMode.Validation,
+            excludedStakeholders = Set.empty,
+            representativePackageIdOverride = RepresentativePackageIdOverride.NoOverride,
           ),
         timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
       ).map(_ => ()),

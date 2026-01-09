@@ -578,4 +578,82 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     getUser.primaryParty.value.uid.identifier shouldBe validatorPartyHint
   }
 
+  "onboard user with custom party hint and check assignment/creation modes" in { implicit env =>
+    initDso()
+    aliceValidatorBackend.startSync()
+
+    val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+    val testUser1 = s"test-1-${Random.nextInt(10000)}"
+    val testUser2 = s"test-2-${Random.nextInt(10000)}"
+    val testUser3 = s"test-3-${Random.nextInt(10000)}"
+    val testUser4 = s"test-4-${Random.nextInt(10000)}"
+    val customPartyHint = s"CustomHint${Random.nextInt(10000)}"
+
+    def onboard(
+        name: String,
+        partyId: Option[PartyId] = None,
+        createIfMissing: Option[Boolean] = None,
+    ): PartyId = {
+      aliceValidatorBackend.onboardUser(name, partyId, createIfMissing)
+    }
+
+    clue(
+      "Assign new user to existing Validator Party"
+    ) {
+      aliceValidatorBackend.listUsers() should not contain testUser1
+      val assignedPartyId = onboard(
+        name = testUser1,
+        partyId = Some(aliceValidatorParty),
+      )
+      assignedPartyId shouldBe aliceValidatorParty
+      aliceValidatorBackend.listUsers() should contain(testUser1)
+    }
+
+    clue("Use 'name' as hint") {
+      aliceValidatorBackend.listUsers() should not contain testUser2
+
+      val defaultPartyId = onboard(
+        name = testUser2,
+        createIfMissing = Some(true),
+      )
+
+      val expectedHint = BaseLedgerConnection.sanitizeUserIdToPartyString(testUser2)
+      defaultPartyId.toString.split("::").head shouldBe expectedHint
+      aliceValidatorBackend.listUsers() should contain(testUser2)
+    }
+
+    clue("Use partyId as hint") {
+      val desiredPartyId = PartyId.tryCreate(customPartyHint, aliceValidatorParty.uid.namespace)
+      aliceValidatorBackend.listUsers() should not contain testUser3
+      val customPartyId = onboard(
+        name = testUser3,
+        partyId = Some(desiredPartyId),
+        createIfMissing = Some(true),
+      )
+
+      customPartyId.toString.split("::").head shouldBe customPartyHint
+      customPartyId shouldBe desiredPartyId
+      aliceValidatorBackend.listUsers() should contain(testUser3)
+    }
+
+    clue("Fail when creation is disallowed but no party is provided to assign to") {
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+        intercept[com.digitalasset.canton.console.CommandFailure] {
+          onboard(
+            name = testUser4,
+            createIfMissing = Some(false),
+          )
+        },
+        entries => {
+          forAtLeast(1, entries)(
+            _.message should include(
+              s"party_id must be provided when createPartyIfMissing is false and no existing"
+            )
+          )
+        },
+      )
+      aliceValidatorBackend.listUsers() should not contain testUser4
+    }
+  }
+
 }

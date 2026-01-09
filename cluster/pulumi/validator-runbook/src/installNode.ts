@@ -148,6 +148,8 @@ async function installValidator(
     topupConfig,
   } = validatorDeploymentConfig;
 
+  const participantPruningConfig = validatorConfig?.participantPruningSchedule;
+
   const supportsValidatorRunbookReset = config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET', false);
   const postgresValues: ChartValues = loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
@@ -201,6 +203,10 @@ async function installValidator(
     ),
   };
 
+  if (validatorConfig.validatorApp?.scanClient != null) {
+    delete validatorValuesFromYamlFiles.scanAddress;
+  }
+
   const newParticipantIdentifier =
     validatorConfig.newParticipantId ||
     validatorValuesFromYamlFiles?.participantIdentitiesDumpImport?.newParticipantIdentifier;
@@ -213,6 +219,7 @@ async function installValidator(
         ? true
         : validatorValuesFromYamlFiles.migration.migrating,
     },
+    scanClient: validatorConfig.validatorApp?.scanClient,
     metrics: {
       enable: true,
     },
@@ -227,6 +234,7 @@ async function installValidator(
           newParticipantIdentifier,
         }
       : undefined,
+    participantPruningConfig: participantPruningConfig,
     ...(participantBootstrapDumpSecret ? { nodeIdentifier: newParticipantIdentifier } : {}),
     persistence: {
       ...validatorValuesFromYamlFiles.persistence,

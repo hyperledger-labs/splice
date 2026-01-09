@@ -620,4 +620,4 @@ groups:
           summary: Blockchain is not being pruned
         labels:
           "": ""
-        isPaused: $ENABLE_COMETBFT_PRUNING
+        isPaused: $COMETBFT_PRUNING_DISABLED
