@@ -1365,29 +1365,29 @@ class SvFrontendIntegrationTest
       }
     }
 
-    // "NEW UI: Create Unclaimed Activity Record" in { implicit env =>
-    //   val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-    //   val amount = "100"
+    "NEW UI: Create Unclaimed Activity Record" in { implicit env =>
+      val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+      val amount = "100"
 
-    //   createProposal(
-    //     "SRARC_CreateUnallocatedUnclaimedActivityRecord",
-    //     "create-unallocated-unclaimed-activity-record",
-    //   ) { implicit webDriver =>
-    //     eventually() {
-    //       inside(find(id("create-unallocated-unclaimed-activity-record-beneficiary"))) {
-    //         case Some(element) =>
-    //           element.underlying.sendKeys(beneficiary)
-    //       }
-    //     }
+      createProposal(
+        "SRARC_CreateUnallocatedUnclaimedActivityRecord",
+        "create-unallocated-unclaimed-activity-record",
+      ) { implicit webDriver =>
+        eventually() {
+          inside(find(id("create-unallocated-unclaimed-activity-record-beneficiary"))) {
+            case Some(element) =>
+              element.underlying.sendKeys(beneficiary)
+          }
+        }
 
-    //     eventually() {
-    //       inside(find(id("create-unallocated-unclaimed-activity-record-amount"))) {
-    //         case Some(element) =>
-    //           element.underlying.sendKeys(amount)
-    //       }
-    //     }
-    //   }
-    // }
+        eventually() {
+          inside(find(id("create-unallocated-unclaimed-activity-record-amount"))) {
+            case Some(element) =>
+              element.underlying.sendKeys(amount)
+          }
+        }
+      }
+    }
 
     "NEW UI: Set Amulet Rules Configuration" in { implicit env =>
       createProposal("CRARC_SetConfig", "set-amulet-config-rules") { _ =>
