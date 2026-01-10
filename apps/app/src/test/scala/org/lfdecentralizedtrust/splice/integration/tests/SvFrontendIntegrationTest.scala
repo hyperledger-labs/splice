@@ -1335,28 +1335,28 @@ class SvFrontendIntegrationTest
       }
     }
 
-    // "NEW UI: Grant and Revoke Featured App Right" in { implicit env =>
-    //   // First, create a Grant proposal and capture the contract ID
-    //   val grantProposalContractId = createProposal(
-    //     "SRARC_GrantFeaturedAppRight",
-    //     "grant-featured-app",
-    //   ) { implicit webDriver =>
-    //     eventually() {
-    //       inside(find(id("grant-featured-app-idValue"))) { case Some(element) =>
-    //         element.underlying.sendKeys("test-provider-party-id")
-    //       }
-    //     }
-    //   }
+    "NEW UI: Grant and Revoke Featured App Right" in { implicit env =>
+      // First, create a Grant proposal and capture the contract ID
+      val grantProposalContractId = createProposal(
+        "SRARC_GrantFeaturedAppRight",
+        "grant-featured-app",
+      ) { implicit webDriver =>
+        eventually() {
+          inside(find(id("grant-featured-app-idValue"))) { case Some(element) =>
+            element.underlying.sendKeys("test-provider-party-id")
+          }
+        }
+      }
 
-    //   // Now create a Revoke proposal using the Grant proposal's contract ID
-    //   createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
-    //     eventually() {
-    //       inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
-    //         element.underlying.sendKeys(grantProposalContractId)
-    //       }
-    //     }
-    //   }
-    // }
+      // Now create a Revoke proposal using the Grant proposal's contract ID
+      // createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
+      //   eventually() {
+      //     inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
+      //       element.underlying.sendKeys(grantProposalContractId)
+      //     }
+      //   }
+      // }
+    }
 
     "NEW UI: Set Dso Rules Configuration" in { implicit env =>
       createProposal("SRARC_SetConfig", "set-dso-config-rules") { _ =>
