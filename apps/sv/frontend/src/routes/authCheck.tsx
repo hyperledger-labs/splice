@@ -19,6 +19,7 @@ interface AuthCheckProps {
 }
 
 const AuthCheck: React.FC<AuthCheckProps> = ({ authConfig, testAuthConfig }) => {
+  console.log('[DEBUG] AuthCheck rendering');
   const { userAccessToken, isAuthenticated } = useUserState();
   const svClient = useSvAdminClient();
   type AuthorizationState = 'isLoading' | 'ok' | 'unauthorized' | 'failed' | 'unset';

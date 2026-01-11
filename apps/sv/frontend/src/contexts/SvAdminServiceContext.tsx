@@ -94,7 +94,12 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
   children,
 }) => {
   const { userAccessToken } = useUserState();
+  console.log(
+    '[DEBUG] SvAdminClientProvider rendering, token:',
+    userAccessToken ? 'present' : 'absent'
+  );
   const friendlyClient: SvAdminClient | undefined = useMemo(() => {
+    console.log('[DEBUG] Creating new SvAdminClient');
     const configuration = createConfiguration({
       baseServer: new ServerConfiguration(url, {}),
       promiseMiddleware: [new ApiMiddleware(userAccessToken), new OpenAPILoggingMiddleware('sv')],
