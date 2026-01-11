@@ -315,7 +315,7 @@ class SvFrontendIntegrationTest
         extraFormOps: WebDriverType => Unit
     )(implicit
         env: SpliceTestConsoleEnvironment
-    ): String = {
+    ): String = clue(s"Creating proposal: $action") {
       val requestReasonUrl = "https://new-proposal-url.com/"
       val requestReasonBody = "This is a summary of the proposal"
 
