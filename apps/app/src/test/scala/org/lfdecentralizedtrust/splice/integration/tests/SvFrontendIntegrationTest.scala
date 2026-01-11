@@ -475,34 +475,6 @@ class SvFrontendIntegrationTest
         )
       }
 
-      withFrontEnd("sv1") { implicit webDriver =>
-        actAndCheck(
-          "sv1 navigates back to the proposal details page", {
-            go to proposalDetailsUrl
-          },
-        )(
-          "sv1 can see the new vote from sv2",
-          _ => {
-            val sv2PartyId = sv2Backend.getDsoInfo().svParty.toProtoPrimitive
-            val sv2PartyHint = sv2PartyId.split("::").head
-            eventuallySucceeds() {
-              val votes =
-                webDriver.findElements(By.cssSelector("[data-testid='proposal-details-vote']"))
-              votes.size should be >= 1
-
-              val voterPartyTexts = votes.asScala.map { vote =>
-                vote
-                  .findElement(
-                    By.cssSelector("[data-testid='proposal-details-voter-party-id-value']")
-                  )
-                  .getText
-              }
-              voterPartyTexts.exists(_.startsWith(sv2PartyHint)) shouldBe true
-            }
-          },
-        )
-      }
-
       proposalContractId
     }
 

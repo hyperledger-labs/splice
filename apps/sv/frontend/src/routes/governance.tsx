@@ -42,7 +42,6 @@ function getAction(action: ActionRequiringConfirmation): string {
 const QUERY_LIMIT = 50;
 
 export const Governance: React.FC = () => {
-  console.log('[DEBUG] Governance component rendering');
   const svConfig = useSvConfig();
   const amuletName = svConfig.spliceInstanceNames.amuletName;
 
