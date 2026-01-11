@@ -324,12 +324,12 @@ class SvFrontendIntegrationTest
 
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
-          "sv1 operator can login and browse to the governance tab", {
+          "sv1 operator can login and browse to the beta governance tab", {
             go to s"http://localhost:$sv1UIPort/governance-beta"
             loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
           },
         )(
-          "sv1 can see the governance page",
+          "sv1 can see the beta governance page",
           _ => {
             eventuallySucceeds() {
               find(id("initiate-proposal-button")) should not be empty
