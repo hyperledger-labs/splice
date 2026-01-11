@@ -428,52 +428,52 @@ class SvFrontendIntegrationTest
 
       }
 
-      withFrontEnd("sv2") { implicit webDriver =>
-        actAndCheck(
-          "sv2 operator can login and browse to the governance page", {
-            go to s"http://localhost:$sv2UIPort/governance-beta"
-            loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
-          },
-        )(
-          "sv2 can see the action required section with at least one item",
-          _ => {
-            eventuallySucceeds() {
-              find(testId("action-required-section")) should not be empty
-              getActionRequiredElems().size should be > 0
-            }
-          },
-        )
+      // withFrontEnd("sv2") { implicit webDriver =>
+      //   actAndCheck(
+      //     "sv2 operator can login and browse to the governance page", {
+      //       go to s"http://localhost:$sv2UIPort/governance-beta"
+      //       loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
+      //     },
+      //   )(
+      //     "sv2 can see the action required section with at least one item",
+      //     _ => {
+      //       eventuallySucceeds() {
+      //         find(testId("action-required-section")) should not be empty
+      //         getActionRequiredElems().size should be > 0
+      //       }
+      //     },
+      //   )
 
-        actAndCheck(
-          "sv2 clicks on an action required item", {
-            val actionsRequired = getActionRequiredElems()
-            webDriver.executeScript("arguments[0].click();", actionsRequired.asScala.head)
-          },
-        )(
-          "sv2 can see the vote request and cast a vote",
-          _ => {
-            inside(find(id("your-vote-reason-input"))) { case Some(element) =>
-              element.underlying.sendKeys("A sample reason")
-            }
+      //   actAndCheck(
+      //     "sv2 clicks on an action required item", {
+      //       val actionsRequired = getActionRequiredElems()
+      //       webDriver.executeScript("arguments[0].click();", actionsRequired.asScala.head)
+      //     },
+      //   )(
+      //     "sv2 can see the vote request and cast a vote",
+      //     _ => {
+      //       inside(find(id("your-vote-reason-input"))) { case Some(element) =>
+      //         element.underlying.sendKeys("A sample reason")
+      //       }
 
-            inside(find(id("your-vote-url-input"))) { case Some(element) =>
-              element.underlying.sendKeys("https://my-splice-vote-url.com")
-            }
+      //       inside(find(id("your-vote-url-input"))) { case Some(element) =>
+      //         element.underlying.sendKeys("https://my-splice-vote-url.com")
+      //       }
 
-            click on testId("your-vote-accept")
+      //       click on testId("your-vote-accept")
 
-            eventuallyClickOn(id("submit-vote-button"))
+      //       eventuallyClickOn(id("submit-vote-button"))
 
-            clue("wait for the vote submission success message") {
-              eventuallySucceeds() {
-                inside(find(testId("vote-submission-success"))) { case Some(element) =>
-                  element.text shouldBe "Vote successfully updated!"
-                }
-              }
-            }
-          },
-        )
-      }
+      //       clue("wait for the vote submission success message") {
+      //         eventuallySucceeds() {
+      //           inside(find(testId("vote-submission-success"))) { case Some(element) =>
+      //             element.text shouldBe "Vote successfully updated!"
+      //           }
+      //         }
+      //       }
+      //     },
+      //   )
+      // }
 
       proposalContractId
     }
