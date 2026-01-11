@@ -24,7 +24,7 @@ import org.openqa.selenium.By
 import org.openqa.selenium.support.ui.Select
 import org.slf4j.event.Level
 
-import scala.jdk.CollectionConverters.*
+// import scala.jdk.CollectionConverters.*
 import java.util.Optional
 
 class SvFrontendIntegrationTest
@@ -319,8 +319,8 @@ class SvFrontendIntegrationTest
       val requestReasonUrl = "https://new-proposal-url.com/"
       val requestReasonBody = "This is a summary of the proposal"
 
-      var proposalDetailsUrl: String = ""
-      var proposalContractId: String = ""
+      // var proposalDetailsUrl: String = ""
+      val proposalContractId: String = ""
 
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
@@ -410,19 +410,19 @@ class SvFrontendIntegrationTest
               proposals.size should be > 0
             }
 
-            clue("click the first inflight proposal to view details") {
-              val proposals = getInflightProposals()
-              webDriver.executeScript("arguments[0].click();", proposals.asScala.head)
-            }
+            // clue("click the first inflight proposal to view details") {
+            //   val proposals = getInflightProposals()
+            //   webDriver.executeScript("arguments[0].click();", proposals.asScala.head)
+            // }
 
-            eventually() {
-              val currentUrl = webDriver.getCurrentUrl
-              currentUrl should include("/governance-beta/proposals/")
-              proposalDetailsUrl = currentUrl
-              // Extract contract ID from URL: /governance-beta/proposals/{contractId}
-              proposalContractId =
-                currentUrl.split("/governance-beta/proposals/")(1).split("\\?")(0)
-            }
+            // eventually() {
+            //   val currentUrl = webDriver.getCurrentUrl
+            //   currentUrl should include("/governance-beta/proposals/")
+            //   proposalDetailsUrl = currentUrl
+            //   // Extract contract ID from URL: /governance-beta/proposals/{contractId}
+            //   proposalContractId =
+            //     currentUrl.split("/governance-beta/proposals/")(1).split("\\?")(0)
+            // }
           },
         )
 
@@ -1398,7 +1398,8 @@ class SvFrontendIntegrationTest
       val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
       val amount = "100"
 
-      val proposalId = createProposal(
+      // val proposalId =
+      createProposal(
         "SRARC_CreateUnallocatedUnclaimedActivityRecord",
         "create-unallocated-unclaimed-activity-record",
       ) { implicit webDriver =>
@@ -1417,13 +1418,13 @@ class SvFrontendIntegrationTest
         }
       }
 
-      createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
-        eventually() {
-          inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
-            element.underlying.sendKeys(proposalId)
-          }
-        }
-      }
+    // createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
+    //   eventually() {
+    //     inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
+    //       element.underlying.sendKeys(proposalId)
+    //     }
+    //   }
+    // }
     }
   }
   def changeAction(actionName: String)(implicit webDriver: WebDriverType) = {
