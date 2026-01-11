@@ -1,6 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   AuthProvider,
   ErrorBoundary,
@@ -46,18 +47,24 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const refetchInterval = useConfigPollInterval();
   const navigate = useNavigate();
 
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        refetchInterval,
-        structuralSharing: replaceEqualDeep,
-      },
-    },
-  });
+  const queryClient = useMemo(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            refetchInterval,
+            structuralSharing: replaceEqualDeep,
+          },
+        },
+      }),
+    [refetchInterval]
+  );
+
+  const redirect = useCallback((path: string) => navigate(path), [navigate]);
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
+      <AuthProvider authConf={config.auth} redirect={redirect}>
         <QueryClientProvider client={queryClient}>
           <ReactQueryDevtools initialIsOpen={false} />
           <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
