@@ -1048,24 +1048,24 @@ class UpdateHistory(
   private def beforeFilters(
       migrationId: Long,
       synchronizerId: SynchronizerId,
-      beforeRecordTime: CantonTimestamp,
-      atOrAfterRecordTimeO: Option[CantonTimestamp],
+      atOrBeforeRecordTime: CantonTimestamp,
+      afterRecordTimeO: Option[CantonTimestamp],
   ): NonEmptyList[SQLActionBuilder] = {
-    atOrAfterRecordTimeO match {
+    afterRecordTimeO match {
       case None =>
         NonEmptyList.of(
           // Uses `> CantonTimestamp.MinValue` to exclude import updates
           sql"""migration_id = $migrationId and
                 domain_id = $synchronizerId and
-                record_time < $beforeRecordTime and
+                record_time <= $atOrBeforeRecordTime and
                 record_time > ${CantonTimestamp.MinValue}"""
         )
-      case Some(atOrAfterRecordTime) =>
+      case Some(afterRecordTime) =>
         NonEmptyList.of(
           sql"""migration_id = $migrationId and
                 domain_id = $synchronizerId and
-                record_time < $beforeRecordTime and
-                record_time >= ${atOrAfterRecordTime}
+                record_time <= $atOrBeforeRecordTime and
+                record_time > ${afterRecordTime}
                 """
         )
     }
@@ -1257,11 +1257,11 @@ class UpdateHistory(
   def getUpdatesBefore(
       migrationId: Long,
       synchronizerId: SynchronizerId,
-      beforeRecordTime: CantonTimestamp,
-      atOrAfterRecordTime: Option[CantonTimestamp],
+      atOrBeforeRecordTime: CantonTimestamp,
+      afterRecordTime: Option[CantonTimestamp],
       limit: PageLimit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
-    val filters = beforeFilters(migrationId, synchronizerId, beforeRecordTime, atOrAfterRecordTime)
+    val filters = beforeFilters(migrationId, synchronizerId, atOrBeforeRecordTime, afterRecordTime)
     val orderBy = sql"record_time desc"
     for {
       txs <- getTxUpdates(filters, orderBy, limit)
@@ -2160,14 +2160,14 @@ class UpdateHistory(
       override def items(
           migrationId: Long,
           synchronizerId: SynchronizerId,
-          before: CantonTimestamp,
+          atOrBefore: CantonTimestamp,
           count: Int,
       )(implicit tc: TraceContext): Future[Seq[UpdateHistoryResponse]] = {
         getUpdatesBefore(
           migrationId = migrationId,
           synchronizerId = synchronizerId,
-          beforeRecordTime = before,
-          atOrAfterRecordTime = None,
+          atOrBeforeRecordTime = atOrBefore,
+          afterRecordTime = None,
           limit = PageLimit.tryCreate(count),
         ).map(_.map(_.update))
       }

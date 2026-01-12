@@ -2092,9 +2092,9 @@ class HttpScanHandler(
         .getUpdatesBefore(
           migrationId = body.migrationId,
           synchronizerId = SynchronizerId.tryFromString(body.synchronizerId),
-          beforeRecordTime = CantonTimestamp.assertFromInstant(body.before.toInstant),
-          atOrAfterRecordTime =
-            body.atOrAfter.map(x => CantonTimestamp.assertFromInstant(x.toInstant)),
+          atOrBeforeRecordTime = CantonTimestamp.assertFromInstant(body.atOrBefore.toInstant),
+          afterRecordTime =
+            body.after.map(x => CantonTimestamp.assertFromInstant(x.toInstant)),
           limit = PageLimit.tryCreate(body.count),
         )
         .map { txs =>

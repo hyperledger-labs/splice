@@ -249,7 +249,7 @@ final class HistoryBackfilling[T](
       last <- destination.insert(migrationId, synchronizerId, items)
     } yield {
       logger.debug(
-        s"Backfilled ${items.size} items for domain ${synchronizerId} in migration ${migrationId} before record time ${backfillFrom}"
+        s"Backfilled ${items.size} items for domain ${synchronizerId} in migration ${migrationId} up to (inclusive) record time ${backfillFrom}"
       )
       last
     }

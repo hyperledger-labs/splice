@@ -92,7 +92,7 @@ class AcsSnapshotStore(
           where #$tableAlias.history_id = $historyId
             and #$tableAlias.migration_id = $migrationId
             and #$tableAlias.record_time >= $from -- this will be >= MinValue for the first snapshot, which includes ACS imports
-            and #$tableAlias.record_time < $until
+            and #$tableAlias.record_time <= $until
            """
       val statement = (sql"""
             with previous_snapshot_data as (select contract_id

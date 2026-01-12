@@ -1506,8 +1506,8 @@ object HttpScanAppClient {
   case class GetUpdatesBefore(
       migrationId: Long,
       synchronizerId: SynchronizerId,
-      before: CantonTimestamp,
-      atOrAfter: Option[CantonTimestamp],
+      atOrBefore: CantonTimestamp,
+      after: Option[CantonTimestamp],
       count: Int,
   ) extends InternalBaseCommand[
         http.GetUpdatesBeforeResponse,
@@ -1525,8 +1525,8 @@ object HttpScanAppClient {
           .GetUpdatesBeforeRequest(
             migrationId,
             synchronizerId.toProtoPrimitive,
-            before.toInstant.atOffset(java.time.ZoneOffset.UTC),
-            atOrAfter.map(_.toInstant.atOffset(java.time.ZoneOffset.UTC)),
+            atOrBefore.toInstant.atOffset(java.time.ZoneOffset.UTC),
+            after.map(_.toInstant.atOffset(java.time.ZoneOffset.UTC)),
             count,
           ),
         headers,
