@@ -3,7 +3,7 @@
 
 import { DateWithDurationDisplay } from '@lfdecentralizedtrust/splice-common-frontend';
 import { Decimal } from 'decimal.js-light';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FormControl, Stack, TextField, Typography } from '@mui/material';
 import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers';
@@ -47,6 +47,9 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
   const [mustMintBefore, setMustMintBefore] = useState<Dayjs>(dayjs());
   const [amountError, setAmountError] = useState<string | null>(null);
 
+  const summaryRef = useRef(summary);
+  summaryRef.current = summary;
+
   useEffect(() => {
     if (existing?.expiresAt) {
       setMustMintBefore(dayjs(existing.expiresAt));
@@ -65,14 +68,14 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
             value: {
               beneficiary,
               amount,
-              reason: summary,
+              reason: summaryRef.current,
               expiresAt: mustMintBefore.toISOString(),
             },
           },
         },
       });
     },
-    [chooseAction, summary]
+    [chooseAction]
   );
 
   useEffect(() => {

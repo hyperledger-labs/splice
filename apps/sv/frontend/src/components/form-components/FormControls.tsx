@@ -52,6 +52,7 @@ export const FormControls: React.FC<FormControlsProps> = props => {
             type={'submit'}
             size="large"
             disabled={!canSubmit || isSubmitting}
+            id="submit-button"
             data-testid="submit-button"
           >
             {isSubmitting ? 'Submitting' : submitTitle}
