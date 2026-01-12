@@ -1490,7 +1490,6 @@ final class DbMultiDomainAcsStore[TXE](
             insert.evt.getContractId
           }
         )
-        beforeAcs = System.nanoTime()
         insertsToDo = workTodo.collect {
           case insert: Insert
               if !insertContractIdsWithIncompleteReassignments.contains(insert.evt.getContractId) =>
@@ -1511,12 +1510,12 @@ final class DbMultiDomainAcsStore[TXE](
           case None =>
             DBIO.successful(())
         }
-        afterAcs = System.nanoTime()
-        toDelete = workTodo.collect { case Delete(exercisedEvent) =>
-          exercisedEvent
-        }
-        _ <- doDeleteContracts(toDelete, summary)
-        afterDeletes = System.nanoTime()
+        _ <- doDeleteContracts(
+          workTodo.collect { case Delete(exercisedEvent) =>
+            exercisedEvent
+          },
+          summary,
+        )
         // TODO (#3048): batch this
         _ <- DBIO.seq(txLogEntries.map { case (recordTime, (txe, offset, synchronizerId)) =>
           doIngestTxLogInsert(
@@ -1528,7 +1527,6 @@ final class DbMultiDomainAcsStore[TXE](
             summary,
           )
         }*)
-        afterTxlog = System.nanoTime()
         _ <- DBIO.seq(synchronizerIdsToMinRecordTime.toSeq.map {
           case (synchronizerId, recordTime) =>
             doInitializeFirstIngestedUpdate(
@@ -1537,16 +1535,7 @@ final class DbMultiDomainAcsStore[TXE](
               CantonTimestamp.assertFromInstant(recordTime),
             )
         }*)
-      } yield {
-        val afterAll = System.nanoTime()
-        println(s"""
-            |ACS ingestion took ${afterAcs - beforeAcs} ns for ${insertsToDo.size} inserts
-            |Deletes took ${afterDeletes - afterAcs} ns for ${toDelete.size} deletes
-            |TxLog ingestion took ${afterTxlog - afterDeletes} ns for ${txLogEntries.size} entries
-            |Initialize first ingested took ${afterAll - afterTxlog} ns
-            |""".stripMargin)
-        summary
-      }
+      } yield summary
 
       ingestUpdateAtOffset(trees.batch.last.tree.getOffset, allDbOps).map(_ => summary)
     }
