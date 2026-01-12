@@ -710,10 +710,10 @@ object SpliceConfig {
             !(conf.domains.global.sequencerNames.isDefined && conf.domains.global.threshold.isDefined &&
               conf.domains.global.sequencerNames
                 .map(x => x.length)
-                .getOrElse(0) > conf.domains.global.threshold.getOrElse(0)),
+                .getOrElse(0) >= conf.domains.global.threshold.getOrElse(0)),
             (),
             ConfigValidationFailed(
-              "Configuration error: Length of sequencerNames should be less than or equal to threshold."
+              "Configuration error: Length of sequencerNames should be greater than or equal to threshold."
             ),
           )
           _ <- Either.cond(
