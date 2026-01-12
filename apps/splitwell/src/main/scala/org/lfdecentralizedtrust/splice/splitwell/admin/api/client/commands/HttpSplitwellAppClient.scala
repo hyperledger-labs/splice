@@ -4,9 +4,11 @@
 package org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands
 
 import org.apache.pekko.http.scaladsl.model.HttpHeader
+import org.apache.pekko.stream.Materializer
 import cats.implicits.*
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
+import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.splitwell as http
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
@@ -19,11 +21,25 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
+
+import scala.concurrent.ExecutionContext
 
 object HttpSplitwellAppClient {
-  import http.SplitwellClient as Client
-  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result, Client] {
-    override val createGenClientFn = (fn, host, ec, mat) => Client.httpClient(fn, host)(ec, mat)
+
+  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = http.SplitwellClient
+
+    def createClient(host: String)(implicit
+        httpClient: HttpClient,
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client =
+      http.SplitwellClient.httpClient(
+        HttpClientBuilder().buildClient(),
+        host,
+      )
   }
 
   case class ListGroups(party: PartyId)

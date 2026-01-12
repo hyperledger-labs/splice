@@ -11,8 +11,8 @@ trait HttpCommandRunner {
   /** Run an HTTP command and return its result.
     * HTTP variant of Canton’s AdminCommandRunner.
     */
-  protected[console] def httpCommand[Res, Result, Client](
-      httpCommand: HttpCommand[Res, Result, Client],
+  protected[console] def httpCommand[Result](
+      httpCommand: HttpCommand[?, Result],
       basePath: Option[String] = None,
   ): ConsoleCommandResult[Result]
 }

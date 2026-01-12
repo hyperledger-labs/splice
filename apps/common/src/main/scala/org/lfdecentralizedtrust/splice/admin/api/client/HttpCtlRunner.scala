@@ -25,9 +25,9 @@ class HttpCtlRunner(
     val loggerFactory: NamedLoggerFactory
 ) extends NamedLogging {
 
-  def run[Res, Result, Client](
+  def run[Res, Result](
       host: String,
-      command: HttpCommand[Res, Result, Client],
+      command: HttpCommand[Res, Result],
       headers: List[HttpHeader],
   )(implicit
       templateDecoder: TemplateJsonDecoder,
@@ -37,7 +37,7 @@ class HttpCtlRunner(
       mat: Materializer,
   ): EitherT[Future, String, Result] = {
 
-    val client: Client = command.createClient(host)
+    val client: command.Client = command.createClient(host)
 
     for {
       response <- command

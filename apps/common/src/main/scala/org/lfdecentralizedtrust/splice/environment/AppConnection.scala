@@ -56,9 +56,9 @@ abstract class BaseAppConnection(
       Future.successful,
     )
 
-  protected def runHttpCmd[Res, Result, Client](
+  protected def runHttpCmd[Res, Result](
       url: Uri,
-      command: HttpCommand[Res, Result, Client],
+      command: HttpCommand[Res, Result],
       headers: List[HttpHeader] = List.empty[HttpHeader],
   )(implicit
       templateDecoder: TemplateJsonDecoder,
@@ -67,7 +67,7 @@ abstract class BaseAppConnection(
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[Result] = {
-    val client: Client = command.createClient(url.toString())
+    val client: command.Client = command.createClient(url.toString())
     for {
       response <- EitherTUtil.toFuture(
         command.submitRequest(client, tc.propagate(headers)).leftMap[Throwable] {

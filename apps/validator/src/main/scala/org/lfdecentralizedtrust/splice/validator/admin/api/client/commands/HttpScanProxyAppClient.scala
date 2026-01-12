@@ -5,9 +5,12 @@ package org.lfdecentralizedtrust.splice.validator.admin.api.client.commands
 
 import cats.data.EitherT
 import cats.syntax.either.*
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scanproxy as scanProxy}
 import org.lfdecentralizedtrust.splice.http.v0.scanproxy.{GetDsoPartyIdResponse, ScanproxyClient}
 import org.lfdecentralizedtrust.splice.util.{Codec, ContractWithState, TemplateJsonDecoder}
@@ -15,13 +18,22 @@ import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommandCounter
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 object HttpScanProxyAppClient {
-  import scanProxy.ScanproxyClient as Client
-  abstract class ScanProxyBaseCommand[Res, Result] extends HttpCommand[Res, Result, Client] {
-    val createGenClientFn = (fn, host, ec, mat) => Client.httpClient(fn, host)(ec, mat)
-    override val nonErrorStatusCodes = Set(StatusCodes.NotFound)
+
+  abstract class ScanProxyBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = scanProxy.ScanproxyClient
+
+    def createClient(host: String)(implicit
+        httpClient: HttpClient,
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client = scanProxy.ScanproxyClient.httpClient(
+      HttpClientBuilder().buildClient(Set(StatusCodes.NotFound)),
+      host,
+    )
   }
 
   case object GetDsoParty extends ScanProxyBaseCommand[scanProxy.GetDsoPartyIdResponse, PartyId] {

@@ -34,10 +34,11 @@ import org.lfdecentralizedtrust.tokenstandard.{metadata, transferinstruction}
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
+import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
-  allocationinstructionv1,
   allocationv1,
+  allocationinstructionv1,
   transferinstructionv1,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommandCounter
@@ -504,7 +505,8 @@ abstract class ValidatorAppReference(
 final class ValidatorAppBackendReference(
     override val consoleEnvironment: SpliceConsoleEnvironment,
     name: String,
-) extends ValidatorAppReference(consoleEnvironment, name)
+)(implicit actorSystem: ActorSystem)
+    extends ValidatorAppReference(consoleEnvironment, name)
     with AppBackendReference
     with BaseInspection[ValidatorApp] {
 
@@ -562,6 +564,14 @@ final class ValidatorAppBackendReference(
   @Help.Summary("Return local validator app config")
   override def config: ValidatorAppBackendConfig =
     consoleEnvironment.environment.config.validatorsByString(name)
+
+  /** Remote participant this validator app is configured to interact with. */
+  lazy val participantClient =
+    new ParticipantClientReference(
+      consoleEnvironment,
+      s"remote participant for `$name`",
+      config.participantClient.getParticipantClientConfig(),
+    )
 
   /** Remote participant this validator app is configured to interact with. Uses admin tokens to bypass auth. */
   val participantClientWithAdminToken =

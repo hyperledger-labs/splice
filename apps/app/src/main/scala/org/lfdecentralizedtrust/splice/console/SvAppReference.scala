@@ -38,6 +38,7 @@ import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import org.apache.pekko.actor.ActorSystem
 
 import scala.jdk.OptionConverters.*
 import java.time.Instant
@@ -282,7 +283,8 @@ final case class SvAppClientReference(
 class SvAppBackendReference(
     override val consoleEnvironment: SpliceConsoleEnvironment,
     name: String,
-) extends SvAppReference(consoleEnvironment, name)
+)(implicit actorSystem: ActorSystem)
+    extends SvAppReference(consoleEnvironment, name)
     with AppBackendReference
     with BaseInspection[SvApp] {
 
@@ -400,6 +402,14 @@ class SvAppBackendReference(
     consoleEnvironment.run {
       httpCommand(HttpSvOperatorAppClient.GetMediatorNodeStatus())
     }
+
+  /** Remote participant this sv app is configured to interact with. */
+  lazy val participantClient =
+    new ParticipantClientReference(
+      consoleEnvironment,
+      s"remote participant for `$name``",
+      config.participantClient.getParticipantClientConfig(),
+    )
 
   /** Remote participant this sv app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val participantClientWithAdminToken =

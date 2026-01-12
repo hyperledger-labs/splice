@@ -4,10 +4,11 @@
 package org.lfdecentralizedtrust.splice.sv.admin.api.client.commands
 
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
+import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.implicits.toTraverseOps
 import cats.syntax.either.*
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.amuletprice.AmuletPriceVote
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
@@ -18,21 +19,33 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding as vo
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.environment.SpliceStatus
+import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv_operator as http}
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboarding
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 object HttpSvOperatorAppClient {
-  import http.SvOperatorClient as Client
-  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result, Client] {
-    val createGenClientFn = (fn, host, ec, mat) => Client.httpClient(fn, host)(ec, mat)
+  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = http.SvOperatorClient
+
+    def createClient(host: String)(implicit
+        httpClient: HttpClient,
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client =
+      http.SvOperatorClient.httpClient(
+        HttpClientBuilder().buildClient(),
+        host,
+      )
   }
 
   case object ListOngoingValidatorOnboardings

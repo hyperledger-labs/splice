@@ -29,7 +29,7 @@ class HttpServerMetrics(metricsFactory: LabeledMetricsFactory) {
   private val inFlightRequests = metricsFactory.counter(
     MetricInfo(
       name = prefix :+ "requests" :+ "inflight",
-      summary = "Count of in-flight http requests",
+      summary = "Histogram for http request durations",
       qualification = Latency,
       labelsWithDescription = Map(
         "operation" -> "Descriptor of the HTTP operation done, as per the OpenAPI spec"

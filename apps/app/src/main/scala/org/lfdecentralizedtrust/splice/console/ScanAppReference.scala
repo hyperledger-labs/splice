@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.console
 
+import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
@@ -723,7 +724,8 @@ abstract class ScanAppReference(
 final class ScanAppBackendReference(
     override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
     name: String,
-) extends ScanAppReference(spliceConsoleEnvironment, name)
+)(implicit actorSystem: ActorSystem)
+    extends ScanAppReference(spliceConsoleEnvironment, name)
     with AppBackendReference
     with BaseInspection[ScanApp] {
 
@@ -744,6 +746,14 @@ final class ScanAppBackendReference(
   @Help.Summary("Return local scan app config")
   override def config: ScanAppBackendConfig =
     spliceConsoleEnvironment.environment.config.scansByString(name)
+
+  /** Remote participant this scan app is configured to interact with. */
+  lazy val participantClient =
+    new ParticipantClientReference(
+      spliceConsoleEnvironment,
+      s"remote participant for `$name``",
+      config.participantClient.getParticipantClientConfig(),
+    )
 
   /** Remote participant this scan app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val participantClientWithAdminToken =

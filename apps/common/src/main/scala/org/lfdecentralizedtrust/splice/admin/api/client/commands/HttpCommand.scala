@@ -4,13 +4,16 @@
 package org.lfdecentralizedtrust.splice.admin.api.client.commands
 
 import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import org.lfdecentralizedtrust.splice.http.HttpClient
+import io.circe.parser.*
 
 import scala.concurrent.{ExecutionContext, Future}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
+import com.digitalasset.canton.tracing.TraceContext
 
 case class HttpCommandException(
     request: HttpRequest,
@@ -37,40 +40,16 @@ object HttpCommandException {
 /** Equivalent of Canton’s AdminCommand but for our
   * native HTTP APIs.
   */
-trait HttpCommand[Res, Result, C] {
-  type Client = C
+trait HttpCommand[Res, Result] {
 
-  lazy val fullName: String = {
-    // not using getClass.getSimpleName because it ignores the hierarchy of nested classes, and it also throws unexpected exceptions
-    getClass.getName.split('.').last.replace("$", ".").stripSuffix(".")
-  }
-
-  lazy val clientName: String = {
-    fullName.split('.').headOption.getOrElse("UnknownClient")
-  }
-
-  lazy val operationName: String = {
-    fullName.split('.').lastOption.getOrElse("UnknownOperation")
-  }
-
-  def nonErrorStatusCodes: Set[StatusCode] = Set.empty
-
-  /** Must return a constructor (function) for the specific guardrails HTTP client * */
-  protected def createGenClientFn
-      : (HttpRequest => Future[HttpResponse], String, ExecutionContext, Materializer) => Client
+  type Client
 
   def createClient(host: String)(implicit
       httpClient: HttpClient,
+      tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
-  ): Client = createGenClientFn(httpClientFn(), host, ec, mat)
-
-  def httpClientFn()(implicit
-      httpClient: HttpClient,
-      ec: ExecutionContext,
-      mat: Materializer,
-  ): HttpRequest => Future[HttpResponse] =
-    HttpClient.createHttpFn(clientName, operationName, nonErrorStatusCodes)
+  ): Client
 
   def submitRequest(
       client: Client,
@@ -88,10 +67,19 @@ trait HttpCommand[Res, Result, C] {
       decoder: TemplateJsonDecoder
   ): PartialFunction[Res, Either[String, Result]]
 
-  private[splice] final def withRawResponse: HttpCommand[Res, Res, C] = {
+  private[splice] final def withRawResponse
+      : HttpCommand[Res, Res] { type Client = HttpCommand.this.Client } = {
     val self: this.type = this
-    new HttpCommand[Res, Res, C] {
-      override val createGenClientFn = self.createGenClientFn
+    new HttpCommand[Res, Res] {
+      type Client = self.Client
+
+      override def createClient(host: String)(implicit
+          httpClient: HttpClient,
+          tc: TraceContext,
+          ec: ExecutionContext,
+          mat: Materializer,
+      ) = self.createClient(host)
+
       override def submitRequest(
           client: Client,
           headers: List[HttpHeader],
@@ -101,7 +89,77 @@ trait HttpCommand[Res, Result, C] {
           decoder: TemplateJsonDecoder
       ) = { case res => Right(res) }
 
-      override lazy val operationName: String = self.operationName
+      override def fullName = self.fullName
     }
+  }
+
+  def fullName: String =
+    // not using getClass.getSimpleName because it ignores the hierarchy of nested classes, and it also throws unexpected exceptions
+    getClass.getName.split('.').last.replace("$", ".")
+
+}
+
+object HttpClientBuilder {
+  def apply()(implicit
+      httpClient: HttpClient,
+      ec: ExecutionContext,
+      mat: Materializer,
+  ) =
+    new HttpClientBuilder()
+}
+
+final class HttpClientBuilder()(implicit
+    httpClient: HttpClient,
+    ec: ExecutionContext,
+    mat: Materializer,
+) {
+  private def getApiErrorFromResponse(
+      request: HttpRequest,
+      response: HttpResponse,
+  ): Future[HttpCommandException] = {
+    Unmarshal(response)
+      .to[String]
+      .map { body =>
+        val decoded = for {
+          parsed <- parse(body)
+          errorResponse <- parsed.as[ErrorResponse]
+        } yield errorResponse
+
+        // Fallback to original response string if deserializing to ErrorResponse fails
+        decoded.fold[HttpCommandException.ResponseBody](
+          _ => HttpCommandException.RawResponse(body),
+          HttpCommandException.ErrorResponseBody(_),
+        )
+      }
+      .map { errorMessage => HttpCommandException(request, response.status, errorMessage) }
+  }
+
+  private def httpClientWithErrors(
+      nextClient: HttpRequest => Future[HttpResponse],
+      errors: PartialFunction[StatusCode, Unit],
+  )(
+      req: HttpRequest
+  ) = {
+    nextClient(req).flatMap { _resp =>
+      errors
+        .andThen(_ =>
+          getApiErrorFromResponse(req, _resp).flatMap { error =>
+            Future.failed[HttpResponse](error)
+          }
+        )
+        .applyOrElse(_resp.status, (_: StatusCode) => Future.successful(_resp))
+    }
+  }
+
+  def buildClient(
+      nonErrorStatusCode: Set[StatusCode] = Set.empty
+  ): HttpRequest => Future[HttpResponse] = {
+    httpClientWithErrors(
+      httpClient.executeRequest,
+      {
+        case code @ (StatusCodes.ServerError(_) | StatusCodes.ClientError(_))
+            if !nonErrorStatusCode.contains(code) =>
+      },
+    )
   }
 }

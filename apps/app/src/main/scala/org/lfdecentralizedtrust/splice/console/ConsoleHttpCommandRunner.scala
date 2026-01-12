@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.console
 
-import com.digitalasset.canton.config.ConsoleCommandTimeout
+import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
 import com.digitalasset.canton.console.{
   CommandErrors,
   ConsoleCommandResult,
@@ -17,6 +17,7 @@ import org.apache.pekko.http.scaladsl.model.HttpHeader
 import org.lfdecentralizedtrust.splice.admin.api.client.HttpCtlRunner
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpCommand, HttpCommandException}
 import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
+import org.lfdecentralizedtrust.splice.environment.SpliceEnvironment
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
@@ -25,23 +26,25 @@ import scala.concurrent.{ExecutionContextExecutor, TimeoutException}
 /** HTTP version of Canton’s GrpcAdminCommandRunner
   */
 class ConsoleHttpCommandRunner(
+    environment: SpliceEnvironment,
     commandTimeouts: ConsoleCommandTimeout,
-    override val loggerFactory: NamedLoggerFactory,
-)(implicit
-    tracer: Tracer,
-    templateDecoder: TemplateJsonDecoder,
-    httpClient: HttpClient,
-    ec: ExecutionContextExecutor,
-    as: ActorSystem,
-) extends NamedLogging
+    requestTimeout: NonNegativeDuration,
+)(implicit tracer: Tracer, templateDecoder: TemplateJsonDecoder)
+    extends NamedLogging
     with Spanning {
+
+  private implicit val executionContext: ExecutionContextExecutor =
+    environment.executionContext
+  private implicit val actorSystem: ActorSystem = environment.actorSystem
+  override val loggerFactory: NamedLoggerFactory = environment.loggerFactory
+
   private val httpRunner = new HttpCtlRunner(
     loggerFactory
   )
 
   def runCommand[Result](
       instanceName: String,
-      command: HttpCommand[?, Result, ?],
+      command: HttpCommand[?, Result],
       headers: List[HttpHeader],
       clientConfig: NetworkAppClientConfig,
   ): ConsoleCommandResult[Result] =
@@ -53,6 +56,9 @@ class ConsoleHttpCommandRunner(
         traceContext
       )
       val commandTimeout = commandTimeouts.bounded
+
+      implicit val httpClient: HttpClient =
+        HttpClient(HttpClient.HttpRequestParameters(requestTimeout), logger)
 
       val url = clientConfig.url
       try {

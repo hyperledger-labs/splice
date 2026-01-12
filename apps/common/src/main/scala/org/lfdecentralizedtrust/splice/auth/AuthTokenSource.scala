@@ -11,7 +11,6 @@ import org.lfdecentralizedtrust.splice.config.AuthTokenSourceConfig
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.http.HttpClientMetrics
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
@@ -89,12 +88,11 @@ case class AuthTokenSourceOAuthClientCredentials(
     audience: String,
     scope: Option[String],
     requestTimeout: NonNegativeDuration,
-    httpClientMetrics: HttpClientMetrics,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, ac: ActorSystem)
     extends AuthTokenSource
     with NamedLogging {
-  private val oauth = new OAuthApi(requestTimeout, httpClientMetrics, loggerFactory)
+  private val oauth = new OAuthApi(requestTimeout, loggerFactory)
 
   override def getToken(implicit tc: TraceContext): Future[Option[AuthToken]] = {
     for {
@@ -115,7 +113,6 @@ case class AuthTokenSourceOAuthClientCredentials(
 object AuthTokenSource {
   def fromConfig(
       config: AuthTokenSourceConfig,
-      httpClientMetrics: HttpClientMetrics,
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext, ac: ActorSystem): AuthTokenSource = config match {
     case AuthTokenSourceConfig.None() =>
@@ -137,7 +134,6 @@ object AuthTokenSource {
         wellKnownConfigUrl = wellKnownConfigUrl,
         clientId = clientId,
         clientSecret = clientSecret,
-        httpClientMetrics = httpClientMetrics,
         loggerFactory = loggerFactory,
         audience = audience,
         scope = scope,

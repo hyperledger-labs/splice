@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.console
 
+import org.apache.pekko.actor.ActorSystem
 import com.daml.ledger.api.v2.CommandsOuterClass
 import com.daml.ledger.javaapi.data.codegen.Update
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
@@ -28,10 +29,8 @@ import com.digitalasset.canton.console.{
   LedgerApiCommandRunner,
 }
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 
-import scala.concurrent.{Await, ExecutionContext}
-import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 
 /** Splitwell app reference. Defines the console commands that can be run against either a client or backend splitwell reference.
@@ -79,26 +78,22 @@ final class SplitwellAppClientReference(
     override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
     name: String,
     val config: SplitwellAppClientConfig, // adding this explicitly for easier overriding
-) extends SplitwellAppReference(spliceConsoleEnvironment, name) {
+)(implicit actorSystem: ActorSystem)
+    extends SplitwellAppReference(spliceConsoleEnvironment, name) {
   private val acceptDuration = new RelTime(
     60_000_000
   )
+
   override protected val instanceType = "Splitwell Client"
 
   override def httpClientConfig = config.adminApi
 
-  implicit val ec: ExecutionContext = executionContext
   override lazy val ledgerApi: com.digitalasset.canton.console.ExternalLedgerApiClient =
     new ExternalLedgerApiClient(
       config.participantClient.ledgerApi.clientConfig.address,
       config.participantClient.ledgerApi.clientConfig.port,
       config.participantClient.ledgerApi.clientConfig.tls,
-      Await.result(
-        spliceConsoleEnvironment.httpClient
-          .getToken(config.participantClient.ledgerApi.authConfig)
-          .map(_.map(_.accessToken)),
-        30.seconds,
-      ),
+      config.participantClient.ledgerApi.getToken().map(_.accessToken),
     )(consoleEnvironment)
 
   val userId: String = config.ledgerApiUser
@@ -474,7 +469,8 @@ final class SplitwellAppClientReference(
 final class SplitwellAppBackendReference(
     override val consoleEnvironment: SpliceConsoleEnvironment,
     name: String,
-) extends SplitwellAppReference(consoleEnvironment, name)
+)(implicit actorSystem: ActorSystem)
+    extends SplitwellAppReference(consoleEnvironment, name)
     with AppBackendReference
     with BaseInspection[SplitwellApp] {
 
@@ -511,6 +507,14 @@ final class SplitwellAppBackendReference(
     consoleEnvironment.environment.config.splitwellsByString(name)
 
   override val scanClientConfig = config.scanClient
+
+  /** Remote participant this splitwell app is configured to interact with. */
+  lazy val participantClient =
+    new ParticipantClientReference(
+      consoleEnvironment,
+      s"remote participant for `$name``",
+      config.participantClient.getParticipantClientConfig(),
+    )
 
   /** Remote participant this splitwell app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val participantClientWithAdminToken =
