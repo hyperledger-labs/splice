@@ -173,9 +173,11 @@ class DomainConnector(
                     case Some(allowedNames) =>
                       SequencerConnections.tryMany(
                         nonEmptyConnections.forgetNE,
-                        config.domains.global.threshold.getOrElse(
-                          Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size)
-                        ),
+                        config.domains.global.threshold
+                          .map(com.digitalasset.canton.config.RequireTypes.PositiveInt.tryCreate)
+                          .getOrElse(
+                            Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size)
+                          ),
                         submissionRequestAmplification = SubmissionRequestAmplification(
                           Thresholds.sequencerSubmissionRequestAmplification(
                             nonEmptyConnections.size
