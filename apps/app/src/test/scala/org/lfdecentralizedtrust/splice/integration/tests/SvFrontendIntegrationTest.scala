@@ -1378,8 +1378,7 @@ class SvFrontendIntegrationTest
     // }
 
     "NEW UI: Two failing proposals" in { implicit env =>
-      // val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-      val beneficiary = "sv-3"
+      val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
       val amount = "101"
 
       // val proposalId =
@@ -1387,28 +1386,17 @@ class SvFrontendIntegrationTest
         "SRARC_CreateUnallocatedUnclaimedActivityRecord",
         "create-unallocated-unclaimed-activity-record",
       ) { implicit webDriver =>
-        eventually() {
-          inside(find(id("create-unallocated-unclaimed-activity-record-beneficiary"))) {
-            case Some(element) =>
-              element.underlying.sendKeys(beneficiary)
-          }
-        }
-
-        eventually() {
-          inside(find(id("create-unallocated-unclaimed-activity-record-amount"))) {
-            case Some(element) =>
-              element.underlying.sendKeys(amount)
-          }
-        }
+        fillOutTextField("create-unallocated-unclaimed-activity-record-beneficiary", beneficiary)
+        fillOutTextField("create-unallocated-unclaimed-activity-record-amount", amount)
       }
 
-      // createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
-      //   eventually() {
-      //     inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
-      //       element.underlying.sendKeys(proposalId)
-      //     }
-      //   }
-      // }
+    // createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
+    //   eventually() {
+    //     inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
+    //       element.underlying.sendKeys(proposalId)
+    //     }
+    //   }
+    // }
     }
   }
   def changeAction(actionName: String)(implicit webDriver: WebDriverType) = {
@@ -1457,6 +1445,21 @@ class SvFrontendIntegrationTest
     forExactly(1, rows) { row =>
       seleniumText(row.childElement(className("sv-party"))) shouldBe svParty.toProtoPrimitive
       row.childElement(className("amulet-price")).text shouldBe amuletPrice
+    }
+  }
+
+  /** Fills a text field by chunking the input string to avoid React re-render issues.
+    * Long strings typed character-by-character cause too many re-renders.
+    */
+  def fillOutTextField(elementId: String, text: String, chunkSize: Int = 4)(implicit
+      webDriver: WebDriverType
+  ): Unit = {
+    eventually() {
+      inside(find(id(elementId))) { case Some(element) =>
+        text.grouped(chunkSize).foreach { chunk =>
+          element.underlying.sendKeys(chunk)
+        }
+      }
     }
   }
 
