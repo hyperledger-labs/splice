@@ -86,7 +86,7 @@ export function deployGCPodReaper(
           {
             apiGroups: [''], // Core API group for Pods
             resources: ['pods'],
-            verbs: ['list', 'create', 'delete', 'update'],
+            verbs: ['list', 'create', 'delete', 'update', 'get'],
           },
         ],
       },
