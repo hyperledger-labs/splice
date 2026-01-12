@@ -797,8 +797,6 @@ object CompactJsonScanHttpEncodings {
   def apply() = new CompactJsonScanHttpEncodings(RemoveFieldLabels.value, RemoveFieldLabels.record)
 }
 
-
-
 // A lossless, but harder to process, encoding. Should be used only for backfilling Scan.
 case object ProtobufJsonScanHttpEncodings extends ScanHttpEncodings {
   import org.lfdecentralizedtrust.splice.util.ValueJsonCodecProtobuf
