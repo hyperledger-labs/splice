@@ -123,7 +123,7 @@ abstract class StoreIngestionPerformanceTest(
       )
       .zipWithIndex
       .runWith(Sink.foreachAsync(parallelism = 1) { case (batch, index) =>
-        println(s"Ingesting batch $index of ${batch.length} elements")
+        logger.info(s"Ingesting batch $index of ${batch.length} elements")
         val before = System.nanoTime()
         store.multiDomainAcsStore.ingestionSink
           .ingestUpdateBatch(NonEmptyList.fromListUnsafe(batch))
@@ -134,7 +134,7 @@ abstract class StoreIngestionPerformanceTest(
             totalItems += batch.length
             totalBatches += 1
             val avg = totalTime / totalItems
-            println(
+            logger.info(
               f"Ingested batch $index (${batch.length} elements) in $duration ns, average per-item time: $avg%.2f ns over $totalItems records, total time: $totalTime ns"
             )
           }
