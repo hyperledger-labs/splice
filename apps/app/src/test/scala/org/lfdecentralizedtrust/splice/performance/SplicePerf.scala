@@ -1,6 +1,8 @@
 package org.lfdecentralizedtrust.splice.performance
 
 import cats.syntax.all.*
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import com.monovore.decline.*
@@ -28,6 +30,7 @@ object SplicePerfImpl {
     implicit val loggerFactory: NamedLoggerFactory = NamedLoggerFactory.root
     implicit val as: ActorSystem = ActorSystem("PerformanceRunner")
     implicit val tc: TraceContext = TraceContext.empty
+    implicit val metricsFactory: LabeledMetricsFactory = NoOpMetricsFactory
 
     def run(runnable: Runnable): Unit = {
       try {
