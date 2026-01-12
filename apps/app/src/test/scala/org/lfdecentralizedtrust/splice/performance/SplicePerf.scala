@@ -6,6 +6,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.monovore.decline.*
 import org.apache.pekko.actor.ActorSystem
 
+import java.nio.file.Paths
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.TimeUnit
@@ -56,7 +57,7 @@ object SplicePerfImpl {
             Opts
               .option[String]("write-path", "Path to write the updates to", "w")
               .map(
-                java.nio.file.Paths.get(_)
+                Paths.get(_)
               ),
             Opts
               .option[String](
@@ -89,7 +90,7 @@ object SplicePerfImpl {
               Opts
                 .option[String]("write-path", "Path to write the ACS snapshot to", "w")
                 .map(
-                  java.nio.file.Paths.get(_)
+                  Paths.get(_)
                 ),
               Opts
                 .option[String](
@@ -118,9 +119,18 @@ object SplicePerfImpl {
                   "Name of the test to run (supports globbing)",
                   "t",
                 ),
-              Opts.option[String]("config-path", "Path to the config file", "c"),
-            ).mapN { (testNames, configPath) =>
-              run(new TestRunner(testNames, configPath))
+              Opts
+                .option[String]("config-path", "Path to the config file", "c")
+                .map(
+                  Paths.get(_)
+                ),
+              Opts
+                .option[String]("dump-path", "Path to the update history dump file", "d")
+                .map(
+                  Paths.get(_)
+                ),
+            ).mapN { (testNames, configPath, dumpPath) =>
+              run(new TestRunner(testNames, configPath, dumpPath))
             }
           )
         )
