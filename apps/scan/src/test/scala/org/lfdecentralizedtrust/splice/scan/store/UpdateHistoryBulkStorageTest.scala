@@ -9,9 +9,19 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
-import org.lfdecentralizedtrust.splice.scan.store.bulk.{BulkStorageConfig, Result, UpdateHistoryBulkStorage}
+import org.lfdecentralizedtrust.splice.scan.store.bulk.{
+  BulkStorageConfig,
+  Result,
+  UpdateHistorySegmentBulkStorage,
+}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
-import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest, TreeUpdateWithMigrationId, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
+  Limit,
+  StoreTest,
+  TreeUpdateWithMigrationId,
+  UpdateHistory,
+}
 import org.scalatest.concurrent.PatienceConfiguration
 import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
@@ -39,17 +49,15 @@ class UpdateHistoryBulkStorageTest
         val segmentSize = 2200L
         val mockStore = new MockUpdateHistoryStore(initialStoreSize)
         val bucketConnection = getS3BucketConnection(loggerFactory)
-        val bulkStorage = new UpdateHistoryBulkStorage(
+        val segment = new UpdateHistorySegmentBulkStorage(
           bulkStorageTestConfig,
           mockStore.store,
           bucketConnection,
-          loggerFactory,
-        )
-        val segment = bulkStorage.UpdateHistorySegmentBulkStorage(
           0,
           CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(0)),
           0,
           CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentSize)),
+          loggerFactory,
         )
         clue(
           "Start reading updates, should push 1000 updates, and not be ready for the next 1000"
