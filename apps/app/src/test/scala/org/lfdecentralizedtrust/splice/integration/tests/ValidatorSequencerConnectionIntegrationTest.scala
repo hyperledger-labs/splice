@@ -39,7 +39,8 @@ class ValidatorSequencerConnectionIntegrationTest
             c.copy(
               domains = c.domains.copy(
                 global = c.domains.global.copy(
-                  sequencerNames = Some(NonEmptyList.of(getSvName(1), getSvName(2)))
+                  sequencerNames = Some(NonEmptyList.of(getSvName(1), getSvName(2), getSvName(3))),
+                  threshold = Some(2),
                 )
               ),
               automation =
@@ -67,7 +68,8 @@ class ValidatorSequencerConnectionIntegrationTest
 
       val sv1Url = getPublicSequencerUrl(sv1Backend)
       val sv2InitialUrl = getPublicSequencerUrl(sv2Backend)
-      val initialExpectedUrls = Set(sv1Url, sv2InitialUrl)
+      val sv3Url = getPublicSequencerUrl(sv3Backend)
+      val initialExpectedUrls = Set(sv1Url, sv2InitialUrl, sv3Url)
 
       withClue("Validator should connect to the filtered list of sequencers from the config") {
         eventually(60.seconds, 1.second) {
@@ -76,6 +78,12 @@ class ValidatorSequencerConnectionIntegrationTest
             globalSyncAlias,
           )
           connectedUrls shouldBe initialExpectedUrls
+
+          val currentThreshold = getSequencerTrustThreshold(
+            aliceValidatorBackend.participantClientWithAdminToken,
+            globalSyncAlias,
+          )
+          currentThreshold shouldBe 2
         }
       }
       val newSv2Address = "localhost:19108"
@@ -106,6 +114,18 @@ class ValidatorSequencerConnectionIntegrationTest
   private def getPublicSequencerUrl(sv: SvAppBackendReference): String = {
     val fullUrl = sv.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
     Uri(fullUrl).authority.toString()
+  }
+
+  private def getSequencerTrustThreshold(
+      participantConnection: ParticipantClientReference,
+      synchronizerAlias: SynchronizerAlias,
+  ): Int = {
+    participantConnection.synchronizers
+      .config(synchronizerAlias)
+      .value
+      .sequencerConnections
+      .sequencerTrustThreshold
+      .unwrap
   }
 
   private def getSequencerPublicUrls(
