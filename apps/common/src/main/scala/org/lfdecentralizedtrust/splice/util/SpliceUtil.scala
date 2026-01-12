@@ -225,7 +225,7 @@ object SpliceUtil {
     Some(damlDecimal(2.85)).toJava,
 
     // developmentFundPercentage
-    Optional.empty(),
+    Some(damlDecimal(0.05)).toJava,
   )
 
   private def hours(h: Long): RelTime = new RelTime(TimeUnit.HOURS.toMicros(h))
