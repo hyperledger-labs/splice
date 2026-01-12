@@ -312,7 +312,7 @@ class SvFrontendIntegrationTest
     }
 
     def createProposal(action: String, formPrefix: String)(
-        // extraFormOps: WebDriverType => Unit
+        extraFormOps: WebDriverType => Unit
     )(implicit
         env: SpliceTestConsoleEnvironment
     ): String = clue(s"Creating proposal: $action") {
@@ -370,7 +370,7 @@ class SvFrontendIntegrationTest
         actAndCheck(
           "sv1 operator can create a new proposal", {
             // Fill in the action-specific form fields first
-            // extraFormOps(webDriver)
+            extraFormOps(webDriver)
 
             // eventually() {
             //   inside(find(id(s"$formPrefix-summary"))) { case Some(element) =>
@@ -1378,37 +1378,36 @@ class SvFrontendIntegrationTest
     // }
 
     "NEW UI: Two failing proposals" in { implicit env =>
-      // val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-      // val amount = "100"
+      val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+      val amount = "100"
 
       // val proposalId =
       createProposal(
         "SRARC_CreateUnallocatedUnclaimedActivityRecord",
         "create-unallocated-unclaimed-activity-record",
-      )()
-      // { implicit webDriver =>
-      //   eventually() {
-      //     inside(find(id("create-unallocated-unclaimed-activity-record-beneficiary"))) {
-      //       case Some(element) =>
-      //         element.underlying.sendKeys(beneficiary)
-      //     }
-      //   }
+      ) { implicit webDriver =>
+        eventually() {
+          inside(find(id("create-unallocated-unclaimed-activity-record-beneficiary"))) {
+            case Some(element) =>
+              element.underlying.sendKeys(beneficiary)
+          }
+        }
 
-      //   eventually() {
-      //     inside(find(id("create-unallocated-unclaimed-activity-record-amount"))) {
-      //       case Some(element) =>
-      //         element.underlying.sendKeys(amount)
-      //     }
-      //   }
-      // }
+        eventually() {
+          inside(find(id("create-unallocated-unclaimed-activity-record-amount"))) {
+            case Some(element) =>
+              element.underlying.sendKeys(amount)
+          }
+        }
+      }
 
-      // createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
-      //   eventually() {
-      //     inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
-      //       element.underlying.sendKeys(proposalId)
-      //     }
-      //   }
-      // }
+    // createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
+    //   eventually() {
+    //     inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
+    //       element.underlying.sendKeys(proposalId)
+    //     }
+    //   }
+    // }
     }
   }
   def changeAction(actionName: String)(implicit webDriver: WebDriverType) = {
