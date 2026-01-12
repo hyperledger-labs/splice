@@ -702,7 +702,8 @@ lazy val `splice-amulet-daml` =
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-featured-app-v1-daml` / Compile / damlBuild).value,
+          (`splice-api-featured-app-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-credential-registry-v1-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
