@@ -2201,7 +2201,7 @@ object HttpScanAppClient {
       )
       .setSynchronizerId(disclosedContract.synchronizerId)
       .setTemplateId(
-        CompactJsonScanHttpEncodings.parseTemplateId(disclosedContract.templateId).toProto
+        CompactJsonScanHttpEncodings().parseTemplateId(disclosedContract.templateId).toProto
       )
       .build()
   }
@@ -2219,7 +2219,7 @@ object HttpScanAppClient {
       )
       .setSynchronizerId(disclosedContract.synchronizerId)
       .setTemplateId(
-        CompactJsonScanHttpEncodings.parseTemplateId(disclosedContract.templateId).toProto
+        CompactJsonScanHttpEncodings().parseTemplateId(disclosedContract.templateId).toProto
       )
       .build()
   }
@@ -2237,7 +2237,7 @@ object HttpScanAppClient {
       )
       .setSynchronizerId(disclosedContract.synchronizerId)
       .setTemplateId(
-        CompactJsonScanHttpEncodings.parseTemplateId(disclosedContract.templateId).toProto
+        CompactJsonScanHttpEncodings().parseTemplateId(disclosedContract.templateId).toProto
       )
       .build()
   }

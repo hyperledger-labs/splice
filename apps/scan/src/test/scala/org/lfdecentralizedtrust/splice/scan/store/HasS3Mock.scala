@@ -4,7 +4,7 @@ import com.digitalasset.canton.{BaseTest, FutureHelpers}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.github.luben.zstd.ZstdDirectBufferDecompressingStream
 import io.netty.buffer.PooledByteBufAllocator
-import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodingsWithOrWithoutFieldLabels
+import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.store.bulk.{S3BucketConnection, S3Config}
 import org.scalatest.EitherValues
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
@@ -79,5 +79,6 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
   }
 }
 
-case object CompactJsonScanHttpEncodingsWithFieldLabels
-    extends CompactJsonScanHttpEncodingsWithOrWithoutFieldLabels(true)
+object CompactJsonScanHttpEncodingsWithFieldLabels {
+  def apply() = new CompactJsonScanHttpEncodings(identity, identity)
+}

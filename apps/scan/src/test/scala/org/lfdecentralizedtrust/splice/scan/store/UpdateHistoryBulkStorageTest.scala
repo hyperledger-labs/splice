@@ -9,7 +9,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
-import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.store.bulk.{BulkStorageConfig, Result, UpdateHistoryBulkStorage}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest, TreeUpdateWithMigrationId, UpdateHistory}
@@ -88,10 +87,9 @@ class UpdateHistoryBulkStorageTest
           val allUpdatesFromS3 = objectKeys.flatMap(
             readUncompressAndDecode(bucketConnection, io.circe.parser.decode[UpdateHistoryItemV2])
           )
-          val CompactJsonScanHttpEncodingsWithFieldLabels = new CompactJsonScanHttpEncodings(identity, identity)
           allUpdatesFromS3
             .map(
-              CompactJsonScanHttpEncodingsWithFieldLabels.httpToLapiUpdate
+              CompactJsonScanHttpEncodingsWithFieldLabels().httpToLapiUpdate
             ) should contain theSameElementsInOrderAs allUpdates
         }
       }

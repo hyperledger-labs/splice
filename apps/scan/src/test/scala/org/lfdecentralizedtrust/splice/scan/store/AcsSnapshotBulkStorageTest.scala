@@ -85,7 +85,7 @@ class AcsSnapshotBulkStorageTest
             )
           )
           allContractsFromS3.map(
-            CompactJsonScanHttpEncodingsWithFieldLabels.httpToJavaCreatedEvent
+            CompactJsonScanHttpEncodingsWithFieldLabels().httpToJavaCreatedEvent
           ) should contain theSameElementsInOrderAs allContracts.map(_.event)
         }
       }

@@ -514,7 +514,7 @@ object ScanHttpEncodings {
         ScanHttpEncodings.makeConsistentAcrossSvs(update)
     }
     val encodings: ScanHttpEncodings = encoding match {
-      case definitions.DamlValueEncoding.members.CompactJson => CompactJsonScanHttpEncodings
+      case definitions.DamlValueEncoding.members.CompactJson => CompactJsonScanHttpEncodings()
       case definitions.DamlValueEncoding.members.ProtobufJson => ProtobufJsonScanHttpEncodings
     }
     // v0 always returns the update ids as `#` prefixed,as that's the way they were encoded in canton. v1 returns it without the `#`
@@ -793,7 +793,7 @@ case class CompactJsonScanHttpEncodings(
 }
 
 // A lossy, but much easier to process, encoding. Should be used for all endpoints not used for backfilling Scan.
-case object CompactJsonScanHttpEncodings {
+object CompactJsonScanHttpEncodings {
   def apply() = new CompactJsonScanHttpEncodings(RemoveFieldLabels.value, RemoveFieldLabels.record)
 }
 
