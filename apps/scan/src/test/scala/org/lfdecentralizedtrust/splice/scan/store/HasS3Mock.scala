@@ -2,21 +2,16 @@ package org.lfdecentralizedtrust.splice.scan.store
 
 import com.digitalasset.canton.{BaseTest, FutureHelpers}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.TraceContext
 import com.github.luben.zstd.ZstdDirectBufferDecompressingStream
 import io.netty.buffer.PooledByteBufAllocator
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodingsWithOrWithoutFieldLabels
 import org.lfdecentralizedtrust.splice.scan.store.bulk.{S3BucketConnection, S3Config}
-import org.mockito.ArgumentMatchers.anyString
-import org.mockito.Mockito
-import org.mockito.invocation.InvocationOnMock
 import org.scalatest.EitherValues
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.S3Object
 
 import java.net.URI
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import scala.concurrent.{ExecutionContext, Future}
 import scala.sys.process.*
@@ -24,7 +19,7 @@ import scala.util.Using
 
 trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with BaseTest {
 
-  // TODO(#3429): consider running s3Mock container as a service in GHA instead of starting it here
+  // TODO(#3429): consider running s3Mock container as a service in GHA instead of starting it here. Alternatively, use TestContainers to manage the container
   def withS3Mock[A](test: => Future[A])(implicit ec: ExecutionContext): Future[A] = {
     // start s3Mock in a contaner
     "docker run -p 9090:9090 -e COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS=bucket -e debug=true -d --rm --name s3mock adobe/s3mock".!
@@ -48,30 +43,6 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
     })
   }
 
-  def getS3BucketConnectionWithInjectedErrors(
-      loggerFactory: NamedLoggerFactory
-  ): S3BucketConnection = {
-    val s3BucketConnection: S3BucketConnection = getS3BucketConnection(loggerFactory)
-    val s3BucketConnectionWithErrors = Mockito.spy(s3BucketConnection)
-    var failureCount = 0
-    val _ = doAnswer { (invocation: InvocationOnMock) =>
-      val args = invocation.getArguments
-      args.toList match {
-        case (key: String) :: _ if key.endsWith("2.zstd") =>
-          if (failureCount < 2) {
-            failureCount += 1
-            Future.failed(new RuntimeException("Simulated S3 write error"))
-          } else {
-            invocation.callRealMethod().asInstanceOf[Future[Unit]]
-          }
-        case _ =>
-          invocation.callRealMethod().asInstanceOf[Future[Unit]]
-      }
-    }.when(s3BucketConnectionWithErrors)
-      .writeFullObject(anyString(), any[ByteBuffer])(any[TraceContext], any[ExecutionContext])
-    s3BucketConnectionWithErrors
-  }
-
   def getS3BucketConnection(loggerFactory: NamedLoggerFactory): S3BucketConnection = {
     val s3Config = S3Config(
       URI.create("http://localhost:9090"),
@@ -89,6 +60,7 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
     val bufferAllocator = PooledByteBufAllocator.DEFAULT
     val compressed = s3BucketConnection.readFullObject(s3obj.key()).futureValue
     val compressedDirect = bufferAllocator.directBuffer(compressed.capacity())
+    // Empirically, our data is compressed by a factor of at most 200 (and is deterministic, so this is not expected to flake)
     val uncompressedDirect = bufferAllocator.directBuffer(compressed.capacity() * 200)
     val uncompressedNio = uncompressedDirect.nioBuffer(0, uncompressedDirect.capacity())
     compressedDirect.writeBytes(compressed)

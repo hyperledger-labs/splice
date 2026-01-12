@@ -5,18 +5,27 @@ package org.lfdecentralizedtrust.splice.scan.store
 
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
-import org.lfdecentralizedtrust.splice.scan.store.bulk.{AcsSnapshotBulkStorage, BulkStorageConfig}
+import org.lfdecentralizedtrust.splice.scan.store.bulk.{
+  AcsSnapshotBulkStorage,
+  BulkStorageConfig,
+  S3BucketConnection,
+}
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest}
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
+import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito
+import org.mockito.invocation.InvocationOnMock
 import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
-import scala.concurrent.Future
+import java.nio.ByteBuffer
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.FutureConverters.*
 import scala.jdk.CollectionConverters.*
 
@@ -83,32 +92,6 @@ class AcsSnapshotBulkStorageTest
     }
   }
 
-//  // Similar to CompactJsonScanHttpEncodings.httpToJavaCreatedEvent, but does preserve field names, as we want to assert on their equality.
-//  def reconstructFromS3(createdEvent: httpApi.CreatedEvent): javaapi.CreatedEvent = {
-//    val templateId = CompactJsonScanHttpEncodings.parseTemplateId(createdEvent.templateId)
-//    new javaapi.CreatedEvent(
-//      /*witnessParties = */ java.util.Collections.emptyList(),
-//      /*offset = */ 0, // not populated
-//      /*nodeId = */ EventId.nodeIdFromEventId(createdEvent.eventId),
-//      templateId,
-//      createdEvent.packageName,
-//      createdEvent.contractId,
-//      ValueJsonCodecCodegen
-//        .deserializableContractPayload(templateId, createdEvent.createArguments.noSpaces)
-//        .value,
-//      /*createdEventBlob = */ ByteString.EMPTY,
-//      /*interfaceViews = */ java.util.Collections.emptyMap(),
-//      /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
-//      /* contractKey = */ None.toJava,
-//      createdEvent.signatories.asJava,
-//      createdEvent.observers.asJava,
-//      createdEvent.createdAt.toInstant,
-//      /* acsDelta = */ false,
-//      /* representativePackageId = */ templateId.getPackageId,
-//    )
-//
-//  }
-//
   def mockAcsSnapshotStore(snapshotSize: Int): AcsSnapshotStore = {
     val store = mock[AcsSnapshotStore]
     val partyId = mkPartyId("alice")
@@ -155,6 +138,30 @@ class AcsSnapshotBulkStorageTest
         }
     }
     store
+  }
+
+  def getS3BucketConnectionWithInjectedErrors(
+      loggerFactory: NamedLoggerFactory
+  ): S3BucketConnection = {
+    val s3BucketConnection: S3BucketConnection = getS3BucketConnection(loggerFactory)
+    val s3BucketConnectionWithErrors = Mockito.spy(s3BucketConnection)
+    var failureCount = 0
+    val _ = doAnswer { (invocation: InvocationOnMock) =>
+      val args = invocation.getArguments
+      args.toList match {
+        case (key: String) :: _ if key.endsWith("2.zstd") =>
+          if (failureCount < 2) {
+            failureCount += 1
+            Future.failed(new RuntimeException("Simulated S3 write error"))
+          } else {
+            invocation.callRealMethod().asInstanceOf[Future[Unit]]
+          }
+        case _ =>
+          invocation.callRealMethod().asInstanceOf[Future[Unit]]
+      }
+    }.when(s3BucketConnectionWithErrors)
+      .writeFullObject(anyString(), any[ByteBuffer])(any[TraceContext], any[ExecutionContext])
+    s3BucketConnectionWithErrors
   }
 
 }
