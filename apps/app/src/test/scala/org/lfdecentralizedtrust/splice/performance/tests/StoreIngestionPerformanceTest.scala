@@ -53,7 +53,6 @@ abstract class StoreIngestionPerformanceTest(
           _ <- store.multiDomainAcsStore.ingestionSink.initialize()
           txs = loadTxsFromDump()
           _ <- ingestAll(store, txs)
-          // TODO: log the results nicely
         } yield ()
       }
   }
