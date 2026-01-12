@@ -357,11 +357,6 @@
           }
         }
       },
-      "sequencerPruningConfig": {
-        "enabled": true,
-        "pruningInterval": "1 hours",
-        "retentionPeriod": "30 days"
-      },
       "splitPostgresInstances": true,
       "topupConfig": {
         "minTopupInterval": "1m",
@@ -1835,6 +1830,10 @@
           {
             "name": "CUSTOM_MOCK_ENV_VAR_NAME",
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
+            "value": "canton.sv-apps.sv.local-synchronizer-node.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
@@ -1914,7 +1913,7 @@
           "sequencerAddress": "global-domain-3-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
-            "pruningInterval": "1 hours",
+            "pruningInterval": "1 hour",
             "retentionPeriod": "30 days"
           },
           "sequencerPublicUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com",
@@ -2716,6 +2715,10 @@
           {
             "name": "CUSTOM_MOCK_ENV_VAR_NAME",
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
+            "value": "canton.sv-apps.sv.local-synchronizer-node.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
@@ -2797,7 +2800,7 @@
           "sequencerAddress": "global-domain-3-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
-            "pruningInterval": "1 hours",
+            "pruningInterval": "1 hour",
             "retentionPeriod": "30 days"
           },
           "sequencerPublicUrl": "https://sequencer-3.sv-1.mock.global.canton.network.digitalasset.com",
@@ -2893,6 +2896,10 @@
           {
             "name": "ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT",
             "value": "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+            "value": "canton.validator-apps.validator_backend.participant-pruning-schedule {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",

@@ -50,6 +50,7 @@ import com.digitalasset.canton.topology.{
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.github.blemale.scaffeine.Scaffeine
 import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -65,6 +66,7 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
 }
 
 import java.time.Instant
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -102,6 +104,12 @@ class ParticipantAdminConnection(
       _.getSchedule(_),
     )
 
+  private val synchronizerIdCache =
+    Scaffeine()
+      .expireAfterWrite(10.minutes)
+      .maximumSize(100)
+      .buildAsync[SynchronizerAlias, SynchronizerId]()
+
   override type Status = ParticipantStatus
 
   override protected def getStatusRequest: GrpcAdminCommand[?, ?, NodeStatus[ParticipantStatus]] =
@@ -122,10 +130,14 @@ class ParticipantAdminConnection(
 
   def getSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
-  ): Future[SynchronizerId] =
-    getPhysicalSynchronizerId(synchronizerAlias).map(_.logical)
+  ): Future[SynchronizerId] = {
+    synchronizerIdCache.getFuture(
+      synchronizerAlias,
+      alias => getPhysicalSynchronizerId(alias).map(_.logical),
+    )
+  }
 
-  def getPhysicalSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
+  private def getPhysicalSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
   ): Future[PhysicalSynchronizerId] =
     // We avoid ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId which tries to make

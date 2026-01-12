@@ -434,22 +434,22 @@ class DomainMigrationInitializer(
   ) = {
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
-      "sequencer_genesis",
-      s"Sequencer ${identityDump.id} is ready to be initialized with the genesis state",
+      "node_genesis",
+      s"Node ${identityDump.id} is ready to be initialized with the genesis state",
       connection.getStatus.map {
         case NodeStatus.Failure(msg) =>
           throw Status.FAILED_PRECONDITION
-            .withDescription("Sequencer is in failure state: " + msg)
+            .withDescription("Node is in failure state: " + msg)
             .asRuntimeException()
         case NodeStatus.NotInitialized(_, Some(WaitingForInitialization)) =>
           logger.info(
-            "Sequencer is in waiting for initialization state, proceeding with genesis import"
+            "Node is in waiting for initialization state, proceeding with genesis import"
           )
           ()
         case NodeStatus.NotInitialized(_, other) =>
           throw Status.FAILED_PRECONDITION
             .withDescription(
-              s"Sequencer is waiting for $other, we can initialize it only when it's ready."
+              s"Node is waiting for $other, we can initialize it only when it's ready."
             )
             .asRuntimeException()
         case NodeStatus.Success(_) => ()

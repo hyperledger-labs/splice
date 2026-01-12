@@ -9,6 +9,32 @@
       "type": "object",
       "description": "The authentication configuration for the application"
     },
+    "synchronizer": {
+      "type": "object",
+      "description": "Configuration parameters for the sequencer connections.",
+      "properties": {
+        "connectionType": {
+          "type": "string",
+          "enum": [
+            "from-scan",
+            "trusted-url",
+            "trusted-svs"
+          ]
+        },
+        "sequencerNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Optional list of trusted sequencer / SV names."
+        },
+        "url": {
+          "type": "string",
+          "description": "Trusted sequencer Url."
+        }
+      }
+    },
     "scanClient": {
       "type": "object",
       "description": "Configuration parameters for the scan client.",
@@ -558,6 +584,64 @@
           ]
         },
         "errorMessage": "If 'scanClient' is set, 'scanAddress' and 'nonSvValidatorTrustSingleScan' must not be set. All the scan specific configuration must be done inside the 'scanClient' object."
+      }
+    },
+    {
+      "if": {
+        "required": ["synchronizer"],
+        "properties": {
+          "synchronizer": {
+            "required": ["connectionType"]
+          }
+        }
+      },
+      "then": {
+        "allOf": [
+          {
+            "if": {
+              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "from-scan" } } } }
+            },
+            "then": {
+              "properties": {
+                "synchronizer": {
+                  "properties": {
+                    "url": { "not": {} },
+                    "sequencerNames": { "not": {} }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "trusted-url" } } } }
+            },
+            "then": {
+              "properties": {
+                "synchronizer": {
+                  "required": ["url"],
+                  "properties": { "sequencerNames": { "not": {} } }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "trusted-svs" } } } }
+            },
+            "then": {
+              "properties": {
+                "synchronizer": {
+                  "required": ["sequencerNames"],
+                  "properties": {
+                    "url": { "not": {} },
+                    "sequencerNames": { "minItems": 1 }
+                  }
+                }
+              }
+            }
+          }
+        ]
       }
     }
   ]

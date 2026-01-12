@@ -60,7 +60,6 @@ abstract class InStackDecentralizedSynchronizerNode
       sequencerPostgres: Postgres;
       mediatorPostgres: Postgres;
     },
-    active: boolean,
     driver:
       | { type: 'cometbft'; host: Output<string>; port: number }
       | {
@@ -224,7 +223,6 @@ export class InStackCometBftDecentralizedSynchronizerNode
     this.installDecentralizedSynchronizer(
       svConfig,
       dbs,
-      active,
       {
         type: 'cometbft',
         host: pulumi.interpolate`${cometbftRelease.rpcServiceName}.${xns.logicalName}.svc.cluster.local`,
@@ -251,7 +249,6 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
       sequencerPostgres: Postgres;
       mediatorPostgres: Postgres;
     },
-    active: boolean,
     version: CnChartVersion,
     imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
@@ -260,7 +257,6 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
     this.installDecentralizedSynchronizer(
       svConfig,
       dbs,
-      active,
       {
         type: 'cantonbft',
         externalAddress: `sequencer-p2p-${migrationId}.${ingressName}.${CLUSTER_HOSTNAME}`,
