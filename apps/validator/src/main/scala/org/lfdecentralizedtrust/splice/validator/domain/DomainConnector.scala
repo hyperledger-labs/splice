@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DsoSequencer
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorAppBackendConfig
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.data.CantonTimestamp
@@ -153,17 +154,25 @@ class DomainConnector(
                     )
                     .asRuntimeException()
                 case Some(nonEmptyConnections) =>
+                  val threshold = config.domains.global.threshold
+                    .map(com.digitalasset.canton.config.RequireTypes.PositiveInt.tryCreate)
+                    .getOrElse(
+                      Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size)
+                    )
+
+                  val amplificationFactor = PositiveInt.tryCreate(
+                    Math.max(
+                      threshold.unwrap,
+                      Thresholds
+                        .sequencerSubmissionRequestAmplification(nonEmptyConnections.size)
+                        .unwrap,
+                    )
+                  )
                   SequencerConnections.tryMany(
                     nonEmptyConnections.forgetNE,
-                    config.domains.global.threshold
-                      .map(com.digitalasset.canton.config.RequireTypes.PositiveInt.tryCreate)
-                      .getOrElse(
-                        Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size)
-                      ),
+                    threshold,
                     submissionRequestAmplification = SubmissionRequestAmplification(
-                      Thresholds.sequencerSubmissionRequestAmplification(
-                        nonEmptyConnections.size
-                      ),
+                      amplificationFactor,
                       config.sequencerRequestAmplificationPatience,
                     ),
                     sequencerLivenessMargin =
