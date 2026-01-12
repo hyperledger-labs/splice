@@ -19,7 +19,7 @@ import {
   validateEffectiveDate,
   validateExpiration,
   validateExpiryEffectiveDate,
-  // validateMintedBeneficiary,
+  validateMintedBeneficiary,
   validateMintBefore,
   validateRewardAmount,
   validateSummary,
@@ -193,12 +193,10 @@ export const CreateUnallocatedUnclaimedActivityRecordForm: React.FC = _ => {
 
             <form.AppField
               name="beneficiary"
-              validators={
-                {
-                  // onBlur: ({ value }) => validateMintedBeneficiary(value),
-                  // onChange: ({ value }) => validateMintedBeneficiary(value),
-                }
-              }
+              validators={{
+                onBlur: ({ value }) => validateMintedBeneficiary(value),
+                onChange: ({ value }) => validateMintedBeneficiary(value),
+              }}
             >
               {field => (
                 <field.TextField
