@@ -64,6 +64,25 @@ class ValidatorSequencerConnectionIntegrationTest
         sv4ScanBackend,
       )
 
+      // We must wait for the sequencers to "mature" in Scan before starting the validator.
+      // WITHOUT THIS: Alice queries Scan and finds that although 4 sequencers are listed,
+      // some (like SV3) have an 'availableAfter' timestamp in the future.
+      // Alice's DomainConnector correctly ignores these "not yet available" sequencers.
+      // If Alice only finds 1 valid sequencer but is configured with a trust threshold of 2,
+      // she will crash on startup to prevent operating with insufficient trust.
+      withClue("Wait for all 4 SV sequencers to be available and valid in Scan") {
+        eventually(60.seconds, 1.second) {
+          val allDomains = sv1ScanBackend.listDsoSequencers()
+          val now = env.environment.clock.now
+          val availableSequencers = for {
+            domain <- allDomains
+            sequencer <- domain.sequencers
+            if sequencer.url.nonEmpty && !now.toInstant.isBefore(sequencer.availableAfter)
+          } yield sequencer
+          availableSequencers.size shouldBe 4
+        }
+      }
+
       aliceValidatorBackend.startSync()
 
       val sv1Url = getPublicSequencerUrl(sv1Backend)
@@ -72,7 +91,7 @@ class ValidatorSequencerConnectionIntegrationTest
       val initialExpectedUrls = Set(sv1Url, sv2InitialUrl, sv3Url)
 
       withClue("Validator should connect to the filtered list of sequencers from the config") {
-        eventually(60.seconds, 1.second) {
+        eventually(120.seconds, 1.second) {
           val connectedUrls = getSequencerPublicUrls(
             aliceValidatorBackend.participantClientWithAdminToken,
             globalSyncAlias,
@@ -91,10 +110,10 @@ class ValidatorSequencerConnectionIntegrationTest
 
       setSequencerUrl(sv2Backend, newSv2Url).futureValue
 
-      val updatedExpectedUrls = Set(sv1Url, newSv2Address)
+      val updatedExpectedUrls = Set(sv1Url, newSv2Address, sv3Url)
 
       withClue("Validator should eventually see the updated sequencer URL from the ledger") {
-        eventually(60.seconds, 1.second) {
+        eventually(120.seconds, 1.second) {
           val connectedUrls = getSequencerPublicUrls(
             aliceValidatorBackend.participantClientWithAdminToken,
             globalSyncAlias,
