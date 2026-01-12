@@ -212,3 +212,104 @@ tests:
           path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='AUTH_JWKS_URL')].value
       - notExists:
           path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='AUTH_TARGET_AUDIENCE')].value
+  - it: "pvc creates persistent volume claim and volume mount"
+    set:
+      pvc:
+        size: "20Gi"
+        volumeStorageClass: "standard"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      # Sanity check
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: participant
+      # Volume is created
+      - equal:
+          path: spec.template.spec.volumes
+          value:
+            - name: participant-volume
+              persistentVolumeClaim:
+                claimName: participant-1-participant-pvc
+      # Volume mount is created
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts
+          value:
+            - name: participant-volume
+              mountPath: /persistent-data
+  - it: "pvc creates PersistentVolumeClaim resource"
+    set:
+      pvc:
+        size: "20Gi"
+        volumeStorageClass: "standard"
+    documentSelector:
+      path: kind
+      value: PersistentVolumeClaim
+    asserts:
+      - equal:
+          path: metadata.name
+          value: participant-1-participant-pvc
+      - equal:
+          path: spec.accessModes[0]
+          value: ReadWriteOnce
+      - equal:
+          path: spec.resources.requests.storage
+          value: "20Gi"
+      - equal:
+          path: spec.storageClassName
+          value: "standard"
+      - equal:
+          path: metadata.annotations
+          value:
+            helm.sh/resource-policy: keep
+  - it: "pvc and extraVolumes work together correctly"
+    set:
+      pvc:
+        size: "10Gi"
+        volumeStorageClass: "fast-ssd"
+      extraVolumes:
+        - name: secret-volume
+          secret:
+            secretName: my-secret
+        - name: config-volume
+          persistentVolumeClaim:
+            claimName: external-pvc
+      extraVolumeMounts:
+        - name: secret-volume
+          mountPath: /secrets
+          readOnly: true
+        - name: config-volume
+          mountPath: /config
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      # Sanity check
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: participant
+      # All volumes are created (extraVolumes + pvc volume)
+      - equal:
+          path: spec.template.spec.volumes
+          value:
+            - name: secret-volume
+              secret:
+                secretName: my-secret
+            - name: config-volume
+              persistentVolumeClaim:
+                claimName: external-pvc
+            - name: participant-volume
+              persistentVolumeClaim:
+                claimName: participant-1-participant-pvc
+      # All volume mounts are created (extraVolumeMounts + pvc mount)
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts
+          value:
+            - name: secret-volume
+              mountPath: /secrets
+              readOnly: true
+            - name: config-volume
+              mountPath: /config
+            - name: participant-volume
+              mountPath: /persistent-data

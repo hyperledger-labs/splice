@@ -89,7 +89,7 @@ as follows.
 3. Run a background process that regularly performs the following steps:
 
     1. Determines all users that have more than 10 ``Holding`` UTXOs.
-       For example, using the DB provided by the `Participant Query Store <https://docs.digitalasset.com/build/3.3/sdlc-howtos/applications/develop/pqs/index.html>`__;
+       For example, using the DB provided by the `Participant Query Store <https://docs.digitalasset.com/build/3.4/sdlc-howtos/applications/develop/pqs/index.html>`__;
        or by :ref:`reading the Holding contracts <token_standard_usage_reading_contracts>`
        directly from the Ledger API of your validator node. The former being the more scalable option.
     2. Constructs the transfer choices to merge the extra ``Holding`` contracts by querying
@@ -162,7 +162,7 @@ All interaction works via the JSON Ledger API (see its `OpenAPI definition here 
 This OpenAPI definition is also accessible at ``http(s)://${YOUR_PARTICIPANT}/docs/openapi``.
 We encourage developers to use OpenAPI code generation tools as opposed to manually writing HTTP requests.
 
-Check out the `Authentication docs <https://docs.digitalasset.com/operate/3.3/howtos/secure/apis/jwt.html>`_ for more information on how to authenticate the requests.
+Check out the `Authentication docs <https://docs.digitalasset.com/operate/3.4/howtos/secure/apis/jwt.html>`_ for more information on how to authenticate the requests.
 
 
 .. _token_standard_usage_reading_contracts:
