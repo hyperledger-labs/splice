@@ -36,9 +36,10 @@ class UpdateHistoryBulkStorageTest
     with HasExecutionContext
     with HasActorSystem
     with HasS3Mock {
+  val maxFileSize = 30000L
   val bulkStorageTestConfig = BulkStorageConfig(
     1000,
-    30000L,
+    maxFileSize,
   )
 
   "UpdateHistoryBulkStorage" should {
@@ -86,18 +87,20 @@ class UpdateHistoryBulkStorageTest
             .asScala
           allUpdates <- mockStore.store.getUpdatesWithoutImportUpdates(
             None,
-            HardLimit.tryCreate(2200, 2200),
+            HardLimit.tryCreate(segmentSize.toInt, segmentSize.toInt),
             afterIsInclusive = true,
           )
         } yield {
           val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
           objectKeys should have length 2
+          s3Objects.contents().get(0).size().toInt should be >= maxFileSize.toInt
           val allUpdatesFromS3 = objectKeys.flatMap(
             readUncompressAndDecode(bucketConnection, io.circe.parser.decode[UpdateHistoryItemV2])
           )
           allUpdatesFromS3
-            .map(CompactJsonScanHttpEncodingsWithFieldLabels.httpToLapiUpdate)
-            .head should be(allUpdates.head)
+            .map(
+              CompactJsonScanHttpEncodingsWithFieldLabels.httpToLapiUpdate
+            ) should contain theSameElementsInOrderAs allUpdates
         }
       }
     }

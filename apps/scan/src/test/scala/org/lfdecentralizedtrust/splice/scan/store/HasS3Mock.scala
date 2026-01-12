@@ -62,19 +62,21 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
     val compressedDirect = bufferAllocator.directBuffer(compressed.capacity())
     // Empirically, our data is compressed by a factor of at most 200 (and is deterministic, so this is not expected to flake)
     val uncompressedDirect = bufferAllocator.directBuffer(compressed.capacity() * 200)
-    val uncompressedNio = uncompressedDirect.nioBuffer(0, uncompressedDirect.capacity())
-    compressedDirect.writeBytes(compressed)
-    Using(new ZstdDirectBufferDecompressingStream(compressedDirect.nioBuffer())) {
-      _.read(uncompressedNio)
+    try {
+      val uncompressedNio = uncompressedDirect.nioBuffer(0, uncompressedDirect.capacity())
+      compressedDirect.writeBytes(compressed)
+      Using(new ZstdDirectBufferDecompressingStream(compressedDirect.nioBuffer())) {
+        _.read(uncompressedNio)
+      }
+      uncompressedNio.flip()
+      val allContractsStr = StandardCharsets.UTF_8.newDecoder().decode(uncompressedNio).toString
+      val allContracts = allContractsStr.split("\n")
+      allContracts.map(decoder(_).value)
+    } finally {
+      compressedDirect.release()
+      uncompressedDirect.release()
     }
-    uncompressedNio.flip()
-    val allContractsStr = StandardCharsets.UTF_8.newDecoder().decode(uncompressedNio).toString
-    val allContracts = allContractsStr.split("\n")
-    compressedDirect.release()
-    uncompressedDirect.release()
-    allContracts.map(decoder(_).value)
   }
-
 }
 
 case object CompactJsonScanHttpEncodingsWithFieldLabels
