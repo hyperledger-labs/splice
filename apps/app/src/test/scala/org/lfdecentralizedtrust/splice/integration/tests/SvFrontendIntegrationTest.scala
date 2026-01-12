@@ -1378,7 +1378,7 @@ class SvFrontendIntegrationTest
     // }
 
     "NEW UI: Two failing proposals" in { implicit env =>
-      // val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+      val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
       val amount = "101"
 
       // val proposalId =
@@ -1386,12 +1386,12 @@ class SvFrontendIntegrationTest
         "SRARC_CreateUnallocatedUnclaimedActivityRecord",
         "create-unallocated-unclaimed-activity-record",
       ) { implicit webDriver =>
-        // eventually() {
-        //   inside(find(id("create-unallocated-unclaimed-activity-record-beneficiary"))) {
-        //     case Some(element) =>
-        //       element.underlying.sendKeys(beneficiary)
-        //   }
-        // }
+        eventually() {
+          inside(find(id("create-unallocated-unclaimed-activity-record-beneficiary"))) {
+            case Some(element) =>
+              element.underlying.sendKeys(beneficiary)
+          }
+        }
 
         eventually() {
           inside(find(id("create-unallocated-unclaimed-activity-record-amount"))) {
@@ -1401,13 +1401,13 @@ class SvFrontendIntegrationTest
         }
       }
 
-      // createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
-      //   eventually() {
-      //     inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
-      //       element.underlying.sendKeys(proposalId)
-      //     }
-      //   }
-      // }
+    // createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
+    //   eventually() {
+    //     inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
+    //       element.underlying.sendKeys(proposalId)
+    //     }
+    //   }
+    // }
     }
   }
   def changeAction(actionName: String)(implicit webDriver: WebDriverType) = {
