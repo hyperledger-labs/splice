@@ -1,20 +1,19 @@
 package org.lfdecentralizedtrust.splice.performance
 
 import cats.data.Chain
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.actor.{ActorSystem, Scheduler}
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpClientBuilder
-import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.{HttpClient, HttpClientMetrics}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  DamlValueEncoding,
   UpdateHistoryItemV2,
-  UpdateHistoryRequestAfter,
-  UpdateHistoryRequestV2,
   UpdateHistoryResponseV2,
 }
-import org.lfdecentralizedtrust.splice.http.v0.scan as http
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.GetUpdateHistoryV2
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
@@ -34,6 +33,7 @@ class DownloadScanUpdates(
     as: ActorSystem,
     override val loggerFactory: NamedLoggerFactory,
     tc: TraceContext,
+    metricsFactory: LabeledMetricsFactory,
 ) extends Runnable
     with NamedLogging {
 
@@ -42,24 +42,26 @@ class DownloadScanUpdates(
   def run(): Unit = {
     implicit val httpClient: HttpClient = {
       // request timeout slightly higher than the default 38s in Splice servers
-      HttpClient(HttpClient.HttpRequestParameters(NonNegativeDuration.ofSeconds(40L)), logger)
+      HttpClient(
+        HttpClient.HttpRequestParameters(NonNegativeDuration.ofSeconds(40L)),
+        HttpClientMetrics(metricsFactory),
+        logger,
+      )
     }
     implicit val scheduler: Scheduler = as.scheduler
-
-    val client = http.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
 
     def query(at: Instant): Future[UpdateHistoryResponseV2] = {
       org.apache.pekko.pattern
         .retry(
           () => {
             logger.info(s"Querying at $at")
-            client
-              .getUpdateHistoryV2(
-                UpdateHistoryRequestV2(
-                  after = Some(UpdateHistoryRequestAfter(migrationId.toLong, at.toString)),
-                  pageSize = 1000,
-                )
-              )
+            val command = GetUpdateHistoryV2(
+              count = 1000,
+              after = Some((migrationId.toLong, at.toString)),
+              DamlValueEncoding.CompactJson,
+            )
+            command
+              .submitRequest(command.createClient(host), Nil)
               .value
               .map(
                 _.fold(
