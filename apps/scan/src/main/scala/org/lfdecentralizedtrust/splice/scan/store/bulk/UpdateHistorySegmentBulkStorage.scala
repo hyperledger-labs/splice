@@ -35,7 +35,7 @@ class UpdateHistorySegmentBulkStorage(
     extends NamedLogging {
 
   private val liveSource: Source[ByteString, SourceQueueWithComplete[ByteString]] =
-    Source.queue[ByteString](100, overflowStrategy = OverflowStrategy.backpressure)
+    Source.queue[ByteString](2, overflowStrategy = OverflowStrategy.backpressure)
   private val (queue, initStream) = liveSource
     .toMat(Sink.asPublisher(fanout = false))(org.apache.pekko.stream.scaladsl.Keep.both)
     .run()
