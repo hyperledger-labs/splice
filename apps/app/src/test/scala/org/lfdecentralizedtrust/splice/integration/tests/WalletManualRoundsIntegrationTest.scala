@@ -312,7 +312,7 @@ class WalletManualRoundsIntegrationTest
         },
       )
 
-      aliceWalletClient.tap(20.0)
+      aliceWalletClient.tap(100.0)
 
       eventually() {
         aliceValidatorWalletClient.listAppRewardCoupons() should be(empty)
