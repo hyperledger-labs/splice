@@ -1381,8 +1381,7 @@ class SvFrontendIntegrationTest
       val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
       val amount = "101"
 
-      // val proposalId =
-      createProposal(
+      val proposalId = createProposal(
         "SRARC_CreateUnallocatedUnclaimedActivityRecord",
         "create-unallocated-unclaimed-activity-record",
       ) { implicit webDriver =>
@@ -1390,13 +1389,9 @@ class SvFrontendIntegrationTest
         fillOutTextField("create-unallocated-unclaimed-activity-record-amount", amount)
       }
 
-    // createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
-    //   eventually() {
-    //     inside(find(id("revoke-featured-app-idValue"))) { case Some(element) =>
-    //       element.underlying.sendKeys(proposalId)
-    //     }
-    //   }
-    // }
+      createProposal("SRARC_RevokeFeaturedAppRight", "revoke-featured-app") { implicit webDriver =>
+        fillOutTextField("revoke-featured-app-idValue", proposalId)
+      }
     }
   }
   def changeAction(actionName: String)(implicit webDriver: WebDriverType) = {
