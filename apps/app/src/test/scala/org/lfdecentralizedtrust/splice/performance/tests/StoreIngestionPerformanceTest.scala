@@ -25,7 +25,6 @@ import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 import org.lfdecentralizedtrust.splice.store.db.DbAppStore
 
 import java.nio.file.{Files, Path}
-import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 
 abstract class StoreIngestionPerformanceTest(
@@ -45,7 +44,7 @@ abstract class StoreIngestionPerformanceTest(
   type Store <: DbAppStore
   protected def mkStore(storage: DbStorage): Store
 
-  def run() = {
+  def run(): Future[Unit] = {
     val storage = initializeStorage()
     val store = mkStore(storage)
     TraceContext
@@ -110,7 +109,9 @@ abstract class StoreIngestionPerformanceTest(
   private def ingestAll(store: Store, txs: Seq[TreeUpdateWithMigrationId])(implicit
       tc: TraceContext
   ): Future[Done] = {
-    val timings = mutable.ListBuffer[Long]()
+    var totalTime = BigDecimal(0)
+    var totalItems = 0L
+    var totalBatches = 0L
     Source
       .fromIterator(() => txs.iterator)
       .batch(ingestionConfig.maxBatchSize.toLong, Vector(_))(_ :+ _)
@@ -130,15 +131,17 @@ abstract class StoreIngestionPerformanceTest(
           .map { _ =>
             val after = System.nanoTime()
             val duration = after - before
-            timings ++= Seq.fill(batch.length)(duration / batch.length)
-            val avg = timings.sum.toDouble / timings.size
+            totalTime += duration
+            totalItems += batch.length
+            totalBatches += 1
+            val avg = totalTime / totalItems
             println(
-              f"Ingested batch $index (${batch.length} elements) in $duration ns, average per-item time: $avg%.2f ns over ${timings.size} records, total time: ${timings.sum} ns"
+              f"Ingested batch $index (${batch.length} elements) in $duration ns, average per-item time: $avg%.2f ns over $totalItems records, total time: $totalTime ns"
             )
           }
       })
   }
 
-  protected def mkParticipantId(name: String) =
+  protected def mkParticipantId(name: String): ParticipantId =
     ParticipantId.tryFromProtoPrimitive("PAR::" + name + "::dummy")
 }
