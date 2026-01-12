@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.migration
 
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.util.UploadablePackage
-import com.digitalasset.canton.config.{SynchronizerTimeTrackerConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.{NonNegativeFiniteDuration, SynchronizerTimeTrackerConfig}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.SynchronizerAlias
@@ -14,14 +14,14 @@ import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.topology.SynchronizerId
 import com.google.protobuf.ByteString
 
-import scala.annotation.nowarn
+import scala.annotation.{nowarn, unused}
 import scala.concurrent.{ExecutionContext, Future}
 
 class DomainDataRestorer(
     participantAdminConnection: ParticipantAdminConnection,
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration,
     timeTrackerObservationLatency: NonNegativeFiniteDuration,
-    newSequencerConnectionPool: Boolean,
+    @unused newSequencerConnectionPool: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
@@ -70,7 +70,8 @@ class DomainDataRestorer(
         _ = logger.info("Imported the ACS")
         _ <- participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
           synchronizerAlias,
-          newSequencerConnectionPool,
+          // TODO(#3455) re-enable based on config flag once it's fixed
+          newSequencerConnectionPool = false,
           config => Some(config.copy(manualConnect = false)),
         )
       } yield ()
