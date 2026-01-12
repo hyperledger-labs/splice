@@ -51,7 +51,7 @@ object SplicePerfImpl {
         )(
           (
             Opts
-              .option[String]("host", "Host URI of the SV node", "h")
+              .option[String]("host", "Host URI of Scan. Default: DA SV-2's Scan on MainNet", "h")
               .withDefault("https://scan.sv-2.global.canton.network.digitalasset.com"),
             Opts.option[Int]("migration-id", "Migration ID to query the updates for", "m"),
             Opts
@@ -62,13 +62,13 @@ object SplicePerfImpl {
             Opts
               .option[String](
                 "download-start-time",
-                "The time from which to start downloading updates (ISO-8601 format)",
+                "The time from which to start downloading updates (ISO-8601 format). Default: 1h ago",
                 "s",
               )
               .map(Instant.parse)
               .withDefault(Instant.now().minus(1, ChronoUnit.HOURS)),
             Opts
-              .option[String]("duration", "Duration (Scala Duration notation)", "d")
+              .option[String]("duration", "Duration (Scala Duration notation). Default: 1h", "d")
               .map(Duration.create)
               .withDefault(Duration(1, TimeUnit.HOURS)),
           ).mapN { (host, migrationId, writePath, startAt, duration) =>
@@ -84,7 +84,7 @@ object SplicePerfImpl {
           )(
             (
               Opts
-                .option[String]("host", "Host URI of the SV node", "h")
+                .option[String]("host", "Host URI of Scan. Default: DA SV-2's Scan on MainNet", "h")
                 .withDefault("https://scan.sv-2.global.canton.network.digitalasset.com"),
               Opts.option[Int]("migration-id", "Migration ID to query the ACS snapshot for", "m"),
               Opts
@@ -95,7 +95,7 @@ object SplicePerfImpl {
               Opts
                 .option[String](
                   "snapshot-time",
-                  "The time at which to download the ACS snapshot (ISO-8601 format)",
+                  "The time at which to download the ACS snapshot (ISO-8601 format). Default: now",
                   "s",
                 )
                 .map(Instant.parse)
@@ -125,7 +125,12 @@ object SplicePerfImpl {
                   Paths.get(_)
                 ),
               Opts
-                .option[String]("dump-path", "Path to the update history dump file", "d")
+                .option[String](
+                  "dump-path",
+                  """Path to the dump file containing Update History data.
+                    |This can be obtained by running the `download-scan-updates` command.""".stripMargin,
+                  "d",
+                )
                 .map(
                   Paths.get(_)
                 ),
