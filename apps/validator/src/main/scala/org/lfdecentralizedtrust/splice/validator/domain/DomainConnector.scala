@@ -153,44 +153,24 @@ class DomainConnector(
                     )
                     .asRuntimeException()
                 case Some(nonEmptyConnections) =>
-                  config.domains.global.sequencerNames match {
-                    case None =>
-                      SequencerConnections.tryMany(
-                        nonEmptyConnections.forgetNE,
-                        Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
-                        submissionRequestAmplification = SubmissionRequestAmplification(
-                          Thresholds.sequencerSubmissionRequestAmplification(
-                            nonEmptyConnections.size
-                          ),
-                          config.sequencerRequestAmplificationPatience,
-                        ),
-                        sequencerLivenessMargin =
-                          Thresholds.sequencerConnectionsLivenessMargin(nonEmptyConnections.size),
-                        // TODO(#2666) Make the delays configurable.
-                        sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
-                      )
-
-                    case Some(allowedNames) =>
-                      SequencerConnections.tryMany(
-                        nonEmptyConnections.forgetNE,
-                        config.domains.global.threshold
-                          .map(com.digitalasset.canton.config.RequireTypes.PositiveInt.tryCreate)
-                          .getOrElse(
-                            Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size)
-                          ),
-                        submissionRequestAmplification = SubmissionRequestAmplification(
-                          Thresholds.sequencerSubmissionRequestAmplification(
-                            nonEmptyConnections.size
-                          ),
-                          config.sequencerRequestAmplificationPatience,
-                        ),
-                        sequencerLivenessMargin =
-                          Thresholds.sequencerConnectionsLivenessMargin(nonEmptyConnections.size),
-                        // TODO(#2666) Make the delays configurable.
-                        sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
-                      )
-                  }
-
+                  SequencerConnections.tryMany(
+                    nonEmptyConnections.forgetNE,
+                    config.domains.global.threshold
+                      .map(com.digitalasset.canton.config.RequireTypes.PositiveInt.tryCreate)
+                      .getOrElse(
+                        Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size)
+                      ),
+                    submissionRequestAmplification = SubmissionRequestAmplification(
+                      Thresholds.sequencerSubmissionRequestAmplification(
+                        nonEmptyConnections.size
+                      ),
+                      config.sequencerRequestAmplificationPatience,
+                    ),
+                    sequencerLivenessMargin =
+                      Thresholds.sequencerConnectionsLivenessMargin(nonEmptyConnections.size),
+                    // TODO(#2666) Make the delays configurable.
+                    sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
+                  )
               }
             }.toMap
           }
