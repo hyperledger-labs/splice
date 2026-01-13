@@ -360,7 +360,6 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
         SpliceUtil.defaultTransferConfig(
           amuletConfig.transferConfig.maxNumInputs.toInt,
           amuletConfig.transferConfig.holdingFee.rate,
-          zeroTransferFees = true,
         ),
         amuletConfig.issuanceCurve,
         amuletConfig.decentralizedSynchronizer,

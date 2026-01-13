@@ -8,7 +8,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
-  updateAllSvAppFoundDsoConfigs_,
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransferInstructionResultOutput.members
@@ -49,11 +48,6 @@ class TokenStandardTransferIntegrationTest
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
-        )(config)
-      )
-      .addConfigTransforms((_, config) =>
-        updateAllSvAppFoundDsoConfigs_(
-          _.copy(zeroTransferFees = true)
         )(config)
       )
   }

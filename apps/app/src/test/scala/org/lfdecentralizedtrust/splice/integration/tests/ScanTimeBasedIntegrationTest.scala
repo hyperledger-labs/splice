@@ -13,7 +13,6 @@ import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
@@ -21,7 +20,6 @@ import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAnsConfig
 
 import java.time.Duration
-import scala.jdk.CollectionConverters.*
 
 class ScanTimeBasedIntegrationTest
     extends IntegrationTest
@@ -80,26 +78,15 @@ class ScanTimeBasedIntegrationTest
       val cfg = eventuallySucceeds() {
         sv1ScanBackend.getAmuletConfigForRound(firstRound + 3)
       }
-      cfg.amuletCreateFee.bigDecimal.setScale(10) should be(
-        SpliceUtil.defaultCreateFee.fee divide walletAmuletPrice setScale 10
-      )
+      cfg.amuletCreateFee.bigDecimal.setScale(10) should be(BigDecimal(0).bigDecimal.setScale(10))
       cfg.holdingFee.bigDecimal.setScale(10) should be(
         SpliceUtil.defaultHoldingFee.rate divide walletAmuletPrice setScale 10
       )
-      cfg.lockHolderFee.bigDecimal.setScale(10) should be(
-        SpliceUtil.defaultLockHolderFee.fee divide walletAmuletPrice setScale 10
-      )
+      cfg.lockHolderFee.bigDecimal.setScale(10) should be(BigDecimal(0).bigDecimal.setScale(10))
       cfg.transferFee.initial.bigDecimal.setScale(10) should be(
-        SpliceUtil.defaultTransferFee.initialRate.setScale(10)
+        SpliceUtil.zeroTransferFee.initialRate.setScale(10)
       )
-      cfg.transferFee.steps shouldBe (
-        SpliceUtil.defaultTransferFee.steps.asScala.toSeq.map(step =>
-          HttpScanAppClient.RateStep(
-            step._1 divide walletAmuletPrice,
-            step._2,
-          )
-        )
-      )
+      cfg.transferFee.steps shouldBe empty
     }
 
     clue(s"Try to get config for round ${firstRound + 4} which does not yet exist") {
