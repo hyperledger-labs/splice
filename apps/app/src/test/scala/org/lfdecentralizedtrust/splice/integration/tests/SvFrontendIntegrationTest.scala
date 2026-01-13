@@ -391,7 +391,7 @@ class SvFrontendIntegrationTest
 
           eventually() {
             val submitButton = webDriver.findElement(By.id("submit-button"))
-            webDriver.executeScript("arguments[0].click();", submitButton)
+            submitButton.click()
           }
 
           eventually() {
@@ -401,7 +401,7 @@ class SvFrontendIntegrationTest
 
           eventually() {
             val submitButton = webDriver.findElement(By.id("submit-button"))
-            webDriver.executeScript("arguments[0].click();", submitButton)
+            submitButton.click()
           }
         },
       )(
