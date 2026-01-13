@@ -37,15 +37,19 @@ class MergeUnclaimedDevelopmentFundCouponsTrigger(
     with SvTaskBasedTrigger[MergeUnclaimedDevelopmentFundCouponsTask] {
 
   private val store = svTaskContext.dsoStore
+  private val threshold = svConfig.unclaimedDevelopmentFundCouponsThreshold
 
   protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[MergeUnclaimedDevelopmentFundCouponsTask]] = {
-    val threshold = svConfig.unclaimedDevelopmentFundCouponsThreshold
-    val limit = PageLimit.tryCreate(threshold + 1)
+    val limit = PageLimit.tryCreate(2 * threshold + 1)
     store.listUnclaimedDevelopmentFundCoupons(limit).map { unclaimedDevelopmentFundCoupons =>
-      if (unclaimedDevelopmentFundCoupons.length > threshold) {
-        Seq(MergeUnclaimedDevelopmentFundCouponsTask(unclaimedDevelopmentFundCoupons))
+      if (unclaimedDevelopmentFundCoupons.length >= 2 * threshold) {
+        Seq(
+          MergeUnclaimedDevelopmentFundCouponsTask(
+            unclaimedDevelopmentFundCoupons.sortBy(_.payload.amount)
+          )
+        )
       } else {
         Seq()
       }
@@ -66,7 +70,7 @@ class MergeUnclaimedDevelopmentFundCouponsTrigger(
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
       choiceArg = new AmuletRules_MergeUnclaimedDevelopmentFundCoupons(
-        unclaimedDevelopmentFundCouponsTask.contracts.map(_.contractId).asJava
+        unclaimedDevelopmentFundCouponsTask.contracts.take(threshold).map(_.contractId).asJava
       )
       arg = new DsoRules_MergeUnclaimedDevelopmentFundCoupons(
         amuletRules.contractId,
