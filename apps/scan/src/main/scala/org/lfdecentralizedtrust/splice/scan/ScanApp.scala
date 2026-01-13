@@ -323,8 +323,6 @@ class ScanApp(
         store,
         acsSnapshotStore,
         config.spliceInstanceNames,
-        packageVersionSupport,
-        clock,
         loggerFactory,
       )
 

@@ -106,10 +106,13 @@ class TokenStandardMetadataTimeBasedIntegrationTest
       )(
         "rounds are defined and include tapped amulet",
         _ => {
-          val (roundNumber, _) = sv1ScanBackend.getRoundOfLatestData()
-          val totalBalance = sv1ScanBackend
-            .getTotalAmuletBalance(roundNumber)
-            .getOrElse(fail("total balance not yet defined"))
+          val totalBalance = BigDecimal(
+            sv1ScanBackend
+              .lookupInstrument("Amulet")
+              .flatMap(_.totalSupply)
+              .valueOrFail("total balance not yet defined")
+          )
+
           totalBalance should be >= walletUsdToAmulet(99.0)
         },
       )
