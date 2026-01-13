@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
@@ -75,7 +76,20 @@ class LogicalSynchronizerUpgradeIntegrationTest
               )
             )
           )
-        )(config)
+        )(
+          config.copy(
+            svApps = config.svApps ++
+              Seq(1, 2, 3, 4).map(sv =>
+                InstanceName.tryCreate(s"sv${sv}Local") ->
+                  config
+                    .svApps(InstanceName.tryCreate(s"sv$sv"))
+              ),
+            scanApps = config.scanApps ++ Seq(1, 2, 3, 4).map(sv =>
+              InstanceName.tryCreate(s"sv${sv}ScanLocal") ->
+                config.scanApps(InstanceName.tryCreate(s"sv${sv}Scan"))
+            ),
+          )
+        )
       )
       .withManualStart
 
