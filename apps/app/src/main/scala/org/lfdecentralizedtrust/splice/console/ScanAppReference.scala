@@ -249,12 +249,6 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
     }
 
-  @Help.Summary("Get the total balance of Amulet in the network")
-  def getTotalAmuletBalance(asOfEndOfRound: Long): Option[BigDecimal] =
-    consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetTotalAmuletBalance(asOfEndOfRound))
-    }
-
   @Help.Summary("Get the Amulet config parameters for a given round")
   def getAmuletConfigForRound(
       round: Long
@@ -616,6 +610,11 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.LookupInstrument(instrumentId))
     }
+
+  def getTotalAmuletBalance(): Option[BigDecimal] = {
+    lookupInstrument("Amulet")
+      .flatMap(_.totalSupply.map(s => BigDecimal(s)))
+  }
 
   def listInstruments() =
     consoleEnvironment.run {

@@ -5,6 +5,12 @@
 
 .. _release_notes:
 
+.. release-notes:: upcoming
+
+  - Scan
+
+    - ``/v0/total-amulet-balance`` and ``/v0/wallet-balance`` endpoints have been removed.
+
 .. release-notes:: 0.5.7
 
   .. important::
