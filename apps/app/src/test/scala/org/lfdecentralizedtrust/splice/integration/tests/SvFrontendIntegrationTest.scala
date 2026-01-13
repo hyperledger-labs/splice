@@ -415,7 +415,7 @@ class SvFrontendIntegrationTest
 
           clue("click the first inflight proposal to view details") {
             val proposals = getInflightProposals()
-            webDriver.executeScript("arguments[0].click();", proposals.asScala.head)
+            proposals.asScala.head.click()
           }
 
           eventually() {
@@ -449,7 +449,7 @@ class SvFrontendIntegrationTest
       actAndCheck(
         "sv2 clicks on an action required item", {
           val actionsRequired = getActionRequiredElems()
-          webDriver.executeScript("arguments[0].click();", actionsRequired.asScala.head)
+          actionsRequired.asScala.head.click()
         },
       )(
         "sv2 can see the vote request and cast a vote",
