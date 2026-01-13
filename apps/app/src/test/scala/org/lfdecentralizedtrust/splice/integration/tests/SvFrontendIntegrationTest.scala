@@ -24,6 +24,7 @@ import org.openqa.selenium.By
 import org.openqa.selenium.support.ui.Select
 import org.slf4j.event.Level
 
+import scala.jdk.CollectionConverters.*
 import java.util.Optional
 
 class SvFrontendIntegrationTest
@@ -308,6 +309,171 @@ class SvFrontendIntegrationTest
       }
     }
 
+    def createProposal(action: String, effectiveAtThreshold: Boolean = true)(
+        extraFormOps: WebDriverType => Unit
+    )(implicit
+        env: SpliceTestConsoleEnvironment
+    ) = {
+      val requestReasonUrl = "https://new-proposal-url.com/"
+      val requestReasonBody = "This is a summary of the proposal"
+      val thresholdDeadline = "2034-07-12 00:12"
+      val effectiveDate = "2034-07-13 00:12"
+
+      withFrontEnd("sv1") { implicit webDriver =>
+        val previousInflightProposalsSize = getInflightProposals().size
+        previousInflightProposalsSize shouldBe 0
+        // logger.debug(s"tesco at definition previousInflightProposalsSize: $previousInflightProposalsSize")
+
+        actAndCheck(
+          "sv1 operator can login and browse to the governance tab", {
+            go to s"http://localhost:$sv1UIPort/governance-beta"
+            loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
+          },
+        )(
+          "sv1 can navigate to the create proposal page",
+          _ => {
+            val initiateProposalButton = find(id("initiate-proposal-button"))
+            clue("initiate proposal button is visible") {
+              // eventuallySucceeds() {
+              initiateProposalButton should not be empty
+
+              click on id("initiate-proposal-button")
+              // }
+            }
+
+            clue("Select an Action page is visible") {
+              find(id("select-action")) should not be empty
+            }
+
+            clickOn(id("select-action"))
+
+            eventually() {
+              val actionItem = webDriver.findElement(By.cssSelector(s"[data-testid='$action']"))
+              actionItem.click()
+            }
+
+            webDriver.findElement(By.tagName("body")).click()
+
+            val nextButton = webDriver.findElement(By.cssSelector(s"[data-testid='next-button']"))
+            nextButton.click()
+
+            find(id("offboard-sv-action")) should not be empty
+
+          },
+        )
+
+        actAndCheck(
+          "sv1 operator can create a new proposal", {
+
+            setThresholdDeadline("sv1", thresholdDeadline, "offboard-sv-expiry-date-field")
+
+            if (effectiveAtThreshold) {
+              inside(find(id("effective-at-threshold-radio"))) { case Some(element) =>
+                element.underlying.click()
+              }
+            } else {
+              setEffectiveDate2("sv1", effectiveDate)
+            }
+
+            inside(find(id("offboard-sv-summary"))) { case Some(element) =>
+              element.underlying.sendKeys(requestReasonBody)
+            }
+
+            inside(find(id("offboard-sv-url"))) { case Some(element) =>
+              element.underlying.sendKeys(requestReasonUrl)
+            }
+
+            extraFormOps(webDriver)
+
+            clickVoteRequestSubmitButtonOnceEnabled2()
+          },
+        )(
+          "sv1 can see the new proposal",
+          _ => {
+            // find(id("inflight-proposals-section-title")) should not be empty
+
+            val currentInflightProposals = getInflightProposals()
+            currentInflightProposals.size shouldBe previousInflightProposalsSize + 1
+
+            clue("click the new proposal") {
+              // println(s"tesco currentinflight: ${currentInflightProposals.asScala.head}")
+              val link = webDriver
+                .findElement(By.cssSelector("[data-testid='inflight-proposals-row-link']"))
+              // webDriver.executeScript("arguments[0].scrollIntoView(true);", link)
+              // Not sure why this is the only way to make it work but hewre we are.
+              webDriver.executeScript("arguments[0].click();", link)
+
+              // link.click()
+              // webDriver.executeScript("arguments[0].click();", link)
+              // currentInflightProposals.asScala.head.click()
+            }
+          },
+        )
+
+      }
+
+      withFrontEnd("sv2") { implicit webDriver =>
+        val (_, reviewButton) = actAndCheck(
+          "sv2 operator can login and browse to the governance page", {
+            go to s"http://localhost:$sv2UIPort/governance-beta"
+            loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
+          },
+        )(
+          "sv2 can see the new vote request",
+          _ => {
+            eventuallySucceeds() {
+              val actionsRequired = getActionRequiredElems()
+              actionsRequired.size shouldBe 1
+
+              webDriver.executeScript("arguments[0].click();", actionsRequired.asScala.head)
+            }
+            // actionsRequired.asScala.head.click()
+
+            inside(find(id("your-vote-reason-input"))) { case Some(element) =>
+              element.underlying.sendKeys("A sample reason")
+            }
+
+            inside(find(id("your-vote-url-input"))) { case Some(element) =>
+              element.underlying.sendKeys("https://my-splice-vote-url.com")
+            }
+
+            webDriver.findElement(By.cssSelector(s"[data-testid='your-vote-accept']")).click()
+
+            eventuallyClickOn(id("submit-vote-button"))
+
+            clue("wait for the vote submission success message") {
+              eventuallySucceeds() {
+                inside(find(xpath("//*[@data-testid='vote-submission-success']"))) {
+                  case Some(element) =>
+                    element.text shouldBe "Vote successfully updated!"
+                }
+              }
+            }
+          },
+        )
+      }
+
+      withFrontEnd("sv1") { implicit webDriver =>
+        clue("sv1 operator can see the new vote from sv2") {
+          val sv2PartyId = sv2Backend.getDsoInfo().svParty.toProtoPrimitive
+          val votes =
+            webDriver.findElements(By.cssSelector("[data-testid='proposal-details-vote']"))
+          votes.size shouldBe 1
+
+          val voterInput = votes.asScala.head
+            .findElement(
+              By.cssSelector("[data-testid='proposal-details-voter-party-id-input']")
+            )
+          voterInput.getAttribute("value") shouldBe sv2PartyId
+        }
+
+      // actAndCheck(
+      //   "sv1 operator can see the vote request detail", {
+      //   },
+      // )("", _ => {})
+      }
+    }
+
     def testCreateAndVoteDsoRulesAction(action: String, effectiveAtThreshold: Boolean = true)(
         fillUpForm: WebDriverType => Unit
     )(validateRequestedActionInModal: WebDriverType => Unit)(implicit
@@ -561,6 +727,24 @@ class SvFrontendIntegrationTest
             }
           }
         }
+      }
+    }
+
+    "NEW UI: Offboard" in { implicit env =>
+      val sv3PartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+
+      createProposal("SRARC_OffboardSv") { implicit webDriver =>
+        // eventually() {
+        find(id("offboard-sv-member-dropdown")) match {
+          case Some(element) => element.underlying.click()
+          case None =>
+            fail("Could not find offboard-sv-member-dropdown")
+        }
+
+        val memberSelect = webDriver.findElement(By.cssSelector(s"[data-value='$sv3PartyId']"))
+        memberSelect.click()
+        webDriver.findElement(By.tagName("body")).click()
+        // }
       }
     }
 
@@ -1139,6 +1323,14 @@ class SvFrontendIntegrationTest
     tbodyInProgress
       .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
       .getOrElse(0)
+  }
+
+  def getInflightProposals()(implicit webDriver: WebDriverType) = {
+    webDriver.findElements(By.cssSelector("[data-testid='inflight-proposals-row-link']"))
+  }
+
+  def getActionRequiredElems()(implicit webDriver: WebDriverType) = {
+    webDriver.findElements(By.cssSelector("[data-testid='action-required-card-link']"))
   }
 
   def getVoteRequestsRejectedSize()(implicit webDriver: WebDriverType) = {
