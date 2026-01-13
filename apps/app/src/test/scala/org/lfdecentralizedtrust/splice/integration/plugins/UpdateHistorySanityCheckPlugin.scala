@@ -236,6 +236,7 @@ class UpdateHistorySanityCheckPlugin(
       }
       if (lines.nonEmpty) {
         val message = s"${this.getClass} contains errors: $lines, exiting test."
+        readLines.foreach(logger.warn(_))
         logger.error(message)
         System.err.println(message)
         sys.exit(1)

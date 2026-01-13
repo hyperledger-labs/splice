@@ -11,18 +11,16 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.transferinput.InputAmulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
-import org.lfdecentralizedtrust.splice.util.{SpliceUtil, Contract}
+import org.lfdecentralizedtrust.splice.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.Future
 
 trait TransferInputStore extends AppStore with LimitHelpers {
 
-  /** List all amulets owned by a user in descending order */
-  // TODO(#2257): we don't really need the round here anymore
+  /** List all non-expired amulets owned by a user in descending order according to their amount. */
   def listSortedAmuletsAndQuantity(
-      submittingRound: Long,
-      limit: Limit = Limit.DefaultLimit,
+      limit: Limit = Limit.DefaultLimit
   )(implicit
       tc: TraceContext
   ): Future[Seq[(BigDecimal, InputAmulet)]] = for {
@@ -30,7 +28,7 @@ trait TransferInputStore extends AppStore with LimitHelpers {
   } yield amulets
     .map(c =>
       (
-        SpliceUtil.currentAmount(c.payload, submittingRound, deductHoldingFees = false),
+        c.payload.amount.initialAmount,
         c,
       )
     )

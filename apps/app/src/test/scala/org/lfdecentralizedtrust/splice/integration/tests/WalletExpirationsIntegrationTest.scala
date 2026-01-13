@@ -30,6 +30,7 @@ class WalletExpirationsIntegrationTest
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
+        sv1Backend.participantClient
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })

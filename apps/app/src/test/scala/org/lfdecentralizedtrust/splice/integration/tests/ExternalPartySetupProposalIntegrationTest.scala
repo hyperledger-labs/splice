@@ -66,6 +66,7 @@ class ExternalPartySetupProposalIntegrationTest
   override lazy val sanityChecksIgnoredRootCreates = Seq(
     TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID,
     amuletCodegen.AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+    amuletCodegen.ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
   )
 
   override def environmentDefinition: EnvironmentDefinition = {
@@ -282,9 +283,10 @@ class ExternalPartySetupProposalIntegrationTest
             aliceValidatorBackend
               .getExternalPartyBalance(aliceParty)
               .totalUnlockedCoin
-          ) should beAround(
-            BigDecimal(2000 - 1000 - 16.0 - 6.0 /* 16 output fees, 6.0 sender change fees */ ) +
-              BigDecimal(issuingRound.issuancePerUnfeaturedAppRewardCoupon) * appRewardAmount
+          ) should be(
+            BigDecimal(1000) + BigDecimal(
+              issuingRound.issuancePerUnfeaturedAppRewardCoupon
+            ) * appRewardAmount
           )
           bobValidatorBackend
             .getExternalPartyBalance(bobParty)
@@ -335,16 +337,26 @@ class ExternalPartySetupProposalIntegrationTest
       val update = eventuallySucceeds() {
         sv1ScanBackend.getUpdate(updateId, encoding = CompactJson)
       }
-      val rewardRound =
-        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(amuletCodegen.ValidatorRewardCoupon.COMPANION)(
-            aliceParty,
-            c => c.data.user == aliceParty.toProtoPrimitive,
-          )
-          .loneElement
-          .data
-          .round
-          .number
+      // Create a validator reward to test reward minting
+      val (_, rewardRound) = actAndCheck(
+        "Create validator reward",
+        createRewards(
+          appRewards = Seq.empty,
+          validatorRewards = Seq((aliceParty, BigDecimal(1.0))),
+        ),
+      )(
+        "reward is observable",
+        _ =>
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(amuletCodegen.ValidatorRewardCoupon.COMPANION)(
+              aliceParty,
+              c => c.data.user == aliceParty.toProtoPrimitive,
+            )
+            .loneElement
+            .data
+            .round
+            .number,
+      )
 
       actAndCheck(
         s"Advance rounds until $rewardRound is issuing", {
@@ -423,10 +435,10 @@ class ExternalPartySetupProposalIntegrationTest
             aliceValidatorBackend
               .getExternalPartyBalance(aliceParty)
               .totalUnlockedCoin
-          ) should beAround(
+          ) should be(
             BigDecimal(
-              2000 - 1000 - 500 - 34.0 /* last number is fees from the prior transfer and this combined */
-            )
+              2000 - 1000 - 500
+            ) + BigDecimal(issuingRound.issuancePerUnfeaturedAppRewardCoupon) * appRewardAmount
           )
           bobValidatorBackend
             .getExternalPartyBalance(bobParty)

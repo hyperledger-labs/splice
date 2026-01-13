@@ -28,8 +28,7 @@ import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
 
 testMerging : Script ()
 testMerging = do
-  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
-    noTransferFee = True
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
 
   (operator, appRightCall) <- setupWalletOperator registry "wallet-operator"
   (alice, aliceDelegation) <- setupWalletUserNoPreapproval operator "alice"
@@ -63,8 +62,7 @@ testMerging = do
 -- | Test airdropping tokens to multiple users with merge delegation in place.
 testAirdrop : Script ()
 testAirdrop = do
-  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
-    noTransferFee = True
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
 
   (operator, featuredAppRight) <- setupWalletOperator registry "wallet-operator"
 
@@ -95,14 +93,12 @@ testAirdrop = do
 testMultiRegistryAirdrop : Script ()
 testMultiRegistryAirdrop = do
   registry1 <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
-    noTransferFee = True
     dsoPartyName = "dso-party"
 
   -- We don't yet have a mock token in the Splice repo that we could use to simulate a completely
   -- different token registry. For testing the logic it is though sufficient to create a second
   -- instance of Amulet with a different DSO party.
   registry2 <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
-    noTransferFee = True
     dsoPartyName = "mock-other-admin-party"
 
   (operator, featuredAppRight) <- setupWalletOperator registry1 "wallet-operator"
@@ -304,4 +300,3 @@ checkExactlyOneHolding registry expectedAmount user = do
   WalletClient.checkBalance user registry.instrumentId expectedAmount
   holdingCids <- WalletClient.listHoldingCids user registry.instrumentId
   length holdingCids === 1
-
