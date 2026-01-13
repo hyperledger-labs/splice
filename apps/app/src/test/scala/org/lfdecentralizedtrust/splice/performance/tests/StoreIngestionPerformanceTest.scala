@@ -53,6 +53,7 @@ abstract class StoreIngestionPerformanceTest(
           _ <- store.ingestionSink.initialize()
           txs = loadTxsFromDump()
           _ <- ingestAll(store, txs)
+          _ <- sanityCheckTables(storage)
         } yield ()
       }
   }
@@ -139,6 +140,34 @@ abstract class StoreIngestionPerformanceTest(
             )
           }
       })
+  }
+
+  protected val tablesToSanityCheck: Seq[String]
+
+  /** Make sure that there's at least one row, as otherwise things might not be wired up properly.
+    */
+  private def sanityCheckTables(storage: DbStorage)(implicit tc: TraceContext) = {
+    import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+    Future.traverse(tablesToSanityCheck) { tableName =>
+      storage
+        .querySingle(
+          sql"select count(*) from #$tableName".as[Int].headOption,
+          s"sanityCheck-$tableName",
+        )
+        .value
+        .failOnShutdownToAbortException("Should not be shutting down.")
+        .flatMap {
+          case Some(count) if count > 0 =>
+            logger.info(s"Table $tableName has $count rows, sanity check passed.")
+            Future.unit
+          case err =>
+            Future.failed(
+              new IllegalStateException(
+                s"Sanity check failed for table $tableName. There are $err rows."
+              )
+            )
+        }
+    }
   }
 
   protected def mkParticipantId(name: String): ParticipantId =

@@ -5,9 +5,10 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.performance.tests.{
-  UpdateHistoryIngestionPerformanceTest,
+  ScanStoreIngestionPerformanceTest,
   StoreIngestionPerformanceTest,
   SvDsoStoreIngestionPerformanceTest,
+  UpdateHistoryIngestionPerformanceTest,
 }
 
 import java.nio.file.Path
@@ -31,7 +32,7 @@ class TestRunner(testNames: String, configPath: Path, updateHistoryDumpPath: Pat
         SvDsoStoreIngestionPerformanceTest.tryCreate(updateHistoryDumpPath, config, loggerFactory)
       ),
       "DbScanStore" -> (() =>
-        UpdateHistoryIngestionPerformanceTest
+        ScanStoreIngestionPerformanceTest
           .tryCreate(updateHistoryDumpPath, config, loggerFactory)
       ),
       "UpdateHistory" -> (() =>

@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.config.{IngestionConfig, SpliceConfig}
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
-import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanStore, DbScanStoreMetrics}
+import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanStore, DbScanStoreMetrics, ScanTables}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import pureconfig.ConfigReader
@@ -41,6 +41,9 @@ class ScanStoreIngestionPerformanceTest(
     ) {
 
   override type Store = MultiDomainAcsStore
+
+  override protected val tablesToSanityCheck: Seq[String] =
+    Seq(ScanTables.acsTableName, ScanTables.txLogTableName)
 
   override protected def mkStore(storage: DbStorage): MultiDomainAcsStore = {
     val packageSignatures =
@@ -86,7 +89,7 @@ object ScanStoreIngestionPerformanceTest {
       implicit
       ec: ExecutionContext,
       actorSystem: ActorSystem,
-  ): UpdateHistoryIngestionPerformanceTest = {
+  ): ScanStoreIngestionPerformanceTest = {
     val spliceConfig = SpliceConfig.loadOrThrow(config)
     val sv1Config = spliceConfig.scanApps.getOrElse(
       InstanceName.tryCreate("sv1Scan"),
@@ -101,7 +104,7 @@ object ScanStoreIngestionPerformanceTest {
             s"Failed to read SvDsoStoreIngestionPerformanceTest config: $err"
           ),
         cfg =>
-          new UpdateHistoryIngestionPerformanceTest(
+          new ScanStoreIngestionPerformanceTest(
             PartyId.tryFromProtoPrimitive(cfg.dsoParty),
             cfg.migrationId,
             updateHistoryDumpPath,

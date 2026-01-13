@@ -15,7 +15,7 @@ import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import org.lfdecentralizedtrust.splice.sv.store.SvStore
-import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
+import org.lfdecentralizedtrust.splice.sv.store.db.{DbSvDsoStore, DsoTables}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import pureconfig.ConfigReader
 import pureconfig.generic.semiauto.deriveReader
@@ -42,6 +42,8 @@ class SvDsoStoreIngestionPerformanceTest(
     ) {
 
   override type Store = MultiDomainAcsStore
+
+  override protected val tablesToSanityCheck: Seq[String] = Seq(DsoTables.acsTableName)
 
   override protected def mkStore(storage: DbStorage): MultiDomainAcsStore = {
     val packageSignatures =
