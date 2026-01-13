@@ -21,8 +21,8 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   UpdateHistoryResponseV2,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
-import org.lfdecentralizedtrust.splice.store.db.DbAppStore
 
 import java.nio.file.{Files, Path}
 import scala.concurrent.{ExecutionContext, Future}
@@ -41,16 +41,16 @@ abstract class StoreIngestionPerformanceTest(
 
   protected implicit val closeContext: CloseContext = CloseContext(this)
 
-  type Store <: DbAppStore
+  type Store <: HasIngestionSink
   protected def mkStore(storage: DbStorage): Store
 
   def run(): Future[Unit] = {
     val storage = initializeStorage()
     val store = mkStore(storage)
     TraceContext
-      .withNewTraceContext(s"${store.storeName}PerformanceTest") { implicit tc =>
+      .withNewTraceContext(this.getClass.getName) { implicit tc =>
         for {
-          _ <- store.multiDomainAcsStore.ingestionSink.initialize()
+          _ <- store.ingestionSink.initialize()
           txs = loadTxsFromDump()
           _ <- ingestAll(store, txs)
         } yield ()
@@ -125,7 +125,7 @@ abstract class StoreIngestionPerformanceTest(
       .runWith(Sink.foreachAsync(parallelism = 1) { case (batch, index) =>
         logger.info(s"Ingesting batch $index of ${batch.length} elements")
         val before = System.nanoTime()
-        store.multiDomainAcsStore.ingestionSink
+        store.ingestionSink
           .ingestUpdateBatch(NonEmptyList.fromListUnsafe(batch))
           .map { _ =>
             val after = System.nanoTime()

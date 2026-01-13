@@ -1,29 +1,23 @@
 package org.lfdecentralizedtrust.splice.performance.tests
 
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.NoReportingTracerProvider
 import com.typesafe.config.Config
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.{IngestionConfig, SpliceConfig}
-import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.scan.store.ScanStore
-import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanStore, DbScanStoreMetrics}
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
-import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, UpdateHistory}
 import pureconfig.ConfigReader
 import pureconfig.generic.semiauto.deriveReader
 
 import java.nio.file.Path
 import scala.concurrent.ExecutionContext
 
-class ScanStoreIngestionPerformanceTest(
+class UpdateHistoryIngestionPerformanceTest(
     dsoParty: PartyId,
     migrationId: Long,
     updateHistoryDumpPath: Path,
@@ -40,47 +34,33 @@ class ScanStoreIngestionPerformanceTest(
       ingestionConfig,
     ) {
 
-  override type Store = MultiDomainAcsStore
+  override type Store = UpdateHistory
 
-  override protected def mkStore(storage: DbStorage): MultiDomainAcsStore = {
-    val packageSignatures =
-      ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        DarResources.amulet.all ++
-          DarResources.validatorLifecycle.all ++
-          DarResources.dsoGovernance.all
-      )
-    implicit val templateJsonDecoder: TemplateJsonDecoder =
-      new ResourceTemplateDecoder(packageSignatures, loggerFactory)
-    new DbScanStore(
-      ScanStore.Key(dsoParty),
-      storage,
-      isFirstSv = true,
-      loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory)(
-        NoReportingTracerProvider.tracer
-      ),
-      _ => throw new RuntimeException("Scan Aggregates do not matter for this test."),
-      DomainMigrationInfo(
-        migrationId,
-        None,
-      ),
-      participantId = mkParticipantId("IngestionPerformanceIngestionTest"),
-      IngestionConfig(),
-      new DbScanStoreMetrics(NoOpMetricsFactory, loggerFactory, timeouts),
-      0L,
-    )(ec, templateJsonDecoder, closeContext).multiDomainAcsStore
+  override protected def mkStore(storage: DbStorage): UpdateHistory = {
+    new UpdateHistory(
+      storage = storage,
+      domainMigrationInfo = DomainMigrationInfo(migrationId, None),
+      storeName = this.getClass.getName,
+      participantId = mkParticipantId(this.getClass.getSimpleName),
+      updateStreamParty = dsoParty,
+      backfillingRequired = UpdateHistory.BackfillingRequirement.BackfillingNotRequired,
+      loggerFactory = loggerFactory,
+      enableissue12777Workaround = true,
+      enableImportUpdateBackfill = false,
+      metrics = HistoryMetrics.apply(NoOpMetricsFactory, migrationId),
+    )
   }
 
 }
 
-object ScanStoreIngestionPerformanceTest {
+object UpdateHistoryIngestionPerformanceTest {
 
-  case class ScanStoreIngestionPerformanceTestConfig(
+  case class UpdateHistoryIngestionPerformanceTestConfig(
       dsoParty: String,
       migrationId: Long,
   )
-  private implicit val configReader: ConfigReader[ScanStoreIngestionPerformanceTestConfig] =
-    deriveReader[ScanStoreIngestionPerformanceTestConfig]
+  private implicit val configReader: ConfigReader[UpdateHistoryIngestionPerformanceTestConfig] =
+    deriveReader[UpdateHistoryIngestionPerformanceTestConfig]
 
   def tryCreate(updateHistoryDumpPath: Path, config: Config, loggerFactory: NamedLoggerFactory)(
       implicit
@@ -94,7 +74,7 @@ object ScanStoreIngestionPerformanceTest {
     )
 
     configReader
-      .from(config.getValue("performance.tests.DbSvDsoStore"))
+      .from(config.getValue("performance.tests.UpdateHistoryIngestionPerformanceTest"))
       .fold(
         err =>
           throw new IllegalArgumentException(
