@@ -3,6 +3,7 @@
     "contractEntry" : {
       "JsActiveContract" : {
         "createdEvent" : {
+          "acsDelta" : true,
           "contractId" : "1",
           "contractKey" : null,
           "createArgument" : {
@@ -11,7 +12,7 @@
                 "createdAt" : {
                   "number" : "1"
                 },
-                "initialAmount" : "1064.0304414400",
+                "initialAmount" : "1000.0000000000",
                 "ratePerRound" : {
                   "rate" : "0.0038051800"
                 }
@@ -39,7 +40,7 @@
                 "message" : ""
               },
               "viewValue" : {
-                "amount" : "1064.0304414400",
+                "amount" : "1000.0000000000",
                 "instrumentId" : {
                   "admin" : "dso::normalized",
                   "id" : "Amulet"
@@ -67,6 +68,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
+          "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -86,6 +88,7 @@
     "contractEntry" : {
       "JsActiveContract" : {
         "createdEvent" : {
+          "acsDelta" : true,
           "contractId" : "2",
           "contractKey" : null,
           "createArgument" : {
@@ -134,6 +137,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
+          "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -153,6 +157,7 @@
     "contractEntry" : {
       "JsActiveContract" : {
         "createdEvent" : {
+          "acsDelta" : true,
           "contractId" : "3",
           "contractKey" : null,
           "createArgument" : {
@@ -160,7 +165,7 @@
               "createdAt" : {
                 "number" : "1"
               },
-              "initialAmount" : "4100.8695585600",
+              "initialAmount" : "4289.0000000000",
               "ratePerRound" : {
                 "rate" : "0.0038051800"
               }
@@ -180,7 +185,7 @@
                 "message" : ""
               },
               "viewValue" : {
-                "amount" : "4100.8695585600",
+                "amount" : "4289.0000000000",
                 "instrumentId" : {
                   "admin" : "dso::normalized",
                   "id" : "Amulet"
@@ -201,6 +206,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
+          "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -220,11 +226,20 @@
     "contractEntry" : {
       "JsActiveContract" : {
         "createdEvent" : {
+          "acsDelta" : true,
           "contractId" : "4",
           "contractKey" : null,
           "createArgument" : {
-            "amount" : "30.0000000000",
-            "issuer" : "alice::normalized",
+            "amount" : {
+              "createdAt" : {
+                "number" : "1"
+              },
+              "initialAmount" : "500.0000000000",
+              "ratePerRound" : {
+                "rate" : "0.0038051800"
+              }
+            },
+            "dso" : "dso::normalized",
             "owner" : "alice::normalized"
           },
           "createdAt" : "1971-01-01T00:00:00Z",
@@ -239,7 +254,7 @@
                 "message" : ""
               },
               "viewValue" : {
-                "amount" : "489.0000000000",
+                "amount" : "500.0000000000",
                 "instrumentId" : {
                   "admin" : "dso::normalized",
                   "id" : "Amulet"
@@ -260,6 +275,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
+          "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
           "signatories" : [
             "dso::normalized",
             "alice::normalized"
@@ -279,9 +295,14 @@
     "contractEntry" : {
       "JsActiveContract" : {
         "createdEvent" : {
+          "acsDelta" : true,
           "contractId" : "5",
           "contractKey" : null,
-          "createArgument" : null,
+          "createArgument" : {
+            "amount" : "30.0000000000",
+            "issuer" : "alice::normalized",
+            "owner" : "alice::normalized"
+          },
           "createdAt" : "1971-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [
@@ -314,6 +335,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-token-test-dummy-holding",
+          "representativePackageId" : "4f40fb033ef3db89623642c1b494e846097fa32af138b3864a63aa15937a323d",
           "signatories" : [
             "alice::normalized"
           ],
@@ -332,6 +354,7 @@
     "contractEntry" : {
       "JsActiveContract" : {
         "createdEvent" : {
+          "acsDelta" : true,
           "contractId" : "6",
           "contractKey" : null,
           "createArgument" : {
@@ -371,6 +394,7 @@
           ],
           "offset" : 1,
           "packageName" : "splice-token-test-dummy-holding",
+          "representativePackageId" : "4f40fb033ef3db89623642c1b494e846097fa32af138b3864a63aa15937a323d",
           "signatories" : [
             "alice::normalized"
           ],

@@ -27,7 +27,6 @@ class BootstrapTest extends IntegrationTest {
       // We reduce the polling interval here primarily for the top-up trigger to ensure that a top-up happens as soon as
       // possible during the validator setup and other txs do not get throttled for want of traffic.
       .addConfigTransform((_, config) => ConfigTransforms.reducePollingInterval(config))
-      .addConfigTransform((_, config) => ConfigTransforms.disableZeroFees()(config))
 
   "Bootstrap script should pass" in { implicit env =>
     // the script logs errors when a ANS name check fails but then recovers from this

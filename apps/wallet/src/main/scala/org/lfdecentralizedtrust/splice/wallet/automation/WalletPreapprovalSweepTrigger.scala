@@ -37,7 +37,7 @@ class WalletPreapprovalSweepTrigger(
     override val ec: ExecutionContext,
     override val tracer: Tracer,
     mat: Materializer,
-) extends WalletSweepTrigger(context, store, config, scanConnection, packageVersionSupport) {
+) extends WalletSweepTrigger(context, store, config, scanConnection) {
 
   override protected def getOutstandingBalanceUsd(
       amuletPrice: java.math.BigDecimal,

@@ -1,5 +1,9 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  AppRewardCoupon,
+  ValidatorRewardCoupon,
+}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
@@ -7,14 +11,17 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
-import org.lfdecentralizedtrust.splice.util.{SpliceUtil, TimeTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{
+  SpliceUtil,
+  TimeTestUtil,
+  TriggerTestUtil,
+  WalletTestUtil,
+}
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExpiredAmuletTrigger
-import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.HasExecutionContext
 import monocle.macros.syntax.lens.*
-import org.slf4j.event.Level
 
 import java.time.Duration
 
@@ -22,7 +29,8 @@ class TimeBasedTreasuryIntegrationTest
     extends IntegrationTest
     with HasExecutionContext
     with WalletTestUtil
-    with TimeTestUtil {
+    with TimeTestUtil
+    with TriggerTestUtil {
 
   // We increase holding fees for this test so we can expire amulets within a few rounds
   // without running into problematic because of, e.g., create fees.
@@ -47,21 +55,39 @@ class TimeBasedTreasuryIntegrationTest
   // TODO (#965) remove and fix test failures
   override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
 
+  override protected lazy val sanityChecksIgnoredRootCreates = Seq(
+    AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+    ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+  )
+
   "automatically merge transfer inputs when the automation is triggered" in { implicit env =>
     val (alice, bob) = onboardAliceAndBob()
     waitForWalletUser(aliceValidatorWalletClient)
+    val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
 
     // create two amulets in alice's wallet
-    aliceWalletClient.tap(50)
-    checkWallet(alice, aliceWalletClient, Seq(exactly(50)), holdingFee)
+    aliceWalletClient.tap(10)
+    checkWallet(alice, aliceWalletClient, Seq(exactly(10)), holdingFee)
 
-    // run a transfer such that alice's validator has some rewards
-    p2pTransfer(aliceWalletClient, bobWalletClient, bob, 40.0)
+    // create some rewards for alice's validator
+    createRewards(
+      validatorRewards = Seq((alice, 0.43)),
+      appRewards = Seq((aliceValidatorParty, 0.43, false)),
+    )
     eventually()(aliceValidatorWalletClient.listAppRewardCoupons() should have size 1)
     eventually()(aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1)
-    // and give alice another amulet.
-    aliceWalletClient.tap(50)
-    checkWallet(alice, aliceWalletClient, Seq((9, 10), exactly(50)), holdingFee)
+    TriggerTestUtil.setTriggersWithin(
+      triggersToPauseAtStart = Seq(
+        aliceValidatorBackend
+          .userWalletAutomation(aliceWalletClient.config.ledgerApiUser)
+          .futureValue
+          .trigger[CollectRewardsAndMergeAmuletsTrigger]
+      )
+    ) {
+      // and give alice another amulet.
+      aliceWalletClient.tap(50)
+      checkWallet(alice, aliceWalletClient, Seq((9, 10), exactly(50)), holdingFee)
+    }
 
     // advance by two ticks, so the issuing round of round 1 is created
     advanceRoundsToNextRoundOpening
@@ -123,92 +149,6 @@ class TimeBasedTreasuryIntegrationTest
         exactly(100),
         exactly(holdingFee),
       )
-  }
-
-  "don't collect rewards if their collection is more expensive than they reward in amulets" in {
-    implicit env =>
-      val (_, bob) = onboardAliceAndBob()
-      waitForWalletUser(aliceValidatorWalletClient)
-
-      // giving alice 2 amulets...
-      aliceWalletClient.tap(1)
-      aliceWalletClient.tap(1)
-      eventually() {
-        aliceWalletClient.list().amulets should have length 2
-      }
-      // ..so when she pays bob, she doesn't have to pay a transfer fee which
-      // will result in alice validator's reward being small enough that its not worth it to collect the reward
-      p2pTransfer(aliceWalletClient, bobWalletClient, bob, 0.00001)
-      eventually() {
-        aliceValidatorWalletClient.listAppRewardCoupons() should have length 1
-        aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 1
-      }
-
-      // advancing the rounds so the rewards would be collectable.
-      advanceRoundsToNextRoundOpening
-      advanceRoundsToNextRoundOpening
-
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-        {
-          // reward is now collectable..
-          advanceRoundsToNextRoundOpening
-        },
-        entries => {
-          forAtLeast(1, entries)( // however, we see that we choose not to the validator reward..
-            _.message should include(
-              "is smaller than the create-fee"
-            )
-          )
-        },
-      )
-
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-        {
-          aliceValidatorWalletClient.tap(1)
-          eventually() {
-            aliceValidatorWalletClient.list().amulets should have length 1
-          }
-        },
-        entries => {
-          forAtLeast(
-            1,
-            entries,
-          )( // .. even when alice's validator has another amulet and would only need to pay
-            // an create-fee for collecting the reward.
-            _.message should include(
-              "is smaller than the create-fee"
-            )
-          )
-        },
-      )
-  }
-
-  "don't run merge if rewards and amulets are too small" in { implicit env =>
-    val (_, _) = onboardAliceAndBob()
-    aliceWalletClient.tap(0.001)
-    aliceWalletClient.tap(0.001)
-
-    eventually() {
-      aliceWalletClient.list().amulets should have length 2
-    }
-
-    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-      {
-        // trigger automation.
-        advanceRoundsToNextRoundOpening
-      },
-      entries => {
-        forAtLeast(
-          1,
-          entries,
-        )(
-          // but do nothing since our amulets are too small to be worth merging.
-          _.message should include regex (
-            "the total rewards and amulet quantity .* is smaller than the create-fee"
-          )
-        )
-      },
-    )
   }
 
   "merge also amulet that should be expired" in { implicit env =>

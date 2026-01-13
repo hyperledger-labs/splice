@@ -15,7 +15,7 @@ module Splice.Tests.TestAmuletTokenDvP where
 
 import Daml.Script
 
-import DA.Action (unless)
+import DA.Action (unless, when)
 import DA.Assert
 import DA.Foldable (forA_, foldMap)
 import DA.Optional (isSome)
@@ -142,7 +142,7 @@ setupOtcTrade  = do
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
   -- check metadata
-  expectBurn result.meta
+  expectNoBurn result.meta
 
   -- check lock context
   [(_, lockedHolding)] <- WalletClient.listLockedHoldings alice registry.instrumentId
@@ -212,7 +212,7 @@ testDvP = script do
     allocationsWithContext = fmap snd richAllocationsWithContext
 
   -- check metadata
-  forA_ results $ \result -> expectBurn result.meta
+  forA_ results $ \result -> expectNoBurn result.meta
 
   -- check that the expected transfers happened
   WalletClient.checkHoldingWithAmountExists alice amuletId 20.0
@@ -232,8 +232,8 @@ testDvP = script do
 
       extraAppReward = 2.0 -- 1 $ (at 0.5 Amulet per $)
       providerWeight = 0.8
-      aliceAmount = providerWeight * (extraAppReward + 1.06) -- 1% fees plus the 0.06 Amulet create fee  (at 0.5 Amulet per $)
-      bobAmount = providerWeight * (extraAppReward + 0.26) -- 0.5% fees (at 0.5 Amulet per $)
+      aliceAmount = providerWeight * extraAppReward
+      bobAmount = providerWeight * extraAppReward
 
       checkNumCouponsFor b expectedNumCoupons = do
         let numCoupons = length $ filter (\c -> c.beneficiary == Some b) coupons
@@ -321,7 +321,7 @@ appBackendListAllocations p ref = do
         pure (fundedAllocation.allocation.transferLegId, (cid, fundedAllocation))
   pure $ TextMap.fromList matchingAllocs
 
-expectBurn : Metadata -> Script ()
-expectBurn meta =
-  unless (isSome $ TextMap.lookup burnedMetaKey meta.values) $
-    fail $ "Expected burned meta key to be present in " <> show meta
+expectNoBurn : Metadata -> Script ()
+expectNoBurn meta =
+  when (isSome $ TextMap.lookup burnedMetaKey meta.values) $
+    fail $ "Did not expect burned meta key to be present in " <> show meta

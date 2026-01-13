@@ -18,18 +18,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 trait PackageVersionSupport extends NamedLogging {
 
-  def supportBootstrapWithNonZeroRound(parties: Seq[PartyId], now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[FeatureSupport] = {
-    isDarSupported(
-      parties,
-      PackageIdResolver.Package.SpliceDsoGovernance,
-      now,
-      DarResources.dsoGovernance,
-      DarResources.dsoGovernance_0_1_17,
-    )
-  }
-
   def supportsMergeDuplicatedValidatorLicense(
       dsoGovernanceParties: Seq[PartyId],
       amuletParties: Seq[PartyId],
@@ -78,33 +66,6 @@ trait PackageVersionSupport extends NamedLogging {
       // this is when the description field was added to transfer preapprovals
       DarResources.wallet_0_1_9,
       ignoreRedundantCheck = true,
-    )
-  }
-
-  // TODO(#2257): remove this flag once the holding fees change has been rolled out to MainNet
-  def noHoldingFeesOnTransfers(dsoParty: PartyId, now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[FeatureSupport] = {
-    isDarSupported(
-      Seq(dsoParty),
-      PackageIdResolver.Package.SpliceAmulet,
-      now,
-      DarResources.amulet,
-      // This is when the AmuletRules transfer choice was changed to not charge holding fees
-      DarResources.amulet_0_1_14,
-    )
-  }
-
-  def supportsExpectedDsoParty(parties: Seq[PartyId], now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[FeatureSupport] = {
-    isDarSupported(
-      parties,
-      PackageIdResolver.Package.SpliceAmulet,
-      now,
-      DarResources.amulet,
-      // this is when the expectedDsoParty was added to all choices granted to users on AmuletRules and ExternalAmuletRules
-      DarResources.amulet_0_1_11,
     )
   }
 

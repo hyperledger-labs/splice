@@ -27,7 +27,7 @@ export const buildScanMock = (baseScanUrl: string): RestHandler[] => {
   const scanUrl = `${baseScanUrl}/api/scan`;
   return [
     rest.get(`${scanUrl}/v0/feature-support`, (_, res, ctx) => {
-      return res(ctx.json<FeatureSupportResponse>({ no_holding_fees_on_transfers: false }));
+      return res(ctx.json<FeatureSupportResponse>({ }));
     }),
 
     dsoInfoHandler(scanUrl),
