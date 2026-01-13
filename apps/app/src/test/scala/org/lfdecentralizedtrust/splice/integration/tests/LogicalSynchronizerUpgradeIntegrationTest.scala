@@ -68,55 +68,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       .addConfigTransforms((_, config) => {
         ConfigTransforms
-          .bumpCantonSyncPortsBy(22_000, _.contains("Local"))
-          .compose(
-            ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
-              if (name.endsWith("Local")) {
-                config
-              } else {
-                config.copy(
-                  domainMigrationDumpPath =
-                    Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
-                )
-              }
-            }
-          )(
-            config.copy(
-              svApps = config.svApps ++
-                Seq(1, 2, 3, 4).map(sv =>
-                  InstanceName.tryCreate(s"sv${sv}Local") ->
-                    ConfigTransforms.withBftSequencer(
-                      config
-                        .svApps(InstanceName.tryCreate(s"sv$sv"))
-                        .copy(
-                          onboarding = Some(
-                            DomainMigration(
-                              name = getSvName(sv),
-                              dumpFilePath = Path.of(""),
-                            )
-                          ),
-                          domainMigrationId = 1L,
-                          legacyMigrationId = Some(0L),
-                        )
-                    )
-                ),
-              scanApps = config.scanApps ++ Seq(1, 2, 3, 4).map(sv =>
-                InstanceName.tryCreate(s"sv${sv}ScanLocal") ->
-                  ConfigTransforms.withBftSequencer(
-                    s"sv${sv}ScanLocal",
-                    config
-                      .scanApps(InstanceName.tryCreate(s"sv${sv}Scan"))
-                      .copy(domainMigrationId = 1L),
-                    migrationId = 1L,
-                    basePort = 27010,
-                  )
-              ),
-            )
-          )
+          .bumpCantonSyncPortsBy(22_000, _.contains("Local"))(config)
       })
-      .addConfigTransform((_, config) =>
-        ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
-      )
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllScanAppConfigs_(conf =>
           conf.copy(cache =
