@@ -3218,7 +3218,6 @@ class State:
         (validator_reward_coupons, app_reward_coupons) = self.handle_transfer_rewards(
             transaction, event.child_event_ids
         )
-        assert len(validator_reward_coupons) == 1
         amount = amulet.payload.get_amulet_amount()
         assert amount.get_expiring_amount_created_at() == round_number
         if renewal:
@@ -3231,8 +3230,15 @@ class State:
             textwrap.dedent(
                 f"""\
                          round: {round_number}
-                         burnt_locked_amulet: -{amount.get_expiring_amount_initial_amount()} created in round {round_number}
+                         burnt_locked_amulet: -{amount.get_expiring_amount_initial_amount()} created in round {round_number}"""
+            )
+            + (
+                textwrap.dedent(
+                    f"""
                          validator_activity_record for {sender} with amount {validator_reward_coupons[0].payload.get_validator_reward_amount()}"""
+                )
+                if validator_reward_coupons
+                else ""
             ),
             parties=[user],
         )

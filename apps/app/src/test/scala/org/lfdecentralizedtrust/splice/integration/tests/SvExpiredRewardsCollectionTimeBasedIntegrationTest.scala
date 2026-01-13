@@ -7,6 +7,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.util.{Contract, SvTestUtil}
 
+import java.util.UUID
 import scala.concurrent.duration.*
 
 class SvExpiredRewardsCollectionTimeBasedIntegrationTest
@@ -37,16 +38,25 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
     // contract IDs of existing ones, and compare to that below
     val leftoverRewardIds = getRewardCoupons(round).view.map(_.id).toSet
 
+    // Tap to pay preapproval fees
+    aliceValidatorWalletClient.tap(100.0)
+    bobValidatorWalletClient.tap(100.0)
+    // Self feature to get app rewards
+    aliceValidatorWalletClient.selfGrantFeaturedAppRight()
+    bobValidatorWalletClient.selfGrantFeaturedAppRight()
+
     val (aliceParty, bobParty) = onboardAliceAndBob()
+    aliceWalletClient.createTransferPreapproval()
+    bobWalletClient.createTransferPreapproval()
     aliceWalletClient.tap(100.0)
     bobWalletClient.tap(100.0)
 
     actAndCheck()(
       "Generate some reward coupons by executing a few direct transfers", {
-        p2pTransfer(aliceWalletClient, bobWalletClient, bobParty, 10.0)
-        p2pTransfer(aliceWalletClient, bobWalletClient, bobParty, 10.0)
-        p2pTransfer(bobWalletClient, aliceWalletClient, aliceParty, 10.0)
-        p2pTransfer(bobWalletClient, aliceWalletClient, aliceParty, 10.0)
+        aliceWalletClient.transferPreapprovalSend(bobParty, 10.0, UUID.randomUUID.toString)
+        aliceWalletClient.transferPreapprovalSend(bobParty, 10.0, UUID.randomUUID.toString)
+        bobWalletClient.transferPreapprovalSend(aliceParty, 10.0, UUID.randomUUID.toString)
+        bobWalletClient.transferPreapprovalSend(aliceParty, 10.0, UUID.randomUUID.toString)
       },
     )(
       "Wait for all reward coupons to be created",
@@ -56,7 +66,7 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
         getRewardCoupons(round)
           .filterNot(c =>
             leftoverRewardIds(c.id)
-          ) should have length 8 // 4 app rewards + 4 validator
+          ) should have length 6 // 4 featured app rewards + 2 validator from setting up preapprovals
       },
     )
     actAndCheck(

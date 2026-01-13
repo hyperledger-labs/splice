@@ -354,7 +354,7 @@ class DevelopmentFundCouponIntegrationTest
     val bobBalanceAfter = clue("Coupon is collected by the collect rewards automation") {
       eventually() {
         aliceValidatorWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
-        val newBalance = 34 // 40 - fees
+        val newBalance = 40
         checkWallet(
           bobParty,
           bobWalletClient,

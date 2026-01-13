@@ -737,13 +737,13 @@ testAmuletRulesConfigChange = do
   [(_, amuletRules)] <- query @AmuletRules dso
 
   let defaultTransferConfig2 = TransferConfig with
-        createFee = FixedFee 0.04
+        createFee = FixedFee 0.0
         holdingFee = RatePerRound 0.00004
-        lockHolderFee = FixedFee 0.007
+        lockHolderFee = FixedFee 0.0
         transferFee = SteppedRate with
-          initialRate = 0.06
-          steps = [(100.1, 0.002), (1000.1, 0.0002), (1000000.1, 0.00002)]
-        extraFeaturedAppRewardAmount = 2.0
+          initialRate = 0.0
+          steps = []
+        extraFeaturedAppRewardAmount = 1.0
         maxNumInputs = 101
         maxNumOutputs = 101
         maxNumLockHolders = 11

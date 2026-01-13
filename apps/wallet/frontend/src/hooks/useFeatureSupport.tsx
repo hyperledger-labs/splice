@@ -6,7 +6,6 @@ import { useWalletClient } from '../contexts/WalletServiceContext';
 interface WalletFeatureSupport {
   tokenStandard: boolean;
   transferPreapprovalDescription: boolean;
-  noHoldingFeesOnTransfers: boolean;
 }
 export const useFeatureSupport = (): UseQueryResult<WalletFeatureSupport> => {
   const walletClient = useWalletClient();
@@ -14,11 +13,9 @@ export const useFeatureSupport = (): UseQueryResult<WalletFeatureSupport> => {
     queryKey: ['featureSupport'],
     queryFn: async () => {
       const result = await walletClient.featureSupport();
-      console.log('RESult', result);
       return {
         tokenStandard: result.token_standard,
         transferPreapprovalDescription: result.transfer_preapproval_description,
-        noHoldingFeesOnTransfers: result.no_holding_fees_on_transfers,
       };
     },
   });

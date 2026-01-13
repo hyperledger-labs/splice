@@ -24,11 +24,4 @@ class SpliceUtilTest extends AnyWordSpec with BaseTest {
     // Capped at initial amount
     SpliceUtil.holdingFee(amulet, 3L) shouldBe new BigDecimal(1.0).setScale(10)
   }
-  "compute current amount" in {
-    SpliceUtil.currentAmount(amulet, 0L) shouldBe new BigDecimal(1.0).setScale(10)
-    SpliceUtil.currentAmount(amulet, 1L) shouldBe new BigDecimal(0.5).setScale(10)
-    SpliceUtil.currentAmount(amulet, 2L) shouldBe new BigDecimal(0.0).setScale(10)
-    // Capped at 0
-    SpliceUtil.currentAmount(amulet, 3L) shouldBe new BigDecimal(0.0).setScale(10)
-  }
 }

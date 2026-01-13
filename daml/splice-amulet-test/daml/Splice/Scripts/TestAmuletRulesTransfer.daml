@@ -87,21 +87,8 @@ testUsageFees = do
       expectedDso = Some app.dso
 
   let config = scaleFees 1.0 defaultTransferConfig
-      expectedTransferFee = 0.03 + chargeSteppedRate config.transferFee 10.0
-      expectedSenderTransferFee = expectedTransferFee * 0.6
-      expectedReceiverTransferFee = expectedTransferFee * 0.4
-      expectedLockFee3 =
-        config.createFee.fee + chargeSteppedRate config.transferFee outputAmount3 +
-        config.lockHolderFee.fee -- only one lock fee is charged, as bob is the owner and thus already a controller of the unlock choice
-      expectedSenderLockFee3 = expectedLockFee3 * (1.0 - 0.75)
-      expectedLockFee1 = config.createFee.fee
       inputAmuletHoldingFees = config.holdingFee.rate * 3.0 -- there are 3 input amulets
-      outputAmuletHoldingFees = config.holdingFee.rate * 4.0  -- there are 4 input amulets
-      outputFees = [config.createFee.fee, expectedLockFee1, expectedTransferFee, expectedLockFee3]
-      senderChangeFee =
-        100.0 - outputAmount1 - outputAmount2 - outputAmount2 - outputAmount3
-        - config.createFee.fee - expectedLockFee1 - expectedSenderTransferFee
-        - expectedSenderLockFee3
+      outputAmuletHoldingFees = config.holdingFee.rate * 5.0  -- there are 4 output amulets + sender change
 
   let ignoreBalanceChanges = transferResult.summary with balanceChanges = Map.empty
 
@@ -115,25 +102,23 @@ testUsageFees = do
     inputAmuletAmount = 100.0
     balanceChanges = Map.empty
     holdingFees = 0.0 -- no holding fees charged on transfer
-    outputFees
-    senderChangeFee
-    senderChangeAmount = 0.0
+    outputFees = [0.0, 0.0, 0.0, 0.0]
+    senderChangeFee = 0.0
+    senderChangeAmount = 0.2
     amuletPrice = 1.0
 
   let totalBalanceChange = sum $ Map.values transferResult.summary.balanceChanges
 
   totalBalanceChange.changeToHoldingFeesRate  === outputAmuletHoldingFees - inputAmuletHoldingFees
-  assertMsg "Partial sender change fee"
-    (0.0 < senderChangeFee && senderChangeFee < config.createFee.fee)
 
   aliceAmulets <- query @Amulet alice.primaryParty
   bobAmulets <- query @Amulet bob.primaryParty
-  sort (map (\(_, c) -> c.amount.initialAmount) aliceAmulets) === [1.0, outputAmount1]
-  sort (map (\(_, c) -> c.amount.initialAmount) bobAmulets) === [1.0, outputAmount2 - expectedReceiverTransferFee]
+  sort (map (\(_, c) -> c.amount.initialAmount) aliceAmulets) === [0.2, 1.0, outputAmount1]
+  sort (map (\(_, c) -> c.amount.initialAmount) bobAmulets) === [1.0, outputAmount2]
 
   [(_, lockedAmulet)] <- query @LockedAmulet bob.primaryParty
   lockedAmulet.amulet.owner === bob.primaryParty
-  lockedAmulet.amulet.amount.initialAmount === outputAmount3 - expectedLockFee3 * 0.75
+  lockedAmulet.amulet.amount.initialAmount === outputAmount3
   lockedAmulet.lock.holders === [alice.primaryParty]
   return ()
 
@@ -308,8 +293,8 @@ testSenderChangeAndOutput = do
   balanceChange.changeToHoldingFeesRate === 2.0 * holdingFee
   return ()
 
-testSenderNoChange: Script ()
-testSenderNoChange = do
+testSenderSmallChange: Script ()
+testSenderSmallChange = do
   defaultAppWithUsers <- setupDefaultAppWithUsers
   let DefaultAppWithUsers{..} = defaultAppWithUsers
 
@@ -353,15 +338,14 @@ testSenderNoChange = do
     context = context.context
     expectedDso = Some app.dso
 
-  assertMsg "senderChangeAmount == 0"
-    (transferResult.summary.senderChangeAmount == 0.0)
+  transferResult.summary.senderChangeAmount === amulet1Amount - outputAmount1 - outputAmount2 - outputAmount3
 
   let Some(balanceChange) = Map.lookup alice.primaryParty transferResult.summary.balanceChanges
-  balanceChange.changeToHoldingFeesRate === holdingFee
+  balanceChange.changeToHoldingFeesRate === holdingFee + holdingFee -- outputs + sender change
   return ()
 
-testSenderNoChangeNoSenderOutput: Script ()
-testSenderNoChangeNoSenderOutput = do
+testSenderSmallChangeNoSenderOutput: Script ()
+testSenderSmallChangeNoSenderOutput = do
   defaultAppWithUsers <- setupDefaultAppWithUsers
   let DefaultAppWithUsers{..} = defaultAppWithUsers
 
@@ -399,14 +383,13 @@ testSenderNoChangeNoSenderOutput = do
     context = context.context
     expectedDso = Some app.dso
 
-  assertMsg "senderChangeAmount == 0"
-    (transferResult.summary.senderChangeAmount == 0.0)
+  transferResult.summary.senderChangeAmount === amulet1Amount - outputAmount1 - outputAmount2
 
   let Some(bobBalanceChange) = Map.lookup bob.primaryParty transferResult.summary.balanceChanges
   bobBalanceChange.changeToHoldingFeesRate === 2.0 * holdingFee
 
   let Some(aliceBalanceChange) = Map.lookup alice.primaryParty transferResult.summary.balanceChanges
-  aliceBalanceChange.changeToHoldingFeesRate === negate holdingFee
+  aliceBalanceChange.changeToHoldingFeesRate === 0.0
 
   return ()
 
@@ -462,7 +445,6 @@ testAppRewardBeneficiaries = do
 
   forA_ [False, True] $ \featured -> do
 
-    -- unfeatured without beneficiaries
     amulet <- tap app alice 100.0
 
     context <- getPaymentTransferContextFeaturedApp app alice (if featured then Some featuredAppRightCid else None)
@@ -485,46 +467,52 @@ testAppRewardBeneficiaries = do
       context = context.context
       expectedDso = Some app.dso
 
-    [(rewardCid, aliceAppRewardCouponUnfeaturedNoBeneficiary)] <- query @AppRewardCoupon alice.primaryParty
-    -- archive to simplify test queries
-    submitMulti [alice.primaryParty, app.dso] [] $ archiveCmd rewardCid
+    if featured
+      then do
+        [(rewardCid, aliceAppRewardCouponUnfeaturedNoBeneficiary)] <- query @AppRewardCoupon alice.primaryParty
+        -- archive to simplify test queries
+        submitMulti [alice.primaryParty, app.dso] [] $ archiveCmd rewardCid
 
-    -- unfeatured with beneficiaries
+        -- unfeatured with beneficiaries
 
-    checkTransferMetadata app TxKind_Transfer alice.primaryParty $
-      submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
-        transfer = Transfer with
-          sender = alice.primaryParty
-          provider = alice.primaryParty
-          inputs = map (\c -> InputAmulet c) (optionalToList transferResult.senderChangeAmulet)
-          outputs = [
-                      TransferOutput with
-                        receiver = bob.primaryParty
-                        receiverFeeRatio = 0.0
-                        amount = 10.0
-                        lock = None
-                    ]
-          beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2, AppRewardBeneficiary bob.primaryParty 0.7, AppRewardBeneficiary bob.primaryParty 0.1]
-        context = context.context
-        expectedDso = Some app.dso
+        checkTransferMetadata app TxKind_Transfer alice.primaryParty $
+          submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+            transfer = Transfer with
+              sender = alice.primaryParty
+              provider = alice.primaryParty
+              inputs = map (\c -> InputAmulet c) (optionalToList transferResult.senderChangeAmulet)
+              outputs = [
+                          TransferOutput with
+                            receiver = bob.primaryParty
+                            receiverFeeRatio = 0.0
+                            amount = 10.0
+                            lock = None
+                        ]
+              beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2, AppRewardBeneficiary bob.primaryParty 0.7, AppRewardBeneficiary bob.primaryParty 0.1]
+            context = context.context
+            expectedDso = Some app.dso
 
-    [(rewardCid1, aliceAppRewardCouponUnfeaturedBeneficiary)] <- queryFilter @AppRewardCoupon alice.primaryParty (\r -> r.beneficiary == Some alice.primaryParty)
+        [(rewardCid1, aliceAppRewardCouponUnfeaturedBeneficiary)] <- queryFilter @AppRewardCoupon alice.primaryParty (\r -> r.beneficiary == Some alice.primaryParty)
 
-    [(rewardCid2, bobAppRewardCouponUnfeaturedBeneficiary)] <- queryFilter @AppRewardCoupon bob.primaryParty (\r -> r.beneficiary == Some bob.primaryParty)
+        [(rewardCid2, bobAppRewardCouponUnfeaturedBeneficiary)] <- queryFilter @AppRewardCoupon bob.primaryParty (\r -> r.beneficiary == Some bob.primaryParty)
 
-    -- archive to simplify test queries
-    forA_ [rewardCid1, rewardCid2] $ \cid -> submitMulti [alice.primaryParty, app.dso] [] $ archiveCmd cid
+        -- archive to simplify test queries
+        forA_ [rewardCid1, rewardCid2] $ \cid -> submitMulti [alice.primaryParty, app.dso] [] $ archiveCmd cid
 
 
-    forA_ [aliceAppRewardCouponUnfeaturedNoBeneficiary, aliceAppRewardCouponUnfeaturedBeneficiary, bobAppRewardCouponUnfeaturedBeneficiary] $ \reward -> do
-      reward.featured === featured
-      reward.provider === alice.primaryParty
-    aliceAppRewardCouponUnfeaturedNoBeneficiary.beneficiary === Some alice.primaryParty
-    aliceAppRewardCouponUnfeaturedBeneficiary.beneficiary === Some alice.primaryParty
-    bobAppRewardCouponUnfeaturedBeneficiary.beneficiary === Some bob.primaryParty
+        forA_ [aliceAppRewardCouponUnfeaturedNoBeneficiary, aliceAppRewardCouponUnfeaturedBeneficiary, bobAppRewardCouponUnfeaturedBeneficiary] $ \reward -> do
+          reward.featured === featured
+          reward.provider === alice.primaryParty
+        aliceAppRewardCouponUnfeaturedNoBeneficiary.beneficiary === Some alice.primaryParty
+        aliceAppRewardCouponUnfeaturedBeneficiary.beneficiary === Some alice.primaryParty
+        bobAppRewardCouponUnfeaturedBeneficiary.beneficiary === Some bob.primaryParty
 
-    aliceAppRewardCouponUnfeaturedBeneficiary.amount === 0.2 * aliceAppRewardCouponUnfeaturedNoBeneficiary.amount
-    bobAppRewardCouponUnfeaturedBeneficiary.amount   === 0.8 * aliceAppRewardCouponUnfeaturedNoBeneficiary.amount
+        aliceAppRewardCouponUnfeaturedBeneficiary.amount === 0.2 * aliceAppRewardCouponUnfeaturedNoBeneficiary.amount
+        bobAppRewardCouponUnfeaturedBeneficiary.amount   === 0.8 * aliceAppRewardCouponUnfeaturedNoBeneficiary.amount
+      else do
+        [] <- query @AppRewardCoupon alice.primaryParty
+        [] <- query @AppRewardCoupon bob.primaryParty
+        pure ()
 
 testUnclaimedActivityRecordTransferInput : Script ()
 testUnclaimedActivityRecordTransferInput = do

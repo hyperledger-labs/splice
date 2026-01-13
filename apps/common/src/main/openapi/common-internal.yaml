@@ -369,8 +369,9 @@ components:
 
     FeatureSupportResponse:
       type: object
-      required:
-        - no_holding_fees_on_transfers
+      required: []
       properties:
-        no_holding_fees_on_transfers:
+        # Guardrails seems to be unhappy when there are no properties so we add a dummy property.
+        # Remove once you add an actual property.
+        dummy:
           type: boolean

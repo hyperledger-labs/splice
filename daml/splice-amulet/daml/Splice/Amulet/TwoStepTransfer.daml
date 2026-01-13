@@ -45,11 +45,6 @@ data TwoStepTransfer = TwoStepTransfer with
     allowFeaturing : Bool
       -- ^ Whether the second step can be featured.
 
--- | The extra amount locked to guard against the transfer fees changing between
--- the time of locking the amulet and the time of executing the actual transfer.
-feeReserveMultiplier : Decimal
-feeReserveMultiplier = 4.0
-
 -- | Converting a set of holding inputs to inputs for an amulet transfer,
 -- unlocking any expired LockedAmulet holdings on the fly.
 holdingToTransferInputs : ForOwner -> PaymentTransferContext -> [ContractId Holding] -> Update [TransferInput]
@@ -71,15 +66,6 @@ prepareTwoStepTransfer
   -> Update (ContractId LockedAmulet, [ContractId Holding], Metadata)
 prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids paymentContext = do
   require "requestedAt < transferBefore" (requestedAt < transferBefore)
-  -- over-approximate fees that will be due on the actual transfer
-  let receiverOutputForActualTransfer = TransferOutput with
-        receiver
-        amount
-        receiverFeeRatio = 0.0  -- all fees are paid by the sender
-        lock = None
-  [expectedTransferFees] <- exerciseComputeFees dso paymentContext sender [receiverOutputForActualTransfer]
-  let feesReserveAmount = expectedTransferFees * feeReserveMultiplier
-
   -- lock the amulet
   transferInputs <- holdingToTransferInputs (ForOwner with dso; owner = sender) paymentContext inputHoldingCids
   let transfer = Splice.AmuletRules.Transfer with
@@ -88,7 +74,7 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids paymentC
         outputs =
           [ TransferOutput with
               receiver = sender
-              amount = amount + feesReserveAmount
+              amount
               receiverFeeRatio = 0.0 -- locking fees are paid by the sender
               lock = Some TimeLock with
                 expiresAt = transferBefore
@@ -158,4 +144,3 @@ abortTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
       -- scan is telling us to not expire the lock, this is OK if the transfer expired
       assertDeadlineExceeded transferBeforeDeadline transferBefore
       pure []
-

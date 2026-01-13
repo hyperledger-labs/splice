@@ -9,7 +9,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferins
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAllScanAppConfigs_,
-  updateAllSvAppFoundDsoConfigs_,
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType as HttpTransactionType
@@ -50,11 +49,6 @@ class TokenStandardTransferIntegrationTest
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
-        )(config)
-      )
-      .addConfigTransforms((_, config) =>
-        updateAllSvAppFoundDsoConfigs_(
-          _.copy(zeroTransferFees = true)
         )(config)
       )
       .addConfigTransforms((_, config) =>

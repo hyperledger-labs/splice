@@ -12,8 +12,7 @@ import Splice.Util.FeaturedApp.BatchedMarkersProxy
 import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
 
 test = script do
-  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
-    noTransferFee = True
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
 
   provider <- allocateParty "provider"
   beneficiary <- allocateParty "beneficiary"

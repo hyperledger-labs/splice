@@ -594,21 +594,13 @@ class HttpWalletHandler(
     implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.getBalance") { _ => _ =>
       for {
-        noHoldingFeesOnTransfers <- packageVersionSupport.noHoldingFeesOnTransfers(
-          userWallet.store.key.dsoParty,
-          walletManager.clock.now,
-        )
-        deductHoldingFees = !noHoldingFeesOnTransfers.supported
         currentRound <- scanConnection
           .getLatestOpenMiningRound()
           .map(_.payload.round.number)
         (unlockedQty, unlockedHoldingFees) <- userWallet.store.getAmuletBalanceWithHoldingFees(
-          currentRound,
-          deductHoldingFees = deductHoldingFees,
+          currentRound
         )
         lockedQty <- userWallet.store.getLockedAmuletBalance(
-          currentRound,
-          deductHoldingFees = deductHoldingFees,
         )
       } yield {
         d0.GetBalanceResponse(
@@ -752,12 +744,6 @@ class HttpWalletHandler(
   )(implicit tc: TraceContext) = {
     val store = wallet.store
     for {
-      supportsExpectedDsoParty <- packageVersionSupport
-        .supportsExpectedDsoParty(
-          Seq(store.key.validatorParty, store.key.endUserParty, store.key.dsoParty),
-          walletManager.clock.now,
-        )
-        .map(_.supported)
       _ <- wallet.connection
         .submit(
           Seq(store.key.validatorParty, store.key.endUserParty),
@@ -765,7 +751,7 @@ class HttpWalletHandler(
           new TransferPreapprovalProposal(
             store.key.endUserParty.toProtoPrimitive,
             store.key.validatorParty.toProtoPrimitive,
-            Option.when(supportsExpectedDsoParty)(store.key.dsoParty.toProtoPrimitive).toJava,
+            java.util.Optional.of(store.key.dsoParty.toProtoPrimitive),
           ).create,
         )
         .withDedup(
@@ -1097,7 +1083,7 @@ class HttpWalletHandler(
       amulet.toHttp,
       round,
       Codec.encode(SpliceUtil.holdingFee(amulet.payload, round)),
-      Codec.encode(SpliceUtil.currentAmount(amulet.payload, round)),
+      Codec.encode(amulet.payload.amount.initialAmount),
     )
   }
 
@@ -1109,7 +1095,7 @@ class HttpWalletHandler(
       lockedAmulet.toHttp,
       round,
       Codec.encode(SpliceUtil.holdingFee(lockedAmulet.payload.amulet, round)),
-      Codec.encode(SpliceUtil.currentAmount(lockedAmulet.payload.amulet, round)),
+      Codec.encode(lockedAmulet.payload.amulet.amount.initialAmount),
     )
 
   override def withdrawAmuletAllocation(

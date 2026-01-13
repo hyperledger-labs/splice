@@ -3,6 +3,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "1",
         "contractKey" : null,
         "createArgument" : {
@@ -11,7 +12,7 @@
               "createdAt" : {
                 "number" : "1"
               },
-              "initialAmount" : "1064.0304414400",
+              "initialAmount" : "1000.0000000000",
               "ratePerRound" : {
                 "rate" : "0.0038051800"
               }
@@ -39,7 +40,7 @@
               "message" : ""
             },
             "viewValue" : {
-              "amount" : "1064.0304414400",
+              "amount" : "1000.0000000000",
               "instrumentId" : {
                 "admin" : "dso::normalized",
                 "id" : "Amulet"
@@ -62,11 +63,12 @@
             }
           }
         ],
-        "nodeId" : 12,
+        "nodeId" : 7,
         "observers" : [
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -83,6 +85,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "2",
         "contractKey" : null,
         "createArgument" : {
@@ -126,11 +129,12 @@
             }
           }
         ],
-        "nodeId" : 27,
+        "nodeId" : 22,
         "observers" : [
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -147,6 +151,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "3",
         "contractKey" : null,
         "createArgument" : {
@@ -154,7 +159,7 @@
             "createdAt" : {
               "number" : "1"
             },
-            "initialAmount" : "4100.8695585600",
+            "initialAmount" : "4289.0000000000",
             "ratePerRound" : {
               "rate" : "0.0038051800"
             }
@@ -174,7 +179,7 @@
               "message" : ""
             },
             "viewValue" : {
-              "amount" : "4100.8695585600",
+              "amount" : "4289.0000000000",
               "instrumentId" : {
                 "admin" : "dso::normalized",
                 "id" : "Amulet"
@@ -190,11 +195,12 @@
             }
           }
         ],
-        "nodeId" : 28,
+        "nodeId" : 23,
         "observers" : [
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -211,6 +217,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "4",
         "contractKey" : null,
         "createArgument" : {
@@ -218,7 +225,7 @@
             "createdAt" : {
               "number" : "1"
             },
-            "initialAmount" : "489.0000000000",
+            "initialAmount" : "500.0000000000",
             "ratePerRound" : {
               "rate" : "0.0038051800"
             }
@@ -238,7 +245,7 @@
               "message" : ""
             },
             "viewValue" : {
-              "amount" : "489.0000000000",
+              "amount" : "500.0000000000",
               "instrumentId" : {
                 "admin" : "dso::normalized",
                 "id" : "Amulet"
@@ -254,11 +261,12 @@
             }
           }
         ],
-        "nodeId" : 8,
+        "nodeId" : 6,
         "observers" : [
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -275,6 +283,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "5",
         "contractKey" : null,
         "createArgument" : {
@@ -314,6 +323,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-token-test-dummy-holding",
+        "representativePackageId" : "4f40fb033ef3db89623642c1b494e846097fa32af138b3864a63aa15937a323d",
         "signatories" : [
           "alice::normalized"
         ],
@@ -329,6 +339,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "6",
         "contractKey" : null,
         "createArgument" : {
@@ -368,6 +379,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-token-test-dummy-holding",
+        "representativePackageId" : "4f40fb033ef3db89623642c1b494e846097fa32af138b3864a63aa15937a323d",
         "signatories" : [
           "alice::normalized"
         ],
@@ -383,6 +395,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "7",
         "contractKey" : null,
         "createArgument" : {
@@ -400,6 +413,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-wallet",
+        "representativePackageId" : "d164bed10c3b9291dc64abed570103903510fb2b49d552340bb4c95b506bcb67",
         "signatories" : [
           "aliceValidator::normalized",
           "alice::normalized"
@@ -416,6 +430,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "8",
         "contractKey" : null,
         "createArgument" : {
@@ -432,6 +447,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "aliceValidator::normalized",
           "alice::normalized"
@@ -462,6 +478,7 @@
     },
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "9",
         "contractKey" : null,
         "createArgument" : {
@@ -479,6 +496,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-wallet",
+        "representativePackageId" : "d164bed10c3b9291dc64abed570103903510fb2b49d552340bb4c95b506bcb67",
         "signatories" : [
           "alice::normalized"
         ],
@@ -508,6 +526,7 @@
     },
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "12",
         "contractKey" : null,
         "createArgument" : {
@@ -527,6 +546,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "aliceValidator::normalized",
@@ -559,6 +579,7 @@
     },
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "17",
         "contractKey" : null,
         "createArgument" : {
@@ -602,11 +623,12 @@
             }
           }
         ],
-        "nodeId" : 11,
+        "nodeId" : 9,
         "observers" : [
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -622,7 +644,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "24",
+        "contractId" : "22",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -638,14 +660,15 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "24",
+        "acsDelta" : true,
+        "contractId" : "22",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
             "createdAt" : {
               "number" : "1"
             },
-            "initialAmount" : "87.0000000000",
+            "initialAmount" : "100.0000000000",
             "ratePerRound" : {
               "rate" : "0.0038051800"
             }
@@ -665,7 +688,7 @@
               "message" : ""
             },
             "viewValue" : {
-              "amount" : "87.0000000000",
+              "amount" : "100.0000000000",
               "instrumentId" : {
                 "admin" : "dso::normalized",
                 "id" : "Amulet"
@@ -680,67 +703,33 @@
               "owner" : "alice::normalized"
             }
           }
-        ],
-        "nodeId" : 12,
-        "observers" : [
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized",
-          "alice::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:Amulet",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : null,
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "25",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : "7.0000000000",
-          "dso" : "dso::normalized",
-          "round" : {
-            "number" : "1"
-          },
-          "user" : "alice::normalized"
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-        ],
-        "nodeId" : 9,
-        "observers" : [
-          "alice::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:ValidatorRewardCoupon",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : {
-      "archivedEvent" : {
-        "contractId" : "27",
-        "implementedInterfaces" : [
-          "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
         "nodeId" : 10,
+        "observers" : [
+        ],
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
+        "signatories" : [
+          "dso::normalized",
+          "alice::normalized"
+        ],
+        "templateId" : "#package-name:Splice.Amulet:Amulet",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    }
+  },
+  {
+    "archived" : {
+      "archivedEvent" : {
+        "contractId" : "23",
+        "implementedInterfaces" : [
+          "#package-name:Splice.Api.Token.HoldingV1:Holding"
+        ],
+        "nodeId" : 7,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -752,14 +741,15 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "27",
+        "acsDelta" : true,
+        "contractId" : "23",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
             "createdAt" : {
               "number" : "1"
             },
-            "initialAmount" : "64.9000000000",
+            "initialAmount" : "90.0000000000",
             "ratePerRound" : {
               "rate" : "0.0038051800"
             }
@@ -779,7 +769,7 @@
               "message" : ""
             },
             "viewValue" : {
-              "amount" : "64.9000000000",
+              "amount" : "90.0000000000",
               "instrumentId" : {
                 "admin" : "dso::normalized",
                 "id" : "Amulet"
@@ -795,11 +785,12 @@
             }
           }
         ],
-        "nodeId" : 9,
+        "nodeId" : 7,
         "observers" : [
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -813,48 +804,13 @@
     }
   },
   {
-    "archived" : null,
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "29",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : "6.1000000000",
-          "dso" : "dso::normalized",
-          "round" : {
-            "number" : "1"
-          },
-          "user" : "alice::normalized"
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-        ],
-        "nodeId" : 6,
-        "observers" : [
-          "alice::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:ValidatorRewardCoupon",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "31",
+        "contractId" : "25",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 12,
+        "nodeId" : 9,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -866,7 +822,8 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "31",
+        "acsDelta" : true,
+        "contractId" : "25",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -914,11 +871,586 @@
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
         ],
         "templateId" : "#package-name:Splice.Amulet:Amulet",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    }
+  },
+  {
+    "archived" : {
+      "archivedEvent" : {
+        "contractId" : "26",
+        "implementedInterfaces" : [
+          "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
+        ],
+        "nodeId" : 0,
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "templateId" : "#package-name:Splice.AmuletTransferInstruction:AmuletTransferInstruction",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    },
+    "created" : {
+      "createdEvent" : {
+        "acsDelta" : true,
+        "contractId" : "26",
+        "contractKey" : null,
+        "createArgument" : {
+          "lockedAmulet" : "28",
+          "transfer" : {
+            "amount" : "1000.0000000000",
+            "executeBefore" : "2025-06-18T00:00:00.000000Z",
+            "inputHoldingCids" : [
+              "28"
+            ],
+            "instrumentId" : {
+              "admin" : "dso::normalized",
+              "id" : "Amulet"
+            },
+            "meta" : {
+              "values" : {
+                
+              }
+            },
+            "receiver" : "bob::normalized",
+            "requestedAt" : "2025-06-18T00:00:00.000000Z",
+            "sender" : "alice::normalized"
+          }
+        },
+        "createdAt" : "1971-01-01T00:00:42.000420Z",
+        "createdEventBlob" : "",
+        "interfaceViews" : [
+          {
+            "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
+            "viewStatus" : {
+              "code" : 0,
+              "details" : [
+              ],
+              "message" : ""
+            },
+            "viewValue" : {
+              "meta" : {
+                "values" : {
+                  
+                }
+              },
+              "originalInstructionCid" : null,
+              "status" : {
+                "tag" : "TransferPendingReceiverAcceptance",
+                "value" : {
+                  
+                }
+              },
+              "transfer" : {
+                "amount" : "1000.0000000000",
+                "executeBefore" : "2025-06-18T00:00:00.000000Z",
+                "inputHoldingCids" : [
+                  "28"
+                ],
+                "instrumentId" : {
+                  "admin" : "dso::normalized",
+                  "id" : "Amulet"
+                },
+                "meta" : {
+                  "values" : {
+                    
+                  }
+                },
+                "receiver" : "bob::normalized",
+                "requestedAt" : "2025-06-18T00:00:00.000000Z",
+                "sender" : "alice::normalized"
+              }
+            }
+          }
+        ],
+        "nodeId" : 12,
+        "observers" : [
+          "bob::normalized"
+        ],
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
+        "signatories" : [
+          "dso::normalized",
+          "alice::normalized"
+        ],
+        "templateId" : "#package-name:Splice.AmuletTransferInstruction:AmuletTransferInstruction",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    }
+  },
+  {
+    "archived" : {
+      "archivedEvent" : {
+        "contractId" : "27",
+        "implementedInterfaces" : [
+          "#package-name:Splice.Api.Token.HoldingV1:Holding"
+        ],
+        "nodeId" : 6,
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "templateId" : "#package-name:Splice.Amulet:Amulet",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    },
+    "created" : {
+      "createdEvent" : {
+        "acsDelta" : true,
+        "contractId" : "27",
+        "contractKey" : null,
+        "createArgument" : {
+          "amount" : {
+            "createdAt" : {
+              "number" : "1"
+            },
+            "initialAmount" : "5090.0000000000",
+            "ratePerRound" : {
+              "rate" : "0.0038051800"
+            }
+          },
+          "dso" : "dso::normalized",
+          "owner" : "alice::normalized"
+        },
+        "createdAt" : "1971-01-01T00:00:42.000420Z",
+        "createdEventBlob" : "",
+        "interfaceViews" : [
+          {
+            "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
+            "viewStatus" : {
+              "code" : 0,
+              "details" : [
+              ],
+              "message" : ""
+            },
+            "viewValue" : {
+              "amount" : "5090.0000000000",
+              "instrumentId" : {
+                "admin" : "dso::normalized",
+                "id" : "Amulet"
+              },
+              "lock" : null,
+              "meta" : {
+                "values" : {
+                  "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
+                  "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
+                }
+              },
+              "owner" : "alice::normalized"
+            }
+          }
+        ],
+        "nodeId" : 11,
+        "observers" : [
+        ],
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
+        "signatories" : [
+          "dso::normalized",
+          "alice::normalized"
+        ],
+        "templateId" : "#package-name:Splice.Amulet:Amulet",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    }
+  },
+  {
+    "archived" : {
+      "archivedEvent" : {
+        "contractId" : "28",
+        "implementedInterfaces" : [
+          "#package-name:Splice.Api.Token.HoldingV1:Holding"
+        ],
+        "nodeId" : 2,
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "templateId" : "#package-name:Splice.Amulet:LockedAmulet",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    },
+    "created" : {
+      "createdEvent" : {
+        "acsDelta" : true,
+        "contractId" : "28",
+        "contractKey" : null,
+        "createArgument" : {
+          "amulet" : {
+            "amount" : {
+              "createdAt" : {
+                "number" : "1"
+              },
+              "initialAmount" : "1000.0000000000",
+              "ratePerRound" : {
+                "rate" : "0.0038051800"
+              }
+            },
+            "dso" : "dso::normalized",
+            "owner" : "alice::normalized"
+          },
+          "lock" : {
+            "expiresAt" : "2025-06-18T00:00:00.000000Z",
+            "holders" : [
+              "dso::normalized"
+            ],
+            "optContext" : "transfer to 'bob::normalized'"
+          }
+        },
+        "createdAt" : "1971-01-01T00:00:42.000420Z",
+        "createdEventBlob" : "",
+        "interfaceViews" : [
+          {
+            "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
+            "viewStatus" : {
+              "code" : 0,
+              "details" : [
+              ],
+              "message" : ""
+            },
+            "viewValue" : {
+              "amount" : "1000.0000000000",
+              "instrumentId" : {
+                "admin" : "dso::normalized",
+                "id" : "Amulet"
+              },
+              "lock" : {
+                "context" : "transfer to 'bob::normalized'",
+                "expiresAfter" : null,
+                "expiresAt" : "2025-06-18T00:00:00.000000Z",
+                "holders" : [
+                  "dso::normalized"
+                ]
+              },
+              "meta" : {
+                "values" : {
+                  "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
+                  "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
+                }
+              },
+              "owner" : "alice::normalized"
+            }
+          }
+        ],
+        "nodeId" : 10,
+        "observers" : [
+        ],
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
+        "signatories" : [
+          "dso::normalized",
+          "alice::normalized"
+        ],
+        "templateId" : "#package-name:Splice.Amulet:LockedAmulet",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    }
+  },
+  {
+    "archived" : {
+      "archivedEvent" : {
+        "contractId" : "29",
+        "implementedInterfaces" : [
+          "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
+        ],
+        "nodeId" : 0,
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "templateId" : "#package-name:Splice.AmuletTransferInstruction:AmuletTransferInstruction",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    },
+    "created" : {
+      "createdEvent" : {
+        "acsDelta" : true,
+        "contractId" : "29",
+        "contractKey" : null,
+        "createArgument" : {
+          "lockedAmulet" : "31",
+          "transfer" : {
+            "amount" : "1000.0000000000",
+            "executeBefore" : "2025-06-18T00:00:00.000000Z",
+            "inputHoldingCids" : [
+              "31"
+            ],
+            "instrumentId" : {
+              "admin" : "dso::normalized",
+              "id" : "Amulet"
+            },
+            "meta" : {
+              "values" : {
+                
+              }
+            },
+            "receiver" : "bob::normalized",
+            "requestedAt" : "2025-06-18T00:00:00.000000Z",
+            "sender" : "alice::normalized"
+          }
+        },
+        "createdAt" : "1971-01-01T00:00:42.000420Z",
+        "createdEventBlob" : "",
+        "interfaceViews" : [
+          {
+            "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
+            "viewStatus" : {
+              "code" : 0,
+              "details" : [
+              ],
+              "message" : ""
+            },
+            "viewValue" : {
+              "meta" : {
+                "values" : {
+                  
+                }
+              },
+              "originalInstructionCid" : null,
+              "status" : {
+                "tag" : "TransferPendingReceiverAcceptance",
+                "value" : {
+                  
+                }
+              },
+              "transfer" : {
+                "amount" : "1000.0000000000",
+                "executeBefore" : "2025-06-18T00:00:00.000000Z",
+                "inputHoldingCids" : [
+                  "31"
+                ],
+                "instrumentId" : {
+                  "admin" : "dso::normalized",
+                  "id" : "Amulet"
+                },
+                "meta" : {
+                  "values" : {
+                    
+                  }
+                },
+                "receiver" : "bob::normalized",
+                "requestedAt" : "2025-06-18T00:00:00.000000Z",
+                "sender" : "alice::normalized"
+              }
+            }
+          }
+        ],
+        "nodeId" : 9,
+        "observers" : [
+          "bob::normalized"
+        ],
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
+        "signatories" : [
+          "dso::normalized",
+          "alice::normalized"
+        ],
+        "templateId" : "#package-name:Splice.AmuletTransferInstruction:AmuletTransferInstruction",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    }
+  },
+  {
+    "archived" : {
+      "archivedEvent" : {
+        "contractId" : "30",
+        "implementedInterfaces" : [
+          "#package-name:Splice.Api.Token.HoldingV1:Holding"
+        ],
+        "nodeId" : 6,
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "templateId" : "#package-name:Splice.Amulet:Amulet",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    },
+    "created" : {
+      "createdEvent" : {
+        "acsDelta" : true,
+        "contractId" : "30",
+        "contractKey" : null,
+        "createArgument" : {
+          "amount" : {
+            "createdAt" : {
+              "number" : "1"
+            },
+            "initialAmount" : "4090.0000000000",
+            "ratePerRound" : {
+              "rate" : "0.0038051800"
+            }
+          },
+          "dso" : "dso::normalized",
+          "owner" : "alice::normalized"
+        },
+        "createdAt" : "1971-01-01T00:00:42.000420Z",
+        "createdEventBlob" : "",
+        "interfaceViews" : [
+          {
+            "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
+            "viewStatus" : {
+              "code" : 0,
+              "details" : [
+              ],
+              "message" : ""
+            },
+            "viewValue" : {
+              "amount" : "4090.0000000000",
+              "instrumentId" : {
+                "admin" : "dso::normalized",
+                "id" : "Amulet"
+              },
+              "lock" : null,
+              "meta" : {
+                "values" : {
+                  "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
+                  "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
+                }
+              },
+              "owner" : "alice::normalized"
+            }
+          }
+        ],
+        "nodeId" : 8,
+        "observers" : [
+        ],
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
+        "signatories" : [
+          "dso::normalized",
+          "alice::normalized"
+        ],
+        "templateId" : "#package-name:Splice.Amulet:Amulet",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    }
+  },
+  {
+    "archived" : {
+      "archivedEvent" : {
+        "contractId" : "31",
+        "implementedInterfaces" : [
+          "#package-name:Splice.Api.Token.HoldingV1:Holding"
+        ],
+        "nodeId" : 2,
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "templateId" : "#package-name:Splice.Amulet:LockedAmulet",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    },
+    "created" : {
+      "createdEvent" : {
+        "acsDelta" : true,
+        "contractId" : "31",
+        "contractKey" : null,
+        "createArgument" : {
+          "amulet" : {
+            "amount" : {
+              "createdAt" : {
+                "number" : "1"
+              },
+              "initialAmount" : "1000.0000000000",
+              "ratePerRound" : {
+                "rate" : "0.0038051800"
+              }
+            },
+            "dso" : "dso::normalized",
+            "owner" : "alice::normalized"
+          },
+          "lock" : {
+            "expiresAt" : "2025-06-18T00:00:00.000000Z",
+            "holders" : [
+              "dso::normalized"
+            ],
+            "optContext" : "transfer to 'bob::normalized'"
+          }
+        },
+        "createdAt" : "1971-01-01T00:00:42.000420Z",
+        "createdEventBlob" : "",
+        "interfaceViews" : [
+          {
+            "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
+            "viewStatus" : {
+              "code" : 0,
+              "details" : [
+              ],
+              "message" : ""
+            },
+            "viewValue" : {
+              "amount" : "1000.0000000000",
+              "instrumentId" : {
+                "admin" : "dso::normalized",
+                "id" : "Amulet"
+              },
+              "lock" : {
+                "context" : "transfer to 'bob::normalized'",
+                "expiresAfter" : null,
+                "expiresAt" : "2025-06-18T00:00:00.000000Z",
+                "holders" : [
+                  "dso::normalized"
+                ]
+              },
+              "meta" : {
+                "values" : {
+                  "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
+                  "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
+                }
+              },
+              "owner" : "alice::normalized"
+            }
+          }
+        ],
+        "nodeId" : 7,
+        "observers" : [
+        ],
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
+        "signatories" : [
+          "dso::normalized",
+          "alice::normalized"
+        ],
+        "templateId" : "#package-name:Splice.Amulet:LockedAmulet",
         "witnessParties" : [
           "alice::normalized"
         ]
@@ -945,6 +1477,7 @@
     },
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "32",
         "contractKey" : null,
         "createArgument" : {
@@ -1015,12 +1548,13 @@
             }
           }
         ],
-        "nodeId" : 17,
+        "nodeId" : 9,
         "observers" : [
           "bob::normalized"
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -1040,7 +1574,7 @@
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 9,
+        "nodeId" : 6,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -1052,6 +1586,7 @@
     },
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "33",
         "contractKey" : null,
         "createArgument" : {
@@ -1059,7 +1594,7 @@
             "createdAt" : {
               "number" : "1"
             },
-            "initialAmount" : "4987.8984779200",
+            "initialAmount" : "3090.0000000000",
             "ratePerRound" : {
               "rate" : "0.0038051800"
             }
@@ -1079,7 +1614,7 @@
               "message" : ""
             },
             "viewValue" : {
-              "amount" : "4987.8984779200",
+              "amount" : "3090.0000000000",
               "instrumentId" : {
                 "admin" : "dso::normalized",
                 "id" : "Amulet"
@@ -1095,11 +1630,12 @@
             }
           }
         ],
-        "nodeId" : 16,
+        "nodeId" : 8,
         "observers" : [
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -1131,6 +1667,7 @@
     },
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "34",
         "contractKey" : null,
         "createArgument" : {
@@ -1139,7 +1676,7 @@
               "createdAt" : {
                 "number" : "1"
               },
-              "initialAmount" : "1064.0015220800",
+              "initialAmount" : "1000.0000000000",
               "ratePerRound" : {
                 "rate" : "0.0038051800"
               }
@@ -1167,7 +1704,7 @@
               "message" : ""
             },
             "viewValue" : {
-              "amount" : "1064.0015220800",
+              "amount" : "1000.0000000000",
               "instrumentId" : {
                 "admin" : "dso::normalized",
                 "id" : "Amulet"
@@ -1190,11 +1727,12 @@
             }
           }
         ],
-        "nodeId" : 15,
+        "nodeId" : 7,
         "observers" : [
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -1208,33 +1746,107 @@
     }
   },
   {
-    "archived" : null,
+    "archived" : {
+      "archivedEvent" : {
+        "contractId" : "35",
+        "implementedInterfaces" : [
+          "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
+        ],
+        "nodeId" : 0,
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "templateId" : "#package-name:Splice.AmuletTransferInstruction:AmuletTransferInstruction",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    },
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "35",
         "contractKey" : null,
         "createArgument" : {
-          "amount" : "7.0000000000",
-          "dso" : "dso::normalized",
-          "round" : {
-            "number" : "1"
-          },
-          "user" : "alice::normalized"
+          "lockedAmulet" : "37",
+          "transfer" : {
+            "amount" : "1000.0000000000",
+            "executeBefore" : "2025-06-18T00:00:00.000000Z",
+            "inputHoldingCids" : [
+              "37"
+            ],
+            "instrumentId" : {
+              "admin" : "dso::normalized",
+              "id" : "Amulet"
+            },
+            "meta" : {
+              "values" : {
+                
+              }
+            },
+            "receiver" : "bob::normalized",
+            "requestedAt" : "2025-06-18T00:00:00.000000Z",
+            "sender" : "alice::normalized"
+          }
         },
         "createdAt" : "1971-01-01T00:00:42.000420Z",
         "createdEventBlob" : "",
         "interfaceViews" : [
+          {
+            "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
+            "viewStatus" : {
+              "code" : 0,
+              "details" : [
+              ],
+              "message" : ""
+            },
+            "viewValue" : {
+              "meta" : {
+                "values" : {
+                  
+                }
+              },
+              "originalInstructionCid" : null,
+              "status" : {
+                "tag" : "TransferPendingReceiverAcceptance",
+                "value" : {
+                  
+                }
+              },
+              "transfer" : {
+                "amount" : "1000.0000000000",
+                "executeBefore" : "2025-06-18T00:00:00.000000Z",
+                "inputHoldingCids" : [
+                  "37"
+                ],
+                "instrumentId" : {
+                  "admin" : "dso::normalized",
+                  "id" : "Amulet"
+                },
+                "meta" : {
+                  "values" : {
+                    
+                  }
+                },
+                "receiver" : "bob::normalized",
+                "requestedAt" : "2025-06-18T00:00:00.000000Z",
+                "sender" : "alice::normalized"
+              }
+            }
+          }
         ],
-        "nodeId" : 13,
+        "nodeId" : 9,
         "observers" : [
-          "alice::normalized"
+          "bob::normalized"
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
-          "dso::normalized"
+          "dso::normalized",
+          "alice::normalized"
         ],
-        "templateId" : "#package-name:Splice.Amulet:ValidatorRewardCoupon",
+        "templateId" : "#package-name:Splice.AmuletTransferInstruction:AmuletTransferInstruction",
         "witnessParties" : [
           "alice::normalized"
         ]
@@ -1243,35 +1855,79 @@
     }
   },
   {
-    "archived" : null,
+    "archived" : {
+      "archivedEvent" : {
+        "contractId" : "36",
+        "implementedInterfaces" : [
+          "#package-name:Splice.Api.Token.HoldingV1:Holding"
+        ],
+        "nodeId" : 6,
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "templateId" : "#package-name:Splice.Amulet:Amulet",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    },
     "created" : {
       "createdEvent" : {
+        "acsDelta" : true,
         "contractId" : "36",
         "contractKey" : null,
         "createArgument" : {
-          "amount" : "7.0000000000",
-          "beneficiary" : "alice::normalized",
+          "amount" : {
+            "createdAt" : {
+              "number" : "1"
+            },
+            "initialAmount" : "2090.0000000000",
+            "ratePerRound" : {
+              "rate" : "0.0038051800"
+            }
+          },
           "dso" : "dso::normalized",
-          "featured" : false,
-          "provider" : "alice::normalized",
-          "round" : {
-            "number" : "1"
-          }
+          "owner" : "alice::normalized"
         },
         "createdAt" : "1971-01-01T00:00:42.000420Z",
         "createdEventBlob" : "",
         "interfaceViews" : [
+          {
+            "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
+            "viewStatus" : {
+              "code" : 0,
+              "details" : [
+              ],
+              "message" : ""
+            },
+            "viewValue" : {
+              "amount" : "2090.0000000000",
+              "instrumentId" : {
+                "admin" : "dso::normalized",
+                "id" : "Amulet"
+              },
+              "lock" : null,
+              "meta" : {
+                "values" : {
+                  "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
+                  "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
+                }
+              },
+              "owner" : "alice::normalized"
+            }
+          }
         ],
-        "nodeId" : 14,
+        "nodeId" : 8,
         "observers" : [
-          "alice::normalized"
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
-          "dso::normalized"
+          "dso::normalized",
+          "alice::normalized"
         ],
-        "templateId" : "#package-name:Splice.Amulet:AppRewardCoupon",
+        "templateId" : "#package-name:Splice.Amulet:Amulet",
         "witnessParties" : [
           "alice::normalized"
         ]
@@ -1283,898 +1939,6 @@
     "archived" : {
       "archivedEvent" : {
         "contractId" : "37",
-        "implementedInterfaces" : [
-          "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
-        ],
-        "nodeId" : 0,
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "templateId" : "#package-name:Splice.AmuletTransferInstruction:AmuletTransferInstruction",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    },
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "37",
-        "contractKey" : null,
-        "createArgument" : {
-          "lockedAmulet" : "39",
-          "transfer" : {
-            "amount" : "1000.0000000000",
-            "executeBefore" : "2025-06-18T00:00:00.000000Z",
-            "inputHoldingCids" : [
-              "39"
-            ],
-            "instrumentId" : {
-              "admin" : "dso::normalized",
-              "id" : "Amulet"
-            },
-            "meta" : {
-              "values" : {
-                
-              }
-            },
-            "receiver" : "bob::normalized",
-            "requestedAt" : "2025-06-18T00:00:00.000000Z",
-            "sender" : "alice::normalized"
-          }
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-          {
-            "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
-            "viewStatus" : {
-              "code" : 0,
-              "details" : [
-              ],
-              "message" : ""
-            },
-            "viewValue" : {
-              "meta" : {
-                "values" : {
-                  
-                }
-              },
-              "originalInstructionCid" : null,
-              "status" : {
-                "tag" : "TransferPendingReceiverAcceptance",
-                "value" : {
-                  
-                }
-              },
-              "transfer" : {
-                "amount" : "1000.0000000000",
-                "executeBefore" : "2025-06-18T00:00:00.000000Z",
-                "inputHoldingCids" : [
-                  "39"
-                ],
-                "instrumentId" : {
-                  "admin" : "dso::normalized",
-                  "id" : "Amulet"
-                },
-                "meta" : {
-                  "values" : {
-                    
-                  }
-                },
-                "receiver" : "bob::normalized",
-                "requestedAt" : "2025-06-18T00:00:00.000000Z",
-                "sender" : "alice::normalized"
-              }
-            }
-          }
-        ],
-        "nodeId" : 14,
-        "observers" : [
-          "bob::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized",
-          "alice::normalized"
-        ],
-        "templateId" : "#package-name:Splice.AmuletTransferInstruction:AmuletTransferInstruction",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : {
-      "archivedEvent" : {
-        "contractId" : "38",
-        "implementedInterfaces" : [
-          "#package-name:Splice.Api.Token.HoldingV1:Holding"
-        ],
-        "nodeId" : 9,
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "templateId" : "#package-name:Splice.Amulet:Amulet",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    },
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "38",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : {
-            "createdAt" : {
-              "number" : "1"
-            },
-            "initialAmount" : "3910.8969558400",
-            "ratePerRound" : {
-              "rate" : "0.0038051800"
-            }
-          },
-          "dso" : "dso::normalized",
-          "owner" : "alice::normalized"
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-          {
-            "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
-            "viewStatus" : {
-              "code" : 0,
-              "details" : [
-              ],
-              "message" : ""
-            },
-            "viewValue" : {
-              "amount" : "3910.8969558400",
-              "instrumentId" : {
-                "admin" : "dso::normalized",
-                "id" : "Amulet"
-              },
-              "lock" : null,
-              "meta" : {
-                "values" : {
-                  "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
-                  "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
-                }
-              },
-              "owner" : "alice::normalized"
-            }
-          }
-        ],
-        "nodeId" : 13,
-        "observers" : [
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized",
-          "alice::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:Amulet",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : {
-      "archivedEvent" : {
-        "contractId" : "39",
-        "implementedInterfaces" : [
-          "#package-name:Splice.Api.Token.HoldingV1:Holding"
-        ],
-        "nodeId" : 2,
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "templateId" : "#package-name:Splice.Amulet:LockedAmulet",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    },
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "39",
-        "contractKey" : null,
-        "createArgument" : {
-          "amulet" : {
-            "amount" : {
-              "createdAt" : {
-                "number" : "1"
-              },
-              "initialAmount" : "1064.0015220800",
-              "ratePerRound" : {
-                "rate" : "0.0038051800"
-              }
-            },
-            "dso" : "dso::normalized",
-            "owner" : "alice::normalized"
-          },
-          "lock" : {
-            "expiresAt" : "2025-06-18T00:00:00.000000Z",
-            "holders" : [
-              "dso::normalized"
-            ],
-            "optContext" : "transfer to 'bob::normalized'"
-          }
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-          {
-            "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
-            "viewStatus" : {
-              "code" : 0,
-              "details" : [
-              ],
-              "message" : ""
-            },
-            "viewValue" : {
-              "amount" : "1064.0015220800",
-              "instrumentId" : {
-                "admin" : "dso::normalized",
-                "id" : "Amulet"
-              },
-              "lock" : {
-                "context" : "transfer to 'bob::normalized'",
-                "expiresAfter" : null,
-                "expiresAt" : "2025-06-18T00:00:00.000000Z",
-                "holders" : [
-                  "dso::normalized"
-                ]
-              },
-              "meta" : {
-                "values" : {
-                  "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
-                  "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
-                }
-              },
-              "owner" : "alice::normalized"
-            }
-          }
-        ],
-        "nodeId" : 12,
-        "observers" : [
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized",
-          "alice::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:LockedAmulet",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : null,
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "40",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : "7.0000000000",
-          "dso" : "dso::normalized",
-          "round" : {
-            "number" : "1"
-          },
-          "user" : "alice::normalized"
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-        ],
-        "nodeId" : 10,
-        "observers" : [
-          "alice::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:ValidatorRewardCoupon",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : null,
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "41",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : "7.0000000000",
-          "beneficiary" : "alice::normalized",
-          "dso" : "dso::normalized",
-          "featured" : false,
-          "provider" : "alice::normalized",
-          "round" : {
-            "number" : "1"
-          }
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-        ],
-        "nodeId" : 11,
-        "observers" : [
-          "alice::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:AppRewardCoupon",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : {
-      "archivedEvent" : {
-        "contractId" : "42",
-        "implementedInterfaces" : [
-          "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
-        ],
-        "nodeId" : 0,
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "templateId" : "#package-name:Splice.AmuletTransferInstruction:AmuletTransferInstruction",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    },
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "42",
-        "contractKey" : null,
-        "createArgument" : {
-          "lockedAmulet" : "44",
-          "transfer" : {
-            "amount" : "1000.0000000000",
-            "executeBefore" : "2025-06-18T00:00:00.000000Z",
-            "inputHoldingCids" : [
-              "44"
-            ],
-            "instrumentId" : {
-              "admin" : "dso::normalized",
-              "id" : "Amulet"
-            },
-            "meta" : {
-              "values" : {
-                
-              }
-            },
-            "receiver" : "bob::normalized",
-            "requestedAt" : "2025-06-18T00:00:00.000000Z",
-            "sender" : "alice::normalized"
-          }
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-          {
-            "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
-            "viewStatus" : {
-              "code" : 0,
-              "details" : [
-              ],
-              "message" : ""
-            },
-            "viewValue" : {
-              "meta" : {
-                "values" : {
-                  
-                }
-              },
-              "originalInstructionCid" : null,
-              "status" : {
-                "tag" : "TransferPendingReceiverAcceptance",
-                "value" : {
-                  
-                }
-              },
-              "transfer" : {
-                "amount" : "1000.0000000000",
-                "executeBefore" : "2025-06-18T00:00:00.000000Z",
-                "inputHoldingCids" : [
-                  "44"
-                ],
-                "instrumentId" : {
-                  "admin" : "dso::normalized",
-                  "id" : "Amulet"
-                },
-                "meta" : {
-                  "values" : {
-                    
-                  }
-                },
-                "receiver" : "bob::normalized",
-                "requestedAt" : "2025-06-18T00:00:00.000000Z",
-                "sender" : "alice::normalized"
-              }
-            }
-          }
-        ],
-        "nodeId" : 14,
-        "observers" : [
-          "bob::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized",
-          "alice::normalized"
-        ],
-        "templateId" : "#package-name:Splice.AmuletTransferInstruction:AmuletTransferInstruction",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : {
-      "archivedEvent" : {
-        "contractId" : "43",
-        "implementedInterfaces" : [
-          "#package-name:Splice.Api.Token.HoldingV1:Holding"
-        ],
-        "nodeId" : 9,
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "templateId" : "#package-name:Splice.Amulet:Amulet",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    },
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "43",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : {
-            "createdAt" : {
-              "number" : "1"
-            },
-            "initialAmount" : "2833.8954337600",
-            "ratePerRound" : {
-              "rate" : "0.0038051800"
-            }
-          },
-          "dso" : "dso::normalized",
-          "owner" : "alice::normalized"
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-          {
-            "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
-            "viewStatus" : {
-              "code" : 0,
-              "details" : [
-              ],
-              "message" : ""
-            },
-            "viewValue" : {
-              "amount" : "2833.8954337600",
-              "instrumentId" : {
-                "admin" : "dso::normalized",
-                "id" : "Amulet"
-              },
-              "lock" : null,
-              "meta" : {
-                "values" : {
-                  "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
-                  "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
-                }
-              },
-              "owner" : "alice::normalized"
-            }
-          }
-        ],
-        "nodeId" : 13,
-        "observers" : [
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized",
-          "alice::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:Amulet",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : {
-      "archivedEvent" : {
-        "contractId" : "44",
-        "implementedInterfaces" : [
-          "#package-name:Splice.Api.Token.HoldingV1:Holding"
-        ],
-        "nodeId" : 2,
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "templateId" : "#package-name:Splice.Amulet:LockedAmulet",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    },
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "44",
-        "contractKey" : null,
-        "createArgument" : {
-          "amulet" : {
-            "amount" : {
-              "createdAt" : {
-                "number" : "1"
-              },
-              "initialAmount" : "1064.0015220800",
-              "ratePerRound" : {
-                "rate" : "0.0038051800"
-              }
-            },
-            "dso" : "dso::normalized",
-            "owner" : "alice::normalized"
-          },
-          "lock" : {
-            "expiresAt" : "2025-06-18T00:00:00.000000Z",
-            "holders" : [
-              "dso::normalized"
-            ],
-            "optContext" : "transfer to 'bob::normalized'"
-          }
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-          {
-            "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
-            "viewStatus" : {
-              "code" : 0,
-              "details" : [
-              ],
-              "message" : ""
-            },
-            "viewValue" : {
-              "amount" : "1064.0015220800",
-              "instrumentId" : {
-                "admin" : "dso::normalized",
-                "id" : "Amulet"
-              },
-              "lock" : {
-                "context" : "transfer to 'bob::normalized'",
-                "expiresAfter" : null,
-                "expiresAt" : "2025-06-18T00:00:00.000000Z",
-                "holders" : [
-                  "dso::normalized"
-                ]
-              },
-              "meta" : {
-                "values" : {
-                  "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
-                  "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
-                }
-              },
-              "owner" : "alice::normalized"
-            }
-          }
-        ],
-        "nodeId" : 12,
-        "observers" : [
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized",
-          "alice::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:LockedAmulet",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : null,
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "45",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : "7.0000000000",
-          "dso" : "dso::normalized",
-          "round" : {
-            "number" : "1"
-          },
-          "user" : "alice::normalized"
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-        ],
-        "nodeId" : 10,
-        "observers" : [
-          "alice::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:ValidatorRewardCoupon",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : null,
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "46",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : "7.0000000000",
-          "beneficiary" : "alice::normalized",
-          "dso" : "dso::normalized",
-          "featured" : false,
-          "provider" : "alice::normalized",
-          "round" : {
-            "number" : "1"
-          }
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-        ],
-        "nodeId" : 11,
-        "observers" : [
-          "alice::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:AppRewardCoupon",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : {
-      "archivedEvent" : {
-        "contractId" : "47",
-        "implementedInterfaces" : [
-          "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
-        ],
-        "nodeId" : 0,
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "templateId" : "#package-name:Splice.AmuletTransferInstruction:AmuletTransferInstruction",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    },
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "47",
-        "contractKey" : null,
-        "createArgument" : {
-          "lockedAmulet" : "49",
-          "transfer" : {
-            "amount" : "1000.0000000000",
-            "executeBefore" : "2025-06-18T00:00:00.000000Z",
-            "inputHoldingCids" : [
-              "49"
-            ],
-            "instrumentId" : {
-              "admin" : "dso::normalized",
-              "id" : "Amulet"
-            },
-            "meta" : {
-              "values" : {
-                
-              }
-            },
-            "receiver" : "bob::normalized",
-            "requestedAt" : "2025-06-18T00:00:00.000000Z",
-            "sender" : "alice::normalized"
-          }
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-          {
-            "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
-            "viewStatus" : {
-              "code" : 0,
-              "details" : [
-              ],
-              "message" : ""
-            },
-            "viewValue" : {
-              "meta" : {
-                "values" : {
-                  
-                }
-              },
-              "originalInstructionCid" : null,
-              "status" : {
-                "tag" : "TransferPendingReceiverAcceptance",
-                "value" : {
-                  
-                }
-              },
-              "transfer" : {
-                "amount" : "1000.0000000000",
-                "executeBefore" : "2025-06-18T00:00:00.000000Z",
-                "inputHoldingCids" : [
-                  "49"
-                ],
-                "instrumentId" : {
-                  "admin" : "dso::normalized",
-                  "id" : "Amulet"
-                },
-                "meta" : {
-                  "values" : {
-                    
-                  }
-                },
-                "receiver" : "bob::normalized",
-                "requestedAt" : "2025-06-18T00:00:00.000000Z",
-                "sender" : "alice::normalized"
-              }
-            }
-          }
-        ],
-        "nodeId" : 14,
-        "observers" : [
-          "bob::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized",
-          "alice::normalized"
-        ],
-        "templateId" : "#package-name:Splice.AmuletTransferInstruction:AmuletTransferInstruction",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : {
-      "archivedEvent" : {
-        "contractId" : "48",
-        "implementedInterfaces" : [
-          "#package-name:Splice.Api.Token.HoldingV1:Holding"
-        ],
-        "nodeId" : 9,
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "templateId" : "#package-name:Splice.Amulet:Amulet",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    },
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "48",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : {
-            "createdAt" : {
-              "number" : "1"
-            },
-            "initialAmount" : "1756.8939116800",
-            "ratePerRound" : {
-              "rate" : "0.0038051800"
-            }
-          },
-          "dso" : "dso::normalized",
-          "owner" : "alice::normalized"
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-          {
-            "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
-            "viewStatus" : {
-              "code" : 0,
-              "details" : [
-              ],
-              "message" : ""
-            },
-            "viewValue" : {
-              "amount" : "1756.8939116800",
-              "instrumentId" : {
-                "admin" : "dso::normalized",
-                "id" : "Amulet"
-              },
-              "lock" : null,
-              "meta" : {
-                "values" : {
-                  "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
-                  "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
-                }
-              },
-              "owner" : "alice::normalized"
-            }
-          }
-        ],
-        "nodeId" : 13,
-        "observers" : [
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized",
-          "alice::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:Amulet",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : {
-      "archivedEvent" : {
-        "contractId" : "49",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -2190,7 +1954,8 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "49",
+        "acsDelta" : true,
+        "contractId" : "37",
         "contractKey" : null,
         "createArgument" : {
           "amulet" : {
@@ -2198,7 +1963,7 @@
               "createdAt" : {
                 "number" : "1"
               },
-              "initialAmount" : "1064.0015220800",
+              "initialAmount" : "1000.0000000000",
               "ratePerRound" : {
                 "rate" : "0.0038051800"
               }
@@ -2226,7 +1991,7 @@
               "message" : ""
             },
             "viewValue" : {
-              "amount" : "1064.0015220800",
+              "amount" : "1000.0000000000",
               "instrumentId" : {
                 "admin" : "dso::normalized",
                 "id" : "Amulet"
@@ -2249,11 +2014,12 @@
             }
           }
         ],
-        "nodeId" : 12,
+        "nodeId" : 7,
         "observers" : [
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -2270,79 +2036,8 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "50",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : "7.0000000000",
-          "dso" : "dso::normalized",
-          "round" : {
-            "number" : "1"
-          },
-          "user" : "alice::normalized"
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-        ],
-        "nodeId" : 10,
-        "observers" : [
-          "alice::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:ValidatorRewardCoupon",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : null,
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "51",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : "7.0000000000",
-          "beneficiary" : "alice::normalized",
-          "dso" : "dso::normalized",
-          "featured" : false,
-          "provider" : "alice::normalized",
-          "round" : {
-            "number" : "1"
-          }
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-        ],
-        "nodeId" : 11,
-        "observers" : [
-          "alice::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:AppRewardCoupon",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : null,
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "52",
+        "acsDelta" : true,
+        "contractId" : "38",
         "contractKey" : null,
         "createArgument" : {
           "lockedAmulet" : "1",
@@ -2412,12 +2107,13 @@
             }
           }
         ],
-        "nodeId" : 14,
+        "nodeId" : 9,
         "observers" : [
           "bob::normalized"
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -2433,11 +2129,11 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "53",
+        "contractId" : "39",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 16,
+        "nodeId" : 15,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -2449,14 +2145,15 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "53",
+        "acsDelta" : true,
+        "contractId" : "39",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
             "createdAt" : {
               "number" : "1"
             },
-            "initialAmount" : "679.8634702400",
+            "initialAmount" : "1090.0000000000",
             "ratePerRound" : {
               "rate" : "0.0038051800"
             }
@@ -2476,7 +2173,7 @@
               "message" : ""
             },
             "viewValue" : {
-              "amount" : "679.8634702400",
+              "amount" : "1090.0000000000",
               "instrumentId" : {
                 "admin" : "dso::normalized",
                 "id" : "Amulet"
@@ -2492,162 +2189,12 @@
             }
           }
         ],
-        "nodeId" : 13,
+        "nodeId" : 8,
         "observers" : [
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized",
-          "alice::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:Amulet",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : null,
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "54",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : "7.0000000000",
-          "dso" : "dso::normalized",
-          "round" : {
-            "number" : "1"
-          },
-          "user" : "alice::normalized"
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-        ],
-        "nodeId" : 10,
-        "observers" : [
-          "alice::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:ValidatorRewardCoupon",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : null,
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "55",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : "7.0000000000",
-          "beneficiary" : "alice::normalized",
-          "dso" : "dso::normalized",
-          "featured" : false,
-          "provider" : "alice::normalized",
-          "round" : {
-            "number" : "1"
-          }
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-        ],
-        "nodeId" : 11,
-        "observers" : [
-          "alice::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:AppRewardCoupon",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : {
-      "archivedEvent" : {
-        "contractId" : "57",
-        "implementedInterfaces" : [
-          "#package-name:Splice.Api.Token.HoldingV1:Holding"
-        ],
-        "nodeId" : 18,
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "templateId" : "#package-name:Splice.Amulet:Amulet",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    },
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "57",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : {
-            "createdAt" : {
-              "number" : "1"
-            },
-            "initialAmount" : "42.0015220800",
-            "ratePerRound" : {
-              "rate" : "0.0038051800"
-            }
-          },
-          "dso" : "dso::normalized",
-          "owner" : "alice::normalized"
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-          {
-            "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
-            "viewStatus" : {
-              "code" : 0,
-              "details" : [
-              ],
-              "message" : ""
-            },
-            "viewValue" : {
-              "amount" : "42.0015220800",
-              "instrumentId" : {
-                "admin" : "dso::normalized",
-                "id" : "Amulet"
-              },
-              "lock" : null,
-              "meta" : {
-                "values" : {
-                  "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
-                  "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
-                }
-              },
-              "owner" : "alice::normalized"
-            }
-          }
-        ],
-        "nodeId" : 12,
-        "observers" : [
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -2663,7 +2210,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "58",
+        "contractId" : "41",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -2679,14 +2226,15 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "58",
+        "acsDelta" : false,
+        "contractId" : "41",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
             "createdAt" : {
               "number" : "1"
             },
-            "initialAmount" : "1064.0015220800",
+            "initialAmount" : "1000.0000000000",
             "ratePerRound" : {
               "rate" : "0.0038051800"
             }
@@ -2706,7 +2254,7 @@
               "message" : ""
             },
             "viewValue" : {
-              "amount" : "1064.0015220800",
+              "amount" : "1000.0000000000",
               "instrumentId" : {
                 "admin" : "dso::normalized",
                 "id" : "Amulet"
@@ -2727,6 +2275,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -2740,85 +2289,13 @@
     }
   },
   {
-    "archived" : null,
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "59",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : "16.0000000000",
-          "dso" : "dso::normalized",
-          "round" : {
-            "number" : "1"
-          },
-          "user" : "alice::normalized"
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-        ],
-        "nodeId" : 9,
-        "observers" : [
-          "alice::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:ValidatorRewardCoupon",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : null,
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "60",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : "16.0000000000",
-          "beneficiary" : "alice::normalized",
-          "dso" : "dso::normalized",
-          "featured" : false,
-          "provider" : "alice::normalized",
-          "round" : {
-            "number" : "1"
-          }
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-        ],
-        "nodeId" : 10,
-        "observers" : [
-          "alice::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:AppRewardCoupon",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "61",
+        "contractId" : "42",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 20,
+        "nodeId" : 17,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -2830,14 +2307,15 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "61",
+        "acsDelta" : true,
+        "contractId" : "42",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
             "createdAt" : {
               "number" : "1"
             },
-            "initialAmount" : "1064.0015220800",
+            "initialAmount" : "1000.0000000000",
             "ratePerRound" : {
               "rate" : "0.0038051800"
             }
@@ -2857,7 +2335,7 @@
               "message" : ""
             },
             "viewValue" : {
-              "amount" : "1064.0015220800",
+              "amount" : "1000.0000000000",
               "instrumentId" : {
                 "admin" : "dso::normalized",
                 "id" : "Amulet"
@@ -2878,6 +2356,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -2893,11 +2372,11 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "62",
+        "contractId" : "43",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 22,
+        "nodeId" : 19,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -2909,14 +2388,15 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "62",
+        "acsDelta" : true,
+        "contractId" : "43",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
             "createdAt" : {
               "number" : "1"
             },
-            "initialAmount" : "1064.0015220800",
+            "initialAmount" : "1000.0000000000",
             "ratePerRound" : {
               "rate" : "0.0038051800"
             }
@@ -2936,7 +2416,7 @@
               "message" : ""
             },
             "viewValue" : {
-              "amount" : "1064.0015220800",
+              "amount" : "1000.0000000000",
               "instrumentId" : {
                 "admin" : "dso::normalized",
                 "id" : "Amulet"
@@ -2957,6 +2437,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -2972,7 +2453,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "63",
+        "contractId" : "44",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
         ],
@@ -2988,15 +2469,16 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "63",
+        "acsDelta" : true,
+        "contractId" : "44",
         "contractKey" : null,
         "createArgument" : {
-          "lockedAmulet" : "64",
+          "lockedAmulet" : "45",
           "transfer" : {
             "amount" : "200.0000000000",
             "executeBefore" : "2025-06-18T00:00:00.000000Z",
             "inputHoldingCids" : [
-              "64"
+              "45"
             ],
             "instrumentId" : {
               "admin" : "dso::normalized",
@@ -3040,7 +2522,7 @@
                 "amount" : "200.0000000000",
                 "executeBefore" : "2025-06-18T00:00:00.000000Z",
                 "inputHoldingCids" : [
-                  "64"
+                  "45"
                 ],
                 "instrumentId" : {
                   "admin" : "dso::normalized",
@@ -3064,6 +2546,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "bob::normalized"
@@ -3079,7 +2562,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "65",
+        "contractId" : "46",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
         ],
@@ -3095,15 +2578,16 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "65",
+        "acsDelta" : true,
+        "contractId" : "46",
         "contractKey" : null,
         "createArgument" : {
-          "lockedAmulet" : "66",
+          "lockedAmulet" : "47",
           "transfer" : {
             "amount" : "200.0000000000",
             "executeBefore" : "2025-06-18T00:00:00.000000Z",
             "inputHoldingCids" : [
-              "66"
+              "47"
             ],
             "instrumentId" : {
               "admin" : "dso::normalized",
@@ -3147,7 +2631,7 @@
                 "amount" : "200.0000000000",
                 "executeBefore" : "2025-06-18T00:00:00.000000Z",
                 "inputHoldingCids" : [
-                  "66"
+                  "47"
                 ],
                 "instrumentId" : {
                   "admin" : "dso::normalized",
@@ -3171,6 +2655,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "bob::normalized"
@@ -3186,7 +2671,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "67",
+        "contractId" : "48",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
         ],
@@ -3202,15 +2687,16 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "67",
+        "acsDelta" : true,
+        "contractId" : "48",
         "contractKey" : null,
         "createArgument" : {
-          "lockedAmulet" : "68",
+          "lockedAmulet" : "49",
           "transfer" : {
             "amount" : "200.0000000000",
             "executeBefore" : "2025-06-18T00:00:00.000000Z",
             "inputHoldingCids" : [
-              "68"
+              "49"
             ],
             "instrumentId" : {
               "admin" : "dso::normalized",
@@ -3254,7 +2740,7 @@
                 "amount" : "200.0000000000",
                 "executeBefore" : "2025-06-18T00:00:00.000000Z",
                 "inputHoldingCids" : [
-                  "68"
+                  "49"
                 ],
                 "instrumentId" : {
                   "admin" : "dso::normalized",
@@ -3278,6 +2764,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "bob::normalized"
@@ -3294,15 +2781,16 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "69",
+        "acsDelta" : true,
+        "contractId" : "50",
         "contractKey" : null,
         "createArgument" : {
-          "lockedAmulet" : "70",
+          "lockedAmulet" : "51",
           "transfer" : {
             "amount" : "200.0000000000",
             "executeBefore" : "2025-06-18T00:00:00.000000Z",
             "inputHoldingCids" : [
-              "70"
+              "51"
             ],
             "instrumentId" : {
               "admin" : "dso::normalized",
@@ -3346,7 +2834,7 @@
                 "amount" : "200.0000000000",
                 "executeBefore" : "2025-06-18T00:00:00.000000Z",
                 "inputHoldingCids" : [
-                  "70"
+                  "51"
                 ],
                 "instrumentId" : {
                   "admin" : "dso::normalized",
@@ -3370,6 +2858,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "bob::normalized"
@@ -3385,11 +2874,11 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "71",
+        "contractId" : "52",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 24,
+        "nodeId" : 21,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -3401,7 +2890,8 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "71",
+        "acsDelta" : true,
+        "contractId" : "52",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -3444,11 +2934,12 @@
             }
           }
         ],
-        "nodeId" : 11,
+        "nodeId" : 9,
         "observers" : [
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -3464,11 +2955,11 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "78",
+        "contractId" : "56",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
-        "nodeId" : 14,
+        "nodeId" : 13,
         "offset" : 42,
         "packageName" : "splice-amulet",
         "templateId" : "#package-name:Splice.Amulet:Amulet",
@@ -3480,14 +2971,15 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "78",
+        "acsDelta" : false,
+        "contractId" : "56",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
             "createdAt" : {
               "number" : "1"
             },
-            "initialAmount" : "1064.0015220800",
+            "initialAmount" : "1000.0000000000",
             "ratePerRound" : {
               "rate" : "0.0038051800"
             }
@@ -3507,7 +2999,7 @@
               "message" : ""
             },
             "viewValue" : {
-              "amount" : "1064.0015220800",
+              "amount" : "1000.0000000000",
               "instrumentId" : {
                 "admin" : "dso::normalized",
                 "id" : "Amulet"
@@ -3528,6 +3020,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "alice::normalized"
@@ -3541,81 +3034,9 @@
     }
   },
   {
-    "archived" : null,
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "79",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : "6.0000000000",
-          "dso" : "dso::normalized",
-          "round" : {
-            "number" : "1"
-          },
-          "user" : "alice::normalized"
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-        ],
-        "nodeId" : 25,
-        "observers" : [
-          "alice::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:ValidatorRewardCoupon",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
-    "archived" : null,
-    "created" : {
-      "createdEvent" : {
-        "contractId" : "80",
-        "contractKey" : null,
-        "createArgument" : {
-          "amount" : "6.0000000000",
-          "beneficiary" : "alice::normalized",
-          "dso" : "dso::normalized",
-          "featured" : false,
-          "provider" : "alice::normalized",
-          "round" : {
-            "number" : "1"
-          }
-        },
-        "createdAt" : "1971-01-01T00:00:42.000420Z",
-        "createdEventBlob" : "",
-        "interfaceViews" : [
-        ],
-        "nodeId" : 26,
-        "observers" : [
-          "alice::normalized"
-        ],
-        "offset" : 42,
-        "packageName" : "splice-amulet",
-        "signatories" : [
-          "dso::normalized"
-        ],
-        "templateId" : "#package-name:Splice.Amulet:AppRewardCoupon",
-        "witnessParties" : [
-          "alice::normalized"
-        ]
-      },
-      "synchronizerId" : "sync::normalized"
-    }
-  },
-  {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "81",
+        "contractId" : "57",
         "implementedInterfaces" : [
         ],
         "nodeId" : 1,
@@ -3630,7 +3051,8 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "81",
+        "acsDelta" : true,
+        "contractId" : "57",
         "contractKey" : null,
         "createArgument" : {
           "expectedDso" : "dso::normalized",
@@ -3647,6 +3069,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-wallet",
+        "representativePackageId" : "d164bed10c3b9291dc64abed570103903510fb2b49d552340bb4c95b506bcb67",
         "signatories" : [
           "alice::normalized"
         ],
@@ -3662,7 +3085,8 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "82",
+        "acsDelta" : true,
+        "contractId" : "58",
         "contractKey" : null,
         "createArgument" : {
           "dso" : "dso::normalized",
@@ -3681,6 +3105,7 @@
         ],
         "offset" : 42,
         "packageName" : "splice-amulet",
+        "representativePackageId" : "becac25fb1aae27eb95c51a9e280b96bd5d4dad3d0355165218b146fe206b79c",
         "signatories" : [
           "dso::normalized",
           "aliceValidator::normalized",

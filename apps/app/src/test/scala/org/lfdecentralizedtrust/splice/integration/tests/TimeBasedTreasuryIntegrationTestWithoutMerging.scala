@@ -16,6 +16,10 @@ import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigUtil, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.automation.AmuletMetricsTrigger
 import org.slf4j.event.Level
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  AppRewardCoupon,
+  ValidatorRewardCoupon,
+}
 
 import java.time.Instant
 import java.time.Duration
@@ -47,13 +51,18 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       )
   }
 
+  override protected lazy val sanityChecksIgnoredRootCreates = Seq(
+    AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+    ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+  )
+
   "rewards from older rounds are prioritized while respecting maxNumInputs" in { implicit env =>
     val (alice, _) = onboardAliceAndBob()
 
     aliceValidatorWalletClient.tap(100)
-    createRewardsInRound(aliceValidatorWalletClient, aliceWalletClient, alice, 1)
+    createRewardsInRound(aliceValidatorWalletClient, 1)
     advanceRoundsToNextRoundOpening
-    createRewardsInRound(aliceValidatorWalletClient, aliceWalletClient, alice, 2)
+    createRewardsInRound(aliceValidatorWalletClient, 2)
     aliceValidatorWalletClient.tap(50)
 
     // by advancing three rounds, both round 1 and round 2 are in their issuing phase.
@@ -109,14 +118,19 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     val (alice, _) = onboardAliceAndBob()
 
     aliceValidatorWalletClient.tap(10000)
-    // Execute three transfers that generate different amount of rewards.
-    p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 5)
-    // second and third transfer are a lot larger than the first one, but very close to each other.
-    // because in the first part of the issuance curve already, apps (40%) gain a lot more rewards than validators (12%)
+    // Generate rewards with different amounts with two that are significantly larger than the others.
+    // Because in the first part of the issuance curve already, apps (40%) gain a lot more rewards than validators (12%)
     // the app rewards, the app reward from the second transfer is prioritized over the validator reward from the
     // third (larger) transfer.
-    p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 2000)
-    p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 2010)
+    val aliceValidator = aliceValidatorBackend.getValidatorPartyId()
+    createRewards(
+      appRewards = Seq(
+        (aliceValidator, 5, false),
+        (aliceValidator, 2000, false),
+        (aliceValidator, 2010, false),
+      ),
+      validatorRewards = Seq((aliceValidator, 5), (aliceValidator, 2000), (aliceValidator, 2010)),
+    )
 
     // by advancing three rounds, round 1 is in the issuing phase.
     advanceRoundsToNextRoundOpening
@@ -186,11 +200,11 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     val (alice, _) = onboardAliceAndBob()
 
     aliceValidatorWalletClient.tap(100)
-    createRewardsInRound(aliceValidatorWalletClient, aliceWalletClient, alice, 1)
+    createRewardsInRound(aliceValidatorWalletClient, 1)
     advanceRoundsToNextRoundOpening
-    createRewardsInRound(aliceValidatorWalletClient, aliceWalletClient, alice, 2)
+    createRewardsInRound(aliceValidatorWalletClient, 2)
     advanceRoundsToNextRoundOpening
-    createRewardsInRound(aliceValidatorWalletClient, aliceWalletClient, alice, 3)
+    createRewardsInRound(aliceValidatorWalletClient, 3)
 
     // by advancing 2 rounds, both round 1 and round 2 are in their issuing phase
     advanceRoundsToNextRoundOpening
@@ -280,10 +294,11 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   "adjust maxNumInput if there is a tap operation in the batch" in { implicit env =>
     val (alice, _) = onboardAliceAndBob()
     aliceValidatorWalletClient.tap(50)
-    p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 5)
-    eventually() {
-      aliceValidatorWalletClient.list().amulets should have length 1
-    }
+    val aliceValidator = aliceValidatorBackend.getValidatorPartyId()
+    createRewards(
+      appRewards = Seq((aliceValidator, 10.0, false)),
+      validatorRewards = Seq((aliceValidator, 10.0)),
+    )
     aliceValidatorWalletClient.tap(50)
 
     eventually() {
@@ -398,14 +413,15 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
   private def createRewardsInRound(
       validatorWallet: WalletAppClientReference,
-      userWallet: WalletAppClientReference,
-      receiverParty: PartyId,
       round: Int,
-  ) = {
-    p2pTransfer(validatorWallet, userWallet, receiverParty, 5)
+  )(implicit env: SpliceTestConsoleEnvironment) = {
+    val party = PartyId.tryFromProtoPrimitive(validatorWallet.userStatus().party)
+    createRewards(
+      appRewards = Seq((party, 10.0, false)),
+      validatorRewards = Seq((party, 10.0)),
+    )
 
     eventually() {
-      validatorWallet.list().amulets should have length 1
       validatorWallet
         .listValidatorRewardCoupons()
         .filter(_.payload.round.number == round) should have length 1

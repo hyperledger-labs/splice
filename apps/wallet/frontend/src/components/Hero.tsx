@@ -44,9 +44,7 @@ const Hero: React.FC = () => {
               />
             </Typography>
             <Typography variant="caption">
-              {featureSupport.data?.noHoldingFeesOnTransfers
-                ? `Reflects unlocked ${config.spliceInstanceNames.amuletName} and rewards earned`
-                : `Reflects unlocked ${config.spliceInstanceNames.amuletName}, rewards earned and holding fees`}
+              {`Reflects unlocked ${config.spliceInstanceNames.amuletName} and rewards earned`}
             </Typography>
           </Box>
         )}

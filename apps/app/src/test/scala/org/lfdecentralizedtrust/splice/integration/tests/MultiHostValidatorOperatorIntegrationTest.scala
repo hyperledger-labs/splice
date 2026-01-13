@@ -196,7 +196,7 @@ class MultiHostValidatorOperatorIntegrationTest
       "The send succeeds despite alice's validator being disconnected and stopped",
       _ => {
         // Fees eat up quite a bit
-        splitwellWalletClient.balance().unlockedQty should beWithin(47, 48)
+        splitwellWalletClient.balance().unlockedQty should be(60)
         // Alice's wallet is stopped, so we confirm the transaction via scan
         sv1ScanBackend
           .listTransactions(

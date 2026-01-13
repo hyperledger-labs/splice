@@ -167,9 +167,7 @@ class MintingDelegationCollectRewardsTrigger(
         // Merge the smallest amounts first
         // we do +1 here to maintain exactly 'mergeLimit' amulets after the mint
         amulets
-          .sortBy(a =>
-            BigDecimal(SpliceUtil.currentAmount(a.payload, openRound.payload.round.number))
-          )
+          .sortBy(a => BigDecimal(a.payload.amount.initialAmount))
           .take(amulets.size - mergeLimit.toInt + 1)
       } else Seq.empty
 

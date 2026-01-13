@@ -7,10 +7,13 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.Integration
 import org.lfdecentralizedtrust.splice.util.{SplitwellTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
 import org.lfdecentralizedtrust.splice.wallet.store.{
+  BalanceChangeTxLogEntry,
   TransferTxLogEntry,
   TxLogEntry as walletLogEntry,
 }
 import com.digitalasset.canton.HasExecutionContext
+
+import java.util.UUID
 
 class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
     extends IntegrationTestWithSharedEnvironment
@@ -37,23 +40,27 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
   "A wallet" should {
 
     "handle app and validator rewards that are collected" in { implicit env =>
-      val (alice, _) = onboardAliceAndBob()
+      val (alice, bob) = onboardAliceAndBob()
       waitForWalletUser(aliceValidatorWalletClient)
       waitForWalletUser(bobValidatorWalletClient)
 
-      // Note this has no effect on the wallet app, as it is not a featured app and thus does not use the featured app
-      // right in the transfer contexts of its submissions. We leave it here to test that it has no effect.
+      // Self-feature to get app rewards
       grantFeaturedAppRight(bobValidatorWalletClient)
+      // Tap to pay preapproval fees
+      bobValidatorWalletClient.tap(100.0)
+      bobWalletClient.createTransferPreapproval()
 
-      bobWalletClient.tap(50)
+      aliceWalletClient.tap(60.0)
 
       actAndCheck(
-        "Transfer from Bob to Alice",
-        p2pTransfer(bobWalletClient, aliceWalletClient, alice, 30.0),
+        "Transfer from Alice to Bob",
+        aliceWalletClient.transferPreapprovalSend(bob, 30.0, UUID.randomUUID.toString),
       )(
         "Bob's validator will receive some rewards",
         _ => {
+          // from the featured incoming transfer
           bobValidatorWalletClient.listAppRewardCoupons() should have size 1
+          // from creating the transfer preapproval
           bobValidatorWalletClient.listValidatorRewardCoupons() should have size 1
         },
       )
@@ -80,7 +87,7 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
       )
 
       val (appRewardAmount, validatorRewardAmount) =
-        getRewardCouponsValue(appRewards, validatorRewards, featured = false)
+        getRewardCouponsValue(appRewards, validatorRewards)
 
       checkTxHistory(
         bobValidatorWalletClient,
@@ -94,7 +101,13 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
             logEntry.receivers shouldBe empty
             logEntry.appRewardsUsed shouldBe appRewardAmount
             logEntry.validatorRewardsUsed shouldBe validatorRewardAmount
-          }
+          },
+          { case logEntry: TransferTxLogEntry =>
+            logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.TransferPreapprovalCreation.toProto
+          },
+          { case logEntry: BalanceChangeTxLogEntry =>
+            logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
+          },
         ),
         trafficTopups = IgnoreTopupsDevNet,
       )
