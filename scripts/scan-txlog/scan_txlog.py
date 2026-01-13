@@ -3796,6 +3796,8 @@ class State:
                 return self.handle_transfer_preapproval_send(transaction, event)
             case "TransferPreapproval_Cancel":
                 return HandleTransactionResult.empty()
+            case "DsoRules_ExpireTransferPreapproval":
+                return HandleTransactionResult.empty()
             case "TransferCommand_Send":
                 return self.handle_transfer_command_send(transaction, event)
             case "LockedAmulet_Unlock":
