@@ -17,8 +17,8 @@
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
-  "id": 1164,
+  "graphTooltip": 1,
+  "id": 15005,
   "links": [],
   "panels": [
     {
@@ -91,17 +91,15 @@
       "id": 1,
       "options": {
         "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "pluginVersion": "12.1.1",
@@ -201,8 +199,8 @@
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "pluginVersion": "12.1.1",
@@ -274,7 +272,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "s"
         },
         "overrides": []
       },
@@ -287,9 +286,7 @@
       "id": 4,
       "options": {
         "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -382,9 +379,7 @@
       "id": 3,
       "options": {
         "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -392,7 +387,7 @@
         "tooltip": {
           "hideZeros": true,
           "mode": "multi",
-          "sort": "none"
+          "sort": "desc"
         }
       },
       "pluginVersion": "12.1.1",
@@ -417,10 +412,8 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": "All",
-          "value": [
-            "$__all"
-          ]
+          "text": ["validator1"],
+          "value": ["validator1"]
         },
         "definition": "label_values(daml_http_client_requests_duration_seconds,namespace)",
         "includeAll": true,
@@ -481,9 +474,7 @@
       {
         "current": {
           "text": "All",
-          "value": [
-            "$__all"
-          ]
+          "value": ["$__all"]
         },
         "definition": "label_values(daml_http_client_requests_duration_seconds{namespace=~\"$namespace\", job=~\"$job\"},http_client)",
         "includeAll": true,
@@ -535,5 +526,5 @@
   "timezone": "UTC",
   "title": "Http Client",
   "uid": "a8a3113a-bccf-4728-b752-dd7a5d6f9bda",
-  "version": 19
+  "version": 3
 }
