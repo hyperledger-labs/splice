@@ -568,10 +568,15 @@ const UnfeatureAppSection = ({ rightContractId }: UnfeatureAppSectionProps) => {
       sx={{ display: 'contents' }}
     >
       <DetailItem
-        label="Contract ID"
-        value={rightContractId}
+        label="Proposal ID"
+        value={
+          <CopyableIdentifier
+            value={rightContractId}
+            size="large"
+            data-testid="proposal-details-unfeature-app-value"
+          />
+        }
         labelId="proposal-details-unfeature-app-label"
-        valueId="proposal-details-unfeature-app-value"
       />
     </Box>
   );
