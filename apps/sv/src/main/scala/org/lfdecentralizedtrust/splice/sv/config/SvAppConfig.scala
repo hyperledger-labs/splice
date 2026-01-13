@@ -364,7 +364,7 @@ case class SvAppBackendConfig(
     // a migration. This can be a useful assertion but is very slow so should not be enabled on clusters with large topology state.
     validateTopologyAfterMigration: Boolean = false,
     // The threshold above which unclaimed development fund coupons will be merged.
-    numUnclaimedDevelopmentFundCouponsThreshold: Int = 10,
+    unclaimedDevelopmentFundCouponsThreshold: Int = 10,
 ) extends SpliceBackendConfig {
 
   def shouldSkipSynchronizerInitialization =
