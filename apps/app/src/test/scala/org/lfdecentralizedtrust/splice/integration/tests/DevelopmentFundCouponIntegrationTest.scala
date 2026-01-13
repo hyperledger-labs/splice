@@ -36,6 +36,9 @@ class DevelopmentFundCouponIntegrationTest
           )
         )(config)
       )
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.withDevelopmentFundPercentage(0.05)(config)
+      )
 
   "UnclaimedDevelopmentFundCoupons are merged" in { implicit env =>
     actAndCheck(

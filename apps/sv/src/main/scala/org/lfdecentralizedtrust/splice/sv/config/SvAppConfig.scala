@@ -102,6 +102,7 @@ object SvOnboardingConfig {
       initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = Some(BigDecimal(1.0)),
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
       initialRound: Long = 0L,
+      developmentFundPercentage: Option[BigDecimal] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(

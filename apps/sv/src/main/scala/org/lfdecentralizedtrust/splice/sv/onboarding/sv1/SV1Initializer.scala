@@ -685,6 +685,7 @@ class SV1Initializer(
                   sv1Config.zeroTransferFees,
                   sv1Config.initialTransferPreapprovalFee,
                   sv1Config.initialFeaturedAppActivityMarkerAmount,
+                  developmentFundPercentage = sv1Config.developmentFundPercentage,
                 )
                 for {
                   sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(
