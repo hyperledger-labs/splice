@@ -360,10 +360,19 @@ class SvFrontendIntegrationTest
         formPrefix: String,
         requestReasonBody: String,
         requestReasonUrl: String,
+        effectiveAtThreshold: Boolean,
         extraFormOps: WebDriverType => Unit,
     )(implicit webDriver: WebDriverType): String = {
       val (_, contractId) = actAndCheck(
         "sv1 operator can create a new proposal", {
+          if (effectiveAtThreshold) {
+            eventually() {
+              val effectiveAtThresholdRadio =
+                webDriver.findElement(By.id("effective-at-threshold-radio"))
+              effectiveAtThresholdRadio.click()
+            }
+          }
+
           eventually() {
             extraFormOps(webDriver)
           }
@@ -498,7 +507,11 @@ class SvFrontendIntegrationTest
         },
       )
 
-    def assertCreateProposal(action: String, formPrefix: String)(
+    def assertCreateProposal(
+        action: String,
+        formPrefix: String,
+        effectiveAtThreshold: Boolean = true,
+    )(
         extraFormOps: WebDriverType => Unit
     )(implicit
         env: SpliceTestConsoleEnvironment
@@ -509,7 +522,13 @@ class SvFrontendIntegrationTest
       val proposalContractId = withFrontEnd("sv1") { implicit webDriver =>
         loginToGovernanceBeta(sv1UIPort, sv1Backend.config.ledgerApiUser)
         selectActionAndNavigateToForm(action, formPrefix)
-        fillAndSubmitProposalForm(formPrefix, requestReasonBody, requestReasonUrl, extraFormOps)
+        fillAndSubmitProposalForm(
+          formPrefix,
+          requestReasonBody,
+          requestReasonUrl,
+          effectiveAtThreshold,
+          extraFormOps,
+        )
       }
 
       withFrontEnd("sv2") { implicit webDriver =>
@@ -1352,19 +1371,15 @@ class SvFrontendIntegrationTest
       val sv4PartyId = sv4Backend.getDsoInfo().svParty.toProtoPrimitive
       val effectiveDate = "2099-01-31 00:12"
 
-      assertCreateProposal("SRARC_OffboardSv", "offboard-sv") { implicit webDriver =>
+      assertCreateProposal("SRARC_OffboardSv", "offboard-sv", false) { implicit webDriver =>
+        setBetaEffectiveDate("sv1", "offboard-sv", effectiveDate)
+
         eventually() {
           val dropdown = webDriver.findElement(By.id("offboard-sv-member-dropdown"))
           dropdown.click()
-        }
 
-        eventually() {
           val memberOption = webDriver.findElement(By.cssSelector(s"[data-value='$sv4PartyId']"))
           memberOption.click()
-        }
-
-        eventually() {
-          setBetaEffectiveDate("sv1", "offboard-sv", effectiveDate)
         }
       }
     }
