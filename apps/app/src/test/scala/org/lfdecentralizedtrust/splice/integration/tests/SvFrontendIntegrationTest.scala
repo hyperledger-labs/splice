@@ -1353,13 +1353,19 @@ class SvFrontendIntegrationTest
       val effectiveDate = "2099-01-31 00:12"
 
       assertCreateProposal("SRARC_OffboardSv", "offboard-sv") { implicit webDriver =>
-        val dropdown = webDriver.findElement(By.id("offboard-sv-member-dropdown"))
-        dropdown.click()
+        eventually() {
+          val dropdown = webDriver.findElement(By.id("offboard-sv-member-dropdown"))
+          dropdown.click()
+        }
 
-        val memberOption = webDriver.findElement(By.cssSelector(s"[data-value='$sv4PartyId']"))
-        memberOption.click()
+        eventually() {
+          val memberOption = webDriver.findElement(By.cssSelector(s"[data-value='$sv4PartyId']"))
+          memberOption.click()
+        }
 
-        setBetaEffectiveDate("sv1", "offboard-sv", effectiveDate)
+        eventually() {
+          setBetaEffectiveDate("sv1", "offboard-sv", effectiveDate)
+        }
       }
     }
 
