@@ -36,7 +36,7 @@ const deleteBadPodsCommand = [
               (.status.reason == "Evicted") or
               (.status.containerStatuses[]?.state.terminated? | .reason == "Error" and .exitCode == 137) or
               (.status.initContainerStatuses[]?.state.waiting?.reason == "ContainerStatusUnknown")
-            ) | .metadata.name' | sort -u | xargs
+            ) | .metadata.name' | sort -u
         );
         if [ -z "$BAD_PODS" ]; then
             echo "No bad pods found in $NAMESPACE. Skipping.";
