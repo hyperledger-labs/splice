@@ -30,18 +30,25 @@ class DevelopmentFundCouponIntegrationTest
       .addConfigTransform((_, config) =>
         ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
       )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppConfigs_(
+          _.copy(
+            unclaimedDevelopmentFundCouponsThreshold = 3
+          )
+        )(config)
+      )
 
   "UnclaimedDevelopmentFundCoupons are merged" in { implicit env =>
     actAndCheck(
-      "Advance 10 rounds", {
-        Range(0, 10).foreach(_ => advanceRoundsByOneTickViaAutomation())
+      "Advance 3 rounds", {
+        Range(0, 3).foreach(_ => advanceRoundsByOneTickViaAutomation())
       },
     )(
-      "10 UnclaimedDevelopmentFundCoupons are created and the trigger does not merge the coupons",
+      "3 UnclaimedDevelopmentFundCoupons are created and the trigger does not merge the coupons",
       _ =>
         sv1Backend.participantClient.ledger_api_extensions.acs
           .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
-          .size shouldBe 10,
+          .size shouldBe 3,
     )
 
     actAndCheck(
