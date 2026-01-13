@@ -678,7 +678,7 @@ object SpliceConfig {
       deriveReader[ValidatorExtraSynchronizerConfig]
     implicit val validatorSynchronizerConfigReader: ConfigReader[ValidatorSynchronizerConfig] =
       deriveReader[ValidatorSynchronizerConfig]
-    implicit val validatorTrustedSynchronizerConfig
+    implicit val validatorTrustedSynchronizerConfigReader
         : ConfigReader[ValidatorTrustedSynchronizerConfig] =
       deriveReader[ValidatorTrustedSynchronizerConfig]
     implicit val offsetDateTimeConfigurationReader: ConfigReader[java.time.OffsetDateTime] =
@@ -1040,7 +1040,7 @@ object SpliceConfig {
       deriveWriter[ValidatorExtraSynchronizerConfig]
     implicit val validatorSynchronizerConfigWriter: ConfigWriter[ValidatorSynchronizerConfig] =
       deriveWriter[ValidatorSynchronizerConfig]
-    implicit val validatorTrustedSynchronizerConfig
+    implicit val validatorTrustedSynchronizerConfigWriter
         : ConfigWriter[ValidatorTrustedSynchronizerConfig] =
       deriveWriter[ValidatorTrustedSynchronizerConfig]
     implicit val offsetDateTimeConfigurationWriter: ConfigWriter[java.time.OffsetDateTime] =
