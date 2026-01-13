@@ -18,11 +18,11 @@ import { useMutation } from '@tanstack/react-query';
 
 import { useMintingDelegations } from '../hooks/useMintingDelegations';
 import { useMintingDelegationProposals } from '../hooks/useMintingDelegationProposals';
-import { useWalletClient } from '../contexts/WalletServiceContext';
 import {
-  MintingDelegation,
-  MintingDelegationProposal,
-} from '@daml.js/splice-wallet/lib/Splice/Wallet/MintingDelegation/module';
+  MintingDelegationWithStatus,
+  MintingDelegationProposalWithStatus,
+  useWalletClient,
+} from '../contexts/WalletServiceContext';
 
 export const shortenPartyId = (partyId: string): string => {
   const elements = partyId.split('::');
@@ -78,6 +78,7 @@ export const Delegations: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>Beneficiary</TableCell>
+              <TableCell>Onboarded</TableCell>
               <TableCell>Max Amulets</TableCell>
               <TableCell>Expiration</TableCell>
               <TableCell>Accept</TableCell>
@@ -86,7 +87,7 @@ export const Delegations: React.FC = () => {
           </TableHead>
           <TableBody>
             {proposals.map(proposal => (
-              <ProposalRow key={proposal.contractId} proposal={proposal} />
+              <ProposalRow key={proposal.contract.contractId} proposal={proposal} />
             ))}
           </TableBody>
         </Table>
@@ -104,6 +105,7 @@ export const Delegations: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>Beneficiary</TableCell>
+              <TableCell>Onboarded</TableCell>
               <TableCell>Max Amulets</TableCell>
               <TableCell>Expiration</TableCell>
               <TableCell>Withdraw</TableCell>
@@ -111,7 +113,7 @@ export const Delegations: React.FC = () => {
           </TableHead>
           <TableBody>
             {delegations.map(delegation => (
-              <DelegationRow key={delegation.contractId} delegation={delegation} />
+              <DelegationRow key={delegation.contract.contractId} delegation={delegation} />
             ))}
           </TableBody>
         </Table>
@@ -121,15 +123,16 @@ export const Delegations: React.FC = () => {
 };
 
 interface DelegationRowProps {
-  delegation: Contract<MintingDelegation>;
+  delegation: MintingDelegationWithStatus;
 }
 
 const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
   const { withdrawMintingDelegation } = useWalletClient();
+  const { contract, beneficiaryOnboarded } = delegation;
 
   const withdrawMutation = useMutation({
     mutationFn: async () => {
-      return await withdrawMintingDelegation(delegation.contractId);
+      return await withdrawMintingDelegation(contract.contractId);
     },
     onError: error => {
       console.error('Failed to withdraw minting delegation', error);
@@ -138,23 +141,28 @@ const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
 
   return (
     <TableRow
-      key={delegation.contractId}
-      id={`delegation-row-${delegation.contractId}`}
+      key={contract.contractId}
+      id={`delegation-row-${contract.contractId}`}
       className="delegation-row"
     >
       <TableCell>
         <Typography className="delegation-beneficiary">
-          {shortenPartyId(delegation.payload.beneficiary)}
+          {shortenPartyId(contract.payload.beneficiary)}
+        </Typography>
+      </TableCell>
+      <TableCell>
+        <Typography className="delegation-onboarded">
+          {beneficiaryOnboarded ? '✓' : '✗'}
         </Typography>
       </TableCell>
       <TableCell>
         <Typography className="delegation-max-amulets">
-          {delegation.payload.amuletMergeLimit}
+          {contract.payload.amuletMergeLimit}
         </Typography>
       </TableCell>
       <TableCell>
         <Typography className="delegation-expiration">
-          <DateDisplay datetime={delegation.payload.expiresAt} />
+          <DateDisplay datetime={contract.payload.expiresAt} />
         </Typography>
       </TableCell>
       <TableCell>
@@ -181,15 +189,16 @@ const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
 };
 
 interface ProposalRowProps {
-  proposal: Contract<MintingDelegationProposal>;
+  proposal: MintingDelegationProposalWithStatus;
 }
 
 const ProposalRow: React.FC<ProposalRowProps> = ({ proposal }) => {
   const { acceptMintingDelegationProposal, rejectMintingDelegationProposal } = useWalletClient();
+  const { contract, beneficiaryOnboarded } = proposal;
 
   const acceptMutation = useMutation({
     mutationFn: async () => {
-      return await acceptMintingDelegationProposal(proposal.contractId);
+      return await acceptMintingDelegationProposal(contract.contractId);
     },
     onError: error => {
       console.error('Failed to accept minting delegation proposal', error);
@@ -198,23 +207,28 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal }) => {
 
   const rejectMutation = useMutation({
     mutationFn: async () => {
-      return await rejectMintingDelegationProposal(proposal.contractId);
+      return await rejectMintingDelegationProposal(contract.contractId);
     },
     onError: error => {
       console.error('Failed to reject minting delegation proposal', error);
     },
   });
 
-  const delegation = proposal.payload.delegation;
+  const delegation = contract.payload.delegation;
 
   return (
     <TableRow
-      key={proposal.contractId}
-      id={`proposal-row-${proposal.contractId}`}
+      key={contract.contractId}
+      id={`proposal-row-${contract.contractId}`}
       className="proposal-row"
     >
       <TableCell>
         <Typography className="proposal-beneficiary">{shortenPartyId(delegation.beneficiary)}</Typography>
+      </TableCell>
+      <TableCell>
+        <Typography className="proposal-onboarded">
+          {beneficiaryOnboarded ? '✓' : '✗'}
+        </Typography>
       </TableCell>
       <TableCell>
         <Typography className="proposal-max-amulets">{delegation.amuletMergeLimit}</Typography>
@@ -227,6 +241,10 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal }) => {
       <TableCell>
         <DisableConditionally
           conditions={[
+            {
+              disabled: !beneficiaryOnboarded,
+              reason: 'Beneficiary is not onboarded',
+            },
             {
               disabled: acceptMutation.isPending,
               reason: 'Accepting proposal...',

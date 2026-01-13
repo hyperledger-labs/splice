@@ -40,6 +40,21 @@ import {
   MintingDelegationProposal,
 } from '@daml.js/splice-wallet/lib/Splice/Wallet/MintingDelegation/module';
 
+export interface MintingDelegationWithStatus {
+  contract: Contract<MintingDelegation>;
+  beneficiaryOnboarded: boolean;
+}
+
+export interface MintingDelegationProposalWithStatus {
+  contract: Contract<MintingDelegationProposal>;
+  beneficiaryOnboarded: boolean;
+}
+
+export interface MintingDelegationProposalWithOnboardedStatus {
+  contract: Contract<MintingDelegationProposal>;
+  beneficiaryOnboarded: boolean;
+}
+
 import {
   BalanceChange,
   ListAcceptedTransferOffersResponse,
@@ -106,8 +121,8 @@ export interface WalletClient {
 
   listAmuletAllocations: () => Promise<Contract<AmuletAllocation>[]>;
   listAllocationRequests: () => Promise<Contract<AllocationRequest>[]>;
-  listMintingDelegations: () => Promise<Contract<MintingDelegation>[]>;
-  listMintingDelegationProposals: () => Promise<Contract<MintingDelegationProposal>[]>;
+  listMintingDelegations: () => Promise<MintingDelegationWithStatus[]>;
+  listMintingDelegationProposals: () => Promise<MintingDelegationProposalWithStatus[]>;
   acceptMintingDelegationProposal: (
     proposalContractId: ContractId<MintingDelegationProposal>
   ) => Promise<void>;
@@ -348,11 +363,17 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       listMintingDelegations: async () => {
         const res = await walletClient.listMintingDelegations();
-        return res.delegations.map(d => Contract.decodeOpenAPI(d.contract, MintingDelegation));
+        return res.delegations.map(d => ({
+          contract: Contract.decodeOpenAPI(d.contract, MintingDelegation),
+          beneficiaryOnboarded: d.beneficiary_onboarded,
+        }));
       },
       listMintingDelegationProposals: async () => {
         const res = await walletClient.listMintingDelegationProposals();
-        return res.proposals.map(p => Contract.decodeOpenAPI(p.contract, MintingDelegationProposal));
+        return res.proposals.map(p => ({
+          contract: Contract.decodeOpenAPI(p.contract, MintingDelegationProposal),
+          beneficiaryOnboarded: p.beneficiary_onboarded,
+        }));
       },
       acceptMintingDelegationProposal: async proposalContractId => {
         await walletClient.acceptMintingDelegationProposal(proposalContractId);

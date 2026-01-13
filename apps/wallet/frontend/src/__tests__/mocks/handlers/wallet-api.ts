@@ -32,6 +32,8 @@ import {
 import {
   mockMintingDelegations,
   mockMintingDelegationProposals,
+  mockDelegationOnboardedStatus,
+  mockProposalOnboardedStatus,
 } from '../delegation-constants';
 import { mkContract } from '../contract';
 
@@ -235,9 +237,9 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
   rest.get(`${walletUrl}/v0/wallet/minting-delegations`, (_, res, ctx) => {
     return res(
       ctx.json<ListMintingDelegationsResponse>({
-        delegations: mockMintingDelegations.map(delegation => ({
+        delegations: mockMintingDelegations.map((delegation, index) => ({
           contract: mkContract(MintingDelegation, delegation),
-          beneficiary_onboarded: true,
+          beneficiary_onboarded: mockDelegationOnboardedStatus[index],
         })),
       })
     );
@@ -246,8 +248,9 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
   rest.get(`${walletUrl}/v0/wallet/minting-delegation-proposals`, (_, res, ctx) => {
     return res(
       ctx.json<ListMintingDelegationProposalsResponse>({
-        proposals: mockMintingDelegationProposals.map(proposal => ({
+        proposals: mockMintingDelegationProposals.map((proposal, index) => ({
           contract: mkContract(MintingDelegationProposal, proposal),
+          beneficiary_onboarded: mockProposalOnboardedStatus[index],
         })),
       })
     );
