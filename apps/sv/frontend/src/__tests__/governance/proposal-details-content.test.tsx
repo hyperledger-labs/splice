@@ -130,7 +130,6 @@ describe('SV user can', () => {
 
 describe('Proposal Details Content', () => {
   test('should render proposal details page', async () => {
-    // Use votes where current SV (sv1) has not voted yet so the form is visible
     const votesWithNoCurrentSvVote = [
       {
         sv: 'sv1',

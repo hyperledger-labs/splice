@@ -10,6 +10,7 @@ import { ContractId } from '@daml/types';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ProposalVote } from '../../utils/types';
 import { Alert, Box, Button, Stack, TextField, Typography } from '@mui/material';
+import { useEffect } from 'react';
 interface CastVoteArgs {
   accepted: boolean;
   url: string;
@@ -20,10 +21,11 @@ interface ProposalVoteFormProps {
   voteRequestContractId: ContractId<VoteRequest>;
   currentSvPartyId: string;
   votes: ProposalVote[];
+  onSubmissionComplete?: () => void;
 }
 
 export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
-  const { voteRequestContractId, currentSvPartyId, votes } = props;
+  const { voteRequestContractId, currentSvPartyId, votes, onSubmissionComplete } = props;
   const { castVote } = useSvAdminClient();
   const yourVote = votes.find(vote => vote.sv === currentSvPartyId);
 
@@ -33,6 +35,12 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
       return castVote(voteRequestContractId, accepted, url, reason);
     },
   });
+
+  useEffect(() => {
+    if (castVoteMutation.isSuccess || castVoteMutation.isError) {
+      onSubmissionComplete?.();
+    }
+  }, [castVoteMutation.isSuccess, castVoteMutation.isError, onSubmissionComplete]);
 
   const form = useForm({
     defaultValues: {
@@ -208,30 +216,36 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
                 mt: 3,
               }}
             >
-              <Button
-                variant="pill"
-                disabled={isSubmitting || !isValid}
-                onClick={() => {
-                  form.setFieldValue('vote', 'accepted');
-                  form.handleSubmit();
-                }}
-                data-testid="your-vote-accept"
-              >
-                {isSubmitting ? 'Submitting...' : 'Accept'}
-              </Button>
-              <Button
-                variant="pill"
-                color="secondary"
-                disabled={isSubmitting || !isValid}
-                onClick={() => {
-                  form.setFieldValue('vote', 'rejected');
-                  form.handleSubmit();
-                }}
-                sx={{ backgroundColor: 'transparent' }}
-                data-testid="your-vote-reject"
-              >
-                {isSubmitting ? 'Submitting...' : 'Reject'}
-              </Button>
+              {isSubmitting ? (
+                <Typography color="text.secondary">Submitting...</Typography>
+              ) : (
+                <>
+                  <Button
+                    variant="pill"
+                    disabled={!isValid}
+                    onClick={() => {
+                      form.setFieldValue('vote', 'accepted');
+                      form.handleSubmit();
+                    }}
+                    data-testid="your-vote-accept"
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    variant="pill"
+                    color="secondary"
+                    disabled={!isValid}
+                    onClick={() => {
+                      form.setFieldValue('vote', 'rejected');
+                      form.handleSubmit();
+                    }}
+                    sx={{ backgroundColor: 'transparent' }}
+                    data-testid="your-vote-reject"
+                  >
+                    Reject
+                  </Button>
+                </>
+              )}
             </Box>
           )}
         />

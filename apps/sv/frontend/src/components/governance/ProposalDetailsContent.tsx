@@ -112,6 +112,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
 
   const [voteTabValue, setVoteTabValue] = useState<VoteTab>('all');
   const [editFormKey, setEditFormKey] = useState(0);
+  const [voteSubmitted, setVoteSubmitted] = useState(false);
 
   const handleVoteTabChange = (_event: React.SyntheticEvent, newValue: VoteTab) => {
     setVoteTabValue(newValue);
@@ -120,7 +121,8 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
   const yourVote = votes.find(vote => vote.sv === currentSvPartyId);
   const hasVoted = yourVote?.vote === 'accepted' || yourVote?.vote === 'rejected';
   const isEditingVote = editFormKey > 0;
-  const showVoteForm = proposalDetails.isVoteRequest && !isClosed && (!hasVoted || isEditingVote);
+  const showVoteForm =
+    proposalDetails.isVoteRequest && !isClosed && (!hasVoted || isEditingVote || voteSubmitted);
 
   const { acceptedVotes, rejectedVotes, awaitingVotes } = votes.reduce(
     (acc, vote) => {
@@ -428,6 +430,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
                 key={editFormKey}
                 voteRequestContractId={contractId}
                 currentSvPartyId={currentSvPartyId}
+                onSubmissionComplete={() => setVoteSubmitted(true)}
                 votes={votes}
               />
             </VoteSection>
