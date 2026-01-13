@@ -56,7 +56,6 @@ class WalletMintingDelegationTimeBasedIntegrationTest
         aliceValidatorWalletClient.tap(100.0)
 
         val beneficiaryParty = onboardExternalParty(aliceValidatorBackend, Some("beneficiary"))
-        createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiaryParty)
 
         // Use a separate party to test that its proposals/delegation remain
         // unaffected when modifying beneficiaryParty's proposals/delegations
@@ -78,7 +77,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
           _ => {
             val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
             proposals.proposals should have size 1
-            proposals.proposals.head.contractId
+            proposals.proposals.head.contract.contractId
           },
         )
 
@@ -104,6 +103,63 @@ class WalletMintingDelegationTimeBasedIntegrationTest
           },
         )
 
+        // Test beneficiaryOnboarded status: create proposal before onboarding beneficiary
+        val (_, proposalBeforeOnboardingCid) = actAndCheck(
+          "Create minting delegation proposal before beneficiary is onboarded",
+          createMintingDelegationProposal(beneficiaryParty, validatorParty, expiresAt),
+        )(
+          "Proposal is visible with beneficiaryOnboarded = false",
+          _ => {
+            val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
+            proposals.proposals should have size 2
+            val beneficiaryProposal = proposals.proposals
+              .find(
+                _.contract.payload.hcursor
+                  .downField("delegation")
+                  .get[String]("beneficiary")
+                  .contains(beneficiaryParty.party.toProtoPrimitive)
+              )
+              .value
+            beneficiaryProposal.beneficiaryOnboarded shouldBe false
+            beneficiaryProposal.contract.contractId
+          },
+        )
+
+        // Accept the proposal before onboarding and verify beneficiaryOnboarded = false in delegations
+        actAndCheck(
+          "Accept proposal before beneficiary is onboarded",
+          aliceValidatorWalletClient.acceptMintingDelegationProposal(proposalBeforeOnboardingCid),
+        )(
+          "Delegation is created with beneficiaryOnboarded = false",
+          _ => {
+            val delegations = aliceValidatorWalletClient.listMintingDelegations()
+            delegations.delegations should have size 2
+            val beneficiaryDelegation = delegations.delegations
+              .find(
+                _.contract.payload.hcursor
+                  .get[String]("beneficiary")
+                  .contains(beneficiaryParty.party.toProtoPrimitive)
+              )
+              .value
+            beneficiaryDelegation.beneficiaryOnboarded shouldBe false
+          },
+        )
+
+        // Onboard beneficiary
+        createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiaryParty)
+
+        clue("After onboarding, beneficiaryOnboarded should be true in delegations") {
+          val delegations = aliceValidatorWalletClient.listMintingDelegations()
+          val beneficiaryDelegation = delegations.delegations
+            .find(
+              _.contract.payload.hcursor
+                .get[String]("beneficiary")
+                .contains(beneficiaryParty.party.toProtoPrimitive)
+            )
+            .value
+          beneficiaryDelegation.beneficiaryOnboarded shouldBe true
+        }
+
         // Test 1: Creates a proposal and test reject
         clue("Test reject minting delegation proposal") {
           val (_, proposal1Cid) = actAndCheck(
@@ -116,12 +172,13 @@ class WalletMintingDelegationTimeBasedIntegrationTest
               proposals.proposals should have size 2
               proposals.proposals
                 .find(
-                  _.payload.hcursor
+                  _.contract.payload.hcursor
                     .downField("delegation")
                     .get[String]("beneficiary")
                     .contains(beneficiaryParty.party.toProtoPrimitive)
                 )
                 .value
+                .contract
                 .contractId
             },
           )
@@ -148,12 +205,13 @@ class WalletMintingDelegationTimeBasedIntegrationTest
               proposals.proposals should have size 2
               proposals.proposals
                 .find(
-                  _.payload.hcursor
+                  _.contract.payload.hcursor
                     .downField("delegation")
                     .get[String]("beneficiary")
                     .contains(beneficiaryParty.party.toProtoPrimitive)
                 )
                 .value
+                .contract
                 .contractId
             },
           )
@@ -184,12 +242,13 @@ class WalletMintingDelegationTimeBasedIntegrationTest
               proposals.proposals should have size 2
               proposals.proposals
                 .find(
-                  _.payload.hcursor
+                  _.contract.payload.hcursor
                     .downField("delegation")
                     .get[String]("beneficiary")
                     .contains(beneficiaryParty.party.toProtoPrimitive)
                 )
                 .value
+                .contract
                 .contractId
             },
           )
@@ -205,12 +264,12 @@ class WalletMintingDelegationTimeBasedIntegrationTest
               delegations.delegations should have size 2
               val beneficiaryDelegation = delegations.delegations
                 .find(
-                  _.payload.hcursor
+                  _.contract.payload.hcursor
                     .get[String]("beneficiary")
                     .contains(beneficiaryParty.party.toProtoPrimitive)
                 )
                 .value
-              beneficiaryDelegation.contractId shouldBe newDelegationCid
+              beneficiaryDelegation.contract.contractId shouldBe newDelegationCid
               newDelegationCid
             },
           )
@@ -236,12 +295,13 @@ class WalletMintingDelegationTimeBasedIntegrationTest
               proposals.proposals should have size 2
               proposals.proposals
                 .find(
-                  _.payload.hcursor
+                  _.contract.payload.hcursor
                     .downField("delegation")
                     .get[String]("beneficiary")
                     .contains(beneficiary3Party.party.toProtoPrimitive)
                 )
                 .value
+                .contract
                 .contractId
             },
           )
@@ -311,7 +371,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
         _ => {
           val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
           proposals.proposals should have size 1
-          proposals.proposals.head.contractId
+          proposals.proposals.head.contract.contractId
         },
       )
 
