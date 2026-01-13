@@ -319,10 +319,7 @@ class SvFrontendIntegrationTest
       val requestReasonUrl = "https://new-proposal-url.com/"
       val requestReasonBody = "This is a summary of the proposal"
 
-      var proposalDetailsUrl: String = ""
-      var proposalContractId: String = ""
-
-      withFrontEnd("sv1") { implicit webDriver =>
+      val proposalContractId = withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "sv1 operator can login and browse to the beta governance tab", {
             go to s"http://localhost:$sv1UIPort/governance-beta"
@@ -367,7 +364,7 @@ class SvFrontendIntegrationTest
           },
         )
 
-        actAndCheck(
+        val (_, contractId) = actAndCheck(
           "sv1 operator can create a new proposal", {
             // Fill in the action-specific form fields first
             extraFormOps(webDriver)
@@ -418,14 +415,12 @@ class SvFrontendIntegrationTest
             eventually() {
               val currentUrl = webDriver.getCurrentUrl
               currentUrl should include("/governance-beta/proposals/")
-              proposalDetailsUrl = currentUrl
               // Extract contract ID from URL: /governance-beta/proposals/{contractId}
-              proposalContractId =
-                currentUrl.split("/governance-beta/proposals/")(1).split("\\?")(0)
+              currentUrl.split("/governance-beta/proposals/")(1).split("\\?")(0)
             }
           },
         )
-
+        contractId
       }
 
       withFrontEnd("sv2") { implicit webDriver =>
@@ -478,7 +473,7 @@ class SvFrontendIntegrationTest
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "sv1 navigates back to the proposal details page", {
-            go to proposalDetailsUrl
+            go to s"http://localhost:$sv1UIPort/governance-beta/proposals/$proposalContractId"
           },
         )(
           "sv1 can see the new vote from sv2",
