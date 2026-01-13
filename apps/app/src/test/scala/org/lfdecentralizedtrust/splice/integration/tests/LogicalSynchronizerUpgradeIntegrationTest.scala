@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import better.files.File.apply
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -20,6 +21,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.integration.tests.SvMigrationApiIntegrationTest.directoryForDump
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
@@ -64,7 +66,19 @@ class LogicalSynchronizerUpgradeIntegrationTest
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       .addConfigTransforms((_, config) => {
         ConfigTransforms
-          .bumpCantonSyncPortsBy(22_000, _.contains("Local"))(config)
+          .bumpCantonSyncPortsBy(22_000, _.contains("Local"))
+          .compose(
+            ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
+              if (name.endsWith("Local")) {
+                config
+              } else {
+                config.copy(
+                  domainMigrationDumpPath =
+                    Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
+                )
+              }
+            }
+          )(config)
       })
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllScanAppConfigs_(conf =>
