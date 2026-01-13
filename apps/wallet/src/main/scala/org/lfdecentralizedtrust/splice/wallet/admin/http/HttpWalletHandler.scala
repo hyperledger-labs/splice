@@ -1290,12 +1290,22 @@ class HttpWalletHandler(
       val pageLimit = PageLimit.tryCreate(limit.getOrElse(Limit.DefaultMaxPageSize))
       for {
         page <- userWallet.store.listMintingDelegationProposals(after, pageLimit)
-      } yield WalletResource.ListMintingDelegationProposalsResponseOK(
-        d0.ListMintingDelegationProposalsResponse(
-          page.resultsInPage.map(_.toHttp).toVector,
-          page.nextPageToken,
+      } yield {
+        val proposalsWithStatus = page.resultsInPage.map { proposal =>
+          val beneficiary = PartyId.tryFromProtoPrimitive(proposal.payload.delegation.beneficiary)
+          val isOnboarded =
+            walletManager.externalPartyWalletManager
+              .lookupExternalPartyWallet(beneficiary)
+              .isDefined
+          d0.MintingDelegationProposalWithStatus(proposal.toHttp, isOnboarded)
+        }.toVector
+        WalletResource.ListMintingDelegationProposalsResponseOK(
+          d0.ListMintingDelegationProposalsResponse(
+            proposalsWithStatus,
+            page.nextPageToken,
+          )
         )
-      )
+      }
     }
   }
 
@@ -1445,12 +1455,22 @@ class HttpWalletHandler(
       val pageLimit = PageLimit.tryCreate(limit.getOrElse(Limit.DefaultMaxPageSize))
       for {
         page <- userWallet.store.listMintingDelegations(after, pageLimit)
-      } yield WalletResource.ListMintingDelegationsResponseOK(
-        d0.ListMintingDelegationsResponse(
-          page.resultsInPage.map(_.toHttp).toVector,
-          page.nextPageToken,
+      } yield {
+        val delegationsWithStatus = page.resultsInPage.map { delegation =>
+          val beneficiary = PartyId.tryFromProtoPrimitive(delegation.payload.beneficiary)
+          val isOnboarded =
+            walletManager.externalPartyWalletManager
+              .lookupExternalPartyWallet(beneficiary)
+              .isDefined
+          d0.MintingDelegationWithStatus(delegation.toHttp, isOnboarded)
+        }.toVector
+        WalletResource.ListMintingDelegationsResponseOK(
+          d0.ListMintingDelegationsResponse(
+            delegationsWithStatus,
+            page.nextPageToken,
+          )
         )
-      )
+      }
     }
   }
 
