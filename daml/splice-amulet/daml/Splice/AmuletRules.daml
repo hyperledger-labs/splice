@@ -1261,9 +1261,9 @@ data AppTransferContext = AppTransferContext
   deriving (Show, Eq)
 
 -- Adapter for choices that need to return an `AmuletCreateSummary` but call a choice internally that no longer returns one.
-legacyAmuletCreateSummary : Party -> ContractId OpenMiningRound -> ContractId Amulet -> Update (AmuletCreateSummary (ContractId Amulet))
-legacyAmuletCreateSummary dso miningRoundCid amulet = do
-  round <- fetchReferenceData (ForDso dso) miningRoundCid
+legacyAmuletCreateSummary : Party -> Party -> ContractId OpenMiningRound -> ContractId Amulet -> Update (AmuletCreateSummary (ContractId Amulet))
+legacyAmuletCreateSummary dso p miningRoundCid amulet = do
+  round <- fetchPublicReferenceData (ForDso dso) miningRoundCid (OpenMiningRound_Fetch p)
   pure AmuletCreateSummary with
     amulet
     amuletPrice = round.amuletPrice

@@ -216,7 +216,7 @@ template SubscriptionInitialPayment
       do
         _ <- create TerminatedSubscription with ..
         result <- exercise lockedAmulet LockedAmulet_UnlockV2
-        amuletSum <- legacyAmuletCreateSummary subscriptionData.dso transferContext.openMiningRound result.amuletCid
+        amuletSum <- legacyAmuletCreateSummary subscriptionData.dso subscriptionData.sender transferContext.openMiningRound result.amuletCid
         return SubscriptionInitialPayment_RejectResult with
           amuletSum
 
@@ -230,7 +230,7 @@ template SubscriptionInitialPayment
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         _ <- create TerminatedSubscription with ..
         result <- exercise lockedAmulet LockedAmulet_OwnerExpireLockV2 -- would fail if we can't expire yet
-        amuletSum <- legacyAmuletCreateSummary subscriptionData.dso transferContext.openMiningRound result.amuletCid
+        amuletSum <- legacyAmuletCreateSummary subscriptionData.dso subscriptionData.sender transferContext.openMiningRound result.amuletCid
         return SubscriptionInitialPayment_ExpireResult with
           amuletSum
 
@@ -336,7 +336,7 @@ template SubscriptionPayment
           nextPaymentDueAt = thisPaymentDueAt
           ..
         result <- exercise lockedAmulet LockedAmulet_UnlockV2
-        amuletSum <- legacyAmuletCreateSummary subscriptionData.dso transferContext.openMiningRound result.amuletCid
+        amuletSum <- legacyAmuletCreateSummary subscriptionData.dso subscriptionData.sender transferContext.openMiningRound result.amuletCid
         pure SubscriptionPayment_RejectResult with
           subscriptionState
           amuletSum
@@ -354,7 +354,7 @@ template SubscriptionPayment
           nextPaymentDueAt = thisPaymentDueAt
           ..
         result <- exercise lockedAmulet LockedAmulet_OwnerExpireLockV2 -- would fail if we can't expire yet
-        amuletSum <- legacyAmuletCreateSummary subscriptionData.dso transferContext.openMiningRound result.amuletCid
+        amuletSum <- legacyAmuletCreateSummary subscriptionData.dso subscriptionData.sender transferContext.openMiningRound result.amuletCid
         pure SubscriptionPayment_ExpireResult with
           subscriptionState
           amuletSum = amuletSum

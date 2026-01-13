@@ -234,7 +234,7 @@ template AcceptedAppPayment
       controller map (\r -> r.receiver) amuletReceiverAmounts
       do create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) amuletReceiverAmounts
          result <- exercise lockedAmulet LockedAmulet_UnlockV2
-         amuletSum <- legacyAmuletCreateSummary dso context.openMiningRound result.amuletCid
+         amuletSum <- legacyAmuletCreateSummary dso sender context.openMiningRound result.amuletCid
          return AcceptedAppPayment_RejectResult with
             amulet = amuletSum
 
@@ -245,6 +245,6 @@ template AcceptedAppPayment
       do -- TODO(#3152) Split out amulet unlocking from payment expiry
          create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) amuletReceiverAmounts
          result <- exercise lockedAmulet LockedAmulet_OwnerExpireLockV2
-         amuletSum <- legacyAmuletCreateSummary dso context.openMiningRound result.amuletCid
+         amuletSum <- legacyAmuletCreateSummary dso sender context.openMiningRound result.amuletCid
          return AcceptedAppPayment_ExpireResult with
             amulet = amuletSum
