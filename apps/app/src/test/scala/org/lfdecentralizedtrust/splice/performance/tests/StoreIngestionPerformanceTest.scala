@@ -101,7 +101,7 @@ abstract class StoreIngestionPerformanceTest(
     dump.transactions.zipWithIndex.collect {
       // deliberately ignoring reassignments
       case (UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(update), index) =>
-        CompactJsonScanHttpEncodings.httpToLapiTransaction(update, index.toLong)
+        CompactJsonScanHttpEncodings().httpToLapiTransaction(update, index.toLong)
     }
   }
 
