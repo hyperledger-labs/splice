@@ -25,10 +25,10 @@ trait SvFrontendTestUtil extends TestCommon {
     setDateTime(party, "datetime-picker-vote-request-effectivity", dateTime)
   }
 
-  def setEffectiveDate2(party: String, dateTime: String)(implicit
+  def setBetaEffectiveDate(party: String, formPrefix: String, dateTime: String)(implicit
       webDriver: WebDriverType
   ) = {
-    setDateTime(party, "effective-date-field", dateTime)
+    setDateTime(party, s"$formPrefix-effective-date-field", dateTime)
   }
 
   def setAmuletConfigDate(party: String, dateTime: String)(implicit
