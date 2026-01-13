@@ -21,6 +21,8 @@ import {
   mockMintingDelegations,
   mockMintingDelegationProposals,
   delegationExpiresAtFormatted,
+  mockDelegationOnboardedStatus,
+  mockProposalOnboardedStatus,
 } from './mocks/delegation-constants';
 import { requestMocks } from './mocks/handlers/transfers-api';
 import { server } from './setup/setup';
@@ -534,6 +536,13 @@ describe('Wallet user can', () => {
       );
     });
 
+    // Verify proposal onboarded status is displayed (✓ for true, ✗ for false)
+    const proposalOnboardedCells = document.querySelectorAll('.proposal-onboarded');
+    expect(proposalOnboardedCells.length).toBe(mockMintingDelegationProposals.length);
+    mockProposalOnboardedStatus.forEach((isOnboarded, index) => {
+      expect(proposalOnboardedCells[index].textContent).toBe(isOnboarded ? '✓' : '✗');
+    });
+
     // Verify proposal max amulets values
     const proposalMaxAmulets = document.querySelectorAll('.proposal-max-amulets');
     expect(proposalMaxAmulets.length).toBe(mockMintingDelegationProposals.length);
@@ -550,10 +559,16 @@ describe('Wallet user can', () => {
     });
 
     // Verify Accept buttons are present for each proposal
+    // Accept button should be disabled when beneficiary is not onboarded
     const acceptButtons = document.querySelectorAll('.proposal-accept');
     expect(acceptButtons.length).toBe(mockMintingDelegationProposals.length);
-    acceptButtons.forEach(button => {
-      expect(button.textContent).toBe('Accept');
+    mockProposalOnboardedStatus.forEach((isOnboarded, index) => {
+      expect(acceptButtons[index].textContent).toBe('Accept');
+      if (isOnboarded) {
+        expect(acceptButtons[index]).not.toBeDisabled();
+      } else {
+        expect(acceptButtons[index]).toBeDisabled();
+      }
     });
 
     // ---- Verify Delegations table ----
@@ -565,6 +580,13 @@ describe('Wallet user can', () => {
     expect(beneficiaries.length).toBe(mockMintingDelegations.length);
     mockMintingDelegations.forEach((delegation, index) => {
       expect(beneficiaries[index].textContent).toBe(shortenPartyId(delegation.beneficiary));
+    });
+
+    // Verify onboarded status is displayed (✓ for true, ✗ for false)
+    const onboardedCells = document.querySelectorAll('.delegation-onboarded');
+    expect(onboardedCells.length).toBe(mockMintingDelegations.length);
+    mockDelegationOnboardedStatus.forEach((isOnboarded, index) => {
+      expect(onboardedCells[index].textContent).toBe(isOnboarded ? '✓' : '✗');
     });
 
     // Verify max amulets values are displayed
