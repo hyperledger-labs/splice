@@ -22,13 +22,13 @@
     "wallet/external-openapi-ts-client"
   ],
   "dependencies": {
-    "@daml.js/ans": "file:common/frontend/daml.js/splice-amulet-name-service-0.1.16",
-    "@daml.js/splice-amulet": "file:common/frontend/daml.js/splice-amulet-0.1.15",
-    "@daml.js/splice-dso-governance": "file:common/frontend/daml.js/splice-dso-governance-0.1.21",
+    "@daml.js/ans": "file:common/frontend/daml.js/splice-amulet-name-service-0.1.17",
+    "@daml.js/splice-amulet": "file:common/frontend/daml.js/splice-amulet-0.1.16",
+    "@daml.js/splice-dso-governance": "file:common/frontend/daml.js/splice-dso-governance-0.1.22",
     "@daml.js/splice-validator-lifecycle": "file:common/frontend/daml.js/splice-validator-lifecycle-0.1.6",
-    "@daml.js/splice-wallet": "file:common/frontend/daml.js/splice-wallet-0.1.16",
-    "@daml.js/splice-wallet-payments": "file:common/frontend/daml.js/splice-wallet-payments-0.1.15",
-    "@daml.js/splitwell": "file:common/frontend/daml.js/splitwell-0.1.16",
+    "@daml.js/splice-wallet": "file:common/frontend/daml.js/splice-wallet-0.1.17",
+    "@daml.js/splice-wallet-payments": "file:common/frontend/daml.js/splice-wallet-payments-0.1.16",
+    "@daml.js/splitwell": "file:common/frontend/daml.js/splitwell-0.1.17",
     "xunit-viewer": "^10.6.1"
   }
 }

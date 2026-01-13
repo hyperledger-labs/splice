@@ -66,6 +66,7 @@ class ExternalPartySetupProposalIntegrationTest
   override lazy val sanityChecksIgnoredRootCreates = Seq(
     TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID,
     amuletCodegen.AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+    amuletCodegen.ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
   )
 
   override def environmentDefinition: EnvironmentDefinition = {
@@ -282,9 +283,10 @@ class ExternalPartySetupProposalIntegrationTest
             aliceValidatorBackend
               .getExternalPartyBalance(aliceParty)
               .totalUnlockedCoin
-          ) should beAround(
-            BigDecimal(2000 - 1000 - 16.0 - 6.0 /* 16 output fees, 6.0 sender change fees */ ) +
-              BigDecimal(issuingRound.issuancePerUnfeaturedAppRewardCoupon) * appRewardAmount
+          ) should be(
+            BigDecimal(1000) + BigDecimal(
+              issuingRound.issuancePerUnfeaturedAppRewardCoupon
+            ) * appRewardAmount
           )
           bobValidatorBackend
             .getExternalPartyBalance(bobParty)
@@ -335,16 +337,26 @@ class ExternalPartySetupProposalIntegrationTest
       val update = eventuallySucceeds() {
         sv1ScanBackend.getUpdate(updateId, encoding = CompactJson)
       }
-      val rewardRound =
-        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(amuletCodegen.ValidatorRewardCoupon.COMPANION)(
-            aliceParty,
-            c => c.data.user == aliceParty.toProtoPrimitive,
-          )
-          .loneElement
-          .data
-          .round
-          .number
+      // Create a validator reward to test reward minting
+      val (_, rewardRound) = actAndCheck(
+        "Create validator reward",
+        createRewards(
+          appRewards = Seq.empty,
+          validatorRewards = Seq((aliceParty, BigDecimal(1.0))),
+        ),
+      )(
+        "reward is observable",
+        _ =>
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(amuletCodegen.ValidatorRewardCoupon.COMPANION)(
+              aliceParty,
+              c => c.data.user == aliceParty.toProtoPrimitive,
+            )
+            .loneElement
+            .data
+            .round
+            .number,
+      )
 
       actAndCheck(
         s"Advance rounds until $rewardRound is issuing", {
@@ -423,10 +435,10 @@ class ExternalPartySetupProposalIntegrationTest
             aliceValidatorBackend
               .getExternalPartyBalance(aliceParty)
               .totalUnlockedCoin
-          ) should beAround(
+          ) should be(
             BigDecimal(
-              2000 - 1000 - 500 - 34.0 /* last number is fees from the prior transfer and this combined */
-            )
+              2000 - 1000 - 500
+            ) + BigDecimal(issuingRound.issuancePerUnfeaturedAppRewardCoupon) * appRewardAmount
           )
           bobValidatorBackend
             .getExternalPartyBalance(bobParty)
@@ -444,6 +456,18 @@ class ExternalPartySetupProposalIntegrationTest
           rewards.loneElement.data.featured shouldBe true
         },
       )
+
+      val txs = sv1ScanBackend.listActivity(None, 1000)
+      forExactly(2, txs) { tx =>
+        // Test that the tx history for the TransferCommand_Send exercise gets parsed properly.
+        val transfer = tx.transfer.value
+        transfer.sender.party shouldBe aliceParty.toProtoPrimitive
+        transfer.balanceChanges shouldBe empty
+        transfer.transferKind shouldBe Some(
+          definitions.Transfer.TransferKind.members.PreapprovalSend
+        )
+        transfer.description shouldBe Some("transfer-command-description")
+      }
 
       // Check that transfer command gets archived if preapproval does not exist.
       val sv1Party = sv1Backend.getDsoInfo().svParty

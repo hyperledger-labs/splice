@@ -1179,8 +1179,8 @@ class WalletTxLogIntegrationTest
           .getValidatorPartyId()
           .toProtoPrimitive
         logEntry.sender.value.amount should beWithin(
-          -preapprovalFee - smallAmount,
           -preapprovalFee,
+          -preapprovalFee + smallAmount,
         )
         logEntry.receivers shouldBe empty
         logEntry.senderHoldingFees should beWithin(0, smallAmount)

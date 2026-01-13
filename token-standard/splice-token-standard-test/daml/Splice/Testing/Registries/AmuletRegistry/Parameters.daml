@@ -19,7 +19,7 @@ defaultTransferConfig : TransferConfig USD
 defaultTransferConfig = TransferConfig with
     -- Fee to create a new amulet.
     -- Set to the fixed part of the transfer fee.
-    createFee = FixedFee 0.03
+    createFee = FixedFee 0.0
 
     -- Fee for keeping a amulet around.
     -- This is roughly equivalent to 1.05$/365 days but expressed as rounds
@@ -31,12 +31,12 @@ defaultTransferConfig = TransferConfig with
     -- Fee per lock holder.
     -- Chosen to match the update to cover the cost of informing lock-holders about
     -- actions on the locked amulet.
-    lockHolderFee = FixedFee 0.005
+    lockHolderFee = FixedFee 0.0
 
     -- Fee for transferring some amount of amulet to a new owner.
     transferFee = SteppedRate with
-      initialRate = 0.01
-      steps = [(100.0, 0.001), (1000.0, 0.0001), (1000000.0, 0.00001)]
+      initialRate = 0.0
+      steps = []
 
     -- Extra reward amount for featured apps in USD
     extraFeaturedAppRewardAmount = 1.0

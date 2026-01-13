@@ -6,7 +6,7 @@
 sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
 name: splice-amulet
 source: daml
-version: 0.1.15
+version: 0.1.16
 dependencies:
   - daml-prim
   - daml-stdlib

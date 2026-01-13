@@ -77,8 +77,7 @@ class TransferCommandSendTrigger(
             configUsd = openRound.payload.transferConfigUsd
             maxNumInputs = configUsd.maxNumInputs.intValue()
             amulets <- wallet.store.listSortedAmuletsAndQuantity(
-              openRound.payload.round.number,
-              PageLimit.tryCreate(maxNumInputs),
+              PageLimit.tryCreate(maxNumInputs)
             )
             openIssuingRounds = issuingMiningRounds.filter(c =>
               c.payload.opensAt.isBefore(now.toInstant)

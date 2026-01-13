@@ -4,6 +4,10 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{SpliceUtil, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  AppRewardCoupon,
+  ValidatorRewardCoupon,
+}
 
 import scala.concurrent.duration.DurationInt
 
@@ -21,22 +25,39 @@ class WalletRewardsTimeBasedIntegrationTest
   // TODO (#965) remove and fix test failures
   override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
 
+  override protected lazy val sanityChecksIgnoredRootCreates = Seq(
+    AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+    ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+  )
+
   "A wallet" should {
 
     "list and automatically collect app & validator rewards" in { implicit env =>
       val (alice, bob) = onboardAliceAndBob()
       waitForWalletUser(aliceValidatorWalletClient)
       waitForWalletUser(bobValidatorWalletClient)
+      val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+      val bobValidatorParty = bobValidatorBackend.getValidatorPartyId()
 
       // Tap amulet and do a transfer from alice to bob
       aliceWalletClient.tap(walletAmuletToUsd(50))
 
       p2pTransfer(aliceWalletClient, bobWalletClient, bob, 40.0)
+      // Rewards roughly match what we had before we set fees to zero
+      createRewards(
+        appRewards = Seq((aliceValidatorParty, 0.43, false)),
+        validatorRewards = Seq((alice, 0.43)),
+      )
 
       // Retrieve transferred amulet in bob's wallet and transfer part of it back to alice;
       // bob's validator will receive some app rewards
       eventually()(bobWalletClient.list().amulets should have size 1)
       p2pTransfer(bobWalletClient, aliceWalletClient, alice, 30.0)
+      // Rewards roughly match what we had before we set fees to zero
+      createRewards(
+        appRewards = Seq((bobValidatorParty, 0.33, false)),
+        validatorRewards = Seq((bob, 0.33)),
+      )
 
       val openRounds = eventually() {
         import math.Ordering.Implicits.*

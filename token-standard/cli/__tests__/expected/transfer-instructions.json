@@ -1,6 +1,6 @@
 [
   {
-    "contractId": "52",
+    "contractId": "38",
     "payload": {
       "meta": {
         "values": {}
@@ -14,7 +14,7 @@
         "amount": "1000.0000000000",
         "executeBefore": "2025-06-18T00:00:00.000000Z",
         "inputHoldingCids": [
-          "0"
+          "1"
         ],
         "instrumentId": {
           "admin": "dso::normalized",
@@ -30,7 +30,7 @@
     }
   },
   {
-    "contractId": "69",
+    "contractId": "50",
     "payload": {
       "meta": {
         "values": {}
@@ -44,7 +44,7 @@
         "amount": "200.0000000000",
         "executeBefore": "2025-06-18T00:00:00.000000Z",
         "inputHoldingCids": [
-          "70"
+          "51"
         ],
         "instrumentId": {
           "admin": "dso::normalized",

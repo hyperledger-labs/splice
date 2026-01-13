@@ -640,31 +640,9 @@ class TreasuryService(
   private def shouldMergeOnlyTransferRun(
       totalRewardsQuantity: BigDecimal,
       amuletInputsAndQuantity: Seq[(BigDecimal, InputAmulet)],
-      createFeeCc: BigDecimal,
-  )(implicit tc: TraceContext): Boolean = {
+  ): Boolean = {
     val numAmuletInputs = amuletInputsAndQuantity.length
-    val totalAmuletQuantity = amuletInputsAndQuantity.map(_._1).sum
-    if (numAmuletInputs <= 1) {
-      val run = totalRewardsQuantity > createFeeCc
-      // only log when there are actually some rewards to possibly collect.
-      if (!run && totalRewardsQuantity != 0) {
-        // Log at info level to avoid surprises wrt rewards not accumulating.
-        logger.info(
-          "Not executing a merge operation because there no amulets to merge " +
-            s"and the totalRewardsQuantity $totalRewardsQuantity is smaller than the create-fee $createFeeCc"
-        )
-      }
-      run
-    } else {
-      val totalQuantity = totalRewardsQuantity + totalAmuletQuantity
-      val run = totalQuantity > createFeeCc
-      if (!run && totalQuantity != 0)
-        logger.debug(
-          "Not executing a merge operation because " +
-            s"the total rewards and amulet quantity ${totalQuantity} is smaller than the create-fee $createFeeCc"
-        )
-      run
-    }
+    totalRewardsQuantity > BigDecimal(0.0) || numAmuletInputs > 1
   }
 
   //          002| 2024-06-03T15:43:38.124Z [⋮] DEBUG - c.d.n.a.a.HttpRequestLogger:WalletManualRoundsIntegrationTest/config=5ad173a8/validator=aliceValidator (5b962e505ea5140afe2bd833f8c88bb3---21693c15d5eb9f93) - HTTP GET /api/validator/v0/wallet/balance from (127.0.0.1:35514): Responding with entity data: {"round":9,"effective_unlocked_qty":"","effective_locked_qty":"0.0000000000","total_holding_fees":""}
@@ -719,8 +697,7 @@ class TreasuryService(
       validatorRights <- walletManager.store.multiDomainAcsStore
         .listContracts(amuletCodegen.ValidatorRight.COMPANION)
       amuletInputsAndQuantity <- userStore.listSortedAmuletsAndQuantity(
-        openRound.payload.round.number,
-        PageLimit.tryCreate(maxNumInputs),
+        PageLimit.tryCreate(maxNumInputs)
       )
       (validatorRewardsAmuletQuantity, validatorRewardCouponUsers, validatorRewardInputs) <-
         getValidatorRewardsAndQuantity(
@@ -757,14 +734,12 @@ class TreasuryService(
           maxNumInputs
         )
     } yield {
-      val createFeeCc = SpliceUtil.dollarsToCC(configUsd.createFee.fee, amuletPrice)
       if (
         isMergeOny && !shouldMergeOnlyTransferRun(
           appRewardsTotalAmuletQuantity + validatorRewardsAmuletQuantity + validatorFaucetsAmuletQuantity +
             validatorLivenessActivityRecordsAmuletQuantity + svRewardsTotalAmuletQuantity +
             unclaimedActivityRecordsQuantity + developmentFundCouponsQuantity,
           amuletInputsAndQuantity,
-          createFeeCc,
         )
       ) {
         None

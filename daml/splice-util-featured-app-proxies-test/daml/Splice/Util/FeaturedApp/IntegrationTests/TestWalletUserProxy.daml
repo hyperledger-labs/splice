@@ -47,9 +47,7 @@ data WalletProviderData = WalletProviderData with
 -- | Test that both offer and accept grant activity markers
 test_two_step_featured_app_markers : Script ()
 test_two_step_featured_app_markers = do
-  -- disable transfer fees to check that only the featured app activity markers will be there
-  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
-    noTransferFee = True
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
 
   -- Setup a wallet provider that will host alice
   aliceProvider <- setupWalletProvider registry "aliceWalletProvider" None
@@ -156,8 +154,7 @@ test_two_step_featured_app_markers = do
 
 test_transfer_withdraw_and_reject : Script ()
 test_transfer_withdraw_and_reject = do
-  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
-    noTransferFee = True
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
 
   -- Setup a wallet provider that will host alice
   aliceProvider <- setupWalletProvider registry "aliceWalletProvider" None
@@ -235,8 +232,7 @@ test_transfer_withdraw_and_reject = do
 
 test_featured_batch_transfer : Script ()
 test_featured_batch_transfer = do
-  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
-    noTransferFee = True
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
 
   -- Setup a wallet provider that will host alice
   provider <- setupWalletProvider registry "walletProvider" None
@@ -282,14 +278,12 @@ test_featured_batch_transfer = do
 
 test_unfeatured_multi_registry_batch_transfer : Script ()
 test_unfeatured_multi_registry_batch_transfer = do
-  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
-    noTransferFee = True
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
 
   -- We don't yet have a mock token in the Splice repo that we could use to simulate a completely
   -- different token registry. For testing the logic it is though sufficient to create a second
   -- instance of Amulet with a different DSO party.
   registry2 <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
-    noTransferFee = True
     dsoPartyName = "mock-other-admin-party"
 
   alice <- allocatePartyExact "alice"

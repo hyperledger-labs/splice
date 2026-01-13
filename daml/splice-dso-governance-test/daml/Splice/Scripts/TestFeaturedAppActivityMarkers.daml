@@ -144,25 +144,11 @@ testFeaturedAppActivityMarkersConfigDisabled = do
     archiveCmd amuletRulesCid
   amuletRulesCid <- submit app.dso $
     createCmd amuletRules with
-      configSchedule.initialValue.featuredAppActivityMarkerAmount = None
+      configSchedule.initialValue = amuletRules.configSchedule.initialValue with
+        featuredAppActivityMarkerAmount = Some 0.0
+        transferConfig.extraFeaturedAppRewardAmount = 0.0
 
   (openMiningRoundCid, _) <- getLatestOpenRound app
-
-  AmuletRules_ConvertFeaturedAppActivityMarkersResult couponCids <- submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_ConvertFeaturedAppActivityMarkers with
-      markerCids = [fromInterfaceContractId markerIface]
-      openMiningRoundCid
-  couponCids === []
-  None <- queryInterfaceContractId app.dso markerIface
-
-  submit app.dso $
-    archiveCmd amuletRulesCid
-  amuletRulesCid <- submit app.dso $
-    createCmd amuletRules with
-      configSchedule.initialValue.featuredAppActivityMarkerAmount = Some 0.0
-
-  FeaturedAppRight_CreateActivityMarkerResult [markerIface] <- submit alice.primaryParty $ exerciseCmd (toInterfaceContractId @Splice.Api.FeaturedAppRightV1.FeaturedAppRight featuredAppRightCid) Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
-    with
-      beneficiaries = [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary alice.primaryParty 1.0]
 
   AmuletRules_ConvertFeaturedAppActivityMarkersResult couponCids <- submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_ConvertFeaturedAppActivityMarkers with
       markerCids = [fromInterfaceContractId markerIface]

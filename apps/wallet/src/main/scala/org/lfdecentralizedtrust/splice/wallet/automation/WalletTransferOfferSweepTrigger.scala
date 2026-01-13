@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.wallet.automation
 import org.lfdecentralizedtrust.splice.automation.TriggerContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment
-import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.ccToDollars
 import org.lfdecentralizedtrust.splice.wallet.config.WalletSweepConfig
@@ -25,12 +25,11 @@ class WalletTransferOfferSweepTrigger(
     connection: SpliceLedgerConnection,
     config: WalletSweepConfig,
     scanConnection: ScanConnection,
-    packageVersionSupport: PackageVersionSupport,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
     mat: Materializer,
-) extends WalletSweepTrigger(context, store, config, scanConnection, packageVersionSupport) {
+) extends WalletSweepTrigger(context, store, config, scanConnection) {
 
   override protected def extraRetrieveTasksValidation()(implicit tc: TraceContext) = Future.unit
 

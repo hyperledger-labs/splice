@@ -416,7 +416,9 @@ class WalletTransactionHistoryFrontendIntegrationTest
                 expectedPartyDescription = Some(
                   s"Automation ${expectedAns(sv1Party, s"${sv1Name.toLowerCase}.sv.$ansAcronym")}"
                 ),
-                expectedAmountAmulet = -preapprovalFee,
+                expectedAmountAmulet = -preapprovalFee + 0.01,
+                // The actual preapproval fee is based on a getTime call in the choice so you pay for slightly less than 90 days.
+                // smallAmount is large enough that the whole check becomes meaningless so we use 0.01 explicitly.
               )
             }
             forExactly(1, txs) { tx =>
