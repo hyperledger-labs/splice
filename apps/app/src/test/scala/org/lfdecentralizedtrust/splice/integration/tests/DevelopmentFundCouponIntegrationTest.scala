@@ -12,7 +12,6 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AdvanceOpenMi
 import org.lfdecentralizedtrust.splice.util.{TriggerTestUtil, WalletTestUtil}
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_21
-@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_15
 class DevelopmentFundCouponIntegrationTest
     extends SvIntegrationTestBase
     with TriggerTestUtil
