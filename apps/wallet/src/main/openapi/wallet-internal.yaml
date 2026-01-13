@@ -1752,6 +1752,18 @@ components:
           additionalProperties:
             type: string
 
+    MintingDelegationProposalWithStatus:
+      type: object
+      required:
+        - contract
+        - beneficiary_onboarded
+      properties:
+        contract:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        beneficiary_onboarded:
+          type: boolean
+          description: Whether the beneficiary party is currently onboarded
+
     ListMintingDelegationProposalsResponse:
       type: object
       required:
@@ -1760,7 +1772,7 @@ components:
         proposals:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+            $ref: "#/components/schemas/MintingDelegationProposalWithStatus"
         next_page_token:
           type: integer
           format: int64
@@ -1777,6 +1789,18 @@ components:
           type: string
           description: Contract ID of the created MintingDelegation
 
+    MintingDelegationWithStatus:
+      type: object
+      required:
+        - contract
+        - beneficiary_onboarded
+      properties:
+        contract:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        beneficiary_onboarded:
+          type: boolean
+          description: Whether the beneficiary party is currently onboarded
+
     ListMintingDelegationsResponse:
       type: object
       required:
@@ -1785,7 +1809,7 @@ components:
         delegations:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+            $ref: "#/components/schemas/MintingDelegationWithStatus"
         next_page_token:
           type: integer
           format: int64
