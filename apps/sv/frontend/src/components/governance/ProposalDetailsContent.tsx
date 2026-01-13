@@ -7,7 +7,7 @@ import {
   VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
-import { ChevronLeft } from '@mui/icons-material';
+import { ChevronLeft, Edit } from '@mui/icons-material';
 import { Box, Button, Divider, Stack, Tab, Tabs, Typography } from '@mui/material';
 import React, { PropsWithChildren, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
@@ -111,10 +111,15 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
   ]);
 
   const [voteTabValue, setVoteTabValue] = useState<VoteTab>('all');
+  const [editFormKey, setEditFormKey] = useState(0);
 
   const handleVoteTabChange = (_event: React.SyntheticEvent, newValue: VoteTab) => {
     setVoteTabValue(newValue);
   };
+
+  const yourVote = votes.find(vote => vote.sv === currentSvPartyId);
+  const hasVoted = yourVote?.vote === 'accepted' || yourVote?.vote === 'rejected';
+  const isEditingVote = editFormKey > 0;
 
   const { acceptedVotes, rejectedVotes, awaitingVotes } = votes.reduce(
     (acc, vote) => {
@@ -394,6 +399,11 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
                   status={vote.vote}
                   isYou={vote.isYou}
                   isClosed={isClosed}
+                  onEdit={
+                    vote.isYou && hasVoted && !isClosed
+                      ? () => setEditFormKey(k => k + 1)
+                      : undefined
+                  }
                 />
               ))}
               {getFilteredVotes().length === 0 && (
@@ -406,15 +416,21 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             </Box>
           </VoteSection>
 
-          <VoteSection title="Your Vote" data-testid="proposal-details-your-vote" bordered centered>
-            {proposalDetails.isVoteRequest && !isClosed && (
+          {proposalDetails.isVoteRequest && !isClosed && (!hasVoted || isEditingVote) && (
+            <VoteSection
+              title="Your Vote"
+              data-testid="proposal-details-your-vote"
+              bordered
+              centered
+            >
               <ProposalVoteForm
+                key={editFormKey}
                 voteRequestContractId={contractId}
                 currentSvPartyId={currentSvPartyId}
                 votes={votes}
               />
-            )}
-          </VoteSection>
+            </VoteSection>
+          )}
         </Stack>
       </Box>
     </Box>
@@ -464,6 +480,7 @@ interface VoteItemProps {
   status: VoteStatus;
   isClosed?: boolean;
   isYou?: boolean;
+  onEdit?: () => void;
 }
 
 const VoteItem: React.FC<VoteItemProps> = ({
@@ -473,6 +490,7 @@ const VoteItem: React.FC<VoteItemProps> = ({
   status,
   isClosed,
   isYou = false,
+  onEdit,
 }) => (
   <>
     <Box
@@ -499,11 +517,26 @@ const VoteItem: React.FC<VoteItemProps> = ({
         )}
         {url && <CopyableUrl url={url} size="small" data-testid="proposal-details-vote-url" />}
       </Box>
-      <VoteStats
-        vote={status}
-        noVoteMessage={isClosed ? 'No Vote' : 'Awaiting Response'}
-        data-testid="proposal-details-vote-status"
-      />
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <VoteStats
+          vote={status}
+          noVoteMessage={isClosed ? 'No Vote' : 'Awaiting Response'}
+          data-testid="proposal-details-vote-status"
+        />
+        {onEdit && (
+          <Button
+            color="secondary"
+            startIcon={<Edit fontSize="small" />}
+            onClick={onEdit}
+            data-testid="your-vote-edit-button"
+            sx={{
+              fontSize: 16,
+            }}
+          >
+            Edit
+          </Button>
+        )}
+      </Box>
     </Box>
     <Divider sx={{ borderBottomWidth: 2 }} />
   </>
