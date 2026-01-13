@@ -454,17 +454,15 @@ class SvFrontendIntegrationTest
       )(
         "sv2 can see the vote request and cast a vote",
         _ => {
-          inside(find(id("your-vote-reason-input"))) { case Some(element) =>
+          inside(find(testId("your-vote-reason-input"))) { case Some(element) =>
             element.underlying.sendKeys("A sample reason")
           }
 
-          inside(find(id("your-vote-url-input"))) { case Some(element) =>
+          inside(find(testId("your-vote-url-input"))) { case Some(element) =>
             element.underlying.sendKeys("https://my-splice-vote-url.com")
           }
 
           click on testId("your-vote-accept")
-
-          eventuallyClickOn(id("submit-vote-button"))
 
           clue("wait for the vote submission success message") {
             eventuallySucceeds() {
