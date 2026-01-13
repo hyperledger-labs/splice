@@ -242,14 +242,6 @@ class TokenStandardAllocationIntegrationTest
             decoded.data.featured shouldBe true
           }
         }
-        forExactly(1, events) {
-          inside(_) { case c: CreatedEvent =>
-            val decoded = JavaDecodeUtil
-              .decodeCreated(AppRewardCoupon.COMPANION)(c)
-              .value
-            decoded.data.featured shouldBe false
-          }
-        }
       },
     )
   }

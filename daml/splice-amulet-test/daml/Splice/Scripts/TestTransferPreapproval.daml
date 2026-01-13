@@ -209,7 +209,7 @@ testTransferCommand = script do
   map snd amulets === [Amulet app.dso externalParty (ExpiringAmount 42.0 (Round 1) (RatePerRound 0.00002))]
   None <- queryContractId app.dso transferCmd
   appRewards <- query @AppRewardCoupon aliceValidator.primaryParty
-  map snd appRewards === [AppRewardCoupon app.dso aliceValidator.primaryParty True 1.45 (Round 1) (Some aliceValidator.primaryParty)]
+  map snd appRewards === [AppRewardCoupon app.dso aliceValidator.primaryParty True 1.0 (Round 1) (Some aliceValidator.primaryParty)]
 
   ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with
@@ -271,7 +271,7 @@ testTransferCommand = script do
       transferPreapprovalCidO = Some transferPreapprovalCid
       transferCounterCid
 
-  reason === ITR_InsufficientFunds 33.93
+  reason === ITR_InsufficientFunds 33.0
 
   -- amulets get merged even on failed transfers
   [(amulet, _)] <- query @Amulet alice.primaryParty

@@ -264,8 +264,6 @@ class DomainMigrationInitializer(
       _ <- establishInitialRound(
         readOnlyConnection,
         upgradesConfig,
-        packageVersionSupport,
-        svStore.key.svParty,
       )
       _ <- newJoiningNodeInitializer(None, newCometBftNode).onboard(
         decentralizedSynchronizerId,

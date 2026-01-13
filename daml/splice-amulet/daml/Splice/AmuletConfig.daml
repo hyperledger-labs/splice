@@ -71,7 +71,8 @@ validAmuletConfig AmuletConfig
     tickDuration > days 0 &&
     validPackageConfig packageConfig &&
     optional True (>= 0.0) transferPreapprovalFee &&
-    optional True (>= 0.0) featuredAppActivityMarkerAmount
+    optional True (>= 0.0) featuredAppActivityMarkerAmount &&
+    featuredAppActivityMarkerAmount == Some transferConfig.extraFeaturedAppRewardAmount
 
 validTransferConfig : TransferConfig unit -> Bool
 validTransferConfig TransferConfig
@@ -85,10 +86,11 @@ validTransferConfig TransferConfig
     , maxNumLockHolders
     }
   =
-    positiveFixedFee createFee &&
+    createFee == FixedFee 0.0 &&
+    lockHolderFee == FixedFee 0.0 &&
+    lockHolderFee == FixedFee 0.0 &&
+    transferFee.initialRate == 0.0 && null transferFee.steps &&
     positiveRatePerRound holdingFee &&
-    validSteppedRate transferFee &&
-    positiveFixedFee lockHolderFee &&
     extraFeaturedAppRewardAmount >= 0.0 &&
     maxNumInputs >= 1 &&
     maxNumOutputs >= 1 &&

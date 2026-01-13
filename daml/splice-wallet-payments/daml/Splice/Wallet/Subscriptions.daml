@@ -368,8 +368,6 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
 
   targetAmount <- paymentAmountToAmulet dso contextRound paymentAmount
 
-  outputFees <- exerciseComputeFees dso context sender [mkTransferOutput receiver targetAmount]
-  let lockAmount = targetAmount + sum outputFees
   -- We know that the contextRound (=latest Round) won't be archived before
   -- its targetClosesAt or for at least 1 tick from the time we submit against the ledger.
   let expiresAt = max (addRelTime now contextRound.tickDuration) contextRound.targetClosesAt
@@ -383,7 +381,7 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
        outputs =
          [ TransferOutput with
              receiver = sender
-             amount = lockAmount
+             amount = targetAmount
              lock = Some TimeLock with
                holders = dedupSort [provider, receiver]
                expiresAt = expiresAt

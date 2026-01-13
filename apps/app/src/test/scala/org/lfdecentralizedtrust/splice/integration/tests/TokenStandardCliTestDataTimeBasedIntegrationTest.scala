@@ -271,7 +271,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
             )
             eventually() {
-              aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("87")) // fees!
+              aliceWalletClient.balance().unlockedQty should be(BigDecimal("100"))
             }
             // Deliberately using a non-token-standard transfer so that this shows up as a Transfer still (tx-kind-based)
             aliceWalletClient.transferPreapprovalSend(
@@ -280,7 +280,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               UUID.randomUUID().toString,
             )
             eventually() {
-              aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("64.9")) // fees!
+              aliceWalletClient.balance().unlockedQty should be(BigDecimal("90")) // fees!
             }
             aliceWalletClient.tap(walletAmuletToUsd(6000.0))
             val (_, bobInstructionCids) = actAndCheck(
@@ -360,10 +360,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 instructions should have size 2 withClue "TransferInstructions"
                 getBobPartyBalance().unlockedQty should beAround(BigDecimal("1000.0"))
                 inside(aliceWalletClient.balance()) { aliceBalance =>
-                  aliceBalance.unlockedQty should beWithin(
-                    BigDecimal("2800.0"),
-                    BigDecimal("3000.0"),
-                  )
+                  aliceBalance.unlockedQty should be(BigDecimal("3090"))
                   aliceBalance.lockedQty should beWithin(BigDecimal("2000.0"), BigDecimal("2150.0"))
                 }
               },
@@ -448,7 +445,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   )
                   val (unlockedHoldings, lockedHoldings) =
                     bobHoldings.partition(h => h._2.lock.isEmpty)
-                  unlockedHoldings should have size 4 withClue "unlocked holdings"
+                  unlockedHoldings should have size 3 withClue "unlocked holdings"
                   lockedHoldings should have size 1 withClue "locked holdings"
                 },
               )
@@ -518,10 +515,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   alice.partyId,
                 ) should have size 3 withClue "holdings"
                 inside(aliceWalletClient.balance()) { aliceBalance =>
-                  aliceBalance.unlockedQty should beWithin(
-                    BigDecimal("4100.0"),
-                    BigDecimal("4200.0"),
-                  )
+                  aliceBalance.unlockedQty should be(BigDecimal("4290"))
                   aliceBalance.lockedQty should beWithin(BigDecimal("1000.0"), BigDecimal("1100.0"))
                 }
                 // there is one less locke
@@ -585,7 +579,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             }
             charlieWalletClient.transferPreapprovalSend(
               alice.partyId,
-              charlieAmount - 11,
+              charlieAmount,
               UUID.randomUUID().toString,
               Some("non-ts-transfer"),
             )
