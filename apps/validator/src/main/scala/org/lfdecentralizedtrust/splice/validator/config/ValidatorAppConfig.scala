@@ -98,16 +98,7 @@ case class ValidatorDecentralizedSynchronizerConfig(
       */
     trafficBalanceCacheTimeToLive: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(1),
-
-    /** An optional, static list of trusted sequencer names to connect to.
-      * sequencerNames is mutually exclusive with `url`.
-      */
-    sequencerNames: Option[NonEmptyList[String]] = None,
-
-    /** An optional parameter to specify the BFT threshold for the domain connections.
-      * If not specified, length(sequencerNames) / 3 +1 will be used.
-      */
-    threshold: Option[Int] = None,
+    trustedSynchronizerConfig: Option[ValidatorTrustedSynchronizerConfig] = None,
 ) {
 
   /** Converts the reservedTraffic into an Option that is set to None if the validator is not
@@ -116,6 +107,18 @@ case class ValidatorDecentralizedSynchronizerConfig(
   lazy val reservedTrafficO: Option[NonNegativeLong] =
     if (buyExtraTraffic.targetThroughput.value <= 0L) None else Some(reservedTraffic)
 }
+
+case class ValidatorTrustedSynchronizerConfig(
+    /** static list of trusted sequencer names to connect to.
+      * sequencerNames is mutually exclusive with `url`.
+      */
+    sequencerNames: NonEmptyList[String],
+
+    /** parameter to specify the BFT threshold for the domain connections.
+      * If not specified, length(sequencerNames) / 3 +1 will be used.
+      */
+    threshold: Int,
+)
 
 // Validators are responsible for establishing connections to domains and so need more information than just a `SynchronizerConfig`
 case class ValidatorExtraSynchronizerConfig(

@@ -154,11 +154,12 @@ class DomainConnector(
                     )
                     .asRuntimeException()
                 case Some(nonEmptyConnections) =>
-                  val threshold = config.domains.global.threshold
-                    .map(com.digitalasset.canton.config.RequireTypes.PositiveInt.tryCreate)
-                    .getOrElse(
-                      Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size)
-                    )
+                  val threshold: PositiveInt =
+                    config.domains.global.trustedSynchronizerConfig match {
+                      case Some(config) => PositiveInt.tryCreate(config.threshold)
+                      case None =>
+                        Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size)
+                    }
 
                   val amplificationFactor = PositiveInt.tryCreate(
                     Math.max(
@@ -207,11 +208,11 @@ class DomainConnector(
           // so this is just an extra safeguard.
           sequencers.synchronizerId == decentralizedSynchronizerId
         )
-      val svFilteredSequencers = config.domains.global.sequencerNames match {
-        case Some(allowedNames) =>
-          val allowedNamesSet = allowedNames.toList.toSet
+      val svFilteredSequencers = config.domains.global.trustedSynchronizerConfig match {
+        case Some(config) =>
+          val allowedNamesSet = config.sequencerNames.toList.toSet
           logger.debug(
-            s"Filtering sequencers to only include: ${allowedNames.toList.mkString(", ")}"
+            s"Filtering sequencers to only include: ${allowedNamesSet.toList.mkString(", ")}"
           )
           filteredSequencers.map { domainSequencer =>
             domainSequencer.copy(sequencers =

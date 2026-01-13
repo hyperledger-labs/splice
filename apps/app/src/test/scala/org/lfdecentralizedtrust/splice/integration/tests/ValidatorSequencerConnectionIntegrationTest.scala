@@ -21,6 +21,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import org.apache.pekko.http.scaladsl.model.Uri
+import org.lfdecentralizedtrust.splice.validator.config.ValidatorTrustedSynchronizerConfig
 
 class ValidatorSequencerConnectionIntegrationTest
     extends IntegrationTest
@@ -39,8 +40,12 @@ class ValidatorSequencerConnectionIntegrationTest
             c.copy(
               domains = c.domains.copy(
                 global = c.domains.global.copy(
-                  sequencerNames = Some(NonEmptyList.of(getSvName(1), getSvName(2), getSvName(3))),
-                  threshold = Some(2),
+                  trustedSynchronizerConfig = Some(
+                    ValidatorTrustedSynchronizerConfig(
+                      sequencerNames = NonEmptyList.of(getSvName(1), getSvName(2), getSvName(3)),
+                      threshold = 2,
+                    )
+                  )
                 )
               ),
               automation =
