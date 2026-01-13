@@ -10,7 +10,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   ValidatorRewardCoupon,
   ValidatorRight,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLivenessActivityRecord
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.mintingdelegation as mintingDelegationCodegen
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -18,6 +17,7 @@ import org.lfdecentralizedtrust.splice.automation.Trigger
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
 import org.lfdecentralizedtrust.splice.wallet.automation.{
   CollectRewardsAndMergeAmuletsTrigger,
+  MintingDelegationCollectRewardsTrigger,
   RejectInvalidMintingDelegationProposalTrigger,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
@@ -320,8 +320,6 @@ class WalletMintingDelegationTimeBasedIntegrationTest
       // ValidatorRewardCoupons, AppRewardCoupons, ValidatorLivenessActivityRecords,
       // and UnclaimedActivityRecords.
 
-      // setup: create delegation for external-party
-      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val validatorParty = aliceValidatorBackend.getValidatorPartyId()
       aliceValidatorWalletClient.tap(100.0)
 
@@ -357,136 +355,99 @@ class WalletMintingDelegationTimeBasedIntegrationTest
           )
       }
 
-      // helpful APIs
       def getBalance(): BigDecimal = BigDecimal(
         aliceValidatorBackend
           .getExternalPartyBalance(beneficiaryParty.party)
           .totalUnlockedCoin
       )
 
-      def advanceAndGetIssuingRound(): IssuingMiningRound = {
-        advanceRoundsToNextRoundOpening
-        advanceRoundsToNextRoundOpening
-        advanceRoundsToNextRoundOpening
-        eventually() {
-          val (_, issuingRounds) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
-          issuingRounds.toList.lastOption.value.payload
-        }
-      }
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
 
-      def advanceRoundsAndVerifyBalanceIncrease(): Unit = {
-        val balanceBefore = getBalance()
-
-        advanceRoundsToNextRoundOpening
-        advanceRoundsToNextRoundOpening
-        advanceTimeForRewardAutomationToRunForCurrentRound
-
+      // Get an issuing round whose opensAt is in the past.
+      val issuingRound = eventually() {
         val (_, issuingRounds) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
-        val issuingRoundsMap = issuingRounds.view.map(r => r.payload.round -> r.payload).toMap
-
-        clue("All reward contracts should be consumed") {
-          eventually() {
-            externalPartyWallet.store.listSortedValidatorRewards(None).futureValue shouldBe empty
-            externalPartyWallet.store.listUnclaimedActivityRecords().futureValue shouldBe empty
-            externalPartyWallet.store
-              .listSortedAppRewards(issuingRoundsMap)
-              .futureValue shouldBe empty
-            externalPartyWallet.store
-              .listSortedLivenessActivityRecords(issuingRoundsMap)
-              .futureValue shouldBe empty
-          }
-        }
-
-        clue("Balance should have increased") {
-          eventually() {
-            val balanceAfter = getBalance()
-            balanceAfter should be > balanceBefore
-          }
-        }
+        issuingRounds.toList.headOption.value.payload
       }
 
-      // Tests start -----
+      val balanceBefore = getBalance()
+      balanceBefore shouldBe BigDecimal(0)
 
-      clue("Test AppRewardCoupon") {
-        val issuingRound = advanceAndGetIssuingRound()
-
-        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
-          .submitWithResult(
-            userId = sv1Backend.config.ledgerApiUser,
-            actAs = Seq(dsoParty),
-            readAs = Seq.empty,
-            update = new AppRewardCoupon(
-              dsoParty.toProtoPrimitive,
-              beneficiaryParty.party.toProtoPrimitive,
-              false, // not featured
-              BigDecimal(100.0).bigDecimal,
-              issuingRound.round,
-              java.util.Optional.empty(),
-            ).create,
-          )
-
-        advanceRoundsAndVerifyBalanceIncrease()
-      }
-
-      clue("Test ValidatorLivenessActivityRecord") {
-        val issuingRound = advanceAndGetIssuingRound()
-
-        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
-          .submitWithResult(
-            userId = sv1Backend.config.ledgerApiUser,
-            actAs = Seq(dsoParty),
-            readAs = Seq.empty,
-            update = new ValidatorLivenessActivityRecord(
-              dsoParty.toProtoPrimitive,
-              beneficiaryParty.party.toProtoPrimitive,
-              issuingRound.round,
-            ).create,
-          )
-
-        advanceRoundsAndVerifyBalanceIncrease()
-      }
-
-      clue("Test UnclaimedActivityRecord") {
-        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
-          .submitWithResult(
-            userId = sv1Backend.config.ledgerApiUser,
-            actAs = Seq(dsoParty),
-            readAs = Seq.empty,
-            update = new UnclaimedActivityRecord(
-              dsoParty.toProtoPrimitive,
-              beneficiaryParty.party.toProtoPrimitive,
-              BigDecimal(100.0).bigDecimal,
-              "test reward",
-              env.environment.clock.now.plus(Duration.ofDays(1)).toInstant,
-            ).create,
-          )
-
-        advanceRoundsAndVerifyBalanceIncrease()
-      }
+      val appRewardAmount = BigDecimal(100.0)
+      val unclaimedActivityAmount = BigDecimal(200.0)
+      val validatorRewardAmount = BigDecimal(500.0)
 
       // For ValidatorRewardCoupon, we need ValidatorRight for beneficiary
-      // And also need to pause the validator's own reward collection
-      // which would normally mint this coupon
-      clue("Test ValidatorRewardCoupon") {
-        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-          .submitJavaExternalOrLocal(
-            actingParty = beneficiaryParty.richPartyId,
-            commands = new ValidatorRight(
-              dsoParty.toProtoPrimitive,
-              beneficiaryParty.party.toProtoPrimitive,
-              beneficiaryParty.party.toProtoPrimitive, // validator = beneficiary
-            ).create.commands.asScala.toSeq,
-          )
-
-        val issuingRound4 = advanceAndGetIssuingRound()
-
-        // Pause the validator's reward collection to prevent race
-        val validatorRewardTrigger = collectRewardsAndMergeAmuletsTrigger(
-          aliceValidatorBackend,
-          aliceValidatorWalletClient.config.ledgerApiUser,
+      aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+        .submitJavaExternalOrLocal(
+          actingParty = beneficiaryParty.richPartyId,
+          commands = new ValidatorRight(
+            dsoParty.toProtoPrimitive,
+            beneficiaryParty.party.toProtoPrimitive,
+            beneficiaryParty.party.toProtoPrimitive, // validator = beneficiary
+          ).create.commands.asScala.toSeq,
         )
 
-        setTriggersWithin(triggersToPauseAtStart = Seq(validatorRewardTrigger)) {
+      // Pause the validator's own reward collection trigger
+      // which would normally mint this coupon
+      val validatorRewardTrigger = collectRewardsAndMergeAmuletsTrigger(
+        aliceValidatorBackend,
+        aliceValidatorWalletClient.config.ledgerApiUser,
+      )
+
+      setTriggersWithin(triggersToPauseAtStart = Seq(validatorRewardTrigger)) {
+        val externalPartyMintingDelegationTrigger = mintingDelegationCollectRewardsTrigger(
+          aliceValidatorBackend,
+          beneficiaryParty.party,
+        )
+
+        // Pause minting delegation trigger to ensure we mint them together
+        setTriggersWithin(triggersToPauseAtStart = Seq(externalPartyMintingDelegationTrigger)) {
+          // Create AppRewardCoupon
+          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitWithResult(
+              userId = sv1Backend.config.ledgerApiUser,
+              actAs = Seq(dsoParty),
+              readAs = Seq.empty,
+              update = new AppRewardCoupon(
+                dsoParty.toProtoPrimitive,
+                beneficiaryParty.party.toProtoPrimitive,
+                false,
+                appRewardAmount.bigDecimal,
+                issuingRound.round,
+                java.util.Optional.empty(),
+              ).create,
+            )
+
+          // Create UnclaimedActivityRecord
+          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitWithResult(
+              userId = sv1Backend.config.ledgerApiUser,
+              actAs = Seq(dsoParty),
+              readAs = Seq.empty,
+              update = new UnclaimedActivityRecord(
+                dsoParty.toProtoPrimitive,
+                beneficiaryParty.party.toProtoPrimitive,
+                unclaimedActivityAmount.bigDecimal,
+                "test reward",
+                env.environment.clock.now.plus(Duration.ofDays(1)).toInstant,
+              ).create,
+            )
+
+          // Create ValidatorLivenessActivityRecord
+          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitWithResult(
+              userId = sv1Backend.config.ledgerApiUser,
+              actAs = Seq(dsoParty),
+              readAs = Seq.empty,
+              update = new ValidatorLivenessActivityRecord(
+                dsoParty.toProtoPrimitive,
+                beneficiaryParty.party.toProtoPrimitive,
+                issuingRound.round,
+              ).create,
+            )
+
+          // Create ValidatorRewardCoupon
           sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
             .submitWithResult(
               userId = sv1Backend.config.ledgerApiUser,
@@ -495,14 +456,55 @@ class WalletMintingDelegationTimeBasedIntegrationTest
               update = new ValidatorRewardCoupon(
                 dsoParty.toProtoPrimitive,
                 beneficiaryParty.party.toProtoPrimitive,
-                BigDecimal(100.0).bigDecimal,
-                issuingRound4.round,
+                validatorRewardAmount.bigDecimal,
+                issuingRound.round,
               ).create,
             )
+        }
 
-          advanceRoundsAndVerifyBalanceIncrease()
+        // Advance time to collect all rewards
+        advanceRoundsToNextRoundOpening
+        advanceTimeForRewardAutomationToRunForCurrentRound
+
+        val (_, issuingRoundsAfter) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
+        val issuingRoundsMap = issuingRoundsAfter.view.map(r => r.payload.round -> r.payload).toMap
+
+        clue("All reward contracts should be consumed") {
+          eventually() {
+            externalPartyWallet.store.listUnclaimedActivityRecords().futureValue shouldBe empty
+            externalPartyWallet.store
+              .listSortedAppRewards(issuingRoundsMap)
+              .futureValue shouldBe empty
+            externalPartyWallet.store
+              .listSortedValidatorRewards(Some(issuingRoundsMap.keySet.map(_.number)))
+              .futureValue shouldBe empty
+            externalPartyWallet.store
+              .listSortedLivenessActivityRecords(issuingRoundsMap)
+              .futureValue shouldBe empty
+          }
         }
       }
+
+      // Verify balance increase
+      val balanceAfter = getBalance()
+      val actualIncrease = balanceAfter - balanceBefore
+
+      val expectedTotalReward =
+        (appRewardAmount * BigDecimal(issuingRound.issuancePerUnfeaturedAppRewardCoupon)) +
+          (BigDecimal(
+            issuingRound.optIssuancePerValidatorFaucetCoupon.orElse(java.math.BigDecimal.ZERO)
+          )) +
+          (validatorRewardAmount * BigDecimal(issuingRound.issuancePerValidatorRewardCoupon)) +
+          unclaimedActivityAmount
+
+      val (openRoundsForFee, _) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
+      val openRoundForFee = openRoundsForFee.head
+      val createFee = BigDecimal(
+        openRoundForFee.payload.transferConfigUsd.createFee.fee
+      ) / BigDecimal(openRoundForFee.payload.amuletPrice)
+
+      actualIncrease should be >= (expectedTotalReward - createFee)
+      actualIncrease should be <= expectedTotalReward
     }
 
     "merge amulets above when they go above the merge-limit" in { implicit env =>
@@ -629,6 +631,18 @@ class WalletMintingDelegationTimeBasedIntegrationTest
       .userWalletAutomation(userName)
       .futureValue
       .trigger[CollectRewardsAndMergeAmuletsTrigger]
+
+  private def mintingDelegationCollectRewardsTrigger(
+      validatorBackend: ValidatorAppBackendReference,
+      externalParty: PartyId,
+  ): Trigger =
+    validatorBackend.appState.walletManager
+      .valueOrFail("WalletManager is expected to be defined")
+      .externalPartyWalletManager
+      .lookupExternalPartyWallet(externalParty)
+      .valueOrFail(s"Expected ${externalParty} to have an external party wallet")
+      .automation
+      .trigger[MintingDelegationCollectRewardsTrigger]
 
   private def createMintingDelegationProposal(
       beneficiaryParty: OnboardingResult,
