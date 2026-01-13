@@ -61,7 +61,7 @@ describe('Update SV Reward Weight Form', () => {
 
     const urlInput = screen.getByTestId('update-sv-reward-weight-url');
     expect(urlInput).toBeDefined();
-    expect(urlInput.getAttribute('value')).toBe('');
+    expect(urlInput.getAttribute('value')).toBe('https://');
 
     const memberInput = screen.getByTestId('update-sv-reward-weight-member-dropdown');
     expect(memberInput).toBeDefined();

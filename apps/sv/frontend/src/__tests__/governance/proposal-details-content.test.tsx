@@ -130,6 +130,23 @@ describe('SV user can', () => {
 
 describe('Proposal Details Content', () => {
   test('should render proposal details page', async () => {
+    // Use votes where current SV (sv1) has not voted yet so the form is visible
+    const votesWithNoCurrentSvVote = [
+      {
+        sv: 'sv1',
+        isYou: true,
+        vote: 'no-vote' as const,
+      },
+      {
+        sv: 'sv3',
+        vote: 'rejected' as const,
+        reason: {
+          url: 'https://example.com',
+          body: 'Reason',
+        },
+      },
+    ];
+
     render(
       <Wrapper>
         <ProposalDetailsContent
@@ -137,7 +154,7 @@ describe('Proposal Details Content', () => {
           contractId={voteRequest.contractId}
           proposalDetails={voteRequest.proposalDetails}
           votingInformation={voteRequest.votingInformation}
-          votes={voteRequest.votes}
+          votes={votesWithNoCurrentSvVote}
         />
       </Wrapper>
     );
@@ -758,6 +775,10 @@ describe('Proposal Details > Votes & Voting', () => {
   });
 
   test('should render voting form for vote request when voting has not closed', () => {
+    const votesWithNoCurrentSvVote: ProposalVote[] = votesData.map(v =>
+      v.sv === 'sv1' ? { sv: v.sv, isYou: v.isYou, vote: 'no-vote' as const } : v
+    );
+
     render(
       <Wrapper>
         <ProposalDetailsContent
@@ -765,7 +786,7 @@ describe('Proposal Details > Votes & Voting', () => {
           contractId={voteRequest.contractId}
           proposalDetails={voteRequest.proposalDetails}
           votingInformation={voteRequest.votingInformation}
-          votes={votesData}
+          votes={votesWithNoCurrentSvVote}
         />
       </Wrapper>
     );
