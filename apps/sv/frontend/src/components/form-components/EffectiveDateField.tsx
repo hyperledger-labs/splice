@@ -86,7 +86,8 @@ export const EffectiveDateField: React.FC<EffectiveDateFieldProps> = props => {
                   textField: {
                     fullWidth: true,
                     variant: 'outlined',
-                    id: `${id}-field effective-date-field`,
+                    id: `${id}-field`,
+                    className: 'effective-date-field',
                     onBlur: field.handleBlur,
                     error: !field.state.meta.isValid,
                     helperText: field.state.meta.errors?.[0],
