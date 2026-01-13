@@ -415,7 +415,7 @@ class SvFrontendIntegrationTest
 
           clue("click the first inflight proposal to view details") {
             val proposals = getInflightProposals()
-            proposals.asScala.head.click()
+            webDriver.executeScript("arguments[0].click();", proposals.asScala.head)
           }
 
           eventually() {
