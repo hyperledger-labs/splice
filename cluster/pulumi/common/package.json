@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "src/index.ts",
   "dependencies": {
-    "@google-cloud/storage": "^6.11.0",
+    "@google-cloud/storage": "^7.18.0",
     "@kubernetes/client-node": "^0.22.3",
     "@pulumi/command": "1.1.0",
     "@pulumi/gcp": "8.32.1",
