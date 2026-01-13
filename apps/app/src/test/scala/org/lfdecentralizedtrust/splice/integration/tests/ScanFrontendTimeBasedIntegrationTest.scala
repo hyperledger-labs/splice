@@ -240,7 +240,7 @@ class ScanFrontendTimeBasedIntegrationTest
           "Check the initial amulet config matches the defaults",
           _ => {
             find(id("base-transfer-fee")).value.text should matchText(
-              s"${SpliceUtil.defaultCreateFee.fee.doubleValue()} USD"
+              s"0.0 USD"
             )
 
             find(id("holding-fee")).value.text should matchText(
@@ -248,7 +248,7 @@ class ScanFrontendTimeBasedIntegrationTest
             )
 
             find(id("lock-holder-fee")).value.text should matchText(
-              s"${SpliceUtil.defaultLockHolderFee.fee.doubleValue()} USD"
+              s"0.0 USD"
             )
 
             find(id("round-tick-duration")).value.text should matchText {
@@ -259,7 +259,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
             findAll(className("transfer-fee-row")).toList
               .map(_.text)
-              .zip(SpliceUtil.defaultTransferFee.steps.asScala.toList)
+              .zip(SpliceUtil.zeroTransferFee.steps.asScala.toList)
               .foreach({
                 case (txFeeRow, defaultStep) => {
                   txFeeRow should include(defaultStep._1.setScale(0).toString)

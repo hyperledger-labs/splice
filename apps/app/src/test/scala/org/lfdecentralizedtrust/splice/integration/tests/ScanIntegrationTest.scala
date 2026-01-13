@@ -17,7 +17,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
-  updateAllSvAppFoundDsoConfigs_,
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
@@ -51,11 +50,6 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .addConfigTransforms((_, config) =>
-        updateAllSvAppFoundDsoConfigs_(
-          _.copy(zeroTransferFees = true)
-        )(config)
-      )
       .addConfigTransforms((_, config) =>
         (updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]

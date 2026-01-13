@@ -196,7 +196,6 @@ object ConfigTransforms {
       disableOnboardingParticipantPromotionDelay(),
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
       setDefaultGrpcDeadlineForTreasuryService(),
-      disableZeroFees(),
       updateAllAutomationConfigs(
         _.copy(rewardOperationRoundsCloseBufferDuration = NonNegativeFiniteDuration.ofMillis(100))
       ),
@@ -295,9 +294,6 @@ object ConfigTransforms {
         )
       )
     )
-
-  def disableZeroFees(): ConfigTransform =
-    updateAllSvAppFoundDsoConfigs_(c => c.copy(zeroTransferFees = false))
 
   def updateAllValidatorAppConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig

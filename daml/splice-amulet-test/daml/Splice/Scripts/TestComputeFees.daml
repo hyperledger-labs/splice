@@ -4,7 +4,6 @@
 module Splice.Scripts.TestComputeFees where
 
 import DA.Assert
-import DA.Time
 import DA.TextMap as TextMap
 import Daml.Script
 
@@ -13,79 +12,7 @@ import Splice.Scripts.Util
 import Splice.Api.Token.MetadataV1
 import Splice.Amulet
 import Splice.AmuletRules
-import Splice.Expiry
 import Splice.Fees
-
-
-template Test
-  with
-    dso : Party
-    sender : Party
-  where
-    signatory sender
-    choice Test_ComputeFees : [Decimal]
-      with
-        context : PaymentTransferContext
-        outputs : [TransferOutput]
-      controller sender
-      do exerciseComputeFees dso context sender outputs
-
-
-test = script do
-    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
-    now <- getTime
-    context <- getPaymentTransferContext app alice
-    test <- submitUser alice.userId $ createCmd Test with
-      dso = app.dso
-      sender = alice.primaryParty
-    let outputs =
-          [ TransferOutput with
-              receiver = alice.primaryParty
-              receiverFeeRatio = 0.4
-              amount = 20.0
-              lock = None
-          , TransferOutput with
-              receiver = alice.primaryParty
-              receiverFeeRatio = 0.0
-              amount = 20.0
-              lock = Some TimeLock with
-                expiresAt = addRelTime now (days 1)
-                holders = [bob.primaryParty, bob.primaryParty, provider1.primaryParty]
-                optContext = None
-          , TransferOutput with
-              receiver = bob.primaryParty
-              receiverFeeRatio = 0.0
-              amount = 20.0
-              lock = None
-          , TransferOutput with
-              receiver = bob.primaryParty
-              receiverFeeRatio = 0.6
-              amount = 20.0
-              lock = None
-          , TransferOutput with
-              receiver = bob.primaryParty
-              receiverFeeRatio = 0.0
-              amount = 20.0
-              lock = Some TimeLock with
-                expiresAt = addRelTime now (days 1)
-                holders = [bob.primaryParty, bob.primaryParty, provider1.primaryParty]
-                optContext = None
-          , TransferOutput with
-              receiver = bob.primaryParty
-              receiverFeeRatio = 0.0
-              amount = 101.0
-              lock = None
-          ]
-    fees <- submitUser alice.userId $ exerciseCmd test Test_ComputeFees with ..
-    fees ===
-      [ 0.03                  -- flat fee
-      , 0.03 + 0.005 * 2.0    -- flat + lock holder
-      , 0.03 + 0.01 * 20.0    -- create + transfer
-      , 0.03 + 0.01 * 20.0    -- create + transfer (receiverFeeRatio does not matter)
-      , 0.03 + 0.01 * 20.0 + 0.005 * 1.0    -- flat + transfer + lock holders different from the receiver
-      , 0.03 + 0.01 * 100.0 + 0.001 * 1.0  -- create + stepped transfer
-      ]
-    pure()
 
 testScaledHoldingFees: Script ()
 testScaledHoldingFees = do
@@ -139,4 +66,3 @@ testScaledHoldingFees = do
   expectedMeta === result.meta
 
   pure ()
-
