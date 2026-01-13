@@ -121,6 +121,19 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
   const hasVoted = yourVote?.vote === 'accepted' || yourVote?.vote === 'rejected';
   const isEditingVote = editFormKey > 0;
 
+  // Debug logging for integration tests
+  const showVoteForm = proposalDetails.isVoteRequest && !isClosed && (!hasVoted || isEditingVote);
+  console.log('Vote form conditions:', {
+    isVoteRequest: proposalDetails.isVoteRequest,
+    isClosed,
+    hasVoted,
+    isEditingVote,
+    showVoteForm,
+    currentSvPartyId,
+    yourVote: yourVote?.vote,
+    votesCount: votes.length,
+  });
+
   const { acceptedVotes, rejectedVotes, awaitingVotes } = votes.reduce(
     (acc, vote) => {
       switch (vote.vote) {
@@ -416,7 +429,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             </Box>
           </VoteSection>
 
-          {proposalDetails.isVoteRequest && !isClosed && (!hasVoted || isEditingVote) && (
+          {showVoteForm && (
             <VoteSection
               title="Your Vote"
               data-testid="proposal-details-your-vote"
