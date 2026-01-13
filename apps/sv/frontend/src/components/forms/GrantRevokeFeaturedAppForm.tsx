@@ -79,7 +79,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
       type: 'custom',
       effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
     },
-    url: '',
+    url: 'https://',
     summary: '',
     idValue: '',
   };
