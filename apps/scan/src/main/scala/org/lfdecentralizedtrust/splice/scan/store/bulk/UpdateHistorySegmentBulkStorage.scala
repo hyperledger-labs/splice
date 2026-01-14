@@ -111,12 +111,12 @@ class UpdateHistorySegmentBulkStorage(
         .fold(
           updateHistory.getUpdatesWithoutImportUpdates(
             Some((fromMigrationId, fromTimestamp)),
-            HardLimit.tryCreate(config.dbReadChunkSize)
+            HardLimit.tryCreate(config.dbReadChunkSize),
           )
         )(after =>
           updateHistory.getUpdatesWithoutImportUpdates(
             Some((after._1, after._2)),
-            HardLimit.tryCreate(config.dbReadChunkSize)
+            HardLimit.tryCreate(config.dbReadChunkSize),
           )
         )
 
