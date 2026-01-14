@@ -444,8 +444,9 @@ class WalletMintingDelegationTimeBasedIntegrationTest
           ).create.commands.asScala.toSeq,
         )
 
-      // Pause the validator's own reward collection trigger
-      // which would normally mint this coupon
+      // Pause the validator's own reward collection trigger which would
+      // normally mint this coupon for itself, because the validator-app currently
+      // auto creates the ValidatorRight contract while onboarding the external-party
       val validatorRewardTrigger = collectRewardsAndMergeAmuletsTrigger(
         aliceValidatorBackend,
         aliceValidatorWalletClient.config.ledgerApiUser,
