@@ -42,7 +42,7 @@ class MergeUnclaimedDevelopmentFundCouponsTrigger(
   protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[MergeUnclaimedDevelopmentFundCouponsTask]] = {
-    val limit = PageLimit.tryCreate(2 * threshold + 1)
+    val limit = PageLimit.tryCreate(2 * threshold)
     store.listUnclaimedDevelopmentFundCoupons(limit).map { unclaimedDevelopmentFundCoupons =>
       if (unclaimedDevelopmentFundCoupons.length >= 2 * threshold) {
         Seq(
