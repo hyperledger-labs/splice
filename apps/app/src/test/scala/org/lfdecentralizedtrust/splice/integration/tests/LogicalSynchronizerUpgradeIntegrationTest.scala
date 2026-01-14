@@ -203,6 +203,16 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
     val newSynchronizerSerial = decentralizedSynchronizerPSId.serial + NonNegativeInt.one
     val successorPsid = decentralizedSynchronizerPSId.copy(serial = newSynchronizerSerial)
+    // Upload after starting validator which connects to global
+    // synchronizers as upload_dar_unless_exists vets on all
+    // connected synchronizers.
+    aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
+    val externalPartyOnboarding = clue("Create external party and transfer 40 amulet to it") {
+      createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
+    }
+    val allBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+    val allNewBackends = Seq(sv1LocalBackend, sv2LocalBackend, sv3LocalBackend, sv4LocalBackend)
+    val upgradeTime = CantonTimestamp.now().plusSeconds(60)
     withCantonSvNodes(
       (
         None,
@@ -212,25 +222,17 @@ class LogicalSynchronizerUpgradeIntegrationTest
       ),
       participants = false,
       logSuffix = "global-domain-migration",
-      enableBftSequencer = false,
+      extraSequencerConfig = Seq(
+        s"parameters.sequencing-time-lower-bound-exclusive = $upgradeTime"
+      ),
     )() {
-      // Upload after starting validator which connects to global
-      // synchronizers as upload_dar_unless_exists vets on all
-      // connected synchronizers.
-      aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
-      val externalPartyOnboarding = clue("Create external party and transfer 40 amulet to it") {
-        createExternalParty(aliceValidatorBackend, aliceValidatorWalletClient)
-      }
-      val allBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
-      val allNewBackends = Seq(sv1LocalBackend, sv2LocalBackend, sv3LocalBackend, sv4LocalBackend)
-      val migrationTime = CantonTimestamp.now().plusSeconds(60)
 
-      val announcement = clue(s"Announce migration at $migrationTime") {
+      val announcement = clue(s"Announce migration at $upgradeTime") {
         allBackends.par.map { backend =>
           backend.participantClientWithAdminToken.topology.synchronizer_upgrade.announcement
             .propose(
               successorPsid,
-              migrationTime,
+              upgradeTime,
               store = Some(Synchronizer(decentralizedSynchronizerId)),
             )
         }
@@ -257,7 +259,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
           }
         }
       }
-
       clue("init new nodes") {
         allNewBackends.zip(allBackends).par.map { case (newBackend, oldBackend) =>
           TraceContext.withNewTraceContext(s"init ${oldBackend.name}") { implicit traceContext =>
