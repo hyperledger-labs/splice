@@ -93,7 +93,7 @@ class WalletTxLogTimeBasedIntegrationTest
         val appRewards = aliceValidatorWalletClient.listAppRewardCoupons()
         val validatorRewards = aliceValidatorWalletClient.listValidatorRewardCoupons()
         val (appRewardAmount, validatorRewardAmount) =
-          getRewardCouponsValue(appRewards, validatorRewards, false)
+          getRewardCouponsValue(appRewards, validatorRewards)
 
         actAndCheck(
           "Alice's validator transfers some CC to Bob (using her app & validator rewards)",

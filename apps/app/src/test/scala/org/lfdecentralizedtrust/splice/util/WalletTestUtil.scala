@@ -1003,7 +1003,6 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
           amuletCodegen.ValidatorRewardCoupon,
         ]
       ],
-      featured: Boolean,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ): (BigDecimal, BigDecimal) =
@@ -1023,7 +1022,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       val appRewardBalance = appRewards
         .foldLeft(BigDecimal(0))((total, coupon) => {
           val issuanceConfig = getIssuanceConfig(coupon.payload.round.number)
-          val issuancePerARC = if (featured) {
+          val issuancePerARC = if (coupon.payload.featured) {
             BigDecimal(issuanceConfig.issuancePerFeaturedAppRewardCoupon)
           } else {
             BigDecimal(issuanceConfig.issuancePerUnfeaturedAppRewardCoupon)
