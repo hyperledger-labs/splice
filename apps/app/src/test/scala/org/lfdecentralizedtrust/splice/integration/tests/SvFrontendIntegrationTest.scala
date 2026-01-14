@@ -454,17 +454,19 @@ class SvFrontendIntegrationTest
       )(
         "sv2 can see the vote request and cast a vote",
         _ => {
-          inside(find(id("your-vote-reason-input"))) { case Some(element) =>
+          eventuallySucceeds() {
+            find(testId("your-vote-reason-input")) should not be empty
+          }
+
+          inside(find(testId("your-vote-reason-input"))) { case Some(element) =>
             element.underlying.sendKeys("A sample reason")
           }
 
-          inside(find(id("your-vote-url-input"))) { case Some(element) =>
+          inside(find(testId("your-vote-url-input"))) { case Some(element) =>
             element.underlying.sendKeys("https://my-splice-vote-url.com")
           }
 
           click on testId("your-vote-accept")
-
-          eventuallyClickOn(id("submit-vote-button"))
 
           clue("wait for the vote submission success message") {
             eventuallySucceeds() {
@@ -516,7 +518,7 @@ class SvFrontendIntegrationTest
     )(implicit
         env: SpliceTestConsoleEnvironment
     ): String = clue(s"Creating proposal: $action") {
-      val requestReasonUrl = "https://new-proposal-url.com/"
+      val requestReasonUrl = "new-proposal-url.com/"
       val requestReasonBody = "This is a summary of the proposal"
 
       val proposalContractId = withFrontEnd("sv1") { implicit webDriver =>

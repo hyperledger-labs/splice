@@ -61,7 +61,7 @@ describe('Offboard SV Form', () => {
 
     const urlInput = screen.getByTestId('offboard-sv-url');
     expect(urlInput).toBeDefined();
-    expect(urlInput.getAttribute('value')).toBe('');
+    expect(urlInput.getAttribute('value')).toBe('https://');
 
     const memberInput = screen.getByTestId('offboard-sv-member-dropdown');
     expect(memberInput).toBeDefined();
