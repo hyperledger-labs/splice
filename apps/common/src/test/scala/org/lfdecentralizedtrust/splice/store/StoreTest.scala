@@ -139,10 +139,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     LfContractId.assertFromString("00" + f"$cIdCounter%064x").coid
   }
 
-  protected def resetCIdCounter() = {
-    cIdCounter = 0
-  }
-
   protected def time(n: Long): CantonTimestamp = CantonTimestamp.ofEpochSecond(n)
 
   private def schedule(
@@ -298,6 +294,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       ratePerRound: BigDecimal,
       version: DarResource = DarResources.amulet_current,
       dso: PartyId = dsoParty,
+      contractId: String = nextCid(),
   ) = {
     val templateId = new Identifier(
       version.packageId,
@@ -315,7 +312,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
     contract(
       identifier = templateId,
-      contractId = new amuletCodegen.Amulet.ContractId(nextCid()),
+      contractId = new amuletCodegen.Amulet.ContractId(contractId),
       payload = template,
     )
   }
@@ -911,6 +908,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       workflowId: String,
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
+      updateId: String = nextUpdateId(),
   ): Transaction = mkCreateTxWithInterfaces(
     offset,
     createRequests.map(cr =>
@@ -922,6 +920,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     workflowId,
     recordTime,
     createdEventObservers,
+    updateId,
   )
 
   protected def mkCreateTxWithInterfaces(
@@ -935,6 +934,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       workflowId: String,
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
+      updateId: String = nextUpdateId(),
   ): Transaction = mkTx(
     offset,
     createRequests.map[Event] { case (contract, implementedInterfaces, failedInterfaces) =>
@@ -950,6 +950,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     effectiveAt,
     workflowId,
     recordTime = recordTime,
+    updateId = updateId,
   )
 
   protected def acs(
@@ -1279,8 +1280,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       workflowId: String = "",
       commandId: String = "",
       recordTime: Instant = defaultEffectiveAt,
+      updateId: String = nextUpdateId(),
   ): Transaction = {
-    val updateId = nextUpdateId()
     val eventsWithId = events.zipWithIndex.map { case (e, i) =>
       withNodeId(e, i)
     }

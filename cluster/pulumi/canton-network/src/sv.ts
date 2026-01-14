@@ -42,14 +42,15 @@ import {
 import {
   approvedSvIdentities,
   CantonBftSynchronizerNode,
-  CometbftSynchronizerNode,
   configForSv,
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
   installSvLoopback,
   SvParticipant,
+  valuesForSvApp,
+  valuesForSvValidatorApp,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
-import { svsConfig, SvConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
+import { SvConfig, svsConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
 import { installValidatorApp } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { initialAmuletPrice } from '@lfdecentralizedtrust/splice-pulumi-common/src/initialAmuletPrice';
@@ -357,13 +358,14 @@ async function installValidator(
   scan: Resource
 ) {
   const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
-  const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.sv-2.${CLUSTER_HOSTNAME}`;
+  const commonValidatorAppValues = valuesForSvValidatorApp(
+    decentralizedSynchronizerMigrationConfig,
+    svConfig
+  );
 
-  const bftSequencerConnection =
-    !svConfig.participant || svConfig.participant.bftSequencerConnection;
-
-  const validator = await installValidatorApp({
+  return await installValidatorApp({
     xns,
+    ...commonValidatorAppValues,
     migration: {
       id: decentralizedSynchronizerMigrationConfig.active.id,
     },
@@ -386,7 +388,6 @@ async function installValidator(
       : [postgres],
     svValidator: true,
     participantAddress: sv.participant.internalClusterAddress,
-    decentralizedSynchronizerUrl: bftSequencerConnection ? undefined : decentralizedSynchronizerUrl,
     scanAddress: internalScanUrl(svConfig),
     auth0Client: svConfig.auth0Client,
     auth0ValidatorAppName: svConfig.auth0ValidatorAppName,
@@ -394,23 +395,9 @@ async function installValidator(
     nodeIdentifier: svConfig.onboardingName,
     logLevel: svConfig.logging?.appsLogLevel,
     logAsync: svConfig.logging?.appsAsync,
-    additionalEnvVars: [
-      ...(bftSequencerConnection
-        ? []
-        : [
-            {
-              name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
-              value:
-                'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
-            },
-          ]),
-      ...(svConfig.validatorApp?.additionalEnvVars || []),
-    ],
     additionalJvmOptions: svConfig.validatorApp?.additionalJvmOptions || '',
     resources: svConfig.validatorApp?.resources,
   });
-
-  return validator;
 }
 
 function internalScanUrl(config: SvConfig): pulumi.Output<string> {
@@ -427,21 +414,14 @@ function installSvApp(
   decentralizedSynchronizer: DecentralizedSynchronizerNode
 ) {
   const svDbName = `sv_${sanitizedForPostgres(config.nodeName)}`;
-
-  const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
-  const bftSequencerConnectionEnvVars =
-    !config.participant || config.participant.bftSequencerConnection
-      ? []
-      : [
-          {
-            name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
-            value: 'canton.sv-apps.sv.bft-sequencer-connection = false',
-          },
-        ];
-  const additionalEnvVars = (config.svApp?.additionalEnvVars || []).concat(
-    bftSequencerConnectionEnvVars
+  const commonSvAppValues = valuesForSvApp(
+    decentralizedSynchronizerMigrationConfig,
+    config,
+    decentralizedSynchronizer
   );
+
   const svValues = {
+    ...commonSvAppValues,
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     ...spliceInstanceNames,
     onboardingType: config.onboarding.type,
@@ -458,15 +438,6 @@ function installSvApp(
       config.onboarding.type == 'found-dso' ? config.onboarding.initialRound : undefined,
     initialAmuletPrice: initialAmuletPrice,
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
-    ...(useCantonBft
-      ? {}
-      : {
-          cometBFT: {
-            enabled: true,
-            connectionUri: pulumi.interpolate`http://${(decentralizedSynchronizer as unknown as CometbftSynchronizerNode).cometbftRpcServiceName}:26657`,
-            externalGovernanceKey: config.cometBftGovernanceKey ? true : undefined,
-          },
-        }),
     decentralizedSynchronizerUrl:
       config.onboarding.type == 'found-dso'
         ? undefined
@@ -476,16 +447,11 @@ function installSvApp(
       // we need to include a dummy value though
       // because helm does not distinguish between an empty object and unset.
       {
+        ...(commonSvAppValues.domain || {}),
         sequencerAddress: decentralizedSynchronizer.namespaceInternalSequencerAddress,
         mediatorAddress: decentralizedSynchronizer.namespaceInternalMediatorAddress,
         // required to prevent participants from using new nodes when the domain is upgraded
         sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.${config.ingressName}.${CLUSTER_HOSTNAME}`,
-        sequencerPruningConfig: config.sequencerPruningConfig,
-        ...(useCantonBft
-          ? {
-              enableBftSequencer: true,
-            }
-          : {}),
         skipInitialization: svsConfig?.synchronizer?.skipInitialization,
       },
     scan: {
@@ -529,7 +495,6 @@ function installSvApp(
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: config.logging?.appsLogLevel,
     logAsyncFlush: config.logging?.appsAsync,
-    additionalEnvVars,
     resources: config.svApp?.resources,
     periodicTopologySnapshotConfig: config.periodicTopologySnapshotConfig,
   } as ChartValues;
@@ -540,7 +505,7 @@ function installSvApp(
     };
   }
 
-  const svApp = installSpliceHelmChart(
+  return installSpliceHelmChart(
     xns,
     'sv-app',
     'splice-sv-node',
@@ -555,7 +520,6 @@ function installSvApp(
     undefined,
     appsAffinityAndTolerations
   );
-  return svApp;
 }
 
 function installScan(
@@ -610,7 +574,7 @@ function installScan(
     installRateLimits(xns.logicalName, 'scan-app', 5012, svsConfig.scan.externalRateLimits);
   }
 
-  const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {
+  return installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {
     // TODO(#893) if possible, don't require parallel start of sv app and scan when using CantonBft
     dependsOn: dependsOn
       .concat(decentralizedSynchronizerNode.dependencies)
@@ -620,5 +584,4 @@ function installScan(
           : participant.asDependencies.concat([postgres])
       ),
   });
-  return scan;
 }

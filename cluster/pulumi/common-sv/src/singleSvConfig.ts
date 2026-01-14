@@ -29,6 +29,15 @@ const EnvVarConfigSchema = z.object({
   name: z.string(),
   value: z.string(),
 });
+export type EnvVarConfig = z.infer<typeof EnvVarConfigSchema>;
+const CantonPruningSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    cron: z.string().optional(),
+    maxDuration: z.string().optional(),
+    retentionPeriod: z.string().optional(),
+  })
+  .optional();
 const CloudSqlWithOverrideConfigSchema = CloudSqlConfigSchema.partial()
   .default(spliceConfig.pulumiProjectConfig.cloudSql)
   .transform(sqlConfig => merge({}, spliceConfig.pulumiProjectConfig.cloudSql, sqlConfig));
@@ -116,6 +125,24 @@ const SingleSvConfigSchema = z
     svApp: SvAppConfigSchema.optional(),
     scanApp: ScanAppConfigSchema.optional(),
     validatorApp: SvValidatorAppConfigSchema.optional(),
+    pruning: z
+      .object({
+        cometbft: z
+          .object({
+            retainBlocks: z.number(),
+          })
+          .optional(),
+        sequencer: z
+          .object({
+            enabled: z.boolean().optional(),
+            pruningInterval: z.string().optional(),
+            retentionPeriod: z.string().optional(),
+          })
+          .optional(),
+        mediator: CantonPruningSchema,
+        participant: CantonPruningSchema,
+      })
+      .optional(),
     logging: z
       .object({
         appsLogLevel: LogLevelSchema,
@@ -155,10 +182,14 @@ export const configForSv = (svName: string): SingleSvConfiguration => {
   return merge({}, clusterSvsConfiguration.default, clusterSvsConfiguration[svName]);
 };
 
-console.error(
-  'Loaded SVS configuration',
-  util.inspect(clusterSvsConfiguration, {
-    depth: null,
-    maxStringLength: null,
-  })
-);
+export const allSvsConfiguration: SingleSvConfiguration[] = allConfiguredSvs.map(sv => {
+  const svConfig = configForSv(sv);
+  console.error(
+    `Loaded ${sv} config`,
+    util.inspect(svConfig, {
+      depth: null,
+      maxStringLength: null,
+    })
+  );
+  return svConfig;
+});

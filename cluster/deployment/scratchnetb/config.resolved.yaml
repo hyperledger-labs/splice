@@ -145,6 +145,11 @@ svs:
         requests:
           cpu: '1'
           memory: '12Gi'
+    pruning:
+      cometbft:
+        retainBlocks: 2000
+      sequencer:
+        enabled: false
     scanApp:
       resources:
         limits:

@@ -52,7 +52,7 @@ Enabling metrics
 Configuring a helm deployment to enable metrics
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-To enable metrics in a helm deployment, set the `metrics.enabled` value to `true` (default `false`) in the helm values. This will create a `ServiceMonitor` kubernetes custom resource. For this to work it would require that the Prometheus operator is installed in the cluster.
+To enable metrics in a helm deployment, set the `metrics.enable` value to `true` (default `false`) in the helm values. This will create a `ServiceMonitor` kubernetes custom resource. For this to work it would require that the Prometheus operator is installed in the cluster.
 
 Alternatively you can add prometheus scrape annotations to the charts that are configured to scrape port 10013.
 
@@ -77,7 +77,7 @@ See the :ref:`validator-metrics-reference` for the concrete set of metrics.
 This trigger is disabled by default.
 As per the information in :ref:`Adding ad-hoc configuration <configuration_ad_hoc>`,
 add an environment variable
-``ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT=canton.validator-apps.validator.automation.topology-metrics-polling-interval = 5m``
+``ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT=canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m``
 to enable the trigger with a polling interval of 5 minutes.
 
 

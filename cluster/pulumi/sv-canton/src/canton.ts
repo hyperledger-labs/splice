@@ -12,7 +12,6 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   InstalledMigrationSpecificSv,
-  installSvParticipant,
   SingleSvConfiguration,
   StaticCometBftConfigWithNodeName,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
@@ -23,6 +22,7 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-sv-canton/src/decentralizedSynchronizerNode';
 
 import { spliceConfig } from '../../common/src/config/config';
+import { installSvParticipant } from './participant';
 
 export function installCantonComponents(
   xns: ExactNamespace,
@@ -118,10 +118,8 @@ export function installCantonComponents(
       svConfig,
       migrationId,
       auth0Config,
-      isActiveMigration,
       participantPg,
       migrationInfo.version,
-      svConfig.onboardingName,
       ledgerApiUserSecretSource,
       imagePullServiceAccountName,
       withAddedDependencies(opts, ledgerApiUserSecret ? [ledgerApiUserSecret] : [])
@@ -137,7 +135,6 @@ export function installCantonComponents(
             mediatorPostgres: mediatorPostgres,
             setCoreDbNames: svConfig.isCoreSv,
           },
-          isActiveMigration,
           migrationInfo.version,
           imagePullServiceAccountName,
           opts

@@ -115,6 +115,7 @@ export function installCometBftNode(
       ...nodeConfig,
       keysSecret: keysSecret ? keysSecret.metadata.name : '',
       enableTimeoutCommit,
+      retainBlocks: svConfiguration.pruning?.cometbft?.retainBlocks || 0,
     },
     logLevel: svConfiguration.logging?.cometbftLogLevel,
     stateSync: {

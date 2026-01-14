@@ -16,6 +16,9 @@ validator1:
   deduplicationDuration: 30m
 svs:
   default:
+    pruning:
+      cometbft:
+        retainBlocks: 2000 # corresponds to a retention period of ~2 hours
     svApp:
       resources:
         limits:

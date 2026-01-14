@@ -1639,24 +1639,33 @@ class WalletTxLogIntegrationTest
     }
 
     "not blow up with failed CO_TransferPreapprovalSend" in { implicit env =>
-      // Note: using Alice and Charlie because manually creating subscriptions requires both
-      // the sender and the receiver to be hosted on the same participant.
-      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+      // the renewal of the preapproval can cause a LOCAL_VERDICT_LOCKED_CONTRACTS conflict with the send
+      setTriggersWithin(
+        triggersToPauseAtStart =
+          Seq(aliceValidatorBackend.validatorAutomation.trigger[RenewTransferPreapprovalTrigger]),
+        triggersToResumeAtStart = Seq.empty,
+      ) {
+        // Note: using Alice and Charlie because manually creating subscriptions requires both
+        // the sender and the receiver to be hosted on the same participant.
+        onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
-      aliceValidatorWalletClient.tap(100) // funds to create preapproval
-      createTransferPreapprovalEnsuringItExists(charlieWalletClient, aliceValidatorBackend)
+        aliceValidatorWalletClient.tap(100) // funds to create preapproval
+        createTransferPreapprovalEnsuringItExists(charlieWalletClient, aliceValidatorBackend)
 
-      assertCommandFailsDueToInsufficientFunds(
-        aliceWalletClient.transferPreapprovalSend(
-          charlieUserParty,
-          BigDecimal(10000000),
-          UUID.randomUUID().toString,
-          Some("this should not go through"),
+        val dedupId = UUID.randomUUID().toString
+
+        assertCommandFailsDueToInsufficientFunds(
+          aliceWalletClient.transferPreapprovalSend(
+            charlieUserParty,
+            BigDecimal(10000000),
+            dedupId,
+            Some("this should not go through"),
+          )
         )
-      )
 
-      aliceWalletClient.listTransactions(None, Limit.DefaultMaxPageSize) shouldBe empty
+        aliceWalletClient.listTransactions(None, Limit.DefaultMaxPageSize) shouldBe empty
+      }
     }
 
   }
