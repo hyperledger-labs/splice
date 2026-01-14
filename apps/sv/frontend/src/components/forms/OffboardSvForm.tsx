@@ -56,7 +56,7 @@ export const OffboardSvForm: React.FC = _ => {
       type: 'custom',
       effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
     },
-    url: 'https://',
+    url: '',
     summary: '',
     sv: '',
   };

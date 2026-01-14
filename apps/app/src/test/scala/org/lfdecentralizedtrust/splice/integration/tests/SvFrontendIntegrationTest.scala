@@ -518,7 +518,7 @@ class SvFrontendIntegrationTest
     )(implicit
         env: SpliceTestConsoleEnvironment
     ): String = clue(s"Creating proposal: $action") {
-      val requestReasonUrl = "new-proposal-url.com/"
+      val requestReasonUrl = "https://new-proposal-url.com/"
       val requestReasonBody = "This is a summary of the proposal"
 
       val proposalContractId = withFrontEnd("sv1") { implicit webDriver =>

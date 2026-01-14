@@ -59,7 +59,7 @@ describe('Set DSO Config Rules Form', () => {
 
     const urlInput = screen.getByTestId('set-dso-config-rules-url');
     expect(urlInput).toBeDefined();
-    expect(urlInput.getAttribute('value')).toBe('https://');
+    expect(urlInput.getAttribute('value')).toBe('');
 
     const configLabels = screen.getAllByTestId(/config-label-/);
     expect(configLabels.length).toBeGreaterThan(15);
