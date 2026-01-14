@@ -355,7 +355,11 @@ class WalletMintingDelegationTimeBasedIntegrationTest
       // ValidatorRewardCoupons, AppRewardCoupons, ValidatorLivenessActivityRecords,
       // and UnclaimedActivityRecords.
 
-      val validatorParty = aliceValidatorBackend.getValidatorPartyId()
+      // Use alice (regular user) as the delegate
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      aliceWalletClient.tap(100.0)
+
+      // Validator also needs funds for the external party setup proposal
       aliceValidatorWalletClient.tap(100.0)
 
       val beneficiaryParty =
@@ -365,20 +369,27 @@ class WalletMintingDelegationTimeBasedIntegrationTest
       val expiresAt = env.environment.clock.now.plus(Duration.ofDays(30)).toInstant
       val (_, proposalContractId) = actAndCheck(
         "Create minting delegation proposal",
-        createMintingDelegationProposal(beneficiaryParty, validatorParty, expiresAt),
+        createMintingDelegationProposal(beneficiaryParty, aliceParty, expiresAt),
       )(
         "Proposal is visible",
         _ => {
-          val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
+          val proposals = aliceWalletClient.listMintingDelegationProposals()
           proposals.proposals should have size 1
           proposals.proposals.head.contract.contractId
         },
       )
 
-      // The accept sometimes fails due to race with rejectInvalidMintingDelegationProposalTrigger
-      eventually() {
-        aliceValidatorWalletClient.acceptMintingDelegationProposal(proposalContractId)
-      }
+      // Alice accepts the proposal (not the validator)
+      actAndCheck(
+        "Alice accepts the proposal",
+        aliceWalletClient.acceptMintingDelegationProposal(proposalContractId),
+      )(
+        "Delegation is created",
+        _ => {
+          val delegations = aliceWalletClient.listMintingDelegations()
+          delegations.delegations should have size 1
+        },
+      )
 
       val externalPartyWallet = eventually() {
         aliceValidatorBackend.appState.walletManager
