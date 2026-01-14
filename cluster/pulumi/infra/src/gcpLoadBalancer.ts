@@ -230,7 +230,7 @@ function createHTTPRoute(
                     // https://gateway-api.sigs.k8s.io/reference/spec/#httprequestredirectfilter
                     scheme: 'https',
                     port: 443,
-                    statusCode: 308, // Permanent Redirect
+                    statusCode: 301,
                   },
                 },
               ],
