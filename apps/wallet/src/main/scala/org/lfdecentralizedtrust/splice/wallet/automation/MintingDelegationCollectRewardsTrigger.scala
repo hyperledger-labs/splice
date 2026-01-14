@@ -146,11 +146,8 @@ class MintingDelegationCollectRewardsTrigger(
       validatorRewardCouponsToCollect.nonEmpty ||
       couponsData.appRewardCoupons.nonEmpty ||
       couponsData.unclaimedActivityRecords.nonEmpty
-    // Merge amulets if:
-    // 1. We're above the merge limit, OR
-    // 2. We're at the merge limit AND have rewards to collect (which would create a new amulet)
-    val shouldMergeAmulets = amulets.size > mergeLimit ||
-      (amulets.size == mergeLimit && hasRewardsToCollect)
+    // Merge amulets if we're at 2x the merge limit to reduce potential waste of traffic
+    val shouldMergeAmulets = amulets.size >= 2 * mergeLimit
 
     if (hasRewardsToCollect || shouldMergeAmulets) {
       val amuletsToMerge = if (shouldMergeAmulets) {
