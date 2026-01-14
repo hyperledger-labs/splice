@@ -18,7 +18,7 @@ import sys
 import argparse
 import os
 import time
-import traceback
+
 
 def FAIL(message):
     LOG.error(message)
@@ -161,7 +161,6 @@ class TemplateQualifiedNames:
     dso_bootstrap = "Splice.DsoBootstrap:DsoBootstrap"
     amulet_rules = "Splice.AmuletRules:AmuletRules"
     unclaimed_reward = "Splice.Amulet:UnclaimedReward"
-    unclaimed_activity_record = "Splice.Amulet:UnclaimedActivityRecord"
     amulet_conversion_rate_feed = (
         "Splice.Ans.AmuletConversionRateFeed:AmuletConversionRateFeed"
     )
@@ -181,7 +180,6 @@ class TemplateQualifiedNames:
             ans_entry_context,
             subscription_idle_state,
             unclaimed_reward,
-            unclaimed_activity_record,
         ]
     )
 
@@ -1021,10 +1019,6 @@ class LfValue:
     def get_unclaimed_reward_amount(self):
         return self.__get_record_field("amount").__get_numeric()
 
-    # template UnclaimedActivityRecord -> amount
-    def get_unclaimed_activity_record_amount(self):
-        return self.__get_record_field("amount").__get_numeric()
-
     # template AppRewardCoupon -> round
     def get_app_reward_round(self):
         return self.__get_record_field("round").__get_round_number()
@@ -1361,9 +1355,6 @@ class TransferSummary:
     fees: list
 
     def is_valid(self):
-        LOG.debug(f"effective_inputs: {self.effective_inputs}")
-        LOG.debug(f"all_outputs: {[o.initial_amount for o in self.all_outputs]}")
-        LOG.debug(f"fees: {self.fees}")
         return sum(self.effective_inputs) == sum(
             [o.initial_amount for o in self.all_outputs]
         ) + sum(self.fees)
@@ -1405,7 +1396,6 @@ class TransferInputs:
         validator_liveness_activity_records,
         sv_rewards,
         amulets,
-        unclaimed_activity_records,
         round_number,
         issuing_mining_rounds,
     ):
@@ -1415,7 +1405,6 @@ class TransferInputs:
         self.validator_liveness_activity_records = validator_liveness_activity_records
         self.sv_rewards = sv_rewards
         self.amulets = amulets
-        self.unclaimed_activity_records = unclaimed_activity_records
         self.round_number = round_number
         self.issuing_mining_rounds_by_round = {
             r.payload.get_issuing_mining_round_round(): r.payload
@@ -1539,9 +1528,6 @@ class TransferInputs:
         )
         output += sv_outputs
         effective_inputs += sv_inputs
-
-        effective_inputs += [ar.payload.get_unclaimed_activity_record_amount() for ar in self.unclaimed_activity_records]
-        # FIXME: outputs etc
 
         reward_total_cc = (
             unfeatured_total_cc
@@ -2047,22 +2033,19 @@ class State:
             )
 
     def handle_transaction(self, transaction):
-        LOG.debug(f"Handling transaction {transaction.update_id}. It has {len(transaction.root_event_ids)} root events.")
         self._check_synchronizer_id(transaction)
 
         previous_state = self.clone()
         result = HandleTransactionResult.empty()
         try:
             for event_id in transaction.root_event_ids:
-                LOG.debug(f"Processing root event ID {event_id}")
                 event = transaction.events_by_id[event_id]
                 event_result = self.handle_root_event(transaction, event)
                 result = result.merge(event_result)
         except Exception as e:
-            LOG.debug(f"Encountered exception while processing transaction: {traceback.format_exc()}")
             self._fail(
                 transaction,
-                f"Encountered exception while processing transaction: {traceback.format_exc()}",
+                f"Encountered exception while processing transaction: {e}",
                 cause=e,
             )
 
@@ -2082,7 +2065,7 @@ class State:
         if created != acs_diff.created_events.keys():
             self._fail(
                 transaction,
-                f"Transaction {transaction.update_id} created contracts {acs_diff.created_events}, but our state created {created}",
+                f"Transaction created contracts {acs_diff.created_events}\nbut our state created {created}",
             )
             self.active_contracts = {
                 k: v
@@ -2094,7 +2077,7 @@ class State:
         if archived != acs_diff.archived_events.keys():
             self._fail(
                 transaction,
-                f"Transaction archived contracts {acs_diff.archived_events}, but our state archived {archived}",
+                f"Transaction archived contracts {acs_diff.archived_events}\nbut our state archived {archived}",
             )
             self.active_contracts = {
                 k: v
@@ -2226,7 +2209,6 @@ class State:
         validator_liveness_activity_records = {}
         sv_rewards = {}
         amulets = []
-        unclaimed_activity_records = []
         for i in inputs:
             tag = i["tag"]
             value = i["value"]
@@ -2279,8 +2261,6 @@ class State:
                     del self.active_contracts[cid]
                 case "InputUnclaimedActivityRecord":
                     cid = value.get_contract_id()
-                    unclaimed_activity_record = self.active_contracts[cid]
-                    unclaimed_activity_records += [unclaimed_activity_record]
                     del self.active_contracts[cid]
                 case _:
                     self._fail(transaction, f"Unexpected transfer input: {tag}")
@@ -2291,7 +2271,6 @@ class State:
             validator_liveness_activity_records,
             sv_rewards,
             amulets,
-            unclaimed_activity_records,
             transfer_round_number,
             self.active_issuing_mining_rounds(),
         )
@@ -2418,7 +2397,6 @@ class State:
         return (validator_reward_coupons, app_reward_coupons)
 
     def handle_transfer(self, transaction, event, description="Transfer"):
-        LOG.debug(f"In handle_transfer for update {transaction.update_id} and event {event.event_id}")
         arg = event.exercise_argument.get_amulet_rules_transfer_transfer()
 
         sender = arg.get_transfer_sender()
@@ -2473,7 +2451,6 @@ class State:
         )
         if transfer_error := summary.get_error("transfer"):
             self._fail(transaction, f"Transfer error: {transfer_error}")
-        LOG.debug("Transfer summary: %s", summary)
         activity_record_descriptions = []
         for validator_reward in validator_reward_coupons:
             amount = validator_reward.payload.get_validator_reward_amount()
@@ -2495,7 +2472,6 @@ class State:
             + summary.get_all_owners()
             + summary.get_all_lock_holders()
         )
-        LOG.debug("Interested parties: %s", interested_parties)
 
         self._txinfo(
             transaction,
@@ -2521,7 +2497,6 @@ class State:
         self.total_burnt += summary.get_fees_total() + (
             initial_amulet_cc_input - amulet_cc_input
         )
-        LOG.debug(f"Total burnt so far: {self.total_burnt}")
 
         self._report_line(
             transaction,
@@ -2540,10 +2515,8 @@ class State:
             },
             parties=interested_parties,
         )
-        LOG.debug(f"Reporting {len(all_inputs)} inputs and {len(all_outputs)} outputs")
 
         for i in all_inputs:
-            LOG.debug(f"Reporting input: {i}")
             self._report_line(
                 transaction,
                 "TXI",
@@ -2577,15 +2550,12 @@ class State:
                     self.total_minted += i.effective_amount
                 case "sv_activity_record":
                     self.total_minted += i.effective_amount
-                case "unclaimed_activity_record":
-                    self.total_minted += i.effective_amount
                 case "amulet":
                     pass
                 case _:
                     self._fail(transaction, f"Unknown input source: {i.source}")
 
         for o in all_outputs:
-            LOG.debug(f"Reporting output: {o}")
             self._report_line(
                 transaction,
                 "TXO",
@@ -2604,10 +2574,7 @@ class State:
                 parties=interested_parties,
             )
 
-        LOG.debug("computing return")
-        ret = HandleTransactionResult.for_open_round(round_number)
-        LOG.debug("returning %s", ret)
-        return ret
+        return HandleTransactionResult.for_open_round(round_number)
 
     def handle_tap(self, transaction, event):
         summary = event.exercise_result.get_tap_result_amulet_sum()
@@ -3377,26 +3344,6 @@ class State:
 
         return HandleTransactionResult.empty()
 
-    def handle_unclaimed_activity_record_create_archive(self, transaction, event):
-        for event_id in transaction.events_by_id:
-            event = transaction.events_by_id[event_id]
-            match event.template_id.qualified_name:
-                case TemplateQualifiedNames.unclaimed_reward:
-                    if isinstance(event, CreatedEvent):
-                        self.active_contracts[event.contract_id] = event
-                    else:
-                        del self.active_contracts[event.contract_id]
-                case TemplateQualifiedNames.unclaimed_activity_record:
-                    if isinstance(event, CreatedEvent):
-                        LOG.debug(f"Tracking unclaimed activity record {event.contract_id}")
-                        self.active_contracts[event.contract_id] = event
-                    else:
-                        LOG.debug(f"Untracking unclaimed activity record {event.contract_id}")
-                        del self.active_contracts[event.contract_id]
-
-        return HandleTransactionResult.empty()
-
-
     def handle_claim_expired_rewards(self, transaction, event):
         # We support both the new models where DsoRules_ClaimExpiredRewardCoupons directly archives
         # and the old models where it goes through AmuletRules_ClaimExpiredRewardCoupons
@@ -3813,7 +3760,7 @@ class State:
         return HandleTransactionResult.empty()
 
     def handle_root_exercised_event(self, transaction, event):
-        LOG.debug(f"Root exercise: {event.choice_name} (update: {transaction.update_id})")
+        LOG.debug(f"Root exercise: {event.choice_name}")
         match event.choice_name:
             case "DsoRules_ReceiveSvRewardCoupon":
                 return self.handle_receive_sv_reward_coupon(transaction, event)
@@ -3848,8 +3795,6 @@ class State:
             case "TransferPreapproval_Send":
                 return self.handle_transfer_preapproval_send(transaction, event)
             case "TransferPreapproval_Cancel":
-                return HandleTransactionResult.empty()
-            case "DsoRules_ExpireTransferPreapproval":
                 return HandleTransactionResult.empty()
             case "TransferCommand_Send":
                 return self.handle_transfer_command_send(transaction, event)
@@ -3921,11 +3866,11 @@ class State:
             case "DsoRules_UpdateAmuletPriceVote":
                 return HandleTransactionResult.empty()
             case "DsoRules_AllocateUnallocatedUnclaimedActivityRecord":
-                return self.handle_unclaimed_activity_record_create_archive(transaction, event)
+                return self.handle_unclaimed_reward_create_archive(transaction, event)
             case "DsoRules_ExpireUnallocatedUnclaimedActivityRecord":
                 return HandleTransactionResult.empty()
             case "DsoRules_ExpireUnclaimedActivityRecord":
-                return self.handle_unclaimed_activity_record_create_archive(transaction, event)
+                return self.handle_unclaimed_reward_create_archive(transaction, event)
             case "AmuletRules_Fetch":
                 return HandleTransactionResult.empty()
             case "OpenMiningRound_Fetch":
@@ -4301,7 +4246,6 @@ async def _check_scan_balance_assertions(
             per_round_state,
         ) in app_state.per_round_states.items():
             if round_number >= result.for_open_round:
-                LOG.debug("Handling transaction in per round state")
                 per_round_state.handle_transaction(transaction)
 
     if result.new_closed_round:
