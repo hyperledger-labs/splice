@@ -8,6 +8,7 @@ import com.daml.tracing.Telemetry
 import com.digitalasset.canton.auth.Authorizer
 import com.digitalasset.canton.config
 import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher
+import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher.PackageResolver
 import com.digitalasset.canton.ledger.api.SubmissionIdGenerator
 import com.digitalasset.canton.ledger.api.auth.services.*
 import com.digitalasset.canton.ledger.api.grpc.GrpcHealthService
@@ -21,15 +22,13 @@ import com.digitalasset.canton.ledger.localstore.api.{
 }
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.index.*
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.PackagePreferenceBackend
 import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
 import com.digitalasset.canton.platform.apiserver.execution.*
-import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.{
-  AuthenticateFatContractInstance,
-  AuthenticateSerializableContract,
-}
+import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.ContractAuthenticatorFn
 import com.digitalasset.canton.platform.apiserver.services.*
 import com.digitalasset.canton.platform.apiserver.services.admin.*
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.InteractiveSubmissionServiceImpl
@@ -42,14 +41,16 @@ import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTr
 import com.digitalasset.canton.platform.config.{
   CommandServiceConfig,
   InteractiveSubmissionServiceConfig,
+  PackageServiceConfig,
   PartyManagementServiceConfig,
   UserManagementServiceConfig,
 }
+import com.digitalasset.canton.platform.packages.DeduplicatingPackageLoader
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.engine.*
 import io.grpc.BindableService
-import io.grpc.protobuf.services.ProtoReflectionService
+import io.grpc.protobuf.services.ProtoReflectionServiceV1
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
@@ -116,9 +117,9 @@ object ApiServices {
       maxDeduplicationDuration: config.NonNegativeFiniteDuration,
       userManagementServiceConfig: UserManagementServiceConfig,
       partyManagementServiceConfig: PartyManagementServiceConfig,
+      packageServiceConfig: PackageServiceConfig,
       engineLoggingConfig: EngineLoggingConfig,
-      authenticateSerializableContract: AuthenticateSerializableContract,
-      authenticateFatContractInstance: AuthenticateFatContractInstance,
+      contractAuthenticator: ContractAuthenticatorFn,
       telemetry: Telemetry,
       loggerFactory: NamedLoggerFactory,
       dynParamGetter: DynamicSynchronizerParameterGetter,
@@ -132,7 +133,6 @@ object ApiServices {
       tracer: Tracer,
   ): ApiServices = {
     implicit val traceContext: TraceContext = TraceContext.empty
-
     val activeContractsService: IndexActiveContractsService = indexService
     val updateService: IndexUpdateService = indexService
     val eventQueryService: IndexEventQueryService = indexService
@@ -173,7 +173,12 @@ object ApiServices {
         )
         val apiEventQueryService =
           new ApiEventQueryService(eventQueryService, telemetry, loggerFactory)
-        val apiPackageService = new ApiPackageService(syncService, telemetry, loggerFactory)
+        val apiPackageService = new ApiPackageService(
+          syncService,
+          packageServiceConfig,
+          telemetry,
+          loggerFactory,
+        )
         val apiUpdateService =
           new ApiUpdateService(
             updateService,
@@ -195,6 +200,7 @@ object ApiServices {
             ledgerFeatures,
             userManagementServiceConfig,
             partyManagementServiceConfig,
+            packageServiceConfig,
             telemetry,
             loggerFactory,
           )
@@ -212,7 +218,7 @@ object ApiServices {
         services -> apiUpdateService
       }
 
-      val apiReflectionService = ProtoReflectionService.newInstance()
+      val apiReflectionService = ProtoReflectionServiceV1.newInstance()
 
       val apiHealthService = new GrpcHealthService(healthChecks, telemetry, loggerFactory)
 
@@ -258,15 +264,29 @@ object ApiServices {
 
     val writeServices = {
       implicit val ec: ExecutionContext = commandExecutionContext
+
+      val packageLoader = new DeduplicatingPackageLoader()
+
+      val packageResolver: PackageResolver = (packageId: Ref.PackageId) =>
+        (tc: TraceContext) =>
+          FutureUnlessShutdown.outcomeF(
+            packageLoader.loadPackage(
+              packageId,
+              syncService.getLfArchive(_)(tc),
+              metrics.execution.getLfPackage,
+            )
+          )
+
       val commandInterpreter =
         new StoreBackedCommandInterpreter(
           engine = engine,
           participant = participantId,
-          packageSyncService = syncService,
+          packageResolver = packageResolver,
           contractStore = contractStore,
-          authenticateSerializableContract = authenticateSerializableContract,
+          contractAuthenticator = contractAuthenticator,
           metrics = metrics,
           config = engineLoggingConfig,
+          prefetchingRecursionLevel = commandConfig.contractPrefetchingDepth,
           loggerFactory = loggerFactory,
           dynParamGetter = dynParamGetter,
           timeProvider = timeProvider,
@@ -294,8 +314,6 @@ object ApiServices {
           getPackageMetadataSnapshot = syncService.getPackageMetadataSnapshot(_)
         )
       val commandsValidator = new CommandsValidator(
-        validateDisclosedContracts =
-          new ValidateDisclosedContracts(authenticateFatContractInstance),
         validateUpgradingPackageResolutions = validateUpgradingPackageResolutions,
         topologyAwarePackageSelectionEnabled = ledgerFeatures.topologyAwarePackageSelection,
       )
@@ -310,13 +328,13 @@ object ApiServices {
           metrics,
           loggerFactory,
         )
-
       val apiPartyManagementService = ApiPartyManagementService.createApiService(
         partyManagementService,
+        userManagementStore,
         new IdentityProviderExists(identityProviderConfigStore),
         partyManagementServiceConfig.maxPartiesPageSize,
+        partyManagementServiceConfig.maxSelfAllocatedParties,
         partyRecordStore,
-        updateService,
         syncService,
         managementServiceTimeout,
         telemetry = telemetry,
@@ -354,6 +372,9 @@ object ApiServices {
         telemetry = telemetry,
         loggerFactory = loggerFactory,
       )
+      val updateServices = new CommandServiceImpl.UpdateServices(
+        getUpdateById = ledgerApiUpdateService.getUpdateById
+      )
       val apiCommandService = CommandServiceImpl.createApiService(
         commandsValidator = commandsValidator,
         transactionSubmissionTracker = transactionSubmissionTracker,
@@ -362,10 +383,7 @@ object ApiServices {
         submit = apiSubmissionService.submitWithTraceContext,
         submitReassignment = apiSubmissionService.submitReassignmentWithTraceContext,
         defaultTrackingTimeout = commandConfig.defaultTrackingTimeout,
-        updateServices = new CommandServiceImpl.UpdateServices(
-          getTransactionTreeById = ledgerApiUpdateService.getTransactionTreeById,
-          getUpdateById = ledgerApiUpdateService.getUpdateById,
-        ),
+        updateServices = updateServices,
         timeProvider = timeProvider,
         maxDeduplicationDuration = maxDeduplicationDuration,
         telemetry = telemetry,
@@ -375,6 +393,7 @@ object ApiServices {
       val apiInteractiveSubmissionService = {
         val interactiveSubmissionService =
           InteractiveSubmissionServiceImpl.createApiService(
+            updateServices,
             syncService,
             seedService,
             commandExecutor,
@@ -384,6 +403,8 @@ object ApiServices {
             interactiveSubmissionServiceConfig,
             contractStore,
             packagePreferenceBackend,
+            transactionSubmissionTracker,
+            commandConfig.defaultTrackingTimeout,
             loggerFactory,
           )
 

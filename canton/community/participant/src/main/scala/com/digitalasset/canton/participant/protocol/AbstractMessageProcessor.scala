@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.participant.protocol
 
+import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import com.daml.metrics.api.MetricsContext
@@ -21,14 +22,17 @@ import com.digitalasset.canton.protocol.messages.{
   ProtocolMessage,
   SignedProtocolMessage,
 }
-import com.digitalasset.canton.sequencing.client.{SendCallback, SequencerClientSend}
+import com.digitalasset.canton.sequencing.client.{
+  SendAsyncClientError,
+  SendCallback,
+  SequencerClientSend,
+}
 import com.digitalasset.canton.sequencing.protocol.{Batch, MessageId, Recipients}
-import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil}
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil, LoggerUtil}
 import com.digitalasset.canton.{RequestCounter, SequencerCounter}
+import org.slf4j.event.Level
 
 import scala.concurrent.ExecutionContext
 
@@ -37,12 +41,12 @@ abstract class AbstractMessageProcessor(
     ephemeral: SyncEphemeralState,
     crypto: SynchronizerCryptoClient,
     sequencerClient: SequencerClientSend,
-    protocolVersion: ProtocolVersion,
-    synchronizerId: SynchronizerId,
 )(implicit ec: ExecutionContext)
     extends NamedLogging
     with FlagCloseable
     with HasCloseContext {
+
+  private def psid = sequencerClient.psid
 
   protected def terminateRequest(
       requestCounter: RequestCounter,
@@ -61,7 +65,7 @@ abstract class AbstractMessageProcessor(
         // providing directly a SequencerIndexMoved with RequestCounter for the non-submitting participant rejections
         eventO.getOrElse(
           SequencerIndexMoved(
-            synchronizerId = synchronizerId,
+            synchronizerId = psid.logical,
             recordTime = requestTimestamp,
           )
         ),
@@ -77,7 +81,7 @@ abstract class AbstractMessageProcessor(
     requestCounter < ephemeral.startingPoints.processing.nextRequestCounter
 
   protected def unlessCleanReplay(requestCounter: RequestCounter)(
-      f: => FutureUnlessShutdown[_]
+      f: => FutureUnlessShutdown[?]
   ): FutureUnlessShutdown[Unit] =
     if (isCleanReplay(requestCounter)) FutureUnlessShutdown.unit else f.void
 
@@ -87,7 +91,7 @@ abstract class AbstractMessageProcessor(
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[SignedProtocolMessage[ConfirmationResponses]] =
-    SignedProtocolMessage.trySignAndCreate(responses, ips, protocolVersion)
+    SignedProtocolMessage.trySignAndCreate(responses, ips)
 
   // Assumes that we are not closing (i.e., that this is synchronized with shutdown somewhere higher up the call stack)
   protected def sendResponses(
@@ -104,29 +108,50 @@ abstract class AbstractMessageProcessor(
     if (messages.isEmpty) FutureUnlessShutdown.unit
     else {
       logger.trace(s"Request $requestId: ProtocolProcessor scheduling the sending of responses")
+      def errorBody = s"Request $requestId: Failed to send responses"
+
       for {
         synchronizerParameters <- crypto.ips
           .awaitSnapshot(requestId.unwrap)
-          .flatMap(snapshot => snapshot.findDynamicSynchronizerParametersOrDefault(protocolVersion))
+          .flatMap(snapshot =>
+            snapshot.findDynamicSynchronizerParametersOrDefault(psid.protocolVersion)
+          )
 
         maxSequencingTime = requestId.unwrap.add(
           synchronizerParameters.confirmationResponseTimeout.unwrap
         )
-        _ <- sequencerClient
+
+        sendResult = sequencerClient
           .sendAsync(
-            Batch.of(protocolVersion, messages*),
+            Batch.of(psid.protocolVersion, messages*),
             topologyTimestamp = Some(requestId.unwrap),
             maxSequencingTime = maxSequencingTime,
             messageId = messageId.getOrElse(MessageId.randomMessageId()),
             callback = SendCallback.log(s"Response message for request [$requestId]", logger),
             amplify = true,
           )
-          .valueOr {
-            // Swallow Left errors to avoid stopping request processing, as sending response could fail for arbitrary reasons
-            // if the sequencer rejects them (e.g. max sequencing time has elapsed)
-            err =>
-              logger.warn(s"Request $requestId: Failed to send responses: ${err.show}")
-          }
+
+        /*
+        Swallow Left errors to avoid stopping request processing, as sending response could fail for arbitrary reasons
+        if the sequencer rejects them (e.g. max sequencing time has elapsed).
+
+         Discard the inner future (actual send) and wait only on the outer future.
+         As a result, we don't wait on the send of confirmation responses.
+         */
+        _ <- sendResult.value.value.map {
+          case Left(err) =>
+            logger.warn(s"$errorBody: ${err.show}")
+
+          case Right(inner: EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit]) =>
+            FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
+              inner.valueOr { err =>
+                LoggerUtil
+                  .logAtLevel(SendAsyncClientError.logLevel(err), s"$errorBody: ${err.show}")
+              },
+              failureMessage = errorBody,
+              level = Level.INFO,
+            )
+        }
       } yield ()
     }
   }
@@ -154,7 +179,7 @@ abstract class AbstractMessageProcessor(
           logger.debug(
             s"Bad request $requestCounter: Timed out without a confirmation result message."
           )
-          performUnlessClosingUSF(functionFullName) {
+          synchronizeWithClosing(functionFullName) {
 
             decisionTimeF.flatMap(
               terminateRequest(requestCounter, sequencerCounter, timestamp, _, None)

@@ -21,6 +21,15 @@ final case class ScanSynchronizerConfig(
     mediator: FullClientConfig,
 )
 
+final case class MediatorVerdictIngestionConfig(
+    /** Max verdicts items for DB insert batch. */
+    batchSize: Int = 50,
+    /** Max time window to wait for DB insert batch. */
+    batchMaxWait: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(1),
+    /** Delay before restart on stream failure. */
+    restartDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5),
+)
+
 /** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!
   *                                            By default depends on the `tickDuration` of rounds. This setting overrides that.
   */
@@ -30,7 +39,9 @@ case class ScanAppBackendConfig(
     svUser: String,
     override val participantClient: ParticipantClientConfig,
     sequencerAdminClient: FullClientConfig,
+    mediatorAdminClient: FullClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
+    mediatorVerdictIngestion: MediatorVerdictIngestionConfig = MediatorVerdictIngestionConfig(),
     isFirstSv: Boolean = false,
     ingestFromParticipantBegin: Boolean = true,
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,
@@ -39,33 +50,21 @@ case class ScanAppBackendConfig(
     enableForcedAcsSnapshots: Boolean = false,
     // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
-    parameters: SpliceParametersConfig = SpliceParametersConfig(
-      batching = BatchingConfig(),
-      customTimeouts = ScanAppBackendConfig.DefaultCustomTimeouts,
-    ),
+    parameters: SpliceParametersConfig = SpliceParametersConfig(),
     spliceInstanceNames: SpliceInstanceNamesConfig,
     updateHistoryBackfillEnabled: Boolean = true,
     updateHistoryBackfillBatchSize: Int = 100,
-    updateHistoryBackfillImportUpdatesEnabled: Boolean = false,
+    updateHistoryBackfillImportUpdatesEnabled: Boolean = true,
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
     bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
     cache: ScanCacheConfig = ScanCacheConfig(),
-    // TODO(#1164): Enable by default
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "scan"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
-}
-
-object ScanAppBackendConfig {
-
-  val DefaultCustomTimeouts: Map[String, NonNegativeFiniteDuration] = Map(
-    "getAcsSnapshot" -> NonNegativeFiniteDuration.ofMinutes(1L)
-  )
-
 }
 
 final case class ScanCacheConfig(
@@ -76,6 +75,10 @@ final case class ScanCacheConfig(
     totalAmuletBalance: CacheConfig = CacheConfig(
       ttl = NonNegativeFiniteDuration.ofMinutes(2),
       maxSize = 1000,
+    ),
+    openMiningRounds: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofSeconds(30),
+      maxSize = 1,
     ),
     amuletRules: CacheConfig = CacheConfig(
       ttl = NonNegativeFiniteDuration.ofSeconds(30),

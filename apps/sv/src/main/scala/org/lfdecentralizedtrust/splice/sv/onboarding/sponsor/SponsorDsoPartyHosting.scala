@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.sponsor
 
 import cats.data.{EitherT, OptionT}
-import cats.implicits.catsSyntaxOptionId
+import cats.syntax.option.*
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AllProposals
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   AuthorizedStateChanged,
@@ -18,7 +18,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting.{
 }
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.PartyToParticipant
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -102,7 +102,7 @@ class SponsorDsoPartyHosting(
     OptionT(
       participantAdminConnection
         .listPartyToParticipant(
-          TopologyStoreId.SynchronizerStore(synchronizerId).some,
+          TopologyStoreId.Synchronizer(synchronizerId).some,
           filterParty = dsoParty.filterString,
           topologyTransactionType = AllProposals,
         )

@@ -4,9 +4,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.ValidatorRewar
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
+}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
-
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -16,6 +18,7 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.util.HexString
 import com.digitalasset.canton.version.ProtocolVersion
+import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 
 import java.nio.file.Files
 import java.time.Duration
@@ -25,7 +28,8 @@ import scala.concurrent.duration.*
 class RecoverExternalPartyIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with ExternallySignedPartyTestUtil
-    with TokenStandardTest {
+    with TokenStandardTest
+    with WalletTestUtil {
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.simpleTopology1Sv(this.getClass.getSimpleName)
@@ -170,13 +174,13 @@ class RecoverExternalPartyIntegrationTest
       }
       val acsSnapshotFile = Files.createTempFile("acs", ".snapshot")
       Files.write(acsSnapshotFile, acsSnapshot.toByteArray())
-      bobValidatorBackend.participantClient.repair.import_acs_old(acsSnapshotFile.toString)
+      bobValidatorBackend.participantClient.repair.import_acs(acsSnapshotFile.toString)
       bobValidatorBackend.participantClient.synchronizers.reconnect_all()
     }
 
     // Tap so we have money for creating the preapproval
     bobValidatorWalletClient.tap(5000.0)
-    bobValidatorWalletClient.createTransferPreapproval()
+    createTransferPreapprovalEnsuringItExists(bobValidatorWalletClient, bobValidatorBackend)
 
     // Grant rights to bob's validator backend the rights to prepare transactions
     // and submit signed on behalf of the party.
@@ -219,7 +223,7 @@ class RecoverExternalPartyIntegrationTest
         aliceParty,
         prepareSend.transaction,
         HexString.toHexString(
-          crypto
+          crypto(env.executionContext)
             .signBytes(
               HexString.parseToByteString(prepareSend.txHash).value,
               alicePrivateKey.asInstanceOf[SigningPrivateKey],
@@ -248,19 +252,21 @@ class RecoverExternalPartyIntegrationTest
   def sign(
       tx: TopologyTransaction[TopologyChangeOp, TopologyMapping],
       privateKey: PrivateKey,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
   ): SignedTopologyTransaction[TopologyChangeOp, TopologyMapping] = {
-    val sig = crypto
+    val sig = crypto(env.executionContext)
       .sign(
         hash = tx.hash.hash,
         signingKey = privateKey.asInstanceOf[SigningPrivateKey],
         usage = SigningKeyUsage.ProtocolOnly,
       )
       .value
-    SignedTopologyTransaction.create(
+    SignedTopologyTransaction.withTopologySignatures(
       tx,
-      NonEmpty(Set, SingleTransactionSignature(tx.hash, sig): TopologyTransactionSignature),
+      NonEmpty(Seq, SingleTransactionSignature(tx.hash, sig): TopologyTransactionSignature),
       isProposal = false,
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
     )
   }
 }

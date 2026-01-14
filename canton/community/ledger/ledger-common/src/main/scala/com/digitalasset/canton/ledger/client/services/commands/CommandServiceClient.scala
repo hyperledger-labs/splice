@@ -7,13 +7,17 @@ import com.daml.ledger.api.v2.command_service.CommandServiceGrpc.CommandServiceS
 import com.daml.ledger.api.v2.command_service.{
   SubmitAndWaitForTransactionRequest,
   SubmitAndWaitForTransactionResponse,
-  SubmitAndWaitForTransactionTreeResponse,
   SubmitAndWaitRequest,
   SubmitAndWaitResponse,
 }
 import com.daml.ledger.api.v2.commands.Commands
 import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_ACS_DELTA
-import com.daml.ledger.api.v2.transaction_filter.{EventFormat, Filters, TransactionFormat}
+import com.daml.ledger.api.v2.transaction_filter.{
+  EventFormat,
+  Filters,
+  TransactionFormat,
+  TransactionShape,
+}
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.ledger.client.services.commands.CommandServiceClient.statusFromThrowable
 import com.digitalasset.canton.tracing.TraceContext
@@ -23,9 +27,13 @@ import io.grpc.protobuf.StatusProto
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import scala.util.chaining.scalaUtilChainingOps
+import scala.util.{Failure, Success, Using}
 
-class CommandServiceClient(service: CommandServiceStub)(implicit
+class CommandServiceClient(
+    service: CommandServiceStub,
+    getDefaultToken: () => Option[String] = () => None,
+)(implicit
     executionContext: ExecutionContext
 ) {
 
@@ -41,7 +49,7 @@ class CommandServiceClient(service: CommandServiceStub)(implicit
     * use java codegen, you need to convert the List[Command] using the codegenToScalaProto method
     */
 
-  def deprecatedSubmitAndWaitForTransactionForJsonApi(
+  private[canton] def submitAndWaitForTransactionForJsonApi(
       request: SubmitAndWaitRequest,
       timeout: Option[Duration] = None,
       token: Option[String] = None,
@@ -50,17 +58,9 @@ class CommandServiceClient(service: CommandServiceStub)(implicit
       getSubmitAndWaitForTransactionRequest(request.commands)
     )
 
-  def deprecatedSubmitAndWaitForTransactionTreeForJsonApi(
-      request: SubmitAndWaitRequest,
-      timeout: Option[Duration] = None,
-      token: Option[String] = None,
-  )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionTreeResponse] =
-    serviceWithTokenAndDeadline(timeout, token).submitAndWaitForTransactionTree(
-      request
-    )
-
   def submitAndWaitForTransaction(
       commands: Commands,
+      transactionShape: TransactionShape = TRANSACTION_SHAPE_ACS_DELTA,
       timeout: Option[Duration] = None,
       token: Option[String] = None,
   )(implicit
@@ -69,20 +69,11 @@ class CommandServiceClient(service: CommandServiceStub)(implicit
     submitAndHandle(
       timeout,
       token,
-      _.submitAndWaitForTransaction(getSubmitAndWaitForTransactionRequest(Some(commands))),
-    )
-
-  def submitAndWaitForTransactionTree(
-      commands: Commands,
-      timeout: Option[Duration] = None,
-      token: Option[String] = None,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[Either[Status, SubmitAndWaitForTransactionTreeResponse]] =
-    submitAndHandle(
-      timeout,
-      token,
-      _.submitAndWaitForTransactionTree(SubmitAndWaitRequest(commands = Some(commands))),
+      withTraceContextInjectedIntoOpenTelemetryContext(
+        _.submitAndWaitForTransaction(
+          getSubmitAndWaitForTransactionRequest(Some(commands), transactionShape)
+        )
+      ),
     )
 
   def submitAndWait(
@@ -95,7 +86,9 @@ class CommandServiceClient(service: CommandServiceStub)(implicit
     submitAndHandle(
       timeout,
       token,
-      _.submitAndWait(SubmitAndWaitRequest(commands = Some(commands))),
+      withTraceContextInjectedIntoOpenTelemetryContext(
+        _.submitAndWait(SubmitAndWaitRequest(commands = Some(commands)))
+      ),
     )
 
   private def serviceWithTokenAndDeadline(
@@ -103,7 +96,7 @@ class CommandServiceClient(service: CommandServiceStub)(implicit
       token: Option[String],
   )(implicit traceContext: TraceContext): CommandServiceStub = {
     val withToken: CommandServiceStub = LedgerClient
-      .stubWithTracing(service, token)
+      .stubWithTracing(service, token.orElse(getDefaultToken()))
 
     timeout
       .fold(withToken) { timeout =>
@@ -123,7 +116,10 @@ class CommandServiceClient(service: CommandServiceStub)(implicit
         case Failure(exception) => handleException(exception)
       }
 
-  private def getSubmitAndWaitForTransactionRequest(commands: Option[Commands]) =
+  private def getSubmitAndWaitForTransactionRequest(
+      commands: Option[Commands],
+      transactionShape: TransactionShape = TRANSACTION_SHAPE_ACS_DELTA,
+  ) =
     SubmitAndWaitForTransactionRequest(
       commands = commands,
       transactionFormat = Some(
@@ -142,11 +138,17 @@ class CommandServiceClient(service: CommandServiceStub)(implicit
               verbose = true,
             )
           ),
-          transactionShape = TRANSACTION_SHAPE_ACS_DELTA,
+          transactionShape = transactionShape,
         )
       ),
     )
 
+  private def withTraceContextInjectedIntoOpenTelemetryContext[R](
+      request: CommandServiceStub => Future[R]
+  )(svc: CommandServiceStub)(implicit traceContext: TraceContext): Future[R] =
+    // Attach the current trace context so the native OpenTelemetry client tracing interceptor
+    // can extract and propagate it
+    Using(traceContext.context.makeCurrent())(_ => request(svc)).pipe(Future.fromTry(_).flatten)
 }
 
 object CommandServiceClient {

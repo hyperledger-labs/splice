@@ -6,27 +6,46 @@ package com.digitalasset.canton.ledger.participant.state.metrics
 import cats.data.EitherT
 import com.daml.metrics.Timed
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.crypto.HashOps
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.error.{TransactionError, TransactionRoutingError}
 import com.digitalasset.canton.ledger.api.health.HealthStatus
+import com.digitalasset.canton.ledger.api.{
+  EnrichedVettedPackages,
+  ListVettedPackagesOpts,
+  UpdateVettedPackagesOpts,
+  UploadDarVettingChange,
+}
 import com.digitalasset.canton.ledger.participant.state.*
 import com.digitalasset.canton.ledger.participant.state.SyncService.{
   ConnectedSynchronizerRequest,
   ConnectedSynchronizerResponse,
+  SubmissionCostEstimation,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
-import com.digitalasset.canton.platform.store.packagemeta.PackageMetadata
-import com.digitalasset.canton.protocol.{LfContractId, LfSubmittedTransaction}
-import com.digitalasset.canton.topology.SynchronizerId
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.platform.apiserver.services.command.interactive.CostEstimationHints
+import com.digitalasset.canton.protocol.{
+  LfContractId,
+  LfFatContractInst,
+  LfSubmittedTransaction,
+  LfVersionedTransaction,
+}
+import com.digitalasset.canton.store.packagemeta.PackageMetadata
+import com.digitalasset.canton.topology.{
+  ExternalPartyOnboardingDetails,
+  ParticipantId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfKeyResolver, LfPartyId}
 import com.digitalasset.daml.lf.archive.DamlLf.Archive
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.data.{ImmArray, Ref}
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, SubmittedTransaction}
+import com.digitalasset.daml.lf.transaction.SubmittedTransaction
 import com.google.protobuf.ByteString
 
 import java.util.concurrent.CompletionStage
@@ -44,7 +63,7 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
       // Currently, the estimated interpretation cost is not used
       _estimatedInterpretationCost: Long,
       keyResolver: LfKeyResolver,
-      processedDisclosedContracts: ImmArray[FatContractInstance],
+      processedDisclosedContracts: ImmArray[LfFatContractInst],
   )(implicit
       traceContext: TraceContext
   ): CompletionStage[SubmissionResult] =
@@ -89,33 +108,36 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
   override def uploadDar(
       dar: Seq[ByteString],
       submissionId: Ref.SubmissionId,
+      vettingChange: UploadDarVettingChange,
+      synchronizerId: Option[SynchronizerId],
   )(implicit
       traceContext: TraceContext
   ): Future[SubmissionResult] =
     Timed.future(
       metrics.services.write.uploadPackages,
-      delegate.uploadDar(dar, submissionId),
+      delegate.uploadDar(dar, submissionId, vettingChange, synchronizerId),
     )
 
   override def allocateParty(
       hint: Ref.Party,
       submissionId: Ref.SubmissionId,
+      synchronizerIdO: Option[SynchronizerId],
+      externalPartyOnboardingDetails: Option[ExternalPartyOnboardingDetails],
   )(implicit
       traceContext: TraceContext
-  ): CompletionStage[SubmissionResult] =
-    Timed.completionStage(
+  ): FutureUnlessShutdown[SubmissionResult] =
+    Timed.future(
       metrics.services.write.allocateParty,
-      delegate.allocateParty(hint, submissionId),
+      delegate.allocateParty(hint, submissionId, synchronizerIdO, externalPartyOnboardingDetails),
     )
 
   override def prune(
       pruneUpToInclusive: Offset,
       submissionId: Ref.SubmissionId,
-      pruneAllDivulgedContracts: Boolean,
   ): CompletionStage[PruningResult] =
     Timed.completionStage(
       metrics.services.write.prune,
-      delegate.prune(pruneUpToInclusive, submissionId, pruneAllDivulgedContracts),
+      delegate.prune(pruneUpToInclusive, submissionId),
     )
 
   override def currentHealth(): HealthStatus =
@@ -129,11 +151,6 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
       delegate.getConnectedSynchronizers(request),
     )
 
-  override def getProtocolVersionForSynchronizer(
-      synchronizerId: Traced[SynchronizerId]
-  ): Option[ProtocolVersion] =
-    delegate.getProtocolVersionForSynchronizer(synchronizerId)
-
   override def incompleteReassignmentOffsets(validAt: Offset, stakeholders: Set[LfPartyId])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Vector[Offset]] =
@@ -142,14 +159,14 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
       delegate.incompleteReassignmentOffsets(validAt, stakeholders),
     )
 
-  override def registerInternalStateService(internalStateService: InternalStateService): Unit =
-    delegate.registerInternalStateService(internalStateService)
+  override def registerInternalIndexService(internalIndexService: InternalIndexService): Unit =
+    delegate.registerInternalIndexService(internalIndexService)
 
-  override def internalStateService: Option[InternalStateService] =
-    delegate.internalStateService
+  override def internalIndexService: Option[InternalIndexService] =
+    delegate.internalIndexService
 
-  override def unregisterInternalStateService(): Unit =
-    delegate.unregisterInternalStateService()
+  override def unregisterInternalIndexService(): Unit =
+    delegate.unregisterInternalIndexService()
 
   override def getPackageMetadataSnapshot(implicit
       errorLoggingContext: ErrorLoggingContext
@@ -172,16 +189,39 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
       delegate.getLfArchive(packageId),
     )
 
-  override def validateDar(dar: ByteString, darName: String)(implicit
+  override def validateDar(
+      dar: ByteString,
+      darName: String,
+      synchronizerId: Option[SynchronizerId],
+  )(implicit
       traceContext: TraceContext
   ): Future[SubmissionResult] =
     Timed.future(
       metrics.services.read.validateDar,
-      delegate.validateDar(dar, darName),
+      delegate.validateDar(dar, darName, synchronizerId),
     )
 
-  // TODO(#25385): Time the operation
-  override def packageMapFor(
+  override def updateVettedPackages(
+      opts: UpdateVettedPackagesOpts
+  )(implicit
+      traceContext: TraceContext
+  ): Future[(Option[EnrichedVettedPackages], Option[EnrichedVettedPackages])] =
+    Timed.future(
+      metrics.services.write.updateVettedPackages,
+      delegate.updateVettedPackages(opts),
+    )
+
+  override def listVettedPackages(
+      opts: ListVettedPackagesOpts
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Seq[EnrichedVettedPackages]] =
+    Timed.future(
+      metrics.services.read.listVettedPackages,
+      delegate.listVettedPackages(opts),
+    )
+
+  override def computePartyVettingMap(
       submitters: Set[LfPartyId],
       informees: Set[LfPartyId],
       vettingValidityTimestamp: CantonTimestamp,
@@ -189,36 +229,44 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
       routingSynchronizerState: RoutingSynchronizerState,
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[SynchronizerId, Map[LfPartyId, Set[PackageId]]]] =
-    delegate.packageMapFor(
-      submitters,
-      informees,
-      vettingValidityTimestamp,
-      prescribedSynchronizer,
-      routingSynchronizerState,
+  ): FutureUnlessShutdown[Map[PhysicalSynchronizerId, Map[LfPartyId, Set[PackageId]]]] =
+    Timed.future(
+      metrics.services.read.computePartyVettingMap,
+      delegate.computePartyVettingMap(
+        submitters,
+        informees,
+        vettingValidityTimestamp,
+        prescribedSynchronizer,
+        routingSynchronizerState,
+      ),
     )
 
-  // TODO(#25385): Time the operation
   override def computeHighestRankedSynchronizerFromAdmissible(
       submitterInfo: SubmitterInfo,
       transaction: LfSubmittedTransaction,
       transactionMeta: TransactionMeta,
-      admissibleSynchronizers: NonEmpty[Set[SynchronizerId]],
+      admissibleSynchronizers: NonEmpty[Set[PhysicalSynchronizerId]],
       disclosedContractIds: List[LfContractId],
       routingSynchronizerState: RoutingSynchronizerState,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TransactionRoutingError, SynchronizerId] =
-    delegate.computeHighestRankedSynchronizerFromAdmissible(
-      submitterInfo,
-      transaction,
-      transactionMeta,
-      admissibleSynchronizers,
-      disclosedContractIds,
-      routingSynchronizerState,
+  ): EitherT[FutureUnlessShutdown, TransactionRoutingError, PhysicalSynchronizerId] =
+    EitherT(
+      Timed.future(
+        metrics.services.read.computeHighestRankedSynchronizerFromAdmissible,
+        delegate
+          .computeHighestRankedSynchronizerFromAdmissible(
+            submitterInfo,
+            transaction,
+            transactionMeta,
+            admissibleSynchronizers,
+            disclosedContractIds,
+            routingSynchronizerState,
+          )
+          .value,
+      )
     )
 
-  // TODO(#25385): Time the operation
   override def selectRoutingSynchronizer(
       submitterInfo: SubmitterInfo,
       transaction: LfSubmittedTransaction,
@@ -230,18 +278,55 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransactionError, SynchronizerRank] =
-    delegate.selectRoutingSynchronizer(
-      submitterInfo,
-      transaction,
-      transactionMeta,
-      disclosedContractIds,
-      optSynchronizerId,
-      transactionUsedForExternalSigning,
-      routingSynchronizerState,
+    EitherT(
+      Timed.future(
+        metrics.services.read.selectRoutingSynchronizer,
+        delegate
+          .selectRoutingSynchronizer(
+            submitterInfo,
+            transaction,
+            transactionMeta,
+            disclosedContractIds,
+            optSynchronizerId,
+            transactionUsedForExternalSigning,
+            routingSynchronizerState,
+          )
+          .value,
+      )
     )
 
   override def getRoutingSynchronizerState(implicit
       traceContext: TraceContext
   ): RoutingSynchronizerState =
     delegate.getRoutingSynchronizerState
+
+  override def estimateTrafficCost(
+      synchronizerId: SynchronizerId,
+      transaction: LfVersionedTransaction,
+      transactionMetadata: TransactionMeta,
+      submitterInfo: SubmitterInfo,
+      keyResolver: LfKeyResolver,
+      disclosedContracts: Map[LfContractId, LfFatContractInst],
+      costHints: CostEstimationHints,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, SubmissionCostEstimation] =
+    delegate.estimateTrafficCost(
+      synchronizerId,
+      transaction,
+      transactionMetadata,
+      submitterInfo,
+      keyResolver,
+      disclosedContracts,
+      costHints,
+    )
+
+  override def protocolVersionForSynchronizerId(
+      synchronizerId: SynchronizerId
+  ): Option[ProtocolVersion] = delegate.protocolVersionForSynchronizerId(synchronizerId)
+
+  override def hashOps: HashOps = delegate.hashOps
+
+  override def participantId: ParticipantId = delegate.participantId
+
 }

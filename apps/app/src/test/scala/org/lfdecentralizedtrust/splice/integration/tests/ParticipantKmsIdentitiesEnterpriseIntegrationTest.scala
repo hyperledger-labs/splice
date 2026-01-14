@@ -20,6 +20,8 @@ class ParticipantKmsIdentitiesEnterpriseIntegrationTest
     extends IntegrationTest
     with StandaloneCanton {
 
+  override protected def runEventHistorySanityCheck: Boolean = false
+
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
   val aliceParticipantDumpFile = testDumpDir.resolve("alice-kms-id-identity-dump.json")
   val sv2ParticipantDumpFile = testDumpDir.resolve("sv2-kms-id-identity-dump.json")
@@ -32,7 +34,6 @@ class ParticipantKmsIdentitiesEnterpriseIntegrationTest
       .clearConfigTransforms() // mainly to get static daml names
       .addConfigTransforms(
         (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
-        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
         (_, conf) =>
           updateAllValidatorConfigs { case (name, c) =>
             if (name == "aliceValidator") {

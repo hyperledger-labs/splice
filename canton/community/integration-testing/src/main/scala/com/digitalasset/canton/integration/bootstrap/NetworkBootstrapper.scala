@@ -4,8 +4,9 @@
 package com.digitalasset.canton.integration.bootstrap
 
 import com.digitalasset.canton.admin.api.client.data.StaticSynchronizerParameters
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.CantonConfig
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.console.{
   InstanceReference,
   LocalInstanceReference,
@@ -15,8 +16,9 @@ import com.digitalasset.canton.console.{
 import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{EnvironmentDefinition, TestConsoleEnvironment}
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.{SynchronizerAlias, protocol}
+import monocle.syntax.all.*
 
 /** Bootstraps synchronizers given topology descriptions and stores information in
   * [[com.digitalasset.canton.integration.EnvironmentTestHelpers.initializedSynchronizers]].
@@ -41,7 +43,7 @@ class NetworkBootstrapper(networks: NetworkTopologyDescription*)(implicit
   private def bootstrapSynchronizer(desc: NetworkTopologyDescription): Unit = {
     val mediatorsToSequencers =
       desc.overrideMediatorToSequencers.getOrElse(
-        desc.mediators.map(_ -> (desc.sequencers, PositiveInt.one)).toMap
+        desc.mediators.map(_ -> (desc.sequencers, PositiveInt.one, NonNegativeInt.zero)).toMap
       )
 
     val synchronizerId = env.bootstrap.synchronizer(
@@ -52,6 +54,7 @@ class NetworkBootstrapper(networks: NetworkTopologyDescription*)(implicit
       synchronizerThreshold = desc.synchronizerThreshold,
       staticSynchronizerParameters = desc.staticSynchronizerParameters,
       mediatorRequestAmplification = SubmissionRequestAmplification.NoAmplification,
+      mediatorThreshold = desc.mediatorThreshold,
     )
 
     val synchronizerAlias = SynchronizerAlias.tryCreate(desc.synchronizerName)
@@ -85,24 +88,54 @@ final case class NetworkTopologyDescription(
     staticSynchronizerParameters: StaticSynchronizerParameters,
     mediatorRequestAmplification: SubmissionRequestAmplification,
     overrideMediatorToSequencers: Option[
-      Map[MediatorReference, (Seq[SequencerReference], PositiveInt)]
+      Map[MediatorReference, (Seq[SequencerReference], PositiveInt, NonNegativeInt)]
     ],
-)
+    mediatorThreshold: PositiveInt,
+) {
+  def withTopologyChangeDelay(
+      topologyChangeDelay: NonNegativeFiniteDuration
+  ): NetworkTopologyDescription =
+    this
+      .focus(_.staticSynchronizerParameters.topologyChangeDelay)
+      .replace(topologyChangeDelay)
+}
 
 object NetworkTopologyDescription {
+
   def apply(
       synchronizerAlias: SynchronizerAlias,
       synchronizerOwners: Seq[InstanceReference],
       synchronizerThreshold: PositiveInt,
       sequencers: Seq[SequencerReference],
       mediators: Seq[MediatorReference],
-      staticSynchronizerParameters: StaticSynchronizerParameters =
-        EnvironmentDefinition.defaultStaticSynchronizerParameters,
       mediatorRequestAmplification: SubmissionRequestAmplification =
         SubmissionRequestAmplification.NoAmplification,
       overrideMediatorToSequencers: Option[
-        Map[MediatorReference, (Seq[SequencerReference], PositiveInt)]
+        Map[MediatorReference, (Seq[SequencerReference], PositiveInt, NonNegativeInt)]
       ] = None,
+      mediatorThreshold: PositiveInt = PositiveInt.one,
+  )(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ): NetworkTopologyDescription =
+    NetworkTopologyDescription(
+      synchronizerName = synchronizerAlias.unwrap,
+      synchronizerOwners,
+      synchronizerThreshold,
+      sequencers,
+      mediators,
+      EnvironmentDefinition.defaultStaticSynchronizerParameters,
+      mediatorRequestAmplification,
+      overrideMediatorToSequencers,
+      mediatorThreshold,
+    )
+
+  def createWithStaticSynchronizerParameters(
+      synchronizerAlias: SynchronizerAlias,
+      synchronizerOwners: Seq[InstanceReference],
+      synchronizerThreshold: PositiveInt,
+      sequencers: Seq[SequencerReference],
+      mediators: Seq[MediatorReference],
+      staticSynchronizerParameters: StaticSynchronizerParameters,
   ): NetworkTopologyDescription =
     NetworkTopologyDescription(
       synchronizerName = synchronizerAlias.unwrap,
@@ -111,15 +144,19 @@ object NetworkTopologyDescription {
       sequencers,
       mediators,
       staticSynchronizerParameters,
-      mediatorRequestAmplification,
-      overrideMediatorToSequencers,
+      SubmissionRequestAmplification.NoAmplification,
+      None,
+      PositiveInt.one,
     )
+
 }
 
 /** A data container to hold useful information for initialized synchronizers
   */
 final case class InitializedSynchronizer(
-    synchronizerId: SynchronizerId,
+    physicalSynchronizerId: PhysicalSynchronizerId,
     staticSynchronizerParameters: protocol.StaticSynchronizerParameters,
     synchronizerOwners: Set[InstanceReference],
-)
+) {
+  def synchronizerId: SynchronizerId = physicalSynchronizerId.logical
+}

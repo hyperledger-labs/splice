@@ -6,7 +6,7 @@
 sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
 name: splice-amulet
 source: daml
-version: 0.1.13
+version: 0.1.14
 dependencies:
   - daml-prim
   - daml-stdlib
@@ -29,4 +29,4 @@ codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java
     decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceAmulet
-    output-directory: target/scala-2.13/src_managed/main/daml-codegen-java
+    output-directory: target/daml-codegen-java

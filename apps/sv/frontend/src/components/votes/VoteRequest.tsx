@@ -190,8 +190,6 @@ export const CreateVoteRequest: React.FC = () => {
     expiresAt = undefined;
   }
 
-  const expirationInDays = dayjs(expiresAt).diff(dayjs(), 'day');
-
   const handleConfirmationAccept = () => {
     createVoteRequestMutation.mutate();
     setConfirmDialogOpen(false);
@@ -200,12 +198,8 @@ export const CreateVoteRequest: React.FC = () => {
   const conflicts = hasConflictingFields(action, voteRequestQuery.data);
 
   useEffect(() => {
-    if (conflicts.hasConflict) {
-      setDisableProceed(true);
-    } else {
-      setDisableProceed(false);
-    }
-  }, [conflicts]);
+    setDisableProceed(conflicts.hasConflict);
+  }, [conflicts.hasConflict]);
 
   const submissionConditions: { disabled: boolean; reason: string; severity?: AlertColor }[] = [
     { disabled: createVoteRequestMutation.isPending, reason: 'Loading...' },
@@ -298,6 +292,7 @@ export const CreateVoteRequest: React.FC = () => {
                   maxDateTime={effectivity}
                   readOnly={false}
                   onChange={d => handleExpirationDateChange(d)}
+                  enableAccessibleFieldDOMStructure={false}
                   slotProps={{
                     textField: {
                       id: 'datetime-picker-vote-request-expiration',
@@ -305,6 +300,9 @@ export const CreateVoteRequest: React.FC = () => {
                         'data-testid': 'datetime-picker-vote-request-expiration',
                       },
                     },
+                    openPickerButton: {
+                      'data-testid': 'datetime-picker-vote-request-expiration-button',
+                    } as Record<string, string>,
                   }}
                   closeOnSelect
                 />
@@ -312,6 +310,7 @@ export const CreateVoteRequest: React.FC = () => {
               <Typography variant="body2" mt={1}>
                 Expires{' '}
                 <DateWithDurationDisplay
+                  id="vote-request-expiration-duration"
                   datetime={expiration?.toDate()}
                   enableDuration
                   onlyDuration
@@ -346,6 +345,7 @@ export const CreateVoteRequest: React.FC = () => {
                     format="YYYY-MM-DD HH:mm"
                     readOnly={false}
                     onChange={d => handleEffectivityDateChange(d)}
+                    enableAccessibleFieldDOMStructure={false}
                     slotProps={{
                       textField: {
                         id: 'datetime-picker-vote-request-effectivity',
@@ -441,7 +441,6 @@ export const CreateVoteRequest: React.FC = () => {
                 }
                 expiresAt={new Date(expiresAt!)}
                 effectiveAt={effectivity?.toDate()}
-                expirationInDays={expirationInDays}
                 confirmationDialogProps={{
                   showDialog: confirmDialogOpen,
                   onAccept: handleConfirmationAccept,

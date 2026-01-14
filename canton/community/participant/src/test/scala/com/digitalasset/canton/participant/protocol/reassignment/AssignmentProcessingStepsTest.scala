@@ -5,18 +5,24 @@ package com.digitalasset.canton.participant.protocol.reassignment
 
 import cats.Eval
 import cats.data.EitherT
-import cats.implicits.*
+import cats.implicits.catsSyntaxEitherId
+import cats.syntax.functor.*
+import com.daml.logging.LoggingContext
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.{CachingConfigs, DefaultProcessingTimeouts}
+import com.digitalasset.canton.config.{
+  CachingConfigs,
+  DefaultProcessingTimeouts,
+  SessionEncryptionKeyCacheConfig,
+}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.{SymbolicCrypto, SymbolicPureCrypto}
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.data.ViewType.AssignmentViewType
 import com.digitalasset.canton.lifecycle.{DefaultPromiseUnlessShutdownFactory, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.LogEntry
-import com.digitalasset.canton.participant.admin.PackageDependencyResolver
+import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.ledger.api.{LedgerApiIndexer, LedgerApiStore}
 import com.digitalasset.canton.participant.metrics.ParticipantTestMetrics
@@ -27,10 +33,11 @@ import com.digitalasset.canton.participant.protocol.conflictdetection.ConflictDe
 }
 import com.digitalasset.canton.participant.protocol.reassignment.AssignmentProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.reassignment.AssignmentValidation.*
-import com.digitalasset.canton.participant.protocol.reassignment.AssignmentValidationError.ContractDataMismatch
+import com.digitalasset.canton.participant.protocol.reassignment.AssignmentValidationError.UnassignmentDataNotFound
+import com.digitalasset.canton.participant.protocol.reassignment.AssignmentValidationResult.ReassigningParticipantValidationResult
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentValidationError.{
-  ContractIdAuthenticationFailure,
+  ContractAuthenticationFailure,
   NotHostedOnParticipant,
   StakeholdersMismatch,
   SubmitterMustBeStakeholder,
@@ -48,12 +55,8 @@ import com.digitalasset.canton.participant.protocol.validation.{
   AuthenticationError,
   AuthenticationValidator,
 }
-import com.digitalasset.canton.participant.protocol.{
-  ContractAuthenticator,
-  EngineController,
-  ProcessingStartingPoints,
-}
-import com.digitalasset.canton.participant.store.ReassignmentStoreTest.coidAbs1
+import com.digitalasset.canton.participant.protocol.{EngineController, ProcessingStartingPoints}
+import com.digitalasset.canton.participant.store.ReassignmentStoreTest.{coidAbs1, reassignment10}
 import com.digitalasset.canton.participant.store.memory.*
 import com.digitalasset.canton.participant.store.{
   AcsCounterParticipantConfigStore,
@@ -70,39 +73,46 @@ import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.store.memory.InMemoryIndexedStringStore
 import com.digitalasset.canton.store.{
   ConfirmationRequestSessionKeyStore,
+  IndexedPhysicalSynchronizer,
   IndexedSynchronizer,
   SessionKeyStoreWithInMemoryCache,
 }
+import com.digitalasset.canton.time.SynchronizerTimeTracker.DummyTickRequest
 import com.digitalasset.canton.time.{SynchronizerTimeTracker, WallClock}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.Confirmation
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
+import com.digitalasset.canton.util.{ContractValidator, ResourceUtil}
 import com.digitalasset.canton.version.HasTestCloseContext
+import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance}
 import monocle.macros.syntax.lens.*
+import org.apache.commons.lang3.NotImplementedException
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.util.UUID
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class AssignmentProcessingStepsTest
+final class AssignmentProcessingStepsTest
     extends AsyncWordSpec
     with BaseTest
     with HasTestCloseContext
     with HasExecutionContext
     with FailOnShutdown {
-  private lazy val sourceSynchronizer = Source(
-    SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("synchronizer::source"))
+  private lazy val sourcePSId = Source(
+    SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("synchronizer::source")).toPhysical
   )
   private lazy val sourceMediator = MediatorGroupRecipient(MediatorGroupIndex.tryCreate(0))
-  private lazy val targetSynchronizer = Target(
-    SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("synchronizer::target"))
+  private lazy val targetPSId = Target(
+    SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("synchronizer::target")).toPhysical
   )
   private lazy val targetMediator = MediatorGroupRecipient(MediatorGroupIndex.tryCreate(0))
   private lazy val anotherSynchronizer = SynchronizerId(
     UniqueIdentifier.tryFromProtoPrimitive("synchronizer::another")
-  )
+  ).toPhysical
   private lazy val anotherMediator = MediatorGroupRecipient(MediatorGroupIndex.tryCreate(1))
   private lazy val party1: LfPartyId = PartyId(
     UniqueIdentifier.tryFromProtoPrimitive("party1::party")
@@ -118,19 +128,9 @@ class AssignmentProcessingStepsTest
     UniqueIdentifier.tryFromProtoPrimitive("bothsynchronizers::participant")
   )
 
-  private def testMetadata(
-      signatories: Set[LfPartyId] = Set(party1),
-      stakeholders: Set[LfPartyId] = Set(party1),
-      maybeKeyWithMaintainersVersioned: Option[LfVersioned[LfGlobalKeyWithMaintainers]] = None,
-  ): ContractMetadata =
-    ContractMetadata.tryCreate(
-      stakeholders = stakeholders,
-      signatories = signatories,
-      maybeKeyWithMaintainersVersioned = maybeKeyWithMaintainersVersioned,
-    )
-
-  private lazy val contract = ExampleTransactionFactory.authenticatedSerializableContract(
-    metadata = testMetadata()
+  private lazy val contract = ExampleContractFactory.build(
+    signatories = Set(party1),
+    stakeholders = Set(party1),
   )
 
   private lazy val initialReassignmentCounter: ReassignmentCounter = ReassignmentCounter.One
@@ -152,7 +152,7 @@ class AssignmentProcessingStepsTest
   private lazy val seedGenerator = new SeedGenerator(crypto.pureCrypto)
 
   private lazy val identityFactory = TestingTopology()
-    .withSynchronizers(sourceSynchronizer.unwrap)
+    .withSynchronizers(sourcePSId.unwrap, targetPSId.unwrap)
     .withReversedTopology(
       Map(
         participant -> Map(
@@ -164,37 +164,44 @@ class AssignmentProcessingStepsTest
     .withSimpleParticipants(participant) // required such that `participant` gets a signing key
     .build(crypto, loggerFactory)
 
-  private lazy val cryptoSnapshot =
-    identityFactory
-      .forOwnerAndSynchronizer(participant, sourceSynchronizer.unwrap)
-      .currentSnapshotApproximation
+  private lazy val cryptoClient =
+    identityFactory.forOwnerAndSynchronizer(participant, targetPSId.unwrap)
 
-  private lazy val assignmentProcessingSteps =
-    testInstance(targetSynchronizer, cryptoSnapshot, None)
+  private lazy val cryptoSnapshot = cryptoClient.currentSnapshotApproximation
+
+  private lazy val assignmentProcessingSteps = testInstance(targetPSId, cryptoClient, None)
 
   private lazy val indexedStringStore = new InMemoryIndexedStringStore(minIndex = 1, maxIndex = 1)
 
   private def statefulDependencies: Future[(SyncPersistentState, SyncEphemeralState)] = {
     val ledgerApiIndexer = mock[LedgerApiIndexer]
     val contractStore = mock[ContractStore]
-    val persistentState =
-      new InMemorySyncPersistentState(
-        participant,
-        clock,
-        crypto,
-        IndexedSynchronizer.tryCreate(targetSynchronizer.unwrap, 1),
-        defaultStaticSynchronizerParameters,
+    val logical =
+      new InMemoryLogicalSyncPersistentState(
+        IndexedSynchronizer.tryCreate(targetPSId.unwrap, 1),
         enableAdditionalConsistencyChecks = true,
         indexedStringStore = indexedStringStore,
         contractStore = contractStore,
         acsCounterParticipantConfigStore = mock[AcsCounterParticipantConfigStore],
-        packageDependencyResolver = mock[PackageDependencyResolver],
         ledgerApiStore = Eval.now(mock[LedgerApiStore]),
         loggerFactory = loggerFactory,
-        exitOnFatalFailures = true,
-        timeouts = timeouts,
-        futureSupervisor = futureSupervisor,
       )
+
+    val physical = new InMemoryPhysicalSyncPersistentState(
+      participant,
+      clock,
+      SynchronizerCrypto(crypto, defaultStaticSynchronizerParameters),
+      IndexedPhysicalSynchronizer.tryCreate(targetPSId.unwrap, 1),
+      defaultStaticSynchronizerParameters,
+      packageMetadataView = mock[PackageMetadataView],
+      ledgerApiStore = Eval.now(mock[LedgerApiStore]),
+      logicalSyncPersistentState = logical,
+      loggerFactory = loggerFactory,
+      parameters = ParticipantNodeParameters.forTestingOnly(testedProtocolVersion),
+      timeouts = timeouts,
+      futureSupervisor = futureSupervisor,
+    )
+    val persistentState = new SyncPersistentState(logical, physical, loggerFactory)
 
     (for {
       _ <- persistentState.parameterStore.setParameters(defaultStaticSynchronizerParameters)
@@ -211,7 +218,9 @@ class AssignmentProcessingStepsTest
         ProcessingStartingPoints.default,
         ParticipantTestMetrics.synchronizer,
         exitOnFatalFailures = true,
-        CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+        // Disable the session encryption key cache: it starts a scheduler that must be closed properly,
+        // otherwise we see RejectedExecutionException warnings during shutdown.
+        SessionEncryptionKeyCacheConfig(enabled = false),
         DefaultProcessingTimeouts.testing,
         loggerFactory = loggerFactory,
         FutureSupervisor.Noop,
@@ -221,12 +230,12 @@ class AssignmentProcessingStepsTest
     }).failOnShutdown
   }
 
-  private lazy val reassignmentId = ReassignmentId(sourceSynchronizer, CantonTimestamp.Epoch)
+  private lazy val reassignmentId = reassignment10
 
   private lazy val reassignmentDataHelpers = ReassignmentDataHelpers(
     contract,
-    reassignmentId.sourceSynchronizer,
-    targetSynchronizer,
+    sourcePSId,
+    targetPSId,
     identityFactory,
   )
 
@@ -236,11 +245,8 @@ class AssignmentProcessingStepsTest
     sourceMediator,
   )()
 
-  private lazy val reassignmentData =
-    reassignmentDataHelpers.reassignmentData(reassignmentId, unassignmentRequest)
-
-  private lazy val unassignmentResult =
-    reassignmentDataHelpers.unassignmentResult(reassignmentData).futureValue
+  private lazy val unassignmentData: UnassignmentData =
+    reassignmentDataHelpers.unassignmentData(unassignmentRequest)
 
   private def mkParsedRequest(
       view: FullAssignmentTree,
@@ -260,40 +266,36 @@ class AssignmentProcessingStepsTest
       Some(signature),
       None,
       isFreshOwnTimelyRequest = true,
+      areContractsUnknown = false,
       Seq.empty,
       targetMediator,
       cryptoSnapshot,
       cryptoSnapshot.ipsSnapshot.findDynamicSynchronizerParameters().futureValueUS.value,
+      view.reassignmentId,
     )
   }
 
   "prepare submission" should {
     def setUpOrFail(
         reassignmentData: UnassignmentData,
-        unassignmentResult: DeliveredUnassignmentResult,
         persistentState: SyncPersistentState,
     ): FutureUnlessShutdown[Unit] =
       for {
         _ <- valueOrFail(persistentState.reassignmentStore.addUnassignmentData(reassignmentData))(
           "add reassignment data failed"
         )
-        _ <- valueOrFail(
-          persistentState.reassignmentStore.addUnassignmentResult(unassignmentResult)
-        )(
-          "add unassignment result failed"
-        )
       } yield ()
 
     val submissionParam = SubmissionParam(
       submitterInfo(party1),
-      reassignmentId,
+      unassignmentData.reassignmentId,
     )
 
     "succeed without errors" in {
       for {
         deps <- statefulDependencies
         (persistentState, state) = deps
-        _ <- setUpOrFail(reassignmentData, unassignmentResult, persistentState).failOnShutdown
+        _ <- setUpOrFail(unassignmentData, persistentState).failOnShutdown
         _preparedSubmission <-
           assignmentProcessingSteps
             .createSubmission(
@@ -309,9 +311,12 @@ class AssignmentProcessingStepsTest
     "fail when a receiving party has no participant on the synchronizer" in {
       // metadataTransformer updates the contract metadata to inject receiving parties
       def test(metadataTransformer: ContractMetadata => ContractMetadata) = {
+
         val helpers = reassignmentDataHelpers
-          .focus(_.contract.metadata)
-          .modify(metadataTransformer)
+          .focus(_.contract)
+          .modify(c =>
+            ExampleContractFactory.modify(c, metadata = Some(metadataTransformer(c.metadata)))
+          )
 
         val unassignmentRequest = helpers.unassignmentRequest(
           party1,
@@ -319,13 +324,12 @@ class AssignmentProcessingStepsTest
           sourceMediator,
         )()
 
-        val reassignmentData2 =
-          reassignmentDataHelpers.reassignmentData(reassignmentId, unassignmentRequest)
+        val reassignmentData2 = reassignmentDataHelpers.unassignmentData(unassignmentRequest)
 
         for {
           deps <- statefulDependencies
           (persistentState, state) = deps
-          _ <- setUpOrFail(reassignmentData2, unassignmentResult, persistentState).failOnShutdown
+          _ <- setUpOrFail(reassignmentData2, persistentState).failOnShutdown
           preparedSubmission <- leftOrFailShutdown(
             assignmentProcessingSteps.createSubmission(
               submissionParam,
@@ -362,39 +366,16 @@ class AssignmentProcessingStepsTest
       } yield succeed
     }
 
-    "fail when unassignment processing is not yet complete" in {
-      for {
-        deps <- statefulDependencies
-        (persistentState, state) = deps
-        _ <- valueOrFail(persistentState.reassignmentStore.addUnassignmentData(reassignmentData))(
-          "add reassignment data failed"
-        ).failOnShutdown
-        preparedSubmission <- leftOrFailShutdown(
-          assignmentProcessingSteps.createSubmission(
-            submissionParam,
-            targetMediator,
-            state,
-            cryptoSnapshot,
-          )
-        )("prepare submission did not return a left")
-      } yield {
-        preparedSubmission should matchPattern { case SubmissionValidationError(_) => }
-        preparedSubmission.message should include(
-          s"Cannot assign `${reassignmentData.reassignmentId}` because unassignment is incomplete"
-        )
-      }
-    }
-
     "fail when submitting party is not a stakeholder" in {
       val submissionParam2 = SubmissionParam(
         submitterInfo(party2),
-        reassignmentId,
+        unassignmentData.reassignmentId,
       )
 
       for {
         deps <- statefulDependencies
         (persistentState, state) = deps
-        _ <- setUpOrFail(reassignmentData, unassignmentResult, persistentState).failOnShutdown
+        _ <- setUpOrFail(unassignmentData, persistentState).failOnShutdown
         preparedSubmission <- leftOrFailShutdown(
           assignmentProcessingSteps.createSubmission(
             submissionParam2,
@@ -405,37 +386,37 @@ class AssignmentProcessingStepsTest
         )("prepare submission did not return a left")
       } yield {
         preparedSubmission shouldBe SubmissionValidationError(
-          s"Submission failed because: ${SubmitterMustBeStakeholder(ReassignmentRef(reassignmentId), party2, Set(party1)).message}"
+          s"Submission failed because: ${SubmitterMustBeStakeholder(ReassignmentRef(unassignmentData.reassignmentId), party2, Set(party1)).message}"
         )
       }
     }
 
     "fail when submitting party not hosted on the participant" in {
-      val submissionParam2 = SubmissionParam(
-        submitterInfo(party3),
-        reassignmentId,
-      )
 
       // We need to change the contract instance otherwise we get another error (AssignmentSubmitterMustBeStakeholder)
-      val contract = ExampleTransactionFactory.asSerializable(
+      val contract = ExampleTransactionFactory.asContractInstance(
         contractId = coidAbs1,
         contractInstance = ExampleTransactionFactory.contractInstance(),
-        ledgerTime = CantonTimestamp.Epoch,
-        metadata = ContractMetadata.tryCreate(Set(), Set(party3), None),
-      )
+        ledgerTime = CreationTime.CreatedAt(CantonTimestamp.Epoch.toLf),
+        metadata = ContractMetadata.tryCreate(Set(party3), Set(party3), None),
+      )()
 
-      val reassignmentData2 = ReassignmentStoreTest.mkUnassignmentDataForSynchronizer(
-        reassignmentId,
+      val unassignmentData2 = ReassignmentStoreTest.mkUnassignmentDataForSynchronizer(
         sourceMediator,
         party3,
-        targetSynchronizer,
+        sourcePSId,
+        targetPSId,
         contract,
+      )
+      val submissionParam2 = SubmissionParam(
+        submitterInfo(party3),
+        unassignmentData2.reassignmentId,
       )
 
       for {
         deps <- statefulDependencies
         (persistentState, ephemeralState) = deps
-        _ <- setUpOrFail(reassignmentData2, unassignmentResult, persistentState).failOnShutdown
+        _ <- setUpOrFail(unassignmentData2, persistentState).failOnShutdown
         preparedSubmission <- leftOrFailShutdown(
           assignmentProcessingSteps.createSubmission(
             submissionParam2,
@@ -446,9 +427,55 @@ class AssignmentProcessingStepsTest
         )("prepare submission did not return a left")
       } yield {
         preparedSubmission shouldBe SubmissionValidationError(
-          s"Submission failed because: ${NotHostedOnParticipant(ReassignmentRef(reassignmentId), party3, participant).message}"
+          s"Submission failed because: ${NotHostedOnParticipant(ReassignmentRef(unassignmentData2.reassignmentId), party3, participant).message}"
         )
       }
+    }
+
+    "fail when target synchronizer has different LSId" in {
+
+      val originalTargetPSId = unassignmentData.targetPSId
+
+      lazy val otherTargetPSId = Target(
+        SynchronizerId(
+          UniqueIdentifier.tryFromProtoPrimitive("synchronizer::othertarget")
+        ).toPhysical
+      )
+
+      val upgradedTargetPSId =
+        targetPSId.map(_.copy(serial = targetPSId.unwrap.serial.increment.toNonNegative))
+
+      originalTargetPSId shouldBe targetPSId
+      otherTargetPSId.map(_.logical) should not be targetPSId.map(_.logical)
+      upgradedTargetPSId.map(_.logical) shouldBe targetPSId.map(_.logical)
+
+      for {
+        deps <- statefulDependencies
+        (persistentState, state) = deps
+        _ <- setUpOrFail(unassignmentData, persistentState).failOnShutdown
+        res <-
+          testInstance(otherTargetPSId, cryptoClient, None)
+            .createSubmission(
+              submissionParam,
+              targetMediator,
+              state,
+              cryptoSnapshot,
+            )
+            .valueOrFailShutdown("assignment submission")
+            .failed
+
+        _ = res.getMessage should include("found on wrong synchronizer")
+
+        // same LSId, different PSId
+        _ <- testInstance(upgradedTargetPSId, cryptoClient, None)
+          .createSubmission(
+            submissionParam,
+            targetMediator,
+            state,
+            cryptoSnapshot,
+          )
+          .valueOrFailShutdown("assignment submission")
+      } yield succeed
     }
   }
 
@@ -456,37 +483,43 @@ class AssignmentProcessingStepsTest
     val assignmentTree = makeFullAssignmentTree()
 
     "succeed without errors" in {
-      val sessionKeyStore =
-        new SessionKeyStoreWithInMemoryCache(CachingConfigs.defaultSessionEncryptionKeyCacheConfig)
-      for {
-        assignmentRequest <- encryptFullAssignmentTree(
-          assignmentTree,
-          RecipientsTest.testInstance,
-          sessionKeyStore,
+      ResourceUtil.withResourceM(
+        new SessionKeyStoreWithInMemoryCache(
+          CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+          timeouts,
+          loggerFactory,
         )
-        envelopes = NonEmpty(
-          Seq,
-          OpenEnvelope(assignmentRequest, RecipientsTest.testInstance)(testedProtocolVersion),
-        )
-        decrypted <-
-          assignmentProcessingSteps
-            .decryptViews(envelopes, cryptoSnapshot, sessionKeyStore)
-            .valueOrFailShutdown(
-              "decrypt request failed"
-            )
-        (WithRecipients(view, recipients), signature) = decrypted.views.loneElement
-        activenessSet =
-          assignmentProcessingSteps
-            .computeActivenessSet(
-              mkParsedRequest(
-                view,
-                recipients,
-              ).copy(signatureO = signature)
-            )
-            .value
-      } yield {
-        decrypted.decryptionErrors shouldBe Seq.empty
-        activenessSet shouldBe mkActivenessSet(assign = Set(contract.contractId))
+      ) { sessionKeyStore =>
+        for {
+          assignmentRequest <- encryptFullAssignmentTree(
+            assignmentTree,
+            RecipientsTest.testInstance,
+            sessionKeyStore,
+          )
+          envelopes = NonEmpty(
+            Seq,
+            OpenEnvelope(assignmentRequest, RecipientsTest.testInstance)(testedProtocolVersion),
+          )
+          decrypted <-
+            assignmentProcessingSteps
+              .decryptViews(envelopes, cryptoSnapshot, sessionKeyStore)
+              .valueOrFailShutdown(
+                "decrypt request failed"
+              )
+          (WithRecipients(view, recipients), signature) = decrypted.views.loneElement
+          activenessSet =
+            assignmentProcessingSteps
+              .computeActivenessSet(
+                mkParsedRequest(
+                  view,
+                  recipients,
+                ).copy(signatureO = signature)
+              )
+              .value
+        } yield {
+          decrypted.decryptionErrors shouldBe Seq.empty
+          activenessSet shouldBe mkActivenessSet(assign = Set(contract.contractId))
+        }
       }
     }
 
@@ -500,7 +533,7 @@ class AssignmentProcessingStepsTest
 
       inside(error) { case UnexpectedSynchronizer(_, targetD, currentD) =>
         assert(targetD == anotherSynchronizer)
-        assert(currentD == targetSynchronizer.unwrap)
+        assert(currentD == targetPSId.unwrap)
       }
     }
 
@@ -510,6 +543,7 @@ class AssignmentProcessingStepsTest
       val viewWithMetadata = (
         WithRecipients(parsedRequest.fullViewTree, parsedRequest.recipients),
         parsedRequest.signatureO,
+        (),
       )
       for {
         result <-
@@ -550,21 +584,20 @@ class AssignmentProcessingStepsTest
           "model conformance error",
         )
       )
-    )
+    ) _
     "succeed without errors" in {
       for {
         deps <- statefulDependencies
         (persistentState, ephemeralState) = deps
 
         _ <- valueOrFail(
-          persistentState.reassignmentStore.addUnassignmentData(
-            reassignmentData.copy(unassignmentResult = Some(unassignmentResult))
-          )
+          persistentState.reassignmentStore.addUnassignmentData(unassignmentData)
         )(
           "add reassignment data failed"
         ).failOnShutdown
 
-        fullAssignmentTree = makeFullAssignmentTree(reassigningParticipants = Set(participant))
+        fullAssignmentTree = fullAssignmentTreeFromUnassignmentData(unassignmentData)
+
         result <- valueOrFail(
           assignmentProcessingSteps
             .constructPendingDataAndResponse(
@@ -573,6 +606,7 @@ class AssignmentProcessingStepsTest
               FutureUnlessShutdown.pure(mkActivenessResult()),
               engineController =
                 EngineController(participant, RequestId(CantonTimestamp.Epoch), loggerFactory),
+              DummyTickRequest,
             )
         )("construction of pending data and response failed").failOnShutdown
       } yield {
@@ -581,135 +615,88 @@ class AssignmentProcessingStepsTest
           ._1
           .responses should matchPattern { case Seq(ConfirmationResponse(_, LocalApprove(), _)) =>
         }
-        result.pendingData.assignmentValidationResult.isSuccessfulF.futureValueUS shouldBe true
+        result.pendingData.assignmentValidationResult.isSuccessful.futureValueUS shouldBe true
         succeed
       }
     }
 
-    "fail when wrong metadata is given" in {
-      def test(testContract: SerializableContract) =
-        for {
-          deps <- statefulDependencies
-          (persistentState, ephemeralState) = deps
+    "fail when an invalid contract is given" in {
 
-          _ <- valueOrFail(
-            persistentState.reassignmentStore.addUnassignmentData(
-              reassignmentData.copy(unassignmentResult = Some(unassignmentResult))
-            )
-          )(
-            "add reassignment data failed"
-          ).failOnShutdown
+      val testContract = ExampleContractFactory.build()
 
-          fullAssignmentTree = makeFullAssignmentTree(
-            party1,
-            testContract,
-            targetSynchronizer,
-            targetMediator,
-            unassignmentResult,
-            reassigningParticipants = Set(participant),
-          )
+      val expected = "bad-contract"
 
-          result <-
-            assignmentProcessingSteps
-              .constructPendingDataAndResponse(
-                mkParsedRequest(fullAssignmentTree),
-                ephemeralState.reassignmentCache,
-                FutureUnlessShutdown.pure(mkActivenessResult()),
-                engineController =
-                  EngineController(participant, RequestId(CantonTimestamp.Epoch), loggerFactory),
-              )
-              .failOnShutdown
-          confirmationResponse <- result.confirmationResponsesF.failOnShutdown
+      val contractValidator = new ContractValidator {
+        override def authenticate(contract: FatContractInstance, targetPackageId: PackageId)(
+            implicit
+            ec: ExecutionContext,
+            traceContext: TraceContext,
+            loggingContext: LoggingContext,
+        ): EitherT[FutureUnlessShutdown, String, Unit] =
+          EitherT.fromEither[FutureUnlessShutdown](expected.asLeft[Unit])
 
-        } yield {
-          confirmationResponse.valueOrFail("no response")._1.responses should matchPattern {
-            case Seq(ConfirmationResponse(_, LocalReject(_, true), _)) =>
-          }
-          val assignmentValidationResult = result.pendingData.assignmentValidationResult
-          val modelConformanceError =
-            assignmentValidationResult.metadataResultET.value.futureValueUS
+        override def authenticateHash(
+            contract: FatContractInstance,
+            contractHash: LfHash,
+        ): Either[String, Unit] = throw new NotImplementedException()
+      }
 
-          modelConformanceError.left.value match {
-            case ContractIdAuthenticationFailure(ref, reason, contractId) =>
-              ref shouldBe fullAssignmentTree.reassignmentRef
-              contractId shouldBe testContract.contractId
-              reason should startWith("Mismatching contract id suffixes")
-            case other => fail(s"Did not expect $other")
-          }
-
-          assignmentValidationResult.validationErrors shouldBe Seq(
-            ContractDataMismatch(reassignmentId)
-          )
-        }
-
-      val baseMetadata = testMetadata()
-
-      // party2 is incorrectly registered as a stakeholder
-      val contractWrongStakeholders: SerializableContract =
-        ExampleTransactionFactory
-          .authenticatedSerializableContract(
-            metadata = baseMetadata
-          )
-          .focus(_.metadata)
-          .replace(
-            testMetadata(stakeholders = baseMetadata.stakeholders + party2)
-          )
-
-      // party2 is incorrectly registered as a signatory
-      val contractWrongSignatories: SerializableContract =
-        ExampleTransactionFactory
-          .authenticatedSerializableContract(
-            metadata = testMetadata(stakeholders = baseMetadata.stakeholders + party2)
-          )
-          .focus(_.metadata)
-          .replace(
-            testMetadata(
-              stakeholders = baseMetadata.stakeholders + party2,
-              signatories = baseMetadata.signatories + party2,
-            )
-          )
-
-      val incorrectKey = ExampleTransactionFactory.globalKeyWithMaintainers(
-        ExampleTransactionFactory.defaultGlobalKey,
-        Set(party1),
-      )
-
-      // Metadata has incorrect key
-      val contractWrongKey: SerializableContract =
-        ExampleTransactionFactory
-          .authenticatedSerializableContract(
-            metadata = testMetadata(stakeholders = baseMetadata.stakeholders + party2)
-          )
-          .focus(_.metadata)
-          .replace(
-            testMetadata(
-              maybeKeyWithMaintainersVersioned = Some(incorrectKey)
-            )
-          )
+      val assignmentProcessingSteps =
+        testInstance(targetPSId, cryptoClient, None, contractValidator)
 
       for {
-        _ <- loggerFactory.assertLoggedWarningsAndErrorsSeq(
-          test(contractWrongStakeholders),
-          modelConformanceError,
-        )
-        _ <- loggerFactory.assertLoggedWarningsAndErrorsSeq(
-          test(contractWrongSignatories),
-          modelConformanceError,
+        deps <- statefulDependencies
+        (persistentState, ephemeralState) = deps
+
+        _ <- valueOrFail(persistentState.reassignmentStore.addUnassignmentData(unassignmentData))(
+          "add reassignment data failed"
+        ).failOnShutdown
+
+        fullAssignmentTree = makeFullAssignmentTree(
+          party1,
+          testContract,
+          targetPSId,
+          targetMediator,
+          reassigningParticipants = Set(participant),
         )
 
-        _ <- loggerFactory.assertLoggedWarningsAndErrorsSeq(
-          test(contractWrongKey),
-          modelConformanceError,
+        result <-
+          assignmentProcessingSteps
+            .constructPendingDataAndResponse(
+              mkParsedRequest(fullAssignmentTree),
+              ephemeralState.reassignmentCache,
+              FutureUnlessShutdown.pure(mkActivenessResult()),
+              engineController =
+                EngineController(participant, RequestId(CantonTimestamp.Epoch), loggerFactory),
+              DummyTickRequest,
+            )
+            .failOnShutdown
+        confirmationResponse <- result.confirmationResponsesF.failOnShutdown
+
+      } yield {
+        confirmationResponse.valueOrFail("no response")._1.responses should matchPattern {
+          case Seq(ConfirmationResponse(_, LocalAbstain(_), _)) =>
+        }
+        val assignmentValidationResult = result.pendingData.assignmentValidationResult
+        val modelConformanceError =
+          assignmentValidationResult.commonValidationResult.contractAuthenticationResultF.value.futureValueUS
+
+        modelConformanceError.left.value match {
+          case ContractAuthenticationFailure(ref, reason, contractId) =>
+            ref shouldBe fullAssignmentTree.reassignmentRef
+            contractId shouldBe testContract.contractId
+            reason should include(expected)
+          case other => fail(s"Did not expect $other")
+        }
+
+        assignmentValidationResult.reassigningParticipantValidationResult.errors should contain(
+          UnassignmentDataNotFound(fullAssignmentTree.reassignmentId)
         )
-      } yield succeed
+      }
+
     }
 
     "fail when inconsistent stakeholders are given" in {
-      /*
-      We construct in this test an inconsistent `inconsistentTree: FullAssignmentTree` :
-      - inconsistentTree.tree.commonData.stakeholders is incorrect
-      - inconsistentTree.view.contract.metadata is correct
-       */
 
       val incorrectMetadata = ContractMetadata.tryCreate(Set(party1), Set(party1, party2), None)
       val incorrectStakeholders = Stakeholders(incorrectMetadata)
@@ -717,16 +704,15 @@ class AssignmentProcessingStepsTest
       val expectedMetadata = contract.metadata
       val expectedStakeholders = Stakeholders(expectedMetadata)
 
-      val expectedError = StakeholdersMismatch(
-        reassignmentRef = ReassignmentRef(reassignmentId),
-        declaredViewStakeholders = incorrectStakeholders,
-        expectedStakeholders = expectedStakeholders,
-      )
-
       val correctViewTree = makeFullAssignmentTree()
       val incorrectViewTree = makeFullAssignmentTree(
-        contract = contract.copy(metadata = incorrectMetadata),
+        contract = ExampleContractFactory.modify(contract, metadata = Some(incorrectMetadata)),
         reassigningParticipants = Set(participant),
+      )
+      val expectedError = StakeholdersMismatch(
+        reassignmentRef = ReassignmentRef(incorrectViewTree.reassignmentId),
+        declaredViewStakeholders = incorrectStakeholders,
+        expectedStakeholders = expectedStakeholders,
       )
 
       val inconsistentTree = FullAssignmentTree(
@@ -744,9 +730,7 @@ class AssignmentProcessingStepsTest
           (persistentState, ephemeralState) = deps
 
           _ <- valueOrFail(
-            persistentState.reassignmentStore.addUnassignmentData(
-              reassignmentData.copy(unassignmentResult = Some(unassignmentResult))
-            )
+            persistentState.reassignmentStore.addUnassignmentData(unassignmentData)
           )(
             "add reassignment data failed"
           ).failOnShutdown
@@ -760,17 +744,17 @@ class AssignmentProcessingStepsTest
                   FutureUnlessShutdown.pure(mkActivenessResult()),
                   engineController =
                     EngineController(participant, RequestId(CantonTimestamp.Epoch), loggerFactory),
+                  DummyTickRequest,
                 )
             )("construction of pending data and response failed").failOnShutdown
 
           metadataCheck =
-            result.pendingData.assignmentValidationResult.metadataResultET.futureValueUS
+            result.pendingData.assignmentValidationResult.commonValidationResult.contractAuthenticationResultF.futureValueUS
         } yield {
           metadataCheck.left.value shouldBe expectedError
-          result.confirmationResponsesF.futureValueUS.value
+          val (confirmationResponses, _) = result.confirmationResponsesF.futureValueUS.value
             .valueOrFail("no response")
-            ._1
-            .responses should matchPattern {
+          confirmationResponses.responses should matchPattern {
             case Seq(ConfirmationResponse(_, LocalReject(_, true), _)) =>
           }
         }).futureValue,
@@ -780,67 +764,96 @@ class AssignmentProcessingStepsTest
   }
 
   "get commit set and contracts to be stored and event" should {
-    "succeed without errors" in {
-      val assignmentResult = reassignmentDataHelpers.assignmentResult()
-
-      val contractId = ExampleTransactionFactory.suffixedId(10, 0)
-      val contract =
-        ExampleTransactionFactory.asSerializable(
-          contractId,
-          contractInstance = ExampleTransactionFactory.contractInstance(),
-          metadata = ContractMetadata.tryCreate(Set(party1), Set(party1), None),
-        )
-      val reassignmentId = ReassignmentId(sourceSynchronizer, CantonTimestamp.Epoch)
-      val rootHash = mock[RootHash]
-      when(rootHash.asLedgerTransactionId).thenReturn(LedgerTransactionId.fromString("id1"))
-      val pendingRequestData = AssignmentProcessingSteps.PendingAssignment(
-        RequestId(CantonTimestamp.Epoch),
-        RequestCounter(1),
-        SequencerCounter(1),
-        assignmentValidationResult = AssignmentValidationResult(
-          rootHash,
-          contract,
-          initialReassignmentCounter,
-          submitterInfo(submitter),
-          reassignmentId,
-          isReassigningParticipant = false,
-          hostedStakeholders = contract.metadata.stakeholders,
-          validationResult = AssignmentValidationResult.ValidationResult(
-            activenessResult = mkActivenessResult(),
-            authenticationErrorO = None,
-            metadataResultET = EitherT.rightT(()),
-            validationErrors = Seq.empty,
-          ),
+    val contract = ExampleContractFactory.build(
+      signatories = Set(party1),
+      stakeholders = Set(party1),
+    )
+    val rootHash = mock[RootHash]
+    when(rootHash.asLedgerTransactionId).thenReturn(LedgerTransactionId.fromString("id1"))
+    val pendingRequestData = AssignmentProcessingSteps.PendingAssignment(
+      RequestId(CantonTimestamp.Epoch),
+      RequestCounter(1),
+      SequencerCounter(1),
+      assignmentValidationResult = AssignmentValidationResult(
+        rootHash,
+        ContractsReassignmentBatch(contract, initialReassignmentCounter),
+        submitterInfo(submitter),
+        reassignmentId,
+        sourcePSId,
+        isReassigningParticipant = false,
+        hostedConfirmingReassigningParties = contract.metadata.stakeholders,
+        commonValidationResult = AssignmentValidationResult.CommonValidationResult(
+          activenessResult = mkActivenessResult(),
+          participantSignatureVerificationResult = None,
+          contractAuthenticationResultF = EitherT.rightT(()),
+          submitterCheckResult = None,
+          reassignmentIdResult = None,
         ),
-        MediatorGroupRecipient(MediatorGroupIndex.one),
-        locallyRejectedF = FutureUnlessShutdown.pure(false),
-        abortEngine = _ => (),
-        engineAbortStatusF = FutureUnlessShutdown.pure(EngineAbortStatus.notAborted),
-      )
+        reassigningParticipantValidationResult =
+          ReassigningParticipantValidationResult(errors = Seq.empty),
+      ),
+      MediatorGroupRecipient(MediatorGroupIndex.zero),
+      locallyRejectedF = FutureUnlessShutdown.pure(false),
+      abortEngine = _ => (),
+      engineAbortStatusF = FutureUnlessShutdown.pure(EngineAbortStatus.notAborted),
+      DummyTickRequest,
+    )
+    val mockDeliver = mock[Deliver[DefaultOpenEnvelope]]
+    when(mockDeliver.timestamp).thenReturn(CantonTimestamp.Epoch)
+
+    "succeed without errors" in {
 
       for {
         deps <- statefulDependencies
         (_persistentState, state) = deps
 
-        _result <- valueOrFail(
+        result <- valueOrFail(
           assignmentProcessingSteps
-            .getCommitSetAndContractsToBeStoredAndEvent(
+            .getCommitSetAndContractsToBeStoredAndEventFactory(
               NoOpeningErrors(
-                SignedContent(
-                  mock[Deliver[DefaultOpenEnvelope]],
-                  Signature.noSignature,
-                  None,
-                  testedProtocolVersion,
-                )
+                SignedContent(mockDeliver, Signature.noSignature, None, testedProtocolVersion)
               ),
-              assignmentResult.verdict,
+              Verdict.Approve(testedProtocolVersion),
               pendingRequestData,
               state.pendingAssignmentSubmissions,
               crypto.pureCrypto,
             )
             .failOnShutdown
         )("get commit set and contracts to be stored and event failed")
-      } yield succeed
+      } yield result.commitSet.nonEmpty shouldBe true
+    }
+
+    "fail with mediator is not active anymore" in {
+      for {
+        deps <- statefulDependencies
+        (_persistentState, state) = deps
+        result <-
+          loggerFactory.assertLoggedWarningsAndErrorsSeq(
+            valueOrFail(
+              assignmentProcessingSteps
+                .getCommitSetAndContractsToBeStoredAndEventFactory(
+                  NoOpeningErrors(
+                    SignedContent(mockDeliver, Signature.noSignature, None, testedProtocolVersion)
+                  ),
+                  Verdict.Approve(testedProtocolVersion),
+                  // request used MediatorGroupIndex.zero
+                  pendingRequestData
+                    .copy(mediator = MediatorGroupRecipient(MediatorGroupIndex.one)),
+                  state.pendingAssignmentSubmissions,
+                  crypto.pureCrypto,
+                )
+                .failOnShutdown
+            )("get commit set and contracts to be stored and event failed"),
+            LogEntry.assertLogSeq(
+              Seq(
+                (
+                  _.shouldBeCantonErrorCode(LocalRejectError.MalformedRejects.MalformedRequest),
+                  "mediator is not active anymore",
+                )
+              )
+            ),
+          )
+      } yield result.commitSet.nonEmpty shouldBe false
     }
   }
 
@@ -894,9 +907,10 @@ class AssignmentProcessingStepsTest
   }
 
   private def testInstance(
-      targetSynchronizer: Target[SynchronizerId],
-      snapshotOverride: SynchronizerSnapshotSyncCryptoApi,
+      targetSynchronizer: Target[PhysicalSynchronizerId],
+      snapshotOverride: SynchronizerCryptoClient,
       awaitTimestampOverride: Option[Future[Unit]],
+      contractValidator: ContractValidator = ContractValidator.AllowAll,
   ) = {
 
     val pureCrypto = new SymbolicPureCrypto
@@ -908,12 +922,13 @@ class AssignmentProcessingStepsTest
       TestReassignmentCoordination.apply(
         Set(),
         CantonTimestamp.Epoch,
-        Some(snapshotOverride),
+        Some(snapshotOverride.currentSnapshotApproximation),
         Some(awaitTimestampOverride),
         loggerFactory,
       ),
+      snapshotOverride,
       seedGenerator,
-      ContractAuthenticator(pureCrypto),
+      contractValidator,
       Target(defaultStaticSynchronizerParameters),
       Target(testedProtocolVersion),
       loggerFactory = loggerFactory,
@@ -922,12 +937,46 @@ class AssignmentProcessingStepsTest
 
   private def makeFullAssignmentTree(
       submitter: LfPartyId = party1,
-      contract: SerializableContract = contract,
-      targetSynchronizer: Target[SynchronizerId] = targetSynchronizer,
+      contract: ContractInstance = contract,
+      targetSynchronizer: Target[PhysicalSynchronizerId] = targetPSId,
       targetMediator: MediatorGroupRecipient = targetMediator,
-      unassignmentResult: DeliveredUnassignmentResult = unassignmentResult,
       uuid: UUID = new UUID(4L, 5L),
       reassigningParticipants: Set[ParticipantId] = Set.empty,
+      unassignmentTs: CantonTimestamp = CantonTimestamp.Epoch,
+  ): FullAssignmentTree = {
+    val seed = seedGenerator.generateSaltSeed()
+
+    val reassignmentId = ReassignmentId.single(
+      sourcePSId,
+      targetSynchronizer,
+      CantonTimestamp.Epoch,
+      contract.contractId,
+      ReassignmentCounter(1),
+    )
+
+    valueOrFail(
+      AssignmentProcessingSteps.makeFullAssignmentTree(
+        crypto.pureCrypto,
+        seed,
+        reassignmentId,
+        submitterInfo(submitter),
+        ContractsReassignmentBatch(contract, initialReassignmentCounter),
+        sourcePSId,
+        targetSynchronizer,
+        targetMediator,
+        uuid,
+        Target(testedProtocolVersion),
+        reassigningParticipants = reassigningParticipants,
+        unassignmentTs,
+      )
+    )("Failed to create FullAssignmentTree")
+  }
+
+  private def fullAssignmentTreeFromUnassignmentData(
+      unassignmentData: UnassignmentData,
+      submitter: LfPartyId = party1,
+      targetMediator: MediatorGroupRecipient = targetMediator,
+      uuid: UUID = new UUID(4L, 5L),
   ): FullAssignmentTree = {
     val seed = seedGenerator.generateSaltSeed()
 
@@ -935,15 +984,16 @@ class AssignmentProcessingStepsTest
       AssignmentProcessingSteps.makeFullAssignmentTree(
         crypto.pureCrypto,
         seed,
+        unassignmentData.reassignmentId,
         submitterInfo(submitter),
-        contract,
-        initialReassignmentCounter,
-        targetSynchronizer,
+        unassignmentData.contractsBatch,
+        unassignmentData.sourcePSId,
+        unassignmentData.targetPSId,
         targetMediator,
-        unassignmentResult,
         uuid,
         Target(testedProtocolVersion),
-        reassigningParticipants = reassigningParticipants,
+        reassigningParticipants = unassignmentData.reassigningParticipants,
+        unassignmentData.unassignmentTs,
       )
     )("Failed to create FullAssignmentTree")
   }

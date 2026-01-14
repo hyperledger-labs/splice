@@ -6,11 +6,11 @@ package com.digitalasset.canton.integration.tests.multisynchronizer
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.LocalSequencerReference
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.{
@@ -71,20 +71,18 @@ trait ReassignmentServiceConcurrentReassignmentsIntegrationTest
         disableAutomaticAssignment(sequencer1)
         disableAutomaticAssignment(sequencer2)
 
-        party1aId = participant1.parties.enable(
-          party1a
-        )
-        participant1.parties.enable(
-          party1b
-        )
-        party2Id = participant2.parties.enable(
-          party2
-        )
-
         participants.all.synchronizers.connect_local(sequencer1, alias = daName)
         participants.all.synchronizers.connect_local(sequencer2, alias = acmeName)
 
-        participants.all.dars.upload(BaseTest.CantonExamplesPath)
+        participants.all.dars.upload(BaseTest.CantonExamplesPath, synchronizerId = daId)
+        participants.all.dars.upload(BaseTest.CantonExamplesPath, synchronizerId = acmeId)
+
+        party1aId = participant1.parties.enable(party1a, synchronizer = daName)
+        participant1.parties.enable(party1a, synchronizer = acmeName)
+        participant1.parties.enable(party1b, synchronizer = daName)
+        participant1.parties.enable(party1b, synchronizer = acmeName)
+        party2Id = participant2.parties.enable(party2, synchronizer = daName)
+        participant2.parties.enable(party2, synchronizer = acmeName)
 
         programmableSequencers.put(
           daName,
@@ -104,10 +102,10 @@ trait ReassignmentServiceConcurrentReassignmentsIntegrationTest
       val contract = IouSyntax.createIou(participant1, Some(daId))(signatory, observer)
       val cid = contract.id.toLf
 
-      val unassignId =
+      val reassignmentId =
         participant1.ledger_api.commands
           .submit_unassign(signatory, Seq(cid), daId, acmeId)
-          .unassignId
+          .reassignmentId
 
       // Check unassignment
       assertNotInLedgerAcsSync(
@@ -128,7 +126,7 @@ trait ReassignmentServiceConcurrentReassignmentsIntegrationTest
       // Submit assignments
       val assignmentCompletion1F = Future {
         failingAssignment(
-          unassignId = unassignId,
+          reassignmentId = reassignmentId,
           source = daId,
           target = acmeId,
           submittingParty = signatory.toLf,
@@ -138,7 +136,7 @@ trait ReassignmentServiceConcurrentReassignmentsIntegrationTest
 
       val assignmentCompletion2F = submission1Phase3Done.future.map { _ =>
         failingAssignment(
-          unassignId = unassignId,
+          reassignmentId = reassignmentId,
           source = daId,
           target = acmeId,
           submittingParty = observer.toLf,
@@ -233,10 +231,10 @@ trait ReassignmentServiceConcurrentReassignmentsIntegrationTest
         val cid = contract.id.toLf
 
         // unassignment contract
-        val unassignId =
+        val reassignmentId =
           participant1.ledger_api.commands
             .submit_unassign(signatory, Seq(cid), daId, acmeId)
-            .unassignId
+            .reassignmentId
 
         eventually() {
           // make sure the unassignment is completed on P2
@@ -274,7 +272,7 @@ trait ReassignmentServiceConcurrentReassignmentsIntegrationTest
         // Submit assignments
         val assignmentCompletion1F = Future {
           failingAssignment(
-            unassignId = unassignId,
+            reassignmentId = reassignmentId,
             source = daId,
             target = acmeId,
             submittingParty = signatory.toLf,
@@ -285,7 +283,7 @@ trait ReassignmentServiceConcurrentReassignmentsIntegrationTest
         // P2 submission should not be sent before P1's
         val assignmentCompletion2F = submission1Done.future.map { _ =>
           failingAssignment(
-            unassignId = unassignId,
+            reassignmentId = reassignmentId,
             source = daId,
             target = acmeId,
             submittingParty = observer.toLf,
@@ -330,7 +328,7 @@ class ReassignmentServiceConcurrentReassignmentsIntegrationTestPostgres
     extends ReassignmentServiceConcurrentReassignmentsIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2"))

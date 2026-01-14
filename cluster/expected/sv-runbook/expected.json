@@ -172,11 +172,75 @@
   },
   {
     "custom": true,
-    "id": "projects/test-project/global/networks/default",
-    "inputs": {},
-    "name": "default",
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-info",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "info",
+      "namespace": "sv",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "deploymentDetails": {
+          "configDigest": {
+            "allowedIpRanges": {
+              "type": "md5",
+              "value": "90eedde4a8599204a45dcb972e212c8b"
+            },
+            "approvedSvIdentities": {
+              "type": "md5",
+              "value": "5871224b744b45122540483fddbd550f"
+            }
+          },
+          "network": "test",
+          "sv": {
+            "version": "0.3.20"
+          },
+          "synchronizer": {
+            "active": {
+              "chainIdSuffix": "4",
+              "migrationId": 3
+            }
+          }
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "istioVirtualService": {
+          "gateway": "cluster-ingress/cn-http-gateway",
+          "host": "info.sv.mock.global.canton.network.digitalasset.com"
+        },
+        "nginxImage": "nginx:latest",
+        "runtimeDetails": {
+          "scanUrl": "http://scan-app.sv:5012"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "info",
     "provider": "",
-    "type": "gcp:compute/network:Network"
+    "type": "kubernetes:helm.sh/v3:Release"
   },
   {
     "custom": true,
@@ -286,6 +350,11 @@
             "protocol": "TCP"
           },
           {
+            "name": "cometbft-0-2-p2p",
+            "number": 26026,
+            "protocol": "TCP"
+          },
+          {
             "name": "cometbft-1-0-p2p",
             "number": 26106,
             "protocol": "TCP"
@@ -293,6 +362,11 @@
           {
             "name": "cometbft-1-1-p2p",
             "number": 26116,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-1-2-p2p",
+            "number": 26126,
             "protocol": "TCP"
           },
           {
@@ -306,6 +380,11 @@
             "protocol": "TCP"
           },
           {
+            "name": "cometbft-2-2-p2p",
+            "number": 26226,
+            "protocol": "TCP"
+          },
+          {
             "name": "cometbft-3-0-p2p",
             "number": 26306,
             "protocol": "TCP"
@@ -316,6 +395,11 @@
             "protocol": "TCP"
           },
           {
+            "name": "cometbft-3-2-p2p",
+            "number": 26326,
+            "protocol": "TCP"
+          },
+          {
             "name": "cometbft-4-0-p2p",
             "number": 26406,
             "protocol": "TCP"
@@ -323,6 +407,11 @@
           {
             "name": "cometbft-4-1-p2p",
             "number": 26416,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-4-2-p2p",
+            "number": 26426,
             "protocol": "TCP"
           }
         ],
@@ -352,8 +441,6 @@
         ],
         "hosts": [
           "mock.global.canton.network.digitalasset.com",
-          "sv.mock.global.canton.network.digitalasset.com",
-          "*.sv.mock.global.canton.network.digitalasset.com",
           "validator.mock.global.canton.network.digitalasset.com",
           "*.validator.mock.global.canton.network.digitalasset.com",
           "validator1.mock.global.canton.network.digitalasset.com",
@@ -361,7 +448,11 @@
           "splitwell.mock.global.canton.network.digitalasset.com",
           "*.splitwell.mock.global.canton.network.digitalasset.com",
           "sv-2.mock.global.canton.network.digitalasset.com",
-          "*.sv-2.mock.global.canton.network.digitalasset.com"
+          "*.sv-2.mock.global.canton.network.digitalasset.com",
+          "sv-1.mock.global.canton.network.digitalasset.com",
+          "*.sv-1.mock.global.canton.network.digitalasset.com",
+          "sv.mock.global.canton.network.digitalasset.com",
+          "*.sv.mock.global.canton.network.digitalasset.com"
         ],
         "http": [
           {
@@ -390,8 +481,6 @@
                 ],
                 "sniHosts": [
                   "mock.global.canton.network.digitalasset.com",
-                  "sv.mock.global.canton.network.digitalasset.com",
-                  "*.sv.mock.global.canton.network.digitalasset.com",
                   "validator.mock.global.canton.network.digitalasset.com",
                   "*.validator.mock.global.canton.network.digitalasset.com",
                   "validator1.mock.global.canton.network.digitalasset.com",
@@ -399,7 +488,11 @@
                   "splitwell.mock.global.canton.network.digitalasset.com",
                   "*.splitwell.mock.global.canton.network.digitalasset.com",
                   "sv-2.mock.global.canton.network.digitalasset.com",
-                  "*.sv-2.mock.global.canton.network.digitalasset.com"
+                  "*.sv-2.mock.global.canton.network.digitalasset.com",
+                  "sv-1.mock.global.canton.network.digitalasset.com",
+                  "*.sv-1.mock.global.canton.network.digitalasset.com",
+                  "sv.mock.global.canton.network.digitalasset.com",
+                  "*.sv.mock.global.canton.network.digitalasset.com"
                 ]
               }
             ],
@@ -417,6 +510,16 @@
     "name": "loopback-virtual-service-sv",
     "provider": "",
     "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
+  },
+  {
+    "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
   },
   {
     "custom": true,
@@ -447,6 +550,7 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
           "enable": true
         },
@@ -458,6 +562,15 @@
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2048Mi"
+          },
+          "requests": {
+            "cpu": "0.5",
+            "memory": "1536Mi"
+          }
         },
         "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
@@ -601,7 +714,35 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "appLabel": "scan-app",
+      "globalLimits": {
+        "fillInterval": "60s",
+        "maxTokens": 2147483647,
+        "tokensPerFill": 2147483647
+      },
+      "inboundPort": 5012,
+      "namespace": "sv",
+      "rateLimits": [
+        {
+          "actions": [
+            {
+              "name": "acs",
+              "pathPrefix": "/api/scan/v0/acs"
+            },
+            {
+              "clientIp": true,
+              "name": "client_ip"
+            }
+          ],
+          "limits": {
+            "fillInterval": "60s",
+            "maxTokens": 10,
+            "tokensPerFill": 5
+          }
+        }
+      ]
+    },
     "name": "splice-sv-scan-app-rate-limit",
     "provider": "",
     "type": "splice:RateLimit"
@@ -697,14 +838,15 @@
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
           },
           {
-            "name": "ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY",
-            "value": "canton.sv-apps.sv.topology-change-delay-duration=250ms"
-          },
-          {
             "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
             "value": "canton.sv-apps.sv.bft-sequencer-connection = false"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
+            "value": "canton.sv-apps.sv.local-synchronizer-node.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
           }
         ],
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
         "affinity": {
           "nodeAffinity": {
             "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -724,7 +866,7 @@
         "approvedSvIdentities": [
           {
             "name": "Digital-Asset-2",
-            "publicKey": "PUBKEY_0==",
+            "publicKey": "sv1-id-public-key",
             "rewardWeightBps": 100000
           },
           {
@@ -746,6 +888,16 @@
             "name": "SV2",
             "publicKey": "PUBLIC_KEY_2==",
             "rewardWeightBps": 150000
+          },
+          {
+            "name": "Digital-Asset-1",
+            "publicKey": "svda1-mock-id-public-key",
+            "rewardWeightBps": 150000
+          },
+          {
+            "name": "DA-Helm-Test-Node",
+            "publicKey": "sv-id-public-key",
+            "rewardWeightBps": 10000
           }
         ],
         "auth": {
@@ -766,7 +918,7 @@
           "sequencerAvailabilityDelay": "60 seconds",
           "sequencerPruningConfig": {
             "enabled": true,
-            "pruningInterval": "1 hours",
+            "pruningInterval": "1 hour",
             "retentionPeriod": "30 days"
           },
           "sequencerPublicUrl": "https://sequencer-3.sv.mock.global.canton.network.digitalasset.com",
@@ -785,7 +937,8 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-2.mock.global.canton.network.digitalasset.com"
         },
-        "logLevel": "DEBUG",
+        "logAsyncFlush": false,
+        "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
           "enable": true
@@ -800,6 +953,15 @@
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
         },
         "scan": {
           "internalUrl": "http://scan-app.sv:5012",
@@ -1054,8 +1216,13 @@
           {
             "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
             "value": "canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT",
+            "value": "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
           }
         ],
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
           "nodeAffinity": {
             "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -1106,6 +1273,14 @@
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "4Gi"
+          },
+          "requests": {
+            "memory": "2Gi"
+          }
         },
         "scanAddress": "http://scan-app.sv:5012",
         "spliceInstanceNames": {

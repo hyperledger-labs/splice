@@ -30,7 +30,8 @@ class WalletAppRewardsTimeBasedIntegrationTest
 
   "A wallet" should {
 
-    "handles rewards correctly in the context of 3rd party apps" in { implicit env =>
+    // TODO(DACH-NY/cn-test-failures#5438) Reenable once the Canton issue is fixed
+    "handles rewards correctly in the context of 3rd party apps" ignore { implicit env =>
       val (_, bobUserParty, _, splitwellProviderParty, key, _) =
         initSplitwellTest()
 
@@ -60,7 +61,7 @@ class WalletAppRewardsTimeBasedIntegrationTest
                 .listValidatorLivenessActivityRecords()
                 .map(_.payload.round.number) should contain(currentRound)
             }
-            advanceRoundsByOneTick
+            advanceRoundsToNextRoundOpening
           }),
         )(
           "Wait for all reward coupons",
@@ -92,7 +93,7 @@ class WalletAppRewardsTimeBasedIntegrationTest
 
         actAndCheck(
           "Advance rounds again to collect rewards",
-          Seq(2, 3).foreach(_ => advanceRoundsByOneTick),
+          Seq(2, 3).foreach(_ => advanceRoundsToNextRoundOpening),
         )(
           "Earn rewards",
           _ => {

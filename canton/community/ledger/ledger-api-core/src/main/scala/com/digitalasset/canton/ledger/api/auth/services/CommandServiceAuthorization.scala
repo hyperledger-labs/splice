@@ -58,19 +58,6 @@ final class CommandServiceAuthorization(
     )(request)
   }
 
-  override def submitAndWaitForTransactionTree(
-      request: SubmitAndWaitRequest
-  ): Future[SubmitAndWaitForTransactionTreeResponse] = {
-    val effectiveSubmitters = CommandsValidator.effectiveSubmitters(request.commands)
-    authorizer.rpc(service.submitAndWaitForTransactionTree)(
-      RequiredClaims.submissionClaims(
-        actAs = effectiveSubmitters.actAs,
-        readAs = effectiveSubmitters.readAs,
-        userIdL = Lens.unit[SubmitAndWaitRequest].commands.userId,
-      )*
-    )(request)
-  }
-
   override def bindService(): ServerServiceDefinition =
     CommandServiceGrpc.bindService(this, executionContext)
 }

@@ -127,4 +127,4 @@ Retried waiting for GCLocker too often allocating
 
 canton/base/errors
 
-# Make sure to have a trailing newline
+Cannot use file /tmp/hsperfdata_ci

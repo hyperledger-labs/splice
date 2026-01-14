@@ -4,32 +4,29 @@
 package org.lfdecentralizedtrust.splice.migration
 
 import cats.data.EitherT
-import cats.implicits.{catsSyntaxOptionId, showInterpolator}
+import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf.ByteString
+import io.grpc.Status
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
 }
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
-import org.lfdecentralizedtrust.splice.migration.AcsExporter.AcsExportFailure
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
-import com.digitalasset.canton.tracing.TraceContext
-import com.google.protobuf.ByteString
-import io.grpc.Status
+import org.lfdecentralizedtrust.splice.migration.AcsExporter.{AcsExportFailure, AcsExportForParties}
+import org.lfdecentralizedtrust.splice.util.SynchronizerMigrationUtil
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.DurationInt
-import scala.jdk.DurationConverters.ScalaDurationOps
 
 class AcsExporter(
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
+    enableNewExport: Boolean,
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
 
@@ -40,81 +37,92 @@ class AcsExporter(
       domain: SynchronizerId,
       timestamp: Instant,
       force: Boolean,
-      parties: PartyId*
+      parties: AcsExportForParties,
   )(implicit
-      tc: TraceContext
-  ): Future[ByteString] = {
-    participantAdminConnection.downloadAcsSnapshot(
-      parties = parties.toSet,
-      filterSynchronizerId = Some(domain),
-      timestamp = Some(timestamp),
-      force = force,
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Seq[ByteString]] = {
+    logger.info(s"Exporting ACS for $parties")
+    getPartiesForWhichToExport(domain, parties).flatMap(parties =>
+      participantAdminConnection.downloadAcsSnapshot(
+        parties = parties,
+        synchronizerId = domain,
+        timestampOrOffset = Left(timestamp),
+        force = force,
+      )
     )
   }
 
-  def safeExportParticipantPartiesAcsFromPausedDomain(domain: SynchronizerId)(implicit
+  def safeExportParticipantPartiesAcsFromPausedDomain(
+      domain: SynchronizerId
+  )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[Future, AcsExportFailure, (ByteString, Instant)] = {
-    EitherT {
-      for {
-        participantId <- participantAdminConnection.getId()
-        parties <- participantAdminConnection
-          .listPartyToParticipant(
-            store = TopologyStoreId.SynchronizerStore(domain).some,
-            filterParticipant = participantId.toProtoPrimitive,
-          )
-          .map(_.map(_.mapping.partyId))
-        _ = logger.info(show"Exporting ACS from paused domain $domain for $parties")
-        acs <- safeExportAcsFromPausedDomain(domain, parties*).value
-      } yield acs
-    }
-  }
-
-  private def safeExportAcsFromPausedDomain(domain: SynchronizerId, parties: PartyId*)(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
-  ): EitherT[Future, AcsExportFailure, (ByteString, Instant)] = {
+  ): EitherT[Future, AcsExportFailure, (Seq[ByteString], Instant)] = {
     for {
-      domainParamsStateTopology <- domainStateTopology
+      parties <- EitherT.liftF(
+        getPartiesForWhichToExport(domain, AcsExportForParties.AllParticipantParties)
+      )
+      _ = logger.info(
+        "Exporting ACS for all the parties hosted on the participant for paused synchronizer"
+      )
+      paramsState <- domainStateTopology
         .firstAuthorizedStateForTheLatestSynchronizerParametersState(domain)
         .toRight(AcsExporter.DomainStateNotFound)
-      domainParamsState = domainParamsStateTopology.mapping.parameters
       _ <- EitherT.cond[Future](
-        domainParamsState.confirmationRequestsMaxRate == NonNegativeInt.zero,
+        SynchronizerMigrationUtil.synchronizerIsPaused(paramsState.currentState),
         (),
         AcsExporter.DomainNotPaused,
       )
       _ <- EitherT.liftF[Future, AcsExportFailure, Unit](
-        waitForMediatorAndParticipantResponseTime(domain, domainParamsStateTopology)
+        waitUntilSynchronizerTime(domain, paramsState.acsExportWaitTimestamp)
       )
-      acsSnapshotTimestamp = domainParamsStateTopology.base.validFrom
-      snapshot <- EitherT.liftF[Future, AcsExportFailure, ByteString](
+      snapshot <- EitherT.liftF[Future, AcsExportFailure, Seq[ByteString]](
         participantAdminConnection.downloadAcsSnapshot(
-          parties = parties.toSet,
-          filterSynchronizerId = Some(domain),
-          timestamp = Some(acsSnapshotTimestamp),
+          parties = parties,
+          synchronizerId = domain,
+          timestampOrOffset = Left(paramsState.exportTimestamp),
           force = true,
         )
       )
+      _ = logger.info(
+        "Exported ACS for all the parties hosted on the participant for paused synchronizer"
+      )
     } yield {
-      snapshot -> acsSnapshotTimestamp
+      snapshot -> paramsState.exportTimestamp
     }
   }
 
-  private def waitForMediatorAndParticipantResponseTime(
+  private def getPartiesForWhichToExport(
+      syncId: SynchronizerId,
+      forParties: AcsExportForParties,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Set[PartyId]] = {
+    forParties match {
+      case AcsExportForParties.AllParticipantParties =>
+        if (enableNewExport)
+          Set.empty[PartyId].pure[Future]
+        else {
+          for {
+            participantId <- participantAdminConnection.getId()
+            parties <- participantAdminConnection
+              .listPartyToParticipant(
+                store = TopologyStoreId.Synchronizer(syncId).some,
+                filterParticipant = participantId.toProtoPrimitive,
+              )
+              .map(_.map(_.mapping.partyId).toSet)
+          } yield parties
+        }
+      case AcsExportForParties.OnlyForParties(parties) => parties.pure[Future]
+    }
+  }
+
+  private def waitUntilSynchronizerTime(
       synchronizerId: SynchronizerId,
-      domainParamsTopology: TopologyResult[SynchronizerParametersState],
+      timestamp: Instant,
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
   ) = {
-    val domainParams = domainParamsTopology.mapping.parameters
-    val duration = domainParams.mediatorReactionTimeout.duration
-      .plus(domainParams.confirmationResponseTimeout.duration)
-      .plus(5.seconds.toJava) // a small buffer to account for network latency
-
-    val readyForDumpAfter = domainParamsTopology.base.validFrom.plus(duration)
     for {
       _ <- retryProvider
         .waitUntil(
@@ -129,10 +137,10 @@ class AcsExporter(
             )
             .map(domainTimeResponse => {
               val domainTimeLowerBound = domainTimeResponse.timestamp.toInstant
-              if (domainTimeLowerBound.isBefore(readyForDumpAfter)) {
+              if (domainTimeLowerBound.isBefore(timestamp)) {
                 throw Status.FAILED_PRECONDITION
                   .withDescription(
-                    s"we should wait until $readyForDumpAfter to let all participants catch up with the paused domain state. Current domain time is $domainTimeLowerBound"
+                    s"we should wait until $timestamp to let all participants catch up with the paused domain state. Current domain time is $domainTimeLowerBound"
                   )
                   .asRuntimeException()
               }
@@ -145,6 +153,13 @@ class AcsExporter(
 }
 
 object AcsExporter {
+
+  sealed trait AcsExportForParties
+
+  object AcsExportForParties {
+    case object AllParticipantParties extends AcsExportForParties
+    case class OnlyForParties(parties: Set[PartyId]) extends AcsExportForParties
+  }
 
   sealed trait AcsExportFailure
 

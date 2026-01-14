@@ -9,8 +9,8 @@ import com.digitalasset.canton.config.DbConfig.Postgres
 import com.digitalasset.canton.console.{LocalParticipantReference, ParticipantReference}
 import com.digitalasset.canton.integration.plugins.{
   UseBftSequencer,
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.tests.DamlRollbackTest.TbContext
 import com.digitalasset.canton.integration.util.EntitySyntax
@@ -29,7 +29,7 @@ import com.digitalasset.daml.lf.data.FrontStack
 import com.digitalasset.daml.lf.transaction.Node
 import com.digitalasset.daml.lf.transaction.test.TestNodeBuilder.{
   CreateKey,
-  CreateTransactionVersion,
+  CreateSerializationVersion,
 }
 import com.digitalasset.daml.lf.transaction.test.{TestNodeBuilder, TransactionBuilder}
 import com.digitalasset.daml.lf.value.Value as LfValue
@@ -98,7 +98,7 @@ trait DamlRollbackTest
   protected def txBuilderContextFrom[A](tx: LfVersionedTransaction)(code: TbContext => A): A =
     code(
       TbContext(
-        txVersion = CreateTransactionVersion.Version(tx.version),
+        txVersion = CreateSerializationVersion.Version(tx.version),
         contractIds = contractIdsInPreorder(tx),
       )
     )
@@ -163,7 +163,7 @@ trait DamlRollbackTest
 }
 
 object DamlRollbackTest {
-  final case class TbContext(txVersion: CreateTransactionVersion, contractIds: Seq[LfContractId])
+  final case class TbContext(txVersion: CreateSerializationVersion, contractIds: Seq[LfContractId])
 }
 
 trait DamlRollbackTestStableLf extends DamlRollbackTest {
@@ -182,7 +182,7 @@ trait DamlRollbackTestStableLf extends DamlRollbackTest {
         .asScala
         .toSeq
 
-    val createTx = participant.ledger_api.javaapi.commands.submit_flat(
+    val createTx = participant.ledger_api.javaapi.commands.submit(
       Seq(signatory),
       createCmd,
     )
@@ -203,7 +203,7 @@ trait DamlRollbackTestStableLf extends DamlRollbackTest {
         observers.map(_.toProtoPrimitive).asJava,
       ).create.commands.asScala.toSeq
 
-    val createTx = participant.ledger_api.javaapi.commands.submit_flat(
+    val createTx = participant.ledger_api.javaapi.commands.submit(
       signatories,
       createCmd,
     )
@@ -220,7 +220,7 @@ trait DamlRollbackTestStableLf extends DamlRollbackTest {
   ): exceptionstester.Informees.ContractId = {
     val cmdSignOn = informees.exerciseSignOn(observer.toProtoPrimitive).commands.asScala.toSeq
     val createTx =
-      participant.ledger_api.javaapi.commands.submit_flat(Seq(observer), cmdSignOn)
+      participant.ledger_api.javaapi.commands.submit(Seq(observer), cmdSignOn)
     JavaDecodeUtil
       .decodeAllCreated(exceptionstester.Informees.COMPANION)(createTx)
       .loneElement
@@ -651,7 +651,7 @@ trait DamlRollbackTestDevLf extends DamlRollbackTest {
         .asScala
         .toSeq
 
-    val createTx = participant.ledger_api.javaapi.commands.submit_flat(
+    val createTx = participant.ledger_api.javaapi.commands.submit(
       Seq(signatory),
       createCmd,
     )
@@ -1164,7 +1164,7 @@ trait DamlRollbackTestDevLf extends DamlRollbackTest {
 trait DamlRollbackReferenceSequencerPostgresTest {
   self: SharedEnvironment =>
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[Postgres](loggerFactory))
 }
 
 trait DamlRollbackBftSequencerPostgresTest {

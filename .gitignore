@@ -1,6 +1,7 @@
 .daml
 *.dar
 !daml/dars/*
+*.iml
 *.log
 *.clog
 .DS_Store
@@ -19,8 +20,6 @@ _build/
 **/metals.sbt
 **/.scala-build/*
 
-# We want to share run configurations
-!.idea/runConfigurations
 .vscode/*
 !.vscode/settings.json
 # Make sure test files are checkedin
@@ -78,3 +77,4 @@ docs/src/deployment/observability/metrics_reference.rst
 # For Vagrant
 /.vagrant/
 /vagrant-nix-cache/
+lnav*work

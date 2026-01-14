@@ -20,10 +20,15 @@ class ValidatorPackageVettingTrigger(
     scanConnection: BftScanConnection,
     override protected val context: TriggerContext,
     maxVettingDelay: NonNegativeFiniteDuration,
+    latestPackagesOnly: Boolean,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
-) extends PackageVettingTrigger(ValidatorPackageVettingTrigger.packages, maxVettingDelay) {
+) extends PackageVettingTrigger(
+      ValidatorPackageVettingTrigger.packages,
+      maxVettingDelay,
+      latestPackagesOnly,
+    ) {
 
   override def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId] =
     scanConnection.getAmuletRulesDomain()(tc)

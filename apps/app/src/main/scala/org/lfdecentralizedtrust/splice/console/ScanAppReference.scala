@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.console
 
-import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
@@ -59,7 +58,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
 }
-import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvAdminAppClient
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvOperatorAppClient
 
 import scala.jdk.OptionConverters.*
 import java.time.Instant
@@ -398,6 +397,9 @@ abstract class ScanAppReference(
   def getAcsSnapshotAt(
       at: CantonTimestamp,
       migrationId: Long,
+      recordTimeMatch: Option[definitions.AcsRequest.RecordTimeMatch] = Some(
+        definitions.AcsRequest.RecordTimeMatch.Exact
+      ),
       after: Option[Long] = None,
       pageSize: Int = 100,
       partyIds: Option[Vector[PartyId]] = None,
@@ -408,6 +410,7 @@ abstract class ScanAppReference(
         HttpScanAppClient.GetAcsSnapshotAt(
           at.toInstant.atOffset(java.time.ZoneOffset.UTC),
           migrationId,
+          recordTimeMatch,
           after,
           pageSize,
           partyIds,
@@ -420,6 +423,9 @@ abstract class ScanAppReference(
       at: CantonTimestamp,
       migrationId: Long,
       partyIds: Vector[PartyId],
+      recordTimeMatch: Option[definitions.HoldingsStateRequest.RecordTimeMatch] = Some(
+        definitions.HoldingsStateRequest.RecordTimeMatch.Exact
+      ),
       after: Option[Long] = None,
       pageSize: Int = 100,
   ) =
@@ -429,8 +435,30 @@ abstract class ScanAppReference(
           at.toInstant.atOffset(java.time.ZoneOffset.UTC),
           migrationId,
           partyIds,
+          recordTimeMatch,
           after,
           pageSize,
+        )
+      )
+    }
+
+  def getHoldingsSummaryAt(
+      at: CantonTimestamp,
+      migrationId: Long,
+      ownerPartyIds: Vector[PartyId] = Vector.empty,
+      recordTimeMatch: Option[definitions.HoldingsSummaryRequest.RecordTimeMatch] = Some(
+        definitions.HoldingsSummaryRequest.RecordTimeMatch.Exact
+      ),
+      asOfRound: Option[Long] = None,
+  ) =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetHoldingsSummaryAt(
+          at.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          migrationId,
+          ownerPartyIds,
+          recordTimeMatch,
+          asOfRound,
         )
       )
     }
@@ -498,6 +526,29 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.GetUpdate(updateId, encoding)
+      )
+    }
+  }
+
+  def getEventHistory(
+      count: Int,
+      after: Option[(Long, String)],
+      encoding: definitions.DamlValueEncoding,
+  ): Seq[definitions.EventHistoryItem] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetEventHistory(count, after, encoding)
+      )
+    }
+  }
+
+  def getEventById(
+      updateId: String,
+      damlValueEncoding: Option[definitions.DamlValueEncoding],
+  ): Option[definitions.EventHistoryItem] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetEventById(updateId, damlValueEncoding)
       )
     }
   }
@@ -622,7 +673,7 @@ abstract class ScanAppReference(
   ): Contract[VoteRequest.ContractId, VoteRequest] = {
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.LookupVoteRequest(trackingCid)()
+        HttpSvOperatorAppClient.LookupVoteRequest(trackingCid)()
       )
     }
   }
@@ -672,8 +723,7 @@ abstract class ScanAppReference(
 final class ScanAppBackendReference(
     override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
     name: String,
-)(implicit actorSystem: ActorSystem)
-    extends ScanAppReference(spliceConsoleEnvironment, name)
+) extends ScanAppReference(spliceConsoleEnvironment, name)
     with AppBackendReference
     with BaseInspection[ScanApp] {
 
@@ -694,14 +744,6 @@ final class ScanAppBackendReference(
   @Help.Summary("Return local scan app config")
   override def config: ScanAppBackendConfig =
     spliceConsoleEnvironment.environment.config.scansByString(name)
-
-  /** Remote participant this scan app is configured to interact with. */
-  lazy val participantClient =
-    new ParticipantClientReference(
-      spliceConsoleEnvironment,
-      s"remote participant for `$name``",
-      config.participantClient.getParticipantClientConfig(),
-    )
 
   /** Remote participant this scan app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val participantClientWithAdminToken =

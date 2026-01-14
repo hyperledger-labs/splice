@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.sv.store
 
 import cats.implicits.toTraverseOps
-import com.daml.ledger.javaapi.data as javab
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedReward
@@ -40,18 +39,18 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{QueryResult, T
 import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsJdbcTypes}
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
 import org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoAcsStoreRowData
-import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template as TemplateCompanion
 import org.lfdecentralizedtrust.splice.util.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
@@ -182,14 +181,14 @@ trait SvDsoStore
     )
 
   /** List amulets that are expired and can never be used as transfer input. */
-  final def listExpiredAmulets
-      : ListExpiredContracts[splice.amulet.Amulet.ContractId, splice.amulet.Amulet] =
-    listExpiredRoundBased(splice.amulet.Amulet.COMPANION)(identity)
+  def listExpiredAmulets(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[splice.amulet.Amulet.ContractId, splice.amulet.Amulet]
 
   /** List locked amulets that are expired and can never be used as transfer input. */
-  final def listLockedExpiredAmulets
-      : ListExpiredContracts[splice.amulet.LockedAmulet.ContractId, splice.amulet.LockedAmulet] =
-    listExpiredRoundBased(splice.amulet.LockedAmulet.COMPANION)(_.amulet)
+  def listLockedExpiredAmulets(
+      ignoredParties: Set[PartyId]
+  ): ListExpiredContracts[splice.amulet.LockedAmulet.ContractId, splice.amulet.LockedAmulet]
 
   def listExpiredVoteRequests(): ListExpiredContracts[VoteRequest.ContractId, VoteRequest] =
     multiDomainAcsStore.listExpiredFromPayloadExpiry(VoteRequest.COMPANION)
@@ -227,6 +226,7 @@ trait SvDsoStore
   def listAppRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
   ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.AppRewardCoupon.ContractId]]]
@@ -249,6 +249,7 @@ trait SvDsoStore
   def listValidatorRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
   ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.ValidatorRewardCoupon.ContractId]]]
@@ -288,6 +289,7 @@ trait SvDsoStore
   def listValidatorFaucetCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
   ): Future[
@@ -297,6 +299,7 @@ trait SvDsoStore
   def listValidatorLivenessActivityRecordsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
   ): Future[
@@ -335,6 +338,7 @@ trait SvDsoStore
   def listSvRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
+      ignoredParties: Set[PartyId],
   )(implicit
       tc: TraceContext
   ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.SvRewardCoupon.ContractId]]]
@@ -355,6 +359,7 @@ trait SvDsoStore
   final def getExpiredCouponsInBatchesPerRoundAndCouponType(
       domain: SynchronizerId,
       enableExpireValidatorFaucet: Boolean,
+      ignoredExpiredRewardsPartyIds: Set[PartyId],
       totalCouponsLimit: Limit = PageLimit.tryCreate(100),
   )(implicit
       tc: TraceContext
@@ -375,26 +380,31 @@ trait SvDsoStore
       appRewardGroups <- listAppRewardCouponsGroupedByRound(
         domain,
         totalCouponsLimit = totalCouponsLimit,
+        ignoredExpiredRewardsPartyIds,
       )
       validatorRewardGroups <- listValidatorRewardCouponsGroupedByRound(
         domain,
         totalCouponsLimit = totalCouponsLimit,
+        ignoredExpiredRewardsPartyIds,
       )
       validatorFaucetGroups <-
         if (enableExpireValidatorFaucet)
           listValidatorFaucetCouponsGroupedByRound(
             domain,
             totalCouponsLimit = totalCouponsLimit,
+            ignoredExpiredRewardsPartyIds,
           )
         else Future.successful(Seq.empty)
       validatorLivenessActivityRecordGroups <-
         listValidatorLivenessActivityRecordsGroupedByRound(
           domain,
           totalCouponsLimit = totalCouponsLimit,
+          ignoredExpiredRewardsPartyIds,
         )
       svRewardCouponGroups <- listSvRewardCouponsGroupedByRound(
         domain,
         totalCouponsLimit = totalCouponsLimit,
+        ignoredExpiredRewardsPartyIds,
       )
       roundNumbers =
         (appRewardGroups ++ validatorRewardGroups ++ validatorFaucetGroups ++ validatorLivenessActivityRecordGroups ++ svRewardCouponGroups)
@@ -686,10 +696,6 @@ trait SvDsoStore
       tc: TraceContext
   ): Future[Seq[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]]
 
-  protected def listExpiredRoundBased[Id <: javab.codegen.ContractId[T], T <: javab.Template](
-      companion: TemplateCompanion[Id, T]
-  )(amulet: T => splice.amulet.Amulet): ListExpiredContracts[Id, T]
-
   final def listUnclaimedRewards(
       limit: Limit
   )(implicit
@@ -951,33 +957,53 @@ trait SvDsoStore
     multiDomainAcsStore
       .listContracts(splice.amulet.FeaturedAppActivityMarker.COMPANION, PageLimit.tryCreate(limit))
       .map(_.map(_.contract))
+
+  /** Whether there are more than the given number of featured app activity markers. */
+  def featuredAppActivityMarkerCountAboveOrEqualTo(threshold: Int)(implicit
+      tc: TraceContext
+  ): Future[Boolean]
+
+  def listFeaturedAppActivityMarkersByContractIdHash(
+      contractIdHashLbIncl: Int,
+      contractIdHashUbIncl: Int,
+      limit: Int,
+  )(implicit tc: TraceContext): Future[Seq[Contract[
+    splice.amulet.FeaturedAppActivityMarker.ContractId,
+    splice.amulet.FeaturedAppActivityMarker,
+  ]]]
+
+  def lookupAmuletConversionRateFeed(
+      publisher: PartyId
+  )(implicit tc: TraceContext): Future[Option[Contract[
+    splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.ContractId,
+    splice.ans.amuletconversionratefeed.AmuletConversionRateFeed,
+  ]]]
+
 }
 
 object SvDsoStore {
   def apply(
       key: SvStore.Key,
-      storage: Storage,
+      storage: DbStorage,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
+      ingestionConfig: IngestionConfig,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
   ): SvDsoStore = {
-    storage match {
-      case db: DbStorage =>
-        new DbSvDsoStore(
-          key,
-          db,
-          loggerFactory,
-          retryProvider,
-          domainMigrationInfo,
-          participantId,
-        )
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-    }
+    new DbSvDsoStore(
+      key,
+      storage,
+      loggerFactory,
+      retryProvider,
+      domainMigrationInfo,
+      participantId,
+      ingestionConfig,
+    )
   }
 
   /** Contract filter of an sv acs store for a specific acs party. */
@@ -1304,6 +1330,15 @@ object SvDsoStore {
             contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
           )
+      },
+      mkFilter(splice.ans.amuletconversionratefeed.AmuletConversionRateFeed.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          conversionRateFeedPublisher =
+            Some(PartyId.tryFromProtoPrimitive(contract.payload.publisher)),
+        )
       },
     )
 

@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.config
 
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.StartupMemoryCheckConfig.ReportingLevel.Warn
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
@@ -21,6 +22,7 @@ abstract class SpliceBackendConfig extends LocalNodeConfig {
   override val topology: TopologyConfig = TopologyConfig()
 
   override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()
+
   def participantClient: BaseParticipantClientConfig
   def automation: AutomationConfig
 
@@ -40,6 +42,35 @@ final case class CircuitBreakerConfig(
     maxResetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
     exponentialBackoffFactor: Double = 2.0,
     randomFactor: Double = 0.2,
+    // If the last failure was more than resetFailuresAfter ago, reset the failures to 0.
+    resetFailuresAfter: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(15),
+)
+
+final case class CircuitBreakersConfig(
+    highPriority: CircuitBreakerConfig = CircuitBreakerConfig(
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(2)
+    ),
+    mediumPriority: CircuitBreakerConfig = CircuitBreakerConfig(
+      maxFailures = 10,
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(3),
+    ),
+    lowPriority: CircuitBreakerConfig = CircuitBreakerConfig(
+      maxFailures = 5,
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(7),
+    ),
+    // Amulet expiry is different from essentially any other trigger run in the SV app in that for it to complete successfully
+    // we need a confirmation from the node hosting the amulet owner. So in other words, if a node is down
+    // this will start failing. Therefore, we use a dedicated circuit breaker just for amulet expiry
+    // to avoid this causing issues for other triggers.
+    amuletExpiry: CircuitBreakerConfig = CircuitBreakerConfig(
+      maxFailures = 5,
+      maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(7),
+    ),
+)
+
+final case class EnabledFeaturesConfig(
+    enableNewAcsExport: Boolean = true,
+    newSequencerConnectionPool: Boolean = false,
 )
 
 /** This class aggregates binary-level configuration options that are shared between each Splice app instance.
@@ -59,7 +90,8 @@ case class SharedSpliceAppParameters(
     override val processingTimeouts: ProcessingTimeout,
     requestTimeout: NonNegativeDuration,
     upgradesConfig: UpgradesConfig = UpgradesConfig(),
-    commandCircuitBreakerConfig: CircuitBreakerConfig = CircuitBreakerConfig(),
+    circuitBreakers: CircuitBreakersConfig = CircuitBreakersConfig(),
+    enabledFeatures: EnabledFeaturesConfig = EnabledFeaturesConfig(),
     // TODO(DACH-NY/canton-network-node#736): likely remove all of the following:
     override val cachingConfigs: CachingConfigs,
     override val enableAdditionalConsistencyChecks: Boolean,
@@ -85,6 +117,5 @@ case class SharedSpliceAppParameters(
 
   override def startupMemoryCheckConfig: StartupMemoryCheckConfig = StartupMemoryCheckConfig(Warn)
 
-  // not applicable
-  override def sessionSigningKeys: SessionSigningKeysConfig = ???
+  def dispatchQueueBackpressureLimit: NonNegativeInt = ???
 }

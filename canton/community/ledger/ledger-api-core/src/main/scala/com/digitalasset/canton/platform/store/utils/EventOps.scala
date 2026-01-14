@@ -3,13 +3,8 @@
 
 package com.digitalasset.canton.platform.store.utils
 
+import com.daml.ledger.api.v2.event.Event
 import com.daml.ledger.api.v2.event.Event.Event.{Archived, Created, Empty, Exercised}
-import com.daml.ledger.api.v2.event.{CreatedEvent, Event, ExercisedEvent}
-import com.daml.ledger.api.v2.transaction.TreeEvent
-import com.daml.ledger.api.v2.transaction.TreeEvent.Kind.{
-  Created as TreeCreated,
-  Exercised as TreeExercised,
-}
 import com.daml.ledger.api.v2.value.Identifier
 
 object EventOps {
@@ -85,26 +80,4 @@ object EventOps {
     }
 
   }
-
-  implicit final class TreeEventKindOps(val kind: TreeEvent.Kind) extends AnyVal {
-    def fold[T](exercise: ExercisedEvent => T, create: CreatedEvent => T): T =
-      kind match {
-        case TreeExercised(value) => exercise(value)
-        case TreeCreated(value) => create(value)
-        case tk => throw new IllegalArgumentException(s"Unknown TreeEvent type: $tk")
-      }
-  }
-
-  implicit final class TreeEventOps(val event: TreeEvent) extends AnyVal {
-    def nodeId: Int = event.kind.fold(_.nodeId, _.nodeId)
-    def witnessParties: Seq[String] = event.kind.fold(_.witnessParties, _.witnessParties)
-    def modifyWitnessParties(f: Seq[String] => Seq[String]): TreeEvent =
-      event.kind.fold(
-        exercise =>
-          TreeEvent(TreeExercised(exercise.copy(witnessParties = f(exercise.witnessParties)))),
-        create => TreeEvent(TreeCreated(create.copy(witnessParties = f(create.witnessParties)))),
-      )
-    def templateId: Option[Identifier] = event.kind.fold(_.templateId, _.templateId)
-  }
-
 }

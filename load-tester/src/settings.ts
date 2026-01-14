@@ -39,6 +39,13 @@ export const configSchema = z.object({
   test: z.object({
     duration: z.string().min(1),
     iterationsPerMinute: z.coerce.number().min(1),
+    preAllocatedVUs: z.coerce.number().default(20),
+    maxVUs: z.coerce.number().default(50),
+  }),
+  adaptiveScenario: z.object({
+    enabled: z.boolean(),
+    maxVUs: z.number(),
+    duration: z.string(),
   }),
 });
 
@@ -50,6 +57,17 @@ export default {
   ...config,
   options: {
     scenarios: {
+      ...(config.adaptiveScenario.enabled
+        ? {
+            adaptive_load: {
+              executor: 'externally-controlled',
+              vus: 1,
+              maxVUs: config.adaptiveScenario.maxVUs,
+              // How long the test lasts
+              duration: config.adaptiveScenario.duration,
+            },
+          }
+        : {}),
       generate_load: {
         executor: 'constant-arrival-rate',
 
@@ -60,8 +78,8 @@ export default {
         rate: config.test.iterationsPerMinute,
         timeUnit: '1m',
 
-        // Pre-allocate VUs
-        preAllocatedVUs: 20,
+        preAllocatedVUs: config.test.preAllocatedVUs,
+        maxVUs: config.test.maxVUs,
       },
     },
   },

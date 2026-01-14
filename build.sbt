@@ -33,7 +33,7 @@ lazy val `canton-wartremover-extension` = BuildCommon.`canton-wartremover-extens
 lazy val `canton-wartremover-annotations` = BuildCommon.`canton-wartremover-annotations`
 lazy val `canton-util-external` = BuildCommon.`canton-util-external`
 lazy val `canton-util-internal` = BuildCommon.`canton-util-internal`
-lazy val `canton-util-logging` = BuildCommon.`canton-util-logging`
+lazy val `canton-util-observability` = BuildCommon.`canton-util-observability`
 lazy val `canton-pekko-fork` = BuildCommon.`canton-pekko-fork`
 lazy val `canton-magnolify-addon` = BuildCommon.`canton-magnolify-addon`
 lazy val `canton-scalatest-addon` = BuildCommon.`canton-scalatest-addon`
@@ -64,6 +64,9 @@ inThisBuild(
 //    semanticdbIncludeInJar := true, // cache it in the remote cache
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
+    // slows down just the non integration tests which is a really small subset
+    // this helps us get actual realistic times for how long a test takes to run
+    Test / parallelExecution := false,
   )
 )
 
@@ -101,6 +104,10 @@ lazy val root: Project = (project in file("."))
     `splice-wallet-payments-daml`,
     `splice-wallet-daml`,
     `splice-wallet-test-daml`,
+    `splice-util-featured-app-proxies-daml`,
+    `splice-util-featured-app-proxies-test-daml`,
+    `splice-util-token-standard-wallet-daml`,
+    `splice-util-token-standard-wallet-test-daml`,
     `splitwell-daml`,
     `splitwell-test-daml`,
     `splice-dso-governance-daml`,
@@ -142,6 +149,7 @@ lazy val root: Project = (project in file("."))
     docs,
     `canton-json-api-v2-openapi-ts-client`,
     `token-standard-cli`,
+    `party-allocator`,
   )
   .settings(
     BuildCommon.sharedSettings,
@@ -224,6 +232,8 @@ lazy val docs = project
           (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
           (`splice-token-test-trading-app-daml` / Compile / damlBuild).value ++
           (`splice-wallet-payments-daml` / Compile / damlBuild).value ++
+          (`splice-util-featured-app-proxies-daml` / Compile / damlBuild).value ++
+          (`splice-util-token-standard-wallet-daml` / Compile / damlBuild).value ++
           (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
@@ -299,12 +309,39 @@ lazy val docs = project
   )
 
 // Shared token standard code
-lazy val `splice-api-token-metadata-v1-daml` =
+lazy val `splice-api-token-metadata-v1-daml`: Project =
   project
     .in(file("token-standard/splice-api-token-metadata-v1"))
     .enablePlugins(DamlPlugin)
     .settings(
-      BuildCommon.damlSettings
+      BuildCommon.damlSettings,
+      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
+      Compile / sourceGenerators +=
+        Def.taskDyn {
+          val tokenMetadataOpenApiFile =
+            baseDirectory.value / "openapi/token-metadata-v1.yaml"
+
+          BuildCommon.TS.generateOpenApiClient(
+            unscopedNpmName = "token-metadata-openapi",
+            openApiSpec = "token-metadata-v1.yaml",
+            cacheFileDependencies = Set(tokenMetadataOpenApiFile),
+            directory = "openapi-ts-client",
+            subPath = "openapi",
+          )
+        },
+      cleanFiles += { baseDirectory.value / "openapi-ts-client" },
+      npmInstallOpenApiDeps := Seq(
+        (
+          (Compile / compile).value,
+          (Compile / baseDirectory).value,
+          false,
+        )
+      ),
+      npmInstallDeps := Seq(
+        baseDirectory.value / "openapi-ts-client" / "package.json"
+      ),
+      npmInstall := BuildCommon.npmInstallTask.value,
+      npmRootDir := baseDirectory.value / "openapi-ts-client",
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -334,12 +371,8 @@ lazy val `splice-api-token-transfer-instruction-v1-daml` =
           val transferInstructionOpenApiFile =
             baseDirectory.value / "openapi/transfer-instruction-v1.yaml"
 
-          val npmName = "transfer-instruction-openapi"
-
           BuildCommon.TS.generateOpenApiClient(
-            npmName = npmName,
-            npmModuleName = npmName,
-            npmProjectName = npmName,
+            unscopedNpmName = "transfer-instruction-openapi",
             openApiSpec = "transfer-instruction-v1.yaml",
             cacheFileDependencies = Set(transferInstructionOpenApiFile),
             directory = "openapi-ts-client",
@@ -457,12 +490,8 @@ lazy val `canton-json-api-v2-openapi-ts-client` = project
       Def.taskDyn {
         val openApiFile = baseDirectory.value / "openapi.yaml"
 
-        val npmName = "canton-json-api-v2"
-
         BuildCommon.TS.generateOpenApiClient(
-          npmName = npmName,
-          npmModuleName = npmName,
-          npmProjectName = npmName,
+          unscopedNpmName = "canton-json-api-v2",
           openApiSpec = "openapi.yaml",
           cacheFileDependencies = Set(openApiFile),
           directory = "openapi-ts-client",
@@ -484,6 +513,9 @@ lazy val `token-standard-cli` =
     .dependsOn(
       `splice-api-token-transfer-instruction-v1-daml`,
       `canton-json-api-v2-openapi-ts-client`,
+      // all dependencies here for token-metadata are not "real" dependencies,
+      // but rather they prevent npm install from being executed concurrently and breaking everything
+      `splice-api-token-metadata-v1-daml`,
     )
     .settings(
       Headers.TsHeaderSettings,
@@ -498,8 +530,15 @@ lazy val `token-standard-cli` =
           (`canton-json-api-v2-openapi-ts-client` / Compile / baseDirectory).value,
           false,
         ),
+        (
+          (`splice-api-token-metadata-v1-daml` / Compile / compile).value,
+          (`splice-api-token-metadata-v1-daml` / Compile / baseDirectory).value,
+          false,
+        ),
       ),
-      npmInstallDeps := Seq(baseDirectory.value / "package.json"),
+      npmInstallDeps := Seq(
+        baseDirectory.value / "package.json"
+      ) ++ (`splice-api-token-metadata-v1-daml` / Compile / npmInstall).value,
       npmInstall := BuildCommon.npmInstallTask.value,
       npmRootDir := baseDirectory.value,
       npmTest := {
@@ -536,6 +575,75 @@ lazy val `token-standard-cli` =
       Compile / compile := {
         npmInstall.value
         (Compile / compile).value
+      },
+    )
+
+lazy val `party-allocator` =
+  project
+    .in(file("party-allocator"))
+    .dependsOn(
+      `splice-api-token-transfer-instruction-v1-daml`,
+      `canton-json-api-v2-openapi-ts-client`,
+    )
+    .settings(
+      Headers.TsHeaderSettings,
+      npmInstallOpenApiDeps := Seq(
+        (
+          (`splice-api-token-transfer-instruction-v1-daml` / Compile / compile).value,
+          (`splice-api-token-transfer-instruction-v1-daml` / Compile / baseDirectory).value,
+          false,
+        ),
+        (
+          (`canton-json-api-v2-openapi-ts-client` / Compile / compile).value,
+          (`canton-json-api-v2-openapi-ts-client` / Compile / baseDirectory).value,
+          false,
+        ),
+      ),
+      npmInstallDeps := Seq(
+        baseDirectory.value / "package.json"
+      ) ++ (`token-standard-cli` / Compile / npmInstall).value,
+      npmInstall := BuildCommon.npmInstallTask.value,
+      npmRootDir := baseDirectory.value,
+      npmTest := {
+        val log = streams.value.log
+        (Test / compile).value
+        npmInstall.value
+        runCommand(
+          Seq("npm", "run", "test:sbt"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+      npmFix := {
+        val log = streams.value.log
+        npmInstall.value
+        runCommand(
+          Seq("npm", "run", "fix"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+      npmLint := {
+        val log = streams.value.log
+        npmInstall.value
+        runCommand(
+          Seq("npm", "run", "check"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+      npmBuild := {
+        val log = streams.value.log
+        npmInstall.value
+        runCommand(
+          Seq("npm", "run", "build"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
       },
     )
 
@@ -678,6 +786,60 @@ lazy val `splice-wallet-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
+lazy val `splice-util-featured-app-proxies-daml` =
+  project
+    .in(file("daml/splice-util-featured-app-proxies"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
+          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `splice-util-token-standard-wallet-daml` =
+  project
+    .in(file("daml/splice-util-token-standard-wallet"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
+          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `splice-util-featured-app-proxies-test-daml` =
+  project
+    .in(file("daml/splice-util-featured-app-proxies-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
+          (`splice-util-featured-app-proxies-daml` / Compile / damlBuild).value,
+      Compile / damlEnableJavaCodegen := false,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `splice-util-token-standard-wallet-test-daml` =
+  project
+    .in(file("daml/splice-util-token-standard-wallet-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
+          (`splice-util-token-standard-wallet-daml` / Compile / damlBuild).value,
+      Compile / damlEnableJavaCodegen := false,
+    )
+    .dependsOn(`canton-bindings-java`)
+
 lazy val `splice-wallet-test-daml` =
   project
     .in(file("daml/splice-wallet-test"))
@@ -780,6 +942,7 @@ lazy val `apps-common` =
         spray_json,
         pekko_spray_json,
         Dependencies.parallel_collections,
+        pekko_connectors_google_cloud_storage,
       ),
       BuildCommon.sharedAppSettings,
       buildInfoKeys := Seq[BuildInfoKey](
@@ -848,16 +1011,16 @@ lazy val `apps-validator` =
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/validator-openapi",
+        unscopedNpmName = "validator-openapi",
         openApiSpec = "validator-internal.yaml",
       ),
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/ans-external-openapi",
+        unscopedNpmName = "ans-external-openapi",
         openApiSpec = "ans-external.yaml",
         directory = "external-openapi-ts-client",
       ),
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/scan-proxy-openapi",
+        unscopedNpmName = "scan-proxy-openapi",
         openApiSpec = "scan-proxy.yaml",
         directory = "scan-proxy-openapi-ts-client",
       ),
@@ -899,7 +1062,7 @@ lazy val `apps-sv` =
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/sv-openapi",
+        unscopedNpmName = "sv-openapi",
         openApiSpec = "sv-internal.yaml",
       ),
       Compile / guardrailTasks :=
@@ -921,11 +1084,17 @@ lazy val `apps-scan` =
       `splice-dso-governance-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(pekko_http_cors, scalapb_runtime_grpc, scalapb_runtime),
+      libraryDependencies ++= Seq(
+        pekko_http_cors,
+        scalapb_runtime_grpc,
+        scalapb_runtime,
+        zstd,
+        aws_s3,
+      ),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/scan-openapi",
+        unscopedNpmName = "scan-openapi",
         openApiSpec = "scan.yaml",
       ),
       Compile / guardrailTasks :=
@@ -1012,6 +1181,9 @@ lazy val `apps-common-frontend` = {
       `apps-wallet`,
       `apps-splitwell`,
       `apps-validator`,
+      // token-standard-cli are not "real" dependencies,
+      // but rather they prevent npm install from being executed concurrently and breaking everything
+      `token-standard-cli`,
     )
     .settings(
       // daml typescript code generation settings:
@@ -1027,7 +1199,7 @@ lazy val `apps-common-frontend` = {
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
-      npmInstallDeps := baseDirectory.value / "package.json" +: damlTsCodegen.value,
+      npmInstallDeps := (baseDirectory.value / "package.json" +: damlTsCodegen.value) ++ (`splice-api-token-metadata-v1-daml` / Compile / npmInstall).value ++ (`token-standard-cli` / Compile / npmInstall).value,
       npmInstallOpenApiDeps :=
         Seq(
           (
@@ -1240,6 +1412,13 @@ lazy val `apps-scan-frontend` = {
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
       frontendWorkspace := "@lfdecentralizedtrust/splice-scan-frontend",
       sharedFrontendSettings,
+      npmInstallOpenApiDeps := Seq(
+        (
+          (`splice-api-token-metadata-v1-daml` / Compile / compile).value,
+          (`splice-api-token-metadata-v1-daml` / Compile / baseDirectory).value,
+          false,
+        )
+      ),
     )
 }
 
@@ -1304,12 +1483,12 @@ lazy val `apps-wallet` =
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/wallet-external-openapi",
+        unscopedNpmName = "wallet-external-openapi",
         openApiSpec = "wallet-external.yaml",
         directory = "external-openapi-ts-client",
       ),
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/wallet-openapi",
+        unscopedNpmName = "wallet-openapi",
         openApiSpec = "wallet-internal.yaml",
       ),
       Compile / guardrailTasks :=
@@ -1342,7 +1521,7 @@ lazy val `apps-splitwell` =
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
-        npmName = "@lfdecentralizedtrust/splitwell-openapi",
+        unscopedNpmName = "splitwell-openapi",
         openApiSpec = "splitwell-internal.yaml",
       ),
       BuildCommon.sharedAppSettings,
@@ -1529,6 +1708,8 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case PathList("io", "grpc", _*) => MergeStrategy.first
     // this file comes in multiple flavors, from io.get-coursier:interface and from org.scala-lang.modules:scala-collection-compat. Since the content differs it is resolve this explicitly with this MergeStrategy.
     case path if path.endsWith("scala-collection-compat.properties") => MergeStrategy.first
+    // Don't really care about the notice file so just take any.
+    case "META-INF/FastDoubleParser-NOTICE" => MergeStrategy.first
     case x => oldStrategy(x)
   }
 }
@@ -1715,12 +1896,17 @@ checkErrors := {
 
   splitAndCheckCantonLogFile("canton", usesSimtime = false)
   splitAndCheckCantonLogFile("canton-simtime", usesSimtime = true)
+  splitAndCheckCantonLogFile("canton-missing-signatures", usesSimtime = false)
   import better.files._
   val dir = File("log/")
   if (dir.exists())
     dir
       .glob("canton-standalone-*.clog")
       .map(_.nameWithoutExtension)
+      .map(_.stripSuffix("_before_shutdown"))
+      .map(_.stripSuffix("_after_shutdown"))
+      .toList
+      .distinct
       .foreach { name =>
         splitAndCheckCantonLogFile(
           name,
@@ -1749,8 +1935,6 @@ lazy val `apps-app`: Project =
     .in(file("apps/app"))
     .dependsOn(
       `apps-common`,
-      `splice-wallet-payments-daml`,
-      `splice-wallet-daml`,
       `apps-splitwell`,
       `apps-validator`,
       `apps-sv` % "compile->compile;test->test",
@@ -1759,6 +1943,9 @@ lazy val `apps-app`: Project =
       `canton-community-app` % "compile->compile;test->test",
       `canton-community-base`,
       `canton-community-integration-testing` % "test",
+      `splice-util-featured-app-proxies-daml` % "test",
+      // necessary for token-standard-cli to get `npm install`ed so that TokenStandardCliSanityCheckPlugin can run
+      `apps-common-frontend`,
     )
     .settings(
       libraryDependencies += "org.scalatestplus" %% "selenium-4-12" % "3.2.17.0" % "test",
@@ -1768,6 +1955,7 @@ lazy val `apps-app`: Project =
       libraryDependencies += kubernetes_client,
       libraryDependencies +=
         "com.google.cloud" % "google-cloud-bigquery" % "2.53.0" % "test",
+      libraryDependencies += "com.monovore" %% "decline" % "2.5.0" % "test",
       // Force SBT to use the right version of opentelemetry libs.
       dependencyOverrides ++= Seq(
         CantonDependencies.opentelemetry_api,
@@ -1778,7 +1966,8 @@ lazy val `apps-app`: Project =
         CantonDependencies.opentelemetry_zipkin,
         CantonDependencies.opentelemetry_instrumentation_grpc,
         CantonDependencies.opentelemetry_instrumentation_runtime_metrics,
-      ),
+      ) ++ Seq("netty-handler-proxy", "netty-codec-socks")
+        .map("io.netty" % _ % CantonDependencies.netty_version % "test"),
       BuildCommon.sharedAppSettings,
       BuildCommon.cantonWarts,
       bundleTask,
@@ -1793,10 +1982,10 @@ lazy val `apps-app`: Project =
 
 // https://tanin.nanakorn.com/technical/2018/09/10/parallelise-tests-in-sbt-on-circle-ci.html
 // also used by Canton team
-lazy val printTests = taskKey[Unit](
+lazy val updateTestConfigForParallelRuns = taskKey[Unit](
   "write full class names of `apps-app` tests to separated files depending on whether the test is for Wall clock time vs Simulated time, Backend vs frontend, preflight; used for CI test splitting"
 )
-printTests := {
+updateTestConfigForParallelRuns := {
   import java.io._
   println("Appending full class names of tests.")
 
@@ -1853,10 +2042,17 @@ printTests := {
       "SvOffboardingIntegrationTest",
       "ManualStartIntegrationTest",
     ).exists(name.contains)
+  def isManualSignatureIntegrationTest(name: String): Boolean =
+    Seq(
+      "ManualSignatureIntegrationTest"
+    ).exists(name.contains)
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
+  // TODO(#3429): for now, we put bulk storage tests in isLocalNetTest, since it 1) requires docker to run s3mock, and 2) does not require canton.
+  // If we keep it here, we should rename isLocalNetTest to be something like "withDockerWithoutCanton".
+  // Alternatively, consider creating a separate group for it, since this one e.g. builds the images which we don't need for the bulk-storage tests.
   def isLocalNetTest(name: String): Boolean =
-    name contains "LocalNet"
+    name.contains("LocalNet") || name.contains("BulkStorageTest")
   def isCometBftTest(name: String): Boolean =
     name contains "CometBft"
   def isRecordTimeToleranceTest(name: String): Boolean =
@@ -1876,6 +2072,16 @@ printTests := {
 
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
+    (
+      "manual tests with custom canton instance",
+      "test-full-class-names-signatures.log",
+      (t: String) => isManualSignatureIntegrationTest(t),
+    ),
+    (
+      "tests for localnet",
+      "test-full-class-names-local-net-based.log",
+      (t: String) => isLocalNetTest(t),
+    ),
     (
       "Unit tests",
       "test-full-class-names-non-integration.log",
@@ -1955,11 +2161,6 @@ printTests := {
       "resource intensive tests",
       "test-full-class-names-resource-intensive.log",
       (t: String) => isResourceIntensiveTest(t),
-    ),
-    (
-      "tests for localnet",
-      "test-full-class-names-local-net-based.log",
-      (t: String) => isLocalNetTest(t),
     ),
     (
       "tests using docker images",

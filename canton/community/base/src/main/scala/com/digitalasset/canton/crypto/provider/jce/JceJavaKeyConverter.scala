@@ -36,7 +36,7 @@ object JceJavaKeyConverter {
         _ <- CryptoKeyValidation.ensureFormat(
           publicKey.format,
           Set(expectedFormat),
-          _ => JceJavaKeyConversionError.UnsupportedKeyFormat(publicKey.format, expectedFormat),
+          JceJavaKeyConversionError.UnsupportedKeyFormat.apply,
         )
         x509KeySpec = new X509EncodedKeySpec(x509PublicKey)
         keyFactory <- Either
@@ -54,7 +54,7 @@ object JceJavaKeyConverter {
       case sigKey: SigningPublicKey =>
         sigKey.keySpec match {
           case SigningKeySpec.EcCurve25519 =>
-            convertFromX509Spki(publicKey.key.toByteArray, "Ed25519")
+            convertFromX509Spki(publicKey.key.toByteArray, SigningKeySpec.EcCurve25519.jcaCurveName)
           case SigningKeySpec.EcP256 | SigningKeySpec.EcP384 | SigningKeySpec.EcSecp256k1 =>
             convertFromX509Spki(publicKey.key.toByteArray, "EC")
         }
@@ -82,7 +82,7 @@ object JceJavaKeyConverter {
         _ <- CryptoKeyValidation.ensureFormat(
           privateKey.format,
           Set(expectedFormat),
-          _ => JceJavaKeyConversionError.UnsupportedKeyFormat(privateKey.format, expectedFormat),
+          JceJavaKeyConversionError.UnsupportedKeyFormat.apply,
         )
         pkcs8KeySpec = new PKCS8EncodedKeySpec(pkcs8PrivateKey)
         keyFactory <- Either
@@ -112,7 +112,7 @@ object JceJavaKeyConverter {
       case sigKey: SigningPrivateKey =>
         sigKey.keySpec match {
           case SigningKeySpec.EcCurve25519 =>
-            convertFromPkcs8(privateKey.key.toByteArray, "Ed25519")
+            convertFromPkcs8(privateKey.key.toByteArray, SigningKeySpec.EcCurve25519.jcaCurveName)
           case SigningKeySpec.EcP256 | SigningKeySpec.EcP384 | SigningKeySpec.EcSecp256k1 =>
             convertFromPkcs8(privateKey.key.toByteArray, "EC")
         }
@@ -138,10 +138,12 @@ object JceJavaKeyConversionError {
       prettyOfClass(unnamedParam(_.error))
   }
 
-  final case class UnsupportedKeyFormat(format: CryptoKeyFormat, expectedFormat: CryptoKeyFormat)
-      extends JceJavaKeyConversionError {
+  final case class UnsupportedKeyFormat(
+      format: CryptoKeyFormat,
+      supportedKeyFormats: Set[CryptoKeyFormat],
+  ) extends JceJavaKeyConversionError {
     override protected def pretty: Pretty[UnsupportedKeyFormat] =
-      prettyOfClass(param("format", _.format), param("expected format", _.expectedFormat))
+      prettyOfClass(param("format", _.format), param("supportedKeyFormats", _.supportedKeyFormats))
   }
 
   final case class InvalidKey(error: String) extends JceJavaKeyConversionError {

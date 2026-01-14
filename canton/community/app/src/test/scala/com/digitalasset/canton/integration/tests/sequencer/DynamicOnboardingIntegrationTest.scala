@@ -125,7 +125,7 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
         testedProtocolVersion,
       )
       maxSequencingTimeOfAggregation = env.environment.clock.now.add(
-        Duration.ofMinutes(1)
+        Duration.ofMinutes(2)
       ) // cannot exceed the DynamicSynchronizerParameters.sequencerAggregateSubmissionTimeout (defaults to 5m)
       topologyTimestampTombstone = env.environment.clock.now
 
@@ -134,18 +134,17 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
         RootHashMessage(
           RootHash(TestHash.digest(1)),
           daId,
-          testedProtocolVersion,
           TransactionViewType,
           CantonTimestamp.Epoch,
           EmptyRootHashMessagePayload,
         ) -> Recipients.cc(mediator1.id),
       )
 
-      TraceContext.withNewTraceContext { implicit traceContext =>
+      TraceContext.withNewTraceContext("agg1") { implicit traceContext =>
         logger.debug("Sending aggregation 1 part 1")
         val send1ResultPromise = Promise[UnlessShutdown[SendResult]]()
         p1SequencerClient
-          .sendAsync(
+          .send(
             aggregatedBatch,
             maxSequencingTime = maxSequencingTimeOfAggregation,
             aggregationRule = Some(aggregationRule1),
@@ -163,11 +162,11 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
         testedProtocolVersion,
       )
       val p3SequencerClient = sequencerClientOf(participant3, daId)
-      TraceContext.withNewTraceContext { implicit traceContext =>
+      TraceContext.withNewTraceContext("agg2") { implicit traceContext =>
         logger.debug("Sending aggregation 2 part 1")
         val send2ResultPromise = Promise[UnlessShutdown[SendResult]]()
         val send2 = p1SequencerClient
-          .sendAsync(
+          .send(
             Batch.empty(testedProtocolVersion),
             maxSequencingTime = maxSequencingTimeOfAggregation,
             messageId = MessageId.tryCreate("aggregation-2-part-1a"),
@@ -179,7 +178,7 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
 
         val send3ResultPromise = Promise[UnlessShutdown[SendResult]]()
         val send3 = p3SequencerClient
-          .sendAsync(
+          .send(
             Batch.empty(testedProtocolVersion),
             maxSequencingTime = maxSequencingTimeOfAggregation,
             messageId = MessageId.tryCreate("aggregation-2-part-1b"),
@@ -287,14 +286,14 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
       // participant3 now talks to the newly onboarded sequencer
 
       val p3SequencerClient = sequencerClientOf(participant3, daId)
-      TraceContext.withNewTraceContext { implicit traceContext =>
+      TraceContext.withNewTraceContext("agg1_2") { implicit traceContext =>
         logger.debug("Sending aggregation 1 part 2")
         val send1ResultPromise = Promise[UnlessShutdown[SendResult]]()
         // This should deliver the bogus root hash message to mediator1
         // When the mediator switches below to the other sequencer,
         // we'd see a ledger fork if the sequencers disagreed on the delivery of this event.
         p3SequencerClient
-          .sendAsync(
+          .send(
             aggregatedBatch,
             maxSequencingTime = maxSequencingTimeOfAggregation,
             aggregationRule = Some(aggregationRule1),
@@ -306,11 +305,11 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
       }
 
       // Now also try to send the second aggregation that was already delivered
-      TraceContext.withNewTraceContext { implicit traceContext =>
+      TraceContext.withNewTraceContext("agg2_2") { implicit traceContext =>
         logger.debug("Sending aggregation 2 part 2")
         val send2ResultPromise = Promise[UnlessShutdown[SendResult]]()
         p3SequencerClient
-          .sendAsync(
+          .send(
             Batch.empty(testedProtocolVersion),
             maxSequencingTime = maxSequencingTimeOfAggregation,
             aggregationRule = Some(aggregationRule2),
@@ -339,6 +338,8 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
       implicit env =>
         import env.*
         // participant3 now talks to the newly onboarded sequencer
+
+        val usingPool = participant1.config.sequencerClient.useNewConnectionPool
 
         val logAssertions: Seq[LogEntry => scalatest.Assertion] =
           Seq {
@@ -373,32 +374,37 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
             },
             // The participant's resilient sequencer subscription warns that it is giving up the sequencer-client-side
             // subscription due to the tombstone error.
-            logEntry => {
-              logEntry.loggerName should include("ResilientSequencerSubscription")
-              logEntry.warningMessage should (include(
-                "Closing resilient sequencer subscription due to error"
-              ) and include("FAILED_PRECONDITION/SEQUENCER_TOMBSTONE_ENCOUNTERED"))
-            },
+            logEntry =>
+              if (usingPool) {
+                logEntry.loggerName should include("SequencerSubscriptionX")
+                logEntry.warningMessage should (include(
+                  "Permanently closing sequencer subscription due to error"
+                ) and include("FAILED_PRECONDITION/SEQUENCER_TOMBSTONE_ENCOUNTERED"))
+
+              } else {
+                logEntry.loggerName should include("ResilientSequencerSubscription")
+                logEntry.warningMessage should (include(
+                  "Closing resilient sequencer subscription due to error"
+                ) and include("FAILED_PRECONDITION/SEQUENCER_TOMBSTONE_ENCOUNTERED"))
+              },
             // The participant's sync service errors that the participant has lost access to the sequencer's
             // corresponding synchronizer.
             logEntry => {
-              logEntry.loggerName should include("CantonSyncService")
+              logEntry.loggerName should include("SynchronizerConnectionsManager")
               logEntry.errorMessage should (include(
                 "SYNC_SERVICE_SYNCHRONIZER_DISCONNECTED"
-              ) and include(
-                "FAILED_PRECONDITION/SEQUENCER_TOMBSTONE_ENCOUNTERED"
               ))
             },
           )
 
         val p3SequencerClient = sequencerClientOf(participant3, daId)
-        TraceContext.withNewTraceContext { implicit traceContext =>
+        TraceContext.withNewTraceContext("tombstone") { implicit traceContext =>
           loggerFactory.assertLogsUnordered(
             {
               logger.debug("Sending submission request with tombstone topology timestamp")
               val send1ResultPromise = Promise[UnlessShutdown[SendResult]]()
               p3SequencerClient
-                .sendAsync(
+                .send(
                   Batch.empty(testedProtocolVersion),
                   maxSequencingTime = maxSequencingTimeOfAggregation,
                   callback = send1ResultPromise.success,
@@ -519,6 +525,7 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
           transportSecurity = false,
           None,
           SequencerAlias.Default,
+          None,
         )
 
       val conn = mediator1.sequencer_connection.get()

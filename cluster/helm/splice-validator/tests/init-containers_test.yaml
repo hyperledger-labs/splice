@@ -12,7 +12,6 @@ set:
   nodeIdentifier: "helm-mock-1-validator"
   validatorPartyHint: "helm-mock-1"
   validatorWalletUser: "mock-wallet-user-id"
-  scanAddress: "trusted.scan.mock.com"
   topup:
     enabled: false
   auth:
@@ -26,7 +25,7 @@ set:
     nameServiceName: Mock Name Service
     nameServiceNameAcronym: MNS
 tests:
-  - it: "has only the pg-init container by default"
+  - it: "has only the pg-init"
     documentSelector:
       path: kind
       value: Deployment
@@ -45,10 +44,12 @@ tests:
                   secretKeyRef:
                     key: postgresPassword
                     name: postgres-secrets
-  - it: "has no init containers when enablePgInitContainer=false and extraInitContainers is not defined"
+
+  - it: "has no init containers when enablePgInitContainer=false, svValidator=true and extraInitContainers is not defined"
     set:
       persistence:
         enablePgInitContainer: false
+      svValidator: true
     documentSelector:
       path: kind
       value: Deployment
@@ -87,7 +88,8 @@ tests:
               env:
                 - name: TOMATO_ENV_VAR
                   value: tomato-value
-  - it: "has both the extraInitContainers and pg-init container when enablePgInitContainer=true"
+
+  - it: "has both the extraInitContainers and pg-init container when enablePgInitContainer=true and no migration PVC init when migration.attachPvc=false"
     set:
       persistence:
         enablePgInitContainer: true
@@ -102,6 +104,8 @@ tests:
           env:
             - name: TOMATO_ENV_VAR
               value: tomato-value
+      migration:
+        attachPvc: false
     documentSelector:
       path: kind
       value: Deployment

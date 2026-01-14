@@ -3,6 +3,8 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
+.. _preapprovals:
+
 Canton Coin Preapprovals
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -110,7 +112,7 @@ for a transfer if the receiver has one setup.
 If you are working through APIs instead, in particular for external parties,
 the preferred way of exercising a Canton Coin transfer is through the
 Token Standard APIs which will also use a preapproval where
-possible. Refer to the `CIP <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0065/cip-0065.md>`_
+possible. Refer to the `CIP <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md>`_
 and the `token standard reference CLI <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/transfer.ts>`_
 for examples of how to use it.
 

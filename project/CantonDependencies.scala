@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.3.0-snapshot.20250624.13835.0.v78d74d4a"
+  val version: String = "3.4.4"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -19,21 +19,21 @@ object CantonDependencies {
     if (sys.props("os.name").contains("Mac")) "osx"
     else sys.props("os.name").toLowerCase
 
-  lazy val scala_version = "2.13.15"
+  lazy val scala_version = "2.13.16"
   lazy val scala_version_short = "2.13"
 
   lazy val anorm = "org.playframework.anorm" %% "anorm" % "2.7.0"
   lazy val apispec_version = "0.11.7"
-  lazy val pekko_version = "1.1.2"
-  lazy val pekko_http_version = "1.1.0"
+  lazy val pekko_version = "1.2.0"
+  lazy val pekko_http_version = "1.2.0"
   lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
   lazy val auth0_jwks = "com.auth0" % "jwks-rsa" % "0.21.2"
   lazy val awaitility = "org.awaitility" % "awaitility" % "4.2.0"
-  lazy val grpc_version = "1.67.1"
+  lazy val grpc_version = "1.75.0"
   lazy val logback_version = "1.5.3"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
-  lazy val ammonite_version = "3.0.0"
+  lazy val ammonite_version = "3.0.1"
   lazy val pprint_version = "0.7.1"
   // if you update the slick version, please also update our forked code in common/slick.util.*
   lazy val slick_version = "3.5.2"
@@ -43,12 +43,12 @@ object CantonDependencies {
 
   lazy val circe_version = "0.14.2"
 
-  lazy val scalatest_version = "3.2.11"
+  lazy val scalatest_version = "3.2.19"
   lazy val scalacheck_version = "1.15.4"
   lazy val scalaz_version = "7.2.33"
   lazy val mockito_scala_version = "1.16.3"
 
-  lazy val netty_version = "4.1.110.Final"
+  lazy val netty_version = "4.1.124.Final"
 
   lazy val reflections = "org.reflections" % "reflections" % "0.10.2"
   lazy val pureconfig = "com.github.pureconfig" %% "pureconfig" % pureconfig_version
@@ -133,11 +133,11 @@ object CantonDependencies {
 
   lazy val grpc_api = "io.grpc" % "grpc-api" % grpc_version
   lazy val grpc_protobuf = "io.grpc" % "grpc-protobuf" % grpc_version
-  lazy val grpc_netty = "io.grpc" % "grpc-netty" % grpc_version
+  lazy val grpc_netty_shaded = "io.grpc" % "grpc-netty-shaded" % grpc_version
   lazy val grpc_stub = "io.grpc" % "grpc-stub" % grpc_version
   // pick the version of boring ssl from this table: https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty
   // required for ALPN (which is required for TLS+HTTP/2) when running on Java 8. JSSE will be used on Java 9+.
-  lazy val netty_boring_ssl = "io.netty" % "netty-tcnative-boringssl-static" % "2.0.65.Final"
+  lazy val netty_boring_ssl = "io.netty" % "netty-tcnative-boringssl-static" % "2.0.72.Final"
   lazy val netty_handler = "io.netty" % "netty-handler" % netty_version
   lazy val grpc_services = "io.grpc" % "grpc-services" % grpc_version
   lazy val google_common_protos = "com.google.api.grpc" % "proto-google-common-protos" % "2.41.0"
@@ -157,7 +157,7 @@ object CantonDependencies {
   lazy val scalatest = "org.scalatest" %% "scalatest" % scalatest_version
   lazy val scalaz_core = "org.scalaz" %% "scalaz-core" % scalaz_version
   lazy val scalatestScalacheck =
-    "org.scalatestplus" %% "scalacheck-1-15" % (scalatest_version + ".0")
+    "org.scalatestplus" %% "scalacheck-1-18" % (scalatest_version + ".0")
   lazy val mockito_scala = "org.mockito" %% "mockito-scala" % mockito_scala_version
   lazy val scalatestMockito = "org.scalatestplus" %% "mockito-3-4" % ("3.2.10.0")
 
@@ -184,9 +184,9 @@ object CantonDependencies {
   lazy val janino = "org.codehaus.janino" % "janino" % "3.1.4"
   lazy val logstash = "net.logstash.logback" % "logstash-logback-encoder" % "6.6"
 
-  lazy val cats = "org.typelevel" %% "cats-core" % "2.6.1"
-  lazy val cats_law = "org.typelevel" %% "cats-laws" % "2.6.1"
-  lazy val cats_scalacheck = "io.chrisdavenport" %% "cats-scalacheck" % "0.2.0"
+  lazy val cats = "org.typelevel" %% "cats-core" % "2.9.0"
+  lazy val cats_law = "org.typelevel" %% "cats-laws" % "2.9.0"
+  lazy val cats_scalacheck = "io.chrisdavenport" %% "cats-scalacheck" % "0.3.2"
 
   lazy val chimney = "io.scalaland" %% "chimney" % "1.4.0"
 
@@ -204,8 +204,8 @@ object CantonDependencies {
     ExclusionRule(organization = "com.amazonaws", name = "aws-java-sdk-kms")
   )
 
-  lazy val opentelemetry_version = "1.36.0"
-  lazy val opentelemetry_java_instrumentation_version = "2.2.0"
+  lazy val opentelemetry_version = "1.43.0"
+  lazy val opentelemetry_java_instrumentation_version = "2.9.0"
   lazy val opentelemetry_api = "io.opentelemetry" % "opentelemetry-api" % opentelemetry_version
   lazy val opentelemetry_sdk = "io.opentelemetry" % "opentelemetry-sdk" % opentelemetry_version
   lazy val opentelemetry_sdk_testing =
@@ -231,9 +231,10 @@ object CantonDependencies {
   lazy val slick = "com.typesafe.slick" %% "slick" % slick_version
   lazy val slick_hikaricp = "com.typesafe.slick" %% "slick-hikaricp" % slick_version
 
-  lazy val testcontainers_version = "1.15.1"
+  lazy val testcontainers_version = "2.0.2"
   lazy val testcontainers = "org.testcontainers" % "testcontainers" % testcontainers_version
-  lazy val testcontainers_postgresql = "org.testcontainers" % "postgresql" % testcontainers_version
+  lazy val testcontainers_postgresql =
+    "org.testcontainers" % "testcontainers-postgresql" % testcontainers_version
 
   lazy val sttp_version = "3.8.16"
   lazy val sttp = "com.softwaremill.sttp.client3" %% "core" % sttp_version
@@ -290,4 +291,13 @@ object CantonDependencies {
   lazy val protobuf_version = google_protobuf_java.revision
   lazy val google_protobuf_java_util =
     "com.google.protobuf" % "protobuf-java-util" % protobuf_version
+
+  // AWS SDK for Java API to encrypt/decrypt keys using AWS KMS
+  lazy val aws_version = "2.29.5"
+  lazy val aws_kms = "software.amazon.awssdk" % "kms" % aws_version
+  lazy val aws_sts = "software.amazon.awssdk" % "sts" % aws_version
+
+  // GCP SDK for Java API to encrypt/decrypt keys using GCP KMS
+  lazy val gcp_kms_version = "2.55.0"
+  lazy val gcp_kms = "com.google.cloud" % "google-cloud-kms" % gcp_kms_version
 }

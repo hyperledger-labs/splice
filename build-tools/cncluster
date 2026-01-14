@@ -128,9 +128,9 @@ function _retry_until_success() {
         exit 1
     fi
 
-    # with 5 second sleep + 1 second kubectl timeout, this is roughly 10 minutes
+    # with 5 second sleep + 1 second kubectl timeout, this is roughly 15 minutes
     # See also max_wait which caps the overall wait time
-    local -i -r max_retries=$((100))
+    local -i -r max_retries=$((150))
     local -i num_retries=0
     local -i -r max_wait=$((60*60)) # do not wait longer than 60m in any case
     local -i -r start_time=$(date +%s)
@@ -433,14 +433,15 @@ function subcmd_logs() {
 
 function k8s_labels_for_app() {
     local global_domain_specific_apps=("global-domain-cometbft" "global-domain-sequencer" "global-domain-mediator")
-    local domain_specific_apps=("participant")
+    local domain_specific_apps="@(participant|multi-participant-[0-9][0-9])"
 
     # shellcheck disable=SC2076
+    # shellcheck disable=SC2053
     if [[ " ${global_domain_specific_apps[*]} " =~ " ${app} " ]]; then
        # If the app is in the list, append the domain to the app
        app_container=${app#"global-domain-"}
        app="global-domain-${domain}-${app#"global-domain-"}"
-    elif [[ " ${domain_specific_apps[*]} " =~ " ${app} " ]]; then
+    elif [[ "$app" == $domain_specific_apps ]]; then
        # If the app is in the list, append the domain to the app
        app="${app}-${domain}"
     fi
@@ -696,6 +697,9 @@ function subcmd_create() {
         #### Enable Firewall Access
         subcmd_cluster_update_access
 
+        ### Enable Http Load Balancing
+        subcmd_cluster_enable_http_load_balancing
+
         #### Delete default firewall rules, if they exist.
         if (gcloud compute firewall-rules delete\
                          default-allow-rdp \
@@ -806,7 +810,7 @@ function subcmd_cluster_update_logging() {
 maintenance_windows=(
   # CI-ish window
   "FREQ=WEEKLY;BYDAY=SA,SU" "2024-01-01T08:00:00Z" "2024-01-01T20:00:00Z"
-  "cn-cimainnet,cn-cinet,cn-ghanet,cn-cidailynet,cn-ciupgradenet,cn-ciperiodicnet,cn-splicenet,cn-scratchanet,cn-scratchbnet,cn-scratchcnet,cn-scratchdnet,cn-scratchenet"
+  "cn-cimainnet,cn-cinet,cn-ghanet,cn-cidailynet,cn-ciperiodicnet,cn-splicenet,cn-scratchanet,cn-scratchbnet,cn-scratchcnet,cn-scratchdnet,cn-scratchenet"
   # prod-like window
   "FREQ=WEEKLY;BYDAY=TU,WE,TH" "2024-01-01T08:00:00Z" "2024-01-01T12:00:00Z"
   "cn-cilrnet,cn-token-std-devnet,cn-testnet,cn-devnet,cn-testzrhnet,cn-mainnet,cn-mainzrhnet"
@@ -911,6 +915,19 @@ function subcmd_cluster_enable_workload_identity() {
         --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
         --workload-metadata=GKE_METADATA
 }
+
+subcommand_whitelist[cluster_enable_http_load_balancing]='Enable http load balancing for the cluster.'
+
+function subcmd_cluster_enable_http_load_balancing() {
+    if ! gcloud container clusters describe "${GCP_CLUSTER_NAME}" --format="value(addonsConfig.httpLoadBalancing)" | grep -q "disabled=True"; then
+        _info "Http Load Balancing is already enabled for the cluster."
+        return
+    fi
+
+    _info "Enabling http load balancing for the cluster ${GCP_CLUSTER_NAME}."
+    gcloud container clusters update "${GCP_CLUSTER_NAME}" --update-addons=HttpLoadBalancing=ENABLED
+}
+
 ###
 
 subcommand_whitelist[ci_warn_lock_expiry]='Run only by CircleCI'
@@ -1286,7 +1303,7 @@ function subcmd_partial_upgrade() {
 
 ###
 
-subcommand_whitelist[wait_for_daml_upgrade]="Waits for daml upgrade after a vote in ciupgrade"
+subcommand_whitelist[wait_for_daml_upgrade]="Waits for daml upgrade after a vote in upgrade test"
 
 function subcmd_wait_for_daml_upgrade() {
     _info "Fetching DSO rules"
@@ -1346,15 +1363,14 @@ function _unlock() {
 }
 
 function _check_stateful_sets() {
-    # Checks if any StatefulSets EXCEPT those with a prometheus image (which are part of the infra stack)
+    # Checks if any StatefulSets EXCEPT those in the observability namespace (which are part of the infra stack)
     # are currently deployed
     # grep exits with return code 1 if it finds no matches so we account for that
-    query_result=$(kubectl get StatefulSets -A -o json 2> /dev/null | jq '.items[].spec.template.spec.containers[].image' |  { grep -v prometheus || test $? = 1; })
-    echo "$query_result"
+    kubectl get statefulset -A -o json | jq '.items[] | select(.metadata.namespace != "observability" and .metadata.namespace != "gmp-system" and .metadata.namespace != "gke-managed-cim")'
 }
 
 function _check_reset_and_unlock() {
-    s=$(_check_stateful_sets)
+    s="$(_check_stateful_sets)"
 
     if [ -n "$s" ]; then
         echo -e "Cluster not reset, it is recommended to reset it before unlocking. Reset now?"
@@ -1458,18 +1474,21 @@ function subcmd_debug_shell() {
     VERSION_NUMBER=$(get-snapshot-version)
   fi
   repo="ghcr.io/digital-asset/decentralized-canton-sync-dev/docker"
+  user="$(whoami)"
+
+  local SHELL_COMMAND="${*:-/bin/bash}"
 
   _info "Deploying debug pod on version $VERSION_NUMBER"
   kubectl apply --wait -f - <<EOF
 apiVersion: v1
 kind: Pod
 metadata:
-  name: splice-debug
+  name: splice-debug-${user}
   labels:
     app: splice-debug
 spec:
   containers:
-  - name: splice-debug
+  - name: splice-debug-${user}
     image: $repo/splice-debug:${VERSION_NUMBER}
     command: ["/bin/sleep", "2h"]
     imagePullPolicy: Always
@@ -1480,13 +1499,14 @@ spec:
     effect: "NoSchedule"
 EOF
 
+  # shellcheck disable=SC2086
   ( _info "Waiting for debug pod to become ready" && \
-    kubectl wait --for=condition=Ready pod splice-debug --timeout=30s && \
+    kubectl wait --for=condition=Ready pod "splice-debug-$user" --timeout=30s && \
     _info "Opening terminal on debug pod" && \
-    kubectl exec -it splice-debug -- /bin/bash ) || true
+    kubectl exec -it "splice-debug-$user" -- $SHELL_COMMAND ) || true
 
   _info "Deleting debug pod"
-  kubectl delete pod splice-debug
+  kubectl delete pod "splice-debug-$user"
 }
 
 ###
@@ -1498,12 +1518,20 @@ function subcmd_participant_console() {
 
     namespace="${1-}"
     domain=${2:-0}
+    app=${3:-"participant"}
+    participant_number=${4:-0}
 
     if [ -z "${namespace}" ]; then
-        _error "Usage: $SCRIPTNAME participant_console <namespace-name> [domain_migration_id]"
+        _error "Usage: $SCRIPTNAME participant_console <namespace-name> [domain_migration_id (Default: 0)]
+        [app <participant|multi-participant-X> (Default: participant)] [participant_number <0-9> (Default: 0)]
+
+              Example: opening sv-1 participant console
+                cncluster participant_console sv-1 7
+
+              Example: opening multi-participant-24 console
+                cncluster participant_console multi-validator 7 multi-participant-24 7"
     fi
 
-    app="participant"
     app_container="$app"
     k8s_labels_for_app
 
@@ -1565,7 +1593,7 @@ function subcmd_participant_console() {
     fi
 
     _info "Starting port forwarding from '$participant_pod'..."
-    kubectl port-forward -n "$namespace" "$participant_pod" 11001:5001 11002:5002 &
+    kubectl port-forward -n "$namespace" "$participant_pod" 11001:5"${participant_number}"01 11002:5"${participant_number}"02 &
     port_forwarding_pid=$!
 
     _info "Starting Canton console..."
@@ -1726,7 +1754,7 @@ function subcmd_backup_nodes() {
     internal_stack=$2
 
     if [ $# -eq 2 ]; then
-        nodes="sv-1 sv-2 sv-3 sv-4 validator1 splitwell"
+        nodes="sv-1 sv-2 sv-3 sv-da-1 validator1 splitwell"
     else
         shift 2
         nodes="$*"
@@ -1734,7 +1762,7 @@ function subcmd_backup_nodes() {
 
     for node in $nodes; do
         case "$node" in
-            sv-1|sv-2|sv-3|sv-4)
+            sv-1|sv-2|sv-3|sv-4|sv-da-1)
                 _info "Backing up sv node $node"
                 SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id" "$internal_stack"
                 ;;
@@ -1794,7 +1822,7 @@ function subcmd_restore_node() {
     fi
 
     case "$node" in
-        sv-1|sv-2|sv-3|sv-4)
+        sv-1|sv-2|sv-3|sv-4|sv-da-1)
             if [ "$node" == "sv-1" ]; then
                 sv_name="Digital-Asset-2"
             else
@@ -2087,9 +2115,11 @@ function subcmd_dump_identities() {
     _cluster_must_exist
 
     all='{}'
-    for i in sv-1 sv-2 sv-3 sv-4; do
+    for i in sv-1 sv-2 sv-3 sv-da-1; do
         if [ "$i" == "sv-1" ]; then
             domain="sv-2"
+        elif [ "$i" == "sv-da-1" ]; then
+            domain="sv-1"
         else
             domain="$i-eng"
         fi
@@ -2155,13 +2185,12 @@ function subcmd_purge_unused_dbs() {
 subcommand_whitelist[set_operator_deployment_reference]="Set the git reference for the operator deployment in the cluster config file"
 function subcmd_set_operator_deployment_reference() {
 
-    # TODO(#1062): remove the ignored parameter once the base version for migration tests is >= 0.4.2
     if [ "$#" -lt 1 ]; then
-        echo "Usage: $0 set_operator_deployment_reference <branch> [<ignored>]"
+        echo "Usage: $0 set_operator_deployment_reference <branch>"
         exit 1
     fi
-    if [ "$#" -gt 2 ]; then
-        echo "Usage: $0 set_operator_deployment_reference <branch> [<ignored>]"
+    if [ "$#" -gt 1 ]; then
+        echo "Usage: $0 set_operator_deployment_reference <branch>"
         exit 1
     fi
     deployment_config=$(cat <<EOF
@@ -2170,6 +2199,152 @@ $(_get_flux_reference_config "$1" "        ")
 EOF
     )
     _update_cluster_config "$deployment_config" "operatorDeployment"
+}
+
+###
+
+subcommand_whitelist[psql]=""
+function subcmd_psql() {
+  _cluster_must_exist
+
+  if [ $# -ne 2 ]; then
+    _error "Usage: $SCRIPTNAME psql <namespace> <application>"
+    exit 1
+  fi
+
+  local NAMESPACE="$1"
+  local APPLICATION="$2"
+
+  _info "Retrieving DB connection info from pod description..."
+  local DB_INIT_COMMAND
+  DB_INIT_COMMAND=$(
+    kubectl describe deployment \
+      --namespace "${NAMESPACE}" \
+      --selector "app=${APPLICATION}" \
+    | grep -i psql \
+    | sed -nE 's/^.*(psql.?*) 2>&1.*$/\1/p'
+  )
+
+  if [ -z "${DB_INIT_COMMAND}" ]; then
+    _error "Application ${APPLICATION} in namespace ${NAMESPACE} does not have an associated database."
+    exit 1
+  fi
+
+  eval "set -- $DB_INIT_COMMAND"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -h|--host)
+        local DB_HOST="$2"
+        shift 2
+        ;;
+      -h=*|--host=*)
+        local DB_HOST="${1#*=}"
+        shift
+        ;;
+      -p|--port)
+        local DB_PORT="$2"
+        shift 2
+        ;;
+      -p=*|--port=*)
+        local DB_PORT="${1#*=}"
+        shift
+        ;;
+      -U|--username)
+        local DB_USERNAME="$2"
+        shift 2
+        ;;
+      -U=*|--username=*)
+        local DB_USERNAME="${1#*=}"
+        shift
+        ;;
+      -c|--command)
+        local DB_CREATE_STATEMENT="$2"
+        shift 2
+        ;;
+      -c=*|--command=*)
+        local DB_CREATE_STATEMENT="${1#*=}"
+        shift
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  if [ -z "${DB_HOST:-}" ]; then
+    _error "Failed to retrieve DB hostname from pod description."
+    exit 1
+  fi
+
+  if [ -z "${DB_PORT:-}" ]; then
+    _error "Failed to retrieve DB port from pod description."
+    exit 1
+  fi
+
+  if [ -z "${DB_USERNAME:-}" ]; then
+    _error "Failed to retrieve DB username from pod description."
+    exit 1
+  fi
+
+  # shellcheck disable=SC2086
+  set -- $DB_CREATE_STATEMENT
+  if [ "${1,,}" == "create" ] && [ "${2,,}" == "database" ] && [ -n "$3" ]; then
+    DB_NAME="$3"
+  else
+    _error "Failed to retrieve DB name from pod description."
+    exit 1
+  fi
+
+  local PASSWORD_REF
+  PASSWORD_REF=$(
+    kubectl get deployment \
+      --namespace "${NAMESPACE}" \
+      --output 'jsonpath={.spec.template.spec.initContainers[].env[?(@.name == "PGPASSWORD")].valueFrom.secretKeyRef}' \
+      "${APPLICATION}"
+  )
+  local SECRET_NAME
+  SECRET_NAME=$(jq -r '.name' <<< "$PASSWORD_REF")
+  local SECRET_KEY
+  SECRET_KEY=$(jq -r '.key' <<< "$PASSWORD_REF")
+
+  _info "Retrieving DB password from secret [${SECRET_NAME}]..."
+  local DB_PASSWORD
+  DB_PASSWORD=$(
+    kubectl get secret \
+      --namespace "${NAMESPACE}" \
+      --output "jsonpath={.data.${SECRET_KEY}}" \
+      "${SECRET_NAME}" \
+    | base64 --decode
+  )
+
+  if [ -z "${DB_PASSWORD}" ]; then
+    _error "Failed to retrieve DB password."
+    exit 1
+  fi
+
+  case "${APPLICATION}" in
+    participant-*)
+      local SEARCH_PATH="participant"
+      ;;
+    sequencer-*)
+      local SEARCH_PATH="sequencer"
+      ;;
+    mediator-*)
+      local SEARCH_PATH="mediator"
+      ;;
+    *)
+      local SEARCH_PATH="$DB_NAME"
+      ;;
+  esac
+
+  subcmd_debug_shell /bin/env \
+    PGPASSWORD="$DB_PASSWORD" \
+    PGOPTIONS="--search_path=${SEARCH_PATH},public" \
+    psql \
+      --host="$DB_HOST" \
+      --port="$DB_PORT" \
+      --username="$DB_USERNAME" \
+      --dbname="$DB_NAME"
 }
 
 ################################

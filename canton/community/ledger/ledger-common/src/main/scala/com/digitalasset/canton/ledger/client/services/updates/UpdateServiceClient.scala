@@ -5,7 +5,8 @@ package com.digitalasset.canton.ledger.client.services.updates
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
-import com.daml.ledger.api.v2.transaction_filter.TransactionFilter
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_ACS_DELTA
+import com.daml.ledger.api.v2.transaction_filter.{EventFormat, TransactionFormat, UpdateFormat}
 import com.daml.ledger.api.v2.update_service.UpdateServiceGrpc.UpdateServiceStub
 import com.daml.ledger.api.v2.update_service.{GetUpdatesRequest, GetUpdatesResponse}
 import com.digitalasset.canton.ledger.client.LedgerClient
@@ -13,13 +14,15 @@ import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 
-class UpdateServiceClient(service: UpdateServiceStub)(implicit
+class UpdateServiceClient(
+    service: UpdateServiceStub,
+    getDefaultToken: () => Option[String] = () => None,
+)(implicit
     esf: ExecutionSequencerFactory
 ) {
   def getUpdatesSource(
       begin: Long,
-      filter: TransactionFilter,
-      verbose: Boolean = false,
+      eventFormat: EventFormat,
       end: Option[Long] = None,
       token: Option[String] = None,
   )(implicit traceContext: TraceContext): Source[GetUpdatesResponse, NotUsed] =
@@ -28,10 +31,19 @@ class UpdateServiceClient(service: UpdateServiceStub)(implicit
         GetUpdatesRequest(
           beginExclusive = begin,
           endInclusive = end,
-          filter = Some(filter),
-          verbose = verbose,
-          updateFormat = None,
+          updateFormat = Some(
+            UpdateFormat(
+              includeTransactions = Some(
+                TransactionFormat(
+                  eventFormat = Some(eventFormat),
+                  transactionShape = TRANSACTION_SHAPE_ACS_DELTA,
+                )
+              ),
+              includeReassignments = Some(eventFormat),
+              includeTopologyEvents = None,
+            )
+          ),
         ),
-        LedgerClient.stubWithTracing(service, token).getUpdates,
+        LedgerClient.stubWithTracing(service, token.orElse(getDefaultToken())).getUpdates,
       )
 }

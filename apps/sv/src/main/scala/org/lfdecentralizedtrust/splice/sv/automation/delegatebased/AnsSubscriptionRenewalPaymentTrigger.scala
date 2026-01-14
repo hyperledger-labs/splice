@@ -22,6 +22,7 @@ import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
@@ -126,7 +127,7 @@ class AnsSubscriptionRenewalPaymentTrigger(
         Optional.of(controller),
       )
     )
-    taskOutcome <- connection
+    taskOutcome <- connection(SpliceLedgerConnectionPriority.Low)
       .submit(
         actAs = Seq(svParty),
         readAs = Seq(dsoParty),

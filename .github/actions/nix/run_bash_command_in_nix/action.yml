@@ -35,6 +35,8 @@ runs:
           target="default"
         fi
 
+        echo "Running command with nix version $(nix --version)"
+
         # Attempt to build the nix env with retries to work around transient download failures
         echo "building nix env"
         MAX_RETRY_NIX_ENV=5
@@ -48,6 +50,7 @@ runs:
           fi
           nix develop \
             path:nix#$target \
+            --verbose \
             --ignore-environment \
             --keep USER \
             --keep HOME \
@@ -142,6 +145,7 @@ runs:
         # Run the command for real within the nix environment
         nix develop \
           path:nix#$target \
+          --verbose \
           --ignore-environment \
           --keep USER \
           --keep HOME \

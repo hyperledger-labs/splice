@@ -4,21 +4,22 @@
 package com.digitalasset.canton.networking.grpc
 
 import com.daml.jwt.JwtTimestampLeeway
-import com.daml.metrics.grpc.{GrpcMetricsServerInterceptor, GrpcServerMetrics}
+import com.daml.metrics.grpc.GrpcMetricsServerInterceptor
 import com.daml.tracing.Telemetry
-import com.digitalasset.canton.auth.{
-  AdminAuthorizer,
-  AuthInterceptor,
-  AuthServiceWildcard,
-  CantonAdminToken,
-  CantonAdminTokenAuthService,
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
+import com.digitalasset.canton.config.{
+  ActiveRequestLimitsConfig,
+  AdminTokenConfig,
+  ApiLoggingConfig,
+  AuthServiceConfig,
+  JwksCacheConfig,
 }
-import com.digitalasset.canton.concurrent.DirectExecutionContext
-import com.digitalasset.canton.config.{ApiLoggingConfig, AuthServiceConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.metrics.ActiveRequestsMetrics.GrpcServerMetricsX
+import com.digitalasset.canton.networking.grpc.ratelimiting.ActiveRequestCounterInterceptor
 import com.digitalasset.canton.tracing.{TraceContextGrpc, TracingConfig}
 import io.grpc.ServerInterceptors.intercept
-import io.grpc.ServerServiceDefinition
+import io.grpc.{ServerInterceptor, ServerServiceDefinition}
 
 import scala.util.chaining.*
 
@@ -27,18 +28,39 @@ trait CantonServerInterceptors {
       service: ServerServiceDefinition,
       withLogging: Boolean,
   ): ServerServiceDefinition
+
+  def activeRequestCounter: Option[ActiveRequestCounterInterceptor]
 }
 
 class CantonCommunityServerInterceptors(
+    api: String,
     tracingConfig: TracingConfig,
     apiLoggingConfig: ApiLoggingConfig,
     loggerFactory: NamedLoggerFactory,
-    grpcMetrics: GrpcServerMetrics,
+    grpcMetrics: GrpcServerMetricsX,
     authServiceConfigs: Seq[AuthServiceConfig],
-    adminToken: Option[CantonAdminToken],
+    adminTokenDispenser: Option[CantonAdminTokenDispenser],
     jwtTimestampLeeway: Option[JwtTimestampLeeway],
+    adminTokenConfig: AdminTokenConfig,
+    jwksCacheConfig: JwksCacheConfig,
     telemetry: Telemetry,
+    additionalInterceptors: Seq[ServerInterceptor] = Seq.empty,
+    requestLimits: Option[ActiveRequestLimitsConfig],
 ) extends CantonServerInterceptors {
+
+  override val activeRequestCounter: Option[ActiveRequestCounterInterceptor] = requestLimits.map {
+    limits =>
+      val (_, requestMetrics) = grpcMetrics
+      new ActiveRequestCounterInterceptor(
+        api,
+        limits.active,
+        limits.warnOnUndefinedLimits,
+        limits.throttleLoggingRatePerSecond,
+        requestMetrics,
+        loggerFactory,
+      )
+  }
+
   private def interceptForLogging(
       service: ServerServiceDefinition,
       withLogging: Boolean,
@@ -61,30 +83,27 @@ class CantonCommunityServerInterceptors(
   private def addMetricsInterceptor(
       service: ServerServiceDefinition
   ): ServerServiceDefinition =
-    intercept(service, new GrpcMetricsServerInterceptor(grpcMetrics))
+    intercept(service, new GrpcMetricsServerInterceptor(grpcMetrics._1))
 
   private def addAuthInterceptor(
       service: ServerServiceDefinition
-  ): ServerServiceDefinition = {
-    val authServices = new CantonAdminTokenAuthService(adminToken) +:
-      (if (authServiceConfigs.isEmpty)
-         List(AuthServiceWildcard)
-       else
-         authServiceConfigs.map(
-           _.create(
-             jwtTimestampLeeway,
-             loggerFactory,
-           )
-         ))
-    val interceptor = new AuthInterceptor(
-      authServices,
-      telemetry,
-      loggerFactory,
-      DirectExecutionContext(loggerFactory.getLogger(AuthInterceptor.getClass)),
-      AdminAuthorizer,
-    )
-    intercept(service, interceptor)
-  }
+  ): ServerServiceDefinition =
+    CantonCommunityAuthInterceptorDefinition
+      .addAuthInterceptor(
+        service,
+        loggerFactory,
+        authServiceConfigs,
+        adminTokenDispenser,
+        jwtTimestampLeeway,
+        adminTokenConfig,
+        jwksCacheConfig,
+        telemetry,
+      )
+
+  private def addLimitInterceptor(service: ServerServiceDefinition): ServerServiceDefinition =
+    activeRequestCounter.fold(service) { limits =>
+      intercept(service, limits)
+    }
 
   def addAllInterceptors(
       service: ServerServiceDefinition,
@@ -94,5 +113,7 @@ class CantonCommunityServerInterceptors(
       .pipe(interceptForLogging(_, withLogging))
       .pipe(addTraceContextInterceptor)
       .pipe(addMetricsInterceptor)
+      .pipe(addLimitInterceptor)
       .pipe(addAuthInterceptor)
+      .pipe(s => additionalInterceptors.foldLeft(s)((acc, i) => intercept(acc, i)))
 }

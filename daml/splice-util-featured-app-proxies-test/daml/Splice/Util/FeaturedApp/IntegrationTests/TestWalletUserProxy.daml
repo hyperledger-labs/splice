@@ -1,0 +1,444 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Daml script tests showing how to use the `WalletUserProxy` in the context of
+-- an wallet to get featured app activity markers for token standard actions of the
+-- wallet users.
+--
+-- Note that the tests themselves do use Amulet tokens as a mock for token standard tokens.
+-- The mechanism for getting the featured app activity markers is generic.
+--
+module Splice.Util.FeaturedApp.IntegrationTests.TestWalletUserProxy where
+
+import qualified Splice.Amulet
+import Splice.Util.FeaturedApp.WalletUserProxy
+
+import Splice.Api.FeaturedAppRightV1
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+
+import Daml.Script
+
+import DA.Action (void)
+import DA.Assert ((===))
+import DA.List (sortOn)
+import qualified DA.Map as Map
+import qualified DA.TextMap as TextMap
+import DA.Optional (isSome, fromOptional)
+import DA.Time
+import DA.Traversable (forA)
+
+import Prelude hiding (forA)
+
+import Splice.Amulet (AppRewardCoupon(..))
+
+import Splice.Testing.Utils
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
+import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+
+data WalletProviderData = WalletProviderData with
+  provider : Party
+  proxyCid : ContractId WalletUserProxy
+  featuredAppRightCid : ContractId FeaturedAppRight
+  extraDisclosuresForProxy : Disclosures'
+
+-- | Test that both offer and accept grant activity markers
+test_two_step_featured_app_markers : Script ()
+test_two_step_featured_app_markers = do
+  -- disable transfer fees to check that only the featured app activity markers will be there
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+
+  -- Setup a wallet provider that will host alice
+  aliceProvider <- setupWalletProvider registry "aliceWalletProvider" None
+
+  -- setup Alice with 1000 Amulet tokens
+  alice <- allocatePartyExact "alice"
+  AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
+  aliceHoldingCids <- WalletClient.listHoldingCids alice registry.instrumentId
+
+  -- setup bob
+  bob <- allocatePartyExact "bob"
+
+  -- setup wallet provider with an allow-list for bob only
+  bobProvider <- setupWalletProvider registry "bobWalletProvider" (Some [bob])
+
+
+  -- create test transfer
+  now <- getTime
+  let transfer = Api.Token.TransferInstructionV1.Transfer with
+        sender = alice
+        receiver = bob
+        amount = 10.0
+        instrumentId = registry.instrumentId
+        requestedAt = now
+        executeBefore = now `addRelTime` days 1
+        inputHoldingCids = aliceHoldingCids
+        meta = Metadata with
+          values = TextMap.fromList [("token-metadata-v1.splice.lfdecentralizedtrust.org/correlation-id", "<test-UUID>")]
+
+
+  -- alice's wallet frontend queries the transfer factory for the choice
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer
+    extraArgs = emptyExtraArgs
+
+  -- simulate alice wanting to wrongly use bob's wallet provider proxy
+  -- to test that the allow list is enforced
+  submitWithDisclosuresMustFail' alice (bobProvider.extraDisclosuresForProxy <> enrichedChoice.disclosures) $ exerciseCmd
+    (bobProvider.proxyCid)
+    WalletUserProxy_TransferFactory_Transfer with
+      cid = enrichedChoice.factoryCid
+      proxyArg = ProxyArg with
+        user = alice
+        choiceArg = enrichedChoice.arg
+        featuredAppRightCid = bobProvider.featuredAppRightCid
+
+  -- alice's wallet frontend also gets the WalletProviderData from the wallet provider's backend
+  -- and creates a transaction that creates featured app activity markers for both alice and the wallet provider
+  result0 <- submitWithDisclosures' alice (aliceProvider.extraDisclosuresForProxy <> enrichedChoice.disclosures) $ exerciseCmd
+    (aliceProvider.proxyCid)
+    WalletUserProxy_TransferFactory_Transfer with
+      cid = enrichedChoice.factoryCid
+      proxyArg = ProxyArg with
+        user = alice
+        choiceArg = enrichedChoice.arg
+        featuredAppRightCid = aliceProvider.featuredAppRightCid
+  let result = result0.choiceResult
+  TransferInstructionResult_Pending aliceInstrCid <- pure result.output
+
+  -- check that exactly two markers exist
+  expectActivityMarkers registry aliceProvider alice
+
+  -- bob queries the pending transfer through their wallet
+  aliceHoldings <- WalletClient.listHoldings alice registry.instrumentId
+  [(bobInstrCid, bobInstrView)] <- WalletClient.listTransferOffers bob registry.instrumentId
+  bobInstrView.transfer.inputHoldingCids === [ cid | (cid, holdingView) <- aliceHoldings, isSome (holdingView.lock) ]
+  bobInstrCid === aliceInstrCid
+
+  -- bob accepts the transfer using their wallet frontend
+  -- same story: query context
+  context <- RegistryApi.getTransferInstruction_AcceptContext registry bobInstrCid emptyMetadata
+
+  -- submit via proxy to create featured app markers
+  result0 <- submitWithDisclosures' bob (bobProvider.extraDisclosuresForProxy <> context.disclosures) $ exerciseCmd
+    (bobProvider.proxyCid)
+    WalletUserProxy_TransferInstruction_Accept with
+      cid = bobInstrCid
+      proxyArg = ProxyArg with
+        user = bob
+        choiceArg = TransferInstruction_Accept with
+          extraArgs = ExtraArgs with
+            context = context.choiceContext
+            meta = emptyMetadata
+        featuredAppRightCid = bobProvider.featuredAppRightCid
+
+  -- sanity check: completion of the transfer
+  let result = result0.choiceResult
+  TransferInstructionResult_Completed _ <- pure result.output
+
+  -- check that exactly two markers exist
+  expectActivityMarkers registry bobProvider bob
+
+  -- sanity check: there are exactly four activity markers
+  activityMarkers <- query @Splice.Amulet.FeaturedAppActivityMarker registry.dso
+  length activityMarkers === 4
+
+  -- sanity check: no AppRewardCoupons are created at this time, as the activity markers have not yet been converted
+  [] <- query @AppRewardCoupon registry.dso
+
+  -- sanity check: check balances
+  WalletClient.checkBalanceApprox alice registry.instrumentId 990.0
+  WalletClient.checkBalance bob registry.instrumentId 10.0
+
+test_transfer_withdraw_and_reject : Script ()
+test_transfer_withdraw_and_reject = do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+
+  -- Setup a wallet provider that will host alice
+  aliceProvider <- setupWalletProvider registry "aliceWalletProvider" None
+  bobProvider <- setupWalletProvider registry "bobWalletProvider" None
+
+  alice <- allocatePartyExact "alice"
+  bob <- allocatePartyExact "bob"
+
+  -- setup alice with 1000 Amulet tokens
+  AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
+
+  let mkTransferOffer = do
+        aliceHoldings <- WalletClient.listHoldingCids alice registry.instrumentId
+        transfer <- mkImmediateTransfer registry alice bob 20.0 aliceHoldings
+
+        -- alice's wallet frontend also gets the WalletProviderData from the wallet provider's backend
+        -- and creates a transaction that creates featured app activity markers for both alice and the wallet provider
+        _ <- submitWithDisclosures' alice (aliceProvider.extraDisclosuresForProxy <> transfer.disclosures) $ exerciseCmd
+          (aliceProvider.proxyCid)
+          WalletUserProxy_TransferFactory_Transfer with
+            cid = transfer.value.factoryCid
+            proxyArg = ProxyArg with
+              user = alice
+              choiceArg = transfer.value.choiceArg
+              featuredAppRightCid = aliceProvider.featuredAppRightCid
+
+        [(bobInstrCid,_)] <- WalletClient.listTransferOffers bob registry.instrumentId
+        pure bobInstrCid
+
+  -- test withdraw by sender
+  offerCid <- mkTransferOffer
+  context <- RegistryApi.getTransferInstruction_RejectContext registry offerCid emptyMetadata
+
+  -- submit via proxy to create featured app markers
+  result0 <- submitWithDisclosures' alice (aliceProvider.extraDisclosuresForProxy <> context.disclosures) $ exerciseCmd
+    (aliceProvider.proxyCid)
+    WalletUserProxy_TransferInstruction_Withdraw with
+      cid = offerCid
+      proxyArg = ProxyArg with
+        user = alice
+        choiceArg = TransferInstruction_Withdraw with
+          extraArgs = ExtraArgs with
+            context = context.choiceContext
+            meta = emptyMetadata
+        featuredAppRightCid = aliceProvider.featuredAppRightCid
+
+  let result = result0.choiceResult
+  TransferInstructionResult_Failed <- pure result.output
+
+  -- test rejection by receiver
+  offerCid <- mkTransferOffer
+  context <- RegistryApi.getTransferInstruction_RejectContext registry offerCid emptyMetadata
+
+  -- submit via proxy to create featured app markers
+  result0 <- submitWithDisclosures' bob (bobProvider.extraDisclosuresForProxy <> context.disclosures) $ exerciseCmd
+    (bobProvider.proxyCid)
+    WalletUserProxy_TransferInstruction_Reject with
+      cid = offerCid
+      proxyArg = ProxyArg with
+        user = bob
+        choiceArg = TransferInstruction_Reject with
+          extraArgs = ExtraArgs with
+            context = context.choiceContext
+            meta = emptyMetadata
+        featuredAppRightCid = bobProvider.featuredAppRightCid
+
+  let result = result0.choiceResult
+  TransferInstructionResult_Failed <- pure result.output
+
+  pure ()
+
+
+-- Testing batch transfer via wallet proxy
+--------------------------------------------
+
+test_featured_batch_transfer : Script ()
+test_featured_batch_transfer = do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+
+  -- Setup a wallet provider that will host alice
+  provider <- setupWalletProvider registry "walletProvider" None
+
+  alice <- allocatePartyExact "alice"
+  bob <- allocatePartyExact "bob"
+  charlie <- allocatePartyExact "charlie"
+
+  -- charlie has a preapproval
+  now <- getTime
+  AmuletRegistry.createTransferPreapproval registry charlie charlie (now `addRelTime` days 90)
+
+  -- setup alice with 1000 Amulet tokens
+  AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
+
+  -- create two transfers to batch: alice -> bob and alice -> charlie
+  aliceHoldings <- WalletClient.listHoldingCids alice registry.instrumentId
+  transfer1 <- mkImmediateTransfer registry alice bob 20.0 aliceHoldings
+  transfer2 <- mkImmediateTransfer registry alice charlie 50.0 [] -- no holdings, as they will be funneled in
+
+  -- execute batch transfer via wallet proxy
+  executeBatchTransfer provider.provider (Some provider.featuredAppRightCid) [transfer1, transfer2]
+
+  -- check featured app markers: there should be four of them, 2 per transfer as the user is also a beneficiary
+  markers <- query @Splice.Amulet.FeaturedAppActivityMarker provider.provider
+  length markers === 4
+
+  -- bob accepts the transfer
+  [(bobInstrCid, _)] <- WalletClient.listTransferOffers bob registry.instrumentId
+  contextBob <- RegistryApi.getTransferInstruction_AcceptContext registry bobInstrCid emptyMetadata
+  _ <- submitWithDisclosures' bob contextBob.disclosures $ exerciseCmd
+    bobInstrCid
+    TransferInstruction_Accept with
+      extraArgs = ExtraArgs with
+        context = contextBob.choiceContext
+        meta = emptyMetadata
+
+  -- check holdings
+  checkExactlyOneHolding registry 930.0 alice
+  checkExactlyOneHolding registry 20.0 bob
+  checkExactlyOneHolding registry 50.0 charlie
+
+
+test_unfeatured_multi_registry_batch_transfer : Script ()
+test_unfeatured_multi_registry_batch_transfer = do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+
+  -- We don't yet have a mock token in the Splice repo that we could use to simulate a completely
+  -- different token registry. For testing the logic it is though sufficient to create a second
+  -- instance of Amulet with a different DSO party.
+  registry2 <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+    dsoPartyName = "mock-other-admin-party"
+
+  alice <- allocatePartyExact "alice"
+  bob <- allocatePartyExact "bob"
+  charlie <- allocatePartyExact "charlie"
+
+  -- create preapprovals in both registries to simplify the test
+  now <- getTime
+  AmuletRegistry.createTransferPreapproval registry bob bob (now `addRelTime` days 90)
+  AmuletRegistry.createTransferPreapproval registry charlie charlie (now `addRelTime` days 90)
+  AmuletRegistry.createTransferPreapproval registry2 charlie charlie (now `addRelTime` days 90)
+
+  -- alice creates their own unfeatured wallet proxy
+  _ <- submit alice $ createCmd WalletUserProxy with
+    provider = alice
+    providerWeight = 1.0
+    userWeight = 0.0
+    extraBeneficiaries = []
+    optAllowList = Some [alice]
+
+  -- setup alice with 1000 Amulet tokens
+  AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
+  AmuletRegistry.tapLockedAndUnlockedFunds registry2 alice 500.0
+
+  -- create two transfers to batch: alice -> bob and alice -> charlie
+  aliceHoldings <- WalletClient.listHoldingCids alice registry.instrumentId
+  aliceHoldings2 <- WalletClient.listHoldingCids alice registry2.instrumentId
+  transfer1 <- mkImmediateTransfer registry alice bob 20.0 aliceHoldings
+  transfer2 <- mkImmediateTransfer registry2 alice charlie 80.0 aliceHoldings2
+  transfer3 <- mkImmediateTransfer registry alice charlie 50.0 [] -- no holdings, as they will be funneled in
+
+  -- execute batch transfer via wallet proxy
+  executeBatchTransfer alice None [transfer1, transfer2, transfer3]
+
+  -- check holdings
+  checkExactlyOneHolding registry 930.0 alice
+  checkExactlyOneHolding registry 20.0 bob
+  checkExactlyOneHolding registry 50.0 charlie
+
+  WalletClient.checkBalance bob registry2.instrumentId 0.0
+  checkExactlyOneHolding registry2 420.0 alice
+  checkExactlyOneHolding registry2 80.0 charlie
+
+
+-- | Execute a batch of transfers.
+executeBatchTransfer : Party -> Optional (ContractId FeaturedAppRight) -> [WithDisclosures TransferFactoryCall] -> Script ()
+executeBatchTransfer operator optFeaturedAppRightCid transferCalls = do
+  [(proxyCid, _)] <- query @WalletUserProxy operator
+  proxyD <- queryDisclosure' @WalletUserProxy operator proxyCid
+  appRightD <- forA optFeaturedAppRightCid $ \cid ->
+    queryDisclosure' @Splice.Amulet.FeaturedAppRight operator (fromInterfaceContractId cid)
+
+  -- note the explicit disclosure of both the app right and the wallet proxy on top of the
+  -- contracts required to be disclosed for the transfers
+  let allDisclosures = mconcat (map (.disclosures) transferCalls) <> proxyD <> fromOptional mempty appRightD
+  let batchCalls = map (.value) transferCalls
+  let sender = getFirstSender batchCalls
+
+  void $ submit (actAs sender <> discloseMany (Map.values allDisclosures.disclosures)) $
+    exerciseCmd proxyCid WalletUserProxy_BatchTransfer with
+      transferCalls = batchCalls
+      optFeaturedAppRightCid
+
+
+-- tools to contstruct transfers
+--------------------------------
+
+data WithDisclosures a = WithDisclosures with
+  value : a
+  disclosures : Disclosures'
+
+instance Functor WithDisclosures where
+  fmap f (WithDisclosures with value; disclosures) =
+    WithDisclosures with value = f value; disclosures
+
+
+-- Note: we intentionally do not provide an Applicative instance to simplify reading the code below.
+
+-- | Build a transfer that we expect to execute immediately
+mkImmediateTransfer
+  : AmuletRegistry.AmuletRegistry -> Party -> Party -> Decimal -> [ContractId Holding]
+  -> Script (WithDisclosures TransferFactoryCall)
+mkImmediateTransfer registry sender receiver amount inputHoldingCids = do
+  now <- getTime
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer = Api.Token.TransferInstructionV1.Transfer with
+        sender
+        receiver
+        amount
+        instrumentId = registry.instrumentId
+        requestedAt = now
+        executeBefore = now `addRelTime` days 1
+        inputHoldingCids
+        meta = emptyMetadata
+    extraArgs = emptyExtraArgs
+  pure $ WithDisclosures with
+    value = TransferFactoryCall with
+      factoryCid = enrichedChoice.factoryCid
+      choiceArg = enrichedChoice.arg
+    disclosures = enrichedChoice.disclosures
+
+
+-- Setup tools
+--------------
+
+setupWalletProvider : AmuletRegistry.AmuletRegistry -> Text -> Optional [Party] -> Script WalletProviderData
+setupWalletProvider registry name optAllowList = do
+  -- Setup a wallet provider that is featured
+  walletProvider <- allocatePartyExact name
+  featuredAppRightCid <- AmuletRegistry.featureApp registry walletProvider
+  -- Setup the wallet provider's token standard proxy
+  proxyCid <- submit walletProvider $ createCmd WalletUserProxy with
+    provider = walletProvider
+    providerWeight = 0.9
+    userWeight = 0.1 -- Showcase direct reward sharing with the user using a 90%/10% split
+    extraBeneficiaries = []
+    optAllowList
+  -- query the disclosures that the wallet app needs to pass in
+  appRightD <- queryDisclosure' @Splice.Amulet.FeaturedAppRight walletProvider featuredAppRightCid
+  proxyD <- queryDisclosure' @WalletUserProxy walletProvider proxyCid
+  let extraDisclosuresForProxy = proxyD <> appRightD
+  pure WalletProviderData with
+    provider = walletProvider
+    proxyCid
+    featuredAppRightCid = toInterfaceContractId featuredAppRightCid
+    extraDisclosuresForProxy
+
+
+expectActivityMarkers : AmuletRegistry.AmuletRegistry -> WalletProviderData -> Party -> Script ()
+expectActivityMarkers registry aliceProvider alice = do
+  activityMarkers <- sortOn (._2.weight) <$> query @Splice.Amulet.FeaturedAppActivityMarker aliceProvider.provider
+  let expectedMarkers =
+        [ Splice.Amulet.FeaturedAppActivityMarker with
+          dso = registry.dso
+          provider = aliceProvider.provider
+          beneficiary = alice
+          weight = 0.1
+        , Splice.Amulet.FeaturedAppActivityMarker with
+          dso = registry.dso
+          provider = aliceProvider.provider
+          beneficiary = aliceProvider.provider
+          weight = 0.9
+        ]
+  expectedMarkers === map (._2) activityMarkers
+
+-- | Check that a user has exactly one holding with the expected amount.
+checkExactlyOneHolding : AmuletRegistry.AmuletRegistry -> Decimal -> Party -> Script ()
+checkExactlyOneHolding registry expectedAmount user = do
+  WalletClient.checkBalance user registry.instrumentId expectedAmount
+  holdingCids <- WalletClient.listHoldingCids user registry.instrumentId
+  length holdingCids === 1

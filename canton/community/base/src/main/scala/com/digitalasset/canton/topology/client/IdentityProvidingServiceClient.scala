@@ -4,6 +4,7 @@
 package com.digitalasset.canton.topology.client
 
 import cats.data.EitherT
+import cats.implicits.toFoldableOps
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
@@ -15,29 +16,31 @@ import com.digitalasset.canton.crypto.{
   EncryptionPublicKey,
   PublicKey,
   SigningKeyUsage,
+  SigningKeysWithThreshold,
   SigningPublicKey,
 }
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.{
   DynamicSequencingParametersWithValidity,
   DynamicSynchronizerParameters,
   DynamicSynchronizerParametersWithValidity,
+  StaticSynchronizerParameters,
 }
 import com.digitalasset.canton.sequencing.TrafficControlParameters
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
-import com.digitalasset.canton.topology.client.PartyKeyTopologySnapshotClient.PartyAuthorizationInfo
 import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.PartyInfo
 import com.digitalasset.canton.topology.processing.{
   EffectiveTime,
   SequencedTime,
   TopologyTransactionProcessingSubscriber,
 }
+import com.digitalasset.canton.topology.store.UnknownOrUnvettedPackages
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.SingleUseCell
@@ -56,32 +59,53 @@ import scala.concurrent.{ExecutionContext, Future}
   * the layout of the synchronizers, such as party-participant relationships, used encryption and
   * signing keys, package information, participant states, synchronizer parameters, and so on.
   */
-class IdentityProvidingServiceClient {
+class IdentityProvidingServiceClient(
+    override protected val loggerFactory: NamedLoggerFactory
+) extends AutoCloseable
+    with NamedLogging {
 
-  private val synchronizers = TrieMap.empty[SynchronizerId, SynchronizerTopologyClient]
+  private val synchronizers = TrieMap.empty[PhysicalSynchronizerId, SynchronizerTopologyClient]
 
-  def add(synchronizerClient: SynchronizerTopologyClient): this.type = {
-    synchronizers += (synchronizerClient.synchronizerId -> synchronizerClient)
-    this
-  }
+  def add(
+      synchronizerClient: SynchronizerTopologyClient
+  )(implicit traceContext: TraceContext): Unit =
+    synchronizers
+      .put(synchronizerClient.psid, synchronizerClient)
+      .foreach { oldTopologyClient =>
+        logger.warn(
+          s"Synchronizer ${synchronizerClient.synchronizerId} already registered a topology client"
+        )
+        oldTopologyClient.close()
+      }
 
-  def allSynchronizers: Iterable[SynchronizerTopologyClient] = synchronizers.values
+  def remove(synchronizerId: PhysicalSynchronizerId): Option[SynchronizerTopologyClient] =
+    synchronizers.remove(synchronizerId)
 
-  def tryForSynchronizer(synchronizerId: SynchronizerId): SynchronizerTopologyClient =
+  def tryForSynchronizer(synchronizerId: PhysicalSynchronizerId): SynchronizerTopologyClient =
     synchronizers.getOrElse(
       synchronizerId,
       sys.error("unknown synchronizer " + synchronizerId.toString),
     )
 
-  def forSynchronizer(synchronizerId: SynchronizerId): Option[SynchronizerTopologyClient] =
+  def forSynchronizer(synchronizerId: PhysicalSynchronizerId): Option[SynchronizerTopologyClient] =
     synchronizers.get(synchronizerId)
+
+  override def close(): Unit = {
+    val instances: Seq[AutoCloseable] = synchronizers.values.toSeq
+    LifeCycle.close(instances*)(logger)
+  }
 
 }
 
 trait TopologyClientApi[+T] { this: HasFutureSupervision =>
 
   /** The synchronizer this client applies to */
+  def psid: PhysicalSynchronizerId
   def synchronizerId: SynchronizerId
+
+  def staticSynchronizerParameters: StaticSynchronizerParameters
+
+  def protocolVersion: ProtocolVersion = psid.protocolVersion
 
   /** Our current snapshot approximation
     *
@@ -100,8 +124,9 @@ trait TopologyClientApi[+T] { this: HasFutureSupervision =>
     * As we future date topology transactions, the head snapshot is our latest knowledge of the
     * topology state, but as it can be still future dated, we need to be careful when actually using
     * it: the state might not yet be active, as the topology transactions are future dated.
-    * Therefore, do not act towards the sequencer using this snapshot, but use the
-    * currentSnapshotApproximation instead.
+    * Therefore, do not prepare regular transactions using this snapshot, but use the
+    * currentSnapshotApproximation instead. A head snapshot can be useful, however, for producing
+    * new topology changes, e.g., for picking the correct serial.
     */
   def headSnapshot(implicit traceContext: TraceContext): T = checked(
     trySnapshot(topologyKnownUntilTimestamp)
@@ -140,6 +165,17 @@ trait TopologyClientApi[+T] { this: HasFutureSupervision =>
       traceContext: TraceContext
   ): FutureUnlessShutdown[T]
 
+  /** Returns the topology information at the `timestamp` point in time, but using
+    * `desiredTimestamp` as the actual "forwarded" timestamp.
+    *
+    * The snapshot returned by this method should ONLY BE USED when computing the timestamp for
+    * signature validation (i.e.
+    * [[com.digitalasset.canton.crypto.SyncCryptoClient.getSnapshotForTimestamp]]).
+    */
+  def hypotheticalSnapshot(timestamp: CantonTimestamp, desiredTimestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[T]
+
   /** Waits until a snapshot is available
     *
     * The snapshot returned by this method should be used for validating transaction and
@@ -155,8 +191,9 @@ trait TopologyClientApi[+T] { this: HasFutureSupervision =>
   def awaitSnapshotUSSupervised(description: => String, warnAfter: Duration = 30.seconds)(
       timestamp: CantonTimestamp
   )(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[T] = supervisedUS(description, warnAfter)(awaitSnapshot(timestamp))
+      loggingContext: ErrorLoggingContext
+  ): FutureUnlessShutdown[T] =
+    supervisedUS(description, warnAfter)(awaitSnapshot(timestamp)(loggingContext.traceContext))
 
   /** Returns the topology information at a certain point in time
     *
@@ -168,6 +205,20 @@ trait TopologyClientApi[+T] { this: HasFutureSupervision =>
     * topology snapshot.
     */
   def trySnapshot(timestamp: CantonTimestamp)(implicit traceContext: TraceContext): T
+
+  /** Returns the topology information at the `timestamp` point in time, but using
+    * `desiredTimestamp` as the actual "forwarded" timestamp.
+    *
+    * Fails with an exception if the state is not yet known.
+    *
+    * The snapshot returned by this method should ONLY BE USED when computing the timestamp for
+    * signature validation (i.e.
+    * [[com.digitalasset.canton.crypto.SyncCryptoClient.getSnapshotForTimestamp]]).
+    */
+  def tryHypotheticalSnapshot(
+      timestamp: CantonTimestamp,
+      desiredTimestamp: CantonTimestamp,
+  )(implicit traceContext: TraceContext): T
 
   /** Returns an optional future which will complete when the effective timestamp has been observed
     *
@@ -260,18 +311,12 @@ trait PartyTopologySnapshotClient {
     */
   def allHaveActiveParticipants(
       parties: Set[LfPartyId],
-      check: ParticipantPermission => Boolean = _ => true,
+      check: ParticipantAttributes => Boolean = _ => true,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Set[LfPartyId], Unit]
 
-  /** Returns the consortium thresholds (how many votes from different participants that host the
-    * consortium party are required for the confirmation to become valid). For normal parties
-    * returns 1.
+  /** Returns the set of parties for which there is at least one participant that satisfies the
+    * predicate
     */
-  def consortiumThresholds(parties: Set[LfPartyId])(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[LfPartyId, PositiveInt]]
-
-  /** Returns true if there is at least one participant that satisfies the predicate */
   def isHostedByAtLeastOneParticipantF(
       parties: Set[LfPartyId],
       check: (LfPartyId, ParticipantAttributes) => Boolean,
@@ -341,33 +386,6 @@ object PartyTopologySnapshotClient {
   }
 }
 
-/** The subset of the topology client, providing the party related key information */
-trait PartyKeyTopologySnapshotClient {
-
-  this: BaseTopologySnapshotClient =>
-
-  /** returns authorization information for the party, including signing keys and threshold */
-  def partyAuthorization(party: PartyId)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[PartyAuthorizationInfo]]
-
-}
-
-object PartyKeyTopologySnapshotClient {
-
-  /** party key information
-    *
-    * @param threshold
-    *   how many signatures we require to have for the given party to authorize a transaction
-    * @param signingKeys
-    *   the valid signing keys for the given party
-    */
-  final case class PartyAuthorizationInfo(
-      threshold: PositiveInt,
-      signingKeys: NonEmpty[Seq[SigningPublicKey]],
-  )
-}
-
 /** The subset of the topology client, providing signing and encryption key information */
 trait KeyTopologySnapshotClient {
 
@@ -419,6 +437,12 @@ trait KeyTopologySnapshotClient {
       limit: Int,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Map[Member, KeyCollection]]
 
+  /** Returns party authorization info for a party. Keys defined in the PartyToParticipant mapping
+    * take precedence over keys defined in PartyToKeyMapping.
+    */
+  def signingKeysWithThreshold(party: PartyId)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[SigningKeysWithThreshold]]
 }
 
 /** The subset of the topology client, providing participant state information */
@@ -434,6 +458,13 @@ trait ParticipantTopologySnapshotClient {
   def isParticipantActive(participantId: ParticipantId)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Boolean]
+
+  def participantsWithSupportedFeature(
+      participants: Set[ParticipantId],
+      feature: SynchronizerTrustCertificate.ParticipantTopologyFeatureFlag,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Set[ParticipantId]]
 
   /** Checks whether the provided participant exists, is active and can login at the given point in
     * time
@@ -544,7 +575,7 @@ trait VettedPackagesSnapshotClient {
       participantId: ParticipantId,
       packages: Set[PackageId],
       ledgerTime: CantonTimestamp,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]]
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[UnknownOrUnvettedPackages]
 
   /** Checks the vetting state for the given packages and returns the packages that have no entry in
     * the participant's VettedPackages topology transactions. Note: this does not check the vetted
@@ -561,10 +592,17 @@ trait VettedPackagesSnapshotClient {
       participantId: ParticipantId,
       packageIds: Set[PackageId],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]]
+
+  /** @return
+    *   all vetted packages
+    */
+  def vettedPackages(participantId: ParticipantId)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Set[VettedPackage]]
 }
 
 trait SynchronizerGovernanceSnapshotClient {
-  this: BaseTopologySnapshotClient with NamedLogging =>
+  this: BaseTopologySnapshotClient & NamedLogging =>
 
   def trafficControlParameters(
       protocolVersion: ProtocolVersion,
@@ -591,8 +629,7 @@ trait SynchronizerGovernanceSnapshotClient {
           // we must use zero as default change delay parameter, as otherwise static time tests will not work
           // however, once the synchronizer has published the initial set of synchronizer parameters, the zero time will be
           // adjusted.
-          topologyChangeDelay = DynamicSynchronizerParameters.topologyChangeDelayIfAbsent,
-          protocolVersion = protocolVersion,
+          protocolVersion = protocolVersion
         )
     }
 
@@ -634,6 +671,24 @@ trait MembersTopologySnapshotClient {
   ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]]
 }
 
+trait SynchronizerUpgradeClient {
+
+  /** In case the synchronizer owners have announced a synchronizer upgrade, returns the physical
+    * synchronizer id of the successor of this synchronizer and the upgrade time. Otherwise, returns
+    * None.
+    */
+  def synchronizerUpgradeOngoing()(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[(SynchronizerSuccessor, EffectiveTime)]]
+
+  /** Returns the known sequencer connection details for the successor synchronizer as published by
+    * the sequencers.
+    */
+  def sequencerConnectionSuccessors()(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[SequencerId, SequencerConnectionSuccessor]]
+}
+
 trait TopologySnapshot
     extends PartyTopologySnapshotClient
     with BaseTopologySnapshotClient
@@ -644,7 +699,7 @@ trait TopologySnapshot
     with SequencerSynchronizerStateClient
     with SynchronizerGovernanceSnapshotClient
     with MembersTopologySnapshotClient
-    with PartyKeyTopologySnapshotClient { this: BaseTopologySnapshotClient with NamedLogging => }
+    with SynchronizerUpgradeClient { this: BaseTopologySnapshotClient & NamedLogging => }
 
 // architecture-handbook-entry-end: IdentityProvidingServiceClient
 
@@ -671,20 +726,27 @@ trait SynchronizerTopologyClientWithInit
   /** Overloaded recent snapshot returning derived type */
   override def currentSnapshotApproximation(implicit
       traceContext: TraceContext
-  ): TopologySnapshotLoader = trySnapshot(approximateTimestamp)
+  ): TopologySnapshotLoader =
+    trySnapshot(approximateTimestamp)
 
   override def trySnapshot(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): TopologySnapshotLoader
 
-  /** Overloaded snapshot returning derived type */
-  override def snapshot(
+  override def tryHypotheticalSnapshot(
+      timestamp: CantonTimestamp,
+      desiredTimestamp: CantonTimestamp,
+  )(implicit
+      traceContext: TraceContext
+  ): TopologySnapshotLoader
+
+  private def waitForTimestampWithLogging(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[TopologySnapshotLoader] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     // Keep current value, in case we need it in the log entry below
     val topoKnownUntilTs = topologyKnownUntilTimestamp
 
-    val syncF = this.awaitTimestamp(timestamp) match {
+    this.awaitTimestamp(timestamp) match {
       case None => FutureUnlessShutdown.unit
       // No need to log a warning if the future we get is due to a shutdown in progress
       case Some(fut) =>
@@ -699,8 +761,22 @@ trait SynchronizerTopologyClientWithInit
         }
         fut
     }
-    syncF.map(_ => trySnapshot(timestamp))
   }
+
+  /** Overloaded snapshot returning derived type */
+  override def snapshot(
+      timestamp: CantonTimestamp
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[TopologySnapshotLoader] =
+    waitForTimestampWithLogging(timestamp).map(_ => trySnapshot(timestamp))
+
+  /** Overloaded hypotheticalSnapshot returning derived type */
+  override def hypotheticalSnapshot(
+      timestamp: CantonTimestamp,
+      desiredTimestamp: CantonTimestamp,
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[TopologySnapshotLoader] =
+    waitForTimestampWithLogging(timestamp).map(_ =>
+      tryHypotheticalSnapshot(timestamp, desiredTimestamp)
+    )
 
   override def awaitSnapshot(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
@@ -754,14 +830,16 @@ private[client] trait KeyTopologySnapshotClientLoader extends KeyTopologySnapsho
   override def encryptionKey(owner: Member)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[EncryptionPublicKey]] =
-    allKeys(owner).map(keyCollection => PublicKey.getLatestKey(keyCollection.encryptionKeys))
+    allKeys(owner).map(keyCollection =>
+      NonEmpty.from(keyCollection.encryptionKeys).map(PublicKey.getLatestKey)
+    )
 
   /** returns the newest encryption public key */
   def encryptionKey(members: Seq[Member])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[Member, EncryptionPublicKey]] =
     encryptionKeys(members).map(
-      _.mapFilter(keyCollection => PublicKey.getLatestKey(keyCollection))
+      _.mapFilter(keyCollection => NonEmpty.from(keyCollection).map(PublicKey.getLatestKey))
     )
 
   override def encryptionKeys(owner: Member)(implicit
@@ -787,6 +865,19 @@ private[client] trait ParticipantTopologySnapshotLoader extends ParticipantTopol
   ): FutureUnlessShutdown[Boolean] =
     findParticipantState(participantId).map(_.isDefined)
 
+  override def participantsWithSupportedFeature(
+      participants: Set[ParticipantId],
+      feature: SynchronizerTrustCertificate.ParticipantTopologyFeatureFlag,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Set[ParticipantId]] = for {
+    participantAttributesMap <- loadParticipantStates(participants.toSeq)
+  } yield {
+    participantAttributesMap.collect {
+      case (pid, attributes) if attributes.features.contains(feature) => pid
+    }.toSet
+  }
+
   override def isParticipantActiveAndCanLoginAt(
       participantId: ParticipantId,
       timestamp: CantonTimestamp,
@@ -810,7 +901,6 @@ private[client] trait ParticipantTopologySnapshotLoader extends ParticipantTopol
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[ParticipantId, ParticipantAttributes]]
-
 }
 
 private[client] trait PartyTopologySnapshotBaseClient {
@@ -819,16 +909,14 @@ private[client] trait PartyTopologySnapshotBaseClient {
 
   override def allHaveActiveParticipants(
       parties: Set[LfPartyId],
-      check: ParticipantPermission => Boolean = _ => true,
+      check: ParticipantAttributes => Boolean = _ => true,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Set[LfPartyId], Unit] = {
     val fetchedF = activeParticipantsOfPartiesWithInfo(parties.toSeq)
     EitherT(
       fetchedF
         .map { fetched =>
           fetched.foldLeft(Set.empty[LfPartyId]) { case (acc, (party, partyInfo)) =>
-            if (
-              partyInfo.participants.exists { case (_, attributes) => check(attributes.permission) }
-            )
+            if (partyInfo.participants.exists { case (_, attributes) => check(attributes) })
               acc
             else acc + party
           }
@@ -881,7 +969,7 @@ private[client] trait PartyTopologySnapshotBaseClient {
         parties.toSeq.mapFilter { party =>
           partiesWithAttributes
             .get(party)
-            .filter(_.permission.canConfirm)
+            .filter(_.canConfirm)
             .map(_ => party)
         }.toSet
       )
@@ -948,11 +1036,6 @@ private[client] trait PartyTopologySnapshotLoader
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Map[LfPartyId, PartyInfo]] =
     loadAndMapPartyInfos(parties, identity)
 
-  final override def consortiumThresholds(
-      parties: Set[LfPartyId]
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Map[LfPartyId, PositiveInt]] =
-    loadAndMapPartyInfos(parties.toSeq, _.threshold)
-
   final override def canNotSubmit(
       participant: ParticipantId,
       parties: Seq[LfPartyId],
@@ -992,7 +1075,7 @@ trait VettedPackagesLoader {
       participant: ParticipantId
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Map[PackageId, VettedPackage]]
 
-  def loadVettedPackages(participants: Seq[ParticipantId])(implicit
+  def loadVettedPackages(participants: Set[ParticipantId])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[ParticipantId, Map[PackageId, VettedPackage]]]
 }
@@ -1005,18 +1088,18 @@ trait VettedPackagesSnapshotLoader extends VettedPackagesSnapshotClient with Vet
       packageId: PackageId,
       ledgerTime: CantonTimestamp,
       vettedPackagesLoader: VettedPackagesLoader,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]]
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[UnknownOrUnvettedPackages]
 
   override final def findUnvettedPackagesOrDependencies(
       participantId: ParticipantId,
       packages: Set[PackageId],
       ledgerTime: CantonTimestamp,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[UnknownOrUnvettedPackages] =
     packages.toList
       .parTraverse(packageId =>
         loadUnvettedPackagesOrDependenciesUsingLoader(participantId, packageId, ledgerTime, this)
       )
-      .map(_.flatten.toSet)
+      .map(_.combineAll)
 
   override final def determinePackagesWithNoVettingEntry(
       participantId: ParticipantId,
@@ -1026,10 +1109,15 @@ trait VettedPackagesSnapshotLoader extends VettedPackagesSnapshotClient with Vet
       val vettedIds = vettedPackages.keySet
       packageIds -- vettedIds
     }
+
+  override def vettedPackages(participantId: ParticipantId)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Set[VettedPackage]] =
+    loadVettedPackages(participantId).map(vettedPackages => vettedPackages.values.toSet)
 }
 
 trait SynchronizerGovernanceSnapshotLoader extends SynchronizerGovernanceSnapshotClient {
-  this: BaseTopologySnapshotClient with NamedLogging =>
+  this: BaseTopologySnapshotClient & NamedLogging =>
 }
 
 /** Loading interface with a more optimal method to read data from a store

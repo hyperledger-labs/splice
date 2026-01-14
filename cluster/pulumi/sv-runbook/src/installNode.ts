@@ -1,11 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
+import * as fs from 'fs';
 import {
   Auth0Client,
   BackupConfig,
   ChartValues,
-  cnsUiSecret,
   config,
   exactNamespace,
   ExactNamespace,
@@ -22,22 +22,18 @@ import {
   CLUSTER_HOSTNAME,
   svKeySecret,
   svKeyFromSecret,
-  validatorSecrets,
+  installValidatorSecrets,
   ExpectedValidatorOnboarding,
   SvIdKey,
-  installLoopback,
   imagePullSecret,
   CnInput,
-  sequencerPruningConfig,
   DecentralizedSynchronizerMigrationConfig,
   ValidatorTopupConfig,
   svValidatorTopupConfig,
   svOnboardingPollingInterval,
   activeVersion,
-  approvedSvIdentities,
   daContactPoint,
   spliceInstanceNames,
-  DEFAULT_AUDIENCE,
   DecentralizedSynchronizerUpgradeConfig,
   ansDomainPrefix,
   svUserIds,
@@ -46,23 +42,36 @@ import {
   svCometBftGovernanceKeyFromSecret,
   failOnAppVersionMismatch,
   networkWideConfig,
+  getAdditionalJvmOptions,
+  installSvAppSecrets,
+  getSvAppApiAudience,
+  getValidatorAppApiAudience,
+  externalIpRangesFile,
+  clusterNetwork,
+  CnChartVersion,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
+  approvedSvIdentities,
+  approvedSvIdentitiesFile,
+  CantonBftSynchronizerNode,
   configForSv,
+  getChainIdSuffix,
+  installSvLoopback,
   svsConfig,
-  updateHistoryBackfillingValues,
+  valuesForSvApp,
+  valuesForSvValidatorApp,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import {
   CloudPostgres,
   SplicePostgres,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
+import { createHash } from 'node:crypto';
 
 import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installCanton } from './decentralizedSynchronizer';
 import { installPostgres } from './postgres';
-import { svAppSecrets } from './utils';
 
 if (!isDevNet) {
   console.error('Launching in non-devnet mode');
@@ -102,23 +111,23 @@ export async function installNode(
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
       xns,
-      RUNBOOK_NAMESPACE: svNamespaceStr,
+      namespace: svNamespaceStr,
       CLUSTER_BASENAME,
       participantIdentitiesFile,
       bootstrappingConfig,
     });
 
-  const loopback = installLoopback(xns);
+  const loopback = installSvLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
-  const svKey = svKeyFromSecret('sv');
+  const svKey = svKeyFromSecret(svAppConfig.svIdKeyGcpSecret);
 
-  const cometBftGovernanceKey = svAppConfig.externalGovernanceKey
-    ? svCometBftGovernanceKeyFromSecret(svNamespaceStr.replace('-', ''))!
+  const cometBftGovernanceKey = svAppConfig.externalGovernanceKeyGcpSecret
+    ? svCometBftGovernanceKeyFromSecret(svAppConfig.externalGovernanceKeyGcpSecret)
     : undefined;
 
-  const { sv, validator } = await installSvAndValidator(
+  await installSvAndValidator(
     {
       xns,
       decentralizedSynchronizerMigrationConfig,
@@ -172,7 +181,7 @@ export async function installNode(
       },
     },
     activeVersion,
-    { dependsOn: ingressImagePullDeps.concat([sv, validator]) }
+    { dependsOn: ingressImagePullDeps }
   );
 }
 
@@ -228,48 +237,14 @@ async function installSvAndValidator(
 
   const svConfig = configForSv('sv');
   const auth0Config = auth0Client.getCfg();
-  const svNameSpaceAuth0Clients = auth0Config.namespaceToUiToClientId['sv'];
-  if (!svNameSpaceAuth0Clients) {
-    throw new Error('No SV namespace in auth0 config');
-  }
-  const svUiClientId = svNameSpaceAuth0Clients['sv'];
-  if (!svUiClientId) {
-    throw new Error('No SV ui client id in auth0 config');
-  }
 
-  const { appSecret: svAppSecret, uiSecret: svAppUISecret } = await svAppSecrets(
-    xns,
-    auth0Client,
-    svUiClientId
-  );
+  const svAppSecrets = await installSvAppSecrets(xns, auth0Client);
 
   svKeySecret(xns, svKey);
 
   const canton = installCanton(onboardingName, decentralizedSynchronizerMigrationConfig);
 
   const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', 'postgres-values-apps.yaml');
-
-  const bftSequencerConnection =
-    !svConfig.participant || svConfig.participant.bftSequencerConnection;
-  const topologyChangeDelayEnvVars = svsConfig?.synchronizer?.topologyChangeDelay
-    ? [
-        {
-          name: 'ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY',
-          value: `canton.sv-apps.sv.topology-change-delay-duration=${svsConfig.synchronizer.topologyChangeDelay}`,
-        },
-      ]
-    : [];
-  const disableBftSequencerConnectionEnvVars = bftSequencerConnection
-    ? []
-    : [
-        {
-          name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
-          value: 'canton.sv-apps.sv.bft-sequencer-connection = false',
-        },
-      ];
-  const svAppAdditionalEnvVars = (svConfig.svApp?.additionalEnvVars || [])
-    .concat(topologyChangeDelayEnvVars)
-    .concat(disableBftSequencerConnectionEnvVars);
 
   const valuesFromYamlFile = loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
@@ -283,6 +258,11 @@ async function installSvAndValidator(
     }
   );
 
+  const commonSvAppValues = valuesForSvApp(decentralizedSynchronizerMigrationConfig, {
+    ...svConfig,
+    cometBftGovernanceKey,
+  });
+
   const extraBeneficiaries = resolveValidator1PartyId
     ? [
         {
@@ -291,24 +271,24 @@ async function installSvAndValidator(
         },
       ]
     : [];
+  const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
   const svValues: ChartValues = {
     ...valuesFromYamlFile,
+    ...commonSvAppValues,
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
     approvedSvIdentities: approvedSvIdentities(),
     domain: {
       ...(valuesFromYamlFile.domain || {}),
-      sequencerPruningConfig,
+      ...(commonSvAppValues.domain || {}),
       skipInitialization:
         svsConfig?.synchronizer?.skipInitialization &&
         !svsConfig?.synchronizer.forceSvRunbookInitialization,
     },
     cometBFT: {
       ...(valuesFromYamlFile.cometBFT || {}),
-      externalGovernanceKey: cometBftGovernanceKey
-        ? true
-        : valuesFromYamlFile.cometBFT?.externalGovernanceKey,
+      ...(commonSvAppValues.cometBFT || {}),
     },
     migration: {
       ...valuesFromYamlFile.migration,
@@ -327,7 +307,9 @@ async function installSvAndValidator(
     initialAmuletPrice: initialAmuletPrice,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: svConfig.logging?.appsLogLevel,
-    additionalEnvVars: svAppAdditionalEnvVars,
+    logAsyncFlush: svConfig.logging?.appsAsync,
+    additionalJvmOptions: getAdditionalJvmOptions(svConfig.svApp?.additionalJvmOptions),
+    resources: svConfig.svApp?.resources,
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
@@ -335,7 +317,7 @@ async function installSvAndValidator(
     ...persistenceForPostgres(appsPg, svValues),
     auth: {
       ...svValues.auth,
-      audience: auth0Config.appToApiAudience['sv'] || DEFAULT_AUDIENCE,
+      audience: getSvAppApiAudience(auth0Config, xns.logicalName),
     },
   };
 
@@ -350,15 +332,7 @@ async function installSvAndValidator(
     ...fixedTokensValue,
   };
 
-  const walletUiClientId = svNameSpaceAuth0Clients['wallet'];
-  if (!walletUiClientId) {
-    throw new Error('No SV ui client id in auth0 config');
-  }
-  const { appSecret: svValidatorAppSecret, uiSecret: svValidatorUISecret } = await validatorSecrets(
-    xns,
-    auth0Client,
-    walletUiClientId
-  );
+  const validatorSecrets = await installValidatorSecrets(xns, auth0Client);
 
   const sv = installSpliceRunbookHelmChart(
     xns,
@@ -370,7 +344,8 @@ async function installSvAndValidator(
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
         .concat(canton.decentralizedSynchronizer.dependencies)
-        .concat([svAppSecret, svAppUISecret, appsPg])
+        .concat(svAppSecrets)
+        .concat([appsPg])
         .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
         .concat(
           cometBftGovernanceKey ? svCometBftGovernanceKeySecret(xns, cometBftGovernanceKey) : []
@@ -385,14 +360,28 @@ async function installSvAndValidator(
       MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
     }
   );
+  const externalSequencerP2pAddress = (
+    canton.decentralizedSynchronizer as unknown as CantonBftSynchronizerNode
+  ).externalSequencerP2pAddress;
   const scanValues: ChartValues = {
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
     ...spliceInstanceNames,
-    ...updateHistoryBackfillingValues,
     metrics: {
       enable: true,
     },
+    ...(useCantonBft
+      ? {
+          bftSequencers: [
+            {
+              p2pUrl: externalSequencerP2pAddress,
+              migrationId: decentralizedSynchronizerMigrationConfig.active.id,
+              sequencerAddress: canton.decentralizedSynchronizer.namespaceInternalSequencerAddress,
+            },
+          ],
+        }
+      : {}),
+    resources: svConfig.scanApp?.resources,
   };
 
   const scanValuesWithFixedTokens = {
@@ -400,7 +389,7 @@ async function installSvAndValidator(
     ...fixedTokensValue,
   };
 
-  installSpliceRunbookHelmChart(
+  const scan = installSpliceRunbookHelmChart(
     xns,
     'scan',
     'splice-scan',
@@ -409,9 +398,16 @@ async function installSvAndValidator(
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
-        .concat([svAppSecret, appsPg])
-        .concat(spliceConfig.pulumiProjectConfig.interAppsDependencies ? [sv] : []),
+        .concat(svAppSecrets)
+        .concat([appsPg]),
     }
+  );
+
+  installInfoEndpoint(xns, decentralizedSynchronizerMigrationConfig, scan);
+
+  const commonValidatorAppValues = valuesForSvValidatorApp(
+    decentralizedSynchronizerMigrationConfig,
+    svConfig
   );
 
   const validatorValues = {
@@ -439,14 +435,16 @@ async function installSvAndValidator(
     ),
     ...spliceInstanceNames,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
+    resources: svConfig.validatorApp?.resources,
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {
     ...validatorValues,
+    ...commonValidatorAppValues,
     ...persistenceForPostgres(appsPg, validatorValues),
     auth: {
       ...validatorValues.auth,
-      audience: auth0Config.appToApiAudience['validator'] || DEFAULT_AUDIENCE,
+      audience: getValidatorAppApiAudience(auth0Config, xns.logicalName),
     },
   };
 
@@ -460,49 +458,67 @@ async function installSvAndValidator(
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
-  const validatorValuesWithMaybeNoBftSequencerConnection: ChartValues = {
-    ...validatorValuesWithMaybeTopups,
-    ...(bftSequencerConnection
-      ? {}
-      : {
-          decentralizedSynchronizerUrl: svValues.decentralizedSynchronizerUrl,
-          useSequencerConnectionsFromScan: false,
-        }),
-    additionalEnvVars: [
-      ...(validatorValuesWithMaybeTopups.additionalEnvVars || []),
-      ...(bftSequencerConnection
-        ? []
-        : [
-            {
-              name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
-              value:
-                'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
-            },
-          ]),
-    ],
-  };
-
-  const cnsUiClientId = svNameSpaceAuth0Clients['cns'];
-  if (!cnsUiClientId) {
-    throw new Error('No CNS ui client id in auth0 config');
-  }
-
   const validator = installSpliceRunbookHelmChart(
     xns,
     'validator',
     'splice-validator',
-    validatorValuesWithMaybeNoBftSequencerConnection,
+    {
+      ...validatorValuesWithMaybeTopups,
+      additionalJvmOptions: getAdditionalJvmOptions(svConfig.validatorApp?.additionalJvmOptions),
+    },
     activeVersion,
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
-        .concat([svValidatorAppSecret, svValidatorUISecret])
+        .concat(validatorSecrets)
         .concat(spliceConfig.pulumiProjectConfig.interAppsDependencies ? [sv] : [])
-        .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
         .concat(backupConfigSecret ? [backupConfigSecret] : [])
         .concat([appsPg]),
     }
   );
 
   return { sv, validator };
+}
+
+function installInfoEndpoint(
+  xns: ExactNamespace,
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
+  scan: pulumi.Resource
+): void {
+  function readFileOrEmptyString(path: string | undefined): string {
+    return path !== undefined ? fs.readFileSync(path, 'utf-8') : '';
+  }
+
+  const defaultValues = loadYamlFromFile(
+    `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/info-values.yaml`,
+    {
+      TARGET_CLUSTER: clusterNetwork,
+      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.id.toString(),
+      MD5_HASH_OF_ALLOWED_IP_RANGES: `"${createHash('md5')
+        .update(readFileOrEmptyString(externalIpRangesFile()))
+        .digest('hex')}"`,
+      MD5_HASH_OF_APPROVED_SV_IDENTITIES: `"${createHash('md5')
+        .update(readFileOrEmptyString(approvedSvIdentitiesFile()))
+        .digest('hex')}"`,
+      CHAIN_ID_SUFFIX: `"${getChainIdSuffix()}"`,
+    }
+  );
+
+  const values = {
+    ...defaultValues,
+    deploymentDetails: {
+      ...defaultValues.deploymentDetails,
+      sv: {
+        version: CnChartVersion.stringify(decentralizedSynchronizerMigrationConfig.active.version),
+      },
+    },
+    istioVirtualService: {
+      host: `info.${xns.logicalName}.${CLUSTER_HOSTNAME}`,
+      gateway: 'cluster-ingress/cn-http-gateway',
+    },
+  };
+
+  installSpliceRunbookHelmChart(xns, 'info', 'splice-info', values, activeVersion, {
+    dependsOn: [scan],
+  });
 }

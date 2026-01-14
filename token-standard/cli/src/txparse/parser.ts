@@ -39,7 +39,7 @@ import {
   ExercisedEvent as LedgerApiExercisedEvent,
   JsGetEventsByContractIdResponse,
   JsTransaction,
-} from "canton-json-api-v2-openapi";
+} from "@lfdecentralizedtrust/canton-json-api-v2-openapi";
 
 export class TransactionParser {
   private readonly ledgerClient: LedgerJsonApi;
@@ -377,7 +377,7 @@ export class TransactionParser {
     const children = await this.getChildren(exercisedEvent);
     const receiverAmounts = new Map<string, BigNumber>();
     children.creates
-      .filter((h) => h.owner !== this.partyId)
+      .filter((h) => h.owner !== sender)
       .forEach((holding) =>
         receiverAmounts.set(
           holding.owner,
@@ -661,7 +661,6 @@ export class TransactionParser {
           ),
           verbose: false,
         },
-        requestingParties: [],
       })
       .catch((err) => {
         // This will happen for holdings with consuming choices

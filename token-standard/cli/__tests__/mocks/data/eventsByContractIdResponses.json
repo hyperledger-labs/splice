@@ -3,7 +3,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "0",
+        "contractId" : "1",
         "contractKey" : null,
         "createArgument" : {
           "amulet" : {
@@ -214,6 +214,70 @@
         "contractId" : "4",
         "contractKey" : null,
         "createArgument" : {
+          "amount" : {
+            "createdAt" : {
+              "number" : "1"
+            },
+            "initialAmount" : "489.0000000000",
+            "ratePerRound" : {
+              "rate" : "0.0038051800"
+            }
+          },
+          "dso" : "dso::normalized",
+          "owner" : "alice::normalized"
+        },
+        "createdAt" : "1971-01-01T00:00:42.000420Z",
+        "createdEventBlob" : "",
+        "interfaceViews" : [
+          {
+            "interfaceId" : "#package-name:Splice.Api.Token.HoldingV1:Holding",
+            "viewStatus" : {
+              "code" : 0,
+              "details" : [
+              ],
+              "message" : ""
+            },
+            "viewValue" : {
+              "amount" : "489.0000000000",
+              "instrumentId" : {
+                "admin" : "dso::normalized",
+                "id" : "Amulet"
+              },
+              "lock" : null,
+              "meta" : {
+                "values" : {
+                  "amulet.splice.lfdecentralizedtrust.org/created-in-round" : "1",
+                  "amulet.splice.lfdecentralizedtrust.org/rate-per-round" : "0.00380518"
+                }
+              },
+              "owner" : "alice::normalized"
+            }
+          }
+        ],
+        "nodeId" : 8,
+        "observers" : [
+        ],
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "signatories" : [
+          "dso::normalized",
+          "alice::normalized"
+        ],
+        "templateId" : "#package-name:Splice.Amulet:Amulet",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    }
+  },
+  {
+    "archived" : null,
+    "created" : {
+      "createdEvent" : {
+        "contractId" : "5",
+        "contractKey" : null,
+        "createArgument" : {
           "amount" : "30.0000000000",
           "issuer" : "alice::normalized",
           "owner" : "alice::normalized"
@@ -265,7 +329,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "5",
+        "contractId" : "6",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "40.0000000000",
@@ -319,7 +383,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "6",
+        "contractId" : "7",
         "contractKey" : null,
         "createArgument" : {
           "dsoParty" : "dso::normalized",
@@ -352,7 +416,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "7",
+        "contractId" : "8",
         "contractKey" : null,
         "createArgument" : {
           "dso" : "dso::normalized",
@@ -383,7 +447,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "8",
+        "contractId" : "9",
         "implementedInterfaces" : [
         ],
         "nodeId" : 1,
@@ -398,7 +462,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "8",
+        "contractId" : "9",
         "contractKey" : null,
         "createArgument" : {
           "expectedDso" : "dso::normalized",
@@ -429,7 +493,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "11",
+        "contractId" : "12",
         "implementedInterfaces" : [
         ],
         "nodeId" : 0,
@@ -444,7 +508,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "11",
+        "contractId" : "12",
         "contractKey" : null,
         "createArgument" : {
           "dso" : "dso::normalized",
@@ -479,7 +543,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "16",
+        "contractId" : "17",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -495,7 +559,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "16",
+        "contractId" : "17",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -558,7 +622,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "23",
+        "contractId" : "24",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -574,7 +638,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "23",
+        "contractId" : "24",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -638,7 +702,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "24",
+        "contractId" : "25",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "7.0000000000",
@@ -672,7 +736,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "26",
+        "contractId" : "27",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -688,7 +752,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "26",
+        "contractId" : "27",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -752,7 +816,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "28",
+        "contractId" : "29",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "6.1000000000",
@@ -786,7 +850,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "30",
+        "contractId" : "31",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -802,7 +866,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "30",
+        "contractId" : "31",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -865,7 +929,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "31",
+        "contractId" : "32",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
         ],
@@ -881,15 +945,15 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "31",
+        "contractId" : "32",
         "contractKey" : null,
         "createArgument" : {
-          "lockedAmulet" : "33",
+          "lockedAmulet" : "34",
           "transfer" : {
             "amount" : "1000.0000000000",
             "executeBefore" : "2025-06-18T00:00:00.000000Z",
             "inputHoldingCids" : [
-              "33"
+              "34"
             ],
             "instrumentId" : {
               "admin" : "dso::normalized",
@@ -933,7 +997,7 @@
                 "amount" : "1000.0000000000",
                 "executeBefore" : "2025-06-18T00:00:00.000000Z",
                 "inputHoldingCids" : [
-                  "33"
+                  "34"
                 ],
                 "instrumentId" : {
                   "admin" : "dso::normalized",
@@ -972,7 +1036,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "32",
+        "contractId" : "33",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -988,7 +1052,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "32",
+        "contractId" : "33",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -1051,7 +1115,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "33",
+        "contractId" : "34",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -1067,7 +1131,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "33",
+        "contractId" : "34",
         "contractKey" : null,
         "createArgument" : {
           "amulet" : {
@@ -1147,7 +1211,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "34",
+        "contractId" : "35",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "7.0000000000",
@@ -1182,7 +1246,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "35",
+        "contractId" : "36",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "7.0000000000",
@@ -1218,7 +1282,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "36",
+        "contractId" : "37",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
         ],
@@ -1234,15 +1298,15 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "36",
+        "contractId" : "37",
         "contractKey" : null,
         "createArgument" : {
-          "lockedAmulet" : "38",
+          "lockedAmulet" : "39",
           "transfer" : {
             "amount" : "1000.0000000000",
             "executeBefore" : "2025-06-18T00:00:00.000000Z",
             "inputHoldingCids" : [
-              "38"
+              "39"
             ],
             "instrumentId" : {
               "admin" : "dso::normalized",
@@ -1286,7 +1350,7 @@
                 "amount" : "1000.0000000000",
                 "executeBefore" : "2025-06-18T00:00:00.000000Z",
                 "inputHoldingCids" : [
-                  "38"
+                  "39"
                 ],
                 "instrumentId" : {
                   "admin" : "dso::normalized",
@@ -1325,7 +1389,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "37",
+        "contractId" : "38",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -1341,7 +1405,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "37",
+        "contractId" : "38",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -1404,7 +1468,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "38",
+        "contractId" : "39",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -1420,7 +1484,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "38",
+        "contractId" : "39",
         "contractKey" : null,
         "createArgument" : {
           "amulet" : {
@@ -1500,7 +1564,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "39",
+        "contractId" : "40",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "7.0000000000",
@@ -1535,7 +1599,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "40",
+        "contractId" : "41",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "7.0000000000",
@@ -1571,7 +1635,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "41",
+        "contractId" : "42",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
         ],
@@ -1587,15 +1651,15 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "41",
+        "contractId" : "42",
         "contractKey" : null,
         "createArgument" : {
-          "lockedAmulet" : "43",
+          "lockedAmulet" : "44",
           "transfer" : {
             "amount" : "1000.0000000000",
             "executeBefore" : "2025-06-18T00:00:00.000000Z",
             "inputHoldingCids" : [
-              "43"
+              "44"
             ],
             "instrumentId" : {
               "admin" : "dso::normalized",
@@ -1639,7 +1703,7 @@
                 "amount" : "1000.0000000000",
                 "executeBefore" : "2025-06-18T00:00:00.000000Z",
                 "inputHoldingCids" : [
-                  "43"
+                  "44"
                 ],
                 "instrumentId" : {
                   "admin" : "dso::normalized",
@@ -1678,7 +1742,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "42",
+        "contractId" : "43",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -1694,7 +1758,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "42",
+        "contractId" : "43",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -1757,7 +1821,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "43",
+        "contractId" : "44",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -1773,7 +1837,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "43",
+        "contractId" : "44",
         "contractKey" : null,
         "createArgument" : {
           "amulet" : {
@@ -1853,7 +1917,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "44",
+        "contractId" : "45",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "7.0000000000",
@@ -1888,7 +1952,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "45",
+        "contractId" : "46",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "7.0000000000",
@@ -1924,7 +1988,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "46",
+        "contractId" : "47",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
         ],
@@ -1940,15 +2004,15 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "46",
+        "contractId" : "47",
         "contractKey" : null,
         "createArgument" : {
-          "lockedAmulet" : "48",
+          "lockedAmulet" : "49",
           "transfer" : {
             "amount" : "1000.0000000000",
             "executeBefore" : "2025-06-18T00:00:00.000000Z",
             "inputHoldingCids" : [
-              "48"
+              "49"
             ],
             "instrumentId" : {
               "admin" : "dso::normalized",
@@ -1992,7 +2056,7 @@
                 "amount" : "1000.0000000000",
                 "executeBefore" : "2025-06-18T00:00:00.000000Z",
                 "inputHoldingCids" : [
-                  "48"
+                  "49"
                 ],
                 "instrumentId" : {
                   "admin" : "dso::normalized",
@@ -2031,7 +2095,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "47",
+        "contractId" : "48",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -2047,7 +2111,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "47",
+        "contractId" : "48",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -2110,7 +2174,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "48",
+        "contractId" : "49",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -2126,7 +2190,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "48",
+        "contractId" : "49",
         "contractKey" : null,
         "createArgument" : {
           "amulet" : {
@@ -2206,7 +2270,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "49",
+        "contractId" : "50",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "7.0000000000",
@@ -2241,7 +2305,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "50",
+        "contractId" : "51",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "7.0000000000",
@@ -2278,15 +2342,15 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "51",
+        "contractId" : "52",
         "contractKey" : null,
         "createArgument" : {
-          "lockedAmulet" : "0",
+          "lockedAmulet" : "1",
           "transfer" : {
             "amount" : "1000.0000000000",
             "executeBefore" : "2025-06-18T00:00:00.000000Z",
             "inputHoldingCids" : [
-              "0"
+              "1"
             ],
             "instrumentId" : {
               "admin" : "dso::normalized",
@@ -2330,7 +2394,7 @@
                 "amount" : "1000.0000000000",
                 "executeBefore" : "2025-06-18T00:00:00.000000Z",
                 "inputHoldingCids" : [
-                  "0"
+                  "1"
                 ],
                 "instrumentId" : {
                   "admin" : "dso::normalized",
@@ -2369,7 +2433,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "52",
+        "contractId" : "53",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -2385,7 +2449,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "52",
+        "contractId" : "53",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -2449,7 +2513,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "53",
+        "contractId" : "54",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "7.0000000000",
@@ -2484,7 +2548,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "54",
+        "contractId" : "55",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "7.0000000000",
@@ -2520,7 +2584,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "56",
+        "contractId" : "57",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -2536,7 +2600,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "56",
+        "contractId" : "57",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -2599,7 +2663,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "57",
+        "contractId" : "58",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -2615,7 +2679,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "57",
+        "contractId" : "58",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -2679,7 +2743,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "58",
+        "contractId" : "59",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "16.0000000000",
@@ -2714,7 +2778,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "59",
+        "contractId" : "60",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "16.0000000000",
@@ -2750,7 +2814,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "60",
+        "contractId" : "61",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -2766,7 +2830,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "60",
+        "contractId" : "61",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -2829,7 +2893,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "61",
+        "contractId" : "62",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -2845,7 +2909,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "61",
+        "contractId" : "62",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -2908,7 +2972,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "62",
+        "contractId" : "63",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
         ],
@@ -2924,15 +2988,15 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "62",
+        "contractId" : "63",
         "contractKey" : null,
         "createArgument" : {
-          "lockedAmulet" : "63",
+          "lockedAmulet" : "64",
           "transfer" : {
             "amount" : "200.0000000000",
             "executeBefore" : "2025-06-18T00:00:00.000000Z",
             "inputHoldingCids" : [
-              "63"
+              "64"
             ],
             "instrumentId" : {
               "admin" : "dso::normalized",
@@ -2976,7 +3040,7 @@
                 "amount" : "200.0000000000",
                 "executeBefore" : "2025-06-18T00:00:00.000000Z",
                 "inputHoldingCids" : [
-                  "63"
+                  "64"
                 ],
                 "instrumentId" : {
                   "admin" : "dso::normalized",
@@ -3015,7 +3079,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "64",
+        "contractId" : "65",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
         ],
@@ -3031,15 +3095,15 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "64",
+        "contractId" : "65",
         "contractKey" : null,
         "createArgument" : {
-          "lockedAmulet" : "65",
+          "lockedAmulet" : "66",
           "transfer" : {
             "amount" : "200.0000000000",
             "executeBefore" : "2025-06-18T00:00:00.000000Z",
             "inputHoldingCids" : [
-              "65"
+              "66"
             ],
             "instrumentId" : {
               "admin" : "dso::normalized",
@@ -3083,7 +3147,7 @@
                 "amount" : "200.0000000000",
                 "executeBefore" : "2025-06-18T00:00:00.000000Z",
                 "inputHoldingCids" : [
-                  "65"
+                  "66"
                 ],
                 "instrumentId" : {
                   "admin" : "dso::normalized",
@@ -3122,7 +3186,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "66",
+        "contractId" : "67",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
         ],
@@ -3138,15 +3202,15 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "66",
+        "contractId" : "67",
         "contractKey" : null,
         "createArgument" : {
-          "lockedAmulet" : "67",
+          "lockedAmulet" : "68",
           "transfer" : {
             "amount" : "200.0000000000",
             "executeBefore" : "2025-06-18T00:00:00.000000Z",
             "inputHoldingCids" : [
-              "67"
+              "68"
             ],
             "instrumentId" : {
               "admin" : "dso::normalized",
@@ -3190,7 +3254,7 @@
                 "amount" : "200.0000000000",
                 "executeBefore" : "2025-06-18T00:00:00.000000Z",
                 "inputHoldingCids" : [
-                  "67"
+                  "68"
                 ],
                 "instrumentId" : {
                   "admin" : "dso::normalized",
@@ -3230,15 +3294,15 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "68",
+        "contractId" : "69",
         "contractKey" : null,
         "createArgument" : {
-          "lockedAmulet" : "69",
+          "lockedAmulet" : "70",
           "transfer" : {
             "amount" : "200.0000000000",
             "executeBefore" : "2025-06-18T00:00:00.000000Z",
             "inputHoldingCids" : [
-              "69"
+              "70"
             ],
             "instrumentId" : {
               "admin" : "dso::normalized",
@@ -3282,7 +3346,7 @@
                 "amount" : "200.0000000000",
                 "executeBefore" : "2025-06-18T00:00:00.000000Z",
                 "inputHoldingCids" : [
-                  "69"
+                  "70"
                 ],
                 "instrumentId" : {
                   "admin" : "dso::normalized",
@@ -3321,7 +3385,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "70",
+        "contractId" : "71",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -3337,7 +3401,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "70",
+        "contractId" : "71",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -3400,7 +3464,7 @@
   {
     "archived" : {
       "archivedEvent" : {
-        "contractId" : "77",
+        "contractId" : "78",
         "implementedInterfaces" : [
           "#package-name:Splice.Api.Token.HoldingV1:Holding"
         ],
@@ -3416,7 +3480,7 @@
     },
     "created" : {
       "createdEvent" : {
-        "contractId" : "77",
+        "contractId" : "78",
         "contractKey" : null,
         "createArgument" : {
           "amount" : {
@@ -3480,7 +3544,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "78",
+        "contractId" : "79",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "6.0000000000",
@@ -3515,7 +3579,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "79",
+        "contractId" : "80",
         "contractKey" : null,
         "createArgument" : {
           "amount" : "6.0000000000",
@@ -3541,6 +3605,88 @@
           "dso::normalized"
         ],
         "templateId" : "#package-name:Splice.Amulet:AppRewardCoupon",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    }
+  },
+  {
+    "archived" : {
+      "archivedEvent" : {
+        "contractId" : "81",
+        "implementedInterfaces" : [
+        ],
+        "nodeId" : 1,
+        "offset" : 42,
+        "packageName" : "splice-wallet",
+        "templateId" : "#package-name:Splice.Wallet.TransferPreapproval:TransferPreapprovalProposal",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    },
+    "created" : {
+      "createdEvent" : {
+        "contractId" : "81",
+        "contractKey" : null,
+        "createArgument" : {
+          "expectedDso" : "dso::normalized",
+          "provider" : "aliceValidator::normalized",
+          "receiver" : "alice::normalized"
+        },
+        "createdAt" : "1971-01-01T00:00:42.000420Z",
+        "createdEventBlob" : "",
+        "interfaceViews" : [
+        ],
+        "nodeId" : 0,
+        "observers" : [
+          "aliceValidator::normalized"
+        ],
+        "offset" : 42,
+        "packageName" : "splice-wallet",
+        "signatories" : [
+          "alice::normalized"
+        ],
+        "templateId" : "#package-name:Splice.Wallet.TransferPreapproval:TransferPreapprovalProposal",
+        "witnessParties" : [
+          "alice::normalized"
+        ]
+      },
+      "synchronizerId" : "sync::normalized"
+    }
+  },
+  {
+    "archived" : null,
+    "created" : {
+      "createdEvent" : {
+        "contractId" : "82",
+        "contractKey" : null,
+        "createArgument" : {
+          "dso" : "dso::normalized",
+          "expiresAt" : "2025-06-18T00:00:00.000000Z",
+          "lastRenewedAt" : "2025-06-18T00:00:00.000000Z",
+          "provider" : "aliceValidator::normalized",
+          "receiver" : "alice::normalized",
+          "validFrom" : "2025-06-18T00:00:00.000000Z"
+        },
+        "createdAt" : "1971-01-01T00:00:42.000420Z",
+        "createdEventBlob" : "",
+        "interfaceViews" : [
+        ],
+        "nodeId" : 16,
+        "observers" : [
+        ],
+        "offset" : 42,
+        "packageName" : "splice-amulet",
+        "signatories" : [
+          "dso::normalized",
+          "aliceValidator::normalized",
+          "alice::normalized"
+        ],
+        "templateId" : "#package-name:Splice.AmuletRules:TransferPreapproval",
         "witnessParties" : [
           "alice::normalized"
         ]

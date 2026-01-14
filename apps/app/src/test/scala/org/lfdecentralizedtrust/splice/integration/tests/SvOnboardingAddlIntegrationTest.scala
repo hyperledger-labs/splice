@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
 import scala.jdk.OptionConverters.*
-import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvAppClient.SvOnboardingStatus
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient.SvOnboardingStatus
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
@@ -201,7 +201,7 @@ class SvOnboardingAddlIntegrationTest
           .forgetNE
 
         val localSequencerUrls: Seq[String] = sequencerConnections.map {
-          inside(_) { case GrpcSequencerConnection(endpoints, _, _, _) =>
+          inside(_) { case GrpcSequencerConnection(endpoints, _, _, _, _) =>
             endpoints.map(_.toURI(false)).forgetNE.loneElement.toString
           }
         }

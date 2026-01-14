@@ -12,6 +12,7 @@ import { AmuletConfig, USD } from '@daml.js/splice-amulet/lib/Splice/AmuletConfi
 
 import { useDsoInfos } from '../../../contexts/SvContext';
 import { ActionFromForm } from '../VoteRequest';
+import BigNumber from 'bignumber.js';
 
 dayjs.extend(utc);
 
@@ -45,13 +46,27 @@ const SetAmuletRulesConfig: React.FC<{
     setConfiguration(config);
     const decoded = AmuletConfig(USD).decoder.run(config);
     if (decoded.ok) {
+      const result = decoded.result;
+      const newConfig: AmuletConfig<USD> = {
+        ...result,
+        transferConfig: {
+          ...result.transferConfig,
+          transferFee: {
+            initialRate: result.transferConfig.transferFee.initialRate,
+            steps: result.transferConfig.transferFee.steps.filter(
+              step => !BigNumber(step._2).eq(0)
+            ),
+          },
+        },
+      };
+      console.log('New config transferFee', newConfig.transferConfig.transferFee);
       chooseAction({
         tag: 'ARC_AmuletRules',
         value: {
           amuletRulesAction: {
             tag: 'CRARC_SetConfig',
             value: {
-              newConfig: decoded.result,
+              newConfig,
               baseConfig: dsoInfosQuery.data!.amuletRules.payload.configSchedule.initialValue,
             },
           },
@@ -65,7 +80,7 @@ const SetAmuletRulesConfig: React.FC<{
   return (
     <Stack direction="column" mb={4} spacing={1}>
       <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
-        <Typography variant="h6" mt={4}>
+        <Typography variant="h6" mt={4} data-testid="set-amulet-rules-config-header">
           Configuration
         </Typography>
         <JsonEditor data={configuration!} onChange={setAmuletConfigAction} />

@@ -9,9 +9,17 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
 import com.digitalasset.canton.sequencing.protocol.{AggregationRule, Batch, MessageId}
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ProtocolVersion
+
+import scala.concurrent.ExecutionContext
 
 trait SequencerClientSend {
+  def psid: PhysicalSynchronizerId
+  final def protocolVersion: ProtocolVersion = psid.protocolVersion
+
+  implicit protected def executionContext: ExecutionContext
 
   /** Sends a request to sequence a deliver event to the sequencer. If we fail to make the request
     * to the sequencer and are certain that it was not received by the sequencer an error is
@@ -70,7 +78,30 @@ trait SequencerClientSend {
   )(implicit
       traceContext: TraceContext,
       metricsContext: MetricsContext,
-  ): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit]
+  ): SendAsyncResult
+
+  /** Flattened version of [[sendAsync]]
+    */
+  def send(
+      batch: Batch[DefaultOpenEnvelope],
+      topologyTimestamp: Option[CantonTimestamp] = None,
+      maxSequencingTime: CantonTimestamp = generateMaxSequencingTime,
+      messageId: MessageId = generateMessageId,
+      aggregationRule: Option[AggregationRule] = None,
+      callback: SendCallback = SendCallback.empty,
+      amplify: Boolean = false,
+  )(implicit
+      traceContext: TraceContext,
+      metricsContext: MetricsContext,
+  ): EitherT[FutureUnlessShutdown, SendAsyncClientError, Unit] = sendAsync(
+    batch = batch,
+    topologyTimestamp = topologyTimestamp,
+    maxSequencingTime = maxSequencingTime,
+    messageId = messageId,
+    aggregationRule = aggregationRule,
+    callback = callback,
+    amplify = amplify,
+  ).value.flatMap(identity)
 
   /** Provides a value for max-sequencing-time to use for `sendAsync` if no better application
     * provided timeout is available. Is currently a configurable offset from our clock.

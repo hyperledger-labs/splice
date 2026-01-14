@@ -4,69 +4,51 @@
 package com.digitalasset.canton.synchronizer.block.update
 
 import cats.syntax.functor.*
-import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.*
-import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedOrderingRequestOps
-import com.digitalasset.canton.synchronizer.sequencer.store.SequencerMemberValidator
-import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
-import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{ErrorUtil, MapsUtil, MonadUtil}
+import com.digitalasset.canton.util.collection.MapsUtil
+import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
 
 import scala.concurrent.ExecutionContext
 
-import BlockUpdateGeneratorImpl.{SequencedSubmission, State}
+import BlockUpdateGeneratorImpl.{SequencedValidatedSubmission, State}
 import SequencedSubmissionsValidator.SequencedSubmissionsValidationResult
 import SubmissionRequestValidator.SubmissionRequestValidationResult
 
-/** Validates a list of [[SequencedSubmission]]s corresponding to a chunk.
+/** Validates a list of
+  * [[com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedSubmissionRequest]]s
+  * corresponding to a chunk.
   */
 private[update] final class SequencedSubmissionsValidator(
-    synchronizerSyncCryptoApi: SynchronizerCryptoClient,
-    sequencerId: SequencerId,
-    rateLimitManager: SequencerRateLimitManager,
     override val loggerFactory: NamedLoggerFactory,
-    metrics: SequencerMetrics,
-    memberValidator: SequencerMemberValidator,
-)(implicit closeContext: CloseContext)
-    extends NamedLogging {
+    submissionRequestValidator: SubmissionRequestValidator,
+) extends NamedLogging {
 
-  private val submissionRequestValidator =
-    new SubmissionRequestValidator(
-      synchronizerSyncCryptoApi,
-      sequencerId,
-      rateLimitManager,
-      loggerFactory,
-      metrics,
-      memberValidator = memberValidator,
-    )
-
-  def validateSequencedSubmissions(
+  def sequentialApplySubmissionsAndEmitOutcomes(
       state: State,
       height: Long,
-      submissionRequestsWithSnapshots: Seq[SequencedSubmission],
+      sequencedValidatedSubmissions: Seq[SequencedValidatedSubmission],
   )(implicit ec: ExecutionContext): FutureUnlessShutdown[SequencedSubmissionsValidationResult] =
     MonadUtil.foldLeftM(
       initialState =
         SequencedSubmissionsValidationResult(inFlightAggregations = state.inFlightAggregations),
-      submissionRequestsWithSnapshots,
-    )(validateSequencedSubmissionAndAddEvents(state.latestSequencerEventTimestamp, height))
+      sequencedValidatedSubmissions,
+    )(applySubmissionAndAddOutcome(state.latestSequencerEventTimestamp, height))
 
   /** @param latestSequencerEventTimestamp
     *   Since each chunk contains at most one event addressed to the sequencer, (and if so it's the
     *   last event), we can treat this timestamp static for the whole chunk and need not update it
     *   in the accumulator.
     */
-  private def validateSequencedSubmissionAndAddEvents(
+  private def applySubmissionAndAddOutcome(
       latestSequencerEventTimestamp: Option[CantonTimestamp],
       height: Long,
   )(
       partialResult: SequencedSubmissionsValidationResult,
-      sequencedSubmissionRequest: SequencedSubmission,
+      sequencedValidatedSubmissionRequest: SequencedValidatedSubmission,
   )(implicit ec: ExecutionContext): FutureUnlessShutdown[SequencedSubmissionsValidationResult] = {
     val SequencedSubmissionsValidationResult(
       inFlightAggregations,
@@ -75,14 +57,17 @@ private[update] final class SequencedSubmissionsValidator(
       reversedOutcomes,
     ) = partialResult
 
-    val SequencedSubmission(
+    val SequencedValidatedSubmission(
       sequencingTimestamp,
-      signedOrderingRequest,
-      topologyOrSequencingSnapshot,
-      topologyTimestampError,
-    ) = sequencedSubmissionRequest
+      signedSubmissionRequest,
+      orderingSequencerId,
+      _,
+      _,
+      trafficConsumption,
+      errorOrResolvedGroups,
+    ) = sequencedValidatedSubmissionRequest
 
-    implicit val traceContext: TraceContext = sequencedSubmissionRequest.traceContext
+    implicit val traceContext: TraceContext = sequencedValidatedSubmissionRequest.traceContext
 
     ErrorUtil.requireState(
       sequencerEventTimestampSoFar.isEmpty,
@@ -91,12 +76,13 @@ private[update] final class SequencedSubmissionsValidator(
 
     for {
       newStateAndOutcome <-
-        submissionRequestValidator.validateAndGenerateSequencedEvents(
+        submissionRequestValidator.applyAggregationAndTrafficControlAndGenerateOutcomes(
           inFlightAggregations,
           sequencingTimestamp,
-          signedOrderingRequest,
-          topologyOrSequencingSnapshot,
-          topologyTimestampError,
+          signedSubmissionRequest,
+          orderingSequencerId,
+          trafficConsumption,
+          errorOrResolvedGroups,
           latestSequencerEventTimestamp,
         )
       SubmissionRequestValidationResult(inFlightAggregations, outcome, sequencerEventTimestamp) =
@@ -111,7 +97,7 @@ private[update] final class SequencedSubmissionsValidator(
           remainingReversedOutcomes = reversedOutcomes,
         )
       _ = logger.debug(
-        s"At block $height, the submission request ${signedOrderingRequest.submissionRequest.messageId} " +
+        s"At block $height, the submission request ${signedSubmissionRequest.content.messageId} " +
           s"at $sequencingTimestamp validated to: ${SubmissionOutcome.prettyString(outcome)}"
       )
     } yield result

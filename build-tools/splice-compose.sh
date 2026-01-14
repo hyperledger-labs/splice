@@ -57,7 +57,7 @@ function _do_start_validator {
     "$@" \
       | tee -a "${SPLICE_ROOT}/log/compose.log" 2>&1 || _error "Failed to start validator, please check ${SPLICE_ROOT}/log/compose.log for details"
 
-  for c in validator participant; do
+  for c in validator participant nginx; do
     docker logs -f splice-validator-${c}-1 >> "${SPLICE_ROOT}/log/compose-${c}.clog" 2>&1 &
   done
 
@@ -103,6 +103,9 @@ function _start_validator {
   fi
   if [ "$trust_single" -eq 1 ]; then
     extra_flags+=("-b")
+  fi
+  if [ "${external_access:-0}" -eq 1 ]; then
+     extra_flags+=("-E")
   fi
 
   secret_url="${sv_from_script}/api/sv/v0/devnet/onboard/validator/prepare"
@@ -178,7 +181,9 @@ function subcmd_start {
   party_hint="$(whoami)-composeValidator-1"
   participant_id=""
   trust_single=0
-  while getopts 'haldn:m:Mwt:i:p:P:b' arg; do
+  external_access=0
+
+  while getopts 'haldn:m:Mwt:i:p:P:bE' arg; do
     case ${arg} in
       h)
         subcmd_help
@@ -221,6 +226,9 @@ function subcmd_start {
       b)
         trust_single=1
         ;;
+      E)
+        external_access=1
+        ;;
       ?)
         subcmd_help
         exit 1
@@ -254,7 +262,7 @@ function subcmd_start {
   fi
 }
 function usage_start {
-  _info "    Options: [-a] [-l] [-d] [-n <network_name>] [-m <migration_id>] [-M] [-w] [-t <image_tag>] [-i <identities_dump>] [-p <party_hint>] [-P <participant_id>]"
+  _info "       Options: [-a] [-l] [-d] [-n <network_name>] [-m <migration_id>] [-M] [-w] [-t <image_tag>] [-i <identities_dump>] [-p <party_hint>] [-P <participant_id>] [-b] [-E]"
   _info "      -a: Enable authentication"
   _info "      -l: Start the validator against a local SV (for integration tests). Default is against a cluster determined by GCP_CLUSTER_HOSTNAME"
   _info "      -d: Use images from the DA-internal repository (default: use locally built images)"
@@ -267,6 +275,7 @@ function usage_start {
   _info "      -p <party_hint>: party hint (by default, <local_user>-composeValidator-1)"
   _info "      -P <participant_id>: participant identifier (by default, identical to the party hint)"
   _info "      -b: Disable BFT reads&writes and trust a single SV."
+  _info "      -E: Bind to 0.0.0.0 for external access."
 }
 
 subcommand_whitelist[stop]='stop a validator'
@@ -307,9 +316,9 @@ function usage_stop {
 
 subcommand_whitelist[start_network]='Starts a full network (one SV + one validator)'
 function subcmd_start_network {
-
+  external_access=0
   wait=0
-  while getopts 'hw' arg; do
+  while getopts 'hwE' arg; do
     case ${arg} in
       h)
         subcmd_help
@@ -317,6 +326,9 @@ function subcmd_start_network {
         ;;
       w)
         wait=1
+        ;;
+      E)
+        external_access=1
         ;;
       ?)
         subcmd_help
@@ -330,8 +342,13 @@ function subcmd_start_network {
   # Locally built images (the default when using this script)
   export IMAGE_REPO=""
 
+  sv_flags=()
+  if [ $external_access -eq 1 ]; then
+    sv_flags+=("-E")
+  fi
+
   _info "Starting SV"
-  "${SV_DIR}/start.sh"
+  "${SV_DIR}/start.sh" "${sv_flags[@]}"
 
   for c in validator participant scan sv-app sequencer-mediator nginx; do
     docker logs -f splice-sv-${c}-1 >> "${SPLICE_ROOT}/log/compose-sv-${c}.clog" 2>&1 &
@@ -340,7 +357,7 @@ function subcmd_start_network {
   # We must wait for the SV to be ready before starting the validator
   # start.sh is idempotent, so running it again with -w should not interfere with the deployment, only wait for it to be ready
   _info "Waiting for the SV to be ready"
-  "${SV_DIR}/start.sh" -w
+  "${SV_DIR}/start.sh" -w "${sv_flags[@]}"
 
   get_secret_url="sv.localhost:8080/api/sv/v0/devnet/onboard/validator/prepare"
   _info "Curling $get_secret_url for the secret"
@@ -365,13 +382,14 @@ function subcmd_start_network {
   curl -sf "scan.localhost:8080/api/scan/readyz" || _error "Scan is not ready after 5 minutes" || exit 1
 
   _info "Starting validator"
-  _do_start_validator -l -o "$secret" -p "local-composeValidator-1" -m 0
+  _do_start_validator -l -o "$secret" -p "local-composeValidator-1" -m 0  "${sv_flags[@]}"
 
   _info "The full network is ready"
 }
 function usage_start_network {
-  _info "    Options: [-w]"
-  _info "      -w: Wait also for the validator to be ready (for the SV we must always wait before starting the validator)"
+  _info "     Options: [-w] [-E]"
+  _info "    -w: Wait also for the validator to be ready (for the SV we must always wait before starting the validator)"
+  _info "    -E: Bind  to 0.0.0.0 for external access."
 }
 
 subcommand_whitelist[stop_network]='Stop a full network, started with start_network'
@@ -659,7 +677,7 @@ function subcmd_identities_dump {
   VALIDATOR_AUTH_AUDIENCE="$DEFAULT_AUDIENCE"
   export VALIDATOR_AUTH_AUDIENCE
 
-  token=$("${VALIDATOR_DIR}/get-token.py" administrator)
+  token=$("${VALIDATOR_DIR}/get-token.py" ledger-api-user)
   curl -sSLf 'http://wallet.localhost/api/validator/v0/admin/participant/identities' -H "authorization: Bearer $token" > "$output_file"
 }
 

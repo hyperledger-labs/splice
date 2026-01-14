@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import cats.data.{NonEmptyVector, OptionT}
 import cats.syntax.either.*
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -33,6 +34,8 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AcsRequest,
   BatchListVotesByVoteRequestsRequest,
   DamlValueEncoding,
+  ErrorResponse,
+  EventHistoryRequest,
   HoldingsStateRequest,
   HoldingsSummaryRequest,
   ListVoteResultsRequest,
@@ -42,7 +45,12 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
-import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore, TxLogEntry}
+import org.lfdecentralizedtrust.splice.scan.store.{
+  AcsSnapshotStore,
+  ScanEventStore,
+  ScanStore,
+  TxLogEntry,
+}
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -52,9 +60,10 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.admin.data.ActiveContractOld as ActiveContract
+import com.digitalasset.canton.participant.admin.data.ActiveContract
 import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.{ByteStringUtil, GrpcStreamingUtils, ResourceUtil}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -64,6 +73,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Try, Using}
+import java.io.ByteArrayInputStream
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
@@ -80,15 +90,25 @@ import org.lfdecentralizedtrust.splice.http.{
   UrlValidator,
 }
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
-import org.lfdecentralizedtrust.splice.store.{AppStore, PageLimit, SortOrder, VotesStore}
+import org.lfdecentralizedtrust.splice.store.{
+  AppStore,
+  AppStoreWithIngestion,
+  PageLimit,
+  SortOrder,
+  VotesStore,
+}
+import AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.util.ErrorUtil
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
+import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
+import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.{RoundPartyTotals, RoundTotals}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
+import org.lfdecentralizedtrust.splice.store.UpdateHistory
 
 import scala.collection.immutable.SortedMap
 
@@ -98,8 +118,10 @@ class HttpScanHandler(
     spliceInstanceNames: SpliceInstanceNamesConfig,
     participantAdminConnection: ParticipantAdminConnection,
     sequencerAdminConnection: SequencerAdminConnection,
-    protected val store: ScanStore,
+    protected val storeWithIngestion: AppStoreWithIngestion[ScanStore],
+    updateHistory: UpdateHistory,
     snapshotStore: AcsSnapshotStore,
+    eventStore: ScanEventStore,
     dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     enableForcedAcsSnapshots: Boolean,
@@ -116,9 +138,15 @@ class HttpScanHandler(
     with HttpValidatorLicensesHandler
     with HttpFeatureSupportHandler {
 
+  import HttpScanHandler.*
+  private val store = storeWithIngestion.store
+
   override protected val workflowId: String = this.getClass.getSimpleName
   override protected val votesStore: VotesStore = store
   override protected val validatorLicensesStore: AppStore = store
+
+  private implicit val offsetDateTimeCodecInstance: Codec[CantonTimestamp, OffsetDateTime] =
+    Codec.OffsetDateTime.instance
 
   def getDsoPartyId(
       response: v0.ScanResource.GetDsoPartyIdResponse.type
@@ -404,8 +432,15 @@ class HttpScanHandler(
             HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
           )
       } yield {
-        definitions.GetTotalAmuletBalanceResponse(
-          Codec.encode(total)
+        total.fold(
+          v0.ScanResource.GetTotalAmuletBalanceResponse
+            .NotFound(ErrorResponse(s"No total amulet balance found for round $asOfEndOfRound"))
+        )(total =>
+          v0.ScanResource.GetTotalAmuletBalanceResponse.OK(
+            definitions.GetTotalAmuletBalanceResponse(
+              Codec.encode(total)
+            )
+          )
         )
       }
     }
@@ -438,7 +473,7 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getAmuletConfigForRound") { _ => _ =>
       store
         .getAmuletConfigForRound(round)
-        .map(cfg => {
+        .map { cfg =>
           val transferFee = cfg.transferFee.getOrElse(throw new RuntimeException("No transfer fee"))
           v0.ScanResource.GetAmuletConfigForRoundResponse.OK(
             definitions.GetAmuletConfigForRoundResponse(
@@ -455,7 +490,7 @@ class HttpScanHandler(
               ),
             )
           )
-        })
+        }
         .transform(HttpErrorHandler.onGrpcNotFound(s"Round ${round} not found"))
     }
   }
@@ -507,14 +542,20 @@ class HttpScanHandler(
       store
         .getTopProvidersByAppRewards(asOfEndOfRound, limit)
         .map(res =>
-          v0.ScanResource.GetTopProvidersByAppRewardsResponse.OK(
-            definitions
-              .GetTopProvidersByAppRewardsResponse(
-                res
-                  .map(p => definitions.PartyAndRewards(Codec.encode(p._1), Codec.encode(p._2)))
-                  .toVector
-              )
-          )
+          if (res.isEmpty) {
+            v0.ScanResource.GetTopProvidersByAppRewardsResponse.NotFound(
+              ErrorResponse(s"No top providers by app rewards found for round $asOfEndOfRound")
+            )
+          } else {
+            v0.ScanResource.GetTopProvidersByAppRewardsResponse.OK(
+              definitions
+                .GetTopProvidersByAppRewardsResponse(
+                  res
+                    .map(p => definitions.PartyAndRewards(Codec.encode(p._1), Codec.encode(p._2)))
+                    .toVector
+                )
+            )
+          }
         )
         .transform(
           HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
@@ -533,14 +574,22 @@ class HttpScanHandler(
       store
         .getTopValidatorsByValidatorRewards(asOfEndOfRound, limit)
         .map(res =>
-          v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse.OK(
-            definitions
-              .GetTopValidatorsByValidatorRewardsResponse(
-                res
-                  .map(p => definitions.PartyAndRewards(Codec.encode(p._1), Codec.encode(p._2)))
-                  .toVector
+          if (res.isEmpty) {
+            v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse.NotFound(
+              ErrorResponse(
+                s"No top validators by validator rewards found for round $asOfEndOfRound"
               )
-          )
+            )
+          } else {
+            v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse.OK(
+              definitions
+                .GetTopValidatorsByValidatorRewardsResponse(
+                  res
+                    .map(p => definitions.PartyAndRewards(Codec.encode(p._1), Codec.encode(p._2)))
+                    .toVector
+                )
+            )
+          }
         )
         .transform(
           HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
@@ -580,21 +629,29 @@ class HttpScanHandler(
       store
         .getTopValidatorsByPurchasedTraffic(asOfEndOfRound, limit)
         .map(validatorTraffic =>
-          v0.ScanResource.GetTopValidatorsByPurchasedTrafficResponse.OK(
-            definitions.GetTopValidatorsByPurchasedTrafficResponse(
-              validatorTraffic
-                .map(t =>
-                  definitions.ValidatorPurchasedTraffic(
-                    Codec.encode(t.validator),
-                    t.numPurchases,
-                    t.totalTrafficPurchased,
-                    Codec.encode(t.totalCcSpent),
-                    t.lastPurchasedInRound,
-                  )
-                )
-                .toVector
+          if (validatorTraffic.isEmpty) {
+            v0.ScanResource.GetTopValidatorsByPurchasedTrafficResponse.NotFound(
+              ErrorResponse(
+                s"No top validators by purchased traffic found for round $asOfEndOfRound"
+              )
             )
-          )
+          } else {
+            v0.ScanResource.GetTopValidatorsByPurchasedTrafficResponse.OK(
+              definitions.GetTopValidatorsByPurchasedTrafficResponse(
+                validatorTraffic
+                  .map(t =>
+                    definitions.ValidatorPurchasedTraffic(
+                      Codec.encode(t.validator),
+                      t.numPurchases,
+                      t.totalTrafficPurchased,
+                      Codec.encode(t.totalCcSpent),
+                      t.lastPurchasedInRound,
+                    )
+                  )
+                  .toVector
+              )
+            )
+          }
         )
         .transform(
           HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
@@ -719,7 +776,6 @@ class HttpScanHandler(
       extracted: TraceContext,
   ): Future[Vector[definitions.UpdateHistoryItem]] = {
     implicit val tc: TraceContext = extracted
-    val updateHistory = store.updateHistory
     val afterO = after.map { after =>
       val afterRecordTime = parseTimestamp(after.afterRecordTime)
       (
@@ -727,45 +783,29 @@ class HttpScanHandler(
         afterRecordTime,
       )
     }
-    updateHistory
-      .getBackfillingState()
-      .flatMap {
-        case BackfillingState.NotInitialized =>
-          throw Status.UNAVAILABLE
-            .withDescription(
-              "This scan instance has not yet loaded its updates history. Wait a short time and retry."
+    confirmBackfillingIsCompleteThen(updateHistory) {
+      for {
+        txs <-
+          if (includeImportUpdates)
+            updateHistory.getAllUpdates(
+              afterO,
+              PageLimit.tryCreate(pageSize),
             )
-            .asRuntimeException()
-        case BackfillingState.InProgress(_, _) =>
-          throw Status.UNAVAILABLE
-            .withDescription(
-              "This scan instance has not yet replicated all data. This process can take an extended period of time to complete. " +
-                "Wait until replication is complete, or connect to a different scan instance."
+          else
+            updateHistory.getUpdatesWithoutImportUpdates(
+              afterO,
+              PageLimit.tryCreate(pageSize),
             )
-            .asRuntimeException()
-        case BackfillingState.Complete =>
-          for {
-            txs <-
-              if (includeImportUpdates)
-                updateHistory.getAllUpdates(
-                  afterO,
-                  PageLimit.tryCreate(pageSize),
-                )
-              else
-                updateHistory.getUpdatesWithoutImportUpdates(
-                  afterO,
-                  PageLimit.tryCreate(pageSize),
-                )
-          } yield txs
-            .map(
-              ScanHttpEncodings.encodeUpdate(
-                _,
-                encoding = encoding,
-                version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
-              )
-            )
-            .toVector
-      }
+      } yield txs
+        .map(
+          ScanHttpEncodings.encodeUpdate(
+            _,
+            encoding = encoding,
+            version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
+          )
+        )
+        .toVector
+    }
   }
 
   override def getUpdateHistory(respond: v0.ScanResource.GetUpdateHistoryResponse.type)(
@@ -833,6 +873,96 @@ class HttpScanHandler(
     }
   }
 
+  def getEventById(
+      updateId: String,
+      encoding: definitions.DamlValueEncoding,
+      extracted: TraceContext,
+  ): Future[Either[definitions.ErrorResponse, definitions.EventHistoryItem]] = {
+    implicit val tc = extracted
+    for {
+      eventO <- eventStore.getEventByUpdateId(
+        updateId,
+        updateHistory.domainMigrationInfo.currentMigrationId,
+      )
+    } yield {
+      eventO match {
+        case None => Left(definitions.ErrorResponse(s"Event with id $updateId not found"))
+        case Some((verdictWithViewsO, updateO)) =>
+          val encodedUpdateV2 = updateO
+            .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
+            .map(toUpdateV2)
+          val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
+            ScanHttpEncodings.encodeVerdict(v, views)
+          }
+          Right(definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded))
+      }
+    }
+  }
+
+  override def getEventById(respond: ScanResource.GetEventByIdResponse.type)(
+      updateId: String,
+      damlValueEncoding: Option[definitions.DamlValueEncoding],
+  )(extracted: TraceContext): Future[ScanResource.GetEventByIdResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getEventById") { _ => _ =>
+      val encoding = damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson)
+      getEventById(
+        updateId = updateId,
+        encoding = encoding,
+        extracted,
+      ).map {
+        case Left(error) => ScanResource.GetEventByIdResponse.NotFound(error)
+        case Right(update) => ScanResource.GetEventByIdResponse.OK(update)
+      }
+    }
+  }
+
+  def getEventHistory(
+      after: Option[definitions.UpdateHistoryRequestAfter] = None,
+      pageSize: Int,
+      encoding: definitions.DamlValueEncoding,
+      extracted: TraceContext,
+  ): Future[Vector[definitions.EventHistoryItem]] = {
+    implicit val tc: TraceContext = extracted
+    val afterO = after.map { a =>
+      val afterRecordTime = parseTimestamp(a.afterRecordTime)
+      (a.afterMigrationId, afterRecordTime)
+    }
+
+    confirmBackfillingIsCompleteThen(updateHistory) {
+      for {
+        events <- eventStore.getEvents(
+          afterO = afterO,
+          currentMigrationId = updateHistory.domainMigrationInfo.currentMigrationId,
+          limit = PageLimit.tryCreate(pageSize),
+        )
+      } yield events.map { case (verdictWithViewsO, updateO) =>
+        val encodedUpdateV2 = updateO
+          .map(ScanHttpEncodings.encodeUpdate(_, encoding, ScanHttpEncodings.V1))
+          .map(toUpdateV2)
+        val verdictEncoded = verdictWithViewsO.map { case (v, views) =>
+          ScanHttpEncodings.encodeVerdict(v, views)
+        }
+        definitions.EventHistoryItem(encodedUpdateV2, verdictEncoded)
+      }.toVector
+    }
+  }
+
+  override def getEventHistory(respond: ScanResource.GetEventHistoryResponse.type)(
+      request: EventHistoryRequest
+  )(extracted: TraceContext): Future[ScanResource.GetEventHistoryResponse] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getEventHistory") { _ => _ =>
+      getEventHistory(
+        after = request.after,
+        pageSize = request.pageSize,
+        encoding = request.damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson),
+        extracted,
+      )
+        .map(items => definitions.EventHistoryResponse(items))
+    }
+  }
+
   private def toUpdateV2(update: definitions.UpdateHistoryItem): definitions.UpdateHistoryItemV2 =
     update match {
       case definitions.UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
@@ -853,6 +983,33 @@ class HttpScanHandler(
           )
         )
     }
+
+  private def confirmBackfillingIsCompleteThen[T](
+      updateHistory: UpdateHistory
+  )(body: => Future[T])(implicit tc: TraceContext): Future[T] = {
+    updateHistory
+      .getBackfillingState()
+      .flatMap {
+        case BackfillingState.NotInitialized =>
+          Future.failed(
+            Status.UNAVAILABLE
+              .withDescription(
+                "This scan instance has not yet loaded its updates history. Wait a short time and retry."
+              )
+              .asRuntimeException()
+          )
+        case BackfillingState.InProgress(_, _) =>
+          Future.failed(
+            Status.UNAVAILABLE
+              .withDescription(
+                "This scan instance has not yet replicated all data. This process can take an extended period of time to complete. " +
+                  "Wait until replication is complete, or connect to a different scan instance."
+              )
+              .asRuntimeException()
+          )
+        case BackfillingState.Complete => body
+      }
+  }
 
   override def listActivity(
       respond: v0.ScanResource.ListActivityResponse.type
@@ -1118,7 +1275,7 @@ class HttpScanHandler(
           .sequentialTraverse(txLogEntryMap.view.toList) { case (cid, entry) =>
             // The update history ingests independently so this lookup can return None temporarily.
             // We just filter out those contracts.
-            store.updateHistory
+            updateHistory
               .lookupContractById(TransferCommand.COMPANION)(cid)
               .map(
                 _.map(c =>
@@ -1149,17 +1306,37 @@ class HttpScanHandler(
   /** Filter the given ACS snapshot to contracts the given party is a stakeholder on */
   // TODO(#828) Move this logic inside a Canton gRPC API.
   private def filterAcsSnapshot(input: ByteString, stakeholder: PartyId): ByteString = {
-    val contracts = ActiveContract
-      .loadFromByteString(input)
-      .valueOr(error =>
-        throw Status.INTERNAL
-          .withDescription(s"Failed to read ACS snapshot: ${error}")
-          .asRuntimeException()
-      )
+    val decompressedBytes =
+      ByteStringUtil
+        .decompressGzip(input, None)
+        .valueOr(err =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"Failed to decompress bytes: $err")
+            .asRuntimeException
+        )
+    val contracts = ResourceUtil.withResource(
+      new ByteArrayInputStream(decompressedBytes.toByteArray)
+    ) { inputSource =>
+      GrpcStreamingUtils
+        .parseDelimitedFromTrusted[ActiveContract](
+          inputSource,
+          ActiveContract,
+        )
+        .valueOr(err =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"Failed to parse contracts in acs snapshot: $err")
+            .asRuntimeException
+        )
+    }
     val output = ByteString.newOutput
     Using.resource(new GZIPOutputStream(output)) { outputStream =>
-      contracts.filter(c => c.contract.metadata.stakeholders.contains(stakeholder.toLf)).foreach {
-        c =>
+      contracts
+        .filter(c =>
+          c.contract.getCreatedEvent.signatories.contains(
+            stakeholder.toLf
+          ) || c.contract.getCreatedEvent.observers.contains(stakeholder.toLf)
+        )
+        .foreach { c =>
           c.writeDelimitedTo(outputStream) match {
             case Left(error) =>
               throw Status.INTERNAL
@@ -1167,7 +1344,7 @@ class HttpScanHandler(
                 .asRuntimeException()
             case Right(_) => outputStream.flush()
           }
-      }
+        }
     }
     output.toByteString
   }
@@ -1182,6 +1359,7 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getAcsSnapshot") { _ => _ =>
       val partyId = PartyId.tryFromProtoPrimitive(party)
       for {
+        synchronizerId <- store.getDecentralizedSynchronizerId()
         // The DSO party is a stakeholder on all "important" contracts, in particular, all amulet holdings and ANS entries.
         // This means the SV participants ingest data for that party and we can take a snapshot for that party.
         // To make sure the snapshot is the same regardless of which SV is queried, we filter it down to
@@ -1190,9 +1368,18 @@ class HttpScanHandler(
         // that users backup their own ACS.
         // As the DSO party is hosted on all SVs, an arbitrary scan instance can be chosen for the ACS snapshot.
         // BFT reads are usually not required since ACS commitments act as a check that the ACS was correct.
-        acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
+        timestampOrOffset <- recordTime match {
+          case None =>
+            storeWithIngestion
+              .connection(SpliceLedgerConnectionPriority.Low)
+              .ledgerEnd()
+              .map(offset => Right(NonNegativeLong.tryCreate(offset)))
+          case Some(time) => Future.successful(Left(time.toInstant))
+        }
+        acsSnapshot <- participantAdminConnection.downloadAcsSnapshotNonChunked(
           Set(partyId),
-          timestamp = recordTime.map(_.toInstant),
+          synchronizerId,
+          timestampOrOffset,
         )
       } yield {
         val filteredAcsSnapshot =
@@ -1206,6 +1393,16 @@ class HttpScanHandler(
     }
   }
 
+  private def getRecordTimeAtOrBefore(migrationId: Long, before: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[Option[CantonTimestamp]] =
+    OptionT(
+      snapshotStore
+        .lookupSnapshotAtOrBefore(migrationId, before)
+    ).map {
+      _.snapshotRecordTime
+    }.value
+
   override def getDateOfMostRecentSnapshotBefore(
       respond: ScanResource.GetDateOfMostRecentSnapshotBeforeResponse.type
   )(before: OffsetDateTime, migrationId: Long)(
@@ -1214,13 +1411,13 @@ class HttpScanHandler(
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getDateOfMostRecentSnapshotBefore") { _ => _ =>
       snapshotStore
-        .lookupSnapshotBefore(migrationId, CantonTimestamp.assertFromInstant(before.toInstant))
+        .lookupSnapshotAtOrBefore(migrationId, Codec.tryDecode(Codec.OffsetDateTime)(before))
         .map {
           case Some(snapshot) =>
             ScanResource.GetDateOfMostRecentSnapshotBeforeResponseOK(
               definitions
                 .AcsSnapshotTimestampResponse(
-                  snapshot.snapshotRecordTime.toInstant.atOffset(ZoneOffset.UTC)
+                  Codec.encode(snapshot.snapshotRecordTime)
                 )
             )
           case None =>
@@ -1258,7 +1455,7 @@ class HttpScanHandler(
                   .asRuntimeException(),
               )
             )
-          snapshotTime <- snapshotStore.updateHistory
+          snapshotTime <- updateHistory
             .getUpdatesBefore(
               snapshotStore.currentMigrationId,
               synchronizerId,
@@ -1277,24 +1474,32 @@ class HttpScanHandler(
                 .update
                 .recordTime
             )
-          lastSnapshot <- snapshotStore.lookupSnapshotBefore(
+          lastSnapshot <- snapshotStore.lookupSnapshotAtOrBefore(
             snapshotStore.currentMigrationId,
             snapshotTime,
           )
-          // note that this will make it so that the next snapshot is taken N hours after THIS snapshot.
-          // this is, in principle, not a problem:
-          // - this will only be used in tests
-          // - wall clock tests must take manual snapshots anyway, because they can't wait
-          // - simtime tests will advanceTime(N.hours)
-          _ = logger.info(s"Forcing ACS snapshot at $snapshotTime. Last snapshot: $lastSnapshot")
-          _ <- snapshotStore.insertNewSnapshot(
-            lastSnapshot,
-            snapshotStore.currentMigrationId,
-            snapshotTime,
-          )
+          _ <-
+            if (lastSnapshot.exists(_.snapshotRecordTime == snapshotTime)) {
+              logger.debug(
+                s"ACS snapshot at $snapshotTime already existed, likely to happen in simtime tests."
+              )
+              Future.successful(snapshotTime)
+            } else {
+              logger.info(s"Forcing ACS snapshot at $snapshotTime. Last snapshot: $lastSnapshot")
+              // note that this will make it so that the next snapshot is taken N hours after THIS snapshot.
+              // this is, in principle, not a problem:
+              // - this will only be used in tests
+              // - wall clock tests must take manual snapshots anyway, because they can't wait
+              // - simtime tests will advanceTime(N.hours)
+              snapshotStore.insertNewSnapshot(
+                lastSnapshot,
+                snapshotStore.currentMigrationId,
+                snapshotTime,
+              )
+            }
         } yield ScanResource.ForceAcsSnapshotNowResponse.OK(
           definitions.ForceAcsSnapshotResponse(
-            snapshotTime.toInstant.atOffset(ZoneOffset.UTC),
+            Codec.encode(snapshotTime),
             snapshotStore.currentMigrationId,
           )
         )
@@ -1307,44 +1512,69 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetAcsSnapshotAtResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getAcsSnapshotAt") { _ => _ =>
-      body match {
-        case AcsRequest(migrationId, recordTime, after, pageSize, partyIds, templates) =>
-          snapshotStore
-            .queryAcsSnapshot(
-              migrationId,
-              CantonTimestamp.assertFromInstant(recordTime.toInstant),
-              after,
-              PageLimit.tryCreate(pageSize),
-              partyIds
-                .getOrElse(Seq.empty)
-                .map(PartyId.tryFromProtoPrimitive),
-              templates
-                .getOrElse(Seq.empty)
-                .map(_.split(":") match {
-                  case Array(packageName, moduleName, entityName) =>
-                    PackageQualifiedName(packageName, QualifiedName(moduleName, entityName))
-                  case _ =>
-                    throw HttpErrorHandler.badRequest(
-                      s"Malformed template_id, expected 'package_name:module_name:entity_name'"
-                    )
-                }),
-            )
-            .map { result =>
-              ScanResource.GetAcsSnapshotAtResponseOK(
-                definitions.AcsResponse(
-                  recordTime,
-                  migrationId,
-                  result.createdEventsInPage
-                    .map(event =>
-                      CompactJsonScanHttpEncodings.javaToHttpCreatedEvent(
-                        event.eventId,
-                        event.event,
-                      )
-                    ),
-                  result.afterToken,
+      val AcsRequest(
+        migrationId,
+        recordTime,
+        recordTimeMatch,
+        after,
+        pageSize,
+        partyIds,
+        templates,
+      ) = body
+
+      def exactQuery(recordTimeTs: CantonTimestamp) = snapshotStore
+        .queryAcsSnapshot(
+          migrationId,
+          recordTimeTs,
+          after,
+          PageLimit.tryCreate(pageSize),
+          partyIds
+            .getOrElse(Seq.empty)
+            .map(PartyId.tryFromProtoPrimitive),
+          templates
+            .getOrElse(Seq.empty)
+            .map(_.split(":") match {
+              case Array(packageName, moduleName, entityName) =>
+                PackageQualifiedName(packageName, QualifiedName(moduleName, entityName))
+              case _ =>
+                throw HttpErrorHandler.badRequest(
+                  s"Malformed template_id, expected 'package_name:module_name:entity_name'"
                 )
-              )
-            }
+            }),
+        )
+
+      def toResponse(result: QueryAcsSnapshotResult) = {
+        ScanResource.GetAcsSnapshotAtResponseOK(
+          definitions.AcsResponse(
+            Codec.encode(result.snapshotRecordTime),
+            migrationId,
+            result.createdEventsInPage
+              .map(event =>
+                CompactJsonScanHttpEncodings().javaToHttpCreatedEvent(
+                  event.eventId,
+                  event.event,
+                )
+              ),
+            result.afterToken,
+          )
+        )
+      }
+
+      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(recordTime)
+
+      recordTimeMatch.getOrElse(AcsRequest.RecordTimeMatch.Exact) match {
+        case AcsRequest.RecordTimeMatch.members.Exact =>
+          exactQuery(recordTimeTs).map(toResponse)
+        case AcsRequest.RecordTimeMatch.members.AtOrBefore =>
+          val snapshotQueryResult = for {
+            recordTime <- OptionT(getRecordTimeAtOrBefore(migrationId, recordTimeTs))
+            snapshotQueryResult <- OptionT.liftF(exactQuery(recordTime))
+          } yield snapshotQueryResult
+          snapshotQueryResult.fold[ScanResource.GetAcsSnapshotAtResponse](
+            ScanResource.GetAcsSnapshotAtResponseNotFound(
+              ErrorResponse(s"No snapshots found before $recordTime")
+            )
+          )(toResponse)
       }
     }
   }
@@ -1354,32 +1584,55 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetHoldingsStateAtResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getHoldingsStateAt") { _ => _ =>
-      body match {
-        case HoldingsStateRequest(migrationId, recordTime, after, pageSize, ownerPartyIds) =>
-          snapshotStore
-            .getHoldingsState(
-              migrationId,
-              CantonTimestamp.assertFromInstant(recordTime.toInstant),
-              after,
-              PageLimit.tryCreate(pageSize),
-              nonEmptyOrFail("ownerPartyIds", ownerPartyIds).map(PartyId.tryFromProtoPrimitive),
-            )
-            .map { result =>
-              ScanResource.GetHoldingsStateAtResponseOK(
-                definitions.AcsResponse(
-                  recordTime,
-                  migrationId,
-                  result.createdEventsInPage
-                    .map(event =>
-                      CompactJsonScanHttpEncodings.javaToHttpCreatedEvent(
-                        event.eventId,
-                        event.event,
-                      )
-                    ),
-                  result.afterToken,
+      val HoldingsStateRequest(
+        migrationId,
+        recordTime,
+        recordTimeMatch,
+        after,
+        pageSize,
+        ownerPartyIds,
+      ) = body
+
+      def exactQuery(recordTimeTs: CantonTimestamp) = snapshotStore
+        .getHoldingsState(
+          migrationId,
+          recordTimeTs,
+          after,
+          PageLimit.tryCreate(pageSize),
+          nonEmptyOrFail("ownerPartyIds", ownerPartyIds).map(PartyId.tryFromProtoPrimitive),
+        )
+
+      def toResponse(result: QueryAcsSnapshotResult) =
+        ScanResource.GetHoldingsStateAtResponseOK(
+          definitions.AcsResponse(
+            Codec.encode(result.snapshotRecordTime),
+            migrationId,
+            result.createdEventsInPage
+              .map(event =>
+                CompactJsonScanHttpEncodings().javaToHttpCreatedEvent(
+                  event.eventId,
+                  event.event,
                 )
-              )
-            }
+              ),
+            result.afterToken,
+          )
+        )
+
+      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(recordTime)
+
+      recordTimeMatch.getOrElse(HoldingsStateRequest.RecordTimeMatch.Exact) match {
+        case HoldingsStateRequest.RecordTimeMatch.members.Exact =>
+          exactQuery(recordTimeTs).map(toResponse)
+        case HoldingsStateRequest.RecordTimeMatch.members.AtOrBefore =>
+          val snapshotQueryResult = for {
+            recordTime <- OptionT(getRecordTimeAtOrBefore(migrationId, recordTimeTs))
+            snapshotQueryResult <- OptionT.liftF(exactQuery(recordTime))
+          } yield snapshotQueryResult
+          snapshotQueryResult.fold[ScanResource.GetHoldingsStateAtResponse](
+            ScanResource.GetHoldingsStateAtResponseNotFound(
+              ErrorResponse(s"No snapshots found before $recordTime")
+            )
+          )(toResponse)
       }
     }
   }
@@ -1389,52 +1642,76 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetHoldingsSummaryAtResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getHoldingsSummaryAt") { _ => _ =>
-      body match {
-        case HoldingsSummaryRequest(migrationId, recordTime, partyIds, asOfRound) =>
-          for {
-            round <- asOfRound match {
-              case Some(round) => Future.successful(round)
-              case None =>
-                // gives the earliest mining round, as listContracts orders by event_number ASC
-                store.multiDomainAcsStore
-                  .listContracts(OpenMiningRound.COMPANION, PageLimit.tryCreate(1))
-                  .map(
-                    _.headOption.getOrElse(
-                      throw Status.FAILED_PRECONDITION
-                        .withDescription("No open mining rounds found.")
-                        .asRuntimeException()
-                    )
-                  )
-                  .map(_.contract.payload.round.number.toLong)
-            }
-            result <- snapshotStore
-              .getHoldingsSummary(
-                migrationId,
-                CantonTimestamp.assertFromInstant(recordTime.toInstant),
-                nonEmptyOrFail("partyIds", partyIds).map(PartyId.tryFromProtoPrimitive),
-                round,
-              )
-          } yield ScanResource.GetHoldingsSummaryAtResponse.OK(
-            definitions.HoldingsSummaryResponse(
-              result.recordTime.toInstant.atOffset(ZoneOffset.UTC),
-              result.migrationId,
-              result.asOfRound,
-              result.summaries.map { case (partyId, holdings) =>
-                definitions.HoldingsSummary(
-                  partyId = Codec.encode(partyId),
-                  totalUnlockedCoin = Codec.encode(holdings.totalUnlockedCoin),
-                  totalLockedCoin = Codec.encode(holdings.totalLockedCoin),
-                  totalCoinHoldings = Codec.encode(holdings.totalCoinHoldings),
-                  accumulatedHoldingFeesUnlocked =
-                    Codec.encode(holdings.accumulatedHoldingFeesUnlocked),
-                  accumulatedHoldingFeesLocked =
-                    Codec.encode(holdings.accumulatedHoldingFeesLocked),
-                  accumulatedHoldingFeesTotal = Codec.encode(holdings.accumulatedHoldingFeesTotal),
-                  totalAvailableCoin = Codec.encode(holdings.totalAvailableCoin),
+      val HoldingsSummaryRequest(
+        migrationId,
+        recordTime,
+        recordTimeMatch,
+        partyIds,
+        asOfRound,
+      ) = body
+
+      def exactQuery(recordTimeTs: CantonTimestamp) = for {
+        round <- asOfRound match {
+          case Some(round) => Future.successful(round)
+          case None =>
+            // gives the earliest mining round, as listContracts orders by event_number ASC
+            store.multiDomainAcsStore
+              .listContracts(OpenMiningRound.COMPANION, PageLimit.tryCreate(1))
+              .map(
+                _.headOption.getOrElse(
+                  throw Status.FAILED_PRECONDITION
+                    .withDescription("No open mining rounds found.")
+                    .asRuntimeException()
                 )
-              }.toVector,
-            )
+              )
+              .map(_.contract.payload.round.number.toLong)
+        }
+        result <- snapshotStore
+          .getHoldingsSummary(
+            migrationId,
+            recordTimeTs,
+            nonEmptyOrFail("partyIds", partyIds).map(PartyId.tryFromProtoPrimitive),
+            round,
           )
+      } yield result
+
+      def toResponse(result: AcsSnapshotStore.HoldingsSummaryResult) =
+        ScanResource.GetHoldingsSummaryAtResponse.OK(
+          definitions.HoldingsSummaryResponse(
+            Codec.encode(result.recordTime),
+            result.migrationId,
+            result.asOfRound,
+            result.summaries.map { case (partyId, holdings) =>
+              definitions.HoldingsSummary(
+                partyId = Codec.encode(partyId),
+                totalUnlockedCoin = Codec.encode(holdings.totalUnlockedCoin),
+                totalLockedCoin = Codec.encode(holdings.totalLockedCoin),
+                totalCoinHoldings = Codec.encode(holdings.totalCoinHoldings),
+                accumulatedHoldingFeesUnlocked =
+                  Codec.encode(holdings.accumulatedHoldingFeesUnlocked),
+                accumulatedHoldingFeesLocked = Codec.encode(holdings.accumulatedHoldingFeesLocked),
+                accumulatedHoldingFeesTotal = Codec.encode(holdings.accumulatedHoldingFeesTotal),
+                totalAvailableCoin = Codec.encode(holdings.totalAvailableCoin),
+              )
+            }.toVector,
+          )
+        )
+
+      val recordTimeTs = Codec.tryDecode(Codec.OffsetDateTime)(recordTime)
+
+      recordTimeMatch.getOrElse(HoldingsSummaryRequest.RecordTimeMatch.Exact) match {
+        case HoldingsSummaryRequest.RecordTimeMatch.members.Exact =>
+          exactQuery(recordTimeTs).map(toResponse)
+        case HoldingsSummaryRequest.RecordTimeMatch.members.AtOrBefore =>
+          val snapshotQueryResult = for {
+            recordTime <- OptionT(getRecordTimeAtOrBefore(migrationId, recordTimeTs))
+            snapshotQueryResult <- OptionT.liftF(exactQuery(recordTime))
+          } yield snapshotQueryResult
+          snapshotQueryResult.fold[ScanResource.GetHoldingsSummaryAtResponse](
+            ScanResource.GetHoldingsSummaryAtResponseNotFound(
+              ErrorResponse(s"No snapshots found before $recordTime")
+            )
+          )(toResponse)
       }
     }
   }
@@ -1480,7 +1757,7 @@ class HttpScanHandler(
   ): Future[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]] = {
     implicit val tc = extracted
     for {
-      tx <- store.updateHistory.getUpdate(updateId)
+      tx <- updateHistory.getUpdate(updateId)
     } yield {
       tx.fold[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]](
         Left(
@@ -1619,25 +1896,7 @@ class HttpScanHandler(
       ensureValidRange(request.startRound, request.endRound, 200) {
         for {
           roundTotals <- store.getRoundTotals(request.startRound, request.endRound)
-          entries = roundTotals.map { roundTotal =>
-            definitions.RoundTotals(
-              closedRound = roundTotal.closedRound,
-              closedRoundEffectiveAt = java.time.OffsetDateTime
-                .ofInstant(roundTotal.closedRoundEffectiveAt.toInstant, ZoneOffset.UTC),
-              appRewards = Codec.encode(roundTotal.appRewards),
-              validatorRewards = Codec.encode(roundTotal.validatorRewards),
-              changeToInitialAmountAsOfRoundZero =
-                Codec.encode(roundTotal.changeToInitialAmountAsOfRoundZero),
-              changeToHoldingFeesRate = Codec.encode(roundTotal.changeToHoldingFeesRate),
-              cumulativeAppRewards = Codec.encode(roundTotal.cumulativeAppRewards),
-              cumulativeValidatorRewards = Codec.encode(roundTotal.cumulativeValidatorRewards),
-              cumulativeChangeToInitialAmountAsOfRoundZero =
-                Codec.encode(roundTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
-              cumulativeChangeToHoldingFeesRate =
-                Codec.encode(roundTotal.cumulativeChangeToHoldingFeesRate),
-              totalAmuletBalance = Codec.encode(roundTotal.totalAmuletBalance),
-            )
-          }
+          entries = roundTotals.map(encodeRoundTotals)
         } yield v0.ScanResource.ListRoundTotalsResponse.OK(
           definitions.ListRoundTotalsResponse(entries.toVector)
         )
@@ -1654,27 +1913,7 @@ class HttpScanHandler(
       ensureValidRange(request.startRound, request.endRound, 50) {
         for {
           roundPartyTotals <- store.getRoundPartyTotals(request.startRound, request.endRound)
-          entries = roundPartyTotals.map { roundPartyTotal =>
-            definitions.RoundPartyTotals(
-              closedRound = roundPartyTotal.closedRound,
-              party = roundPartyTotal.party,
-              appRewards = Codec.encode(roundPartyTotal.appRewards),
-              validatorRewards = Codec.encode(roundPartyTotal.validatorRewards),
-              trafficPurchased = roundPartyTotal.trafficPurchased,
-              trafficPurchasedCcSpent = Codec.encode(roundPartyTotal.trafficPurchasedCcSpent),
-              trafficNumPurchases = roundPartyTotal.trafficNumPurchases,
-              cumulativeAppRewards = Codec.encode(roundPartyTotal.cumulativeAppRewards),
-              cumulativeValidatorRewards = Codec.encode(roundPartyTotal.cumulativeValidatorRewards),
-              cumulativeChangeToInitialAmountAsOfRoundZero =
-                Codec.encode(roundPartyTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
-              cumulativeChangeToHoldingFeesRate =
-                Codec.encode(roundPartyTotal.cumulativeChangeToHoldingFeesRate),
-              cumulativeTrafficPurchased = roundPartyTotal.cumulativeTrafficPurchased,
-              cumulativeTrafficPurchasedCcSpent =
-                Codec.encode(roundPartyTotal.cumulativeTrafficPurchasedCcSpent),
-              cumulativeTrafficNumPurchases = roundPartyTotal.cumulativeTrafficNumPurchases,
-            )
-          }
+          entries = roundPartyTotals.map(encodeRoundPartyTotals)
         } yield v0.ScanResource.ListRoundPartyTotalsResponse.OK(
           definitions.ListRoundPartyTotalsResponse(entries.toVector)
         )
@@ -1816,7 +2055,7 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetMigrationInfoResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getMigrationInfo") { _ => _ =>
-      val sourceHistory = store.updateHistory.sourceHistory
+      val sourceHistory = updateHistory.sourceHistory
       for {
         infoO <- sourceHistory.migrationInfo(body.migrationId)
       } yield infoO match {
@@ -1849,7 +2088,6 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetUpdatesBeforeResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getUpdatesBefore") { _ => _ =>
-      val updateHistory = store.updateHistory
       updateHistory
         .getUpdatesBefore(
           migrationId = body.migrationId,
@@ -1880,7 +2118,6 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetImportUpdatesResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.getImportUpdates") { _ => _ =>
-      val updateHistory = store.updateHistory
       updateHistory
         .getImportUpdates(
           migrationId = body.migrationId,
@@ -2010,7 +2247,7 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.getBackfillingStatus") { _ => _ =>
       for {
-        updateHistoryStatus <- store.updateHistory.getBackfillingState()
+        updateHistoryStatus <- updateHistory.getBackfillingState()
         txLogStatus <- store.multiDomainAcsStore.getTxLogBackfillingState()
         updateHistoryComplete = updateHistoryStatus == BackfillingState.Complete
         txLogComplete = txLogStatus == TxLogBackfillingState.Complete
@@ -2024,8 +2261,9 @@ class HttpScanHandler(
 
   override def featureSupport(respond: ScanResource.FeatureSupportResponse.type)()(
       extracted: TraceContext
-  ): Future[ScanResource.FeatureSupportResponse] = readFeatureSupport(
-  )(extracted, tracer).map(ScanResource.FeatureSupportResponseOK(_))
+  ): Future[ScanResource.FeatureSupportResponse] =
+    readFeatureSupport(store.key.dsoParty)(ec, extracted, tracer)
+      .map(ScanResource.FeatureSupportResponseOK(_))
 
   private def parseTimestamp(str: String): CantonTimestamp = {
     val timestamp = for {
@@ -2068,4 +2306,46 @@ object HttpScanHandler {
   // We expect a handful at most but want to somewhat guard against attacks
   // so we just hardcode a limit of 100.
   private val MAX_TRANSFER_COMMAND_CONTRACTS: Int = 100
+
+  def encodeRoundTotals(roundTotal: RoundTotals): definitions.RoundTotals = {
+    definitions.RoundTotals(
+      closedRound = roundTotal.closedRound,
+      closedRoundEffectiveAt = java.time.OffsetDateTime
+        .ofInstant(roundTotal.closedRoundEffectiveAt.toInstant, ZoneOffset.UTC),
+      appRewards = Codec.encode(roundTotal.appRewards),
+      validatorRewards = Codec.encode(roundTotal.validatorRewards),
+      changeToInitialAmountAsOfRoundZero =
+        Codec.encode(roundTotal.changeToInitialAmountAsOfRoundZero),
+      changeToHoldingFeesRate = Codec.encode(roundTotal.changeToHoldingFeesRate),
+      cumulativeAppRewards = Codec.encode(roundTotal.cumulativeAppRewards),
+      cumulativeValidatorRewards = Codec.encode(roundTotal.cumulativeValidatorRewards),
+      cumulativeChangeToInitialAmountAsOfRoundZero =
+        Codec.encode(roundTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
+      cumulativeChangeToHoldingFeesRate =
+        Codec.encode(roundTotal.cumulativeChangeToHoldingFeesRate),
+      totalAmuletBalance = Codec.encode(roundTotal.totalAmuletBalance),
+    )
+  }
+
+  def encodeRoundPartyTotals(roundPartyTotal: RoundPartyTotals): definitions.RoundPartyTotals = {
+    definitions.RoundPartyTotals(
+      closedRound = roundPartyTotal.closedRound,
+      party = roundPartyTotal.party,
+      appRewards = Codec.encode(roundPartyTotal.appRewards),
+      validatorRewards = Codec.encode(roundPartyTotal.validatorRewards),
+      trafficPurchased = roundPartyTotal.trafficPurchased,
+      trafficPurchasedCcSpent = Codec.encode(roundPartyTotal.trafficPurchasedCcSpent),
+      trafficNumPurchases = roundPartyTotal.trafficNumPurchases,
+      cumulativeAppRewards = Codec.encode(roundPartyTotal.cumulativeAppRewards),
+      cumulativeValidatorRewards = Codec.encode(roundPartyTotal.cumulativeValidatorRewards),
+      cumulativeChangeToInitialAmountAsOfRoundZero =
+        Codec.encode(roundPartyTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
+      cumulativeChangeToHoldingFeesRate =
+        Codec.encode(roundPartyTotal.cumulativeChangeToHoldingFeesRate),
+      cumulativeTrafficPurchased = roundPartyTotal.cumulativeTrafficPurchased,
+      cumulativeTrafficPurchasedCcSpent =
+        Codec.encode(roundPartyTotal.cumulativeTrafficPurchasedCcSpent),
+      cumulativeTrafficNumPurchases = roundPartyTotal.cumulativeTrafficNumPurchases,
+    )
+  }
 }

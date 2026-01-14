@@ -4,7 +4,6 @@
 package com.digitalasset.canton.ledger.participant.state
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.{ExampleTransactionFactory, ReassignmentId}
 import com.digitalasset.canton.topology.{SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
@@ -25,7 +24,7 @@ class ReassignmentCommandsBatchTest extends AnyWordSpec with Matchers {
   private val assign = ReassignmentCommand.Assign(
     Source(synchronizerId(1)),
     Target(synchronizerId(2)),
-    CantonTimestamp.Epoch,
+    ReassignmentId.tryCreate("00"),
   )
 
   "ReassignmentCommandsBatch.create" when {
@@ -47,7 +46,7 @@ class ReassignmentCommandsBatchTest extends AnyWordSpec with Matchers {
       ReassignmentCommandsBatch.create(Seq(assign)) shouldBe Right(
         ReassignmentCommandsBatch.Assignments(
           target = assign.targetSynchronizer,
-          reassignmentId = ReassignmentId(assign.sourceSynchronizer, assign.unassignId),
+          reassignmentId = assign.reassignmentId,
         )
       )
     }
@@ -75,7 +74,7 @@ class ReassignmentCommandsBatchTest extends AnyWordSpec with Matchers {
           unassign.copy(sourceSynchronizer = Source(synchronizerId(42))),
         )
       ) shouldBe Left(
-        ReassignmentCommandsBatch.UnassignmentsWithDifferingSynchronizers
+        ReassignmentCommandsBatch.DifferingSynchronizers
       )
     }
 
@@ -85,16 +84,16 @@ class ReassignmentCommandsBatchTest extends AnyWordSpec with Matchers {
           unassign,
           unassign.copy(targetSynchronizer = Target(synchronizerId(42))),
         )
-      ) shouldBe Left(ReassignmentCommandsBatch.UnassignmentsWithDifferingSynchronizers)
+      ) shouldBe Left(ReassignmentCommandsBatch.DifferingSynchronizers)
     }
 
     "with multiple assigns should fail" in {
       ReassignmentCommandsBatch.create(
         Seq(
           assign,
-          assign.copy(unassignId = assign.unassignId.plusSeconds(1)),
+          assign.copy(reassignmentId = ReassignmentId.tryCreate("0001")),
         )
-      ) shouldBe Left(ReassignmentCommandsBatch.MixedAssignmentWithOtherCommands)
+      ) shouldBe Left(ReassignmentCommandsBatch.MixedAssignWithOtherCommands)
     }
 
     "with both assigns and unassign should fail" in {
@@ -103,7 +102,7 @@ class ReassignmentCommandsBatchTest extends AnyWordSpec with Matchers {
           unassign,
           assign,
         )
-      ) shouldBe Left(ReassignmentCommandsBatch.MixedAssignmentWithOtherCommands)
+      ) shouldBe Left(ReassignmentCommandsBatch.MixedAssignWithOtherCommands)
     }
   }
 }

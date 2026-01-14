@@ -67,6 +67,9 @@ class DockerComposeValidatorFrontendIntegrationTest
   }
 
   "docker-compose based validator works" in { implicit env =>
+    implicit val actorSystem: ActorSystem = env.actorSystem
+    registerHttpConnectionPoolsCleanup(env)
+
     val aliceTap = 123.4
     val adminTap = 234.5
 
@@ -108,7 +111,7 @@ class DockerComposeValidatorFrontendIntegrationTest
         )
         actAndCheck(
           "onboard alice",
-          click on "onboard-button",
+          eventuallyClickOn(id("onboard-button")),
         )(
           "Alice is logged in",
           _ => seleniumText(find(id("logged-in-user"))) should not be "",
@@ -131,6 +134,37 @@ class DockerComposeValidatorFrontendIntegrationTest
 
       // Take a backup of the validator
       Seq("build-tools/splice-compose.sh", "backup_node", backupsDir.toString) !
+
+      clue("JSON ledger API is exposed") {
+        val response =
+          Http().singleRequest(Get("http://json-ledger-api.localhost/v2/version")).futureValue
+        response.status should be(StatusCodes.OK)
+        response.entity.toStrict(10.seconds).futureValue.data.utf8String should include(
+          "\"version\":\"3." // check that it reports a version. We don't care about the exact version
+        )
+      }
+
+      clue("GRPC ledger API is exposed") {
+        import com.digitalasset.canton.ledger.client.GrpcChannel
+        import scala.util.Using
+        val channelConfig = com.digitalasset.canton.ledger.client.configuration
+          .LedgerClientChannelConfiguration(sslContext = None)
+        implicit val releasableChannel: Using.Releasable[io.grpc.ManagedChannel] =
+          (resource: io.grpc.ManagedChannel) => {
+            GrpcChannel.close(resource)
+          }
+        Using.resource(
+          channelConfig
+            .builderFor("grpc-ledger-api.localhost", 80)
+            .executor(env.executionContext)
+            .build
+        ) { channel =>
+          import com.daml.ledger.api.v2.version_service.*
+          val stub = VersionServiceGrpc.stub(channel)
+          val version = stub.getLedgerApiVersion(GetLedgerApiVersionRequest()).futureValue
+          version.version should startWith("3.")
+        }
+      }
 
     }
 
@@ -225,7 +259,7 @@ class DockerComposeValidatorFrontendIntegrationTest
 
           actAndCheck(
             "onboard alice",
-            click on "onboard-button",
+            eventuallyClickOn(id("onboard-button")),
           )(
             "Alice is logged in and maintained her balance",
             _ => userLoggedInAndHasBalance("alice", aliceTap),
@@ -256,8 +290,6 @@ class DockerComposeValidatorFrontendIntegrationTest
       }
 
       clue("validator and participant metrics work") {
-        implicit val sys: ActorSystem = env.actorSystem
-        registerHttpConnectionPoolsCleanup(env)
 
         def metricsAreAvailableFor(node: String) = {
           val result = Http()
@@ -303,13 +335,20 @@ class DockerComposeValidatorFrontendIntegrationTest
       withFrontEnd("frontend") { implicit webDriver =>
         val validatorUserPassword = sys.env(s"COMPOSE_VALIDATOR_WEB_UI_PASSWORD")
         eventuallySucceeds()(go to s"http://wallet.localhost")
-        completeAuth0LoginWithAuthorization(
-          "http://wallet.localhost",
-          "admin@compose-validator.com",
-          validatorUserPassword,
-          () => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
+
+        actAndCheck()(
+          s"Validator login to wallet via auth0",
+          completeAuth0LoginWithAuthorization(
+            "http://wallet.localhost",
+            "admin@compose-validator.com",
+            validatorUserPassword,
+            () => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
+          ),
+        )(
+          "User is already logged in, and sees their balance",
+          _ => userLoggedInAndHasBalance("da-ComposeValidator-1::", adminTap),
         )
-        userLoggedInAndHasBalance("da-ComposeValidator-1::", adminTap)
+
         completeAuth0LoginWithAuthorization(
           "http://ans.localhost",
           "admin@compose-validator.com",

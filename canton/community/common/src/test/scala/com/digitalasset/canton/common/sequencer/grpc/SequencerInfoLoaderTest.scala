@@ -17,10 +17,16 @@ import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnection,
+  SequencerConnectionPoolDelays,
   SequencerConnectionValidation,
   SubmissionRequestAmplification,
 }
-import com.digitalasset.canton.topology.{SequencerId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{
+  PhysicalSynchronizerId,
+  SequencerId,
+  SynchronizerId,
+  UniqueIdentifier,
+}
 import com.digitalasset.canton.tracing.TracingConfig
 import com.digitalasset.canton.version.{ProtocolVersionCompatibility, ReleaseVersion}
 import com.digitalasset.canton.{
@@ -47,12 +53,12 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
   private lazy val sequencerAlias1 = SequencerAlias.tryCreate("sequencer1")
   private lazy val sequencerAlias2 = SequencerAlias.tryCreate("sequencer2")
   private lazy val sequencerAlias3 = SequencerAlias.tryCreate("sequencer3")
-  private lazy val synchronizerId1 = SynchronizerId.tryFromString("first::namespace")
-  private lazy val synchronizerId2 = SynchronizerId.tryFromString("second::namespace")
+  private lazy val psid1 = SynchronizerId.tryFromString("first::namespace").toPhysical
+  private lazy val psid2 = SynchronizerId.tryFromString("second::namespace").toPhysical
   private lazy val endpoint1 = Endpoint("localhost", Port.tryCreate(1001))
   private lazy val endpoint2 = Endpoint("localhost", Port.tryCreate(1002))
   private lazy val endpoint3 = Endpoint("localhost", Port.tryCreate(1003))
-  private lazy val staticSynchronizerParameters = BaseTest.defaultStaticSynchronizerParametersWith()
+  private lazy val staticSynchronizerParameters = BaseTest.defaultStaticSynchronizerParameters
   private lazy val synchronizerAlias = SynchronizerAlias.tryCreate("synchronizer1")
 
   private def mapArgs(
@@ -72,23 +78,26 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
             transportSecurity = false,
             None,
             alias,
+            None,
           ),
           result,
         )
       }
       .map {
         case (conn, Right(result)) =>
-          LoadSequencerEndpointInformationResult.Valid(
-            conn,
-            result,
-            staticSynchronizerParameters,
-          )
+          LoadSequencerEndpointInformationResult.Valid
+            .create(
+              conn,
+              result,
+              staticSynchronizerParameters,
+            )
+            .value
         case (conn, Left(result)) =>
           LoadSequencerEndpointInformationResult.NotValid(conn, result)
       }
 
   private def run(
-      expectSynchronizerId: Option[SynchronizerId],
+      expectSynchronizerId: Option[PhysicalSynchronizerId],
       args: List[
         (
             SequencerAlias,
@@ -107,7 +116,7 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
     )(mapArgs(args))
 
   private def hasError(
-      expectSynchronizerId: Option[SynchronizerId],
+      expectSynchronizerId: Option[PhysicalSynchronizerId],
       args: List[
         (
             SequencerAlias,
@@ -132,7 +141,7 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
           (
             sequencerAlias1,
             endpoint1,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer1)),
+            Right(SynchronizerClientBootstrapInfo(psid1, sequencer1)),
           ),
           (
             sequencerAlias2,
@@ -142,6 +151,7 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
         ),
       )(_ should include("booh"))
     }
+
     "detect mismatches in synchronizer id" in {
       hasError(
         None,
@@ -149,24 +159,25 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
           (
             sequencerAlias1,
             endpoint1,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer1)),
+            Right(SynchronizerClientBootstrapInfo(psid1, sequencer1)),
           ),
           (
             sequencerAlias2,
             endpoint2,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId2, sequencer2)),
+            Right(SynchronizerClientBootstrapInfo(psid2, sequencer2)),
           ),
         ),
       )(_ should include("Synchronizer id mismatch"))
     }
+
     "detect if synchronizer id does not match expected one" in {
       hasError(
-        Some(synchronizerId2),
+        Some(psid2),
         List(
           (
             sequencerAlias1,
             endpoint1,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer1)),
+            Right(SynchronizerClientBootstrapInfo(psid1, sequencer1)),
           )
         ),
       )(_ should include("does not match expected"))
@@ -178,12 +189,12 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
           (
             sequencerAlias1,
             endpoint1,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer1)),
+            Right(SynchronizerClientBootstrapInfo(psid1, sequencer1)),
           ),
           (
             sequencerAlias1,
             endpoint2,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer2)),
+            Right(SynchronizerClientBootstrapInfo(psid1, sequencer2)),
           ),
         ),
       )(_ should include("sequencer-id mismatch"))
@@ -195,12 +206,12 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
           (
             sequencerAlias1,
             endpoint1,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer1)),
+            Right(SynchronizerClientBootstrapInfo(psid1, sequencer1)),
           ),
           (
             sequencerAlias2,
             endpoint2,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer1)),
+            Right(SynchronizerClientBootstrapInfo(psid1, sequencer1)),
           ),
         ),
       )(_ should include("same sequencer-id reported by different alias"))
@@ -212,12 +223,12 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
           (
             sequencerAlias1,
             endpoint1,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer1)),
+            Right(SynchronizerClientBootstrapInfo(psid1, sequencer1)),
           ),
           (
             sequencerAlias2,
             endpoint2,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer2)),
+            Right(SynchronizerClientBootstrapInfo(psid1, sequencer2)),
           ),
         ),
       ).value shouldBe (())
@@ -232,13 +243,13 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
             (
               sequencerAlias1,
               endpoint1,
-              Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer1)),
+              Right(SynchronizerClientBootstrapInfo(psid1, sequencer1)),
             ),
             (sequencerAlias2, endpoint2, Left(SequencerInfoLoaderError.InvalidState("booh"))),
             (
               sequencerAlias3,
               endpoint3,
-              Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer2)),
+              Right(SynchronizerClientBootstrapInfo(psid1, sequencer2)),
             ),
           ),
           validation,
@@ -253,7 +264,7 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
           (
             sequencerAlias1,
             endpoint1,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer1)),
+            Right(SynchronizerClientBootstrapInfo(psid1, sequencer1)),
           ),
           (sequencerAlias2, endpoint2, Left(SequencerInfoLoaderError.InvalidState("booh2"))),
           (sequencerAlias3, endpoint3, Left(SequencerInfoLoaderError.InvalidState("booh3"))),
@@ -269,7 +280,7 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
           (
             sequencerAlias1,
             endpoint1,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer1)),
+            Right(SynchronizerClientBootstrapInfo(psid1, sequencer1)),
           ),
           (sequencerAlias2, endpoint2, Left(SequencerInfoLoaderError.InvalidState("booh2"))),
           (sequencerAlias3, endpoint3, Left(SequencerInfoLoaderError.InvalidState("booh3"))),
@@ -296,7 +307,9 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
       SequencerInfoLoader.aggregateBootstrapInfo(
         logger,
         sequencerTrustThreshold = PositiveInt.tryCreate(2),
+        sequencerLivenessMargin = NonNegativeInt.zero,
         SubmissionRequestAmplification.NoAmplification,
+        SequencerConnectionPoolDelays.default,
         SequencerConnectionValidation.All,
         None,
       )(mapArgs(args))
@@ -307,12 +320,12 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
           (
             sequencerAlias1,
             endpoint1,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer1)),
+            Right(SynchronizerClientBootstrapInfo(psid1, sequencer1)),
           ),
           (
             sequencerAlias2,
             endpoint2,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer2)),
+            Right(SynchronizerClientBootstrapInfo(psid1, sequencer2)),
           ),
         )
       ) match {
@@ -327,7 +340,7 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
           (
             sequencerAlias1,
             endpoint1,
-            Right(SynchronizerClientBootstrapInfo(synchronizerId1, sequencer1)),
+            Right(SynchronizerClientBootstrapInfo(psid1, sequencer1)),
           ),
           (sequencerAlias2, endpoint2, Left(SequencerInfoLoaderError.InvalidState("booh"))),
         )
@@ -461,6 +474,7 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
               transportSecurity = false,
               None,
               SequencerAlias.tryCreate(s"sequencer$i"),
+              None,
             )
           )
       )
@@ -475,11 +489,13 @@ class SequencerInfoLoaderTest extends BaseTestWordSpec with HasExecutionContext 
     )
 
   private def validResult(sc: SequencerConnection): LoadSequencerEndpointInformationResult =
-    LoadSequencerEndpointInformationResult.Valid(
-      sc,
-      SynchronizerClientBootstrapInfo(synchronizerId1, sequencer1),
-      staticSynchronizerParameters,
-    )
+    LoadSequencerEndpointInformationResult.Valid
+      .create(
+        sc,
+        SynchronizerClientBootstrapInfo(psid1, sequencer1),
+        staticSynchronizerParameters,
+      )
+      .value
 
   private def nonValidResultF(
       sc: SequencerConnection

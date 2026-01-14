@@ -109,7 +109,7 @@ spec:
                 path: postgresPassword
       containers:
       - name: postgres-exporter
-        image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+        image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
         env:
           - name: DATA_SOURCE_PASS_FILE
             value: /tmp/pwd
@@ -198,13 +198,13 @@ spec:
   targetLabels:
       - server
 {{- end }}
-{{- define "splice-util-lib.log-level" -}}
-{{- if .logLevel }}
+{{- define "splice-util-lib.log-level" }}
 - name: LOG_LEVEL_CANTON
-  value: {{ .logLevel }}
+  value: {{ .logLevel | default "INFO" }}
 - name: LOG_LEVEL_STDOUT
-  value: {{ .logLevel }}
-{{- end }}
+  value: {{ .logLevelStdout | default "DEBUG" }}
+- name: LOG_IMMEDIATE_FLUSH
+  value: {{ .logAsyncFlush | default false | not | quote }}
 {{- end }}
 {{- define "splice-util-lib.service-account" -}}
 {{- if .serviceAccountName -}}
@@ -236,4 +236,25 @@ app: {{ .app }}
 {{- else }} {{ $value }}
 {{- end }}
 {{- end -}}
+{{- end -}}
+
+{{- define "splice-util-lib.affinity" -}}
+{{- if or .enableAntiAffinity .affinity }}
+affinity:
+  {{- with .affinity }}
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- if .enableAntiAffinity }}
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: splice-component
+              operator: In
+              values:
+                - {{ .app }}
+        topologyKey: kubernetes.io/hostname
+        namespaceSelector: { } # search in all namespaces
+  {{- end }}
+{{- end }}
 {{- end -}}

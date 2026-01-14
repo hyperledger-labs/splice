@@ -36,7 +36,7 @@ abstract class AbstractSynchronizerChangeRealClockIntegrationTest
     //   create $ OfferToPaintHouseByOwner with painter = painter; houseOwner = alice; bank = bank; iouId = iouId
     // This time, let P5 create it on the paint synchronizer
     val cmd = createPaintOfferCmd(alice, bank, painter, iouId)
-    P5.ledger_api.commands.submit(Seq(alice), Seq(cmd), Some(paintSynchronizerId))
+    P5.ledger_api.commands.submit(Seq(alice), Seq(cmd), paintSynchronizerId)
     val paintOfferId =
       searchAcsSync(
         Seq(P4, P5),
@@ -118,7 +118,7 @@ abstract class AbstractSynchronizerChangeRealClockIntegrationTest
     clue(s"running assignment on ${paintOfferUnassignedEvent.contractId}") {
       P4.ledger_api.commands.submit_assign(
         painter,
-        paintOfferUnassignedEvent.unassignId,
+        paintOfferUnassignedEvent.reassignmentId,
         paintSynchronizerId,
         iouSynchronizerId,
       )
@@ -174,7 +174,7 @@ abstract class AbstractSynchronizerChangeRealClockIntegrationTest
 
     P4.ledger_api.commands.submit_assign(
       painter,
-      paintHouseUnassigned.unassignId,
+      paintHouseUnassigned.reassignmentId,
       iouSynchronizerId,
       paintSynchronizerId,
     )
@@ -228,11 +228,15 @@ abstract class AbstractSynchronizerChangeRealClockIntegrationTest
       .filter(OfferToPaintHouseByOwner.COMPANION)(alice)
       .find(_.id.toLf == paintOfferId)
     paintOffer should not be empty
-    val iouTemplateId = TemplateId.templateIdsFromJava(Iou.TEMPLATE_ID_WITH_PACKAGE_ID).head
+    val iouTemplateIdPkgName = TemplateId.fromJavaIdentifier(Iou.TEMPLATE_ID)
+    // Look up actually uploaded IOU package ID to accommodate data continuity tests
+    // as the CantonExamples package ID tend to change across builds.
+    val iouPackageIdUploaded = P3.packages.find_by_module("Iou").map(_.packageId).loneElement
+    val iouTemplateId = iouTemplateIdPkgName.copy(packageId = iouPackageIdUploaded)
     val iouCreated = P1.ledger_api.state.acs
       .of_party(
         party = bank,
-        filterTemplates = Seq(iouTemplateId),
+        filterTemplates = Seq(iouTemplateIdPkgName),
         includeCreatedEventBlob = true,
       )
       .find(_.event.contractId == paintOffer.value.data.iouId.contractId)

@@ -4,6 +4,10 @@ validator1:
     locationId: us-central1
     projectId: da-cn-devnet
     keyRingId: validator1_mock
+  participantPruningSchedule:
+    cron: "0 /10 * * * ?" # Run every 10min
+    maxDuration: "5m"
+    retention: "30d"
 multiValidator:
   postgresPvcSize: '100Gi'
   # Dummy values for testing
@@ -12,21 +16,31 @@ multiValidator:
       value: |
         canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += "org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger"
         canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += "org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger"
+    - name: MULTI_VALIDATOR_ADDITIONAL_CONFIG_PARTICIPANT_PRUNING
+      value: |
+        canton.validator-apps.validator_backend_INDEX.participant-pruning-schedule {
+          cron = "0 /10 * * * ?"
+          max-duration = "5m"
+          retention = "25h"
+        }
   extraParticipantEnvVars:
     - name: MULTI_PARTICIPANT_ADDITIONAL_CONFIG_MAX_CONNECTIONS
       value: canton.participants.participant_INDEX.storage.parameters.max-connections = 33
 sv:
   synchronizer:
     skipInitialization: true
-    topologyChangeDelay: 250ms
 splitwell:
   maxDarVersion: '0.1.8'
+  participantPruningSchedule:
+    cron: "0 /10 * * * ?" # Run every 10min
+    maxDuration: "5m"
+    retention: "30d"
 synchronizerMigration:
   archived:
     - id: 1
       version: 0.3.18
       releaseReference:
-        gitReference: "refs/heads/release-line-0.3.18"
+        gitReference: "981227e62011e386cca3cdb5f00b472cf05a12c4"
         repoUrl: https://github.com/hyperledger-labs/splice
         pulumiStacksDir: "cluster/stacks/prod"
         pulumiBaseDir: "splice/cluster/pulumi"
@@ -106,29 +120,128 @@ loadTester:
   iterationsPerMinute: 30
   minRate: 0.123
   chartVersion: 1.2.3
+  adaptiveScenario:
+    enabled: true
 svs:
   default:
+    pruning:
+      cometbft:
+        retainBlocks: 5040000
+      sequencer:
+        enabled: true
+        pruningInterval: "1 hour"
+        retentionPeriod: "30 days"
+      mediator:
+        enabled: true
+        cron: "0 0 * * *"
+        maxDuration: "30m"
+        retentionPeriod: "7d"
+    scanApp:
+      additionalEnvVars:
+        - name: CUSTOM_MOCK_ENV_VAR_NAME
+          value: CUSTOM_MOCK_ENV_VAR_VALUE
+      additionalJvmOptions: "-DcustomScanAppJvmFlag"
+      resources:
+        requests:
+          cpu: "0.5"
+          memory: '1536Mi'
+        limits:
+          memory: '2048Mi'
     svApp:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
+      additionalJvmOptions: "-DcustomSvAppJvmFlag"
+      resources:
+        requests:
+          cpu: "1"
+          memory: '1Gi'
+        limits:
+          memory: '2Gi'
     participant:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
+      additionalJvmOptions: "-DcustomParticipantJvmFlag"
+    sequencer:
+      additionalEnvVars:
+        - name: CUSTOM_MOCK_ENV_VAR_NAME
+          value: CUSTOM_MOCK_ENV_VAR_VALUE
+      additionalJvmOptions: "-DcustomSequencerJvmFlag"
+      cloudSql:
+        tier: "sequencer-override-tier"
+      resources:
+        requests:
+          cpu: "1"
+          memory: '1Gi'
+        limits:
+          memory: '2Gi'
+    mediator:
+      additionalEnvVars:
+        - name: CUSTOM_MOCK_ENV_VAR_NAME
+          value: CUSTOM_MOCK_ENV_VAR_VALUE
+      additionalJvmOptions: "-DcustomMediatorJvmFlag"
+      resources:
+        requests:
+          cpu: "1"
+          memory: '1Gi'
+        limits:
+          memory: '2Gi'
+    logging:
+      appsLogLevel: WARN
+      cantonLogLevel: INFO
+      cantonStdoutLogLevel: DEBUG
   sv:
     participant:
       bftSequencerConnection: false
-  # TODO(tech-debt) Actually use the values below for the mock expected files (we mock deploy only sv-1 atm).
-  sv-2:
+  sv-1:
+    periodicSnapshots:
+      topology:
+        projectId: 'da-cn-test'
+        bucketName: 'da-cn-topology-snapshots'
+        backupInterval: '24h'
+    logging:
+      appsLogLevel: WARN
+      cantonLogLevel: INFO
+      cantonStdoutLogLevel: DEBUG
+    scanApp:
+      bigQuery:
+        dataset: mock_da2_scan
+        prefix: da2
+    validatorApp:
+      sweep:
+        fromEnv: SV1
+  sv-da-1: # non "sv-X" key => additional SV that is always deployed (key == node name == k8s namespace)
+    publicName: Digital-Asset-1
+    subdomain: sv-1
+    pruning:
+      participant:
+        enabled: true
+        cron: "0 0 * * *"
+        maxDuration: "30m"
+        retentionPeriod: "7d"
+    participant:
+      kms:
+        keyRingId: sv-da-1_participant_mock
+        locationId: us-central1
+    cometbft:
+      nodeId: d825622358065aea3cb3b3479cf64d172675037e
+      validatorKeyAddress: 2D21D8AB2306770E9F93E8BD0E0F07B3E86817D7
+      keysGcpSecret: svda1-mock-cometbft-keys
+    svApp:
+      auth0:
+        clientId: bxjt0vzLyRG2rk2fapXfOzH5lzK4mrl7
+      svIdKeyGcpSecret: svda1-mock-id
+      cometBftGovernanceKeyGcpSecret: svda1-mock-cometbft-governance-key
+    validatorApp:
+      walletUser: auth0|68c2c41e6470184569e4521e
+      sweep:
+        fromEnv: SVDA1
+      auth0:
+        clientId: fBFpzZSRuufk9ueV2pSEkOXNYXuQtVmY
     logging:
       appsLogLevel: INFO
       cantonLogLevel: INFO
-  sv-3:
-    participant:
-      kms:
-        keyRingId: sv-3_participant_mock
-        locationId: us-central1
 infra:
   extraCustomResources:
     deny-onboard-prepare-endpoint:
@@ -156,9 +269,50 @@ infra:
       spec:
         key: value
         anotherKey: anotherValue
+  istio:
+    istiodValues: # example istiod overrides
+      global:
+        proxy:
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
 cluster:
   nodePools:
     apps:
       nodeType: n2-standard-16
 networkWide:
   maxVettingDelay: 1m
+validators:
+  validator-runbook:
+    partyAllocator:
+      enable: true
+      maxParties: 1234
+      parallelism: 321
+      preapprovalRetries: 9876
+      preapprovalRetryDelayMs: 42
+    participantPruningSchedule:
+      cron: "0 /10 * * * ?" # Run every 10min
+      maxDuration: "5m"
+      retention: "30d"
+    participant:
+      additionalEnvVars:
+        - name: ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_NAME
+          value: ADDITIONAL_ENV_VAR_VALIDATOR_PARTICIPANT_VALUE
+      additionalJvmOptions: -Dparticipantoption
+    validatorApp:
+      scanClient:
+        scanType: "bft-custom"
+        seedUrls: [ "https://scan.sv-2-eng.test.network.canton.global","https://scan.sv-3-eng.test.network.canton.global" ]
+        threshold: 2
+        trustedSvs: [ "Digital-Asset-Eng-2","Digital-Asset-Eng-3" ]
+      additionalEnvVars:
+        - name: ADDITIONAL_ENV_VAR_VALIDATOR_NAME
+          value: ADDITIONAL_ENV_VAR_VALIDATOR_NAME
+      additionalJvmOptions: -Dparticipantoption
+  extra-validator:
+    namespace: validator
+    partyHint: 'extra-validator'

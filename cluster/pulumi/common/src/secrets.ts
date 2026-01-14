@@ -6,8 +6,6 @@ import { DockerConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/doc
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
 import { Output } from '@pulumi/pulumi';
 
-import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0';
-import { Auth0Client } from './auth0types';
 import { CnInput } from './helm';
 import { btoa, ExactNamespace } from './utils';
 
@@ -32,8 +30,8 @@ export type GrafanaKeys = {
   adminPassword: string;
 };
 
-export function svKeyFromSecret(sv: string): pulumi.Output<SvIdKey> {
-  const keyJson = getSecretVersionOutput({ secret: `${sv}-id` });
+export function svKeyFromSecret(secretName: string): pulumi.Output<SvIdKey> {
+  const keyJson = getSecretVersionOutput({ secret: secretName });
   return keyJson.apply(k => {
     const secretData = k.secretData;
     const parsed = JSON.parse(secretData);
@@ -58,9 +56,9 @@ export function svCometBftKeysFromSecret(name: string): pulumi.Output<SvCometBft
 }
 
 export function svCometBftGovernanceKeyFromSecret(
-  sv: string
+  secretName: string
 ): pulumi.Output<SvCometBftGovernanceKey> {
-  const keyJson = getSecretVersionOutput({ secret: `${sv}-cometbft-governance-key` });
+  const keyJson = getSecretVersionOutput({ secret: secretName });
   return keyJson.apply(k => {
     const secretData = k.secretData;
     const parsed = JSON.parse(secretData);
@@ -160,39 +158,6 @@ export function imagePullSecretWithNonDefaultServiceAccount(
   return imagePullSecretByNamespaceNameForServiceAccount(ns.logicalName, serviceAccountName, [
     serviceAccount,
   ]);
-}
-
-export function uiSecret(
-  auth0Client: Auth0Client,
-  ns: ExactNamespace,
-  appName: string,
-  clientId: string
-): k8s.core.v1.Secret {
-  return installAuth0UiSecretWithClientId(auth0Client, ns, appName, appName, clientId);
-}
-
-export type AppAndUiSecrets = {
-  appSecret: k8s.core.v1.Secret;
-  uiSecret: k8s.core.v1.Secret;
-};
-
-export async function validatorSecrets(
-  ns: ExactNamespace,
-  auth0Client: Auth0Client,
-  clientId: string
-): Promise<AppAndUiSecrets> {
-  return {
-    appSecret: await installAuth0Secret(auth0Client, ns, 'validator', 'validator'),
-    uiSecret: uiSecret(auth0Client, ns, 'wallet', clientId),
-  };
-}
-
-export function cnsUiSecret(
-  ns: ExactNamespace,
-  auth0Client: Auth0Client,
-  clientId: string
-): k8s.core.v1.Secret {
-  return uiSecret(auth0Client, ns, 'cns', clientId);
 }
 
 export function svKeySecret(ns: ExactNamespace, keys: CnInput<SvIdKey>): k8s.core.v1.Secret {

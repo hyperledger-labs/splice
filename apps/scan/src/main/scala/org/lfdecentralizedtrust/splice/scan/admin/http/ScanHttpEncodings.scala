@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import com.daml.ledger.api.v2.TraceContextOuterClass
-import com.daml.ledger.javaapi.data.TransactionTree
 import com.daml.ledger.javaapi.{data, data as javaApi}
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.CantonTimestamp
@@ -17,9 +16,14 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.{
+  TransactionViewT,
+  VerdictResultDbValue,
+  VerdictT,
+}
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
-import org.lfdecentralizedtrust.splice.util.{Contract, EventId, LegacyOffset, Trees}
+import org.lfdecentralizedtrust.splice.util.{Codec, Contract, EventId, LegacyOffset, Trees}
 
 import java.time.format.DateTimeFormatterBuilder
 import java.time.{Instant, ZoneOffset}
@@ -33,12 +37,6 @@ import scala.jdk.OptionConverters.*
   * http: org.lfdecentralizedtrust.splice.http.v0.httpApi.*
   */
 sealed trait ScanHttpEncodings {
-  private val recordTimeDateFormatter =
-    new DateTimeFormatterBuilder()
-      .appendInstant(6) // 6 digits of precision for microseconds, right padded with zeros
-      .toFormatter()
-  private def formatRecordTime(instant: Instant) =
-    recordTimeDateFormatter.format(instant)
 
   def lapiToHttpUpdate(
       updateWithMigrationId: TreeUpdateWithMigrationId,
@@ -53,7 +51,7 @@ sealed trait ScanHttpEncodings {
               tree.getUpdateId,
               updateWithMigrationId.migrationId,
               tree.getWorkflowId,
-              formatRecordTime(tree.getRecordTime),
+              ScanHttpEncodings.formatRecordTime(tree.getRecordTime),
               updateWithMigrationId.update.synchronizerId.toProtoPrimitive,
               tree.getEffectiveAt.toString,
               LegacyOffset.Api.fromLong(tree.getOffset),
@@ -85,7 +83,7 @@ sealed trait ScanHttpEncodings {
               httpApi.UpdateHistoryReassignment(
                 update.updateId,
                 LegacyOffset.Api.fromLong(update.offset),
-                formatRecordTime(update.recordTime.toInstant),
+                ScanHttpEncodings.formatRecordTime(update.recordTime.toInstant),
                 httpApi.UpdateHistoryAssignment(
                   submitter.toProtoPrimitive,
                   source.toProtoPrimitive,
@@ -112,7 +110,7 @@ sealed trait ScanHttpEncodings {
               httpApi.UpdateHistoryReassignment(
                 update.updateId,
                 LegacyOffset.Api.fromLong(update.offset),
-                formatRecordTime(update.recordTime.toInstant),
+                ScanHttpEncodings.formatRecordTime(update.recordTime.toInstant),
                 httpApi.UpdateHistoryUnassignment(
                   submitter.toProtoPrimitive,
                   source.toProtoPrimitive,
@@ -129,9 +127,9 @@ sealed trait ScanHttpEncodings {
   }
 
   private def javaToHttpEvent(
-      tree: TransactionTree,
+      tree: javaApi.Transaction,
       eventId: String,
-      treeEvent: javaApi.TreeEvent,
+      treeEvent: javaApi.Event,
       eventIdBuild: (String, Int) => String,
   )(implicit
       elc: ErrorLoggingContext
@@ -194,7 +192,7 @@ sealed trait ScanHttpEncodings {
 
   def httpToLapiUpdate(http: httpApi.UpdateHistoryItemV2): TreeUpdateWithMigrationId = http match {
     case httpApi.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(httpTransaction) =>
-      httpToLapiTransaction(httpTransaction)
+      httpToLapiTransaction(httpTransaction, 1L) // offset not used in v2
     case httpApi.UpdateHistoryItemV2.members.UpdateHistoryReassignment(httpReassignment) =>
       httpToLapiReassignment(httpReassignment)
   }
@@ -205,8 +203,9 @@ sealed trait ScanHttpEncodings {
     case httpApi.UpdateHistoryItem.members.UpdateHistoryReassignment(httpReassignment) =>
       httpToLapiReassignment(httpReassignment)
   }
-  private def httpToLapiTransaction(
-      httpV2: httpApi.UpdateHistoryTransactionV2
+  def httpToLapiTransaction(
+      httpV2: httpApi.UpdateHistoryTransactionV2,
+      offset: Long,
   ): TreeUpdateWithMigrationId = {
     val http = httpApi.UpdateHistoryTransaction(
       updateId = httpV2.updateId,
@@ -215,7 +214,7 @@ sealed trait ScanHttpEncodings {
       recordTime = httpV2.recordTime,
       synchronizerId = httpV2.synchronizerId,
       effectiveAt = httpV2.effectiveAt,
-      offset = LegacyOffset.Api.fromLong(1L), // not used in v2
+      offset = LegacyOffset.Api.fromLong(offset),
       rootEventIds = httpV2.rootEventIds,
       eventsById = httpV2.eventsById,
     )
@@ -235,18 +234,23 @@ sealed trait ScanHttpEncodings {
     TreeUpdateWithMigrationId(
       UpdateHistoryResponse(
         update = ledgerApi.TransactionTreeUpdate(
-          new javaApi.TransactionTree(
+          new javaApi.Transaction(
             http.updateId,
             "",
             http.workflowId,
             Instant.parse(http.effectiveAt),
+            http.eventsById
+              .map { case (eventId, treeEventHttp) =>
+                Integer.valueOf(EventId.nodeIdFromEventId(eventId)) -> httpToJavaEvent(
+                  nodesWithChildren,
+                  treeEventHttp,
+                )
+              }
+              .toSeq
+              .sortBy(_._1)
+              .map(_._2)
+              .asJava,
             LegacyOffset.Api.assertFromStringToLong(http.offset),
-            http.eventsById.map { case (eventId, treeEventHttp) =>
-              Integer.valueOf(EventId.nodeIdFromEventId(eventId)) -> httpToJavaEvent(
-                nodesWithChildren,
-                treeEventHttp,
-              )
-            }.asJava,
             http.synchronizerId,
             TraceContextOuterClass.TraceContext.getDefaultInstance,
             Instant.parse(http.recordTime),
@@ -310,13 +314,13 @@ sealed trait ScanHttpEncodings {
   private def httpToJavaEvent(
       nodesWithChildren: Map[Int, Seq[Int]],
       http: httpApi.TreeEvent,
-  ): javaApi.TreeEvent = http match {
+  ): javaApi.Event = http match {
     case httpApi.TreeEvent.members.CreatedEvent(createdHttp) => httpToJavaCreatedEvent(createdHttp)
     case httpApi.TreeEvent.members.ExercisedEvent(exercisedHttp) =>
       httpToJavaExercisedEvent(nodesWithChildren, exercisedHttp)
   }
 
-  private def httpToJavaCreatedEvent(http: httpApi.CreatedEvent): javaApi.CreatedEvent = {
+  def httpToJavaCreatedEvent(http: httpApi.CreatedEvent): javaApi.CreatedEvent = {
     val templateId = parseTemplateId(http.templateId)
     new javaApi.CreatedEvent(
       /*witnessParties = */ java.util.Collections.emptyList(),
@@ -333,6 +337,8 @@ sealed trait ScanHttpEncodings {
       http.signatories.asJava,
       http.observers.asJava,
       http.createdAt.toInstant,
+      /* acsDelta = */ false,
+      /* representativePackageId = */ templateId.getPackageId,
     )
   }
 
@@ -361,6 +367,7 @@ sealed trait ScanHttpEncodings {
       ),
       decodeExerciseResult(templateId, interfaceId, http.choice, http.exerciseResult),
       /*implementedInterfaces = */ java.util.Collections.emptyList(),
+      /*acsDelta = */ false,
     )
   }
 
@@ -440,6 +447,59 @@ object ScanHttpEncodings {
   case object V0 extends ApiVersion
   case object V1 extends ApiVersion
 
+  private val recordTimeDateFormatter =
+    new DateTimeFormatterBuilder().appendInstant(6).toFormatter()
+  def formatRecordTime(instant: Instant): String =
+    recordTimeDateFormatter.format(instant)
+
+  def encodeVerdict(
+      verdict: VerdictT,
+      views: Seq[TransactionViewT],
+  ): definitions.EventHistoryVerdict = {
+    val verdictResultEnum: definitions.VerdictResult = verdict.verdictResult match {
+      case VerdictResultDbValue.Accepted =>
+        definitions.VerdictResult.VerdictResultAccepted
+      case VerdictResultDbValue.Rejected =>
+        definitions.VerdictResult.VerdictResultRejected
+      case _ => definitions.VerdictResult.VerdictResultUnspecified
+    }
+
+    val txViewsList: Vector[definitions.TransactionView] =
+      views.sortBy(_.viewId).toVector.map { v =>
+        val quorums: Vector[definitions.Quorum] = v.confirmingParties.asArray
+          .getOrElse(Vector.empty)
+          .flatMap { j =>
+            val parties = j.hcursor.downField("parties").as[Vector[String]].getOrElse(Vector.empty)
+            val threshold = j.hcursor.downField("threshold").as[Int].getOrElse(0)
+            Some(definitions.Quorum(parties, threshold))
+          }
+        definitions.TransactionView(
+          viewId = v.viewId,
+          informees = v.informees.toVector,
+          confirmingParties = quorums,
+          subViews = v.subViews.toVector,
+        )
+      }
+
+    val txViews = definitions.TransactionViews(
+      views = txViewsList,
+      rootViews = verdict.transactionRootViews.toVector,
+    )
+
+    httpApi.EventHistoryVerdict(
+      updateId = verdict.updateId,
+      migrationId = verdict.migrationId,
+      domainId = Codec.encode(verdict.domainId),
+      recordTime = formatRecordTime(verdict.recordTime.toInstant),
+      finalizationTime = formatRecordTime(verdict.finalizationTime.toInstant),
+      submittingParties = verdict.submittingParties.toVector,
+      submittingParticipantUid = verdict.submittingParticipantUid,
+      verdictResult = verdictResultEnum,
+      mediatorGroup = verdict.mediatorGroup,
+      transactionViews = txViews,
+    )
+  }
+
   def encodeUpdate(
       update: TreeUpdateWithMigrationId,
       encoding: definitions.DamlValueEncoding,
@@ -454,7 +514,7 @@ object ScanHttpEncodings {
         ScanHttpEncodings.makeConsistentAcrossSvs(update)
     }
     val encodings: ScanHttpEncodings = encoding match {
-      case definitions.DamlValueEncoding.members.CompactJson => CompactJsonScanHttpEncodings
+      case definitions.DamlValueEncoding.members.CompactJson => CompactJsonScanHttpEncodings()
       case definitions.DamlValueEncoding.members.ProtobufJson => ProtobufJsonScanHttpEncodings
     }
     // v0 always returns the update ids as `#` prefixed,as that's the way they were encoded in canton. v1 returns it without the `#`
@@ -519,6 +579,8 @@ object ScanHttpEncodings {
                     assign.createdEvent.getSignatories,
                     assign.createdEvent.getObservers,
                     assign.createdEvent.createdAt,
+                    assign.createdEvent.isAcsDelta,
+                    assign.createdEvent.getRepresentativePackageId,
                   )
                 ),
               )
@@ -537,8 +599,8 @@ object ScanHttpEncodings {
   }
 
   def makeConsistentAcrossSvs(
-      tree: javaApi.TransactionTree
-  ): javaApi.TransactionTree = {
+      tree: javaApi.Transaction
+  ): javaApi.Transaction = {
     val mapping = Trees
       .getLocalEventIndices(tree)
     val nodesWithChildren = tree.getEventsById.asScala.map {
@@ -551,7 +613,7 @@ object ScanHttpEncodings {
           .map(mapping)
       case (nodeId, _) => mapping(nodeId.intValue()) -> Seq.empty
     }
-    val eventsById: Iterable[(Int, javaApi.TreeEvent)] = tree.getEventsById.asScala.map {
+    val eventsById: Iterable[(Int, javaApi.Event)] = tree.getEventsById.asScala.map {
       case (nodeId, created: javaApi.CreatedEvent) =>
         mapping(nodeId) -> new javaApi.CreatedEvent(
           created.getWitnessParties,
@@ -568,6 +630,8 @@ object ScanHttpEncodings {
           created.getSignatories,
           created.getObservers,
           created.createdAt,
+          created.isAcsDelta,
+          created.getRepresentativePackageId,
         )
       case (nodeId, exercised: javaApi.ExercisedEvent) =>
         val newNodeId = mapping(exercised.getNodeId)
@@ -589,22 +653,18 @@ object ScanHttpEncodings {
           ),
           exercised.getExerciseResult,
           exercised.getImplementedInterfaces,
+          exercised.isAcsDelta,
         )
       case (_, event) => sys.error(s"Unexpected event type: $event")
     }
 
-    new javaApi.TransactionTree(
+    new javaApi.Transaction(
       tree.getUpdateId,
       tree.getCommandId,
       tree.getWorkflowId,
       tree.getEffectiveAt,
+      eventsById.toList.sortBy(_._1).map(_._2).asJava,
       1L, // tree.getOffset not used as the values are participant local and we want consistency across svs
-      eventsById
-        .map { case (key, value) =>
-          Integer.valueOf(key) -> value
-        }
-        .toMap
-        .asJava,
       tree.getSynchronizerId,
       tree.getTraceContext,
       tree.getRecordTime,
@@ -612,8 +672,41 @@ object ScanHttpEncodings {
   }
 }
 
-// A lossy, but much easier to process, encoding. Should be used for all endpoints not used for backfilling Scan.
-case object CompactJsonScanHttpEncodings extends ScanHttpEncodings {
+object RemoveFieldLabels {
+  def record(value: javaApi.DamlRecord): javaApi.DamlRecord = recordWithoutFieldLabels(value)
+  def value(value: javaApi.Value): javaApi.Value = valueWithoutFieldLabels(value)
+
+  /** Recursively removes all field labels from a value.
+    * ValueJsonCodecCodegen returns values with field labels, but we generally don't store field labels in databases.
+    * The labels are removed to make values comparable.
+    */
+  private def valueWithoutFieldLabels(value: javaApi.Value): javaApi.Value = {
+    value match {
+      case record: javaApi.DamlRecord => recordWithoutFieldLabels(record)
+      case list: javaApi.DamlList => javaApi.DamlList.of(list.toList(valueWithoutFieldLabels))
+      case tmap: javaApi.DamlTextMap => javaApi.DamlTextMap.of(tmap.toMap(valueWithoutFieldLabels))
+      case gmap: javaApi.DamlGenMap =>
+        javaApi.DamlGenMap.of(gmap.toMap(valueWithoutFieldLabels, valueWithoutFieldLabels))
+      case opt: javaApi.DamlOptional =>
+        javaApi.DamlOptional.of(opt.getValue.map(valueWithoutFieldLabels))
+      case variant: javaApi.Variant =>
+        new javaApi.Variant(variant.getConstructor, valueWithoutFieldLabels(variant.getValue))
+      case _ => value
+    }
+  }
+  private def recordWithoutFieldLabels(value: javaApi.DamlRecord): javaApi.DamlRecord = {
+    val fields = value.getFields.asScala.toList
+    val fieldsWithoutLabels = fields.map { f =>
+      new javaApi.DamlRecord.Field(valueWithoutFieldLabels(f.getValue))
+    }
+    new javaApi.DamlRecord(fieldsWithoutLabels.asJava)
+  }
+}
+
+case class CompactJsonScanHttpEncodings(
+    transformValue: javaApi.Value => javaApi.Value,
+    transformRecord: javaApi.DamlRecord => javaApi.DamlRecord,
+) extends ScanHttpEncodings {
   import org.lfdecentralizedtrust.splice.util.ValueJsonCodecCodegen
   override def encodeContractPayload(
       event: javaApi.CreatedEvent
@@ -665,7 +758,7 @@ case object CompactJsonScanHttpEncodings extends ScanHttpEncodings {
           throw new RuntimeException(
             s"Failed to decode contract payload '${json.noSpaces}': $error"
           ),
-        withoutFieldLabels,
+        transformRecord,
       )
 
   override def decodeChoiceArgument(
@@ -681,7 +774,7 @@ case object CompactJsonScanHttpEncodings extends ScanHttpEncodings {
           throw new RuntimeException(
             s"Failed to decode choice argument '${json.noSpaces}': $error"
           ),
-        withoutFieldLabels,
+        transformValue,
       )
 
   override def decodeExerciseResult(
@@ -695,34 +788,13 @@ case object CompactJsonScanHttpEncodings extends ScanHttpEncodings {
       .fold(
         error =>
           throw new RuntimeException(s"Failed to decode choice result '${json.noSpaces}': $error"),
-        withoutFieldLabels,
+        transformValue,
       )
+}
 
-  /** Recursively removes all field labels from a value.
-    * ValueJsonCodecCodegen returns values with field labels, but we generally don't store field labels in databases.
-    * The labels are removed to make values comparable.
-    */
-  private def withoutFieldLabels(value: javaApi.Value): javaApi.Value = {
-    value match {
-      case record: javaApi.DamlRecord => withoutFieldLabels(record)
-      case list: javaApi.DamlList => javaApi.DamlList.of(list.toList(withoutFieldLabels))
-      case tmap: javaApi.DamlTextMap => javaApi.DamlTextMap.of(tmap.toMap(withoutFieldLabels))
-      case gmap: javaApi.DamlGenMap =>
-        javaApi.DamlGenMap.of(gmap.toMap(withoutFieldLabels, withoutFieldLabels))
-      case opt: javaApi.DamlOptional =>
-        javaApi.DamlOptional.of(opt.getValue.map(withoutFieldLabels))
-      case variant: javaApi.Variant =>
-        new javaApi.Variant(variant.getConstructor, withoutFieldLabels(variant.getValue))
-      case _ => value
-    }
-  }
-  private def withoutFieldLabels(value: javaApi.DamlRecord): javaApi.DamlRecord = {
-    val fields = value.getFields.asScala.toList
-    val fieldsWithoutLabels = fields.map { f =>
-      new javaApi.DamlRecord.Field(withoutFieldLabels(f.getValue))
-    }
-    new javaApi.DamlRecord(fieldsWithoutLabels.asJava)
-  }
+// A lossy, but much easier to process, encoding. Should be used for all endpoints not used for backfilling Scan.
+object CompactJsonScanHttpEncodings {
+  def apply() = new CompactJsonScanHttpEncodings(RemoveFieldLabels.value, RemoveFieldLabels.record)
 }
 
 // A lossless, but harder to process, encoding. Should be used only for backfilling Scan.

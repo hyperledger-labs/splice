@@ -8,12 +8,12 @@ import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityPro
 import com.daml.ledger.api.v2.admin.{ObjectMetaOuterClass, UserManagementServiceOuterClass}
 import com.daml.ledger.api.v2.package_reference.PackageReference
 import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
-import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, TransactionTree, User}
+import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, Transaction, User}
 import com.digitalasset.base.error.ErrorResource
 import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.base.error.utils.ErrorDetails.ResourceInfoDetail
 import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.admin.api.client.data.PartyDetails
+import com.digitalasset.canton.admin.api.client.data.parties.PartyDetails
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.error.LedgerApiErrors
@@ -27,8 +27,7 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.InactiveContracts
-import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.{Namespace, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
@@ -38,7 +37,7 @@ import com.digitalasset.daml.lf.data.Ref
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.{Status, StatusRuntimeException}
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.pattern.{CircuitBreaker, CircuitBreakerOpenException}
+import org.apache.pekko.pattern.CircuitBreakerOpenException
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
 import org.apache.pekko.{Done, NotUsed}
@@ -56,6 +55,7 @@ import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
   DisclosedContracts,
+  SpliceCircuitBreaker,
 }
 import shapeless.<:!<
 
@@ -85,6 +85,12 @@ class BaseLedgerConnection(
 
   import BaseLedgerConnection.*
 
+  def deleteUser(
+      userId: String,
+      identityProviderId: Option[String] = None,
+  )(implicit tc: TraceContext): Future[Unit] =
+    client.deleteUser(userId, identityProviderId)
+
   def ledgerEnd()(implicit
       traceContext: TraceContext
   ): Future[Long] =
@@ -96,7 +102,7 @@ class BaseLedgerConnection(
     client.latestPrunedOffset()
 
   def activeContracts(
-      filter: com.daml.ledger.api.v2.transaction_filter.TransactionFilter,
+      eventFormat: com.daml.ledger.api.v2.transaction_filter.EventFormat,
       offset: Long,
   )(implicit tc: TraceContext): Future[
     (
@@ -108,7 +114,7 @@ class BaseLedgerConnection(
     val activeContractsRequest = client.activeContracts(
       lapi.state_service.GetActiveContractsRequest(
         activeAtOffset = offset,
-        filter = Some(filter),
+        eventFormat = Some(eventFormat),
       )
     )
     for {
@@ -141,7 +147,7 @@ class BaseLedgerConnection(
         Seq[IncompleteReassignmentEvent.Unassign],
         Seq[IncompleteReassignmentEvent.Assign],
     )
-  ] = activeContracts(filter.toTransactionFilter, offset)
+  ] = activeContracts(filter.toEventFormat, offset)
 
   def getConnectedDomains(party: PartyId)(implicit
       tc: TraceContext
@@ -189,7 +195,12 @@ class BaseLedgerConnection(
       s"User $userId has primary party",
       check = getOptionalPrimaryParty(userId),
       establish = for {
-        party <- ensurePartyAllocated(AuthorizedStore, hint, None, participantAdminConnection)
+        party <- ensurePartyAllocated(
+          TopologyStoreId.Authorized,
+          hint,
+          None,
+          participantAdminConnection,
+        )
         _ <- setUserPrimaryParty(userId, party)
         _ <- grantUserRights(userId, actAsParties = Seq(party), readAsParties = Seq.empty)
       } yield (),
@@ -293,7 +304,7 @@ class BaseLedgerConnection(
   )(implicit traceContext: TraceContext): Future[PartyId] =
     for {
       party <- ensurePartyAllocated(
-        AuthorizedStore,
+        TopologyStoreId.Authorized,
         sanitizeUserIdToPartyString(user),
         None,
         participantAdminConnection,
@@ -468,6 +479,15 @@ class BaseLedgerConnection(
     } yield userRights.collect { case actAs: User.Right.CanActAs =>
       PartyId.tryFromProtoPrimitive(actAs.party)
     }.toSet
+  }
+
+  def listUserRights(
+      username: String
+  )(implicit tc: TraceContext): Future[Set[User.Right]] = {
+    val userId = Ref.UserId.assertFromString(username)
+    for {
+      userRights <- client.listUserRights(userId)
+    } yield userRights.toSet
   }
 
   def grantUserRights(
@@ -738,7 +758,7 @@ class SpliceLedgerConnection(
     contractDowngradeErrorCallbacks: AtomicReference[Seq[() => Unit]],
     trafficBalanceServiceO: AtomicReference[Option[TrafficBalanceService]],
     completionOffsetCallback: Long => Future[Unit],
-    commandCircuitBreaker: CircuitBreaker,
+    commandCircuitBreaker: SpliceCircuitBreaker,
 )(implicit as: ActorSystem, ec: ExecutionContextExecutor)
     extends BaseLedgerConnection(
       client,
@@ -1251,7 +1271,7 @@ class SpliceLedgerConnection(
 
   // run in connected to out first, *then start* fb
   // but proactively cancel the in->out graph if fb fails
-  private[this] def cancelIfFailed[A, E, B](in: Source[E, _])(out: Sink[E, Future[A]])(
+  private[this] def cancelIfFailed[A, E, B](in: Source[E, ?])(out: Sink[E, Future[A]])(
       fb: => Future[B]
   ): (KillSwitch, Future[(A, B)]) = {
     val (ks, fa) = in.viaMat(KillSwitches.single)(Keep.right).toMat(out)(Keep.both).run()
@@ -1360,7 +1380,7 @@ object SpliceLedgerConnection {
 
   def decodeExerciseResult[T](
       update: Update[T],
-      transaction: TransactionTree,
+      transaction: Transaction,
   ): T = {
     val rootEventIds = transaction.getRootNodeIds.asScala.toSeq
     if (rootEventIds.size == 1) {

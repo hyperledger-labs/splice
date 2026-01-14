@@ -1,0 +1,241 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Daml script tests showing how to use the DelegateProxy in the context of
+-- an exchange integration to get featured app activity markers for
+-- deposits and withdrawals of an token standard token.
+-- See https://docs.digitalasset.com/integrate/devnet/exchange-integration/index.html more details.
+--
+-- Note that the tests themselves do use Amulet tokens as a mock for token standard tokens.
+-- The mechanism for getting the featured app activity markers is generic.
+--
+module Splice.Util.FeaturedApp.IntegrationTests.TestFeaturedDepositsAndWithdrawals where
+
+import qualified Splice.Amulet
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+import Splice.Api.FeaturedAppRightV1
+import Splice.Util.FeaturedApp.DelegateProxy
+
+import Daml.Script
+
+import DA.Assert ((===))
+import qualified DA.Map as Map
+import qualified DA.TextMap as TextMap
+import DA.Time
+
+import Splice.Testing.Utils
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
+import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+
+
+-- Shared test setup
+--------------------
+
+data TestSetup = TestSetup with
+  registry : AmuletRegistry.AmuletRegistry
+  now : Time
+  alice : Party
+  exchangeParty : Party
+  treasuryParty : Party
+  treasuryHoldingCids : [ContractId Holding]
+  proxyCid : ContractId DelegateProxy
+  proxyDisclosures : Disclosures'
+  exchangeAppRightCid : ContractId FeaturedAppRight
+
+setupTest : Script TestSetup
+setupTest = do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
+  now <- getTime
+
+  -- setup alice with a pre-approval from her validator operator
+  alice <- allocatePartyExact "alice"
+
+  -- Setup a featured exchange party
+  exchangeParty <- allocatePartyExact "exchangeParty"
+  featuredAppRightCid <- AmuletRegistry.featureApp registry exchangeParty
+
+  -- retrieve the create-event blob for the featured app right that the treasuryParty needs to pass in
+  appRightD <- queryDisclosure' @Splice.Amulet.FeaturedAppRight exchangeParty featuredAppRightCid
+
+  -- Setup treasury party for the exchange with some funds
+  treasuryParty <- allocatePartyExact "treasuryParty"
+  AmuletRegistry.tapLockedAndUnlockedFunds registry treasuryParty 1000.0
+  treasuryHoldings <- WalletClient.listHoldings treasuryParty registry.instrumentId
+
+  -- Setup the wallet provider's token standard proxy
+  proxyCid <- submit exchangeParty $ createCmd DelegateProxy with
+    provider = exchangeParty
+    delegate = treasuryParty
+
+  -- Check initial balances
+  WalletClient.checkBalance alice registry.instrumentId 0.0
+  WalletClient.checkBalance treasuryParty registry.instrumentId 1000.0
+
+  return TestSetup with
+    registry
+    now
+    alice
+    exchangeParty
+    treasuryParty
+    treasuryHoldingCids = map fst treasuryHoldings
+    proxyCid
+    proxyDisclosures = appRightD
+    exchangeAppRightCid = toInterfaceContractId featuredAppRightCid
+
+-- NOTE: at the time of writing only Amulet supports one-step deposits;
+-- and these are built such that they generate the featured app activity markers
+-- directly when the transfer is executed.
+--
+-- We expect other tokens that support one-step deposits to behave similarly.
+--
+-- The proxy is therefore only needed for two-step deposits, which we test here.
+test_featured_two_step_deposit : Script ()
+test_featured_two_step_deposit = do
+  TestSetup {..} <- setupTest
+
+  -- fund alice
+  AmuletRegistry.tapLockedAndUnlockedFunds registry alice 100.0
+  aliceHoldings <- WalletClient.listHoldings alice registry.instrumentId
+
+  WalletClient.checkBalance alice registry.instrumentId 100.0
+
+  -- check that a two-step deposit can be executed
+  let depositTransfer = Api.Token.TransferInstructionV1.Transfer with
+        sender = alice
+        receiver = treasuryParty
+        amount = 10.0
+        instrumentId = registry.instrumentId
+        requestedAt = now
+        executeBefore = now `addRelTime` days 1
+        inputHoldingCids = map fst aliceHoldings
+        meta = Metadata with
+          values = TextMap.fromList [("splice.lfdecentralizedtrust.org/reason", "<deposit-account-id>")]
+
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer = depositTransfer
+    extraArgs = emptyExtraArgs
+
+  TextMap.size enrichedChoice.arg.extraArgs.context.values === 2
+  Map.size enrichedChoice.disclosures.disclosures === 3
+
+  -- Trigger a two-step transfer via the token standard
+  submitWithDisclosures' alice enrichedChoice.disclosures $
+    exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+
+  -- the balances haven't changed yet
+  WalletClient.checkBalanceApprox alice registry.instrumentId 100.0
+  WalletClient.checkBalance treasuryParty registry.instrumentId 1000.0
+
+  -- the treasuryParty can see the pending transfer
+  [ (aliceDepositInstrCid, aliceDepositInstrView) ] <- WalletClient.listTransferOffers treasuryParty registry.instrumentId
+  -- all information (including the reason metadata) is visible
+  aliceDepositInstrView.transfer.instrumentId === registry.instrumentId
+  aliceDepositInstrView.transfer.amount === 10.0
+  aliceDepositInstrView.transfer.sender === alice
+  aliceDepositInstrView.transfer.receiver === treasuryParty
+  TextMap.lookup "splice.lfdecentralizedtrust.org/reason" aliceDepositInstrView.transfer.meta.values
+    === Some "<deposit-account-id>"
+
+  -- the treasuryParty accepts the transfer via the proxy to get the featured app activity marker
+  context <- RegistryApi.getTransferInstruction_AcceptContext registry aliceDepositInstrCid emptyMetadata
+  submitWithDisclosures' treasuryParty (proxyDisclosures <> context.disclosures) $
+    exerciseCmd proxyCid DelegateProxy_TransferInstruction_Accept with
+      cid = aliceDepositInstrCid
+      proxyArg = ProxyArg with
+        choiceArg =  TransferInstruction_Accept with
+          extraArgs = ExtraArgs with
+            context = context.choiceContext
+            meta = emptyMetadata
+        featuredAppRightCid = exchangeAppRightCid
+        beneficiaries =
+          [ AppRewardBeneficiary with
+              beneficiary = exchangeParty
+              weight = 1.0
+          ]
+          -- NOTE: here you could share some of the rewards with your customers, e.g. by adding
+          -- the customer as a beneficiary with a small weight.
+
+  -- the app activity marker has been created
+  let expectedActivityMarker = Splice.Amulet.FeaturedAppActivityMarker with
+        dso = registry.dso
+        provider = exchangeParty
+        beneficiary = exchangeParty
+        weight = 1.0
+  [(_, actualActivityMarker)] <- query @Splice.Amulet.FeaturedAppActivityMarker exchangeParty
+  actualActivityMarker === expectedActivityMarker
+
+  -- the balances have changed as expected
+  WalletClient.checkBalanceApprox alice registry.instrumentId 90.0
+  WalletClient.checkBalanceApprox treasuryParty registry.instrumentId 1010.0
+
+  pure ()
+
+-- Tests both one-step and two-step withdrawals.
+-- No particular token support is required.
+test_featured_withdrawal : Script ()
+test_featured_withdrawal = script do
+  TestSetup {..} <- setupTest
+
+  -- check that a withdrawal can be executed
+  let withdrawalTransfer = Api.Token.TransferInstructionV1.Transfer with
+        sender = treasuryParty
+        receiver = alice
+        amount = 10.0
+        instrumentId = registry.instrumentId
+        requestedAt = now
+        executeBefore = now `addRelTime` days 1
+        inputHoldingCids = treasuryHoldingCids
+        meta = Metadata with
+          values = TextMap.fromList [("splice.lfdecentralizedtrust.org/reason", "<withdrawal-UUID>")]
+          -- NOTE: if desired you can also add additional metadata using your own metadata keys
+
+
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer = withdrawalTransfer
+    extraArgs = emptyExtraArgs
+
+  -- Trigger an atomic, single-transaction transfer
+  submitWithDisclosures' treasuryParty (proxyDisclosures <> enrichedChoice.disclosures) $ exerciseCmd
+    proxyCid
+    DelegateProxy_TransferFactory_Transfer with
+      cid = enrichedChoice.factoryCid
+      proxyArg = ProxyArg with
+        choiceArg = enrichedChoice.arg
+        featuredAppRightCid = exchangeAppRightCid
+        beneficiaries =
+          [ AppRewardBeneficiary with
+              beneficiary = exchangeParty
+              weight = 1.0
+          ]
+
+  -- there is a featured app activity marker with weight 1.0 for the exchangeParty
+  -- its creation is independent of whether the transfer is a 1-step or multi-step transfer
+  let expectedActivityMarker = Splice.Amulet.FeaturedAppActivityMarker with
+        dso = registry.dso
+        provider = exchangeParty
+        beneficiary = exchangeParty
+        weight = 1.0
+  [(_, actualActivityMarker)] <- query @Splice.Amulet.FeaturedAppActivityMarker exchangeParty
+  actualActivityMarker === expectedActivityMarker
+
+  -- if Alice had setup a pre-approval, then the transfer would already have completed
+  -- she does not, which means that the withdrawal is pending
+  [ (_, aliceInstrView) ] <- WalletClient.listTransferOffers alice registry.instrumentId
+
+  -- the transfers are as expected except for the inputHoldings, which have been updated
+  -- to refer to the locked holding created for the transfer
+  aliceInstrView.transfer with inputHoldingCids = []
+    ===
+    withdrawalTransfer with inputHoldingCids = []
+
+  -- no funds have moved yet
+  WalletClient.checkBalance alice registry.instrumentId 0.0
+  WalletClient.checkBalanceApprox treasuryParty registry.instrumentId 1000.0
+
+  pure ()

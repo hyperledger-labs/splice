@@ -17,8 +17,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * This class contains utilities to decode a <code>CreatedEvent</code> and create a <code>
- * TransactionFilter</code> by provider parties It can only be instantiated with a subtype of <code>
+ * This class contains utilities to decode a <code>CreatedEvent</code> and create an <code>
+ * UpdateFormat</code>, a <code>TransactionFormat</code> or a <code>EventFormat</code> by provided
+ * parties. It can only be instantiated with a subtype of <code>
  * ContractCompanion</code>
  */
 public final class ContractFilter<Ct> {
@@ -110,24 +111,6 @@ public final class ContractFilter<Ct> {
     return companion.fromCreatedEvent(createdEvent);
   }
 
-  /** Method will be removed in 3.4.0 */
-  public TransactionFilter transactionFilter(Optional<Set<String>> parties) {
-    return transactionFilter(filter, parties);
-  }
-
-  private static TransactionFilter transactionFilter(
-      Filter filter, Optional<Set<String>> partiesO) {
-    Map<String, Filter> partyToFilters =
-        partiesO
-            .map(
-                parties ->
-                    parties.stream().collect(Collectors.toMap(Function.identity(), x -> filter)))
-            .orElse(Collections.emptyMap());
-
-    Optional<Filter> anyPartyFilterO = partiesO.isEmpty() ? Optional.of(filter) : Optional.empty();
-    return new TransactionFilter(partyToFilters, anyPartyFilterO);
-  }
-
   public UpdateFormat updateFormat(Optional<Set<String>> parties) {
     return updateFormat(filter, parties, verbose, transactionShape);
   }
@@ -166,8 +149,14 @@ public final class ContractFilter<Ct> {
 
   private static EventFormat eventFormat(
       Filter filter, Optional<Set<String>> partiesO, boolean verbose) {
-    TransactionFilter transactionFilter = transactionFilter(filter, partiesO);
-    return new EventFormat(
-        transactionFilter.getPartyToFilters(), transactionFilter.getAnyPartyFilter(), verbose);
+    Map<String, Filter> partyToFilters =
+        partiesO
+            .map(
+                parties ->
+                    parties.stream().collect(Collectors.toMap(Function.identity(), x -> filter)))
+            .orElse(Collections.emptyMap());
+
+    Optional<Filter> anyPartyFilterO = partiesO.isEmpty() ? Optional.of(filter) : Optional.empty();
+    return new EventFormat(partyToFilters, anyPartyFilterO, verbose);
   }
 }

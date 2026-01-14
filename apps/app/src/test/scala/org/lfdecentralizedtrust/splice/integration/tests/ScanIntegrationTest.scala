@@ -8,6 +8,7 @@ import com.digitalasset.canton.topology.PartyId
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.headers.RawHeader
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
@@ -16,6 +17,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
+  updateAllSvAppFoundDsoConfigs_,
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
@@ -30,7 +32,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.store.Limit
-import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvAppClient
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
@@ -40,14 +42,20 @@ import org.lfdecentralizedtrust.splice.validator.automation.TopupMemberTrafficTr
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 
 import scala.concurrent.{Future, blocking}
-import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.util.{Success, Try}
 
+// this test sets fees to zero, and that only works from 0.1.14 onwards
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_14
 class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeTestUtil {
-  private val defaultPageSize = Limit.MaxPageSize
+  private val defaultPageSize = Limit.DefaultMaxPageSize
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
+      .addConfigTransforms((_, config) =>
+        updateAllSvAppFoundDsoConfigs_(
+          _.copy(zeroTransferFees = true)
+        )(config)
+      )
       .addConfigTransforms((_, config) =>
         (updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
@@ -67,20 +75,26 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
                 "http://testUrl:8081",
               )
             ),
-            parameters =
-              config.parameters.copy(customTimeouts = config.parameters.customTimeouts.map {
+            parameters = config.parameters.copy(
+              customTimeouts = config.parameters.customTimeouts.map {
                 // guaranteeing a timeout for first test below
                 case (key @ "getAcsSnapshot", _) =>
                   key -> NonNegativeFiniteDuration.ofMillis(1L)
                 case other => other
-              }),
+              },
+              // used for the rate limit test
+              rateLimiting = config.parameters.rateLimiting.copy(
+                rateLimiters =
+                  config.parameters.rateLimiting.rateLimiters + ("getAggregatedRounds" -> SpliceRateLimitConfig(
+                    ratePerSecond = 5
+                  ))
+              ),
+            ),
           )
         )(config)
       )
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-          _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
-        )(config)
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
       )
       .withTrafficTopupsEnabled
 
@@ -97,7 +111,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
   "return dso info same as the sv app" in { implicit env =>
     val scan = sv1ScanBackend.getDsoInfo()
     inside(sv1Backend.getDsoInfo()) {
-      case HttpSvAppClient.DsoInfo(
+      case HttpSvPublicAppClient.DsoInfo(
             svUser,
             svParty,
             dsoParty,
@@ -378,15 +392,8 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           balance.unlockedQty shouldBe (walletUsdToAmulet(aliceTapAmount) + transferAmount)
         }
         eventually() {
-          val approxBobFees = walletUsdToAmulet(3) // this value depends on transferAmount
           val balance = bobWalletClient.balance()
-          assertInRange(
-            balance.unlockedQty,
-            (
-              walletUsdToAmulet(bobTapAmount) - transferAmount - approxBobFees,
-              walletUsdToAmulet(bobTapAmount) - transferAmount,
-            ),
-          )
+          balance.unlockedQty shouldBe walletUsdToAmulet(bobTapAmount) - transferAmount
         }
       }
       val bobBalanceAfterTransfer = bobWalletClient.balance()
@@ -409,17 +416,12 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           val transfer = activities.flatMap(_.transfer).loneElement
           val inputAmuletAmount =
             transfer.sender.inputAmuletAmount.map(BigDecimal(_)).getOrElse(BigDecimal(0))
-          val senderChangeFee = BigDecimal(transfer.sender.senderChangeFee)
-          senderChangeFee shouldBe (amuletConfig.amuletCreateFee)
-          val senderFee = BigDecimal(transfer.sender.senderFee)
-          val holdingFees = BigDecimal(transfer.sender.holdingFees)
+          BigDecimal(transfer.sender.senderChangeFee) shouldBe BigDecimal(0)
+          BigDecimal(transfer.sender.senderFee) shouldBe BigDecimal(0)
+          BigDecimal(transfer.sender.holdingFees) shouldBe BigDecimal(0)
+
           val senderChangeAmount = BigDecimal(transfer.sender.senderChangeAmount)
-
-          senderFee shouldBe expectedSenderFee(transferAmount)
-
-          val totalSenderFee = senderFee + holdingFees + senderChangeFee
-
-          inputAmuletAmount - senderChangeAmount shouldBe (transferAmount + totalSenderFee)
+          inputAmuletAmount - senderChangeAmount shouldBe transferAmount
 
           // alice receives transfer
           transfer.receivers
@@ -468,9 +470,9 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       }
       clue("Bob receives self-transfer") {
         eventually() {
-          // a self-transfer should cost some fees.
+          // a self-transfer should not cost any fees.
           val balance = bobWalletClient.balance()
-          balance.unlockedQty should be < bobBalanceAfterTransfer.unlockedQty
+          balance.unlockedQty shouldBe bobBalanceAfterTransfer.unlockedQty
         }
       }
       clue("Bob's self-transfer is shown in scan activity") {
@@ -492,15 +494,14 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           val inputAmuletAmount =
             transfer.sender.inputAmuletAmount.map(BigDecimal(_)).getOrElse(BigDecimal(0))
           val senderChangeFee = BigDecimal(transfer.sender.senderChangeFee)
-          senderChangeFee shouldBe (amuletConfig.amuletCreateFee)
+          senderChangeFee shouldBe BigDecimal(0)
 
           val senderFee = BigDecimal(transfer.sender.senderFee)
-          val holdingFees = BigDecimal(transfer.sender.holdingFees)
+          BigDecimal(transfer.sender.holdingFees) shouldBe BigDecimal(0)
           val senderChangeAmount = BigDecimal(transfer.sender.senderChangeAmount)
-          senderFee shouldBe walletUsdToAmulet(SpliceUtil.defaultCreateFee.fee)
+          senderFee shouldBe BigDecimal(0)
 
-          val totalSenderFee = senderFee + holdingFees + senderChangeFee
-          inputAmuletAmount - senderChangeAmount shouldBe (selfTransferAmount + totalSenderFee)
+          inputAmuletAmount - senderChangeAmount shouldBe selfTransferAmount
 
           BigDecimal(receiver.amount) shouldBe selfTransferAmount
           BigDecimal(receiver.receiverFee) shouldBe BigDecimal(0)
@@ -547,9 +548,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           PartyId
             .tryFromProtoPrimitive(receiver.party) shouldBe (charlieUserParty)
           BigDecimal(receiver.amount) shouldBe transferAmount
-          BigDecimal(receiver.receiverFee) shouldBe expectedSenderFee(
-            transferAmount
-          ) * receiverFeeRatio
+          BigDecimal(receiver.receiverFee) shouldBe BigDecimal(0)
         }
       }
   }
@@ -753,59 +752,86 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     import env.{actorSystem, executionContext}
 
     def doCall() = {
-      sv1ScanBackend.getAcsSnapshot(
-        PartyId.tryCreate("rate-limit-party", dsoParty.namespace),
-        None,
-      )
+      sv1ScanBackend.getAggregatedRounds()
     }
 
-    loggerFactory.suppressWarningsAndErrors {
-      // ignore timeout failures
-      Try {
-        doCall()
-      }.discard
+    loggerFactory.assertLoggedWarningsAndErrorsSeq(
+      {
+        Try {
+          doCall()
+        }.discard
 
-      Threading.sleep(1000) // wait for the rate limiter to start
+        Threading.sleep(1000) // wait for the rate limiter to start
 
-      val results = SpliceRateLimiterTest
-        .runRateLimited(
-          40,
-          200,
-        ) {
-          Future {
-            blocking {
-              doCall()
+        val results = SpliceRateLimiterTest
+          .runRateLimited(
+            10,
+            50,
+          ) {
+            Future {
+              blocking {
+                doCall()
+              }
             }
-          }
-        } futureValue
+          } futureValue
 
-      // 20 is the limit from where the rate limiter starts to kick in
-      // then 20 every second
-      // first second is 20 (full capacity) + 20 (capacity added after consumption)
-      // then 20 every second
-      val maxAccepted = 120
-      // account for bursts in the stream used to rate limit the calls in `runRateLimited`
-      val minAccepted = 60
-      results.count(identity) should (be >= minAccepted and be <= maxAccepted)
+        // 5 is the limit from where the rate limiter starts to kick in
+        // then 5 every second
+        // first second is 5 (full capacity) + 5 (capacity added after consumption)
+        // then 5 every second
+        val maxAccepted = 30
+        // account for bursts in the stream used to rate limit the calls in `runRateLimited`
+        val minAccepted = 10
+        results.count(identity) should (be >= minAccepted and be <= maxAccepted)
 
-    }
-
+      },
+      forAll(_) {
+        _.message should include("Too Many Requests")
+      },
+    )
   }
 
-  def expectedSenderFee(amount: BigDecimal) = {
-    val initialRate = SpliceUtil.defaultTransferFee.initialRate
-    val step1 = SpliceUtil.defaultTransferFee.steps.get(0)
-    val step2 = SpliceUtil.defaultTransferFee.steps.get(1)
-    val step3 = SpliceUtil.defaultTransferFee.steps.get(2)
-    val (step1Amount, step1Mult) = (walletUsdToAmulet(step1._1), step1._2)
-    val (step2Amount, step2Mult) = (walletUsdToAmulet(step2._1), step2._2)
-    // ensuring the right steps are hardcoded here.
-    walletUsdToAmulet(step3._1) should be > amount
-    val steppedRate =
-      initialRate * (amount min step1Amount) +
-        step1Mult * ((amount - step1Amount) max 0 min step2Amount) +
-        step2Mult * ((amount - step1Amount - step2Amount) max 0)
-    walletUsdToAmulet(SpliceUtil.defaultCreateFee.fee) + steppedRate
+  "accept invalid headers" in { implicit env =>
+    import org.apache.pekko.http.scaladsl.model.headers as h
+    import env.actorSystem
+    registerHttpConnectionPoolsCleanup(env)
+
+    // see pekko.http.server.parsing.ignore-illegal-header-for in application.conf
+    // if pekko-http doesn't have a ModeledCompanion, it doesn't have a special parser,
+    // so there is no need to suppress warnings for it
+    val invalidHeaders = Seq[(h.ModeledCompanion[?], String)](
+      (h.Authorization, "Bearer Bearer exxxxxxxxxx"),
+      (h.Cookie, "foo=bar baz"),
+      (h.Origin, "http://foo bar"),
+      (h.`Proxy-Authorization`, "Basic dXNlcjpwYXNz,"), // "user:pass" with trailing comma
+      (h.Referer, "http://foo bar"),
+      (h.`User-Agent`, "OpenAPI-Generator/0.0.1/java"),
+      (h.`X-Forwarded-For`, "1.2.3.4,"),
+      (h.`X-Forwarded-Host`, "a b"),
+      (h.`X-Real-Ip`, "1.2.3.4,"),
+    ).map { case (companion, value) =>
+      val header = RawHeader(companion.name, value)
+      // using `User-Agent` (non-RawHeaders in general) fails the following check;
+      // it cleans away the invalid part of the header,
+      // so we have to use RawHeader to simulate the actual client case
+      header.value shouldBe value
+      import language.existentials
+      companion.parseFromValueString(value) shouldBe a[
+        Left[?, ?]
+      ] withClue s"actual bad value for ${companion.name}"
+      header
+    }
+
+    // SuppressingLogger does not catch the warning (from pekko-http)
+    // if present, it's seen in checkErrors instead
+    val response = Http()
+      .singleRequest(
+        Get(
+          s"${sv1ScanBackend.httpClientConfig.url}/api/scan/v0/splice-instance-names"
+        ).withHeaders(invalidHeaders)
+      )
+      .futureValue
+    response.status shouldBe StatusCodes.OK
   }
 
   def triggerTopupAliceAndBob()(implicit env: SpliceTestConsoleEnvironment): (Boolean, Boolean) = {

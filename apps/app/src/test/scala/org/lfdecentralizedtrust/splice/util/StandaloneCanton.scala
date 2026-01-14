@@ -46,6 +46,7 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
       portsRange: Option[Int] = None,
       extraParticipantsConfigFileNames: Seq[String] = Seq.empty,
       extraParticipantsEnvMap: Map[String, String] = Map.empty,
+      enableBftSequencer: Boolean = IsTheCantonSequencerBFTEnabled,
   )(extraEnv: (String, String)*)(test: => A)(implicit tc: TraceContext): A = {
 
     def conditionalConf(condition: Boolean, filename: String) =
@@ -62,13 +63,13 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
           "standalone-sequencers-mediators-sv123.conf",
         ) ++
         conditionalConf(
-          svs123 && sequencersMediators && IsTheCantonSequencerBFTEnabled,
+          svs123 && sequencersMediators && enableBftSequencer,
           "standalone-sequencers-sv123-extra-enable-bft.conf",
         ) ++
         conditionalConf(sv4 && participants, "standalone-participant-sv4.conf") ++
         conditionalConf(sv4 && sequencersMediators, "standalone-sequencer-mediator-sv4.conf") ++
         conditionalConf(
-          sv4 && sequencersMediators && IsTheCantonSequencerBFTEnabled,
+          sv4 && sequencersMediators && enableBftSequencer,
           "standalone-sequencer-sv4-extra-enable-bft.conf",
         ) ++
         extraParticipantsConfigFileNames.toList.map(testResourcesPath / _)
@@ -83,36 +84,32 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
     val dbNamesEnv = {
       val svDbsSuffix = overrideSvDbsSuffix.getOrElse(dbsSuffix)
       val sequencerDriverDbSuffix = overrideSequencerDriverDbSuffix.getOrElse(dbsSuffix)
-      (1 to 4)
-        .map(i =>
-          Seq(
-            s"SV${i}_PARTICIPANT_DB" -> s"participant_sv${i}_${svDbsSuffix}",
-            s"SV${i}_SEQUENCER_DB_BFT" -> s"sequencer_sv${i}_${svDbsSuffix}_bft",
-            s"SV${i}_SEQUENCER_DB" -> s"sequencer_sv${i}_${svDbsSuffix}",
-            s"SV${i}_MEDIATOR_DB" -> s"mediator_sv${i}_${svDbsSuffix}",
-          )
+      (1 to 4).flatMap(i =>
+        Seq(
+          s"SV${i}_PARTICIPANT_DB" -> s"participant_sv${i}_${svDbsSuffix}",
+          s"SV${i}_SEQUENCER_DB_BFT" -> s"sequencer_sv${i}_${svDbsSuffix}_bft",
+          s"SV${i}_SEQUENCER_DB" -> s"sequencer_sv${i}_${svDbsSuffix}",
+          s"SV${i}_MEDIATOR_DB" -> s"mediator_sv${i}_${svDbsSuffix}",
         )
-        .flatten :+
+      ) :+
         "SEQUENCER_DRIVER_DB" -> s"sequencer_driver_${sequencerDriverDbSuffix}"
     }
 
     val portsEnv = portsRange.fold(Seq(): Seq[(String, String)])(range =>
-      (1 to 4)
-        .map(i =>
-          Seq(
-            s"SV${i}_PARTICIPANT_LEDGER_API_PORT" -> (range * 1000 + i * 100 + 1).toString,
-            s"SV${i}_PARTICIPANT_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 2).toString,
-            s"SV${i}_MEDIATOR_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 7).toString,
-            s"SV${i}_SEQUENCER_PUBLIC_API_PORT" -> (range * 1000 + i * 100 + 8).toString,
-            s"SV${i}_SEQUENCER_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 9).toString,
-          )
+      (1 to 4).flatMap(i =>
+        Seq(
+          s"SV${i}_PARTICIPANT_LEDGER_API_PORT" -> (range * 1000 + i * 100 + 1).toString,
+          s"SV${i}_PARTICIPANT_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 2).toString,
+          s"SV${i}_MEDIATOR_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 7).toString,
+          s"SV${i}_SEQUENCER_PUBLIC_API_PORT" -> (range * 1000 + i * 100 + 8).toString,
+          s"SV${i}_SEQUENCER_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 9).toString,
         )
-        .flatten
+      )
     )
 
     val allExtraEnv =
       (extraEnv ++
-        (1 to 4).map(adminUserEnv(_)).flatten ++
+        (1 to 4).flatMap(adminUserEnv(_)) ++
         portsEnv ++
         dbNamesEnv) ++ extraParticipantsEnvMap.toList
 

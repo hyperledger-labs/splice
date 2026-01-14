@@ -11,15 +11,22 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Pruning,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
-  ClientP2PNetworkManager,
   Env,
   ModuleRef,
+  P2PConnectionEventListener,
+  P2PNetworkManager,
 }
-import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.BftOrderingServiceReceiveRequest
+import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.BftOrderingMessage
 
-final case class P2PNetworkOutModuleDependencies[E <: Env[E]](
-    p2pNetworkManager: ClientP2PNetworkManager[E, BftOrderingServiceReceiveRequest],
-    p2pNetworkIn: ModuleRef[BftOrderingServiceReceiveRequest],
+final case class P2PNetworkOutModuleDependencies[
+    E <: Env[E],
+    P2PNetworkManagerT <: P2PNetworkManager[E, BftOrderingMessage],
+](
+    createP2PNetworkManager: (
+        P2PConnectionEventListener,
+        ModuleRef[BftOrderingMessage],
+    ) => P2PNetworkManagerT,
+    p2pNetworkIn: ModuleRef[BftOrderingMessage],
     mempool: ModuleRef[Mempool.Message],
     availability: ModuleRef[Availability.Message[E]],
     consensus: ModuleRef[Consensus.Message[E]],

@@ -4,9 +4,10 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection
-import org.lfdecentralizedtrust.splice.migration.SynchronizerParametersStateTopologyConnection
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.store.DomainParamsStore
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
@@ -26,10 +27,6 @@ final class DomainParamsIngestionTrigger(
       quiet = true,
     ) {
 
-  private val domainStateTopology = new SynchronizerParametersStateTopologyConnection(
-    participantAdminConnection
-  )
-
   override def completeTask(
       task: PeriodicTaskTrigger.PeriodicTask
   )(implicit tc: TraceContext): Future[TaskOutcome] =
@@ -39,9 +36,12 @@ final class DomainParamsIngestionTrigger(
         Future.successful(TaskNoop)
       case Failure(e) => Future.failed(e)
       case Success(synchronizerId) =>
-        domainStateTopology
-          .firstAuthorizedStateForTheLatestSynchronizerParametersState(synchronizerId)
-          .value
+        participantAdminConnection
+          .lookupSynchronizerParametersState(
+            TopologyStoreId.Synchronizer(synchronizerId),
+            synchronizerId,
+            AuthorizedState,
+          )
           .flatMap {
             case None => Future.successful(TaskNoop)
             case Some(params) =>

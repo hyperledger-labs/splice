@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.participant.admin.data
 
-import better.files.File
 import cats.syntax.either.*
 import com.digitalasset.canton.ReassignmentCounter
 import com.digitalasset.canton.admin.participant.v30
@@ -14,6 +13,7 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.util.{ByteStringUtil, GrpcStreamingUtils, ResourceUtil}
 import com.digitalasset.canton.version.*
+import com.digitalasset.daml.lf.transaction.FatContractInstance
 import com.google.protobuf.ByteString
 
 import java.io.{ByteArrayInputStream, InputStream}
@@ -36,13 +36,21 @@ final case class ActiveContractOld(
 
   override protected lazy val companionObj: ActiveContractOld.type = ActiveContractOld
 
-  private[canton] def withSerializableContract(
-      contract: SerializableContract
-  ): ActiveContractOld =
-    copy(contract = contract)(representativeProtocolVersion)
-
-  private[admin] def toRepairContract: RepairContract =
-    RepairContract(synchronizerId, contract, reassignmentCounter)
+  private[admin] def toRepairContract: RepairContract = {
+    val inst = FatContractInstance.fromCreateNode(
+      contract.toLf,
+      contract.ledgerCreateTime,
+      contract.authenticationData.toLfBytes,
+    )
+    RepairContract(
+      synchronizerId = synchronizerId,
+      contract = inst,
+      reassignmentCounter = reassignmentCounter,
+      // Fine to have the same representative package id as in the original contract since
+      // exports created using ExportAcsOld are not meant to support forgetting the creation package
+      representativePackageId = inst.templateId.packageId,
+    )
+  }
 
 }
 
@@ -51,7 +59,7 @@ object ActiveContractOld extends VersioningCompanion[ActiveContractOld] {
   override def name: String = "ActiveContractOld"
 
   override def versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.ActiveContractOld)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.ActiveContractOld)(
       supportedProtoVersion(_)(fromProtoV30),
       _.toProtoV30,
     )
@@ -84,15 +92,6 @@ object ActiveContractOld extends VersioningCompanion[ActiveContractOld] {
       protocolVersionRepresentativeFor(protocolVersion)
     )
 
-  // TODO(#24728) - Remove, do not depend on reading ACS from file directly
-  private[canton] def fromFile(fileInput: File): Iterator[ActiveContractOld] =
-    ResourceUtil.withResource(fileInput.newGzipInputStream(8192)) { fileInput =>
-      loadFromSource(fileInput) match {
-        case Left(error) => throw new Exception(error)
-        case Right(value) => value.iterator
-      }
-    }
-
   def loadFromByteString(
       bytes: ByteString
   ): Either[String, List[ActiveContractOld]] =
@@ -116,5 +115,4 @@ object ActiveContractOld extends VersioningCompanion[ActiveContractOld] {
         source,
         ActiveContractOld,
       )
-      .map(_.toList)
 }

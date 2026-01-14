@@ -5,7 +5,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
 import org.lfdecentralizedtrust.splice.integration.tests.AppUpgradeIntegrationTest.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
+}
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import org.lfdecentralizedtrust.splice.util.{
   PostgresAroundEach,
@@ -22,7 +25,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.BalanceChangeTxLogEntry
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.store.TimeQuery.HeadState
 import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
@@ -42,7 +45,10 @@ class AppUpgradeIntegrationTest
     with PostgresAroundEach
     with ProcessTestUtil
     with SplitwellTestUtil
-    with WalletTestUtil {
+    with WalletTestUtil
+    with WalletTxLogTestUtil {
+
+  override protected def runEventHistorySanityCheck: Boolean = false
 
   private val splitwellDarPathV1 =
     s"daml/splitwell/.daml/dist/splitwell-base.dar"
@@ -174,7 +180,7 @@ class AppUpgradeIntegrationTest
 
           val bobTxsBeforeUpgrade =
             clue("Check that bob validator can see the tap in the wallet tx history") {
-              val txs = bobValidatorWalletClient.listTransactions(None, 10)
+              val txs = withoutDevNetTopups(bobValidatorWalletClient.listTransactions(None, 10))
               inside(txs(0)) { case logEntry: BalanceChangeTxLogEntry =>
                 logEntry.amount shouldBe walletUsdToAmulet(BigDecimal(1_000_001))
               }
@@ -189,7 +195,8 @@ class AppUpgradeIntegrationTest
           }
 
           clue("Check that bob still sees the same wallet tx history") {
-            val txsAfter = bobValidatorWalletClient.listTransactions(None, 10)
+            val txsAfter =
+              withoutDevNetTopups(bobValidatorWalletClient.listTransactions(None, 10))
             txsAfter should contain allElementsOf bobTxsBeforeUpgrade
           }
 
@@ -517,15 +524,17 @@ class AppUpgradeIntegrationTest
     }
   }
 
-  private def vettedPackages(participant: ParticipantClientReference) = {
+  private def vettedPackages(
+      participant: ParticipantClientReference
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     participant.topology.vetted_packages
       .list(
         filterParticipant = participant.id.filterString,
         timeQuery = HeadState,
-        store = Some(Authorized),
+        store = Some(TopologyStoreId.Synchronizer(decentralizedSynchronizerId)),
       )
       .flatMap(_.item.packages)
-      .filter(_.validFrom.forall(_.isBefore(CantonTimestamp.now())))
+      .filter(_.validFromInclusive.forall(_.isBefore(CantonTimestamp.now())))
   }
 }
 

@@ -115,6 +115,7 @@ export function installCometBftNode(
       ...nodeConfig,
       keysSecret: keysSecret ? keysSecret.metadata.name : '',
       enableTimeoutCommit,
+      retainBlocks: svConfiguration.pruning?.cometbft?.retainBlocks || 0,
     },
     logLevel: svConfiguration.logging?.cometbftLogLevel,
     stateSync: {
@@ -139,11 +140,12 @@ export function installCometBftNode(
     },
     extraLogLevelFlags: svConfiguration.logging?.cometbftExtraLogLevelFlags,
     serviceAccountName: imagePullServiceAccountName,
+    resources: svConfiguration.cometbft?.resources,
   });
   const svIdentifier = nodeConfigs.selfSvNodeName;
   const svIdentifierWithMigration = `${svIdentifier}-m${migrationId}`;
   let volumeDependecies: Resource[] = [];
-  if (svConfiguration?.cometbft) {
+  if (svConfiguration?.cometbft?.snapshotName) {
     const volumeSize = cometbftChartValues.db.volumeSize;
     const diskSnapshot = gcp.compute.getSnapshot({
       name: svConfiguration.cometbft.snapshotName,

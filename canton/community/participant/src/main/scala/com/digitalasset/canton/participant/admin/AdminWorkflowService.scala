@@ -7,7 +7,7 @@ import cats.syntax.either.*
 import com.daml.ledger.api.v2.reassignment.Reassignment
 import com.daml.ledger.api.v2.state_service.ActiveContract
 import com.daml.ledger.api.v2.transaction.Transaction
-import com.daml.ledger.api.v2.transaction_filter.TransactionFilter
+import com.daml.ledger.api.v2.transaction_filter.EventFormat
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.participant.ledger.api.client.CommandResult
 import com.digitalasset.canton.tracing.TraceContext
@@ -18,8 +18,8 @@ import scala.util.chaining.scalaUtilChainingOps
   */
 trait AdminWorkflowService extends NamedLogging with AutoCloseable {
 
-  /** The filters for this service */
-  private[admin] def filters: TransactionFilter
+  /** The event format for this service */
+  private[admin] def eventFormat: EventFormat
 
   /** Processing the transaction must not block; shutdown problems occur otherwise. Long-running
     * computations or blocking calls should be spawned off into an asynchronous computation so that
@@ -39,9 +39,9 @@ trait AdminWorkflowService extends NamedLogging with AutoCloseable {
       operation: String
   )(result: CommandResult)(implicit traceContext: TraceContext): Either[String, Unit] =
     result match {
-      case CommandResult.Success(transactionId) =>
+      case CommandResult.Success(updateId) =>
         logger.info(
-          s"Successfully submitted $operation with transactionId=$transactionId, waiting for response"
+          s"Successfully submitted $operation with updateId=$updateId, waiting for response"
         )
         Either.unit[String]
       case CommandResult.Failed(_, errorStatus) =>

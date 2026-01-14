@@ -20,7 +20,7 @@ class DamlCIUpgradeVotePreflightTest
       "sv1",
       "sv2",
       "sv3",
-      "sv4",
+      "svda1",
       "sv",
     )
     with SvUiPreflightIntegrationTestUtil
@@ -48,12 +48,12 @@ class DamlCIUpgradeVotePreflightTest
       val now = Instant.now()
 
       clue(s"sv1 create vote request") {
-        withWebUiSv(1) { implicit webDriver =>
-          click on "navlink-votes"
+        withWebUiSv("sv1") { implicit webDriver =>
+          eventuallyClickOn(id("navlink-votes"))
           val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
           dropDownAction.selectByValue("CRARC_SetConfig")
 
-          click on "action-change-dialog-proceed"
+          eventuallyClickOn(id("action-change-dialog-proceed"))
 
           // 20m to be effective so as to give enough time to upgrade the SV and Validator runbooks.
           // The expiration doesn't matter so as long as it's enough for SVs to vote, but it needs to be less than the effective date.
@@ -98,24 +98,26 @@ class DamlCIUpgradeVotePreflightTest
       }
 
       clue("Other svs vote in favor") {
-        val svsF = Seq(2, 3, 4).map(withWebUiSv[Unit]) :+ withWebUiSvRunbook[Unit]
+        val svsF = Seq("sv2", "sv3", "svda1").map(withWebUiSv[Unit]) :+ withWebUiSvRunbook[Unit]
         svsF.par.foreach { svF =>
           svF { implicit webDriver =>
-            click on "navlink-votes"
-            click on "tab-panel-action-needed"
-            click on className("vote-row-action")
-            click on "cast-vote-button"
-            click on "accept-vote-button"
-            click on "save-vote-button"
-            click on "vote-confirmation-dialog-accept-button"
+            eventuallySucceeds() {
+              eventuallyClickOn(id("navlink-votes"))
+              eventuallyClickOn(id("tab-panel-action-needed"))
+              eventuallyClickOn(className("vote-row-action"))
+            }
+            eventuallyClickOn(id("cast-vote-button"))
+            eventuallyClickOn(id("accept-vote-button"))
+            eventuallyClickOn(id("save-vote-button"))
+            eventuallyClickOn(id("vote-confirmation-dialog-accept-button"))
           }
         }
       }
 
       clue("The request is displayed in the in progress section") {
-        withWebUiSv(1) { implicit webDriver =>
-          click on "navlink-votes"
-          click on "tab-panel-in-progress"
+        withWebUiSv("sv1") { implicit webDriver =>
+          eventuallyClickOn(id("navlink-votes"))
+          eventuallyClickOn(id("tab-panel-in-progress"))
 
           val tbody = find(id("sv-voting-in-progress-table-body"))
           inside(tbody) { case Some(tb) =>

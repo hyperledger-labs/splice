@@ -51,8 +51,9 @@ import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.sequencing.client.{SendAsyncClientError, SequencerClient}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ContractValidator
 import com.digitalasset.canton.util.ShowUtil.*
 import org.slf4j.event.Level
 
@@ -62,10 +63,11 @@ import scala.concurrent.ExecutionContext
 class TransactionProcessor(
     override val participantId: ParticipantId,
     confirmationRequestFactory: TransactionConfirmationRequestFactory,
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     damle: DAMLe,
     staticSynchronizerParameters: StaticSynchronizerParameters,
     crypto: SynchronizerCryptoClient,
+    contractValidator: ContractValidator,
     sequencerClient: SequencerClient,
     inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTracker,
     ephemeral: SyncEphemeralState,
@@ -77,6 +79,7 @@ class TransactionProcessor(
     packageResolver: PackageResolver,
     override val testingConfig: TestingConfigInternal,
     promiseFactory: PromiseUnlessShutdownFactory,
+    messagePayloadLoggingEnabled: Boolean,
 )(implicit val ec: ExecutionContext)
     extends ProtocolProcessor[
       TransactionProcessingSteps.SubmissionParam,
@@ -91,23 +94,22 @@ class TransactionProcessor(
         new TransactionConfirmationResponsesFactory(
           participantId,
           synchronizerId,
-          staticSynchronizerParameters.protocolVersion,
           loggerFactory,
         ),
         ModelConformanceChecker(
           damle,
           confirmationRequestFactory.transactionTreeFactory,
-          ContractAuthenticator(crypto.pureCrypto),
+          contractValidator,
           participantId,
           packageResolver,
+          crypto.pureCrypto,
           loggerFactory,
         ),
         staticSynchronizerParameters,
         crypto,
         metrics,
-        ContractAuthenticator(crypto.pureCrypto),
         damle.enrichTransaction,
-        damle.enrichCreateNode,
+        damle.enrichContract,
         new AuthorizationValidator(participantId),
         new InternalConsistencyChecker(
           loggerFactory
@@ -115,13 +117,12 @@ class TransactionProcessor(
         commandProgressTracker,
         loggerFactory,
         futureSupervisor,
+        messagePayloadLoggingEnabled,
       ),
       inFlightSubmissionSynchronizerTracker,
       ephemeral,
       crypto,
       sequencerClient,
-      synchronizerId,
-      staticSynchronizerParameters.protocolVersion,
       loggerFactory,
       futureSupervisor,
       promiseFactory,
@@ -140,7 +141,7 @@ class TransactionProcessor(
       transactionMeta: TransactionMeta,
       keyResolver: LfKeyResolver,
       transaction: WellFormedTransaction[WithoutSuffixes],
-      disclosedContracts: Map[LfContractId, SerializableContract],
+      disclosedContracts: Map[LfContractId, ContractInstance],
       topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
@@ -372,10 +373,10 @@ object TransactionProcessor {
     )
     object TimeoutError
         extends ErrorCode(id = "NOT_SEQUENCED_TIMEOUT", ErrorCategory.ContentionOnSharedResources) {
-      final case class Error(timestamp: CantonTimestamp)
+      final case class Error()
           extends TransactionErrorImpl(
             cause =
-              "Transaction was not sequenced within the pre-defined max sequencing time and has therefore timed out"
+              s"Transaction was not sequenced within the pre-defined max sequencing time and has therefore timed out"
           )
           with TransactionSubmissionError
     }
@@ -391,7 +392,7 @@ object TransactionProcessor {
         ) {
       final case class Error(
           topologySnapshotTimestamp: CantonTimestamp,
-          chosenSynchronizerId: SynchronizerId,
+          chosenSynchronizerId: PhysicalSynchronizerId,
       ) extends TransactionErrorImpl(
             cause = "There are no active mediators on the synchronizer"
           )
@@ -460,8 +461,10 @@ object TransactionProcessor {
     }
   }
 
-  final case class SynchronizerParametersError(synchronizerId: SynchronizerId, context: String)
-      extends TransactionProcessorError {
+  final case class SynchronizerParametersError(
+      synchronizerId: PhysicalSynchronizerId,
+      context: String,
+  ) extends TransactionProcessorError {
     override protected def pretty: Pretty[SynchronizerParametersError] = prettyOfClass(
       param("synchronizer", _.synchronizerId),
       param("context", _.context.unquoted),
@@ -475,12 +478,12 @@ object TransactionProcessor {
   }
 
   final case class ViewParticipantDataError(
-      transactionId: TransactionId,
+      updateId: UpdateId,
       viewHash: ViewHash,
       error: String,
   ) extends TransactionProcessorError {
     override protected def pretty: Pretty[ViewParticipantDataError] = prettyOfClass(
-      param("transaction id", _.transactionId),
+      param("update id", _.updateId),
       param("view hash", _.viewHash),
       param("error", _.error.unquoted),
     )
@@ -501,5 +504,4 @@ object TransactionProcessor {
   type TransactionSubmissionFailure = TransactionSubmissionFailure.type
   final case class TransactionSubmissionUnknown(maxSequencingTime: CantonTimestamp)
       extends TransactionSubmissionResult
-  type TransactonSubmissionUnknown = TransactionSubmissionUnknown.type
 }

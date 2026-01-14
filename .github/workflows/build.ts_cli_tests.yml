@@ -10,7 +10,7 @@ jobs:
   ts_cli_tests:
     runs-on: self-hosted-k8s-small
     container:
-      image: digitalasset-canton-network-docker.jfrog.io/digitalasset/splice-test-ci:0.3.12
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
 
     steps:
 
@@ -20,24 +20,24 @@ jobs:
           # Checkout the PR head commit to get the commit message first
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Check out repository code
-        uses: actions/checkout@v4
-        if: inputs.commit_sha != ''
-        with:
-          ref: ${{ inputs.commit_sha }}
-
       - name: Check if static only
         uses: ./.github/actions/tests/skip_on_static
         id: skip
         with:
           gh_token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        if: inputs.commit_sha != ''
+        with:
+          ref: ${{ inputs.commit_sha }}
+
       - name: Setup
         id: setup
         if: steps.skip.outputs.skip != 'true'
         uses: ./.github/actions/tests/common_test_setup
         with:
-          test_name: ui_tests
+          test_name: ts_cli
           oss_only: true
 
       - name: Run Token Standard CLI tests

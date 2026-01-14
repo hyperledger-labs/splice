@@ -13,3 +13,7 @@ approvedSvIdentities:
         weight: 100000
       - beneficiary: "Broadridge-validator-1::1220c89a73e7b47f16dfb48a521eeedfe2a8620ea1b19b815ab427388d9f5427faa5"
         weight: 50000
+  - name: Digital-Asset-1
+    publicKey: THIS_IS_THE_WRONG_KEY
+    # this is the right reward weight though
+    rewardWeightBps: 150000

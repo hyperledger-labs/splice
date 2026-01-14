@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.integration.tests
 
+import cats.syntax.either.*
 import com.daml.ledger.api.v2 as proto
 import com.daml.ledger.api.v2.completion.Completion
 import com.daml.ledger.api.v2.event.CreatedEvent
@@ -24,11 +25,8 @@ import com.digitalasset.canton.console.LocalParticipantReference
 import com.digitalasset.canton.crypto.TestSalt
 import com.digitalasset.canton.data.ViewPosition
 import com.digitalasset.canton.examples.java.iou.{Amount, GetCash, Iou}
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.tests.ActiveContractsIntegrationTest.*
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.GrpcAdminCommandSupport.ParticipantReferenceOps
@@ -40,6 +38,7 @@ import com.digitalasset.canton.integration.util.{
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
+  ConfigTransforms,
   EnvironmentDefinition,
   SharedEnvironment,
   TestConsoleEnvironment,
@@ -48,18 +47,20 @@ import com.digitalasset.canton.ledger.api.validation.{StricterValueValidator, Va
 import com.digitalasset.canton.participant.admin.data.RepairContract
 import com.digitalasset.canton.participant.util.JavaCodegenUtil.ContractIdSyntax
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
+import com.digitalasset.canton.protocol.ContractIdAbsolutizer.ContractIdAbsolutizationDataV1
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import com.digitalasset.canton.{BaseTest, ReassignmentCounter, config, protocol}
+import com.digitalasset.canton.topology.{PartyId, PhysicalSynchronizerId, SynchronizerId}
+import com.digitalasset.canton.util.TestContractHasher
+import com.digitalasset.canton.{BaseTest, ReassignmentCounter, config}
 import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.transaction.Versioned
+import com.digitalasset.daml.lf.transaction.CreationTime
 import com.digitalasset.daml.lf.transaction.test.TestNodeBuilder
 import org.scalatest.Assertion
 
 import java.util.UUID
 import scala.collection.concurrent.TrieMap
+import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 
 class ActiveContractsIntegrationTest
@@ -71,7 +72,7 @@ class ActiveContractsIntegrationTest
 
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2"), Set("sequencer3"))
@@ -86,6 +87,10 @@ class ActiveContractsIntegrationTest
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2_S1M1_S1M1_S1M1
+      .addConfigTransforms(
+        // Ensure reassignments are not tripped up by some participants being a little behind.
+        ConfigTransforms.updateTargetTimestampForwardTolerance(30.seconds)
+      )
       .withSetup { implicit env =>
         import env.*
 
@@ -115,11 +120,16 @@ class ActiveContractsIntegrationTest
           )
         } yield p.synchronizers.connect_local(d, alias = a)
 
-        party1a = participant1.parties.enable("party1")
-        party1b = participant1.parties.enable("party1b")
-        party2 = participant2.parties.enable("party2")
+        Seq(daName, acmeName, repairSynchronizerName).foreach { alias =>
+          party1a = participant1.parties.enable("party1", synchronizer = alias)
+          party1b = participant1.parties.enable("party1b", synchronizer = alias)
+          party2 = participant2.parties.enable("party2", synchronizer = alias)
+        }
 
-        participants.all.dars.upload(BaseTest.CantonExamplesPath)
+        participants.all.dars.upload(BaseTest.CantonExamplesPath, synchronizerId = daId)
+        participants.all.dars.upload(BaseTest.CantonExamplesPath, synchronizerId = acmeId)
+        participants.all.dars
+          .upload(BaseTest.CantonExamplesPath, synchronizerId = repairSynchronizerId)
       }
 
   protected def getActiveContracts(
@@ -135,7 +145,7 @@ class ActiveContractsIntegrationTest
     )
 
   private def create(
-      synchronizerId: SynchronizerId,
+      psid: PhysicalSynchronizerId,
       signatory: PartyId,
       observer: PartyId,
   )(implicit
@@ -143,16 +153,16 @@ class ActiveContractsIntegrationTest
   ): ContractData = {
     import env.*
     val (contract, createUpdate, _) =
-      IouSyntax.createIouComplete(participant1, Some(synchronizerId))(signatory, observer)
+      IouSyntax.createIouComplete(participant1, Some(psid))(signatory, observer)
 
-    val createdEvent = createUpdate.eventsById.values.head.getCreated
+    val createdEvent = createUpdate.events.head.getCreated
 
     ContractData(contract, createdEvent)
 
   }
 
   private def createViaRepair(
-      synchronizerId: SynchronizerId,
+      psid: PhysicalSynchronizerId,
       signatory: PartyId,
       observer: PartyId,
   )(implicit
@@ -160,10 +170,14 @@ class ActiveContractsIntegrationTest
   ): ContractData = {
     import env.*
 
+    // TODO(#27612) Test should also pass with V12 contract IDs
     val cantonContractIdVersion = AuthenticatedContractIdVersionV11
 
     val pureCrypto = participant1.underlying.map(_.cryptoPureApi).value
-    val unicumGenerator = new UnicumGenerator(pureCrypto)
+    val contractIdSuffixer = new ContractIdSuffixer(pureCrypto, cantonContractIdVersion)
+    val ledgerCreateTime = CreationTime.CreatedAt(env.environment.clock.now.toLf)
+    val contractIdAbsolutizer =
+      new ContractIdAbsolutizer(pureCrypto, ContractIdAbsolutizationDataV1)
 
     val createIou = new Iou(
       signatory.toProtoPrimitive,
@@ -178,78 +192,59 @@ class ActiveContractsIntegrationTest
     val lfTemplate = ValueValidator
       .validateIdentifier(Identifier.fromJavaProto(Iou.TEMPLATE_ID_WITH_PACKAGE_ID.toProto))
       .getOrElse(throw new IllegalStateException)
-
-    val signatories = Set(signatory.toLf)
-    val observers = Set(observer.toLf)
-
-    val contractMetadata =
-      ContractMetadata.tryCreate(signatories, signatories ++ observers, None)
-
     val packageName = Ref.PackageName.assertFromString("CantonExamples")
 
-    val contractInst = LfContractInst(
-      packageName = packageName,
-      template = lfTemplate,
-      arg = Versioned(protocol.DummyTransactionVersion, lfArguments),
-    )
-
-    val ledgerCreateTime = env.environment.clock.now
-    val (contractSalt, unicum) = unicumGenerator.generateSaltAndUnicum(
-      synchronizerId = synchronizerId,
-      mediator = MediatorGroupRecipient(MediatorGroupIndex.one),
-      transactionUuid = new UUID(1L, 1L),
-      viewPosition = ViewPosition(List.empty),
-      viewParticipantDataSalt = TestSalt.generateSalt(1),
-      createIndex = 0,
-      ledgerCreateTime = LedgerCreateTime(ledgerCreateTime),
-      metadata = contractMetadata,
-      suffixedContractInstance = ExampleTransactionFactory.asSerializableRaw(contractInst),
-      cantonContractIdVersion,
-    )
-
-    lazy val contractId = cantonContractIdVersion.fromDiscriminator(
-      ExampleTransactionFactory.lfHash(1337),
-      unicum,
-    )
-
-    val createNode = TestNodeBuilder.create(
-      id = contractId,
+    val unsuffixedContractId = LfContractId.V1(ExampleTransactionFactory.lfHash(1337))
+    val unsuffixedCreateNode = TestNodeBuilder.create(
+      id = unsuffixedContractId,
       templateId = lfTemplate,
       argument = lfArguments,
-      signatories = signatories,
-      observers = observers,
+      signatories = Set(signatory.toLf),
+      observers = Set(observer.toLf),
       packageName = packageName,
     )
 
+    val contractSalt = ContractSalt.createV1(pureCrypto)(
+      transactionUuid = new UUID(1L, 1L),
+      psid = psid,
+      mediator = MediatorGroupRecipient(MediatorGroupIndex.one),
+      viewParticipantDataSalt = TestSalt.generateSalt(1),
+      createIndex = 0,
+      viewPosition = ViewPosition(List.empty),
+    )
+    val contractHash =
+      TestContractHasher.Sync.hash(unsuffixedCreateNode, contractIdSuffixer.contractHashingMethod)
+    val ContractIdSuffixer.RelativeSuffixResult(suffixedCreateNode, _, _, authenticationData) =
+      contractIdSuffixer
+        .relativeSuffixForLocalContract(
+          contractSalt,
+          ledgerCreateTime,
+          unsuffixedCreateNode,
+          contractHash,
+        )
+        .valueOr(err => fail("Failed to create contract suffix: " + err))
+    val suffixedFci = LfFatContractInst
+      .fromCreateNode(suffixedCreateNode, ledgerCreateTime, authenticationData.toLfBytes)
+    val absolutizedFci = contractIdAbsolutizer.absolutizeFci(suffixedFci).value
     val repairContract = RepairContract(
-      synchronizerId,
-      contract = SerializableContract(
-        contractId = contractId,
-        contractInstance = createNode.versionedCoinst,
-        metadata = ContractMetadata.tryCreate(
-          signatories = Set(signatory.toLf),
-          stakeholders = Set(signatory.toLf, observer.toLf),
-          maybeKeyWithMaintainersVersioned = None,
-        ),
-        ledgerTime = ledgerCreateTime,
-        contractSalt = contractSalt.unwrap,
-      ).getOrElse(throw new IllegalStateException),
+      psid,
+      absolutizedFci,
       ReassignmentCounter(0),
+      absolutizedFci.templateId.packageId,
     )
 
-    val startOffset =
-      participant1.ledger_api.state.end()
+    val startOffset = participant1.ledger_api.state.end()
     participant1.synchronizers.disconnect_all()
 
     participant1.repair.add(
-      synchronizerId,
+      psid,
       testedProtocolVersion,
       Seq(repairContract),
     )
     participant1.synchronizers.reconnect_all()
     val createdEvent = eventually() {
       val endOffset = participant1.ledger_api.state.end()
-      val updates = participant1.ledger_api.updates.flat(
+      val updates = participant1.ledger_api.updates.transactions(
         partyIds = Set(signatory),
         completeAfter = Int.MaxValue,
         beginOffsetExclusive = startOffset,
@@ -261,7 +256,7 @@ class ActiveContractsIntegrationTest
     ContractData(contract, createdEvent)
   }
 
-  private def submitAssignment(
+  private def submitAssignments(
       out: UnassignedWrapper,
       submitter: PartyId,
       participantOverride: Option[LocalParticipantReference],
@@ -269,7 +264,7 @@ class ActiveContractsIntegrationTest
       env: TestConsoleEnvironment
   ): (AssignedWrapper, Completion) =
     assign(
-      unassignId = out.unassignId,
+      reassignmentId = out.reassignmentId,
       source = SynchronizerId.tryFromString(out.source),
       target = SynchronizerId.tryFromString(out.target),
       submittingParty = submitter.toLf,
@@ -483,7 +478,7 @@ class ActiveContractsIntegrationTest
       )
 
       // Submit the assignments
-      val (assignment1, _) = submitAssignment(unassignment1, observer, Some(participant2))
+      val (assignment1, _) = submitAssignments(unassignment1, observer, Some(participant2))
 
       checkACS(participant2, assignment1.reassignment.offset)(
         activationFromCreate = Seq((contract3.createdEvent, acmeId, ReassignmentCounter(0))),
@@ -491,7 +486,7 @@ class ActiveContractsIntegrationTest
         incompletesUnassigned = Seq(2),
       )
 
-      val (assignment2, _) = submitAssignment(unassignment2, observer, Some(participant2))
+      val (assignment2, _) = submitAssignments(unassignment2, observer, Some(participant2))
 
       // wait until participant2 is synchronized
       eventually() {
@@ -596,7 +591,7 @@ class ActiveContractsIntegrationTest
       unassignment1.events.loneElement.reassignmentCounter shouldBe 1
       getReassignmentCountersFromACS() shouldBe List(1)
 
-      val (assignment1, _) = submitAssignment(unassignment1, signatory, Some(participant1))
+      val (assignment1, _) = submitAssignments(unassignment1, signatory, Some(participant1))
       assignment1.events.loneElement.reassignmentCounter shouldBe 1
       getReassignmentCountersFromACS() shouldBe List(1)
 
@@ -610,7 +605,7 @@ class ActiveContractsIntegrationTest
       unassignment2.events.loneElement.reassignmentCounter shouldBe 2
       getReassignmentCountersFromACS() shouldBe List(2)
 
-      val (assignment2, _) = submitAssignment(unassignment2, signatory, Some(participant1))
+      val (assignment2, _) = submitAssignments(unassignment2, signatory, Some(participant1))
       assignment2.events.loneElement.reassignmentCounter shouldBe 2
       getReassignmentCountersFromACS() shouldBe List(2)
 
@@ -705,12 +700,7 @@ class ActiveContractsIntegrationTest
 
       val contractTemplate = TemplateId.fromJavaProtoIdentifier(Iou.TEMPLATE_ID.toProto)
       // LAPI server throws if the template is not found, so we just get an unused but valid template ID here
-      val otherTemplate = TemplateId(
-        packageId = GetCash.PACKAGE_ID,
-        moduleName = GetCash.TEMPLATE_ID.getModuleName,
-        entityName = GetCash.TEMPLATE_ID.getEntityName,
-      )
-
+      val otherTemplate = TemplateId.fromJavaProtoIdentifier(GetCash.TEMPLATE_ID.toProto)
       val (out, _) = unassign(
         cid = contract.cid,
         source = daId,
@@ -746,7 +736,7 @@ class ActiveContractsIntegrationTest
       checkACS(activeOn = None, incompleteReassignment = true, Seq()) // no filtering
       checkACS(activeOn = None, incompleteReassignment = false, Seq(otherTemplate))
 
-      val (in, _) = submitAssignment(out, party, Some(participant1))
+      val (in, _) = submitAssignments(out, party, Some(participant1))
 
       checkACS(activeOn = Some(in), incompleteReassignment = false, Seq(contractTemplate))
       checkACS(
@@ -808,7 +798,7 @@ class ActiveContractsIntegrationTest
       checkACS(activeOn = None, incompleteReassignment = true, otherParty)
       checkACS(activeOn = None, incompleteReassignment = false, otherParty)
 
-      val (in, _) = submitAssignment(out, party, Some(participant1))
+      val (in, _) = submitAssignments(out, party, Some(participant1))
 
       checkACS(activeOn = Some(in), incompleteReassignment = false, party)
       checkACS(activeOn = None, incompleteReassignment = false, otherParty)
@@ -826,9 +816,7 @@ class ActiveContractsIntegrationTest
           StateService.getActiveContracts(
             proto.state_service.GetActiveContractsRequest(
               activeAtOffset = bigOffset,
-              filter = Some(getTransactionFilter(List(party1a.toLf))),
-              verbose = false,
-              eventFormat = None,
+              eventFormat = Some(getEventFormat(List(party1a.toLf))),
             )
           )
         )
@@ -846,18 +834,19 @@ class ActiveContractsIntegrationTest
       startFromExclusive: Long,
   ) = {
     val unassignedUniqueId = participant.ledger_api.updates
-      .flat(
-        Set(observer),
+      .reassignments(
+        partyIds = Set(observer),
+        filterTemplates = Seq.empty,
         beginOffsetExclusive = startFromExclusive,
         completeAfter = PositiveInt.one,
         resultFilter = _.isUnassignment,
       )
       .collect { case unassigned: UnassignedWrapper =>
-        (unassigned.source, unassigned.unassignId)
+        (unassigned.source, unassigned.reassignmentId)
       }
       .loneElement
 
-    unassignedUniqueId shouldBe (out.source, out.unassignId)
+    unassignedUniqueId shouldBe (out.source, out.reassignmentId)
   }
 }
 

@@ -3,14 +3,16 @@
 
 package com.digitalasset.canton.interactive
 
+import cats.data.{EitherT, NonEmptySet}
 import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher.PackageResolver
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.digitalasset.daml.lf.engine.*
 import com.digitalasset.daml.lf.language.Ast.Package
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, Node, VersionedTransaction}
+import com.digitalasset.daml.lf.transaction.{FatContractInstance, VersionedTransaction}
 
+import scala.collection.immutable.SortedSet
 import scala.concurrent.ExecutionContext
 
 object InteractiveSubmissionEnricher {
@@ -22,7 +24,7 @@ class InteractiveSubmissionEnricher(engine: Engine, packageResolver: PackageReso
     engine,
     // TODO(i21582) Because we do not hash suffixed CIDs, we need to disable validation of suffixed CIDs otherwise enrichment
     // will fail
-    requireContractIdSuffix = false,
+    forbidLocalContractIds = false,
     // Add type info for the pretty-printed prepared transaction
     addTypeInfo = true,
     // Add field names for the pretty-printed prepared transaction
@@ -42,19 +44,20 @@ class InteractiveSubmissionEnricher(engine: Engine, packageResolver: PackageReso
 
   /** Enrich FCI with type info and labels. Leave out trailing none fields.
     */
-  def enrichContract(contract: FatContractInstance)(implicit
+  def enrichContract(contract: FatContractInstance, targetPackageIds: Set[PackageId])(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): FutureUnlessShutdown[FatContractInstance] =
-    consumeEnricherResult(enricher.enrichContract(contract))
-
-  /** Enrich create node with type info and labels. Leave out trailing none fields.
-    */
-  def enrichCreateNode(create: Node.Create)(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): FutureUnlessShutdown[Node.Create] =
-    consumeEnricherResult(enricher.enrichCreate(create))
+  ): EitherT[FutureUnlessShutdown, String, FatContractInstance] =
+    for {
+      packageIds <- EitherT.fromEither[FutureUnlessShutdown](
+        NonEmptySet
+          .fromSet(SortedSet.from(targetPackageIds))
+          .toRight("No target package ids provided")
+      )
+      enriched <- EitherT(
+        consumeEnricherResult(enricher.enrichContractWithPackages(contract, packageIds))
+      )
+    } yield enriched
 
   private[this] def consumeEnricherResult[V](
       result: Result[V]

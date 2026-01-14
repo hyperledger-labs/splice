@@ -10,7 +10,8 @@ import com.digitalasset.canton.config.RequireTypes.{Port, RefinedNumeric}
 import com.digitalasset.canton.data.{DeduplicationPeriod, LedgerTimeBoundaries}
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.UniqueIdentifier
-import com.digitalasset.canton.tracing.{TraceContext, W3CTraceContext}
+import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
+import com.digitalasset.canton.tracing.{TraceContext, Traced, W3CTraceContext}
 import com.digitalasset.canton.util.ShowUtil.HashLength
 import com.digitalasset.canton.util.{ErrorUtil, HexString}
 import com.digitalasset.canton.{LedgerUserId, LfPartyId, LfTimestamp, LfVersioned, Uninhabited}
@@ -18,7 +19,7 @@ import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{DottedName, PackageId, QualifiedName}
 import com.digitalasset.daml.lf.transaction.ContractStateMachine.ActiveLedgerState
 import com.digitalasset.daml.lf.transaction.TransactionErrors.*
-import com.digitalasset.daml.lf.transaction.Versioned
+import com.digitalasset.daml.lf.transaction.{CreationTime, Versioned}
 import com.digitalasset.daml.lf.value.Value
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -151,6 +152,11 @@ trait PrettyInstances {
 
   implicit def prettyLfTimestamp: Pretty[LfTimestamp] = prettyOfString(_.toString)
 
+  implicit def prettyCreationTime: Pretty[CreationTime] = prettyOfString {
+    case CreationTime.CreatedAt(timestamp) => timestamp.toString
+    case CreationTime.Now => "now"
+  }
+
   implicit def prettyLfPartyId: Pretty[LfPartyId] = prettyOfString(prettyUidString(_))
 
   implicit def prettyLfHash: Pretty[LfHash] = prettyOfString(_.toHexString.readableHash.toString)
@@ -162,6 +168,8 @@ trait PrettyInstances {
       case Right(uid) => uid.show
       case Left(_) => partyStr
     }
+
+  implicit val prettyTxHash: Pretty[TxHash] = prettyOfClass(unnamedParam(_.hash))
 
   implicit def prettyPackageId: Pretty[PackageId] = prettyOfString(id => show"${id.readableHash}")
 
@@ -202,7 +210,7 @@ trait PrettyInstances {
       lfContractId.toString
   }
 
-  implicit def prettyLfLanguageVersion: Pretty[LfLanguageVersion] = prettyOfString(
+  implicit def prettyLfSerializationVersion: Pretty[LfSerializationVersion] = prettyOfString(
     _.pretty
   )
 
@@ -277,9 +285,11 @@ trait PrettyInstances {
     paramIfDefined("state", _.state.map(_.unquoted)),
   )
 
-  implicit val prettyTraceContext: Pretty[TraceContext] = prettyOfClass(
-    paramIfDefined("trace id", _.traceId.map(_.unquoted)),
-    paramIfDefined("W3C context", _.asW3CTraceContext),
+  implicit val prettyTraceContext: Pretty[TraceContext] = prettyOfString(_.showTraceId.show)
+
+  implicit def prettyTraced[A: Pretty]: Pretty[Traced[A]] = prettyOfClass(
+    unnamedParam(_.value),
+    unnamedParam(_.traceContext),
   )
 
   implicit val prettyKeyInputError: Pretty[KeyInputError] = {
@@ -300,7 +310,7 @@ trait PrettyInstances {
 
   implicit val prettyPort: Pretty[Port] = prettyOfString(_.unwrap.toString)
 
-  implicit val prettyRefinedNumeric: Pretty[RefinedNumeric[_]] = prettyOfString(_.unwrap.toString)
+  implicit val prettyRefinedNumeric: Pretty[RefinedNumeric[?]] = prettyOfString(_.unwrap.toString)
 
   implicit val prettyServingStatus: Pretty[ServingStatus] = prettyOfClass(
     param("status", _.name().singleQuoted)

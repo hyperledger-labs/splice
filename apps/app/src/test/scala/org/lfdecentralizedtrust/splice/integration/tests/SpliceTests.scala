@@ -5,8 +5,7 @@ import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.daml.metrics.api.opentelemetry.OpenTelemetryMetricsFactory
-import com.daml.metrics.api.{HistogramInventory, MetricsContext, MetricsInfoFilter}
+import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
@@ -24,16 +23,11 @@ import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.networking.grpc.GrpcError
 import com.digitalasset.canton.protocol.LfContractId
-import com.digitalasset.canton.telemetry.OpenTelemetryFactory
 import com.digitalasset.canton.tracing.NoReportingTracerProvider
-import com.digitalasset.canton.tracing.TracingConfig.Tracer
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.typesafe.scalalogging.LazyLogging
-import io.opentelemetry.api.OpenTelemetry
-import io.opentelemetry.exporter.prometheus.PrometheusHttpServer
-import io.opentelemetry.sdk.metrics.internal.state.MetricStorage
 import org.apache.pekko.Done
-import org.apache.pekko.actor.{ActorSystem, CoordinatedShutdown}
+import org.apache.pekko.actor.CoordinatedShutdown
 import org.apache.pekko.http.scaladsl.Http
 import org.lfdecentralizedtrust.splice.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
@@ -47,6 +41,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.integration.{EnvironmentDefinition, InitialPackageVersions}
 import org.lfdecentralizedtrust.splice.integration.plugins.{
+  EventHistorySanityCheckPlugin,
   ResetDecentralizedNamespace,
   ResetSequencerSynchronizerStateThreshold,
   TokenStandardCliSanityCheckPlugin,
@@ -66,7 +61,6 @@ import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 import scala.math.BigDecimal.RoundingMode
-import scala.util.chaining.scalaUtilChainingOps
 import scala.util.{Failure, Success, Try}
 
 /** Analogue to Canton's CommunityTests */
@@ -86,42 +80,12 @@ object SpliceTests extends LazyLogging {
   val testRetryProvider = new RetryProvider(
     NamedLoggerFactory.root,
     ProcessingTimeout(),
-    new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds))(testScheduler),
+    new FutureSupervisor.Impl(
+      NonNegativeDuration.tryFromDuration(10.seconds),
+      NamedLoggerFactory.root,
+    )(testScheduler),
     NoOpMetricsFactory,
   )(NoReportingTracerProvider.tracer)
-
-  private val configuredOpenTelemetry: OpenTelemetry =
-    if (IsCI) {
-      logger.info("Initializing opentelemetry to expose test metrics on port 25001")
-      OpenTelemetryFactory
-        .initializeOpenTelemetry(
-          initializeGlobalOpenTelemetry = true,
-          attachReporters = sdkMeterProviderBuilder => {
-            sdkMeterProviderBuilder.registerMetricReader(
-              PrometheusHttpServer
-                .builder()
-                .setHost("localhost")
-                .setPort(25001)
-                .build()
-            )
-          },
-          metricsEnabled = true,
-          config = Tracer(),
-          histogramConfigs = Seq.empty,
-          loggerFactory = NamedLoggerFactory.root,
-          cardinality = MetricStorage.DEFAULT_MAX_CARDINALITY,
-          testingSupportAdhocMetrics = false,
-          histogramInventory = new HistogramInventory(),
-          histogramFilter = new MetricsInfoFilter(Seq.empty, Set.empty),
-        )
-        .tap { otel =>
-          sys.addShutdownHook {
-            logger.info("Shutting down opentelemetry test metrics")
-            otel.close()
-          }
-        }
-        .openTelemetry
-    } else OpenTelemetry.noop()
 
   type SpliceTestConsoleEnvironment = TestConsoleEnvironment[SpliceConfig, SpliceEnvironment]
   type SharedSpliceEnvironment =
@@ -144,12 +108,7 @@ object SpliceTests extends LazyLogging {
       BaseEnvironmentDefinition[SpliceConfig, SpliceEnvironment]
 
     override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
-      new OpenTelemetryMetricsFactory(
-        configuredOpenTelemetry.getMeterProvider.get("cn_tests"),
-        Set.empty,
-        Some(noTracingLogger.underlying),
-        MetricsContext.Empty,
-      )
+      new InMemoryMetricsFactory
     }
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
@@ -166,14 +125,21 @@ object SpliceTests extends LazyLogging {
     protected def runUpdateHistorySanityCheck: Boolean = true
     protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq.empty
     protected lazy val sanityChecksIgnoredRootExercises: Seq[(Identifier, String)] = Seq.empty
+    protected lazy val skipAcsSnapshotChecks: Boolean = false
     if (runUpdateHistorySanityCheck) {
       registerPlugin(
         new UpdateHistorySanityCheckPlugin(
           sanityChecksIgnoredRootCreates,
           sanityChecksIgnoredRootExercises,
+          skipAcsSnapshotChecks,
           loggerFactory,
         )
       )
+    }
+
+    protected def runEventHistorySanityCheck: Boolean = true
+    if (runEventHistorySanityCheck) {
+      registerPlugin(new EventHistorySanityCheckPlugin(loggerFactory))
     }
 
     protected def runTokenStandardCliSanityCheck: Boolean = true
@@ -220,25 +186,27 @@ object SpliceTests extends LazyLogging {
     protected def runUpdateHistorySanityCheck: Boolean = true
     protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq.empty
     protected lazy val sanityChecksIgnoredRootExercises: Seq[(Identifier, String)] = Seq.empty
+    protected lazy val skipAcsSnapshotChecks: Boolean = false
     if (runUpdateHistorySanityCheck) {
       registerPlugin(
         new UpdateHistorySanityCheckPlugin(
           sanityChecksIgnoredRootCreates,
           sanityChecksIgnoredRootExercises,
+          skipAcsSnapshotChecks,
           loggerFactory,
         )
       )
     }
 
+    protected def runEventHistorySanityCheck: Boolean = true
+    if (runEventHistorySanityCheck) {
+      registerPlugin(new EventHistorySanityCheckPlugin(loggerFactory))
+    }
+
     protected val migrationId: Long = sys.env.getOrElse("MIGRATION_ID", "0").toLong
 
     override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
-      new OpenTelemetryMetricsFactory(
-        configuredOpenTelemetry.getMeterProvider.get("cn_tests"),
-        Set.empty,
-        Some(noTracingLogger.underlying),
-        MetricsContext.Empty,
-      )
+      new InMemoryMetricsFactory
     }
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
@@ -299,7 +267,7 @@ object SpliceTests extends LazyLogging {
     // make `aliceSplitwell` etc. use updated usernames
     override def rsw(name: String)(implicit
         env: SpliceTestConsoleEnvironment
-    ): SplitwellAppClientReference = extendLedgerApiUserWithCaseId(super.rsw(name))(env.actorSystem)
+    ): SplitwellAppClientReference = extendLedgerApiUserWithCaseId(super.rsw(name))
 
     override def perTestCaseName(name: String)(implicit env: SpliceTestConsoleEnvironment) =
       s"${name}_tc$testCaseId.unverified.$ansAcronym"
@@ -329,7 +297,7 @@ object SpliceTests extends LazyLogging {
 
     private def extendLedgerApiUserWithCaseId(
         ref: SplitwellAppClientReference
-    )(implicit actorSystem: ActorSystem): SplitwellAppClientReference = {
+    ): SplitwellAppClientReference = {
       val newLedgerApiUser = perTestCaseNameWithoutUnverified(ref.config.ledgerApiUser)
       val newLedgerApiConfig = ref.config.participantClient.ledgerApi
         .copy(authConfig =

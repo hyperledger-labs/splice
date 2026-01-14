@@ -4,19 +4,31 @@
 package com.digitalasset.canton.synchronizer.sequencer
 
 import cats.data.{EitherT, OptionT}
+import cats.syntax.functorFilter.*
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
+import com.digitalasset.canton.config.{CantonConfig, DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.{HashPurpose, SynchronizerCryptoClient}
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.integration.{ConfigTransform, ConfigTransforms}
+import com.digitalasset.canton.environment.CantonEnvironment
+import com.digitalasset.canton.error.CantonBaseError
+import com.digitalasset.canton.integration.{
+  ConfigTransform,
+  ConfigTransforms,
+  TestConsoleEnvironment,
+}
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
   PromiseUnlessShutdown,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.protocol.messages.{
+  ConfirmationResponses,
+  SignedProtocolMessage,
+  TypedSignedProtocolMessageContent,
+}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.scheduler.PruningScheduler
 import com.digitalasset.canton.sequencing.client.SequencerClientSend
@@ -25,6 +37,7 @@ import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer.RegisterError
 import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig.External
 import com.digitalasset.canton.synchronizer.sequencer.admin.data.SequencerAdminStatus
+import com.digitalasset.canton.synchronizer.sequencer.block.BlockOrderer
 import com.digitalasset.canton.synchronizer.sequencer.errors.{
   CreateSubscriptionError,
   SequencerAdministrationError,
@@ -38,6 +51,7 @@ import com.digitalasset.canton.synchronizer.sequencer.traffic.{
 }
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.Member
+import com.digitalasset.canton.topology.processing.EffectiveTime
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
@@ -95,6 +109,11 @@ class ProgrammableSequencer(
     SequencerTrafficStatus
   ] = baseSequencer.trafficStatus(members, selector)
 
+  override def sequencingTime(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[CantonTimestamp]] =
+    baseSequencer.sequencingTime
+
   /** Run body with a given policy.
     *
     * Points to consider:
@@ -114,15 +133,15 @@ class ProgrammableSequencer(
       setPolicy(name)(policy)
 
       body match {
-        case asyncResult: Future[_] =>
+        case asyncResult: Future[?] =>
           isSync = false
           asyncResult.thereafter(_ => setPreviousPolicy()).asInstanceOf[A]
 
-        case EitherT(value: Future[Either[_, _]] @unchecked) =>
+        case EitherT(value: Future[Either[?, ?]] @unchecked) =>
           isSync = false
           EitherT(value.thereafter(_ => setPreviousPolicy())).asInstanceOf[A]
 
-        case OptionT(value: Future[Option[_]] @unchecked) =>
+        case OptionT(value: Future[Option[?]] @unchecked) =>
           isSync = false
           OptionT(value.thereafter(_ => setPreviousPolicy())).asInstanceOf[A]
 
@@ -206,10 +225,10 @@ class ProgrammableSequencer(
   ): EitherT[FutureUnlessShutdown, PruningError, String] =
     baseSequencer.prune(timestamp)
 
-  override def locatePruningTimestamp(index: PositiveInt)(implicit
+  override def findPruningTimestamp(index: PositiveInt)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, PruningSupportError, Option[CantonTimestamp]] =
-    baseSequencer.locatePruningTimestamp(index)
+    baseSequencer.findPruningTimestamp(index)
 
   override def reportMaxEventAgeMetric(
       oldestEventTimestamp: Option[CantonTimestamp]
@@ -227,20 +246,16 @@ class ProgrammableSequencer(
     baseSequencer.disableMember(member)
 
   private def sendAsyncInternal(signedSubmission: SignedContent[SubmissionRequest])(
-      send: SignedContent[SubmissionRequest] => EitherT[
-        FutureUnlessShutdown,
-        SequencerDeliverError,
-        Unit,
-      ]
+      send: SignedContent[SubmissionRequest] => EitherT[FutureUnlessShutdown, CantonBaseError, Unit]
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] = {
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] = {
     val submission = signedSubmission.content
 
     def scheduleAt(
         at: CantonTimestamp
-    ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] = {
-      val promise = PromiseUnlessShutdown.unsupervised[Either[SequencerDeliverError, Unit]]()
+    ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] = {
+      val promise = PromiseUnlessShutdown.unsupervised[Either[CantonBaseError, Unit]]()
 
       def run(ts: CantonTimestamp): Unit = {
         logger.debug(s"Processing delayed message ${submission.messageId} at $ts")
@@ -256,7 +271,7 @@ class ProgrammableSequencer(
 
     def sendAndCheck(
         submission: SignedContent[SubmissionRequest]
-    ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] =
+    ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
       send(submission).map(_ => checkQueued(submission.content))
 
     blocking(semaphore.acquire())
@@ -314,12 +329,12 @@ class ProgrammableSequencer(
 
   override def sendAsyncSigned(signedSubmission: SignedContent[SubmissionRequest])(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] =
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
     sendAsyncInternal(signedSubmission) { toSend =>
       baseSequencer.sendAsyncSigned(toSend)
     }
 
-  override def readV2(member: Member, timestamp: Option[CantonTimestamp])(implicit
+  override def read(member: Member, timestamp: Option[CantonTimestamp])(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CreateSubscriptionError, Sequencer.SequencedEventSource] =
     blockedMemberReads.get.get(member) match {
@@ -330,7 +345,7 @@ class ProgrammableSequencer(
             Source
               .lazyFutureSource(() =>
                 promise.future
-                  .flatMap(_ => baseSequencer.readV2(member, timestamp).value.unwrap)
+                  .flatMap(_ => baseSequencer.read(member, timestamp).value.unwrap)
                   .map(
                     _.onShutdown(throw new IllegalStateException("Sequencer shutting down")).left
                       .map(err => throw new IllegalStateException(s"Sequencer failed with $err"))
@@ -344,7 +359,7 @@ class ProgrammableSequencer(
 
       case None =>
         logger.debug(s"Member $member is not blocked, emitting sequencer source")
-        baseSequencer.readV2(member, timestamp)
+        baseSequencer.read(member, timestamp)
     }
 
   override def pruningStatus(implicit
@@ -428,6 +443,14 @@ class ProgrammableSequencer(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerError, CantonTimestamp] =
     baseSequencer.awaitContainingBlockLastTimestamp(timestamp)
+
+  override private[sequencer] def updateSynchronizerSuccessor(
+      successorO: Option[SynchronizerSuccessor],
+      announcementEffectiveTime: EffectiveTime,
+  )(implicit traceContext: TraceContext): Unit =
+    baseSequencer.updateSynchronizerSuccessor(successorO, announcementEffectiveTime)
+
+  override private[canton] def orderer: Option[BlockOrderer] = baseSequencer.orderer
 }
 
 /** Utilities for using the [[ProgrammableSequencer]] from tests */
@@ -468,6 +491,8 @@ trait HasProgrammableSequencer {
 }
 
 object ProgrammableSequencer {
+  import org.scalatest.EitherValues.*
+  import org.scalatest.LoneElement.*
 
   private[ProgrammableSequencer] val sequencers
       : concurrent.Map[(String, String), ProgrammableSequencer] =
@@ -481,6 +506,50 @@ object ProgrammableSequencer {
 
   private[sequencer] def allSequencers(environmentId: String): Seq[String] =
     sequencers.keySet.collect { case (`environmentId`, synchronizer) => synchronizer }.toSeq
+
+  /** Extract the list of confirmation responses.
+    */
+  def confirmationResponsesKind(messages: Map[Member, Seq[SubmissionRequest]])(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ): Map[Member, Seq[String]] =
+    messages.view
+      .mapValues(_.mapFilter { submissionRequest =>
+        if (ProgrammableSequencerPolicies.isConfirmationResponse(submissionRequest)) {
+
+          val participant = env.lp(submissionRequest.sender.identifier.toString)
+
+          val localVerdicts = submissionRequest.batch.envelopes
+            .flatMap(
+              _.closeEnvelope
+                .openEnvelope(participant.crypto.pureCrypto, BaseTest.testedProtocolVersion)
+                .value
+                .protocolMessage match {
+                case SignedProtocolMessage(
+                      TypedSignedProtocolMessageContent(confirmations: ConfirmationResponses),
+                      _,
+                    ) =>
+                  val localVerdicts = confirmations.responses.map(_.localVerdict.kind).distinct
+
+                  Some(localVerdicts.forgetNE)
+
+                case _ => None
+              }
+            )
+            .flatten
+            .distinct
+
+          if (localVerdicts.sizeIs > 1)
+            throw new IllegalStateException(
+              s"Found more than one verdict for confirmation response $submissionRequest"
+            )
+
+          Some(localVerdicts.loneElement)
+
+        } else None
+
+      })
+      .filter { case (_, confirmationResponses) => confirmationResponses.nonEmpty }
+      .toMap
 
   /** Changes the [[CantonEnterpriseConfig]] such that all sequencers use a programmable sequencer.
     *
@@ -534,10 +603,10 @@ object ProgrammableSequencer {
 
   private final case class QueuedSubmission(
       submission: SignedContent[SubmissionRequest],
-      send: () => EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit],
+      send: () => EitherT[FutureUnlessShutdown, CantonBaseError, Unit],
       releaseAfter: SubmissionRequest => Boolean,
   ) {
-    val resultPromise: PromiseUnlessShutdown[Either[SequencerDeliverError, Unit]] =
+    val resultPromise: PromiseUnlessShutdown[Either[CantonBaseError, Unit]] =
       PromiseUnlessShutdown.unsupervised()
   }
 }

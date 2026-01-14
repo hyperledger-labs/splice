@@ -82,6 +82,37 @@ the example here. As long as you have docker-compose 2.26.0 or newer you should 
 
 Additional parameters describing your own setup as opposed to the connection to the network are described below.
 
+.. _validator-http-proxy-compose:
+
+HTTP Proxy configuration
+------------------------
+
+If you need to use an HTTP forward proxy for egress in your environment, you need to set ``https.proxyHost`` and ``https.proxyPort``
+in `JAVA_TOOL_OPTIONS` in ``splice-node/docker-compose/validator/compose.yaml`` to use the HTTP proxy for outgoing connections.
+You need to do this for both the validator and the participant services:
+
+.. code-block:: yaml
+
+  services:
+    validator:
+      environment:
+        JAVA_TOOL_OPTIONS: >-
+          -Dhttps.proxyHost=your.proxy.host
+          -Dhttps.proxyPort=your_proxy_port
+
+.. code-block:: yaml
+
+  services:
+    participant:
+      environment:
+        JAVA_TOOL_OPTIONS: >-
+          -Dhttps.proxyHost=your.proxy.host
+          -Dhttps.proxyPort=your_proxy_port
+
+Replace ``your.proxy.host`` and ``your_proxy_port`` with the actual host and port of your HTTP proxy.
+You can set ``https.nonProxyHosts`` as well to prevent proxying for particular addresses.
+Proxy authentication is currently not supported.
+
 Deployment
 ++++++++++
 
@@ -138,6 +169,27 @@ You can open your browser at http://ans.localhost (note that this is currently b
 `ans` and not `cns`), and login using the same administrator user, or any other user that has been onboarded
 via the wallet, in order to purchase a CNS entry for that user.
 
+.. _compose_canton_apis:
+
+Accessing the Canton Participant APIs
+-------------------------------------
+
+The `JSON Ledger API <https://docs.digitalasset.com/build/3.4/tutorials/json-api/canton_and_the_json_ledger_api.html>`_
+is exposed under ``json-ledger-api.localhost:80``. Note that for some
+clients you may explicitly need to set the ``Host:
+json-ledger-api.localhost`` header for this to get resolved correctly.
+
+The `gRPC Ledger API
+<https://docs.digitalasset.com/build/3.4/explanations/ledger-api-services.html>`_
+is exposed under ``grpc-ledger-api.localhost:80``. Note that for some
+clients you may explicitly need to set the ``:authority:
+json-ledger-api.localhost`` pseudo-header for this to get resolved correctly.
+
+The Canton Admin API is not exposed by default as it does not yet
+support auth.  There is a commented out section in ``nginx.conf`` that
+you can enable to expose it if you ensure that it is not exposed
+publicly, e.g., through network restrictions.
+
 
 .. _compose_validator_auth:
 
@@ -164,7 +216,9 @@ AUTH_URL                      The URL of your OIDC provider for obtaining the ``
 AUTH_JWKS_URL                 The URL of your OIDC provider for obtaining the ``jwks.json``, will typically be ``${AUTH_URL}/.well-known/jwks.json``.
 AUTH_WELLKNOWN_URL            The URL of your OIDC provider for obtaining the ``openid-configuration``, will typically be ``${AUTH_URL}/.well-known/openid-configuration``.
 LEDGER_API_AUTH_AUDIENCE      The audience for the participant ledger API. e.g. ``https://ledger_api.example.com``.
-LEDGER_API_AUTH_SCOPE         The scope for the participant ledger API. Optional
+                              This will set the ``ledger-api.auth-services.target-audience`` configuration for the participant.
+LEDGER_API_AUTH_SCOPE         The scope for the participant ledger API.
+                              This will set the participant's ``ledger-api.auth-services.target-scope`` configuration. Optional
 VALIDATOR_AUTH_AUDIENCE       The audience for the validator backend API. e.g. ``https://validator.example.com``.
 VALIDATOR_AUTH_CLIENT_ID      The client id of the OAuth app for the validator app backend.
 VALIDATOR_AUTH_CLIENT_SECRET  The client secret of the OAuth app for the validator app backend.
@@ -194,6 +248,21 @@ you wish to migrate, follow the instructions for associating a user with a party
 :ref:`Users, Parties and Wallets in the Splice Wallet section <validator-users>`, but replace
 the admin party ID with the party ID which you wish to associate with each user.
 
+.. _compose_validator_topup:
+
+Configuring Automatic Traffic Purchases
++++++++++++++++++++++++++++++++++++++++
+
+Your node is configured to automatically purchase :ref:`traffic <traffic>` on a pay-as-you-go basis
+(see :ref:`automatically purchase traffic <traffic_topup>`).
+To tune to your needs, you can set environment variables, for example:
+
+.. code-block:: bash
+
+   export TARGET_TRAFFIC_THROUGHPUT=20000 # target throughput in bytes/second
+   export MIN_TRAFFIC_TOPUP_INTERVAL="1m" # minimum interval between top-ups
+
+.. include:: ../common/traffic_topups.rst
 
 Integration with systemd and other init systems
 +++++++++++++++++++++++++++++++++++++++++++++++

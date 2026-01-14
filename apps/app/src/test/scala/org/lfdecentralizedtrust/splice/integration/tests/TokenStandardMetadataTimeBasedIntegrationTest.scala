@@ -1,17 +1,21 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.environment.DarResources
+import org.lfdecentralizedtrust.splice.integration.{EnvironmentDefinition, InitialPackageVersions}
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
 import org.lfdecentralizedtrust.splice.util.{Codec, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1
 
-import java.time.ZoneOffset
+import java.time.{Duration, ZoneOffset}
+import java.time.temporal.ChronoUnit
 
 class TokenStandardMetadataTimeBasedIntegrationTest
     extends IntegrationTestWithSharedEnvironment
@@ -96,7 +100,7 @@ class TokenStandardMetadataTimeBasedIntegrationTest
         "Advance rounds to a point where round totals are defined and the tapped amulet",
         // We sadly need 7 rounds as we need to get to a point where round 0 is closed
         for (i <- 1 to 7) {
-          advanceRoundsByOneTick
+          advanceRoundsToNextRoundOpening
           sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
         },
       )(
@@ -110,15 +114,61 @@ class TokenStandardMetadataTimeBasedIntegrationTest
         },
       )
       clue("Compare direct scan reads to instrument metadata") {
-        val (roundNumber, effectiveAt) = sv1ScanBackend.getRoundOfLatestData()
-        val totalSupply = sv1ScanBackend.getTotalAmuletBalance(roundNumber)
+        val forcedSnapshotTime = sv1ScanBackend.forceAcsSnapshotNow()
+        advanceTime(Duration.ofSeconds(1L)) // because the sanity plugin will run another snapshot
+        // hope: this test won't have created more than Limit.MaxLimit contracts, so they all fit in a single response
+        val totalSupply = sv1ScanBackend
+          .getAcsSnapshotAt(forcedSnapshotTime, migrationId, partyIds = Some(Vector(dsoParty)))
+          .valueOrFail("Snapshot was just taken, so this has to exist")
+          .createdEvents
+          .map { createdEvent =>
+            if (createdEvent.templateId.endsWith("LockedAmulet")) {
+              BigDecimal(
+                LockedAmulet
+                  .jsonDecoder()
+                  .decode(new JsonLfReader(createdEvent.createArguments.noSpaces))
+                  .amulet
+                  .amount
+                  .initialAmount
+              )
+            } else if (createdEvent.templateId.endsWith("Amulet")) {
+              BigDecimal(
+                Amulet
+                  .jsonDecoder()
+                  .decode(new JsonLfReader(createdEvent.createArguments.noSpaces))
+                  .amount
+                  .initialAmount
+              )
+            } else {
+              BigDecimal(0)
+            }
+          }
+          .sum
+
         val instrument = sv1ScanBackend
           .lookupInstrument(amuletInstrument.id)
           .getOrElse(fail("instrument.totalSupply must be defined at this point"))
-        (
-          instrument.totalSupply.map(Codec.tryDecode(Codec.BigDecimal)),
-          instrument.totalSupplyAsOf,
-        ) shouldBe (totalSupply, Some(effectiveAt.atOffset(ZoneOffset.UTC)))
+
+        val noHoldingFeesOnTransfers =
+          InitialPackageVersions.initialPackageVersion(DarResources.amulet) >= "0.1.14"
+
+        if (noHoldingFeesOnTransfers) {
+          instrument.totalSupply.map(Codec.tryDecode(Codec.BigDecimal)).value shouldBe totalSupply
+          instrument.totalSupplyAsOf.value shouldBe forcedSnapshotTime.toInstant.atOffset(
+            ZoneOffset.UTC
+          )
+        } else {
+          instrument.totalSupply.map(Codec.tryDecode(Codec.BigDecimal)).value should beAround(
+            totalSupply
+          )
+          instrument.totalSupplyAsOf.value should be <= forcedSnapshotTime.toInstant.atOffset(
+            ZoneOffset.UTC
+          )
+          instrument.totalSupplyAsOf.value.plus(
+            10,
+            ChronoUnit.MILLIS,
+          ) should be >= forcedSnapshotTime.toInstant.atOffset(ZoneOffset.UTC)
+        }
       }
     }
   }

@@ -15,7 +15,7 @@ import scala.util.chaining.scalaUtilChainingOps
 class ContractFilterSpec extends AnyFlatSpec with Matchers {
   private val partiesSet = Set("Alice", "Bob").asJava
 
-  behavior of classOf[ContractFilter[_]].getSimpleName
+  behavior of classOf[ContractFilter[?]].getSimpleName
 
   private def templateCumulativeFilter(expectedIncluded: Boolean) = new CumulativeFilter(
     Collections.emptyMap[Identifier, Filter.Interface](),
@@ -40,7 +40,7 @@ class ContractFilterSpec extends AnyFlatSpec with Matchers {
   )
 
   private def assertFilters(
-      contractFilter: ContractFilter[_],
+      contractFilter: ContractFilter[?],
       expectedIncluded: Boolean,
       expectedVerbose: Boolean,
       expectedShape: TransactionShape,
@@ -73,16 +73,6 @@ class ContractFilterSpec extends AnyFlatSpec with Matchers {
     val expectedWildcardTransactionFormat = new TransactionFormat(
       expectedWildcardEventFormat,
       expectedShape,
-    )
-
-    contractFilter.transactionFilter(Optional.of(partiesSet)) shouldBe new TransactionFilter(
-      expectedPartyToFilters,
-      Optional.empty(),
-    )
-
-    contractFilter.transactionFilter(Optional.empty()) shouldBe new TransactionFilter(
-      Collections.emptyMap(),
-      Optional.of(expectedCumulativeFilter),
     )
 
     contractFilter.eventFormat(Optional.of(partiesSet)) shouldBe expectedEventFormatWithParties

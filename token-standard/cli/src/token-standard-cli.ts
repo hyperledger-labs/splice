@@ -83,6 +83,7 @@ export function createProgram(): Command {
         "-u, --user-id <value>",
         "The user id, must match the user in the token",
       )
+      .option("--reason <value>", "The reason for the transfer")
       .action(transfer),
   );
 

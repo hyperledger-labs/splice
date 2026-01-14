@@ -7,36 +7,29 @@ import {
   BackupLocation,
   BootstrappingDumpConfig,
   CnInput,
-  ExpectedValidatorOnboarding,
-  SvIdKey,
-  SvCometBftGovernanceKey,
-  ValidatorTopupConfig,
-  svKeyFromSecret,
-  svCometBftGovernanceKeyFromSecret,
-  DecentralizedSynchronizerMigrationConfig,
-  ApprovedSvIdentity,
   config,
-  approvedSvIdentities,
+  DecentralizedSynchronizerMigrationConfig,
+  ExpectedValidatorOnboarding,
+  SvCometBftGovernanceKey,
+  svCometBftGovernanceKeyFromSecret,
+  SvIdKey,
+  svKeyFromSecret,
+  ValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
+  approvedSvIdentities,
   configForSv,
+  coreSvsToDeploy,
   initialRound,
   StaticCometBftConfigWithNodeName,
-  svConfigs,
-} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
-import {
-  SequencerPruningConfig,
   StaticSvConfig,
   SvOnboarding,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
-import _ from 'lodash';
 
 import { InstalledSv, installSvNode } from './sv';
 
 interface DsoArgs {
-  dsoSize: number;
   auth0Client: Auth0Client;
-  approvedSvIdentities: ApprovedSvIdentity[];
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[]; // Only used by the sv1
   isDevNet: boolean;
   periodicBackupConfig?: BackupConfig;
@@ -44,7 +37,6 @@ interface DsoArgs {
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   topupConfig?: ValidatorTopupConfig;
   splitPostgresInstances: boolean;
-  sequencerPruningConfig: SequencerPruningConfig;
   decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig;
   onboardingPollingInterval?: string;
   disableOnboardingParticipantPromotionDelay: boolean;
@@ -71,23 +63,11 @@ export class Dso extends pulumi.ComponentResource {
       sv1: StaticCometBftConfigWithNodeName;
       peers: StaticCometBftConfigWithNodeName[];
     },
-    extraApprovedSvIdentities: ApprovedSvIdentity[],
     expectedValidatorOnboardings: ExpectedValidatorOnboarding[],
     isFirstSv = false,
     cometBftGovernanceKey: CnInput<SvCometBftGovernanceKey> | undefined = undefined,
     extraDependsOn: CnInput<pulumi.Resource>[] = []
   ) {
-    const defaultApprovedSvIdentities = approvedSvIdentities();
-
-    const identities = _.uniqBy(
-      [
-        ...defaultApprovedSvIdentities,
-        ...extraApprovedSvIdentities,
-        ...this.args.approvedSvIdentities,
-      ],
-      'name'
-    );
-
     return installSvNode(
       {
         isFirstSv,
@@ -101,7 +81,6 @@ export class Dso extends pulumi.ComponentResource {
         auth0SvAppName: svConf.auth0SvAppName,
         onboarding,
         auth0Client: this.args.auth0Client,
-        approvedSvIdentities: identities,
         expectedValidatorOnboardings,
         isDevNet: this.args.isDevNet,
         periodicBackupConfig: this.args.periodicBackupConfig,
@@ -110,7 +89,6 @@ export class Dso extends pulumi.ComponentResource {
         topupConfig: this.args.topupConfig,
         splitPostgresInstances: this.args.splitPostgresInstances,
         scanBigQuery: svConf.scanBigQuery,
-        sequencerPruningConfig: this.args.sequencerPruningConfig,
         disableOnboardingParticipantPromotionDelay:
           this.args.disableOnboardingParticipantPromotionDelay,
         onboardingPollingInterval: this.args.onboardingPollingInterval,
@@ -125,32 +103,28 @@ export class Dso extends pulumi.ComponentResource {
   }
 
   private async installDso() {
-    const relevantSvConfs = svConfigs.slice(0, this.args.dsoSize);
+    const relevantSvConfs = coreSvsToDeploy;
     const [sv1Conf, ...restSvConfs] = relevantSvConfs;
 
     const svIdKeys = restSvConfs.reduce<Record<string, pulumi.Output<SvIdKey>>>((acc, conf) => {
+      const secretName = conf.svIdKeySecretName ?? conf.nodeName.replaceAll('-', '') + '-id';
       return {
         ...acc,
-        [conf.onboardingName]: svKeyFromSecret(conf.nodeName.replace('-', '')),
+        [conf.onboardingName]: svKeyFromSecret(secretName),
       };
     }, {});
 
     const cometBftGovernanceKeys = relevantSvConfs
       .filter(conf => configForSv(conf.nodeName)?.participant?.kms)
       .reduce<Record<string, pulumi.Output<SvCometBftGovernanceKey>>>((acc, conf) => {
+        const secretName =
+          conf.cometBftGovernanceKeySecretName ??
+          conf.nodeName.replaceAll('-', '') + '-cometbft-governance-key';
         return {
           ...acc,
-          [conf.onboardingName]: svCometBftGovernanceKeyFromSecret(conf.nodeName.replace('-', '')),
+          [conf.onboardingName]: svCometBftGovernanceKeyFromSecret(secretName),
         };
       }, {});
-
-    const additionalSvIdentities: ApprovedSvIdentity[] = Object.entries(
-      svIdKeys
-    ).map<ApprovedSvIdentity>(([onboardingName, keys]) => ({
-      name: onboardingName,
-      publicKey: keys.publicKey,
-      rewardWeightBps: 10000, // if already defined in approved-sv-id-values-$CLUSTER.yaml, this will be ignored.
-    }));
 
     const sv1CometBftConf = {
       ...sv1Conf.cometBft,
@@ -185,16 +159,14 @@ export class Dso extends pulumi.ComponentResource {
         sv1: sv1CometBftConf,
         peers: peerCometBftConfs,
       },
-      additionalSvIdentities,
       this.args.expectedValidatorOnboardings,
       true,
       cometBftGovernanceKeys[sv1Conf.onboardingName]
     );
 
-    const useCantonBft =
-      this.args.decentralizedSynchronizerUpgradeConfig.active.sequencer.enableBftSequencer;
     // TODO(#893): long-term CantonBFT deployments should be robust enough to onboard in parallel again?
-    const incrementalOnboarding = useCantonBft;
+    const incrementalOnboarding =
+      this.args.decentralizedSynchronizerUpgradeConfig.active.sequencer.enableBftSequencer;
 
     // recursive install function to allow injecting dependencies on previous svs
     const installSvNodes = async (
@@ -218,7 +190,6 @@ export class Dso extends pulumi.ComponentResource {
         conf,
         onboarding,
         cometBft,
-        additionalSvIdentities,
         [],
         false,
         cometBftGovernanceKeys[conf.onboardingName],

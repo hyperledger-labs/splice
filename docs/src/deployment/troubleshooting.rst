@@ -84,7 +84,7 @@ traffic to complete a traffic purchase. Check the logs for
 If you only want to rely on free traffic and do not want to purchase any extra traffic, remove
 the validator top-up config.
 
-.. code:: bash
+.. code:: text
 
     ABORTED: Traffic balance below reserved traffic amount (0 < 200000)
 
@@ -104,7 +104,7 @@ existing node with a CC balance can transfer CC to you to increase your balance.
 If you only want to rely on free traffic and do not want to purchase any extra traffic, remove
 the validator top-up config.
 
-.. code:: bash
+.. code:: text
 
     Insufficient funds to buy configured traffic amount. Please ensure that the validator’s wallet has enough amulets to purchase 1.9998 MB of traffic to continue healthy operation.
 
@@ -118,7 +118,7 @@ at the end.
 
 In a docker-compose setup, verify the URL passed to ``-s`` which should be a SV URL or ``svSponsorAddress`` for the helm deployment.
 
-.. code:: bash
+.. code:: text
 
     2025-02-11T10:16:13.098Z [⋮] ERROR - o.l.s.v.ValidatorSvConnection:validator=validator_backend (7427be2620676fce8a464eee769eb1d8-app_version-2d71c55f5ecd731b-793d382fa2d6ce14) - Gave up getting 'app version of https://scan.sv-2.dev.global.canton.network.digitalasset.com/api/sv' org.apache.pekko.http.scaladsl.unmarshalling.Unmarshaller$UnsupportedContentTypeException: Unsupported Content-Type [Some(text/html)], supported: application/json
 
@@ -130,7 +130,7 @@ indicates an authenitcation error on the connection to the
 participant. Check the participant logs which will contain more
 details on why the request got rejected.
 
-.. code:: bash
+.. code:: text
 
     2025-02-14T11:32:00.304Z [⋮] INFO - o.l.s.v.ValidatorApp:validator=validator_backend (50836441bf579035d64a56f776566cbf) - The operation 'Get user 7D95xiEUxju4IUXFQgyUrwHMMuZO0g2F@clients' failed with a retryable error (full stack trace omitted): UNAUTHENTICATED: An error occurred. Please contact the operator and inquire about the request efd009557dec03da74dd29b723949cd6 with tid efd009557dec03da74dd29b723949cd6
 
@@ -156,6 +156,21 @@ again.
 If this is not a new node, change
 the values back to what you had before.
 
-.. code:: bash
+.. code:: text
 
     │Caused by: io.grpc.StatusRuntimeException: INTERNAL: Node has identity a-b-c-1::122098ffcd99..., but identifier a-b-1 was expected.                │
+
+MemberDisabled error when connecting to sequencer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A log of the form below in your participant indicates that it has been down longer
+than the 30 day sequencer pruning window so the SVs have disabled it.
+Any attempts to connect will fail with the same error.
+You can recover your CC balance by spinning up a new node via :ref:`validator_reonboard`.
+
+
+.. code:: text
+
+    2025-04-16T08:18:06.451Z [⋮] DEBUG - c.d.c.s.c.t.GrpcSequencerSubscription:participant=participant/domainId=global-domain::12206d339948/sequencerAlias=Some-Alias (---) - Completed subscription with Success(GrpcSubscriptionError(Request failed for sequencer.
+      GrpcRequestRefusedByServer: FAILED_PRECONDITION/MemberDisabled(PAR::validator1::12203d9ed85f...)
+      Request: subscription

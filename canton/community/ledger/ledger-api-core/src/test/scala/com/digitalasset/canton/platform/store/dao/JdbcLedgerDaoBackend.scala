@@ -13,10 +13,11 @@ import com.digitalasset.canton.ledger.api.ParticipantId
 import com.digitalasset.canton.logging.LoggingContextWithTrace.withNewLoggingContext
 import com.digitalasset.canton.logging.SuppressingLogger
 import com.digitalasset.canton.metrics.{LedgerApiServerHistograms, LedgerApiServerMetrics}
+import com.digitalasset.canton.participant.store.ContractStore
+import com.digitalasset.canton.participant.store.memory.InMemoryContractStore
 import com.digitalasset.canton.platform.config.{
   ActiveContractsServiceStreamsConfig,
   ServerRole,
-  TransactionTreeStreamsConfig,
   UpdatesStreamsConfig,
 }
 import com.digitalasset.canton.platform.store.DbSupport.{ConnectionPoolConfig, DbConfig}
@@ -29,7 +30,12 @@ import com.digitalasset.canton.platform.store.dao.events.{
   LfValueTranslation,
 }
 import com.digitalasset.canton.platform.store.interning.StringInterningView
-import com.digitalasset.canton.platform.store.{DbSupport, DbType, FlywayMigrations}
+import com.digitalasset.canton.platform.store.{
+  DbSupport,
+  DbType,
+  FlywayMigrations,
+  PruningOffsetService,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.archive.DamlLf.Archive
 import com.digitalasset.daml.lf.data.Ref
@@ -103,8 +109,10 @@ private[dao] trait JdbcLedgerDaoBackend extends PekkoBeforeAndAfterAll with Base
         loggerFactory = loggerFactory,
       )
       contractLoader <- ContractLoader.create(
+        participantContractStore = contractStore,
         contractStorageBackend = dbSupport.storageBackendFactory.createContractStorageBackend(
-          stringInterningView
+          stringInterningView,
+          ledgerEndCache,
         ),
         dbDispatcher = dbSupport.dbDispatcher,
         metrics = metrics,
@@ -142,12 +150,11 @@ private[dao] trait JdbcLedgerDaoBackend extends PekkoBeforeAndAfterAll with Base
           maxIdsPerIdPage = acsIdPageSize,
           maxPagesPerIdPagesBuffer = 1,
           maxWorkingMemoryInBytesForIdPages = 100 * 1024 * 1024,
-          maxParallelIdCreateQueries = acsIdFetchingParallelism,
+          maxParallelActiveIdQueries = acsIdFetchingParallelism,
           maxParallelPayloadCreateQueries = acsContractFetchingParallelism,
           contractProcessingParallelism = eventsProcessingParallelism,
         ),
         updatesStreamsConfig = UpdatesStreamsConfig.default,
-        transactionTreeStreamsConfig = TransactionTreeStreamsConfig.default,
         globalMaxEventIdQueries = 20,
         globalMaxEventPayloadQueries = 10,
         tracer = OpenTelemetry.noop().getTracer("test"),
@@ -159,6 +166,8 @@ private[dao] trait JdbcLedgerDaoBackend extends PekkoBeforeAndAfterAll with Base
           loadPackage = (packageId, _) => loadPackage(packageId),
           loggerFactory = loggerFactory,
         ),
+        pruningOffsetService = pruningOffsetService,
+        contractStore = contractStore,
       )
     }
   }
@@ -167,7 +176,11 @@ private[dao] trait JdbcLedgerDaoBackend extends PekkoBeforeAndAfterAll with Base
 
   protected final var ledgerDao: LedgerDao = _
   protected var ledgerEndCache: MutableLedgerEndCache = _
+  protected var contractStore: ContractStore = _
   protected var stringInterningView: StringInterningView = _
+  protected val pruningOffsetService: PruningOffsetService = mock[PruningOffsetService]
+  when(pruningOffsetService.pruningOffset(any[TraceContext]))
+    .thenReturn(Future.successful(None))
 
   // `dbDispatcher` and `ledgerDao` depend on the `postgresFixture` which is in turn initialized `beforeAll`
   private var resource: Resource[LedgerDao] = _
@@ -177,6 +190,7 @@ private[dao] trait JdbcLedgerDaoBackend extends PekkoBeforeAndAfterAll with Base
     // We use the dispatcher here because the default Scalatest execution context is too slow.
     implicit val resourceContext: ResourceContext = ResourceContext(system.dispatcher)
     ledgerEndCache = MutableLedgerEndCache()
+    contractStore = new InMemoryContractStore(timeouts, loggerFactory)
     stringInterningView = new StringInterningView(loggerFactory)
     resource = withNewLoggingContext() { implicit loggingContext =>
       for {

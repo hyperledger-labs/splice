@@ -18,7 +18,11 @@ import com.digitalasset.canton.participant.pruning.{
   SortedReconciliationIntervalsHelpers,
   SortedReconciliationIntervalsProvider,
 }
-import com.digitalasset.canton.participant.store.AcsCommitmentStore.ParticipantCommitmentData
+import com.digitalasset.canton.participant.store.AcsCommitmentStore.{
+  ParticipantCommitmentData,
+  ReinitializationStatus,
+}
+import com.digitalasset.canton.participant.store.UpdateMode.Checkpoint
 import com.digitalasset.canton.protocol.ContractMetadata
 import com.digitalasset.canton.protocol.messages.{
   AcsCommitment,
@@ -29,7 +33,12 @@ import com.digitalasset.canton.protocol.messages.{
 import com.digitalasset.canton.pruning.ConfigForNoWaitCounterParticipants
 import com.digitalasset.canton.store.PrunableByTimeTest
 import com.digitalasset.canton.time.PositiveSeconds
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+  UniqueIdentifier,
+}
 import com.digitalasset.canton.{
   BaseTest,
   CloseableTest,
@@ -51,9 +60,9 @@ trait CommitmentStoreBaseTest
     with CloseableTest
     with HasExecutionContext {
 
-  protected lazy val synchronizerId: SynchronizerId = SynchronizerId(
+  protected lazy val synchronizerId: PhysicalSynchronizerId = SynchronizerId(
     UniqueIdentifier.tryFromProtoPrimitive("synchronizer::synchronizer")
-  )
+  ).toPhysical
 
   protected lazy val crypto: SymbolicCrypto = SymbolicCrypto.create(
     testedReleaseProtocolVersion,
@@ -168,7 +177,7 @@ trait CommitmentStoreBaseTest
       testedProtocolVersion,
     )
   lazy val dummySigned: SignedProtocolMessage[AcsCommitment] =
-    SignedProtocolMessage.from(dummyCommitmentMsg, testedProtocolVersion, dummySignature)
+    SignedProtocolMessage.from(dummyCommitmentMsg, dummySignature)
 
   lazy val alice: LfPartyId = LfPartyId.assertFromString("Alice")
   lazy val bob: LfPartyId = LfPartyId.assertFromString("bob")
@@ -274,12 +283,12 @@ trait AcsCommitmentStoreTest
     "correctly compute matched periods in the outstanding table" in {
       val store = mk()
       for {
-        outstanding <- store.outstanding(ts(0), ts(10), Seq.empty, includeMatchedPeriods = true)
+        outstanding <- store.outstanding(ts(0), ts(10), None, includeMatchedPeriods = true)
         _ <- store.markOutstanding(periods(1, 5), remoteId1And2NESet)
         outstandingMarked <- store.outstanding(
           ts(0),
           ts(10),
-          Seq.empty,
+          None,
           includeMatchedPeriods = true,
         )
         _ <- store.markSafe(remoteId, periods(1, 2))
@@ -290,7 +299,7 @@ trait AcsCommitmentStoreTest
         outstandingAfter <- store.outstanding(
           ts(0),
           ts(10),
-          Seq.empty,
+          None,
           includeMatchedPeriods = true,
         )
       } yield {
@@ -311,14 +320,14 @@ trait AcsCommitmentStoreTest
     "correctly store surrounding commits in their correct state when marking period" in {
       val store = mk()
       for {
-        outstanding <- store.outstanding(ts(0), ts(10), Seq.empty, includeMatchedPeriods = true)
+        outstanding <- store.outstanding(ts(0), ts(10), None, includeMatchedPeriods = true)
         _ <- store.markOutstanding(periods(1, 5), remoteIdNESet)
         _ <- store.markUnsafe(remoteId, periods(1, 5))
         _ <- store.markSafe(remoteId, periods(2, 4))
         outstandingAfter <- store.outstanding(
           ts(0),
           ts(10),
-          Seq.empty,
+          None,
           includeMatchedPeriods = true,
         )
       } yield {
@@ -334,24 +343,24 @@ trait AcsCommitmentStoreTest
     "correctly perform state transition in the the outstanding table" in {
       val store = mk()
       for {
-        outstanding <- store.outstanding(ts(0), ts(10), Seq.empty, includeMatchedPeriods = true)
+        outstanding <- store.outstanding(ts(0), ts(10), None, includeMatchedPeriods = true)
         _ <- store.markOutstanding(periods(1, 5), remoteIdNESet)
         _ <- store.markUnsafe(remoteId, periods(1, 5))
         outstandingUnsafe <- store.outstanding(
           ts(0),
           ts(10),
-          Seq.empty,
+          None,
           includeMatchedPeriods = true,
         )
         // we are allowed to transition from state Mismatched to state Matched
         _ <- store.markSafe(remoteId, periods(1, 5))
-        outstandingSafe <- store.outstanding(ts(0), ts(10), Seq.empty, includeMatchedPeriods = true)
+        outstandingSafe <- store.outstanding(ts(0), ts(10), None, includeMatchedPeriods = true)
         // we are not allowed to transition from state Matched to state Mismatch
         _ <- store.markUnsafe(remoteId, periods(1, 5))
         outstandingStillSafe <- store.outstanding(
           ts(0),
           ts(10),
-          Seq.empty,
+          None,
           includeMatchedPeriods = true,
         )
         _ <- store.markOutstanding(periods(1, 5), remoteIdNESet)
@@ -589,11 +598,15 @@ trait AcsCommitmentStoreTest
             ),
           )
         )
-        found1 <- store.searchComputedBetween(ts(0), ts(1), Seq(remoteId))
+        found1 <- store.searchComputedBetween(ts(0), ts(1), NonEmpty.from(Seq(remoteId)))
         found2 <- store.searchComputedBetween(ts(0), ts(2))
-        found3 <- store.searchComputedBetween(ts(1), ts(1))
+        found3 <- store.searchComputedBetween(ts(1).minusMillis(1), ts(1))
         found4 <- store.searchComputedBetween(ts(0), ts(0))
-        found5 <- store.searchComputedBetween(ts(2), ts(2), Seq(remoteId, remoteId2))
+        found5 <- store.searchComputedBetween(
+          ts(2).minusMillis(1),
+          ts(2),
+          NonEmpty.from(Seq(remoteId, remoteId2)),
+        )
 
       } yield {
         found1.toSet shouldBe Set((period(0, 1), remoteId, hashedDummyCommitment))
@@ -623,7 +636,7 @@ trait AcsCommitmentStoreTest
         testedProtocolVersion,
       )
       val dummySigned2 =
-        SignedProtocolMessage.from(dummyMsg2, testedProtocolVersion, dummySignature)
+        SignedProtocolMessage.from(dummyMsg2, dummySignature)
       val dummyMsg3 = AcsCommitment.create(
         synchronizerId,
         remoteId2,
@@ -633,7 +646,7 @@ trait AcsCommitmentStoreTest
         testedProtocolVersion,
       )
       val dummySigned3 =
-        SignedProtocolMessage.from(dummyMsg3, testedProtocolVersion, dummySignature)
+        SignedProtocolMessage.from(dummyMsg3, dummySignature)
 
       for {
         _ <- store.storeReceived(dummySigned).failOnShutdown
@@ -641,9 +654,9 @@ trait AcsCommitmentStoreTest
         _ <- store.storeReceived(dummySigned3).failOnShutdown
         found1 <- store.searchReceivedBetween(ts(0), ts(1))
         found2 <-
-          store.searchReceivedBetween(ts(0), ts(1), Seq(remoteId))
+          store.searchReceivedBetween(ts(0), ts(1), NonEmpty.from(Seq(remoteId)))
         found3 <-
-          store.searchReceivedBetween(ts(0), ts(3), Seq(remoteId, remoteId2))
+          store.searchReceivedBetween(ts(0), ts(3), NonEmpty.from(Seq(remoteId, remoteId2)))
       } yield {
         found1.toSet shouldBe Set(dummySigned, dummySigned3)
         found2.toSet shouldBe Set(dummySigned)
@@ -706,7 +719,7 @@ trait AcsCommitmentStoreTest
         testedProtocolVersion,
       )
       val dummySigned2 =
-        SignedProtocolMessage.from(dummyMsg2, testedProtocolVersion, dummySignature)
+        SignedProtocolMessage.from(dummyMsg2, dummySignature)
 
       for {
         _ <- store.storeReceived(dummySigned).failOnShutdown
@@ -830,7 +843,7 @@ trait AcsCommitmentStoreTest
         _ <- store.markOutstanding(periods(0, 1), remoteIdNESet)
         _ <- store.markOutstanding(periods(0, 2), remoteIdNESet)
         _ <- store.markSafe(remoteId, periods(1, 2))
-        outstandingWithId <- store.outstanding(ts(0), ts(2), Seq(remoteId))
+        outstandingWithId <- store.outstanding(ts(0), ts(2), NonEmpty.from(Seq(remoteId)))
 
         outstandingWithoutId <- store.outstanding(ts(0), ts(2))
       } yield {
@@ -966,79 +979,125 @@ trait IncrementalCommitmentStoreTest extends CommitmentStoreBaseTest {
 
     def rt(timestamp: Int, tieBreaker: Int) = RecordTime(ts(timestamp), tieBreaker.toLong)
 
-    "give correct snapshots on a small example" in {
+    // TODO(i28386) add Efficiency as a mode below when it's fully supported for get() and watermark()
+    forAll(Table("mode", Checkpoint)) { mode =>
+      s"give correct snapshots on a small example in mode $mode" in {
+        val snapshot = mk()
+
+        val snapAB10 = ByteString.copyFromUtf8("AB10")
+        val snapBC10 = ByteString.copyFromUtf8("BC10")
+        val snapBC11 = ByteString.copyFromUtf8("BC11")
+        val snapAB2 = ByteString.copyFromUtf8("AB21")
+        val snapAC2 = ByteString.copyFromUtf8("AC21")
+
+        for {
+          res0 <- snapshot.get()
+          wm0 <- snapshot.watermark
+
+          _ <- snapshot.update(
+            rt(1, 0),
+            updates = Map(SortedSet(alice, bob) -> snapAB10, SortedSet(bob, charlie) -> snapBC10),
+            deletes = Set.empty,
+            mode,
+          )
+          res1 <- snapshot.get()
+          wm1 <- snapshot.watermark
+
+          _ <- snapshot.update(
+            rt(1, 1),
+            updates = Map(SortedSet(bob, charlie) -> snapBC11),
+            deletes = Set.empty,
+            mode,
+          )
+          res11 <- snapshot.get()
+          wm11 <- snapshot.watermark
+
+          _ <- snapshot.update(
+            rt(2, 0),
+            updates = Map(SortedSet(alice, bob) -> snapAB2, SortedSet(alice, charlie) -> snapAC2),
+            deletes = Set(SortedSet(bob, charlie)),
+            mode,
+          )
+          res2 <- snapshot.get()
+          ts2 <- snapshot.watermark
+
+          _ <- snapshot.update(
+            rt(3, 0),
+            updates = Map.empty,
+            deletes = Set(SortedSet(alice, bob), SortedSet(alice, charlie)),
+            mode,
+          )
+          res3 <- snapshot.get()
+          ts3 <- snapshot.watermark
+
+        } yield {
+          wm0 shouldBe RecordTime.MinValue
+          res0 shouldBe (RecordTime.MinValue -> Map.empty)
+
+          wm1 shouldBe rt(1, 0)
+          res1 shouldBe (rt(1, 0) -> Map(
+            SortedSet(alice, bob) -> snapAB10,
+            SortedSet(bob, charlie) -> snapBC10,
+          ))
+
+          wm11 shouldBe rt(1, 1)
+          res11 shouldBe (rt(1, 1) -> Map(
+            SortedSet(alice, bob) -> snapAB10,
+            SortedSet(bob, charlie) -> snapBC11,
+          ))
+
+          ts2 shouldBe rt(2, 0)
+          res2 shouldBe (rt(2, 0) -> Map(
+            SortedSet(alice, bob) -> snapAB2,
+            SortedSet(alice, charlie) -> snapAC2,
+          ))
+
+          ts3 shouldBe rt(3, 0)
+          res3 shouldBe (rt(3, 0) -> Map.empty)
+        }
+      }
+    }
+
+    "start reinitialization" in {
       val snapshot = mk()
-
-      val snapAB10 = ByteString.copyFromUtf8("AB10")
-      val snapBC10 = ByteString.copyFromUtf8("BC10")
-      val snapBC11 = ByteString.copyFromUtf8("BC11")
-      val snapAB2 = ByteString.copyFromUtf8("AB21")
-      val snapAC2 = ByteString.copyFromUtf8("AC21")
-
+      val ts1 = CantonTimestamp.now()
+      val ts2 = ts1.plusSeconds(100)
+      val ts3 = ts1.plusSeconds(200)
       for {
-        res0 <- snapshot.get()
-        wm0 <- snapshot.watermark
-
-        _ <- snapshot.update(
-          rt(1, 0),
-          updates = Map(SortedSet(alice, bob) -> snapAB10, SortedSet(bob, charlie) -> snapBC10),
-          deletes = Set.empty,
-        )
-        res1 <- snapshot.get()
-        wm1 <- snapshot.watermark
-
-        _ <- snapshot.update(
-          rt(1, 1),
-          updates = Map(SortedSet(bob, charlie) -> snapBC11),
-          deletes = Set.empty,
-        )
-        res11 <- snapshot.get()
-        wm11 <- snapshot.watermark
-
-        _ <- snapshot.update(
-          rt(2, 0),
-          updates = Map(SortedSet(alice, bob) -> snapAB2, SortedSet(alice, charlie) -> snapAC2),
-          deletes = Set(SortedSet(bob, charlie)),
-        )
-        res2 <- snapshot.get()
-        ts2 <- snapshot.watermark
-
-        _ <- snapshot.update(
-          rt(3, 0),
-          updates = Map.empty,
-          deletes = Set(SortedSet(alice, bob), SortedSet(alice, charlie)),
-        )
-        res3 <- snapshot.get()
-        ts3 <- snapshot.watermark
+        beginRead <- snapshot.readReinitilizationStatus()
+        // completing a reinitialization does not work if it's not in progress
+        completion0 <- snapshot.markReinitializationCompleted(ts2)
+        completion0Read <- snapshot.readReinitilizationStatus()
+        // first reinitialization should work as nothing is in progress
+        _ <- snapshot.markReinitializationStarted(ts1)
+        reinit1 <- snapshot.readReinitilizationStatus()
+        // reinitialization should work while the first one is still in progress
+        _ <- snapshot.markReinitializationStarted(ts2)
+        reinit2 <- snapshot.readReinitilizationStatus()
+        // completing a reinitialization does not work if it's not in progress
+        completion1 <- snapshot.markReinitializationCompleted(ts1)
+        completion1Read <- snapshot.readReinitilizationStatus()
+        // completing a reinitialization works if it's in progress
+        completion2 <- snapshot.markReinitializationCompleted(ts2)
+        completion2Read <- snapshot.readReinitilizationStatus()
+        // third reinitialization should work as the previous reinit completed
+        _ <- snapshot.markReinitializationStarted(ts3)
+        reinit3 <- snapshot.readReinitilizationStatus()
 
       } yield {
-        wm0 shouldBe RecordTime.MinValue
-        res0 shouldBe (RecordTime.MinValue -> Map.empty)
-
-        wm1 shouldBe rt(1, 0)
-        res1 shouldBe (rt(1, 0) -> Map(
-          SortedSet(alice, bob) -> snapAB10,
-          SortedSet(bob, charlie) -> snapBC10,
-        ))
-
-        wm11 shouldBe rt(1, 1)
-        res11 shouldBe (rt(1, 1) -> Map(
-          SortedSet(alice, bob) -> snapAB10,
-          SortedSet(bob, charlie) -> snapBC11,
-        ))
-
-        ts2 shouldBe rt(2, 0)
-        res2 shouldBe (rt(2, 0) -> Map(
-          SortedSet(alice, bob) -> snapAB2,
-          SortedSet(alice, charlie) -> snapAC2,
-        ))
-
-        ts3 shouldBe rt(3, 0)
-        res3 shouldBe (rt(3, 0) -> Map.empty)
+        beginRead shouldBe ReinitializationStatus(None, None)
+        completion0 shouldBe false
+        completion0Read shouldBe ReinitializationStatus(None, None)
+        reinit1 shouldBe ReinitializationStatus(Some(ts1), None)
+        reinit2 shouldBe ReinitializationStatus(Some(ts2), None)
+        completion1 shouldBe false
+        completion1Read shouldBe ReinitializationStatus(Some(ts2), None)
+        completion2 shouldBe true
+        completion2Read shouldBe ReinitializationStatus(Some(ts2), Some(ts2))
+        reinit3 shouldBe ReinitializationStatus(Some(ts3), Some(ts2))
       }
     }
   }
-
 }
 
 trait CommitmentQueueTest extends CommitmentStoreBaseTest {
@@ -1092,15 +1151,15 @@ trait CommitmentQueueTest extends CommitmentStoreBaseTest {
         at20with41 <- queue.peekThrough(ts(20))
       } yield {
         // We don't really care how the priority queue breaks the ties, so just use sets here
-        at5.toSet shouldBe Set(c11, c12)
-        at10.toSet shouldBe Set(c11, c12, c21)
-        at10with22.toSet shouldBe Set(c11, c12, c21, c22)
-        at10with32.toSet shouldBe Set(c11, c12, c21, c22)
-        at15.toSet shouldBe Set(c11, c12, c21, c22, c32)
-        at15AfterDelete.toSet shouldBe Set(c21, c22, c32)
-        at15with31.toSet shouldBe Set(c21, c22, c32, c31)
+        at5.toSet shouldBe Set(c11, c12).map(_.toQueuedAcsCommitment)
+        at10.toSet shouldBe Set(c11, c12, c21).map(_.toQueuedAcsCommitment)
+        at10with22.toSet shouldBe Set(c11, c12, c21, c22).map(_.toQueuedAcsCommitment)
+        at10with32.toSet shouldBe Set(c11, c12, c21, c22).map(_.toQueuedAcsCommitment)
+        at15.toSet shouldBe Set(c11, c12, c21, c22, c32).map(_.toQueuedAcsCommitment)
+        at15AfterDelete.toSet shouldBe Set(c21, c22, c32).map(_.toQueuedAcsCommitment)
+        at15with31.toSet shouldBe Set(c21, c22, c32, c31).map(_.toQueuedAcsCommitment)
         at20AfterDelete shouldBe List.empty
-        at20with41 shouldBe List(c41)
+        at20with41 shouldBe List(c41).map(_.toQueuedAcsCommitment)
       }).failOnShutdown
     }
 
@@ -1120,33 +1179,53 @@ trait CommitmentQueueTest extends CommitmentStoreBaseTest {
         _ <- queue.enqueue(c12)
         _ <- queue.enqueue(c21)
         at5 <- queue.peekThroughAtOrAfter(ts(5))
+        at5ne <- queue.nonEmptyAtOrAfter(ts(5))
         at10 <- queue.peekThroughAtOrAfter(ts(10))
+        at10ne <- queue.nonEmptyAtOrAfter(ts(10))
         _ <- queue.enqueue(c22)
         at10with22 <- queue.peekThroughAtOrAfter(ts(10))
+        at10with22ne <- queue.nonEmptyAtOrAfter(ts(10))
         at15 <- queue.peekThroughAtOrAfter(ts(15))
+        at15ne <- queue.nonEmptyAtOrAfter(ts(15))
         _ <- queue.enqueue(c32)
         at10with32 <- queue.peekThroughAtOrAfter(ts(10))
+        at10with32ne <- queue.nonEmptyAtOrAfter(ts(10))
         at15with32 <- queue.peekThroughAtOrAfter(ts(15))
+        at15with32ne <- queue.nonEmptyAtOrAfter(ts(15))
         _ <- queue.deleteThrough(ts(5))
         at15AfterDelete <- queue.peekThroughAtOrAfter(ts(15))
+        at15AfterDeleteNe <- queue.nonEmptyAtOrAfter(ts(15))
         _ <- queue.enqueue(c31)
         at15with31 <- queue.peekThroughAtOrAfter(ts(15))
+        at15with31ne <- queue.nonEmptyAtOrAfter(ts(15))
         _ <- queue.deleteThrough(ts(15))
         at20AfterDelete <- queue.peekThroughAtOrAfter(ts(20))
+        at20AfterDeleteNe <- queue.nonEmptyAtOrAfter(ts(20))
         _ <- queue.enqueue(c41)
         at20with41 <- queue.peekThroughAtOrAfter(ts(20))
+        at20with41ne <- queue.nonEmptyAtOrAfter(ts(20))
       } yield {
         // We don't really care how the priority queue breaks the ties, so just use sets here
-        at5.toSet shouldBe Set(c11, c12, c21)
-        at10.toSet shouldBe Set(c21)
-        at10with22.toSet shouldBe Set(c21, c22)
+        at5.toSet shouldBe Set(c11, c12, c21).map(_.toQueuedAcsCommitment)
+        at5ne shouldBe true
+        at10.toSet shouldBe Set(c21).map(_.toQueuedAcsCommitment)
+        at10ne shouldBe true
+        at10with22.toSet shouldBe Set(c21, c22).map(_.toQueuedAcsCommitment)
+        at10with22ne shouldBe true
         at15.toSet shouldBe empty
-        at10with32.toSet shouldBe Set(c21, c22, c32)
-        at15with32.toSet shouldBe Set(c32)
-        at15AfterDelete.toSet shouldBe Set(c32)
-        at15with31.toSet shouldBe Set(c32, c31)
+        at15ne shouldBe false
+        at10with32.toSet shouldBe Set(c21, c22, c32).map(_.toQueuedAcsCommitment)
+        at10with32ne shouldBe true
+        at15with32.toSet shouldBe Set(c32).map(_.toQueuedAcsCommitment)
+        at15with32ne shouldBe true
+        at15AfterDelete.toSet shouldBe Set(c32).map(_.toQueuedAcsCommitment)
+        at15AfterDeleteNe shouldBe true
+        at15with31.toSet shouldBe Set(c32, c31).map(_.toQueuedAcsCommitment)
+        at15with31ne shouldBe true
         at20AfterDelete shouldBe List.empty
-        at20with41 shouldBe List(c41)
+        at20AfterDeleteNe shouldBe false
+        at20with41 shouldBe List(c41).map(_.toQueuedAcsCommitment)
+        at20with41ne shouldBe true
       }
     }
 
@@ -1242,14 +1321,21 @@ trait CommitmentQueueTest extends CommitmentStoreBaseTest {
         )
       } yield {
         // We don't really care how the priority queue breaks the ties, so just use sets here
-        at05.toSet shouldBe Set(dummyCommitmentMsg, dummyCommitmentMsg3)
-        at010.toSet shouldBe Set(dummyCommitmentMsg, dummyCommitmentMsg3)
-        at510.toSet shouldBe Set(dummyCommitmentMsg3)
+        at05.toSet shouldBe Set(dummyCommitmentMsg, dummyCommitmentMsg3).map(
+          _.toQueuedAcsCommitment
+        )
+        at010.toSet shouldBe Set(dummyCommitmentMsg, dummyCommitmentMsg3).map(
+          _.toQueuedAcsCommitment
+        )
+        at510.toSet shouldBe Set(dummyCommitmentMsg3).map(_.toQueuedAcsCommitment)
         at1015 shouldBe empty
-        at1015after.toSet shouldBe Set(dummyCommitmentMsg2)
-        at510after.toSet shouldBe Set(dummyCommitmentMsg3)
-        at515after.toSet shouldBe Set(dummyCommitmentMsg3, dummyCommitmentMsg2)
+        at1015after.toSet shouldBe Set(dummyCommitmentMsg2).map(_.toQueuedAcsCommitment)
+        at510after.toSet shouldBe Set(dummyCommitmentMsg3).map(_.toQueuedAcsCommitment)
+        at515after.toSet shouldBe Set(dummyCommitmentMsg3, dummyCommitmentMsg2).map(
+          _.toQueuedAcsCommitment
+        )
         at015after.toSet shouldBe Set(dummyCommitmentMsg3, dummyCommitmentMsg2, dummyCommitmentMsg)
+          .map(_.toQueuedAcsCommitment)
       }
     }
 

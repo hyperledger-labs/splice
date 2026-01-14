@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import crypto from 'crypto';
 import { SetupServer } from 'msw/node';
@@ -11,6 +12,7 @@ import { vi, afterAll, afterEach, beforeAll } from 'vitest';
 
 import { buildServer } from '../mocks/server';
 import { config } from './config';
+import { DetachedWindowAPI } from 'happy-dom';
 
 // Provide an implementation for webcrypto when generating insecure jwts in the app
 vi.stubGlobal('crypto', crypto.webcrypto);
@@ -20,6 +22,7 @@ window.splice_config = config;
 declare global {
   interface Window {
     splice_config: typeof config; // (make typescript happy)
+    happyDOM: DetachedWindowAPI;
   }
 }
 
@@ -42,4 +45,5 @@ afterAll(() => {
 afterEach(() => {
   server.resetHandlers();
   cleanup();
+  vi.useRealTimers();
 });

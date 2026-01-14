@@ -34,13 +34,14 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistoryTestBase.{
 }
 import org.lfdecentralizedtrust.splice.store.{PageLimit, UpdateHistory, UpdateHistoryTestBase}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
+import com.daml.ledger.api.v2.transaction_filter
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
   AssignedWrapper,
-  TransactionTreeWrapper,
+  TransactionWrapper,
   UnassignedWrapper,
 }
-import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.metrics.MetricValue
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem
@@ -58,16 +59,29 @@ trait UpdateHistoryTestUtil extends TestCommon {
   ): Seq[UpdateHistoryResponse] = {
     val ledgerEnd = participant.ledger_api.state.end()
 
+    val transactionFormat = transaction_filter.TransactionFormat(
+      eventFormat = Some(
+        transaction_filter.EventFormat(
+          filtersByParty = Seq(partyId.toLf -> transaction_filter.Filters(Nil)).toMap,
+          filtersForAnyParty = None,
+        )
+      ),
+      transactionShape = transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+    )
+
     participant.ledger_api.updates
-      .trees(
-        partyIds = Set(partyId),
+      .updates(
+        updateFormat = transaction_filter.UpdateFormat(
+          includeTransactions = Some(transactionFormat),
+          includeReassignments = Some(transactionFormat.getEventFormat),
+          includeTopologyEvents = None,
+        ),
         completeAfter = PositiveInt.MaxValue,
         beginOffsetExclusive = beginExclusive,
         endOffsetInclusive = Some(ledgerEnd),
-        verbose = false,
       )
       .collect {
-        case TransactionTreeWrapper(protoTree) =>
+        case TransactionWrapper(protoTree) =>
           UpdateHistoryResponse(
             TransactionTreeUpdate(LedgerClient.lapiTreeToJavaTree(protoTree)),
             SynchronizerId.tryFromString(protoTree.synchronizerId),
@@ -137,7 +151,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       scanBackend: ScanAppBackendReference,
       scanClient: ScanAppClientReference,
   ): Assertion = {
-    val historyFromStore = scanBackend.appState.store.updateHistory
+    val historyFromStore = scanBackend.appState.automation.updateHistory
       .getAllUpdates(
         None,
         PageLimit.tryCreate(1000),
@@ -194,7 +208,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
         ),
         encoding = CompactJson,
       )
-      .map(CompactJsonScanHttpEncodings.httpToLapiUpdate)
+      .map(CompactJsonScanHttpEncodings().httpToLapiUpdate)
       .map(_.update)
       .map(dropTrailingNones)
 
@@ -219,7 +233,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     updatesFromScanApi.headOption.foreach(fromHistory => {
       val fromPointwiseLookup =
-        CompactJsonScanHttpEncodings.httpToLapiUpdate(
+        CompactJsonScanHttpEncodings().httpToLapiUpdate(
           scanClient.getUpdate(fromHistory.update.updateId, encoding = CompactJson)
         )
       fromPointwiseLookup.update shouldBe fromHistory
@@ -295,14 +309,14 @@ trait UpdateHistoryTestUtil extends TestCommon {
       case ReassignmentUpdate(r) => ReassignmentUpdate(dropTrailingNones(r))
     }
 
-  def dropTrailingNones(t: TransactionTree): TransactionTree =
-    new TransactionTree(
+  def dropTrailingNones(t: Transaction): Transaction =
+    new Transaction(
       t.getUpdateId,
       t.getCommandId,
       t.getWorkflowId,
       t.getEffectiveAt,
+      t.getEvents.asScala.map(dropTrailingNones).asJava,
       t.getOffset,
-      t.getEventsById.asScala.view.mapValues(dropTrailingNones).toMap.asJava,
       t.getSynchronizerId,
       t.getTraceContext,
       t.getRecordTime,
@@ -320,7 +334,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
         assign.copy(createdEvent = dropTrailingNones(assign.createdEvent))
     }
 
-  def dropTrailingNones(e: TreeEvent): TreeEvent = e match {
+  def dropTrailingNones(e: Event): Event = e match {
     case e: CreatedEvent => dropTrailingNones(e)
     case e: ExercisedEvent => dropTrailingNones(e)
     case _ => fail(s"Unexpected event: $e")
@@ -341,6 +355,8 @@ trait UpdateHistoryTestUtil extends TestCommon {
     e.getSignatories,
     e.getObservers,
     e.createdAt,
+    e.isAcsDelta,
+    e.getRepresentativePackageId,
   )
   def dropTrailingNones(e: ExercisedEvent): ExercisedEvent = new ExercisedEvent(
     e.getWitnessParties,
@@ -357,6 +373,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     e.getLastDescendantNodeId,
     dropTrailingNones(e.getExerciseResult),
     e.getImplementedInterfaces,
+    e.isAcsDelta,
   )
 
   def dropTrailingNones(v: Value): Value = v match {

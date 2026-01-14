@@ -32,7 +32,6 @@ import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.EitherUtil.RichEither
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 import io.opentelemetry.api.trace.Tracer
 import org.slf4j.event.Level
@@ -45,13 +44,11 @@ import scala.concurrent.{ExecutionContext, Future}
   * participants.
   */
 private[mediator] class ConfirmationRequestAndResponseProcessor(
-    synchronizerId: SynchronizerId,
     private val mediatorId: MediatorId,
     verdictSender: VerdictSender,
     crypto: SynchronizerCryptoClient,
     timeTracker: SynchronizerTimeTracker,
     val mediatorState: MediatorState,
-    protocolVersion: ProtocolVersion,
     protected val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, tracer: Tracer)
@@ -60,6 +57,8 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
     with FlagCloseable
     with HasCloseContext
     with MediatorEventHandler {
+
+  private val psid = crypto.psid
 
   override def observeTimestampWithoutEvent(sequencingTimestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
@@ -165,7 +164,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
         s"Phase 6: Request ${requestId.unwrap}: Timeout in state ${responseAggregation.state} at $timestamp"
       )
 
-      val timedOut = responseAggregation.timeout(version = timestamp)
+      val timedOut = responseAggregation.timeout()
       MonadUtil.whenM(mediatorState.replace(responseAggregation, timedOut))(
         sendResultIfDone(timedOut, responseAggregation.decisionTime)
       )
@@ -207,21 +206,19 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
             _ <- unitOrVerdictO match {
               // Request is well-formed, but not yet finalized
               case Right(()) =>
-                val aggregationF =
-                  ResponseAggregation.fromRequest(
+                val participantResponseDeadlineTick =
+                  timeTracker.requestTick(participantResponseDeadline)
+                for {
+                  aggregation <- ResponseAggregation.fromRequest(
                     requestId,
                     request,
                     participantResponseDeadline,
                     decisionTime,
                     snapshot.ipsSnapshot,
+                    Some(participantResponseDeadlineTick),
                   )
-
-                for {
-                  aggregation <- aggregationF
-
                   _ <- mediatorState.add(aggregation)
                 } yield {
-                  timeTracker.requestTick(participantResponseDeadline)
                   logger.info(
                     show"Phase 2: Registered request=${requestId.unwrap} with ${request.informeesAndConfirmationParamsByViewPosition.size} view(s). Initial state: ${aggregation.showMergedState}"
                   )
@@ -229,7 +226,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
 
               // Request is finalized, approve / reject immediately
               case Left(Some(rejection)) =>
-                val verdict = rejection.toVerdict(protocolVersion)
+                val verdict = rejection.toVerdict(psid.protocolVersion)
                 logger.debug(show"$requestId: finalizing immediately with verdict $verdict...")
                 for {
                   _ <-
@@ -523,8 +520,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
             sequencingTimestamp,
             submissionTopologyTimestamp,
             crypto,
-            logger,
-          )
+          )(loggingContext, ec)
 
         case Seq() =>
           // This can only happen if there are no root hash messages.
@@ -660,7 +656,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
             snapshot
               .isHostedByAtLeastOneParticipantF(
                 declaredConfirmingParties.toSet,
-                (_, attr) => attr.permission.canConfirm,
+                (_, attr) => attr.canConfirm,
               )
           )
 
@@ -728,18 +724,18 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
             .leftMap(err =>
               MediatorError.MalformedMessage
                 .Reject(
-                  s"$synchronizerId (timestamp: $ts): invalid signature from ${responses.sender} with $err"
+                  s"$psid (timestamp: $ts): invalid signature from ${responses.sender} with $err"
                 )
                 .report()
             )
             .toOption
           _ <-
-            if (signedResponses.synchronizerId == synchronizerId)
+            if (signedResponses.psid == psid)
               OptionT.some[FutureUnlessShutdown](())
             else {
               MediatorError.MalformedMessage
                 .Reject(
-                  s"Request ${responses.requestId}, sender ${responses.sender}: Discarding confirmation response for wrong synchronizer ${signedResponses.synchronizerId}"
+                  s"Request ${responses.requestId}, sender ${responses.sender}: Discarding confirmation response for wrong synchronizer ${signedResponses.psid}"
                 )
                 .report()
               OptionT.none[FutureUnlessShutdown, Unit]
@@ -822,7 +818,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
       tc: TraceContext
   ): Future[Unit] = {
     FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
-      performUnlessClosingUSF("send-result-if-done")(f),
+      synchronizeWithClosing("send-result-if-done")(f),
       s"send-result-if-done failed for request $requestId",
       level = Level.WARN,
     )
@@ -833,11 +829,14 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
       responseAggregation: ResponseAggregation[?],
       decisionTime: CantonTimestamp,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
-    responseAggregation.asFinalized(protocolVersion) match {
+    responseAggregation.asFinalized(psid.protocolVersion) match {
       case Some(finalizedResponse) =>
         logger.info(
           s"Phase 6: Finalized request=${finalizedResponse.requestId} with verdict ${finalizedResponse.verdict}"
         )
+
+        // We've reached a verdict. Cancel any outstanding request for a tick of the participant response deadline.
+        responseAggregation.participantResponseDeadlineTick.foreach(_.cancel())
 
         finalizedResponse.verdict match {
           case Verdict.Approve() => mediatorState.metrics.approvedRequests.mark()

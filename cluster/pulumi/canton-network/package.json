@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "main": "src/index.ts",
   "dependencies": {
-    "@kubernetes/client-node": "^0.18.1",
-    "@types/auth0": "^3.3.2",
-    "auth0": "^3.4.0",
-    "ip": "^1.1.9",
+    "@google-cloud/storage": "^6.11.0",
+    "@kubernetes/client-node": "^0.22.3",
     "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0",
     "@lfdecentralizedtrust/splice-pulumi-common-sv": "1.0.0",
     "@lfdecentralizedtrust/splice-pulumi-common-validator": "1.0.0",
-    "@google-cloud/storage": "^6.11.0"
+    "@types/auth0": "^3.3.2",
+    "auth0": "^4.28.0",
+    "ip": "^1.1.9"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",
@@ -20,7 +20,8 @@
     "format:check": "prettier --check -- src",
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
     "lint:check": "eslint --max-warnings=0 -- src",
-    "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts"
+    "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts",
+    "sql-codegen": "ts-node ./bigquery-sql-codegen.ts"
   },
   "devDependencies": {
     "@types/ip": "^1.1.3",

@@ -44,7 +44,7 @@ permissions:
 jobs:
 
   cancel_if_not_opt_in:
-    runs-on: self-hosted-docker-tiny
+    runs-on: ubuntu-24.04
     # Note that we don't auto-cancel on merged commits (e.g. in a post-merge workflow), and on
     # pull_request_target events (which indicate that we are running from a fork).
     if: github.event_name == 'pull_request'
@@ -158,6 +158,20 @@ jobs:
       daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
+  scala_test_signatures:
+    uses: ./.github/workflows/build.scala_test.yml
+    with:
+      runs_on: self-hosted-k8s-medium
+      test_names_file: 'test-full-class-names-signatures.log'
+      start_canton_options: -B "scripts/bootstrap/bootstrap-canton-with-unsigned-keys.sc"
+      parallelism: 1
+      test_name: signatures
+      with_gcp_creds: false
+      commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
+      oss_only: ${{ inputs.oss_only }}
+    secrets: inherit
+
   scala_test_wall_clock_time:
     uses: ./.github/workflows/build.scala_test.yml
     with:
@@ -165,9 +179,26 @@ jobs:
       test_names_file: 'test-full-class-names.log'
       start_canton_options: -w
       # TODO(DACH-NY/canton-network-node#10912) Investigate why things got slower
-      parallelism: 10
+      parallelism: 11
       test_name: wall-clock-time
       with_gcp_creds: true
+      skip_if_regex: "\\[bft\\]"
+      commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
+      oss_only: ${{ inputs.oss_only }}
+    secrets: inherit
+
+  scala_test_wall_clock_time_bft:
+    uses: ./.github/workflows/build.scala_test.yml
+    with:
+      runs_on: self-hosted-k8s-x-large
+      test_names_file: 'test-full-class-names.log'
+      start_canton_options: -we
+      parallelism: 10
+      test_name: wall-clock-time-bft
+      with_gcp_creds: true
+      pre_sbt_cmd: "export SPLICE_USE_BFT_SEQUENCER=1"
+      run_if_commit_tag: 'bft'
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
       oss_only: ${{ inputs.oss_only }}
@@ -221,7 +252,7 @@ jobs:
       runs_on: self-hosted-docker-large
       test_names_file: 'test-full-class-names-local-net-based.log'
       parallelism: 1
-      test_name: docker-compose
+      test_name: local-net
       with_canton: false
       start_canton_options: ""
       commit_sha: ${{ inputs.commit_sha }}
@@ -312,9 +343,7 @@ jobs:
     - ui_tests
     - ts_cli_tests
     - docs
-    runs-on: self-hosted-docker-tiny
-    container:
-      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2

@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 3016,
+  "id": 5091,
   "links": [],
   "panels": [
     {
@@ -697,10 +697,10 @@
       {
         "current": {
           "text": [
-            "sv-1"
+            "sv-12"
           ],
           "value": [
-            "sv-1"
+            "sv-12"
           ]
         },
         "datasource": {
@@ -723,24 +723,27 @@
       },
       {
         "current": {
-          "text": "All",
+          "text": [
+            "global-domain-6-sequencer"
+          ],
           "value": [
-            "$__all"
+            "global-domain-6-sequencer"
           ]
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_cache_hits, job)",
+        "definition": "label_values(daml_cache_hits{namespace=~\"$namespace\"},job)",
         "includeAll": true,
         "label": "Job",
         "multi": true,
         "name": "job",
         "options": [],
         "query": {
-          "query": "label_values(daml_cache_hits, job)",
-          "refId": "Standard"
+          "qryType": 1,
+          "query": "label_values(daml_cache_hits{namespace=~\"$namespace\"},job)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
@@ -757,15 +760,16 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_cache_hits, component)",
+        "definition": "label_values(daml_cache_hits{namespace=~\"$namespace\", job=~\"$job\"},component)",
         "includeAll": true,
         "label": "Component",
         "multi": true,
         "name": "component",
         "options": [],
         "query": {
-          "query": "label_values(daml_cache_hits, component)",
-          "refId": "Standard"
+          "qryType": 1,
+          "query": "label_values(daml_cache_hits{namespace=~\"$namespace\", job=~\"$job\"},component)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
@@ -782,15 +786,16 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(daml_cache_hits, cache)",
+        "definition": "label_values(daml_cache_hits{namespace=~\"$namespace\", job=~\"$job\"},cache)",
         "includeAll": true,
         "label": "Cache",
         "multi": true,
         "name": "cache",
         "options": [],
         "query": {
-          "query": "label_values(daml_cache_hits, cache)",
-          "refId": "Standard"
+          "qryType": 1,
+          "query": "label_values(daml_cache_hits{namespace=~\"$namespace\", job=~\"$job\"},cache)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
@@ -806,5 +811,5 @@
   "timezone": "",
   "title": "Cache Performance Dashboard",
   "uid": "cache-performance-dashboard",
-  "version": 4
+  "version": 1
 }

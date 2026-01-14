@@ -23,7 +23,7 @@ import com.digitalasset.canton.sequencing.client.{SendCallback, SendResult, Sequ
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.TrafficControlError
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
-import com.digitalasset.canton.topology.{Member, SynchronizerId}
+import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil}
@@ -43,7 +43,7 @@ class TrafficPurchasedSubmissionHandler(
   /** Send a signed traffic purchased entry request.
     * @param member
     *   recipient of the new balance
-    * @param synchronizerId
+    * @param psid
     *   synchronizerId of the synchronizer where the top up is being sent to
     * @param protocolVersion
     *   protocol version used
@@ -58,8 +58,6 @@ class TrafficPurchasedSubmissionHandler(
     */
   def sendTrafficPurchasedRequest(
       member: Member,
-      synchronizerId: SynchronizerId,
-      protocolVersion: ProtocolVersion,
       serial: PositiveInt,
       totalTrafficPurchased: NonNegativeLong,
       sequencerClient: SequencerClientSend,
@@ -71,6 +69,8 @@ class TrafficPurchasedSubmissionHandler(
   ): EitherT[FutureUnlessShutdown, TrafficControlError, Unit] = {
     val topology: SynchronizerSnapshotSyncCryptoApi = cryptoApi.currentSnapshotApproximation
     val snapshot = topology.ipsSnapshot
+
+    val protocolVersion: ProtocolVersion = cryptoApi.psid.protocolVersion
 
     def send(
         maxSequencingTimes: NonEmpty[Seq[CantonTimestamp]],
@@ -139,19 +139,17 @@ class TrafficPurchasedSubmissionHandler(
         threshold = sequencerGroup.threshold,
         protocolVersion,
       )
-      setTrafficPurchasedMessage = SetTrafficPurchasedMessage(
-        member,
-        serial,
-        totalTrafficPurchased,
-        synchronizerId,
-        protocolVersion,
+      setTrafficPurchasedMessage: SetTrafficPurchasedMessage = SetTrafficPurchasedMessage.apply(
+        member = member,
+        serial = serial,
+        totalTrafficPurchased = totalTrafficPurchased,
+        psid = cryptoApi.psid,
       )
       signedTrafficPurchasedMessage <- EitherT
         .liftF(
           SignedProtocolMessage.trySignAndCreate(
             setTrafficPurchasedMessage,
             topology,
-            protocolVersion,
           )
         )
       batch = Batch.of(
@@ -191,11 +189,9 @@ class TrafficPurchasedSubmissionHandler(
   ): EitherT[FutureUnlessShutdown, TrafficControlError, Unit] = {
     val callback = SendCallback.future
     implicit val metricsContext: MetricsContext = MetricsContext("type" -> "traffic-purchase")
-    // Make sure that the sequencer will ask for a time proof if it doesn't observe the sequencing in time
-    synchronizerTimeTracker.requestTick(maxSequencingTime)
     for {
       _ <- sequencerClient
-        .sendAsync(
+        .send(
           batch,
           aggregationRule = Some(aggregationRule),
           maxSequencingTime = maxSequencingTime,
@@ -206,28 +202,33 @@ class TrafficPurchasedSubmissionHandler(
             .Error(err.show): TrafficControlError
         )
     } yield {
-      val logOutcomeF = callback.future.map {
-        case SendResult.Success(_) =>
-          logger.debug(
-            s"Traffic balance request with max sequencing time $maxSequencingTime successfully submitted"
-          )
-        case SendResult.Error(
-              DeliverError(
-                _,
-                _,
-                _,
-                _,
-                SequencerErrors.AggregateSubmissionAlreadySent(message),
-                _,
-              )
-            ) =>
-          logger.info(s"The top-up request was already sent: $message")
-        case SendResult.Error(err) =>
-          logger.info(show"The traffic balance request submission failed: $err")
-        case SendResult.Timeout(time) =>
-          logger.info(
-            show"The traffic balance request submission timed out after sequencing time $time has elapsed"
-          )
+      // Make sure that the sequencer will ask for a time proof if it doesn't observe the sequencing in time
+      val tickRequest = synchronizerTimeTracker.requestTick(maxSequencingTime)
+      val logOutcomeF = callback.future.map { result =>
+        tickRequest.cancel()
+        result match {
+          case SendResult.Success(_) =>
+            logger.debug(
+              s"Traffic balance request with max sequencing time $maxSequencingTime successfully submitted"
+            )
+          case SendResult.Error(
+                DeliverError(
+                  _,
+                  _,
+                  _,
+                  _,
+                  SequencerErrors.AggregateSubmissionAlreadySent(message),
+                  _,
+                )
+              ) =>
+            logger.info(s"The top-up request was already sent: $message")
+          case SendResult.Error(err) =>
+            logger.info(show"The traffic balance request submission failed: $err")
+          case SendResult.Timeout(time) =>
+            logger.info(
+              show"The traffic balance request submission timed out after sequencing time $time has elapsed"
+            )
+        }
       }
       FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
         logOutcomeF,

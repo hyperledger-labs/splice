@@ -10,6 +10,7 @@ app_charts := \
 	splice-istio-gateway \
 	splice-load-tester \
 	splice-participant \
+	splice-party-allocator \
 	splice-postgres \
 	splice-scan \
 	splice-splitwell-app \

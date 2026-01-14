@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
@@ -39,27 +38,13 @@ class BootstrapPackageConfigDarUploadIntegrationTest
       // Technically a single SV test but withCanton doesn't handle that atm.
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withPreSetup(_ => ())
-      .addConfigTransformsToFront(
-        (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
-        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
-      )
+      .addConfigTransformsToFront((_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf))
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
           _.copy(initialPackageConfig = initialPackageConfig)
         )(config)
       )
-      .addConfigTransform((_, conf) =>
-        conf.copy(validatorApps =
-          conf.validatorApps.updatedWith(InstanceName.tryCreate("aliceValidator")) {
-            _.map { aliceValidatorConfig =>
-              val withoutExtraSynchronizers = aliceValidatorConfig.domains.copy(extra = Seq.empty)
-              aliceValidatorConfig.copy(
-                domains = withoutExtraSynchronizers
-              )
-            }
-          }
-        )
-      )
+      .withoutAliceValidatorConnectingToSplitwell
       .withCantonNodeNameSuffix("BootstrapDsoPackageConfig")
       .withManualStart
 

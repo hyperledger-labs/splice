@@ -7,23 +7,35 @@ import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.caching.ScaffeineCache
 import com.digitalasset.canton.caching.ScaffeineCache.TracedAsyncLoadingCache
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.{BatchingConfig, CachingConfigs, ProcessingTimeout}
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.config.{
+  BatchingConfig,
+  CachingConfigs,
+  ProcessingTimeout,
+  TopologyConfig,
+}
+import com.digitalasset.canton.crypto.SigningKeysWithThreshold
+import com.digitalasset.canton.data.{
+  CantonTimestamp,
+  SynchronizerPredecessor,
+  SynchronizerSuccessor,
+}
 import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle, PromiseUnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.{
   DynamicSequencingParametersWithValidity,
   DynamicSynchronizerParametersWithValidity,
+  StaticSynchronizerParameters,
 }
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.PartyInfo
 import com.digitalasset.canton.topology.processing.*
 import com.digitalasset.canton.topology.store.{
-  PackageDependencyResolverUS,
+  PackageDependencyResolver,
   TopologyStore,
   TopologyStoreId,
+  UnknownOrUnvettedPackages,
 }
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
@@ -45,6 +57,9 @@ final class CachingSynchronizerTopologyClient(
 )(implicit val executionContext: ExecutionContext)
     extends SynchronizerTopologyClientWithInit
     with NamedLogging {
+
+  override def staticSynchronizerParameters: StaticSynchronizerParameters =
+    delegate.staticSynchronizerParameters
 
   override def updateHead(
       sequencedTimestamp: SequencedTime,
@@ -132,9 +147,9 @@ final class CachingSynchronizerTopologyClient(
     }
   }
 
-  override def trySnapshot(
+  private def findSnapshotEntry(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): TopologySnapshotLoader = {
+  )(implicit traceContext: TraceContext): Option[SnapshotEntry] = {
     ErrorUtil.requireArgument(
       timestamp <= topologyKnownUntilTimestamp,
       s"requested snapshot=$timestamp, available snapshot=$topologyKnownUntilTimestamp",
@@ -142,19 +157,44 @@ final class CachingSynchronizerTopologyClient(
     // find a matching existing snapshot
     // including `<` is safe as it's guarded by the `topologyKnownUntilTimestamp` check,
     //  i.e., there will be no other snapshots in between, and the snapshot timestamp can be safely "overridden"
-    val cur = snapshots.get().find(_.timestamp <= timestamp)
-    cur match {
+    snapshots.get().find(_.timestamp <= timestamp)
+  }
+
+  override def trySnapshot(
+      timestamp: CantonTimestamp
+  )(implicit traceContext: TraceContext): TopologySnapshotLoader =
+    findSnapshotEntry(timestamp) match {
       // we'll use the cached snapshot client which defines the time-period this timestamp is in
       case Some(snapshotEntry) =>
         new ForwardingTopologySnapshotClient(timestamp, snapshotEntry.get(), loggerFactory)
-      // this timestamp is outside of the window where we have tracked the timestamps of changes.
+      // this timestamp is outside the window where we have tracked the timestamps of changes.
       // so let's do this pointwise
       case None =>
         pointwise.get(timestamp)
     }
-  }
+
+  override def tryHypotheticalSnapshot(
+      timestamp: CantonTimestamp,
+      desiredTimestamp: CantonTimestamp,
+  )(implicit traceContext: TraceContext): TopologySnapshotLoader =
+    findSnapshotEntry(timestamp) match {
+      // we'll use the cached snapshot client which defines the time-period this desiredTimestamp is in
+      case Some(snapshotEntry) =>
+        new ForwardingTopologySnapshotClient(desiredTimestamp, snapshotEntry.get(), loggerFactory)
+      // This timestamp is outside the window where we have tracked the timestamps of changes. We create
+      // a new snapshot based on the original timestamp but with a forward timestamp reference. We do not
+      // cache this value because, in a BFT read of sequencer subscriptions, we need a snapshot prior to the
+      // sequencer aggregation and can be certain that no intervening message occurs after the aggregation.
+      case None =>
+        new ForwardingTopologySnapshotClient(
+          desiredTimestamp,
+          pointwise.get(timestamp),
+          loggerFactory,
+        )
+    }
 
   override def synchronizerId: SynchronizerId = delegate.synchronizerId
+  override def psid: PhysicalSynchronizerId = delegate.psid
 
   override def snapshotAvailable(timestamp: CantonTimestamp): Boolean =
     delegate.snapshotAvailable(timestamp)
@@ -202,9 +242,6 @@ final class CachingSynchronizerTopologyClient(
   ) =
     delegate.scheduleAwait(condition, timeout)
 
-  override def close(): Unit =
-    LifeCycle.close(delegate)(logger)
-
   override def numPendingChanges: Int = delegate.numPendingChanges
 
   override def observed(
@@ -232,17 +269,27 @@ final class CachingSynchronizerTopologyClient(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]] =
     maxTimestampCache.get(sequencedTime)
+
+  override def close(): Unit = {
+    pointwise.invalidateAll()
+    pointwise.cleanUp()
+    maxTimestampCache.invalidateAll()
+    maxTimestampCache.cleanUp()
+    LifeCycle.close(delegate)(logger)
+  }
 }
 
 object CachingSynchronizerTopologyClient {
 
   def create(
       clock: Clock,
-      synchronizerId: SynchronizerId,
+      staticSynchronizerParameters: StaticSynchronizerParameters,
       store: TopologyStore[TopologyStoreId.SynchronizerStore],
-      packageDependenciesResolver: PackageDependencyResolverUS,
+      synchronizerPredecessor: Option[SynchronizerPredecessor],
+      packageDependenciesResolver: PackageDependencyResolver,
       cachingConfigs: CachingConfigs,
       batchingConfig: BatchingConfig,
+      topologyConfig: TopologyConfig,
       timeouts: ProcessingTimeout,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
@@ -256,9 +303,10 @@ object CachingSynchronizerTopologyClient {
     val dbClient =
       new StoreBasedSynchronizerTopologyClient(
         clock,
-        synchronizerId,
+        staticSynchronizerParameters,
         store,
         packageDependenciesResolver,
+        topologyConfig,
         timeouts,
         futureSupervisor,
         loggerFactory,
@@ -272,7 +320,7 @@ object CachingSynchronizerTopologyClient {
         futureSupervisor,
         loggerFactory,
       )
-    headStateInitializer.initialize(caching)
+    headStateInitializer.initialize(caching, synchronizerPredecessor, staticSynchronizerParameters)
   }
 }
 
@@ -299,6 +347,7 @@ private class ForwardingTopologySnapshotClient(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[ParticipantId, ParticipantAttributes]] =
     parent.loadParticipantStates(participants)
+
   override private[client] def loadActiveParticipantsOf(
       party: PartyId,
       participantStates: Seq[ParticipantId] => FutureUnlessShutdown[
@@ -323,7 +372,7 @@ private class ForwardingTopologySnapshotClient(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[PackageId, VettedPackage]] = parent.loadVettedPackages(participant)
 
-  override def loadVettedPackages(participants: Seq[ParticipantId])(implicit
+  override def loadVettedPackages(participants: Set[ParticipantId])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[ParticipantId, Map[PackageId, VettedPackage]]] =
     parent.loadVettedPackages(participants)
@@ -333,7 +382,7 @@ private class ForwardingTopologySnapshotClient(
       packageId: PackageId,
       ledgerTime: CantonTimestamp,
       vettedPackagesLoader: VettedPackagesLoader,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[UnknownOrUnvettedPackages] =
     parent.loadUnvettedPackagesOrDependenciesUsingLoader(
       participant,
       packageId,
@@ -395,10 +444,20 @@ private class ForwardingTopologySnapshotClient(
   )(implicit traceContext: TraceContext) =
     parent.loadBatchActiveParticipantsOf(parties, loadParticipantStates)
 
-  override def partyAuthorization(party: PartyId)(implicit
+  override def signingKeysWithThreshold(party: PartyId)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[PartyKeyTopologySnapshotClient.PartyAuthorizationInfo]] =
-    parent.partyAuthorization(party)
+  ): FutureUnlessShutdown[Option[SigningKeysWithThreshold]] =
+    parent.signingKeysWithThreshold(party)
+
+  override def synchronizerUpgradeOngoing()(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[(SynchronizerSuccessor, EffectiveTime)]] =
+    parent.synchronizerUpgradeOngoing()
+
+  override def sequencerConnectionSuccessors()(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[SequencerId, SequencerConnectionSuccessor]] =
+    parent.sequencerConnectionSuccessors()
 }
 
 class CachingTopologySnapshot(
@@ -431,14 +490,16 @@ class CachingTopologySnapshot(
       .buildTracedAsync[FutureUnlessShutdown, ParticipantId, Option[ParticipantAttributes]](
         cache = cachingConfigs.participantCache.buildScaffeine(),
         loader = implicit traceContext => pid => parent.findParticipantState(pid),
-        allLoader = Some(implicit traceContext =>
-          pids =>
-            parent.loadParticipantStates(pids.toSeq).map { attributes =>
+        allLoader = Some { implicit traceContext => pids =>
+          parent
+            .loadParticipantStates(pids.toSeq)
+            .map(attributes =>
               // make sure that the returned map contains an entry for each input element
               pids.map(pid => pid -> attributes.get(pid)).toMap
-            }
-        ),
+            )
+        },
       )(logger, "participantCache")
+
   private val keyCache: TracedAsyncLoadingCache[FutureUnlessShutdown, Member, KeyCollection] =
     ScaffeineCache.buildTracedAsync[FutureUnlessShutdown, Member, KeyCollection](
       cache = cachingConfigs.keyCache.buildScaffeine(),
@@ -465,7 +526,7 @@ class CachingTopologySnapshot(
       cache = cachingConfigs.packageVettingCache.buildScaffeine(),
       loader = implicit traceContext => x => parent.loadVettedPackages(x),
       allLoader =
-        Some(implicit traceContext => participants => parent.loadVettedPackages(participants.toSeq)),
+        Some(implicit traceContext => participants => parent.loadVettedPackages(participants.toSet)),
     )(logger, "packageVettingCache")
 
   private val mediatorsCache =
@@ -504,18 +565,23 @@ class CachingTopologySnapshot(
       Option[FutureUnlessShutdown[Seq[DynamicSynchronizerParametersWithValidity]]]
     ](None)
 
-  private val partyAuthorizationsCache: TracedAsyncLoadingCache[
+  private val signingKeysWithThresholdCache: TracedAsyncLoadingCache[
     FutureUnlessShutdown,
     PartyId,
-    Option[PartyKeyTopologySnapshotClient.PartyAuthorizationInfo],
+    Option[SigningKeysWithThreshold],
   ] = ScaffeineCache.buildTracedAsync[
     FutureUnlessShutdown,
     PartyId,
-    Option[PartyKeyTopologySnapshotClient.PartyAuthorizationInfo],
+    Option[SigningKeysWithThreshold],
   ](
     cache = cachingConfigs.partyCache.buildScaffeine(),
-    loader = implicit traceContext => party => parent.partyAuthorization(party),
-  )(logger, "partyAuthorizationsCache")
+    loader = implicit traceContext => party => parent.signingKeysWithThreshold(party),
+  )(logger, "signingKeysWithThresholdCache")
+
+  private val synchronizerUpgradeCache =
+    new AtomicReference[
+      Option[FutureUnlessShutdown[Option[(SynchronizerSuccessor, EffectiveTime)]]]
+    ](None)
 
   override def allKeys(owner: Member)(implicit
       traceContext: TraceContext
@@ -555,17 +621,17 @@ class CachingTopologySnapshot(
   ): FutureUnlessShutdown[Map[PackageId, VettedPackage]] =
     packageVettingCache.get(participant)
 
-  override def loadVettedPackages(participants: Seq[ParticipantId])(implicit
+  override def loadVettedPackages(participants: Set[ParticipantId])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[ParticipantId, Map[PackageId, VettedPackage]]] =
-    getAllBatched(participants)(packageVettingCache.getAll(_)(traceContext))
+    getAllBatched(participants.toSeq)(packageVettingCache.getAll(_)(traceContext))
 
   private[client] def loadUnvettedPackagesOrDependenciesUsingLoader(
       participant: ParticipantId,
       packageId: PackageId,
       ledgerTime: CantonTimestamp,
       vettedPackagesLoader: VettedPackagesLoader,
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Set[PackageId]] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[UnknownOrUnvettedPackages] =
     parent.loadUnvettedPackagesOrDependenciesUsingLoader(
       participant,
       packageId,
@@ -654,10 +720,10 @@ class CachingTopologySnapshot(
       parent.listDynamicSynchronizerParametersChanges(),
     )
 
-  override def partyAuthorization(party: PartyId)(implicit
+  override def signingKeysWithThreshold(party: PartyId)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[PartyKeyTopologySnapshotClient.PartyAuthorizationInfo]] =
-    partyAuthorizationsCache.get(party)
+  ): FutureUnlessShutdown[Option[SigningKeysWithThreshold]] =
+    signingKeysWithThresholdCache.get(party)
 
   private def getAllBatched[K, V](
       keys: Seq[K]
@@ -669,4 +735,14 @@ class CachingTopologySnapshot(
         fetchAll(_).map(_.toSeq)
       )
       .map(_.toMap)
+
+  override def synchronizerUpgradeOngoing()(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[(SynchronizerSuccessor, EffectiveTime)]] =
+    getAndCache(synchronizerUpgradeCache, parent.synchronizerUpgradeOngoing())
+
+  override def sequencerConnectionSuccessors()(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[SequencerId, SequencerConnectionSuccessor]] =
+    parent.sequencerConnectionSuccessors()
 }

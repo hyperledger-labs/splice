@@ -20,9 +20,12 @@ import com.digitalasset.canton.synchronizer.mediator.store.{
 }
 import com.digitalasset.canton.synchronizer.metrics.MediatorTestMetrics
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.DefaultTestIdentities
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
+import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.PartyInfo
 import com.digitalasset.canton.topology.client.TopologySnapshot
+import com.digitalasset.canton.topology.transaction.ParticipantAttributes
+import com.digitalasset.canton.topology.transaction.ParticipantPermission.Confirmation
+import com.digitalasset.canton.topology.{DefaultTestIdentities, ParticipantId}
 import com.digitalasset.canton.version.HasTestCloseContext
 import com.digitalasset.canton.{
   BaseTest,
@@ -48,7 +51,7 @@ class MediatorStateTest
   "MediatorState" when {
     val requestId = RequestId(CantonTimestamp.Epoch)
     val fullInformeeTree = {
-      val synchronizerId = DefaultTestIdentities.synchronizerId
+      val psid = DefaultTestIdentities.physicalSynchronizerId
       val participantId = DefaultTestIdentities.participant1
       val alice = LfPartyId.assertFromString("alice")
       val bob = LfPartyId.assertFromString("bob")
@@ -86,8 +89,8 @@ class MediatorStateTest
         testedProtocolVersion,
       )
       val commonMetadata = CommonMetadata
-        .create(hashOps, testedProtocolVersion)(
-          synchronizerId,
+        .create(hashOps)(
+          psid,
           MediatorGroupRecipient(MediatorGroupIndex.zero),
           s(5417),
           new UUID(0, 0),
@@ -105,9 +108,22 @@ class MediatorStateTest
     val informeeMessage =
       InformeeMessage(fullInformeeTree, Signature.noSignature)(testedProtocolVersion)
     val mockTopologySnapshot = mock[TopologySnapshot]
-    when(mockTopologySnapshot.consortiumThresholds(any[Set[LfPartyId]])(anyTraceContext))
-      .thenAnswer { (parties: Set[LfPartyId]) =>
-        FutureUnlessShutdown.pure(parties.map(x => x -> PositiveInt.one).toMap)
+    when(
+      mockTopologySnapshot.activeParticipantsOfPartiesWithInfo(any[Seq[LfPartyId]])(
+        anyTraceContext
+      )
+    )
+      .thenAnswer { (parties: Seq[LfPartyId]) =>
+        FutureUnlessShutdown.pure(
+          parties
+            .map(party =>
+              party -> PartyInfo(
+                PositiveInt.one,
+                Map(ParticipantId("one") -> ParticipantAttributes(Confirmation)),
+              )
+            )
+            .toMap
+        )
       }
     val currentVersion =
       ResponseAggregation
@@ -117,6 +133,7 @@ class MediatorStateTest
           requestId.unwrap.plusSeconds(300),
           requestId.unwrap.plusSeconds(600),
           mockTopologySnapshot,
+          participantResponseDeadlineTick = None,
         )(traceContext, executorService)
         .futureValueUS // without explicit ec it deadlocks on AnyTestSuite.serialExecutionContext
 
@@ -146,7 +163,7 @@ class MediatorStateTest
       }
       "have no more unfinalized after finalization" in {
         for {
-          _ <- sut.replace(currentVersion, currentVersion.timeout(currentVersion.version))
+          _ <- sut.replace(currentVersion, currentVersion.timeout())
         } yield {
           sut.pendingRequestIdsBefore(CantonTimestamp.MaxValue) shouldBe empty
         }

@@ -22,11 +22,13 @@ import org.lfdecentralizedtrust.splice.validator.automation.{
   ReceiveFaucetCouponTrigger,
   ValidatorPackageVettingTrigger,
 }
+import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.lfdecentralizedtrust.splice.wallet.store.TransferTxLogEntry
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry.TransferTransactionSubtype
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.{ForceFlag, ForceFlags, PartyId}
 import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.PackageId
@@ -108,7 +110,7 @@ class SvTimeBasedRewardCouponIntegrationTest
       eventually() {
         val vettedByAlice =
           aliceValidatorBackend.participantClientWithAdminToken.topology.vetted_packages
-            .list()
+            .list(Some(TopologyStoreId.Synchronizer(decentralizedSynchronizerId)))
             .flatMap(
               _.item.packages.map(_.packageId)
             )
@@ -123,6 +125,8 @@ class SvTimeBasedRewardCouponIntegrationTest
           .resume()
       )
 
+      advanceTimeForRewardAutomationToRunForCurrentRound
+
       val openRounds = eventually() {
         val openRounds = sv1ScanBackend
           .getOpenAndIssuingMiningRounds()
@@ -131,7 +135,6 @@ class SvTimeBasedRewardCouponIntegrationTest
         openRounds should not be empty
         openRounds
       }
-
       eventually() {
         val expectedSize = openRounds.size.toLong
         val sv1Coupons = sv1WalletClient.listSvRewardCoupons()
@@ -158,8 +161,8 @@ class SvTimeBasedRewardCouponIntegrationTest
       }
 
       // advance enough rounds to claim one SvRewardCoupon
-      advanceRoundsByOneTick
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
       eventually() {
         val expectedSize = (openRounds.size - 1).toLong
         sv1WalletClient.listSvRewardCoupons() should have size expectedSize
@@ -222,7 +225,7 @@ class SvTimeBasedRewardCouponIntegrationTest
             .listTransactions(
               None,
               TransactionHistoryRequest.SortOrder.Desc,
-              Limit.MaxPageSize,
+              Limit.DefaultMaxPageSize,
             )
             .flatMap(_.transfer)
             .filter(tf =>
@@ -249,11 +252,13 @@ class SvTimeBasedRewardCouponIntegrationTest
 
       clue("The claims appear in the wallet history") {
         eventually() {
-          val txs = sv1WalletClient
-            .listTransactions(
-              None,
-              Limit.MaxPageSize,
-            )
+          val txs = withoutDevNetTopups(
+            sv1WalletClient
+              .listTransactions(
+                None,
+                Limit.DefaultMaxPageSize,
+              )
+          )
             .collect {
               case b: TransferTxLogEntry
                   if b.subtype.value == TransferTransactionSubtype.WalletAutomation.toProto =>
@@ -304,6 +309,15 @@ class SvTimeBasedRewardCouponIntegrationTest
 
     clue("Pause SV4's SvRewardCouponTrigger") {
       sv4RewardCouponTrigger.pause().futureValue
+      // TODO(#2380) Remove the pause once the scan txlog script is fixed.
+    }
+    clue("Pause alice reward collection trigger") {
+      aliceValidatorBackend
+        .userWalletAutomation(aliceValidatorWalletClient.config.ledgerApiUser)
+        .futureValue
+        .trigger[CollectRewardsAndMergeAmuletsTrigger]
+        .pause()
+        .futureValue
     }
 
     clue("Pause alice vetting trigger") {
@@ -317,8 +331,10 @@ class SvTimeBasedRewardCouponIntegrationTest
       aliceValidatorBackend.participantClient.topology.vetted_packages.propose_delta(
         aliceParticipantId,
         removes = Seq(PackageId.assertFromString(latestAmuletPackageId)),
-        force =
-          ForceFlags(ForceFlag.AllowUnvetPackage, ForceFlag.AllowUnvetPackageWithActiveContracts),
+        force = ForceFlags(
+          ForceFlag.AllowUnvettedDependencies
+        ),
+        store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId),
       ),
     )(
       "Alice's participant has unvetted the latest amulet package, and SV4 is aware of that",
@@ -335,7 +351,7 @@ class SvTimeBasedRewardCouponIntegrationTest
 
         eventually() {
           clue("No SvRewardCoupon should be issued to Alice's participant") {
-            advanceRoundsByOneTick
+            advanceRoundsToNextRoundOpening
             sv4RewardCouponTrigger.runOnce().futureValue
             val openRounds = eventually() {
               val openRounds = sv1ScanBackend
@@ -367,6 +383,7 @@ class SvTimeBasedRewardCouponIntegrationTest
         aliceValidatorBackend.participantClient.topology.vetted_packages.propose_delta(
           aliceParticipantId,
           adds = Seq(VettedPackage(PackageId.assertFromString(latestAmuletPackageId), None, None)),
+          store = TopologyStoreId.Synchronizer(decentralizedSynchronizerId),
         )
       },
     )(

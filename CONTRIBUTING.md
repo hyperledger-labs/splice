@@ -46,6 +46,9 @@ If you are planning to work on an issue please assign yourself to it (if you are
 
 Every contribution must be tested in an automated test! For further details see the [Testing README](TESTING.md).
 
+Also note that the splice CI [enforces](https://github.com/cncf/dco2) that all commits on a pull request contain a valid `Signed-off-by: Your Name <your@email.com>` line,
+to confirm adherence to the [DCO](https://developercertificate.org/) requirements.
+
 ## Branch Naming
 
 If you are a Splice Contributor and therefore have write permissions to the Splice repo directly,
@@ -83,7 +86,7 @@ file along with your dar changes.
 ### Backwards-compatible Daml changes
 
 We require all Daml changes to be backwards-compatible. See the [Upgrading and Extending Daml Applications
-section of the Canton docs](https://docs.digitalasset.com/build/3.3/sdlc-howtos/smart-contracts/upgrade/).
+section of the Canton docs](https://docs.digitalasset.com/build/3.4/sdlc-howtos/smart-contracts/upgrade/).
 
 In the early days of Daml 3.0 upgrading of variants and enums was not supported, which is why there
 are variant constructors with names like `ExtFoo` in our codebase. They used to be a workaround for

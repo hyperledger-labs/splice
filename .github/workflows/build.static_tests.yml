@@ -9,6 +9,10 @@ on:
       self_hosted:
         type: boolean
         required: true
+      skip_todo_check:
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   static_tests:
@@ -53,6 +57,7 @@ jobs:
 
       - name: Checking TODOs
         uses: ./.github/actions/nix/run_bash_command_in_nix
+        if: ${{ inputs.skip_todo_check == false }}
         with:
           cmd: |
             echo "PR number: $CIRCLE_PULL_REQUEST"
@@ -83,7 +88,7 @@ jobs:
       - name: SBT-based static checks
         uses: ./.github/actions/sbt/execute_sbt_command
         with:
-          cmd: "Test/compile lint printTests"
+          cmd: "Test/compile lint updateTestConfigForParallelRuns"
 
       - name: Verify no changes in SBT test files
         uses: ./.github/actions/nix/run_bash_command_in_nix

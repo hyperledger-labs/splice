@@ -5,47 +5,43 @@ package com.digitalasset.canton.participant.admin.party
 
 import cats.data.EitherT
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.{PositiveFiniteDuration, ProcessingTimeout}
 import com.digitalasset.canton.crypto.{Hash, HashPurpose}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.admin.party.AddPartyError
 import com.digitalasset.canton.participant.admin.party.PartyReplicationAdminWorkflow.PartyReplicationArguments
 import com.digitalasset.canton.participant.admin.party.PartyReplicationStatus.{
-  AuthorizedReplicationParams,
   ConnectionEstablished,
   PartyReplicationStatus,
+  PartyReplicationStatusCode,
 }
+import com.digitalasset.canton.participant.admin.party.PartyReplicator.AddPartyRequestId
+import com.digitalasset.canton.participant.config.UnsafeOnlinePartyReplicationConfig
 import com.digitalasset.canton.participant.protocol.party.{
+  PartyReplicationProcessor,
   PartyReplicationSourceParticipantProcessor,
   PartyReplicationTargetParticipantProcessor,
 }
 import com.digitalasset.canton.participant.sync.{CantonSyncService, ConnectedSynchronizer}
+import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.resource.DbExceptionRetryPolicy
-import com.digitalasset.canton.sequencing.client.channel.{
-  SequencerChannelClient,
-  SequencerChannelProtocolProcessor,
-}
+import com.digitalasset.canton.sequencing.client.channel.SequencerChannelClient
 import com.digitalasset.canton.sequencing.protocol.channel.SequencerChannelId
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
-import com.digitalasset.canton.topology.store.{StoredTopologyTransaction, TimeQuery, TopologyStore}
-import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Replace
+import com.digitalasset.canton.topology.store.{TimeQuery, TopologyStore}
 import com.digitalasset.canton.topology.transaction.{
-  HostingParticipant,
-  ParticipantPermission,
   PartyToParticipant,
   TopologyChangeOp,
   TopologyMapping,
 }
-import com.digitalasset.canton.topology.{
-  ForceFlags,
-  ParticipantId,
-  PartyId,
-  SequencerId,
-  SynchronizerId,
-}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{
   EitherTUtil,
@@ -55,8 +51,10 @@ import com.digitalasset.canton.util.{
   retry,
 }
 
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.*
 import scala.reflect.ClassTag
 import scala.util.chaining.scalaUtilChainingOps
 
@@ -67,7 +65,7 @@ import scala.util.chaining.scalaUtilChainingOps
   *     agreements.
   *
   * The party replicator conceptually owns the party replication admin workflow and implements the
-  * grpc party management service endpoints related to online party replication, but for practical
+  * gRPC party management service endpoints related to online party replication, but for practical
   * reasons its lifetime is controlled by the admin workflow service. This helps ensure that upon
   * participant HA-activeness changes, the party replication-related classes are all created or
   * closed in unison.
@@ -75,17 +73,28 @@ import scala.util.chaining.scalaUtilChainingOps
 final class PartyReplicator(
     participantId: ParticipantId,
     syncService: CantonSyncService,
+    clock: Clock,
+    config: UnsafeOnlinePartyReplicationConfig,
+    markOnPRAgreementDone: (
+        PartyReplicationAgreementParams,
+        LfContractId,
+        TraceContext,
+    ) => FutureUnlessShutdown[Boolean],
     futureSupervisor: FutureSupervisor,
     exitOnFatalFailures: Boolean,
     override val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
-    pingParallelism: PositiveInt = PositiveInt.tryCreate(4),
+    pingParallelism: PositiveInt = PartyReplicator.defaultPingParallelism,
+    progressSchedulingInterval: PositiveFiniteDuration =
+      PartyReplicator.defaultProgressSchedulingInterval,
 )(implicit
     executionContext: ExecutionContext
 ) extends FlagCloseable
     with NamedLogging {
-  private type AddPartyRequestId = Hash
 
+  // Party replications map must be modified only within the simple executionQueue.
+  // When read outside executeAsync*, readers must be aware that the map concurrently
+  // changes and read state may be immediately stale.
   private val partyReplications =
     new TrieMap[AddPartyRequestId, PartyReplicationStatus.PartyReplicationStatus]()
 
@@ -97,6 +106,14 @@ final class PartyReplicator(
     crashOnFailure = exitOnFatalFailures,
   )
 
+  private val progressSchedulingActive = new AtomicBoolean(false)
+
+  private val topologyWorkflow =
+    new PartyReplicationTopologyWorkflow(participantId, timeouts, loggerFactory)
+
+  private val testInterceptorO: Option[PartyReplicationTestInterceptor] =
+    config.testInterceptor.map(_())
+
   /** Validates online party replication arguments and propose party replication via the provided
     * admin workflow service.
     */
@@ -106,12 +123,18 @@ final class PartyReplicator(
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Hash] =
     executionQueue.executeEUS(
       {
-        val PartyReplicationArguments(partyId, synchronizerId, sourceParticipantIdO, serialO) = args
+        val PartyReplicationArguments(
+          partyId,
+          synchronizerId,
+          sourceParticipantId,
+          serial,
+          participantPermission,
+        ) = args
         for {
           _ <- EitherT.cond[FutureUnlessShutdown](
             syncService.isActive(),
             logger.info(
-              s"Initiating replication of party $partyId from participant $sourceParticipantIdO on synchronizer $synchronizerId"
+              s"Initiating replication of party $partyId from participant $sourceParticipantId on synchronizer $synchronizerId"
             ),
             s"Participant $participantId is inactive",
           )
@@ -136,10 +159,10 @@ final class PartyReplicator(
           syncPersistentState = connectedSynchronizer.synchronizerHandle.syncPersistentState
           sourceParticipantId <- ensurePartyHostedBySourceButNotTargetParticipant(
             partyId,
-            sourceParticipantIdO,
+            sourceParticipantId,
             participantId,
             syncPersistentState.topologyStore,
-            serialO,
+            serial,
           )
           requestId =
             syncPersistentState.pureCryptoApi
@@ -147,24 +170,17 @@ final class PartyReplicator(
               .add(partyId.toProtoPrimitive)
               .add(synchronizerId.toProtoPrimitive)
               .add(sourceParticipantId.toProtoPrimitive)
+              .add(serial.unwrap)
               .finish()
-          _ <- EitherT.fromEither[FutureUnlessShutdown](
-            partyReplications.headOption.fold(Right(()): Either[String, Unit]) {
-              case (id, status) =>
-                Left(
-                  s"Only a single party replication can be in progress: $status, but found party replication $id" +
-                    s" of party ${status.params.partyId} on synchronizer ${status.params.synchronizerId}" +
-                    s" with status ${status.code}"
-                )
-            }
-          )
+          _ <- ensureCanAddParty()
           _ <- adminWorkflow.proposePartyReplication(
             requestId,
             partyId,
             synchronizerId,
             sourceParticipantId,
             sequencerCandidates,
-            serialO,
+            serial,
+            participantPermission,
           )
         } yield {
           val newStatus = PartyReplicationStatus.ProposalProcessed(
@@ -173,23 +189,57 @@ final class PartyReplicator(
             synchronizerId,
             sourceParticipantId,
             participantId,
-            serialO,
+            serial,
+            participantPermission,
           )
-          logger.info(s"Party replication $requestId proposal processed")
-          partyReplications.put(requestId, newStatus).discard
+          partyReplications
+            .put(requestId, newStatus)
+            .fold(logger.info(s"Party replication $requestId proposal processed"))(alreadyExists =>
+              // TODO(#23850): Conflict suggests a coding bug, but could possibly be a (low impact?) attack of a TP toward this TP.
+              logger.warn(
+                s"Overwrote already existing party replication $requestId that had status $alreadyExists"
+              )
+            )
+          activateProgressMonitoring(requestId)
           requestId
         }
       },
       s"add party ${args.partyId} on ${args.synchronizerId}",
     )
 
+  private def ensureCanAddParty(): EitherT[FutureUnlessShutdown, String, Unit] = for {
+    _ <- EitherT.fromEither[FutureUnlessShutdown](
+      partyReplications
+        .collectFirst { case (id, error @ PartyReplicationStatus.Error(_, _)) =>
+          id -> error
+        }
+        .fold(Right(()): Either[String, Unit]) {
+          case (id, PartyReplicationStatus.Error(errorMsg, previousStatus)) =>
+            Left(
+              s"Participant $participantId has encountered previous error \"$errorMsg\" during add_party_async" +
+                s" request $id after status $previousStatus and needs to be repaired"
+            )
+        }
+    )
+    _ <- EitherT.fromEither[FutureUnlessShutdown](
+      partyReplications
+        .collectFirst {
+          case (id, status) if status.code != PartyReplicationStatusCode.Completed =>
+            id -> status
+        }
+        .fold(Right(()): Either[String, Unit]) { case (id, status) =>
+          Left(
+            s"Only a single party replication can be in progress: $status, but found party replication $id" +
+              s" of party ${status.params.partyId} on synchronizer ${status.params.synchronizerId}" +
+              s" with status ${status.code}"
+          )
+        }
+    )
+  } yield ()
+
   private[admin] def getAddPartyStatus(
       addPartyRequestId: AddPartyRequestId
-  )(implicit traceContext: TraceContext): Option[PartyReplicationStatus] = {
-    val maybeStatus = partyReplications.get(addPartyRequestId)
-    logger.info(s"Get party replication status: $addPartyRequestId found: $maybeStatus")
-    maybeStatus
-  }
+  ): Option[PartyReplicationStatus] = partyReplications.get(addPartyRequestId)
 
   /** Validates a channel proposal at the source participant and chooses a sequencer to participate
     * in party replication and respond accordingly by invoking the provided admin workflow callback.
@@ -197,14 +247,13 @@ final class PartyReplicator(
   private[admin] def processPartyReplicationProposalAtSourceParticipant(
       proposalOrError: Either[String, PartyReplicationProposalParams],
       respondToProposal: Either[String, PartyReplicationAgreementParams] => Unit,
-  )(implicit traceContext: TraceContext): Unit =
-    executeAsync(
-      proposalOrError.fold(
-        err => s"reject party replication: $err",
-        params => s"respond to party replication proposal ${params.requestId}",
-      )
-    ) {
-      val responseET = for {
+  )(implicit traceContext: TraceContext): Unit = {
+    val operation = proposalOrError.fold(
+      err => s"reject party replication: $err",
+      params => s"respond to party replication proposal ${params.requestId}",
+    )
+    executeAsyncWithCustomResultHandling(operation, operation) {
+      for {
         proposal <- EitherT.fromEither[FutureUnlessShutdown](proposalOrError)
         PartyReplicationProposalParams(
           _,
@@ -212,7 +261,8 @@ final class PartyReplicator(
           synchronizerId,
           targetParticipantId,
           sequencerIdsProposed,
-          serialO,
+          serial,
+          _,
         ) = proposal
         connectedSynchronizer <-
           EitherT.fromEither[FutureUnlessShutdown](
@@ -220,6 +270,7 @@ final class PartyReplicator(
               .readyConnectedSynchronizerById(synchronizerId)
               .toRight(s"Synchronizer $synchronizerId not connected")
           )
+        _ <- ensureCanAddParty()
         topologySnapshot =
           connectedSynchronizer.synchronizerHandle.topologyClient.headSnapshot
         sequencerIdsInTopology <- EitherT
@@ -258,14 +309,14 @@ final class PartyReplicator(
         )
         _ <- ensurePartyHostedBySourceButNotTargetParticipant(
           partyId,
-          Some(participantId),
+          participantId,
           targetParticipantId,
           connectedSynchronizer.synchronizerHandle.syncPersistentState.topologyStore,
-          serialO,
+          serial,
         )
       } yield PartyReplicationAgreementParams.fromProposal(proposal, participantId, sequencerId)
-
-      responseET.value.map { agreementResponseE =>
+    } { _ =>
+      _.value.map { agreementResponseE =>
         // Respond to the proposal depending on the outcome of the agreement response.
         respondToProposal(agreementResponseE)
 
@@ -277,15 +328,23 @@ final class PartyReplicator(
             response.synchronizerId,
             response.sourceParticipantId,
             response.targetParticipantId,
-            response.serialO,
+            response.serial,
+            response.participantPermission,
           )
           logger.info(
             s"Party replication ${response.requestId} proposal processed at source participant"
           )
-          partyReplications.put(response.requestId, newStatus).discard
+          partyReplications.put(response.requestId, newStatus).foreach { alreadyExists =>
+            // TODO(#23850): Conflict could possibly be a (low impact?) attack of a TP toward this SP.
+            logger.warn(
+              s"Overwrote already existing party replication ${response.requestId} that had status $alreadyExists"
+            )
+          }
+          activateProgressMonitoring(response.requestId)
         }
       }
     }
+  }
 
   private def selectSequencerCandidates(
       synchronizerId: SynchronizerId,
@@ -328,49 +387,39 @@ final class PartyReplicator(
   /** Checks that the party is
     *   - hosted by the source participant
     *   - not yet hosted by the target participant, but can be proposed to be with the provided
-    *     serial if specified
+    *     serial
     */
   private def ensurePartyHostedBySourceButNotTargetParticipant(
       partyId: PartyId,
-      sourceParticipantIdO: Option[ParticipantId],
+      sourceParticipantId: ParticipantId,
       targetParticipantId: ParticipantId,
       topologyStore: TopologyStore[SynchronizerStore],
-      serialO: Option[PositiveInt],
+      serial: PositiveInt,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, ParticipantId] =
     for {
       _ <- EitherT.cond[FutureUnlessShutdown](
-        !sourceParticipantIdO.contains(targetParticipantId),
+        sourceParticipantId != targetParticipantId,
         (),
         s"Source and target participants $targetParticipantId cannot match",
       )
-      partyToParticipantTopologyHeadTx <- partyToParticipantTopologyHead(partyId, topologyStore)
+      partyToParticipantTopologyHeadTx <- topologyWorkflow.partyToParticipantTopologyHead(
+        partyId,
+        topologyStore,
+      )
       activeParticipantsOfParty = partyToParticipantTopologyHeadTx.mapping.participants.map(
         _.participantId
       )
       participantsExceptTargetParticipant = activeParticipantsOfParty.filterNot(
         _ == targetParticipantId
       )
-      sourceParticipantId <- EitherT.fromEither[FutureUnlessShutdown](sourceParticipantIdO match {
-        case None =>
-          Either
-            .cond(
-              participantsExceptTargetParticipant.sizeCompare(1) <= 0,
-              (),
-              s"No source participant specified and could not infer single source participant for party $partyId among ${participantsExceptTargetParticipant
-                  .mkString(",")}",
-            )
-            .flatMap(_ =>
-              participantsExceptTargetParticipant.headOption
-                .toRight(s"No source participant available to replicate party $partyId from")
-            )
-        case Some(sourcePid) =>
-          Either.cond(
-            participantsExceptTargetParticipant.contains(sourcePid),
-            sourcePid,
-            s"Party $partyId is not hosted by source participant $sourcePid. Only hosted on ${activeParticipantsOfParty
-                .mkString(",")}",
-          )
-      })
+      _ <- EitherT.fromEither[FutureUnlessShutdown](
+        Either.cond(
+          participantsExceptTargetParticipant.contains(sourceParticipantId),
+          (),
+          s"Party $partyId is not hosted by source participant $sourceParticipantId. Only hosted on ${activeParticipantsOfParty
+              .mkString(",")}",
+        )
+      )
       _ <- EitherT.cond[FutureUnlessShutdown](
         !activeParticipantsOfParty.contains(targetParticipantId),
         (),
@@ -378,405 +427,712 @@ final class PartyReplicator(
       )
       expectedSerial = partyToParticipantTopologyHeadTx.serial.increment
       _ <- EitherT.cond[FutureUnlessShutdown](
-        serialO.forall(_ == expectedSerial),
+        serial == expectedSerial,
         (),
-        s"Specified serial $serialO does not match the expected serial $expectedSerial add $partyId to $targetParticipantId.",
+        s"Specified serial $serial does not match the expected serial $expectedSerial add $partyId to $targetParticipantId.",
       )
     } yield sourceParticipantId
 
   /** Party replication agreement notification
     */
   private[admin] def processPartyReplicationAgreement(
-      agreementParams: PartyReplicationAgreementParams
-  )(implicit traceContext: TraceContext): Unit = {
-    val requestId = agreementParams.requestId
-    val newStatus = PartyReplicationStatus.AgreementAccepted(agreementParams)
-    logger.info(
-      s"Party replication $requestId agreement accepted for party ${agreementParams.partyId}"
-    )
-    partyReplications.put(requestId, newStatus).discard
-    authorizeTopology(requestId)
-  }
-
-  private def authorizeTopology(requestId: AddPartyRequestId)(implicit
-      traceContext: TraceContext
-  ): Unit = executeAsync(
-    s"authorize party replication topology for $requestId"
+      damlAgreementCid: LfContractId,
+      mightNotRememberProposal: Boolean,
   )(
-    recordIfError(
-      requestId,
-      for {
-        state <- ensureParticipantStateAndSynchronizerConnected[
-          PartyReplicationStatus.AgreementAccepted
-        ](requestId)
-        (status, connectedSynchronizer, _) = state
-        PartyReplicationStatus.AgreementAccepted(
-          params @ PartyReplicationStatus
-            .ReplicationParams(
-              _,
-              partyId,
-              synchronizerId,
-              sourceParticipantId,
-              targetParticipantId,
-            ),
-          sequencerId,
-          serialO,
-        ) = status
-        syncPersistentState = connectedSynchronizer.synchronizerHandle.syncPersistentState
-        partyToParticipantTopologyHeadTx <- partyToParticipantTopologyHead(
-          partyId,
-          syncPersistentState.topologyStore,
+      agreementParams: PartyReplicationAgreementParams
+  )(implicit traceContext: TraceContext): Unit =
+    executeAsync(agreementParams.requestId, "process agreement of party replication") {
+      val requestId = agreementParams.requestId
+      val agreementReceived =
+        PartyReplicationStatus.AgreementAccepted(agreementParams, damlAgreementCid)
+
+      // If the party replication is legitimately not yet known (after a source participant node restart),
+      // set the AgreementAccepted status.
+      if (mightNotRememberProposal && !partyReplications.contains(requestId)) {
+        logger.info(
+          s"Backfilling party replication $requestId agreement not known due to a suspected participant node restart"
         )
-        partyToParticipantMapping = partyToParticipantTopologyHeadTx.mapping
-        proposedPartyToParticipantMapping <- EitherT.fromEither[FutureUnlessShutdown](
-          PartyToParticipant.create(
-            partyId,
-            partyToParticipantMapping.threshold,
-            partyToParticipantMapping.participants :+ HostingParticipant(
-              targetParticipantId,
-              ParticipantPermission.Observation,
-            ),
+        partyReplications.put(requestId, agreementReceived).discard
+        activateProgressMonitoring(requestId)
+        EitherTUtil.unitUS
+      } else
+        for {
+          status <- EitherT.fromEither[FutureUnlessShutdown](
+            partyReplications
+              .get(requestId)
+              .toRight(s"Unknown request id $requestId")
           )
-        )
-        // TODO(#25055): Make this work for decentralized parties in which case the source
-        //  participant cannot sign on behalf of the replicating party. Instead this needs
-        //  to be turned into a wait until all the party signers have authorized the topology
-        //  transaction.
-        _ <- syncPersistentState.topologyManager
-          .proposeAndAuthorize(
-            op = TopologyChangeOp.Replace,
-            mapping = proposedPartyToParticipantMapping,
-            serial = serialO,
-            signingKeys = Seq.empty,
-            protocolVersion = syncPersistentState.topologyManager.managerVersion.serialization,
-            expectFullAuthorization = false,
-            forceChanges = ForceFlags.none,
-            waitToBecomeEffective = Some(timeouts.network.asNonNegativeFiniteApproximation),
+          expectedStatus <- EitherT.fromEither[FutureUnlessShutdown](
+            status
+              .select[PartyReplicationStatus.ProposalProcessed]
+              .toRight(s"Party replication $requestId has an unexpected status $status")
           )
-          .leftMap { err =>
-            val exception = err.asGrpcError
-            logger.warn(
-              s"Error proposing party to participant topology change on $participantId",
-              exception,
+          PartyReplicationStatus.ProposalProcessed(params) = expectedStatus
+          expectedAgreementAccepted = PartyReplicationStatus.AgreementAccepted(
+            params,
+            agreementParams.sequencerId,
+            damlAgreementCid,
+          )
+          _ <- EitherT
+            .cond[FutureUnlessShutdown](
+              agreementReceived == expectedAgreementAccepted,
+              (),
+              s"The party replication $requestId agreement received $agreementReceived does not match the expected agreement $expectedAgreementAccepted",
             )
-            exception.getMessage
-          }
-        // Retrieve PartyToParticipant topology along with effective time, double check that our serial is the
-        // latest head state and in case no serial was specified that the SP and TP are now indeed authorized to
-        // host the party.
-        partyToParticipantTopologyPartyAdded <- partyToParticipantTopologyHead(
-          partyId,
-          syncPersistentState.topologyStore,
-        )
-        _ <- EitherT.cond[FutureUnlessShutdown](
-          serialO.forall(_ == partyToParticipantTopologyPartyAdded.serial),
-          (),
-          s"Specified serial $serialO does not match the actual serial ${partyToParticipantTopologyPartyAdded.serial} when adding $partyId to $targetParticipantId as part of $requestId.",
-        )
-        _ <- EitherT.cond[FutureUnlessShutdown](
-          partyToParticipantTopologyPartyAdded.mapping.participants.exists(
-            _.participantId == targetParticipantId
-          ),
-          (),
-          s"Target participant $targetParticipantId missing from party $partyId even though just added as part of $requestId. This might be a race between expected serial $serialO and actual head serial ${partyToParticipantTopologyPartyAdded.serial}.",
-        )
-        _ <- EitherT.cond[FutureUnlessShutdown](
-          partyToParticipantTopologyPartyAdded.mapping.participants.exists(
-            _.participantId == sourceParticipantId
-          ),
-          (),
-          s"Source participant $sourceParticipantId missing from party $partyId even though kept around as part of $requestId. This might be a race between expected serial $serialO and actual head serial ${partyToParticipantTopologyPartyAdded.serial}.",
-        )
-        // On the source participant wait until the topology change is visible via the ledger api
-        _ <- EitherTUtil.ifThenET(participantId == sourceParticipantId) {
-          val operation = s"observe $partyId topology transaction via ledger api"
-          EitherT(
-            retry
-              .Pause(
-                logger,
-                this,
-                maxRetries = 10,
-                delay = timeouts.storageMaxRetryInterval.asFiniteApproximation,
-                operationName = operation,
-              )
-              .unlessShutdown(
-                performUnlessClosingF(operation)(
+        } yield {
+          logger.info(
+            s"Party replication $requestId agreement accepted for party ${agreementParams.partyId}"
+          )
+          partyReplications.put(requestId, expectedAgreementAccepted).discard
+          activateProgressMonitoring(requestId)
+        }
+    }
+
+  private def authorizeOnboardingTopology(requestId: AddPartyRequestId)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, Unit] =
+    ensureParticipantStateAndSynchronizerConnected[
+      PartyReplicationStatus.AgreementAccepted
+    ](requestId) {
+      case (
+            PartyReplicationStatus.AgreementAccepted(params, sequencerId, damlAgreementCid),
+            connectedSynchronizer,
+            _,
+          ) =>
+        for {
+          authorizedAtO <- topologyWorkflow.authorizeOnboardingTopology(
+            params,
+            connectedSynchronizer.synchronizerHandle.syncPersistentState.topologyManager,
+            connectedSynchronizer.synchronizerHandle.syncPersistentState.topologyStore,
+          )
+          // To be sure the authorization has become effective, wait until the topology change is visible via the ledger api
+          _ <- authorizedAtO match {
+            case Some(authorizedAt) =>
+              val operation = s"observe ${params.partyId} topology transaction via ledger api"
+              retryUntilLocalStoreUpdatedInExpectedState(operation)(
+                synchronizeWithClosingF(_)(
                   syncService.participantNodePersistentState.value.ledgerApiStore
                     .topologyEventOffsetPublishedOnRecordTime(
-                      synchronizerId,
-                      partyToParticipantTopologyPartyAdded.validFrom.value,
+                      params.synchronizerId,
+                      authorizedAt,
                     )
                     .map(offsetO => Either.cond(offsetO.nonEmpty, (), s"failed to $operation"))
-                ),
-                DbExceptionRetryPolicy,
+                )
               )
-          )
+            case None => EitherT.rightT[FutureUnlessShutdown, String](())
+          }
+        } yield {
+          val (partyId, serial) = (params.partyId, params.serial)
+          authorizedAtO.fold(
+            logger.debug(
+              s"Onboarding topology for party replication $requestId and party $partyId not yet authorized."
+            )
+          ) { authorizedAt =>
+            val newStatus =
+              PartyReplicationStatus.TopologyAuthorized(
+                params,
+                sequencerId,
+                damlAgreementCid,
+                authorizedAt,
+              )
+            logger.info(
+              s"Party replication $requestId onboarding topology of party $partyId authorized with serial $serial and effective time $authorizedAt"
+            )
+            partyReplications.put(requestId, newStatus).discard
+          }
         }
-      } yield {
-        val newStatus = PartyReplicationStatus.TopologyAuthorized(
-          params,
-          sequencerId,
-          partyToParticipantTopologyPartyAdded.serial,
-          partyToParticipantTopologyPartyAdded.validFrom.value,
-        )
-        logger.info(
-          s"Party replication $requestId topology of party $partyId authorized with serial ${partyToParticipantTopologyPartyAdded.serial} and effective time ${partyToParticipantTopologyPartyAdded.validFrom.value}"
-        )
-        partyReplications.put(requestId, newStatus).discard
-        connectToSequencerChannel(requestId)
-      },
-    )
-  )
+    }
 
-  private def partyToParticipantTopologyHead(
-      partyId: PartyId,
+  private def partiesHostedByParticipant(
+      participantId: ParticipantId,
+      except: PartyId,
       topologyStore: TopologyStore[SynchronizerStore],
+      asOfExclusive: CantonTimestamp,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, StoredTopologyTransaction[Replace, PartyToParticipant]] =
+  ): EitherT[FutureUnlessShutdown, String, Set[LfPartyId]] =
+    // TODO(#25766): add topology client endpoint
     EitherT(
       topologyStore
         .inspect(
           proposals = false,
-          timeQuery = TimeQuery.HeadState,
-          asOfExclusiveO = None,
+          timeQuery = TimeQuery.Snapshot(asOfExclusive),
+          asOfExclusiveO = None, // ignored for TimeQuery.Snapshot; always exclusive
           op = Some(TopologyChangeOp.Replace),
           types = Seq(TopologyMapping.Code.PartyToParticipant),
-          idFilter = Some(partyId.uid.identifier.str),
-          namespaceFilter = Some(partyId.uid.namespace.filterString),
+          idFilter = None,
+          namespaceFilter = None,
         )
-        .map(
-          _.collectOfMapping[PartyToParticipant]
-            .collectOfType[TopologyChangeOp.Replace]
-            .result
-            .headOption
-            .toRight(
-              s"Party $partyId not hosted on synchronizer ${topologyStore.storeId.synchronizerId}"
-            )
+        .map(topologyTxns =>
+          Right(
+            topologyTxns
+              .collectOfMapping[PartyToParticipant]
+              .collectOfType[TopologyChangeOp.Replace]
+              .result
+              .filter { x =>
+                val ptp = x.mapping
+                ptp.partyId != except &&
+                ptp.participants.exists(_.participantId == participantId)
+              }
+              .map(_.mapping.partyId.toLf)
+              .toSet
+          ): Either[String, Set[LfPartyId]]
         )
     )
 
   private def connectToSequencerChannel(
       requestId: AddPartyRequestId
-  )(implicit traceContext: TraceContext): Unit =
-    executeAsync(
-      s"connect to sequencer channel on behalf of party replication $requestId"
-    )(
-      recordIfError(
-        requestId,
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] = {
+    val ownsSessionKey = true
+    val noSessionKey = false
+    ensureParticipantStateAndSynchronizerConnected[
+      PartyReplicationStatus.TopologyAuthorized
+    ](requestId) {
+      case (
+            status @ PartyReplicationStatus
+              .TopologyAuthorized(params, sequencerId, damlAgreementCid, effectiveAt),
+            connectedSynchronizer,
+            channelClient,
+          ) =>
         for {
-          state <- ensureParticipantStateAndSynchronizerConnected[
-            PartyReplicationStatus.TopologyAuthorized
-          ](requestId)
-          (status, connectedSynchronizer, channelClient) = state
-          AuthorizedReplicationParams(
-            _,
-            partyId,
-            synchronizerId,
-            sourceParticipantId,
-            targetParticipantId,
-            sequencerId,
-            _,
-            effectiveAt,
-          ) = status.authorizedParams
           processorInfo <-
-            if (participantId == sourceParticipantId) {
-              EitherT.rightT[FutureUnlessShutdown, String](
+            if (participantId == params.sourceParticipantId) {
+              partiesHostedByParticipant(
+                status.params.targetParticipantId,
+                params.partyId,
+                connectedSynchronizer.synchronizerHandle.syncPersistentState.topologyStore,
+                effectiveAt,
+              ).map(partiesAlreadyHostedByTargetParticipant =>
                 (
                   PartyReplicationSourceParticipantProcessor(
-                    synchronizerId,
-                    partyId,
+                    connectedSynchronizer.psid,
+                    params.partyId,
+                    requestId,
                     effectiveAt,
+                    partiesAlreadyHostedByTargetParticipant,
                     connectedSynchronizer.synchronizerHandle.syncPersistentState.acsInspection,
-                    updateProgress(requestId, traceContext),
-                    markComplete(requestId, traceContext),
-                    connectedSynchronizer.staticSynchronizerParameters.protocolVersion,
+                    markAcsFullyReplicated(requestId),
+                    recordError(requestId, traceContext),
+                    markDisconnected(requestId),
+                    futureSupervisor,
+                    exitOnFatalFailures,
                     timeouts,
                     loggerFactory,
-                  ): SequencerChannelProtocolProcessor,
+                    testInterceptorO.getOrElse(PartyReplicationTestInterceptor.AlwaysProceed),
+                  ): PartyReplicationProcessor,
                   status.params.targetParticipantId,
-                  false,
+                  noSessionKey,
                 )
               )
-            } else if (participantId == targetParticipantId) {
+            } else if (participantId == params.targetParticipantId) {
               EitherT.rightT[FutureUnlessShutdown, String](
                 (
                   PartyReplicationTargetParticipantProcessor(
-                    synchronizerId,
-                    partyId,
+                    params.partyId,
+                    requestId,
                     effectiveAt,
-                    updateProgress(requestId, traceContext),
-                    markComplete(requestId, traceContext),
-                    (_, _) => EitherTUtil.unitUS,
+                    markAcsFullyReplicated(requestId),
+                    recordError(requestId, traceContext),
+                    markDisconnected(requestId),
                     syncService.participantNodePersistentState,
                     connectedSynchronizer,
-                    connectedSynchronizer.staticSynchronizerParameters.protocolVersion,
+                    futureSupervisor,
+                    exitOnFatalFailures,
                     timeouts,
                     loggerFactory,
-                  ): SequencerChannelProtocolProcessor,
+                    testInterceptorO.getOrElse(PartyReplicationTestInterceptor.AlwaysProceed),
+                  ): PartyReplicationProcessor,
                   status.params.sourceParticipantId,
-                  true,
+                  ownsSessionKey,
                 )
               )
             } else {
               EitherT.leftT[
                 FutureUnlessShutdown,
-                (SequencerChannelProtocolProcessor, ParticipantId, Boolean),
+                (PartyReplicationProcessor, ParticipantId, Boolean),
               ](
                 s"participant $participantId is neither source nor target"
               )
             }
-          (processor, participantIdToConnectTo, isSessionKeyOwner) = processorInfo
+          (processor, counterParticipantId, isSessionKeyOwner) = processorInfo
           _ <- channelClient
             .connectToSequencerChannel(
               sequencerId,
               SequencerChannelId(requestId.toHexString),
-              participantIdToConnectTo,
+              counterParticipantId,
               processor,
               isSessionKeyOwner,
               effectiveAt,
             )
             .mapK(FutureUnlessShutdown.liftK)
         } yield {
-          val newStatus = ConnectionEstablished(status.authorizedParams)
+          val newStatus =
+            ConnectionEstablished(
+              status.params,
+              sequencerId,
+              damlAgreementCid,
+              effectiveAt,
+              processor,
+            )
           logger.info(s"Party replication $requestId connected to sequencer $sequencerId")
           partyReplications.put(requestId, newStatus).discard
-        },
-      )
-    )
+        }
+    }
+  }
 
-  private def updateProgress(requestId: AddPartyRequestId, tc: TraceContext)(
-      contractsReplicated: NonNegativeInt
-  ): Unit = {
-    implicit val traceContext: TraceContext = tc
-    executeAsync(s"progress party replication $requestId") {
-      recordIfError(
-        requestId,
+  private def attemptToReconnectToSequencerChannel(
+      requestId: AddPartyRequestId
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] =
+    ensureParticipantStateAndSynchronizerConnected[PartyReplicationStatus.Disconnected](
+      requestId
+    ) {
+      case (
+            status @ PartyReplicationStatus.Disconnected(_, prev),
+            _,
+            channelClient,
+          ) =>
+        val params = prev.params
+        val processor = prev.partyReplicationProcessor
+        val sequencerId = prev.sequencerId
+        val damlAgreementCid = prev.damlAgreementCid
+        val effectiveAt = prev.effectiveAt
         for {
-          status <- EitherT.fromEither[FutureUnlessShutdown](
-            partyReplications
-              .get(requestId)
-              .toRight(s"Unknown party replication $requestId")
-          )
-          previousParams <- EitherT.fromEither[FutureUnlessShutdown](status match {
-            case PartyReplicationStatus.ConnectionEstablished(params) =>
-              Right(params)
-            case PartyReplicationStatus.ReplicatingAcs(params, _) =>
-              Right(params)
-            case unexpectedStatus =>
-              Left(
-                s"Party replication $requestId status ${unexpectedStatus.code} not expected"
+          processorInfo <-
+            if (participantId == params.sourceParticipantId) {
+              EitherT.rightT[FutureUnlessShutdown, String](
+                (processor, status.params.targetParticipantId, /* isSessionKeyOwner = */ false)
               )
-          })
+            } else if (participantId == params.targetParticipantId) {
+              EitherT.rightT[FutureUnlessShutdown, String](
+                (processor, status.params.sourceParticipantId, /* isSessionKeyOwner = */ true)
+              )
+            } else {
+              EitherT.leftT[
+                FutureUnlessShutdown,
+                (PartyReplicationProcessor, ParticipantId, Boolean),
+              ](
+                s"participant $participantId is neither source nor target"
+              )
+            }
+          (processor, counterParticipantId, isSessionKeyOwner) = processorInfo
+          // Error during attempt to reconnect should not terminally fail OnPR.
+          // Instead, turn an error into an optional message as an indication that
+          // a retry is warranted.
+          cannotReconnectMessageO <- EitherT
+            .right[String](
+              // Before attempting to reconnect via the bidirectionally streaming request,
+              // try a channel-ping because the former does not return an error immediately,
+              // but subsequently produces another disconnect. Doing a ping lowers the
+              // chances of unnecessary and noisy status-change toggling.
+              channelClient
+                .ping(sequencerId)
+                .flatMap(_ =>
+                  channelClient
+                    .connectToSequencerChannel(
+                      sequencerId,
+                      SequencerChannelId(requestId.toHexString),
+                      counterParticipantId,
+                      processor,
+                      isSessionKeyOwner,
+                      effectiveAt,
+                    )
+                    .mapK(FutureUnlessShutdown.liftK)
+                )
+                .value
+                .map(_.swap.toOption)
+            )
         } yield {
-          val newStatus = PartyReplicationStatus.ReplicatingAcs(
-            previousParams,
-            contractsReplicated,
-          )
-          partyReplications.put(requestId, newStatus).discard
-        },
-      )
+          cannotReconnectMessageO.fold {
+            val newStatus =
+              ConnectionEstablished(
+                params,
+                sequencerId,
+                damlAgreementCid,
+                effectiveAt,
+                processor,
+              )
+            logger.info(s"Party replication $requestId reconnected to sequencer $sequencerId")
+            partyReplications.put(requestId, newStatus).discard
+          } { cannotReconnectMsg =>
+            logger.info(
+              s"Party replication $requestId not yet able to reconnect to sequencer $sequencerId: $cannotReconnectMsg"
+            )
+          }
+        }
     }
-  }
 
-  private def markComplete(requestId: AddPartyRequestId, tc: TraceContext)(
-      contractsReplicated: NonNegativeInt
-  ): Unit = {
+  /** Transition to the replicating state if the replicated contracts count is greater than 0.
+    */
+  private def markAcsReplicating(
+      requestId: AddPartyRequestId
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] =
+    ensureParticipantStateAndSynchronizerConnected[
+      PartyReplicationStatus.ConnectionEstablished
+    ](requestId) { case (connectionEstablished, _, _) =>
+      if (connectionEstablished.replicatedContractsCount.unwrap > 0) {
+        val newStatus = PartyReplicationStatus.ReplicatingAcs(connectionEstablished)
+        partyReplications.put(requestId, newStatus).discard
+      }
+      EitherTUtil.unitUS
+    }
+
+  private def markAcsFullyReplicated(requestId: AddPartyRequestId)(tc: TraceContext): Unit = {
     implicit val traceContext: TraceContext = tc
-    executeAsync(s"progress party replication $requestId") {
-      recordIfError(
-        requestId,
-        for {
-          status <- EitherT.fromEither[FutureUnlessShutdown](
-            partyReplications
-              .get(requestId)
-              .toRight(s"Unknown party replication $requestId")
-          )
-          replicatingAcs <- EitherT.fromEither[FutureUnlessShutdown](
-            status
-              .select[PartyReplicationStatus.ReplicatingAcs]
-              .toRight(s"Party replication $requestId status $status not expected")
-          )
-        } yield {
-          val newStatus = PartyReplicationStatus.Completed(
-            replicatingAcs.authorizedParams,
-            contractsReplicated,
-          )
-          partyReplications.put(requestId, newStatus).discard
-        },
-      )
+    executeAsync(requestId, "finish acs replication") {
+      for {
+        status <- EitherT.fromEither[FutureUnlessShutdown](
+          partyReplications
+            .get(requestId)
+            .toRight(s"Unknown party replication $requestId")
+        )
+        newStatus <- EitherT.fromEither[FutureUnlessShutdown](status match {
+          case ce: PartyReplicationStatus.ConnectionEstablished =>
+            Right(PartyReplicationStatus.FullyReplicatedAcs(ce))
+          case ra: PartyReplicationStatus.ReplicatingAcs =>
+            Right(PartyReplicationStatus.FullyReplicatedAcs(ra))
+          case unexpectedStatus =>
+            Left(
+              s"Party replication $requestId status ${unexpectedStatus.code} not expected upon processor completion"
+            )
+        })
+      } yield partyReplications.put(requestId, newStatus).discard
     }
   }
 
-  private def executeAsync(
-      operation: String
-  )(code: => FutureUnlessShutdown[Unit])(implicit traceContext: TraceContext): Unit = {
+  private def finishPartyReplication(requestId: AddPartyRequestId)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, Unit] =
+    ensureParticipantStateAndSynchronizerConnected[
+      PartyReplicationStatus.FullyReplicatedAcs
+    ](requestId) { case (status, connectedSynchronizer, _) =>
+      for {
+        isAgreementArchived <- EitherT.right[String](
+          markOnPRAgreementDone(
+            PartyReplicationAgreementParams.fromAgreedReplicationStatus(status),
+            status.damlAgreementCid,
+            traceContext,
+          )
+        )
+        isPartyOnboarded <- topologyWorkflow.authorizeOnboardedTopology(
+          status.params,
+          status.effectiveAt,
+          connectedSynchronizer.ephemeral.timeTracker,
+          connectedSynchronizer.synchronizerHandle.syncPersistentState.topologyManager,
+          connectedSynchronizer.synchronizerHandle.syncPersistentState.topologyStore,
+          connectedSynchronizer.synchronizerHandle.topologyClient,
+        )
+      } yield {
+        if (isAgreementArchived && isPartyOnboarded) {
+          logger.info(s"Party replication $requestId has completed")
+          partyReplications.put(requestId, PartyReplicationStatus.Completed(status)).discard
+        } else {
+          logger.debug(
+            s"Party replication $requestId not yet completed. AgreementArchived $isAgreementArchived, PartyOnboarded $isPartyOnboarded."
+          )
+        }
+      }
+    }
+
+  private def recordError(requestId: AddPartyRequestId, tc: TraceContext)(error: String): Unit = {
+    implicit val traceContext: TraceContext = tc
+    logger.error(s"Party replication $requestId failed: $error")
+    executeAsync(requestId, "error party replication") {
+      EitherT.leftT[FutureUnlessShutdown, Unit](error)
+    }
+  }
+
+  private def markDisconnected(
+      requestId: AddPartyRequestId
+  )(message: String, tc: TraceContext): Unit = {
+    implicit val traceContext: TraceContext = tc
+    executeAsync(requestId, "disconnect party replication") {
+      for {
+        status <- EitherT.fromEither[FutureUnlessShutdown](
+          partyReplications
+            .get(requestId)
+            .toRight(s"Unknown party replication $requestId")
+        )
+        newStatusO <- EitherT.fromEither[FutureUnlessShutdown](status match {
+          case ce: PartyReplicationStatus.ConnectionEstablished =>
+            Right(Some(PartyReplicationStatus.Disconnected(message, ce)))
+          case ra: PartyReplicationStatus.ReplicatingAcs =>
+            Right(Some(PartyReplicationStatus.Disconnected(message, ra)))
+          case PartyReplicationStatus.Error(_, _) =>
+            Right(None)
+          case unexpectedStatus =>
+            Left(
+              s"Party replication $requestId status $unexpectedStatus not expected upon channel disconnect"
+            ): Either[String, Option[PartyReplicationStatus.ConnectedPartyReplicationStatus]]
+        })
+      } yield {
+        newStatusO.foreach(partyReplications.put(requestId, _).discard)
+      }
+    }
+  }
+
+  /** Asynchronously execute the provided code block and handle the result with a custom handler.
+    * The custom "handleResult" handler allows deviating from the default error handling such as
+    * when the SP rejects a TP-proposed party replication.
+    */
+  private def executeAsyncWithCustomResultHandling[A, I](
+      requestId: I,
+      operation: String,
+  )(code: => EitherT[FutureUnlessShutdown, String, A])(
+      handleResult: I => EitherT[
+        FutureUnlessShutdown,
+        String,
+        A,
+      ] => FutureUnlessShutdown[Unit]
+  )(implicit traceContext: TraceContext): Unit = {
     logger.info(s"About to $operation")
     FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
-      executionQueue.executeUS(code, operation),
+      handleResult(requestId)(executionQueue.executeEUS[String, A](code, operation)),
       s"$operation failed",
     )
   }
 
-  private def recordIfError(
-      requestId: AddPartyRequestId,
-      resultET: => EitherT[FutureUnlessShutdown, String, Unit],
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = resultET
-    .leftMap(err =>
-      partyReplications
-        .get(requestId)
-        .fold(
-          // If party replication id is unknown, log the unexpected call.
-          logger.warn(err)
-        )(prevState =>
-          partyReplications
-            .put(
-              requestId,
-              PartyReplicationStatus.Error(err, prevState),
-            )
-            .discard
-        )
-    )
-    .merge
+  /** Asynchronously execute the provided code block reflecting any returned "left" in the error
+    * status.
+    */
+  private def executeAsync(requestId: AddPartyRequestId, operation: String)(
+      code: => EitherT[FutureUnlessShutdown, String, Unit]
+  )(implicit traceContext: TraceContext): Unit = {
+    def recordIfError(requestId: AddPartyRequestId)(
+        resultET: EitherT[FutureUnlessShutdown, String, Unit]
+    ): FutureUnlessShutdown[Unit] = resultET.leftMap { err =>
+      val previousStatusO = partyReplications.get(requestId)
+      logger.warn(previousStatusO.fold(s"Unknown request id $requestId: $err")(_ => err))
+      previousStatusO.foreach(prevState =>
+        partyReplications
+          .put(
+            requestId,
+            PartyReplicationStatus.Error(err, prevState),
+          )
+          .discard
+      )
+    }.merge
 
+    executeAsyncWithCustomResultHandling(requestId, s"$operation $requestId")(code)(recordIfError)
+  }
+
+  /** Activates progress scheduling once a new party replication request is received unless already
+    * active.
+    */
+  private def activateProgressMonitoring(
+      requestId: AddPartyRequestId
+  )(implicit traceContext: TraceContext): Unit = {
+    val previouslyActive = progressSchedulingActive.getAndSet(true)
+    if (previouslyActive) {
+      logger.info(s"Progress scheduling already active, so no need to activate for $requestId.")
+    } else {
+      logger.info(s"Activating progress scheduling for party replication $requestId.")
+      scheduleExecuteAsync(progressSchedulingInterval)(progressPartyReplication())
+    }
+  }
+
+  /** Single point of entry for progress monitoring and advancing of party replication states for
+    * those states that are driven by the party replicator.
+    */
+  private def progressPartyReplication()(implicit traceContext: TraceContext): Unit = {
+    val activePartyReplications = partyReplications.iterator.collect {
+      case (requestId, _: PartyReplicationStatus.ProgressIsExpected) => requestId
+    }
+
+    if (activePartyReplications.isEmpty) {
+      logger.info("No party replication progress to monitor, deactivating progress scheduling.")
+      progressSchedulingActive.set(false)
+    } else {
+      // Check if any OnPR work is currently running and back off if it is to avoid eagerly queuing
+      // obsolete state transitions.
+      if (!executionQueue.isEmpty) {
+        logger.debug(
+          s"Skipping progress scheduling because still busy with ${executionQueue.queued.mkString(", ")}."
+        )
+      } else {
+        // In case the set of requestIds has changed (particularly if grown) since "activePartyReplications"
+        // has been built above, we will pick it up on the next invocation scheduled below.
+        activePartyReplications.foreach { requestId =>
+          executeAsync(requestId, "progress party replication") {
+            val status = partyReplications.get(requestId).collect {
+              case status: PartyReplicationStatus.ProgressIsExpected => status
+            }
+            status.fold(EitherTUtil.unitUS[String]) {
+              case PartyReplicationStatus.ProposalProcessed(params) =>
+                logger.debug(
+                  s"Party replication $requestId proposal processed for ${params.partyId}. Progress driven by admin workflow."
+                )
+                EitherTUtil.unitUS
+              case _: PartyReplicationStatus.AgreementAccepted =>
+                logger.debug(s"Authorizing party replication $requestId topology")
+                authorizeOnboardingTopology(requestId)
+              case _: PartyReplicationStatus.TopologyAuthorized =>
+                logger.debug(s"Connecting to sequencer channel for party replication $requestId")
+                connectToSequencerChannel(requestId)
+              case PartyReplicationStatus.ConnectionEstablished(params, _, _, _, processor) =>
+                logger.debug(
+                  s"Party replication $requestId connection established for ${params.partyId}. Progress driven by processor."
+                )
+                markAcsReplicating(requestId).map(_ =>
+                  // check that processor has not gotten stuck
+                  processor.progressPartyReplication()
+                )
+              case PartyReplicationStatus.ReplicatingAcs(params, _, _, _, processor) =>
+                logger.debug(
+                  s"Party replication $requestId has replicated ${processor.replicatedContractsCount} contracts for ${params.partyId}. Progress driven by processor."
+                )
+                // check that processor has not gotten stuck
+                EitherT.rightT[FutureUnlessShutdown, String](processor.progressPartyReplication())
+              case PartyReplicationStatus.FullyReplicatedAcs(params, _, _, _, processor) =>
+                logger.debug(
+                  s"Party replication $requestId has finished replicating all ${processor.replicatedContractsCount} contracts for ${params.partyId}."
+                )
+                finishPartyReplication(requestId)(traceContext)
+              case PartyReplicationStatus.Disconnected(message, _) =>
+                logger.info(s"Party replication $requestId attempting to reconnect after: $message")
+                attemptToReconnectToSequencerChannel(requestId)
+            }
+          }
+        }
+      }
+      scheduleExecuteAsync(progressSchedulingInterval)(progressPartyReplication())
+    }
+  }
+
+  /** Asynchronous, scheduled execution relies on the clock's scheduled executor for scheduling, but
+    * relies on the simple execution queue for execution to prevent blocking the participant clock
+    * scheduler for too long. This avoids introducing another scheduler along with a mostly unused
+    * thread whenever the participant does not replicate a party.
+    */
+  private def scheduleExecuteAsync(
+      delta: PositiveFiniteDuration
+  )(code: => Unit)(implicit traceContext: TraceContext): Unit = {
+    logger.debug(s"Scheduling next check in $delta")
+    FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
+      clock.scheduleAfter(_ => code, delta.asJava),
+      "party replicator progress scheduling",
+    )
+  }
+
+  /** Ensures that a number of prerequisites are met for the party replication with the specified
+    * request id. Particularly, verify that:
+    *   1. the participant is HA-active as only the active replica should perform OnPR,
+    *   1. the request id is known,
+    *   1. the current status of the party replication is as expected,
+    *   1. the participant is connected to the synchronizer logging only if it isn't rather than
+    *      failing OnPR,
+    *   1. if connected, the synchronizer exposes a sequencer channel client.
+    *
+    * If all prerequisites are met, invokes the provided `onSuccess` callback. Returns an error if
+    * any prerequisite is not met other than synchronizer connectivity such that progress can resume
+    * upon reconnect.
+    */
   private def ensureParticipantStateAndSynchronizerConnected[
       PRS <: PartyReplicationStatus: ClassTag
   ](
       requestId: AddPartyRequestId
-  ): EitherT[
-    FutureUnlessShutdown,
-    String,
-    (PRS, ConnectedSynchronizer, SequencerChannelClient),
-  ] = for {
-    _ <- EitherT.cond[FutureUnlessShutdown](
-      syncService.isActive(),
-      (),
-      s"Participant $participantId is inactive. Not processing party replication $requestId",
-    )
-    status <- EitherT.fromEither[FutureUnlessShutdown](
-      partyReplications
-        .get(requestId)
-        .toRight(s"Unknown party replication $requestId")
-    )
-    expectedStatus <- EitherT.fromEither[FutureUnlessShutdown](
-      status
-        .select[PRS]
-        .toRight(s"Party replication $requestId status $status not expected")
-    )
-    connectedSynchronizer <-
-      EitherT.fromEither[FutureUnlessShutdown](
-        syncService
-          .readyConnectedSynchronizerById(status.params.synchronizerId)
-          .toRight(
-            s"Synchronizer ${status.params.synchronizerId} not connected, but needed for $requestId"
-          )
+  )(
+      onSuccess: (
+          PRS,
+          ConnectedSynchronizer,
+          SequencerChannelClient,
+      ) => EitherT[FutureUnlessShutdown, String, Unit]
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] = {
+    val stateET = for {
+      _ <- EitherT.cond[FutureUnlessShutdown](
+        syncService.isActive(),
+        (),
+        AddPartyError.Other
+          .Failure(requestId, s"Stopping as participant $participantId is inactive"),
       )
-    channelClient <- EitherT.fromEither[FutureUnlessShutdown](
-      connectedSynchronizer.synchronizerHandle.sequencerChannelClientO.toRight(
-        s"Synchronizer ${status.params.synchronizerId} does not expose sequencer channel client needed for $requestId"
+      status <- EitherT.fromEither[FutureUnlessShutdown](
+        partyReplications
+          .get(requestId)
+          .toRight(AddPartyError.Other.Failure(requestId, "Unknown request id"))
       )
-    )
-  } yield (expectedStatus, connectedSynchronizer, channelClient)
+      expectedStatus <- EitherT.fromEither[FutureUnlessShutdown](
+        status
+          .select[PRS]
+          .toRight(AddPartyError.Other.Failure(requestId, s"Unexpected status $status"))
+      )
+      connectedSynchronizer <-
+        EitherT.fromEither[FutureUnlessShutdown](
+          syncService
+            .readyConnectedSynchronizerById(status.params.synchronizerId)
+            .toRight(
+              AddPartyError.DisconnectedFromSynchronizer.Failure(
+                requestId,
+                status.params.synchronizerId,
+                s"Synchronizer ${status.params.synchronizerId} not connected during ${expectedStatus.code}",
+              )
+            )
+        )
+      channelClient <- EitherT.fromEither[FutureUnlessShutdown](
+        connectedSynchronizer.synchronizerHandle.sequencerChannelClientO.toRight(
+          AddPartyError.Other.Failure(
+            requestId,
+            s"Synchronizer ${status.params.synchronizerId} does not expose necessary sequencer channel client",
+          ): AddPartyError
+        )
+      )
+    } yield (expectedStatus, connectedSynchronizer, channelClient)
 
-  override protected def onClosed(): Unit = LifeCycle.close(executionQueue)(logger)
+    // Skip processing if the participant is not connected to the synchronizer instead of returning an error.
+    stateET.biflatMap(
+      {
+        case AddPartyError.DisconnectedFromSynchronizer.Failure(requestId, synchronizerId, err) =>
+          logger.info(
+            s"Party replication $requestId disconnected from synchronizer $synchronizerId. Waiting until reconnect: $err"
+          )
+          EitherTUtil.unitUS
+        case err: AddPartyError.Other.Failure =>
+          EitherT.leftT[FutureUnlessShutdown, Unit](err.cause)
+      },
+      onSuccess.tupled,
+    )
+  }
+
+  private[party] def retryUntilLocalStoreUpdatedInExpectedState(
+      operation: String
+  )(
+      checkLocalStoreState: String => FutureUnlessShutdown[Either[String, Unit]]
+  )(implicit traceContext: TraceContext) =
+    EitherT(
+      retry
+        .Backoff(
+          logger,
+          this,
+          maxRetries = timeouts.unbounded.retries(1.second),
+          initialDelay = 1.second,
+          maxDelay = 10.seconds,
+          operationName = operation,
+        )
+        .unlessShutdown(
+          checkLocalStoreState(operation),
+          DbExceptionRetryPolicy,
+        )
+    )
+
+  override protected def onClosed(): Unit = {
+
+    def getProcessors: Seq[AutoCloseable] =
+      partyReplications.iterator.toSeq
+        .collect[PartyReplicationStatus.ConnectedPartyReplicationStatus] {
+          case (_, ce: PartyReplicationStatus.ConnectionEstablished) => ce
+          case (_, ra: PartyReplicationStatus.ReplicatingAcs) => ra
+          case (_, fr: PartyReplicationStatus.FullyReplicatedAcs) => fr
+          case (_, co: PartyReplicationStatus.Completed) => co
+        }
+        .map(_.partyReplicationProcessor)
+
+    // Close the execution queue first to prevent activity and races wrt partyReplications.
+    LifeCycle.close((executionQueue +: topologyWorkflow +: getProcessors)*)(logger)
+  }
+}
+
+object PartyReplicator {
+  type AddPartyRequestId = Hash
+
+  lazy val defaultPingParallelism: PositiveInt = PositiveInt.tryCreate(4)
+  lazy val defaultProgressSchedulingInterval: PositiveFiniteDuration =
+    PositiveFiniteDuration.ofSeconds(1L)
 }

@@ -2,13 +2,20 @@ package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendTestCommon
-import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvAppClient.DsoInfo
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient.DsoInfo
 import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.duration.*
 
 trait SvUiPreflightIntegrationTestUtil extends TestCommon {
 
   this: FrontendTestCommon =>
+
+  protected val coreSvIngressNames = Map(
+    "sv1" -> "sv-2",
+    "sv2" -> "sv-2-eng",
+    "sv3" -> "sv-3-eng",
+    "svda1" -> "sv-1",
+  );
 
   def testSvUi(
       svUiUrl: String,
@@ -42,14 +49,14 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
         },
       )
 
-      actAndCheck("Go to general information tab", click on "navlink-dso")(
+      actAndCheck("Go to general information tab", eventuallyClickOn(id("navlink-dso")))(
         "button for domain status appears",
         _ => find(id("information-tab-canton-domain-status")) should not be empty,
       )
 
       actAndCheck(
-        "Click on domain status tab",
-        click on "information-tab-canton-domain-status",
+        "eventuallyClickOn(id(domain status tab",
+        eventuallyClickOn(id("information-tab-canton-domain-status")),
       )(
         "Observe sequencer and mediator as active",
         _ => {
@@ -59,10 +66,10 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
         },
       )
 
-      clue("SVs 1-4 have placed a amulet price vote") {
+      clue("SVs 1-3 + DA-1 have placed a amulet price vote") {
         actAndCheck(
           "Opening amulet price tab",
-          click on "navlink-amulet-price",
+          eventuallyClickOn(id("navlink-amulet-price")),
         )(
           s"We see that this SV and the other SVs have placed a amulet price vote",
           _ => {
@@ -73,7 +80,7 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
                 e.text should fullyMatch regex priceR
               }
             }
-            clue(s"We see, via this SV's UI, that all others of SV1-4 have voted") {
+            clue(s"We see, via this SV's UI, that all others of SV1-3 + DA-1 have voted") {
               val votes = findAll(className("amulet-price-table-row"))
                 .map(row =>
                   (PartyId
@@ -92,10 +99,11 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
         dumpDebugInfoOnFailure {
           val (_, oldFirstSecret) = actAndCheck(
             "Opening validator onboarding tab",
-            click on "navlink-validator-onboarding",
+            eventuallyClickOn(id("navlink-validator-onboarding")),
           )(
             s"Creating an onboarding secret",
             _ => {
+              waitForQuery(id("create-party-hint"))
               waitForQuery(id("create-validator-onboarding-secret"))
               waitForQuery(className("onboarding-secret-table"))
               val secretsItr = findAll(className("onboarding-secret-table-secret"))
@@ -103,8 +111,23 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
             },
           )
           actAndCheck(timeUntilSuccess = 2.minutes)(
-            "click",
-            click on "create-validator-onboarding-secret",
+            "fill the party hint field and eventuallyClickOn(id(the button to create an onboarding secret", {
+              clue("fill party hint") {
+                inside(find(id("create-party-hint"))) { case Some(element) =>
+                  element.underlying.sendKeys("splice-client-10")
+                }
+              }
+
+              clue("wait for the create button to become enabled") {
+                eventually() {
+                  find(id("create-validator-onboarding-secret")).value.isEnabled shouldBe true
+                }
+              }
+
+              clue("click the create validator onboarding secret button") {
+                eventuallyClickOn(id("create-validator-onboarding-secret"))
+              }
+            },
           )(
             s"We see that this SV has created an onboarding secret",
             _ => {
@@ -112,7 +135,7 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
               val firstSecret = if (secretsItr.hasNext) Some(secretsItr.next().text) else None
               firstSecret should not be oldFirstSecret
               inside(firstSecret) { case Some(s) =>
-                s should have size 44
+                s should not be ""
               }
             },
           )
@@ -122,20 +145,20 @@ trait SvUiPreflightIntegrationTestUtil extends TestCommon {
       extraChecks
 
       clue(s"We can log out of this SV's UI") {
-        click on "logout-button"
+        eventuallyClickOn(id("logout-button"))
         waitForQuery(id("oidc-login-button"))
       }
     }
 
   }
 
-  def withWebUiSv[A](i: Int)(f: WebDriverType => A): A = {
-    val ingressName = if (i == 1) "sv-2" else s"sv-$i-eng"
+  def withWebUiSv[A](svName: String)(f: WebDriverType => A): A = {
+    val ingressName = coreSvIngressNames.get(svName).value
     val svUiUrl = s"https://sv.${ingressName}.${sys.env("NETWORK_APPS_ADDRESS")}/";
-    val svUsername = s"admin@sv$i-dev.com";
+    val svUsername = s"admin@${svName}-dev.com";
     val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD")
 
-    withWebUiSv(s"sv$i", svUiUrl, svUsername, svPassword)(f)
+    withWebUiSv(svName, svUiUrl, svUsername, svPassword)(f)
   }
 
   def withWebUiSvRunbook[A](f: WebDriverType => A): A = {

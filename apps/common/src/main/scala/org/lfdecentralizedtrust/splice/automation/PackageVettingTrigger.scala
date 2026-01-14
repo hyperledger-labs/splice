@@ -15,6 +15,7 @@ import scala.concurrent.Future
 abstract class PackageVettingTrigger(
     packages: Set[PackageIdResolver.Package],
     maxVettingDelay: NonNegativeFiniteDuration,
+    latestPackagesOnly: Boolean,
 ) extends PollingTrigger
     with PackageIdResolver.HasAmuletRules
     with PackageVetting.HasVoteRequests {
@@ -30,6 +31,7 @@ abstract class PackageVettingTrigger(
     context.clock,
     participantAdminConnection,
     loggerFactory,
+    latestPackagesOnly,
   )
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {

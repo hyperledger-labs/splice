@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.migration
 
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.util.UploadablePackage
-import com.digitalasset.canton.config.{SynchronizerTimeTrackerConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.{NonNegativeFiniteDuration, SynchronizerTimeTrackerConfig}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.SynchronizerAlias
@@ -14,35 +14,43 @@ import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.topology.SynchronizerId
 import com.google.protobuf.ByteString
 
+import scala.annotation.{nowarn, unused}
 import scala.concurrent.{ExecutionContext, Future}
 
 class DomainDataRestorer(
     participantAdminConnection: ParticipantAdminConnection,
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration,
+    timeTrackerObservationLatency: NonNegativeFiniteDuration,
+    @unused newSequencerConnectionPool: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
   /** We assume the domain was not register prior to trying to restore the data.
     */
+  @nowarn("cat=unused&msg=synchronizerId")
   def connectDomainAndRestoreData(
       synchronizerAlias: SynchronizerAlias,
       synchronizerId: SynchronizerId,
       sequencerConnections: SequencerConnections,
       dars: Seq[Dar],
-      acsSnapshot: ByteString,
+      acsSnapshot: Seq[ByteString],
+      legacyAcsImport: Boolean,
   )(implicit
       tc: TraceContext
   ): Future[Unit] = {
     def restoreData() = {
       val domainConnectionConfig = SynchronizerConnectionConfig(
         synchronizerAlias,
-        synchronizerId = Some(synchronizerId),
+        synchronizerId = None,
+        // TODO(#19804) Consider whether we can add back the safeguard here.
+        // synchronizerId = Some(synchronizerId),
         sequencerConnections = sequencerConnections,
         manualConnect = true,
         initializeFromTrustedSynchronizer = true,
         timeTracker = SynchronizerTimeTrackerConfig(
-          minObservationDuration = timeTrackerMinObservationDuration
+          minObservationDuration = timeTrackerMinObservationDuration,
+          observationLatency = timeTrackerObservationLatency,
         ),
       )
       // We rely on the calls here being idempotent
@@ -58,10 +66,12 @@ class DomainDataRestorer(
               RetryFor.ClientCalls,
             )
         _ = logger.info("Importing the ACS")
-        _ <- importAcs(acsSnapshot)
+        _ <- importAcs(acsSnapshot, legacyAcsImport)
         _ = logger.info("Imported the ACS")
         _ <- participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
           synchronizerAlias,
+          // TODO(#3455) re-enable based on config flag once it's fixed
+          newSequencerConnectionPool = false,
           config => Some(config.copy(manualConnect = false)),
         )
       } yield ()
@@ -87,10 +97,18 @@ class DomainDataRestorer(
       }
   }
 
-  private def importAcs(acs: ByteString)(implicit tc: TraceContext) = {
-    participantAdminConnection.uploadAcsSnapshot(
-      acs
-    )
+  private def importAcs(acs: Seq[ByteString], legacyAcsImport: Boolean)(implicit
+      tc: TraceContext
+  ) = {
+    if (legacyAcsImport) {
+      participantAdminConnection.uploadAcsSnapshotLegacy(
+        acs
+      )
+    } else {
+      participantAdminConnection.uploadAcsSnapshot(
+        acs
+      )
+    }
   }
 
   private def importDars(dars: Seq[Dar])(implicit tc: TraceContext) = {

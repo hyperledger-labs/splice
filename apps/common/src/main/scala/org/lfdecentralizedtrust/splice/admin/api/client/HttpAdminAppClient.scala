@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.admin.api.client
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.environment.SpliceStatus
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions
@@ -15,45 +15,36 @@ import org.lfdecentralizedtrust.splice.http.v0.external.common_admin.CommonAdmin
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.NonNegativeDuration
-import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.OffsetDateTime
 import scala.concurrent.{ExecutionContext, Future}
 
 object PrefixedCommonAdminClient {
   def apply(host: String, basePath: String)(implicit
-      httpClient: HttpRequest => Future[HttpResponse],
+      httpClientFn: HttpRequest => Future[HttpResponse],
       ec: ExecutionContext,
       mat: Materializer,
-  ): PrefixedCommonAdminClient = new PrefixedCommonAdminClient(host, basePath)(httpClient, ec, mat)
+  ): PrefixedCommonAdminClient =
+    new PrefixedCommonAdminClient(host, basePath)(httpClientFn, ec, mat)
 
-  def httpClient(httpClient: HttpRequest => Future[HttpResponse], host: String, basePath: String)(
+  def httpClient(basePath: String)(httpClient: HttpRequest => Future[HttpResponse], host: String)(
       implicit
       ec: ExecutionContext,
       mat: Materializer,
   ): PrefixedCommonAdminClient = new PrefixedCommonAdminClient(host, basePath)(httpClient, ec, mat)
 }
 class PrefixedCommonAdminClient(host: String, override val basePath: String)(implicit
-    httpClient: HttpRequest => Future[HttpResponse],
+    httpClientFn: HttpRequest => Future[HttpResponse],
     ec: ExecutionContext,
     mat: Materializer,
 ) extends CommonAdminClient(host) {}
 
 object HttpAdminAppClient {
-  abstract class BaseCommand[Res, Result](basePath: String) extends HttpCommand[Res, Result] {
-    override type Client = PrefixedCommonAdminClient
-
-    override def createClient(host: String)(implicit
-        httpClient: HttpClient,
-        tc: TraceContext,
-        ec: ExecutionContext,
-        mat: Materializer,
-    ): Client =
-      PrefixedCommonAdminClient.httpClient(
-        HttpClientBuilder().buildClient(),
-        host,
-        basePath,
-      )
+  type Client = PrefixedCommonAdminClient
+  abstract class BaseCommand[Res, Result](basePath: String)
+      extends HttpCommand[Res, Result, Client] {
+    val createGenClientFn = (fn, host, ec, mat) =>
+      PrefixedCommonAdminClient.httpClient(basePath)(fn, host)(ec, mat)
   }
 
   case class GetHealthStatus[S <: NodeStatus.Status](
@@ -77,14 +68,15 @@ object HttpAdminAppClient {
 
   case class GetVersion(basePath: String)
       extends BaseCommand[externalHttp.GetVersionResponse, VersionInfo](basePath) {
+    override val createGenClientFn = (fn, host, ec, mat) =>
+      PrefixedCommonAdminClient.httpClient(basePath)(fn, host)(ec, mat)
 
-    override def createClient(host: String)(implicit
+    override def httpClientFn()(implicit
         httpClient: HttpClient,
-        tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
-    ): PrefixedCommonAdminClient = PrefixedCommonAdminClient.httpClient(
-      HttpClientBuilder()(
+    ): HttpRequest => Future[HttpResponse] =
+      HttpClient.createHttpFn(clientName, operationName)(
         httpClient.withOverrideParameters(
           // Getting the version of an app is done on startup.
           // If there's no response within 5s, we assume the app to be down.
@@ -92,10 +84,7 @@ object HttpAdminAppClient {
         ),
         ec,
         mat,
-      ).buildClient(),
-      host,
-      basePath,
-    )
+      )
 
     override def submitRequest(
         client: Client,

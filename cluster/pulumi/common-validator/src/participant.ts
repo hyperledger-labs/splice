@@ -6,16 +6,17 @@ import {
   Auth0Config,
   auth0UserNameEnvVarSource,
   ChartValues,
-  DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
+  getAdditionalJvmOptions,
   getParticipantKmsHelmResources,
   installSpliceHelmChart,
-  jmxOptions,
   loadYamlFromFile,
   sanitizedForPostgres,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
+  spliceConfig,
+  getLedgerApiAudience,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { ValidatorNodeConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
@@ -26,7 +27,7 @@ export function installParticipant(
   migrationId: DomainMigrationIndex,
   xns: ExactNamespace,
   auth0Config: Auth0Config,
-  nodeIdentifier: string,
+  disableAuth?: boolean,
   version: CnChartVersion = activeVersion,
   defaultPostgres?: postgres.Postgres,
   customOptions?: SpliceCustomResourceOptions
@@ -38,7 +39,14 @@ export function installParticipant(
 
   const participantPostgres =
     defaultPostgres ||
-    postgres.installPostgres(xns, `participant-pg`, `participant-pg`, activeVersion, true);
+    postgres.installPostgres(
+      xns,
+      `participant-pg`,
+      `participant-pg`,
+      activeVersion,
+      spliceConfig.pulumiProjectConfig.cloudSql,
+      true
+    );
   const participantValues: ChartValues = {
     ...loadYamlFromFile(
       `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`,
@@ -60,7 +68,7 @@ export function installParticipant(
     ...participantValues,
     auth: {
       ...participantValues.auth,
-      targetAudience: auth0Config.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
+      targetAudience: getLedgerApiAudience(auth0Config, xns.logicalName),
     },
   };
 
@@ -73,6 +81,7 @@ export function installParticipant(
     {
       ...participantValuesWithSpecifiedAud,
       logLevel: validatorConfig.logging?.level,
+      logAsyncFlush: validatorConfig.logging?.async,
       persistence: {
         databaseName: pgName,
         schema: 'participant',
@@ -88,7 +97,12 @@ export function installParticipant(
           active: true,
         },
       },
-      additionalJvmOptions: jmxOptions(),
+      additionalJvmOptions: getAdditionalJvmOptions(
+        validatorConfig.participant?.additionalJvmOptions
+      ),
+      additionalEnvVars: (participantValuesWithSpecifiedAud.additionalEnvVars ?? []).concat(
+        validatorConfig.participant?.additionalEnvVars ?? []
+      ),
       enablePostgresMetrics: true,
       resources: {
         requests: {
@@ -98,6 +112,7 @@ export function installParticipant(
           memory: '8Gi',
         },
       },
+      disableAuth: disableAuth || false,
     },
     version,
     {

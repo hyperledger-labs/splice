@@ -19,13 +19,20 @@ import com.digitalasset.canton.version.ProtocolVersion
 
 println("Running canton bootstrap script...")
 
+val tokenFile = System.getenv("CANTON_TOKEN_FILENAME")
+if (tokenFile == null) {
+  sys.error("Environment variable CANTON_TOKEN_FILENAME was not set")
+}
+
 val domainParametersConfig = SynchronizerParametersConfig(
-  alphaVersionSupport = true
+  alphaVersionSupport = true,
+  // simtime does not work with non-zero topology change delay so we overwrite it matching the Canton tests
+  topologyChangeDelay = Some(if (tokenFile == "canton-simtime.tokens") NonNegativeFiniteDuration.Zero else NonNegativeFiniteDuration.ofMillis(250)),
 )
 
 def staticParameters(sequencer: LocalInstanceReference) =
   domainParametersConfig
-    .toStaticSynchronizerParameters(sequencer.config.crypto, ProtocolVersion.v33)
+    .toStaticSynchronizerParameters(sequencer.config.crypto, ProtocolVersion.v34, NonNegativeInt.zero)
     .map(StaticSynchronizerParameters(_))
     .getOrElse(sys.error("whatever"))
 
@@ -107,14 +114,10 @@ Files.write(
 println(s"Collecting admin tokens...")
 val adminTokensData = ListBuffer[(String, String)]()
 participants.local.foreach(participant => {
-  val adminToken = participant.underlying.map(_.adminToken.secret).getOrElse("")
+  val adminToken = participant.underlying.map(_.adminTokenDispenser.getCurrentToken.secret).getOrElse("")
   val port = participant.config.ledgerApi.internalPort.get.unwrap
   adminTokensData.append(s"$port" -> adminToken)
 })
-val tokenFile = System.getenv("CANTON_TOKEN_FILENAME")
-if (tokenFile == null) {
-  sys.error("Environment variable CANTON_TOKEN_FILENAME was not set")
-}
 println(s"Writing admin tokens file to $tokenFile...")
 val adminTokensContent =
   adminTokensData.map(x => s"${x._1} ${x._2}").mkString(System.lineSeparator())

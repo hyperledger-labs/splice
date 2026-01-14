@@ -5,17 +5,21 @@ package com.digitalasset.canton.participant.store.memory
 
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
+import com.digitalasset.canton.data.{BufferedAcsCommitment, CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.event.RecordTime
-import com.digitalasset.canton.participant.store.AcsCommitmentStore.ParticipantCommitmentData
+import com.digitalasset.canton.participant.store.AcsCommitmentStore.{
+  ParticipantCommitmentData,
+  ReinitializationStatus,
+}
 import com.digitalasset.canton.participant.store.{
   AcsCommitmentStore,
   AcsCounterParticipantConfigStore,
   CommitmentQueue,
   IncrementalCommitmentStore,
+  UpdateMode,
 }
 import com.digitalasset.canton.protocol.messages.{
   AcsCommitment,
@@ -27,7 +31,7 @@ import com.digitalasset.canton.store.memory.InMemoryPrunableByTime
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
-import com.digitalasset.canton.util.IterableUtil.Ops
+import com.digitalasset.canton.util.collection.IterableUtil.Ops
 
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.annotation.tailrec
@@ -209,7 +213,7 @@ class InMemoryAcsCommitmentStore(
   override def outstanding(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipant: Seq[ParticipantId],
+      counterParticipantsFilter: Option[NonEmpty[Seq[ParticipantId]]] = None,
       includeMatchedPeriods: Boolean,
   )(implicit
       traceContext: TraceContext
@@ -217,10 +221,9 @@ class InMemoryAcsCommitmentStore(
     FutureUnlessShutdown.pure(
       _outstanding.get
         .filter { case (period, participant, state, _) =>
-          (counterParticipant.isEmpty ||
-            counterParticipant.contains(participant)) &&
+          counterParticipantsFilter.fold(true)(_.contains(participant)) &&
           period.fromExclusive < end &&
-          period.toInclusive >= start &&
+          period.toInclusive > start &&
           (includeMatchedPeriods || state != CommitmentPeriodState.Matched)
         }
         .map { case (period, participant, state, _) => (period, participant, state) }
@@ -229,22 +232,22 @@ class InMemoryAcsCommitmentStore(
   override def searchComputedBetween(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipant: Seq[ParticipantId] = Seq.empty,
+      counterParticipantsFilter: Option[NonEmpty[Seq[ParticipantId]]] = None,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[
     Iterable[(CommitmentPeriod, ParticipantId, AcsCommitment.HashedCommitmentType)]
   ] = {
-    val filteredByCounterParty =
-      if (counterParticipant.isEmpty) computed
-      else computed.filter(c => counterParticipant.contains(c._1))
+    val filteredByCounterParty = counterParticipantsFilter.fold(computed)(participants =>
+      computed.filter { case (counterParticipant, _) => participants.contains(counterParticipant) }
+    )
 
     FutureUnlessShutdown.pure(
       filteredByCounterParty.flatMap { case (p, m) =>
         LazyList
           .continually(p)
           .lazyZip(m.filter { case (period, _) =>
-            start <= period.toInclusive && period.fromExclusive < end
+            start < period.toInclusive && period.fromExclusive < end
           })
           .map { case (p, (period, cmt)) =>
             (period, p, cmt)
@@ -256,18 +259,22 @@ class InMemoryAcsCommitmentStore(
   override def searchReceivedBetween(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipant: Seq[ParticipantId] = Seq.empty,
+      counterParticipantsFilter: Option[NonEmpty[Seq[ParticipantId]]] = None,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Iterable[SignedProtocolMessage[AcsCommitment]]] = {
-    val filteredByCounterParty = (if (counterParticipant.isEmpty) received
-                                  else
-                                    received.filter(c => counterParticipant.contains(c._1))).values
+    val filteredByCounterParty = counterParticipantsFilter
+      .fold(received)(participants =>
+        received.filter { case (counterParticipant, _) =>
+          participants.contains(counterParticipant)
+        }
+      )
+      .values
 
     FutureUnlessShutdown.pure(
       filteredByCounterParty.flatMap(msgs =>
         msgs.filter(msg =>
-          start <= msg.message.period.toInclusive && msg.message.period.fromExclusive < end
+          start < msg.message.period.toInclusive && msg.message.period.fromExclusive < end
         )
       )
     )
@@ -334,13 +341,19 @@ class InMemoryIncrementalCommitments(
 ) extends IncrementalCommitmentStore {
   private val snap: TrieMap[SortedSet[LfPartyId], AcsCommitment.CommitmentType] = TrieMap.empty
   snap ++= initialHashes
+  private val checkpointSnap: TrieMap[SortedSet[LfPartyId], AcsCommitment.CommitmentType] =
+    TrieMap.empty
+  checkpointSnap ++= initialHashes
 
   private val rt: AtomicReference[RecordTime] = new AtomicReference(initialRt)
+  private val checkpointRt: AtomicReference[RecordTime] = new AtomicReference(initialRt)
+
+  private val reinitStarted: AtomicReference[Option[CantonTimestamp]] = new AtomicReference(None)
+  private val reinitCompleted: AtomicReference[Option[CantonTimestamp]] = new AtomicReference(None)
 
   private object lock
 
-  /** Update the snapshot */
-  private def update_(
+  private def updateSnap(
       rt: RecordTime,
       updates: Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType],
       deletes: Set[SortedSet[LfPartyId]],
@@ -353,28 +366,91 @@ class InMemoryIncrementalCommitments(
     }
   }
 
-  private def watermark_(): RecordTime = rt.get()
+  private def updateCheckpointSnap(
+      rt: RecordTime,
+      updates: Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType],
+      deletes: Set[SortedSet[LfPartyId]],
+  ): Unit = blocking {
+    lock.synchronized {
+      this.checkpointRt.set(rt)
+      checkpointSnap --= deletes
+      checkpointSnap ++= updates
+      ()
+    }
+  }
+
+  /** Update the snapshot */
+  private def update_(
+      rt: RecordTime,
+      updates: Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType],
+      deletes: Set[SortedSet[LfPartyId]],
+      updateMode: UpdateMode,
+  ): Unit =
+    updateMode match {
+      case UpdateMode.Checkpoint =>
+        updateCheckpointSnap(rt, updates, deletes)
+      case UpdateMode.Efficiency =>
+        updateSnap(rt, updates, deletes)
+    }
+
+  private def watermark_(): RecordTime = checkpointRt.get()
 
   /** A read-only version of the snapshot.
     */
   def snapshot: TrieMap[SortedSet[LfPartyId], AcsCommitment.CommitmentType] = snap.snapshot()
+  def checkpointSnapshot: TrieMap[SortedSet[LfPartyId], AcsCommitment.CommitmentType] =
+    checkpointSnap.snapshot()
 
   override def get()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[(RecordTime, Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType])] = {
     val rt = watermark_()
-    FutureUnlessShutdown.pure((rt, snapshot.toMap))
+    FutureUnlessShutdown.pure((rt, checkpointSnapshot.toMap))
   }
 
   override def update(
       rt: RecordTime,
       updates: Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType],
       deletes: Set[SortedSet[LfPartyId]],
+      updateMode: UpdateMode,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
-    FutureUnlessShutdown.pure(update_(rt, updates, deletes))
+    FutureUnlessShutdown.pure(update_(rt, updates, deletes, updateMode))
 
   override def watermark(implicit traceContext: TraceContext): FutureUnlessShutdown[RecordTime] =
     FutureUnlessShutdown.pure(watermark_())
+
+  override def readReinitilizationStatus()(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[ReinitializationStatus] = {
+    val (started, completed) = blocking {
+      lock.synchronized {
+        (reinitStarted.get(), reinitCompleted.get())
+      }
+    }
+    FutureUnlessShutdown.pure(ReinitializationStatus(started, completed))
+  }
+
+  override def markReinitializationStarted(timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Unit] = {
+    reinitStarted.set(Some(timestamp))
+    FutureUnlessShutdown.pure(())
+  }
+
+  override def markReinitializationCompleted(timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Boolean] = {
+    val completedSuccessfully = blocking {
+      lock.synchronized {
+        val changeConditionMet = reinitStarted.get().contains(timestamp)
+        if (changeConditionMet) {
+          reinitCompleted.set(Some(timestamp))
+        }
+        changeConditionMet
+      }
+    }
+    FutureUnlessShutdown.pure(completedSuccessfully)
+  }
 }
 
 class InMemoryCommitmentQueue(implicit val ec: ExecutionContext) extends CommitmentQueue {
@@ -383,10 +459,12 @@ class InMemoryCommitmentQueue(implicit val ec: ExecutionContext) extends Commitm
 
   /* Access must be synchronized, since PriorityQueue doesn't support concurrent
     modifications. */
-  private val queue: mutable.PriorityQueue[AcsCommitment] =
+  private val queue: mutable.PriorityQueue[BufferedAcsCommitment] =
     // Queues dequeue in max-first, so make the lowest timestamp the maximum
     mutable.PriorityQueue.empty(
-      Ordering.by[AcsCommitment, CantonTimestampSecond](cmt => cmt.period.toInclusive).reverse
+      Ordering
+        .by[BufferedAcsCommitment, CantonTimestampSecond](cmt => cmt.period.toInclusive)
+        .reverse
     )
 
   private object lock
@@ -399,7 +477,7 @@ class InMemoryCommitmentQueue(implicit val ec: ExecutionContext) extends Commitm
   override def enqueue(
       commitment: AcsCommitment
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = sync {
-    queue.enqueue(commitment)
+    queue.enqueue(commitment.toQueuedAcsCommitment)
   }
 
   /** Returns all commitments whose period ends at or before the given timestamp.
@@ -408,7 +486,7 @@ class InMemoryCommitmentQueue(implicit val ec: ExecutionContext) extends Commitm
     */
   override def peekThrough(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[List[AcsCommitment]] = sync {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[List[BufferedAcsCommitment]] = sync {
     queue.takeWhile(_.period.toInclusive <= timestamp).toList
   }
 
@@ -418,9 +496,16 @@ class InMemoryCommitmentQueue(implicit val ec: ExecutionContext) extends Commitm
     */
   override def peekThroughAtOrAfter(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[AcsCommitment]] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[BufferedAcsCommitment]] =
     sync {
       queue.filter(_.period.toInclusive >= timestamp).toSeq
+    }
+
+  override def nonEmptyAtOrAfter(
+      timestamp: CantonTimestamp
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Boolean] =
+    sync {
+      queue.exists(_.period.toInclusive >= timestamp)
     }
 
   def peekOverlapsForCounterParticipant(
@@ -428,7 +513,7 @@ class InMemoryCommitmentQueue(implicit val ec: ExecutionContext) extends Commitm
       counterParticipant: ParticipantId,
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Seq[AcsCommitment]] =
+  ): FutureUnlessShutdown[Seq[BufferedAcsCommitment]] =
     sync {
       queue
         .filter(_.period.overlaps(period))

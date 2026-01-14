@@ -9,21 +9,23 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, Locke
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
   AcsSnapshot,
   QueryAcsSnapshotResult,
+  amuletQualifiedName,
+  lockedAmuletQualifiedName,
 }
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.SelectFromCreateEvents
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, LimitHelpers, UpdateHistory}
-import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}
+import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries, AdvisoryLockIds}
 import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
-import slick.dbio.DBIOAction
+import slick.dbio.{DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.{GetResult, JdbcProfile}
 
@@ -33,6 +35,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class AcsSnapshotStore(
     storage: DbStorage,
     val updateHistory: UpdateHistory,
+    dsoParty: PartyId,
     val currentMigrationId: Long,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, closeContext: CloseContext)
@@ -47,13 +50,13 @@ class AcsSnapshotStore(
 
   private def historyId = updateHistory.historyId
 
-  def lookupSnapshotBefore(
+  def lookupSnapshotAtOrBefore(
       migrationId: Long,
       before: CantonTimestamp,
   )(implicit tc: TraceContext): Future[Option[AcsSnapshot]] = {
     storage
       .querySingle(
-        sql"""select snapshot_record_time, migration_id, history_id, first_row_id, last_row_id
+        sql"""select snapshot_record_time, migration_id, history_id, first_row_id, last_row_id, unlocked_amulet_balance, locked_amulet_balance
             from acs_snapshot
             where snapshot_record_time <= $before
               and migration_id = $migrationId
@@ -79,7 +82,7 @@ class AcsSnapshotStore(
     }.flatMap { _ =>
       val from = lastSnapshot.map(_.snapshotRecordTime).getOrElse(CantonTimestamp.MinValue)
       val previousSnapshotDataFilter = lastSnapshot match {
-        case Some(AcsSnapshot(_, _, _, firstRowId, lastRowId)) =>
+        case Some(AcsSnapshot(_, _, _, firstRowId, lastRowId, _, _)) =>
           sql"where snapshot.row_id >= $firstRowId and snapshot.row_id <= $lastRowId"
         case None =>
           sql"where false"
@@ -92,12 +95,11 @@ class AcsSnapshotStore(
             and #$tableAlias.record_time < $until
            """
       val statement = (sql"""
-        with inserted_rows as (
             with previous_snapshot_data as (select contract_id
                                             from acs_snapshot_data snapshot
                                                      join update_history_creates creates on snapshot.create_id = creates.row_id
                                             """ ++ previousSnapshotDataFilter ++
-        sql"""),
+        sql"""      ),
                 new_creates as (select contract_id
                                 from update_history_creates creates
                                 """ ++ recordTimeFilter("creates") ++ sql"""
@@ -124,34 +126,72 @@ class AcsSnapshotStore(
                                                           history_id,
                                                           migration_id,
                                                           created_at,
-                                                          creates.contract_id
+                                                          creates.contract_id,
+                                                          create_arguments
                                                    from contracts_to_insert contracts
                                                             join update_history_creates creates
-                                                            on contracts.contract_id = creates.contract_id)
-
-                insert into acs_snapshot_data (create_id, template_id, stakeholder)
-                select row_id,
-                       concat(package_name, ':', template_id_module_name, ':', template_id_entity_name),
-                       stakeholder
-                from creates_to_insert
-                         cross join unnest(array_cat(signatories, observers)) as stakeholders(stakeholder)
-                where history_id = $historyId
-                  and migration_id = $migrationId
-                -- consistent ordering across SVs
-                order by created_at, contract_id
-                returning row_id
-        )
+                                                            on contracts.contract_id = creates.contract_id),
+                inserted_rows as (insert into acs_snapshot_data (create_id, template_id, stakeholder)
+                                  select row_id,
+                                         concat(package_name, ':', template_id_module_name, ':', template_id_entity_name),
+                                         stakeholder
+                                  from creates_to_insert
+                                           cross join unnest(array_cat(signatories, observers)) as stakeholders(stakeholder)
+                                  where history_id = $historyId
+                                    and migration_id = $migrationId
+                                  -- consistent ordering across SVs
+                                  order by created_at, contract_id
+                                  returning row_id, create_id, template_id, stakeholder
+                )
         insert
-        into acs_snapshot (snapshot_record_time, migration_id, history_id, first_row_id, last_row_id)
-        select $until, $migrationId, $historyId, min(row_id), max(row_id)
+        into acs_snapshot (snapshot_record_time, migration_id, history_id, first_row_id, last_row_id, unlocked_amulet_balance, locked_amulet_balance)
+        select
+          $until,
+          $migrationId,
+          $historyId,
+          min(inserted_rows.row_id),
+          max(inserted_rows.row_id),
+          -- the stakeholder filter ensures that we don't double-count amulet amounts
+          sum(case when inserted_rows.template_id = $amuletQualifiedName and stakeholder=$dsoParty then (create_arguments->'record'->'fields'->2->'value'->'record'->'fields'->0->'value'->>'numeric')::numeric else 0 end),
+          sum(case when inserted_rows.template_id = $lockedAmuletQualifiedName and stakeholder=$dsoParty then (create_arguments->'record'->'fields'->0->'value'->'record'->'fields'->2->'value'->'record'->'fields'->0->'value'->>'numeric')::numeric else 0 end)
         from inserted_rows
-        having min(row_id) is not null;
+        join creates_to_insert on inserted_rows.create_id = creates_to_insert.row_id
+        having min(inserted_rows.row_id) is not null;
              """).toActionBuilder.asUpdate
-      storage.update(statement, "insertNewSnapshot")
+      storage.queryAndUpdate(withExclusiveSnapshotDataLock(statement), "insertNewSnapshot")
     }.andThen { _ =>
       AcsSnapshotStore.PreventConcurrentSnapshotsSemaphore.release()
     }
   }
+
+  /** Wraps the given action in a transaction that holds an exclusive lock on the acs_snapshot_data table.
+    *
+    *  Note: The acs_snapshot_data table must not have interleaved rows from two different acs snapshots.
+    *  In rare cases, it can happen that the application crashes while writing a snapshot, then
+    *  restarts and starts writing a different snapshot while the previous statement is still running.
+    *
+    *  The exclusive lock prevents this.
+    *  We use a transaction-scoped advisory lock, which is released when the transaction ends.
+    *  Regular locks (e.g. obtained via `LOCK TABLE ... IN EXCLUSIVE MODE`) would conflict with harmless
+    *  background operations like autovacuum or create index concurrently.
+    *
+    *  In case the application crashes while holding the lock, the server _should_ close the connection
+    *  and abort the transaction as soon as it detects a disconnect.
+    *  TODO(#2488): Verify that the server indeed closes connections in a reasonable time.
+    */
+  private def withExclusiveSnapshotDataLock[T, E <: Effect](
+      action: DBIOAction[T, NoStream, E]
+  ): DBIOAction[T, NoStream, Effect.Read & Effect.Transactional & E] =
+    (for {
+      lockResult <- sql"SELECT pg_try_advisory_xact_lock(${AdvisoryLockIds.acsSnapshotDataInsert})"
+        .as[Boolean]
+        .head
+      result <- lockResult match {
+        case true => action
+        // Lock conflicts should almost never happen. If they do, we fail immediately and rely on the trigger infrastructure to retry and log errors.
+        case false => DBIOAction.failed(new Exception("Failed to acquire exclusive lock"))
+      }
+    } yield result).transactionally
 
   def deleteSnapshot(
       snapshot: AcsSnapshot
@@ -176,7 +216,7 @@ class AcsSnapshotStore(
     for {
       snapshot <- storage
         .querySingle(
-          sql"""select snapshot_record_time, migration_id, history_id, first_row_id, last_row_id
+          sql"""select snapshot_record_time, migration_id, history_id, first_row_id, last_row_id, unlocked_amulet_balance, locked_amulet_balance
             from acs_snapshot
             where snapshot_record_time = $snapshot
               and migration_id = $migrationId
@@ -322,7 +362,7 @@ class AcsSnapshotStore(
         recordTime,
         None,
         // if the limit is exceeded by the results from the DB, an exception will be thrown
-        HardLimit.tryCreate(Limit.MaxPageSize),
+        HardLimit.tryCreate(Limit.DefaultMaxPageSize),
         partyIds,
       )
       .map { result =>
@@ -350,6 +390,8 @@ object AcsSnapshotStore {
       historyId: Long,
       firstRowId: Long,
       lastRowId: Long,
+      unlockedAmuletBalance: Option[BigDecimal],
+      lockedAmuletBalance: Option[BigDecimal],
   ) extends PrettyPrinting {
     import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
     override def pretty: Pretty[this.type] = prettyOfClass(
@@ -358,6 +400,8 @@ object AcsSnapshotStore {
       param("historyId", _.historyId),
       param("firstRowId", _.firstRowId),
       param("lastRowId", _.lastRowId),
+      param("unlockedAmuletBalance", _.unlockedAmuletBalance),
+      param("lockedAmuletBalance", _.lockedAmuletBalance),
     )
   }
 
@@ -369,6 +413,8 @@ object AcsSnapshotStore {
         historyId = r.<<[Long],
         firstRowId = r.<<[Long],
         lastRowId = r.<<[Long],
+        unlockedAmuletBalance = r.<<[Option[BigDecimal]],
+        lockedAmuletBalance = r.<<[Option[BigDecimal]],
       )
     )
   }
@@ -380,10 +426,11 @@ object AcsSnapshotStore {
       afterToken: Option[Long],
   )
 
-  private val holdingsTemplates =
-    Vector(Amulet.TEMPLATE_ID_WITH_PACKAGE_ID, LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID).map(
-      PackageQualifiedName.getFromResources
-    )
+  private val amuletQualifiedName =
+    PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION)
+  private val lockedAmuletQualifiedName =
+    PackageQualifiedName.fromJavaCodegenCompanion(LockedAmulet.COMPANION)
+  private val holdingsTemplates = Vector(amuletQualifiedName, lockedAmuletQualifiedName)
 
   private def decodeHoldingContract(createdEvent: CreatedEvent): Either[
     Contract[LockedAmulet.ContractId, LockedAmulet],
@@ -393,16 +440,14 @@ object AcsSnapshotStore {
       .withDescription(s"Failed to decode $createdEvent")
       .asRuntimeException()
     if (
-      PackageQualifiedName.fromEvent(createdEvent) == PackageQualifiedName.getFromResources(
-        Amulet.TEMPLATE_ID_WITH_PACKAGE_ID
-      )
+      PackageQualifiedName
+        .fromEvent(createdEvent) == PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION)
     ) {
       Right(Contract.fromCreatedEvent(Amulet.COMPANION)(createdEvent).getOrElse(failedToDecode))
     } else {
       if (
-        PackageQualifiedName.fromEvent(createdEvent) != PackageQualifiedName.getFromResources(
-          LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID
-        )
+        PackageQualifiedName.fromEvent(createdEvent) != PackageQualifiedName
+          .fromJavaCodegenCompanion(LockedAmulet.COMPANION)
       ) {
         throw io.grpc.Status.INTERNAL
           .withDescription(
@@ -435,14 +480,12 @@ object AcsSnapshotStore {
   }
 
   def apply(
-      storage: Storage,
+      storage: DbStorage,
       updateHistory: UpdateHistory,
+      dsoParty: PartyId,
       migrationId: Long,
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext, closeContext: CloseContext): AcsSnapshotStore =
-    storage match {
-      case db: DbStorage => new AcsSnapshotStore(db, updateHistory, migrationId, loggerFactory)
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-    }
+    new AcsSnapshotStore(storage, updateHistory, dsoParty, migrationId, loggerFactory)
 
 }

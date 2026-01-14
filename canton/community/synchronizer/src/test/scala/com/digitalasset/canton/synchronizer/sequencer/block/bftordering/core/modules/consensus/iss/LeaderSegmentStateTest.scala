@@ -8,9 +8,9 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftSequencerBaseTest.FakeSigner
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.BftSequencerBaseTest
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.BftSequencerBaseTest.FakeSigner
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.EpochState.{
   Epoch,
   Segment,
@@ -85,7 +85,7 @@ class LeaderSegmentStateTest extends AsyncWordSpec with BftSequencerBaseTest {
                 .create(
                   BlockMetadata(EpochNumber.First, n),
                   ViewNumber.First,
-                  OrderingBlock(Seq.empty),
+                  OrderingBlock.empty,
                   CanonicalCommitSet(Set.empty),
                   myId,
                 )
@@ -111,7 +111,7 @@ class LeaderSegmentStateTest extends AsyncWordSpec with BftSequencerBaseTest {
       leaderSegmentState.moreSlotsToAssign shouldBe true
 
       // Self has one slot left to assign (block=4); assign and verify
-      val orderedBlock = leaderSegmentState.assignToSlot(OrderingBlock(Seq.empty), commits.take(1))
+      val orderedBlock = leaderSegmentState.assignToSlot(OrderingBlock.empty, commits.take(1))
       orderedBlock.metadata.blockNumber shouldBe 4L
       orderedBlock.canonicalCommitSet.sortedCommits shouldBe commits
       leaderSegmentState.moreSlotsToAssign shouldBe false
@@ -164,11 +164,20 @@ class LeaderSegmentStateTest extends AsyncWordSpec with BftSequencerBaseTest {
           loggerFactory,
         )
       val leaderSegmentState = new LeaderSegmentState(segmentState, epoch, Seq.empty)
-      mySegment.slotNumbers.foreach { slotNumber =>
+
+      val anotherNodeSegment =
+        epoch.segments
+          .find(_.originalLeader != myId)
+          .getOrElse(fail("there should be more than one segment"))
+
+      (0 until mySegment.slotNumbers.size).foreach { relativeIndex =>
         leaderSegmentState.isProgressBlocked shouldBe false
-        (BlockNumber.First until slotNumber).foreach { n =>
-          leaderSegmentState.confirmCompleteBlockStored(BlockNumber(n))
-        }
+
+        leaderSegmentState.confirmCompleteBlockStored(
+          anotherNodeSegment.slotNumbers(relativeIndex),
+          isEmpty = false,
+        )
+
         leaderSegmentState.isProgressBlocked shouldBe true
         val orderedBlock = leaderSegmentState.assignToSlot(OrderingBlock.empty, Seq.empty)
         completeBlock(segmentState, orderedBlock.metadata.blockNumber)

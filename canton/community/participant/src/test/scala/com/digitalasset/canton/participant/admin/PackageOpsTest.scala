@@ -5,6 +5,7 @@ package com.digitalasset.canton.participant.admin
 
 import cats.Eval
 import cats.data.EitherT
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout}
@@ -15,6 +16,8 @@ import com.digitalasset.canton.participant.admin.PackageService.{DarDescription,
 import com.digitalasset.canton.participant.store.{
   ActiveContractStore,
   ContractStore,
+  LogicalSyncPersistentState,
+  PhysicalSyncPersistentState,
   SyncPersistentState,
 }
 import com.digitalasset.canton.participant.sync.SyncPersistentStateManager
@@ -22,12 +25,13 @@ import com.digitalasset.canton.participant.topology.{
   PackageOps,
   PackageOpsImpl,
   TopologyComponentFactory,
+  TopologyManagerLookup,
 }
-import com.digitalasset.canton.store.IndexedSynchronizer
+import com.digitalasset.canton.store.{IndexedPhysicalSynchronizer, IndexedSynchronizer}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
+import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
   StoredTopologyTransactions,
@@ -51,29 +55,17 @@ trait PackageOpsTestBase extends AsyncWordSpec with BaseTest with ArgumentMatche
 
   s"$sutName.hasPackageVettingEntry" should {
     "return true" when {
-      "head authorized store has the package vetted" in withTestSetup { env =>
-        import env.*
-        unvettedPackagesForSnapshots(Set.empty, Set(pkgId1))
-        packageOps.hasVettedPackageEntry(pkgId1).failOnShutdown.map(_ shouldBe true)
-      }
-
       "one synchronizer topology snapshot has the package vetted" in withTestSetup { env =>
         import env.*
-        unvettedPackagesForSnapshots(Set(pkgId1), Set.empty)
-        packageOps.hasVettedPackageEntry(pkgId1).failOnShutdown.map(_ shouldBe true)
-      }
-
-      "all topology snapshots have the package vetted" in withTestSetup { env =>
-        import env.*
-        unvettedPackagesForSnapshots(Set.empty, Set.empty)
+        unvettedPackagesForSnapshots(Set.empty)
         packageOps.hasVettedPackageEntry(pkgId1).failOnShutdown.map(_ shouldBe true)
       }
     }
 
     "return false" when {
-      "all topology snapshots have the package unvetted" in withTestSetup { env =>
+      "one synchronizer topology snapshot has the package unvetted" in withTestSetup { env =>
         import env.*
-        unvettedPackagesForSnapshots(Set(pkgId1), Set(pkgId1))
+        unvettedPackagesForSnapshots(Set(pkgId1))
         packageOps.hasVettedPackageEntry(pkgId1).failOnShutdown.map(_ shouldBe false)
       }
     }
@@ -96,13 +88,13 @@ trait PackageOpsTestBase extends AsyncWordSpec with BaseTest with ArgumentMatche
           when(activeContractStore.packageUsage(eqTo(pkgId1), eqTo(contractStore))(anyTraceContext))
             .thenReturn(FutureUnlessShutdown.pure(Some(contractId)))
           val indexedSynchronizer = IndexedSynchronizer.tryCreate(synchronizerId1, 1)
-          when(syncPersistentState.indexedSynchronizer).thenReturn(indexedSynchronizer)
+          when(syncPersistentState.synchronizerIdx).thenReturn(indexedSynchronizer)
 
           packageOps.checkPackageUnused(pkgId1).leftOrFail("active contract with package id").map {
             err =>
               err.pkg shouldBe pkgId1
               err.contract shouldBe contractId
-              err.synchronizerId shouldBe synchronizerId1
+              err.synchronizerId shouldBe synchronizerId1.logical
           }
       }.failOnShutdown
     }
@@ -114,58 +106,62 @@ trait PackageOpsTestBase extends AsyncWordSpec with BaseTest with ArgumentMatche
     val stateManager = mock[SyncPersistentStateManager]
     val participantId = ParticipantId(UniqueIdentifier.tryCreate("participant", "one"))
 
-    val headAuthorizedTopologySnapshot = mock[TopologySnapshot]
-    val anotherSynchronizerTopologySnapshot = mock[TopologySnapshot]
+    private val anotherSynchronizerTopologySnapshot = mock[TopologySnapshot]
 
     val pkgId1 = LfPackageId.assertFromString("pkgId1")
     val pkgId2 = LfPackageId.assertFromString("pkgId2")
     val pkgId3 = LfPackageId.assertFromString("pkgId3")
 
-    val packagesToBeVetted = Seq(pkgId1, pkgId2)
-    val packagesToBeUnvetted = List(pkgId1, pkgId2)
+    val synchronizerId1 = SynchronizerId(
+      UniqueIdentifier.tryCreate("synchronizer", "one")
+    ).toPhysical
+    private val synchronizerId2 = SynchronizerId(
+      UniqueIdentifier.tryCreate("synchronizer", "two")
+    ).toPhysical
 
-    val missingPkgId = LfPackageId.assertFromString("missing")
-    val synchronizerId1 = SynchronizerId(UniqueIdentifier.tryCreate("synchronizer", "one"))
-    val synchronizerId2 = SynchronizerId(UniqueIdentifier.tryCreate("synchronizer", "two"))
+    val physicalSyncPersistentState = mock[PhysicalSyncPersistentState]
+    val logicalSyncPersistentState = mock[LogicalSyncPersistentState]
+    val syncPersistentState: SyncPersistentState =
+      new SyncPersistentState(
+        logicalSyncPersistentState,
+        physicalSyncPersistentState,
+        loggerFactory,
+      )
+    when(physicalSyncPersistentState.physicalSynchronizerIdx).thenReturn(
+      IndexedPhysicalSynchronizer.tryCreate(synchronizerId1, index = 1)
+    )
 
-    val syncPersistentState: SyncPersistentState = mock[SyncPersistentState]
     when(stateManager.getAll).thenReturn(Map(synchronizerId1 -> syncPersistentState))
-    val topologyComponentFactory = mock[TopologyComponentFactory]
+    when(stateManager.getAllLatest).thenReturn(Map(synchronizerId1.logical -> syncPersistentState))
+
+    private val topologyComponentFactory = mock[TopologyComponentFactory]
     when(topologyComponentFactory.createHeadTopologySnapshot()(any[ExecutionContext]))
       .thenReturn(anotherSynchronizerTopologySnapshot)
 
     val contractStore = mock[ContractStore]
 
-    when(stateManager.topologyFactoryFor(synchronizerId1, testedProtocolVersion))
+    when(stateManager.topologyFactoryFor(synchronizerId1))
       .thenReturn(Some(topologyComponentFactory))
-    when(stateManager.topologyFactoryFor(synchronizerId2, testedProtocolVersion)).thenReturn(None)
+    when(stateManager.topologyFactoryFor(synchronizerId2)).thenReturn(None)
     when(stateManager.contractStore).thenReturn(Eval.now(contractStore))
 
     val activeContractStore = mock[ActiveContractStore]
 
-    when(syncPersistentState.activeContractStore).thenReturn(activeContractStore)
+    when(logicalSyncPersistentState.activeContractStore).thenReturn(activeContractStore)
     when(activeContractStore.packageUsage(eqTo(pkgId1), eqTo(contractStore))(anyTraceContext))
       .thenReturn(FutureUnlessShutdown.pure(None))
 
     val mainPackageId = DarMainPackageId.tryCreate("darhash")
 
     def unvettedPackagesForSnapshots(
-        unvettedForAuthorizedSnapshot: Set[LfPackageId],
-        unvettedForSynchronizerSnapshot: Set[LfPackageId],
-    ): Unit = {
-      when(
-        headAuthorizedTopologySnapshot.determinePackagesWithNoVettingEntry(
-          participantId,
-          Set(pkgId1),
-        )
-      ).thenReturn(FutureUnlessShutdown.pure(unvettedForAuthorizedSnapshot))
+        unvettedForSynchronizerSnapshot: Set[LfPackageId]
+    ): Unit =
       when(
         anotherSynchronizerTopologySnapshot.determinePackagesWithNoVettingEntry(
           participantId,
           Set(pkgId1),
         )
       ).thenReturn(FutureUnlessShutdown.pure(unvettedForSynchronizerSnapshot))
-    }
   }
 }
 
@@ -182,7 +178,7 @@ class PackageOpsTest extends PackageOpsTestBase {
         arrangeCurrentlyVetted(List(pkgId1))
         expectNewVettingState(List(pkgId1, pkgId2))
         packageOps
-          .vetPackages(Seq(pkgId1, pkgId2), PackageVettingSynchronization.NoSync)
+          .vetPackages(Seq(pkgId1, pkgId2), PackageVettingSynchronization.NoSync, psid)
           .value
           .unwrap
           .map(inside(_) { case UnlessShutdown.Outcome(Right(_)) => succeed })
@@ -196,7 +192,7 @@ class PackageOpsTest extends PackageOpsTestBase {
         // Not ordered to prove that we check set-equality not ordered
         arrangeCurrentlyVetted(List(pkgId2, pkgId1))
         packageOps
-          .vetPackages(Seq(pkgId1, pkgId2), PackageVettingSynchronization.NoSync)
+          .vetPackages(Seq(pkgId1, pkgId2), PackageVettingSynchronization.NoSync, psid)
           .value
           .unwrap
           .map(inside(_) { case UnlessShutdown.Outcome(Right(_)) =>
@@ -230,6 +226,8 @@ class PackageOpsTest extends PackageOpsTestBase {
             pkgId1,
             List(pkgId1, pkgId2),
             DarDescription(mainPackageId, str, str, str),
+            psid,
+            ForceFlags.none,
           )
           .value
           .unwrap
@@ -249,6 +247,8 @@ class PackageOpsTest extends PackageOpsTestBase {
             pkgId3,
             List(pkgId3),
             DarDescription(mainPackageId, str, str, str),
+            psid,
+            ForceFlags.none,
           )
           .value
           .unwrap
@@ -271,22 +271,25 @@ class PackageOpsTest extends PackageOpsTestBase {
   }
 
   protected class TestSetup extends CommonTestSetup {
-    val topologyManager = mock[AuthorizedTopologyManager]
+    val topologyManager = mock[SynchronizerTopologyManager]
 
-    private val nodeId: UniqueIdentifier = UniqueIdentifier.tryCreate("node", "one")
+    val psid = SynchronizerId.tryFromString("test::synchronizer").toPhysical
+
     val packageOps = new PackageOpsImpl(
       participantId = participantId,
-      headAuthorizedTopologySnapshot = headAuthorizedTopologySnapshot,
       stateManager = stateManager,
-      topologyManager = topologyManager,
-      nodeId = nodeId,
+      topologyManagerLookup = new TopologyManagerLookup(
+        lookupByPsid = _ => Some(topologyManager),
+        lookupActivePsidByLsid = _ => Some(topologyManager.psid),
+      ),
       initialProtocolVersion = testedProtocolVersion,
       loggerFactory = loggerFactory,
       timeouts = ProcessingTimeout(),
       futureSupervisor = futureSupervisor,
     )
 
-    val topologyStore = mock[TopologyStore[AuthorizedStore]]
+    val topologyStore = mock[TopologyStore[SynchronizerStore]]
+    when(topologyManager.psid).thenReturn(psid)
     when(topologyManager.store).thenReturn(topologyStore)
     val txSerial = PositiveInt.tryCreate(1)
     def arrangeCurrentlyVetted(currentlyVettedPackages: List[LfPackageId]) =
@@ -296,7 +299,7 @@ class PackageOpsTest extends PackageOpsTestBase {
           eqTo(true),
           eqTo(false),
           eqTo(Seq(VettedPackages.code)),
-          eqTo(Some(Seq(nodeId))),
+          eqTo(Some(NonEmpty(Seq, participantId.uid))),
           eqTo(None),
         )(anyTraceContext)
       ).thenReturn(FutureUnlessShutdown.pure(packagesVettedStoredTx(currentlyVettedPackages)))
@@ -315,7 +318,7 @@ class PackageOpsTest extends PackageOpsTestBase {
           eqTo(Seq.empty),
           eqTo(testedProtocolVersion),
           eqTo(true),
-          eqTo(ForceFlags(ForceFlag.AllowUnvetPackage)),
+          eqTo(ForceFlags.none),
           any[Option[NonNegativeFiniteDuration]],
         )(anyTraceContext)
       ).thenReturn(
@@ -336,7 +339,7 @@ class PackageOpsTest extends PackageOpsTestBase {
       )
 
     private def signedTopologyTransaction(vettedPackages: List[LfPackageId]) =
-      SignedTopologyTransaction.create(
+      SignedTopologyTransaction.withSignatures(
         transaction = TopologyTransaction(
           op = TopologyChangeOp.Replace,
           serial = txSerial,
@@ -346,10 +349,7 @@ class PackageOpsTest extends PackageOpsTestBase {
         ),
         signatures = Signature.noSignatures,
         isProposal = false,
-      )(
-        SignedTopologyTransaction.versioningTable.protocolVersionRepresentativeFor(
-          testedProtocolVersion
-        )
+        testedProtocolVersion,
       )
   }
 }

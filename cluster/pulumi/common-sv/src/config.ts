@@ -2,21 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
 import {
-  ApprovedSvIdentity,
   Auth0Client,
   BackupConfig,
   BackupLocation,
   BootstrappingDumpConfig,
   CnInput,
   ExpectedValidatorOnboarding,
-  K8sResourceSchema,
   SvCometBftGovernanceKey,
   SvIdKey,
   ValidatorTopupConfig,
   RateLimitSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
-import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
+import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { z } from 'zod';
 
 import { SingleSvConfiguration } from './singleSvConfig';
@@ -56,13 +54,9 @@ export interface StaticSvConfig {
   onboardingPollingInterval?: string;
   sweep?: SweepConfig;
   scanBigQuery?: ScanBigQueryConfig;
+  svIdKeySecretName?: string;
+  cometBftGovernanceKeySecretName?: string;
 }
-
-export type SequencerPruningConfig = {
-  enabled: boolean;
-  pruningInterval?: string;
-  retentionPeriod?: string;
-};
 
 export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
   isFirstSv: boolean;
@@ -72,27 +66,29 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
     peers: StaticCometBftConfigWithNodeName[];
   };
   onboarding: SvOnboarding;
-  approvedSvIdentities: ApprovedSvIdentity[];
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[];
   isDevNet: boolean;
   periodicBackupConfig?: BackupConfig;
   identitiesBackupLocation: BackupLocation;
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   topupConfig?: ValidatorTopupConfig;
-  sequencerPruningConfig: SequencerPruningConfig;
   splitPostgresInstances: boolean;
   disableOnboardingParticipantPromotionDelay: boolean;
   onboardingPollingInterval?: string;
   cometBftGovernanceKey?: CnInput<SvCometBftGovernanceKey>;
   initialRound?: string;
+  periodicTopologySnapshotConfig?: BackupConfig;
 }
+
+export const GCPBucketSchema = z.object({
+  projectId: z.string(),
+  bucketName: z.string(),
+  backupInterval: z.string(),
+});
 
 export const SvConfigSchema = z.object({
   sv: z
     .object({
-      participant: z.object({
-        resources: K8sResourceSchema,
-      }),
       cometbft: z
         .object({
           volumeSize: z.string().optional(),
@@ -101,7 +97,6 @@ export const SvConfigSchema = z.object({
         .optional(),
       scan: z
         .object({
-          enableImportUpdatesBackfill: z.boolean().optional(),
           rateLimit: z
             .object({
               acs: z
@@ -119,7 +114,6 @@ export const SvConfigSchema = z.object({
           skipInitialization: z.boolean().default(false),
           // This can be used on clusters like CILR where we usually would expect to skip initialization but the sv runbook gets reset periodically.
           forceSvRunbookInitialization: z.boolean().default(false),
-          topologyChangeDelay: z.string().optional(),
         })
         .optional(),
     })
@@ -136,13 +130,3 @@ export const svsConfig = SvConfigSchema.parse(clusterYamlConfig).sv;
 // eslint-disable-next-line
 // @ts-ignore
 export const initialRound = SvConfigSchema.parse(clusterYamlConfig).initialRound;
-
-export const updateHistoryBackfillingValues = svsConfig?.scan?.enableImportUpdatesBackfill
-  ? {
-      updateHistoryBackfilling: {
-        enabled: true,
-        importUpdatesEnabled: true,
-        batchSize: 100,
-      },
-    }
-  : undefined;

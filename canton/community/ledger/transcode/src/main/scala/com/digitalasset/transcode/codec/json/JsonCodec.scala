@@ -40,17 +40,19 @@ class JsonCodec(
 
       val unexpectedFields = valueMap.keySet.toSet -- fields.map(_._1)
 
-      val result = DynamicValue.Record(fields map { case (name, c) =>
-        if (c.isOptional()) {
-          (Some(name), c.toDynamicValue(valueMap.getOrElse(name, ujson.Null)))
-        } else {
-          valueMap.get(name) match {
-            case Some(value) => (Some(name), c.toDynamicValue(value))
-            case None =>
-              throw new MissingFieldException(name)
+      val result = DynamicValue
+        .Record(fields map { case (name, c) =>
+          if (c.isOptional()) {
+            (Some(name), c.toDynamicValue(valueMap.getOrElse(name, ujson.Null)))
+          } else {
+            valueMap.get(name) match {
+              case Some(value) => (Some(name), c.toDynamicValue(value))
+              case None =>
+                throw new MissingFieldException(name)
+            }
           }
-        }
-      })
+        })
+        .normalized()
       // We handle unexpectedValues after creation of value, as the more important exception is a MissingFieldException and should be
       // thrown if needed
       val unexpectedValues =
@@ -244,11 +246,8 @@ class JsonCodec(
 
     override def fromDynamicValue(dv: DynamicValue): Value = {
       val time = LocalDateTime
-        .ofEpochSecond(
-          dv.timestamp / 1000000,
-          (dv.timestamp % 1000000 * 1000).intValue,
-          ZoneOffset.UTC,
-        )
+        .ofEpochSecond(dv.timestamp / 1_000_000, 0, ZoneOffset.UTC)
+        .plusNanos(dv.timestamp % 1_000_000 * 1_000)
         .atZone(ZoneOffset.UTC)
       Str(DateTimeFormatter.ISO_DATE_TIME.format(time))
     }

@@ -19,7 +19,7 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
       version: '2.3.0',
       namespace: namespace.metadata.name,
       repositoryOpts: {
-        repo: 'https://helm.twun.io',
+        repo: 'https://twuni.github.io/docker-registry.helm',
       },
       values: {
         proxy: {
@@ -28,6 +28,7 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
         },
         persistence: {
           enabled: true,
+          size: '20Gi',
         },
         ...infraAffinityAndTolerations,
       },

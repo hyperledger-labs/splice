@@ -6,10 +6,10 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulat
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.sequencing.protocol.MaxRequestSizeToDeserialize
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.FingerprintKeyId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.{
-  CryptoProvider,
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.crypto.FingerprintKeyId
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.topology.{
   OrderingTopologyProvider,
   TopologyActivationTime,
 }
@@ -28,7 +28,7 @@ import scala.util.Success
 
 class SimulationOrderingTopologyProvider(
     thisNode: BftNodeId,
-    getEndpointsToTopologyData: () => Map[P2PEndpoint, SimulationTopologyData],
+    getEndpointsToTopologyData: () => Map[P2PEndpoint, NodeSimulationTopologyData],
     loggerFactory: NamedLoggerFactory,
 ) extends OrderingTopologyProvider[SimulationEnv] {
 
@@ -40,6 +40,7 @@ class SimulationOrderingTopologyProvider(
         getEndpointsToTopologyData().view
           .filter { case (_, topologyData) =>
             topologyData.onboardingTime.value <= activationTime.value
+            && topologyData.offboardingTime.forall(activationTime.value <= _)
           }
           .map { case (endpoint, topologyData) =>
             endpointToTestBftNodeId(endpoint) -> topologyData
@@ -51,7 +52,11 @@ class SimulationOrderingTopologyProvider(
           activeSequencerTopologyData.view.mapValues { simulationTopologyData =>
             NodeTopologyInfo(
               activationTime = simulationTopologyData.onboardingTime,
-              keyIds = Set(FingerprintKeyId.toBftKeyId(simulationTopologyData.signingPublicKey.id)),
+              keyIds = simulationTopologyData
+                .keysForTimestamp(activationTime.value)
+                .view
+                .map(keyPair => FingerprintKeyId.toBftKeyId(keyPair.publicKey.id))
+                .toSet,
             )
           }.toMap,
           SequencingParameters.Default,

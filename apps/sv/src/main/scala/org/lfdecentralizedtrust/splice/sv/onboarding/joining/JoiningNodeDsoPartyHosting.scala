@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
-import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
@@ -145,7 +145,10 @@ class JoiningNodeDsoPartyHosting(
             },
             logger,
           )
-          _ <- participantAdminConnection.uploadAcsSnapshot(response.acsSnapshot)
+          _ = logger.info(
+            "Received Acs snapshot from sponsor, importing into candidate participant"
+          )
+          _ <- participantAdminConnection.uploadAcsSnapshot(Seq(response.acsSnapshot))
           _ = logger.info(
             "Imported Acs snapshot from sponsor SV participant to candidate participant"
           )

@@ -46,9 +46,13 @@ object DynamicValue {
     * We do not preserver recordId from gRPC versbose records, we do not consider them practically
     * useful
     */
-
   final case class Record(fields: IterableOnce[(Option[String], DynamicValue)]) extends Adt {
     override def inner: Any = fields
+    def normalized(): Record =
+      Record(fields.iterator.toSeq.reverse.dropWhile {
+        case (_, Optional(None)) => true
+        case _ => false
+      }.reverse)
   }
 
   implicit class RecordExtension(value: DynamicValue) {
@@ -177,7 +181,7 @@ object DynamicValue {
 
   /** Local date. Number of dates since epoch (1 Jan 1970). */
   final case class Date(value: Int) extends Primitive {
-    override def inner: Any = Int
+    override def inner: Any = value
   }
 
   implicit class DateExtension(value: DynamicValue) {

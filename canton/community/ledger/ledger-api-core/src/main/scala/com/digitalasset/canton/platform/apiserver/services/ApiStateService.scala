@@ -9,11 +9,11 @@ import com.daml.logging.entries.LoggingEntries
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.ValidationLogger
 import com.digitalasset.canton.ledger.api.grpc.{GrpcApiService, StreamingServiceLifecycleManagement}
+import com.digitalasset.canton.ledger.api.validation.ValueValidator.requirePresence
 import com.digitalasset.canton.ledger.api.validation.{
   FieldValidator,
   FormatValidator,
   ParticipantOffsetValidator,
-  ValidationErrors,
 }
 import com.digitalasset.canton.ledger.participant.state.SyncService
 import com.digitalasset.canton.ledger.participant.state.index.{
@@ -64,34 +64,8 @@ final class ApiStateService(
     registerStream(responseObserver) {
 
       val result = for {
-        filters <- (request.filter, request.verbose, request.eventFormat) match {
-          case (Some(_), _, Some(_)) =>
-            Left(
-              ValidationErrors.invalidArgument(
-                s"Both filter/verbose and event_format is specified. Please use either backwards compatible arguments (filter and verbose) or event_format, but not both."
-              )
-            )
-
-          case (Some(legacyFilter), legacyVerbose, None) =>
-            FormatValidator.validate(legacyFilter, legacyVerbose)
-
-          case (None, true, Some(_)) =>
-            Left(
-              ValidationErrors.invalidArgument(
-                s"Both filter/verbose and event_format is specified. Please use either backwards compatible arguments (filter and verbose) or event_format, but not both."
-              )
-            )
-
-          case (None, false, Some(eventFormat)) =>
-            FormatValidator.validate(eventFormat)
-
-          case (None, _, None) =>
-            Left(
-              ValidationErrors.invalidArgument(
-                s"Either filter/verbose or event_format is required. Please use either backwards compatible arguments (filter and verbose) or event_format, but not both."
-              )
-            )
-        }
+        eventFormatProto <- requirePresence(request.eventFormat, "event_format")
+        eventFormat <- FormatValidator.validate(eventFormatProto)
 
         activeAt <- ParticipantOffsetValidator.validateNonNegative(
           request.activeAtOffset,
@@ -99,14 +73,14 @@ final class ApiStateService(
         )
       } yield {
         withEnrichedLoggingContext(telemetry)(
-          logging.eventFormat(filters)
+          logging.eventFormat(eventFormat)
         ) { implicit loggingContext =>
           logger.info(
             s"Received request for active contracts: $request, ${loggingContext.serializeFiltered("filters")}."
           )
           acsService
             .getActiveContracts(
-              filter = filters,
+              eventFormat = eventFormat,
               activeAt = activeAt,
             )
         }
@@ -133,11 +107,11 @@ final class ApiStateService(
     implicit val loggingContext: LoggingContextWithTrace =
       LoggingContextWithTrace(loggerFactory, telemetry)
     val result = (for {
-      party <- FieldValidator
-        .requirePartyField(request.party, "party")
+      partyO <- FieldValidator
+        .optionalString(request.party)(FieldValidator.requirePartyField(_, "party"))
       participantId <- FieldValidator
         .optionalParticipantId(request.participantId, "participant_id")
-    } yield SyncService.ConnectedSynchronizerRequest(party, participantId))
+    } yield SyncService.ConnectedSynchronizerRequest(partyO, participantId))
       .fold(
         t => FutureUnlessShutdown.failed(ValidationLogger.logFailureWithTrace(logger, request, t)),
         request =>
@@ -145,23 +119,35 @@ final class ApiStateService(
             .getConnectedSynchronizers(request)
             .map(response =>
               GetConnectedSynchronizersResponse(
-                response.connectedSynchronizers.flatMap { connectedSynchronizer =>
+                response.connectedSynchronizers.map { connectedSynchronizer =>
                   val permissions = connectedSynchronizer.permission match {
-                    case TopologyParticipantPermission.Submission =>
-                      Seq(ParticipantPermission.PARTICIPANT_PERMISSION_SUBMISSION)
-                    case TopologyParticipantPermission.Observation =>
-                      Seq(ParticipantPermission.PARTICIPANT_PERMISSION_OBSERVATION)
-                    case TopologyParticipantPermission.Confirmation =>
-                      Seq(ParticipantPermission.PARTICIPANT_PERMISSION_CONFIRMATION)
-                    case _ => Nil
+                    case Some(TopologyParticipantPermission.Submission) =>
+                      Some(ParticipantPermission.PARTICIPANT_PERMISSION_SUBMISSION)
+                    case Some(TopologyParticipantPermission.Observation) =>
+                      Some(ParticipantPermission.PARTICIPANT_PERMISSION_OBSERVATION)
+                    case Some(TopologyParticipantPermission.Confirmation) =>
+                      Some(ParticipantPermission.PARTICIPANT_PERMISSION_CONFIRMATION)
+                    case _ => None
                   }
-                  permissions.map(permission =>
-                    GetConnectedSynchronizersResponse.ConnectedSynchronizer(
-                      synchronizerAlias = connectedSynchronizer.synchronizerAlias.toProtoPrimitive,
-                      synchronizerId = connectedSynchronizer.synchronizerId.toProtoPrimitive,
-                      permission = permission,
+                  permissions
+                    .map(permission =>
+                      GetConnectedSynchronizersResponse.ConnectedSynchronizer(
+                        synchronizerAlias =
+                          connectedSynchronizer.synchronizerAlias.toProtoPrimitive,
+                        synchronizerId =
+                          connectedSynchronizer.synchronizerId.logical.toProtoPrimitive,
+                        permission = permission,
+                      )
                     )
-                  )
+                    .getOrElse(
+                      GetConnectedSynchronizersResponse.ConnectedSynchronizer(
+                        synchronizerAlias =
+                          connectedSynchronizer.synchronizerAlias.toProtoPrimitive,
+                        synchronizerId =
+                          connectedSynchronizer.synchronizerId.logical.toProtoPrimitive,
+                        permission = ParticipantPermission.PARTICIPANT_PERMISSION_UNSPECIFIED,
+                      )
+                    )
                 }
               )
             ),
@@ -188,11 +174,11 @@ final class ApiStateService(
     implicit val loggingContext = LoggingContextWithTrace(loggerFactory, telemetry)
 
     updateService
-      .latestPrunedOffsets()
-      .map { case (prunedUptoInclusive, divulgencePrunedUptoInclusive) =>
+      .latestPrunedOffset()
+      .map { prunedUptoInclusive =>
         GetLatestPrunedOffsetsResponse(
           participantPrunedUpToInclusive = prunedUptoInclusive.fold(0L)(_.unwrap),
-          allDivulgedContractsPrunedUpToInclusive = divulgencePrunedUptoInclusive.fold(0L)(_.unwrap),
+          allDivulgedContractsPrunedUpToInclusive = prunedUptoInclusive.fold(0L)(_.unwrap),
         )
       }
       .thereafter(logger.logErrorsOnCall[GetLatestPrunedOffsetsResponse])

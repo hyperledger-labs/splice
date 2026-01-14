@@ -169,12 +169,12 @@ final case class ViewParticipantData private (
             show"View with root action Create $contractId declares ${createdContract.contract.contractId} as first created core contract."
           )
         val metadata = createdContract.contract.metadata
-        val contractInst = createdContract.contract.rawContractInstance.contractInstance
+        val contractInst = createdContract.contract.inst
 
         RootAction(
           LfCreateCommand(
-            templateId = contractInst.unversioned.template,
-            argument = contractInst.unversioned.arg,
+            templateId = contractInst.templateId,
+            argument = contractInst.createArg,
           ),
           metadata.signatories,
           failed = false,
@@ -345,7 +345,7 @@ object ViewParticipantData
   override val name: String = "ViewParticipantData"
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.ViewParticipantData)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.ViewParticipantData)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
       _.toProtoV30,
     )

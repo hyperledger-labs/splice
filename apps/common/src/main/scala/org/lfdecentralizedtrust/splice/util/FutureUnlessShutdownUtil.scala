@@ -22,6 +22,7 @@ object FutureUnlessShutdownUtil {
   )(implicit ec: ExecutionContext): OptionT[Future, A] = {
     OptionT(futureUnlessShutdownToFuture(f.value))
   }
+
   implicit class FutureUnlessShutdownOps[A](val f: FutureUnlessShutdown[A]) extends AnyVal {
     def toFuture(implicit ec: ExecutionContext): Future[A] =
       f.failOnShutdownToAbortException("Splice unsafe shutdown future")

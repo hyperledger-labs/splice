@@ -8,7 +8,6 @@ import com.daml.ledger.api.v2.command_service.{
   SubmitAndWaitForReassignmentResponse,
   SubmitAndWaitForTransactionRequest,
   SubmitAndWaitForTransactionResponse,
-  SubmitAndWaitForTransactionTreeResponse,
   SubmitAndWaitRequest,
   SubmitAndWaitResponse,
 }
@@ -28,8 +27,4 @@ trait CommandService {
   def submitAndWaitForReassignment(
       request: SubmitAndWaitForReassignmentRequest
   )(loggingContext: LoggingContextWithTrace): Future[SubmitAndWaitForReassignmentResponse]
-
-  def submitAndWaitForTransactionTree(
-      request: SubmitAndWaitRequest
-  )(loggingContext: LoggingContextWithTrace): Future[SubmitAndWaitForTransactionTreeResponse]
 }

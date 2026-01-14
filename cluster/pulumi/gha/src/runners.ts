@@ -56,7 +56,7 @@ const runnerSpecs = [
         memory: '10Gi',
       },
       limits: {
-        cpu: '4',
+        cpu: '6',
         memory: '10Gi',
       },
     },
@@ -71,7 +71,7 @@ const runnerSpecs = [
         memory: '18Gi',
       },
       limits: {
-        cpu: '4',
+        cpu: '6',
         memory: '18Gi',
       },
     },
@@ -86,7 +86,7 @@ const runnerSpecs = [
         memory: '24Gi',
       },
       limits: {
-        cpu: '5',
+        cpu: '7',
         memory: '24Gi',
       },
     },
@@ -101,7 +101,7 @@ const runnerSpecs = [
         memory: '32Gi',
       },
       limits: {
-        cpu: '6',
+        cpu: '8',
         memory: '32Gi',
       },
     },
@@ -116,7 +116,7 @@ const runnerSpecs = [
         memory: '52Gi',
       },
       limits: {
-        cpu: '8',
+        cpu: '10',
         memory: '52Gi',
       },
     },
@@ -133,6 +133,8 @@ const localnetHostAliases = [
       'scan.localhost',
       'sv.localhost',
       'wallet.localhost',
+      'json-ledger-api.localhost',
+      'grpc-ledger-api.localhost',
     ],
   },
 ];
@@ -184,12 +186,16 @@ function installDockerRunnerScaleSet(
             containers: [
               {
                 name: 'runner',
-                image: `${DOCKER_REPO}/splice-test-docker-runner:${ghaConfig.runnerHookVersion}`,
+                image: `${DOCKER_REPO}/splice-test-docker-runner:${ghaConfig.runnerVersion}`,
                 command: ['/home/runner/run.sh'],
                 env: [
                   {
                     name: 'DOCKER_HOST',
                     value: 'unix:///var/run/docker.sock',
+                  },
+                  {
+                    name: 'RUNNER_WAIT_FOR_DOCKER_IN_SECONDS',
+                    value: '120',
                   },
                 ],
                 resources,

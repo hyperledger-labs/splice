@@ -5,62 +5,113 @@ groups:
     folder: canton-network
     interval: 1m
     rules:
-      - uid: adw5rd048zf9ca
-        title: Wasted Traffic
-        condition: wasted_traffic_threshold
+      - uid: 5dcddc9a5487
+        title: Confirmation Requests Total
+        condition: confirmation_requests_total_threshold
         data:
-          - refId: wasted_traffic
+          - refId: confirmation_requests_total
             relativeTimeRange:
               from: 600
               to: 0
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: max by (member) (delta(daml_sequencer_traffic_control_wasted_traffic_total{member=~"PAR::.*"$WASTED_TRAFFIC_ALERT_EXTRA_MEMBER_FILTER}[$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm]))
+              expr: max by (migration_id) (sum by (namespace, migration_id) (rate(daml_sequencer_block_events_total{type="send-confirmation-request"}[$CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE_MINSm])))
               instant: true
               intervalMs: 1000
               legendFormat: __auto
               maxDataPoints: 43200
               range: false
-              refId: wasted_traffic
-          - refId: wasted_traffic_threshold
-            relativeTimeRange:
-              from: 600
-              to: 0
+              refId: confirmation_requests_total
+          - refId: confirmation_requests_total_threshold
             datasourceUid: __expr__
             model:
               conditions:
-                - evaluator:
-                    params:
-                      - $WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES
-                    type: gt
-                  operator:
-                    type: and
-                  query:
-                    params:
-                      - C
-                  reducer:
-                    params: []
-                    type: last
-                  type: query
+                  - evaluator:
+                      params:
+                          - $CONFIRMATION_REQUESTS_TOTAL_ALERT_THRESHOLD
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params: []
+                    reducer:
+                      params: []
+                      type: avg
+                    type: query
               datasource:
-                type: __expr__
-                uid: __expr__
-              expression: wasted_traffic
-              intervalMs: 1000
-              maxDataPoints: 43200
-              refId: wasted_traffic_threshold
+                  name: Expression
+                  type: __expr__
+                  uid: __expr__
+              expression: confirmation_requests_total
+              hide: false
+              refId: confirmation_requests_total_threshold
               type: threshold
-        dashboardUid: fdnphvrryfq4gf
-        panelId: 6
+        dashboardUid: fdjrxql2alblsd
+        panelId: 1
         noDataState: OK
         execErrState: Alerting
         for: 1m
         annotations:
-          __dashboardUid__: fdnphvrryfq4gf
-          __panelId__: "6"
-          description: The rate of traffic wasted by member {{ $labels.member }} exceeded the threshold with a value of {{ humanize1024 $values.wasted_traffic.Value }} in the last $WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm
+          __dashboardUid__: fdjrxql2alblsd
+          __panelId__: "1"
+          description: The total confirmation requests send rate on migration ID {{ $labels.migration_id }} exceeded the threshold with a value of {{ $CONFIRMATION_REQUESTS_TOTAL_ALERT_THRESHOLD }} in the last $CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE_MINSm
           severity: critical
-          summary: Traffic wasted by {{ $labels.member }} exceeded threshold ({{ humanize1024 $WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES }}b over $WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm)
+          summary: Total confirmation requests on migration ID {{ $labels.migration_id }} exceeded the threshold ($CONFIRMATION_REQUESTS_TOTAL_ALERT_THRESHOLD in the last $CONFIRMATION_REQUESTS_TOTAL_ALERT_TIME_RANGE_MINSm)
+        labels: {}
+        isPaused: false
+      - uid: 88b8827c8d09
+        title: Confirmation Requests By Member
+        condition: confirmation_requests_by_member_threshold
+        data:
+          - refId: confirmation_requests_by_member
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: max by (member, migration_id) (rate(daml_sequencer_block_events_total{type="send-confirmation-request"}[$CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGE_MINSm]))
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: confirmation_requests_by_member
+          - refId: confirmation_requests_by_member_threshold
+            datasourceUid: __expr__
+            model:
+              conditions:
+                  - evaluator:
+                      params:
+                          - $CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_THRESHOLD
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params: []
+                    reducer:
+                      params: []
+                      type: avg
+                    type: query
+              datasource:
+                  name: Expression
+                  type: __expr__
+                  uid: __expr__
+              expression: confirmation_requests_by_member
+              hide: false
+              refId: confirmation_requests_by_member_threshold
+              type: threshold
+        dashboardUid: fdjrxql2alblsd
+        panelId: 1
+        noDataState: OK
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          __dashboardUid__: fdjrxql2alblsd
+          __panelId__: "1"
+          description: The confirmation requests send rate of member {{ $labels.member }} on migration ID {{ $labels.migration_id }} exceeded the threshold with a value of {{ $CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_THRESHOLD }} in the last $CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGE_MINSm
+          severity: critical
+          summary: Confirmation requests by member {{ $labels.member }} on migration ID {{ $labels.migration_id }} exceeded the threshold ($CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_THRESHOLD in the last $CONFIRMATION_REQUESTS_BY_MEMBER_ALERT_TIME_RANGE_MINSm)
         labels: {}
         isPaused: false

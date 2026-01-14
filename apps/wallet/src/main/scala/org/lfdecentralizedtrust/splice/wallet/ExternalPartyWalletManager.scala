@@ -4,8 +4,8 @@
 package org.lfdecentralizedtrust.splice.wallet
 
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.config.AutomationConfig
-import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerClient, RetryProvider}
+import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
+import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceLedgerClient}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
@@ -16,7 +16,7 @@ import org.lfdecentralizedtrust.splice.util.{HasHealth, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.wallet.store.{ExternalPartyWalletStore, WalletStore}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -35,13 +35,14 @@ class ExternalPartyWalletManager(
     private[splice] val clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
-    storage: Storage,
+    storage: DbStorage,
     retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
+    params: SpliceParametersConfig,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -171,6 +172,7 @@ class ExternalPartyWalletManager(
       participantId,
       ingestFromParticipantBegin,
       ingestUpdateHistoryFromParticipantBegin,
+      params,
     )
     (externalPartyRetryProvider, walletService)
   }

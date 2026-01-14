@@ -31,6 +31,7 @@ import org.lfdecentralizedtrust.splice.store.{
   ImportUpdatesBackfilling,
   PageLimit,
   TreeUpdateWithMigrationId,
+  UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.data.CantonTimestamp
@@ -46,6 +47,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 
 class ScanHistoryBackfillingTrigger(
     store: ScanStore,
+    updateHistory: UpdateHistory,
     svName: String,
     ledgerClient: SpliceLedgerClient,
     batchSize: Int,
@@ -61,7 +63,7 @@ class ScanHistoryBackfillingTrigger(
     mat: Materializer,
 ) extends PollingParallelTaskExecutionTrigger[ScanHistoryBackfillingTrigger.Task] {
 
-  private val currentMigrationId = store.updateHistory.domainMigrationInfo.currentMigrationId
+  private val currentMigrationId = updateHistory.domainMigrationInfo.currentMigrationId
 
   private val historyMetrics = new HistoryMetrics(context.metricsFactory)(
     MetricsContext(
@@ -70,7 +72,7 @@ class ScanHistoryBackfillingTrigger(
   )
 
   /** A cursor for iterating over the beginning of the update history in findHistoryStart,
-    *  see [[org.lfdecentralizedtrust.splice.store.UpdateHistory.getUpdates()]].
+    *  see [[org.lfdecentralizedtrust.splice.updateHistory.getUpdates()]].
     *  We need to store this as we don't want to start over from the beginning every time the trigger runs.
     */
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -88,14 +90,14 @@ class ScanHistoryBackfillingTrigger(
   override def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[ScanHistoryBackfillingTrigger.Task]] = {
-    if (!store.updateHistory.isReady) {
+    if (!updateHistory.isReady) {
       logger.debug("UpdateHistory is not yet ready")
       Future.successful(Seq.empty)
-    } else if (importUpdateBackfillingEnabled && !store.updateHistory.corruptAcsSnapshotsDeleted) {
+    } else if (importUpdateBackfillingEnabled && !updateHistory.corruptAcsSnapshotsDeleted) {
       logger.debug("There may be corrupt ACS snapshots that need to be deleted")
       Future.successful(Seq.empty)
     } else {
-      store.updateHistory.getBackfillingState().map {
+      updateHistory.getBackfillingState().map {
         case BackfillingState.Complete =>
           historyMetrics.UpdateHistoryBackfilling.completed.updateValue(1)
           historyMetrics.ImportUpdatesBackfilling.completed.updateValue(1)
@@ -149,7 +151,7 @@ class ScanHistoryBackfillingTrigger(
       result <- initialUpdateO match {
         case Some(FoundingTransactionTreeUpdate(treeUpdate, _)) =>
           for {
-            _ <- store.updateHistory
+            _ <- updateHistory
               .initializeBackfilling(
                 treeUpdate.migrationId,
                 treeUpdate.update.synchronizerId,
@@ -163,8 +165,8 @@ class ScanHistoryBackfillingTrigger(
           for {
             // Before deleting updates, we need to delete ACS snapshots that were generated before backfilling was enabled.
             // This will delete all ACS snapshots for migration id where the SV node joined the network.
-            _ <- store.updateHistory.deleteAcsSnapshotsAfter(
-              historyId = store.updateHistory.historyId,
+            _ <- updateHistory.deleteAcsSnapshotsAfter(
+              historyId = updateHistory.historyId,
               migrationId = treeUpdate.migrationId,
               recordTime = CantonTimestamp.MinValue,
             )
@@ -172,12 +174,12 @@ class ScanHistoryBackfillingTrigger(
             // only with the visibility of the SV party and not the DSO party.
             // Note that this will also delete the import updates because they have a record time of 0,
             // which is good because we want to remove them.
-            _ <- store.updateHistory.deleteUpdatesBefore(
+            _ <- updateHistory.deleteUpdatesBefore(
               synchronizerId = treeUpdate.update.synchronizerId,
               migrationId = treeUpdate.migrationId,
               recordTime = treeUpdate.update.update.recordTime,
             )
-            _ <- store.updateHistory
+            _ <- updateHistory
               .initializeBackfilling(
                 treeUpdate.migrationId,
                 treeUpdate.update.synchronizerId,
@@ -203,7 +205,7 @@ class ScanHistoryBackfillingTrigger(
     synchronized {
       val batchSize = 100
       for {
-        updates <- store.updateHistory.getUpdatesWithoutImportUpdates(
+        updates <- updateHistory.getUpdatesWithoutImportUpdates(
           findHistoryStartAfter,
           PageLimit.tryCreate(batchSize),
         )
@@ -260,7 +262,7 @@ class ScanHistoryBackfillingTrigger(
           val backfilling =
             new ScanHistoryBackfilling(
               connection = connection,
-              destinationHistory = store.updateHistory.destinationHistory,
+              destinationHistory = updateHistory.destinationHistory,
               currentMigrationId = currentMigrationId,
               batchSize = batchSize,
               loggerFactory = loggerFactory,
@@ -279,13 +281,16 @@ class ScanHistoryBackfillingTrigger(
         historyMetrics.UpdateHistoryBackfilling.completed.updateValue(0)
         // Using MetricsContext.Empty is okay, because it's merged with the StoreMetrics context
         historyMetrics.UpdateHistoryBackfilling.latestRecordTime.updateValue(
-          workDone.lastBackfilledRecordTime.toMicros
+          workDone.lastBackfilledRecordTime
         )(MetricsContext.Empty)
         historyMetrics.UpdateHistoryBackfilling.updateCount.inc(
           workDone.backfilledUpdates
         )(MetricsContext.Empty)
-        historyMetrics.UpdateHistoryBackfilling.eventCount.inc(workDone.backfilledEvents)(
-          MetricsContext.Empty
+        historyMetrics.UpdateHistoryBackfilling.eventCount.inc(workDone.backfilledCreatedEvents)(
+          MetricsContext("event_type" -> "created")
+        )
+        historyMetrics.UpdateHistoryBackfilling.eventCount.inc(workDone.backfilledExercisedEvents)(
+          MetricsContext("event_type" -> "exercised")
         )
         TaskSuccess("Backfilling step completed")
       case HistoryBackfilling.Outcome.MoreWorkAvailableLater =>

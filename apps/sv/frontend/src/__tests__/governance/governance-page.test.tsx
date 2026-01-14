@@ -19,7 +19,7 @@ const GovernanceWithConfig = () => {
 async function login(user: UserEvent) {
   render(<GovernanceWithConfig />);
 
-  expect(await screen.findByText('Log In')).toBeDefined();
+  expect(await screen.findByText('Log In')).toBeInTheDocument();
 
   const input = screen.getByRole('textbox');
   await user.type(input, 'sv1');
@@ -29,7 +29,7 @@ async function login(user: UserEvent) {
 }
 
 async function navigateToGovernancePage(user: UserEvent) {
-  expect(await screen.findByTestId('navlink-governance-beta')).toBeDefined();
+  expect(await screen.findByTestId('navlink-governance-beta')).toBeInTheDocument();
   await user.click(screen.getByText('Governance'));
 }
 
@@ -41,8 +41,8 @@ describe.skip('Governance Page', () => {
     await login(user);
     await navigateToGovernancePage(user);
 
-    const title = screen.getByTestId('governance-page-title');
-    expect(title).toBeDefined();
+    const title = screen.getByTestId('governance-page-header-title');
+    expect(title).toBeInTheDocument();
   });
 
   test('should render all Governance Page sections', async () => {
@@ -53,13 +53,13 @@ describe.skip('Governance Page', () => {
     await navigateToGovernancePage(user);
 
     const actionRequired = screen.getByTestId('action-required-section');
-    expect(actionRequired).toBeDefined();
+    expect(actionRequired).toBeInTheDocument();
 
-    const inflightVoteRequests = screen.getByTestId('inflight-vote-requests-section');
-    expect(inflightVoteRequests).toBeDefined();
+    const inflightVoteRequests = screen.getByTestId('inflight-proposals-section');
+    expect(inflightVoteRequests).toBeInTheDocument();
 
     const voteHistory = screen.getByTestId('vote-history-section');
-    expect(voteHistory).toBeDefined();
+    expect(voteHistory).toBeInTheDocument();
   });
 
   test('should display the correct number of Action Required Requests', async () => {
@@ -80,7 +80,7 @@ describe.skip('Governance Page', () => {
 
     await navigateToGovernancePage(user);
 
-    expect(() => screen.getAllByTestId('inflight-vote-requests-row')).toThrowError(
+    expect(() => screen.getAllByTestId('inflight-proposals-row')).toThrowError(
       /Unable to find an element/
     );
   });
@@ -108,12 +108,12 @@ describe.skip('Governance Page', () => {
     const actions = screen.getAllByTestId('action-required-card');
 
     const viewDetailsLink = await within(actions[0]).findByTestId('action-required-view-details');
-    expect(viewDetailsLink).toBeDefined();
+    expect(viewDetailsLink).toBeInTheDocument();
 
     await user.click(viewDetailsLink);
 
     const proposalDetails = screen.getByTestId('proposal-details-title');
-    expect(proposalDetails).toBeDefined();
+    expect(proposalDetails).toBeInTheDocument();
   });
 
   test('proposal details page should render all details', async () => {
@@ -126,52 +126,52 @@ describe.skip('Governance Page', () => {
     const actions = screen.getAllByTestId('action-required-card');
 
     const viewDetailsLink = await within(actions[0]).findByTestId('action-required-view-details');
-    expect(viewDetailsLink).toBeDefined();
+    expect(viewDetailsLink).toBeInTheDocument();
 
     await user.click(viewDetailsLink);
 
     const proposalDetails = screen.getByTestId('proposal-details-title');
-    expect(proposalDetails).toBeDefined();
+    expect(proposalDetails).toBeInTheDocument();
 
     const action = screen.getByTestId('proposal-details-action-value');
-    expect(action).toBeDefined();
+    expect(action).toBeInTheDocument();
 
     const summary = screen.getByTestId('proposal-details-summary-value');
-    expect(summary).toBeDefined();
+    expect(summary).toBeInTheDocument();
 
     const url = screen.getByTestId('proposal-details-url-value');
-    expect(url).toBeDefined();
+    expect(url).toBeInTheDocument();
 
     const votingInformationSection = screen.getByTestId('proposal-details-voting-information');
-    expect(votingInformationSection).toBeDefined();
+    expect(votingInformationSection).toBeInTheDocument();
 
     const requesterInput = within(votingInformationSection).getByTestId(
-      'proposal-details-requester-party-id-input'
+      'proposal-details-requester-party-id'
     );
-    expect(requesterInput).toBeDefined();
+    expect(requesterInput).toBeInTheDocument();
 
     const votingClosesIso = within(votingInformationSection).getByTestId(
       'proposal-details-voting-closes-value'
     );
-    expect(votingClosesIso).toBeDefined();
+    expect(votingClosesIso).toBeInTheDocument();
 
     const voteTakesEffectIso = within(votingInformationSection).getByTestId(
       'proposal-details-vote-takes-effect-value'
     );
-    expect(voteTakesEffectIso).toBeDefined();
+    expect(voteTakesEffectIso).toBeInTheDocument();
 
     const status = screen.getByTestId('proposal-details-status-value');
-    expect(status).toBeDefined();
+    expect(status).toBeInTheDocument();
 
-    const votesSection = screen.getByTestId('proposal-details-votes');
-    expect(votesSection).toBeDefined();
+    const votesSection = screen.getByTestId('proposal-details-votes-list');
+    expect(votesSection).toBeInTheDocument();
 
     const votes = within(votesSection).getAllByTestId('proposal-details-vote');
     expect(votes.length).toBeGreaterThan(0);
 
-    expect(screen.getByTestId('proposal-details-your-vote-section')).toBeDefined();
-    expect(screen.getByTestId('proposal-details-your-vote-input')).toBeDefined();
-    expect(screen.getByTestId('proposal-details-your-vote-accept')).toBeDefined();
-    expect(screen.getByTestId('proposal-details-your-vote-reject')).toBeDefined();
+    expect(screen.getByTestId('proposal-details-your-vote-section')).toBeInTheDocument();
+    expect(screen.getByTestId('proposal-details-your-vote-input')).toBeInTheDocument();
+    expect(screen.getByTestId('proposal-details-your-vote-accept')).toBeInTheDocument();
+    expect(screen.getByTestId('proposal-details-your-vote-reject')).toBeInTheDocument();
   });
 });

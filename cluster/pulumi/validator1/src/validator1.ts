@@ -18,8 +18,8 @@ import {
   DecentralizedSynchronizerMigrationConfig,
   ValidatorTopupConfig,
   ansDomainPrefix,
-  installLoopback,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import {
   installParticipant,
   splitwellDarPaths,
@@ -27,9 +27,9 @@ import {
 import {
   AutoAcceptTransfersConfig,
   installValidatorApp,
-  installValidatorSecrets,
 } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
 
+import { spliceConfig } from '../../common/src/config/config';
 import { validator1Config } from './config';
 
 export async function installValidator1(
@@ -54,19 +54,27 @@ export async function installValidator1(
   const imagePullDeps = imagePullSecret(xns);
 
   const defaultPostgres = !splitPostgresInstances
-    ? postgres.installPostgres(xns, 'postgres', 'postgres', activeVersion, false)
+    ? postgres.installPostgres(
+        xns,
+        'postgres',
+        'postgres',
+        activeVersion,
+        spliceConfig.pulumiProjectConfig.cloudSql,
+        false
+      )
     : undefined;
 
   const validatorPostgres =
     defaultPostgres ||
-    postgres.installPostgres(xns, `validator-pg`, `validator-pg`, activeVersion, true);
+    postgres.installPostgres(
+      xns,
+      `validator-pg`,
+      `validator-pg`,
+      activeVersion,
+      spliceConfig.pulumiProjectConfig.cloudSql,
+      true
+    );
   const validatorDbName = `validator1`;
-
-  const validatorSecrets = await installValidatorSecrets({
-    xns,
-    auth0Client,
-    auth0AppName: 'validator1',
-  });
 
   const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps.concat(loopback);
 
@@ -75,7 +83,7 @@ export async function installValidator1(
     decentralizedSynchronizerMigrationConfig.active.id,
     xns,
     auth0Client.getCfg(),
-    'validator1',
+    validator1Config?.disableAuth,
     decentralizedSynchronizerMigrationConfig.active.version,
     defaultPostgres,
     {
@@ -113,11 +121,13 @@ export async function installValidator1(
     topupConfig,
     svValidator: false,
     scanAddress,
-    secrets: validatorSecrets,
+    auth0Client: auth0Client,
+    auth0ValidatorAppName: 'validator1',
     autoAcceptTransfers: autoAcceptTransfers,
     nodeIdentifier: 'validator1',
     participantPruningConfig,
     deduplicationDuration: validator1Config?.deduplicationDuration,
+    disableAuth: validator1Config?.disableAuth,
   });
   installIngress(xns, installSplitwell, decentralizedSynchronizerMigrationConfig);
 
@@ -136,7 +146,7 @@ export async function installValidator1(
       activeVersion,
       {
         dependsOn: imagePullDeps.concat([
-          await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
+          await installAuth0UISecret(auth0Client, xns, 'splitwell'),
         ]),
       }
     );

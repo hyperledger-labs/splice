@@ -14,12 +14,11 @@ import com.digitalasset.canton.data.ViewType.TransactionViewType
 import com.digitalasset.canton.error.MediatorError.InvalidMessage
 import com.digitalasset.canton.integration.IntegrationTestUtilities.*
 import com.digitalasset.canton.integration.{CommunityIntegrationTest, TestConsoleEnvironment}
-import com.digitalasset.canton.logging.LogEntry
-import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
+import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.protocol.messages.{EmptyRootHashMessagePayload, RootHashMessage}
 import com.digitalasset.canton.protocol.{LocalRejectError, RootHash}
-import com.digitalasset.canton.sequencing.client.SendCallback
+import com.digitalasset.canton.sequencing.client.{SendCallback, SendResult}
 import com.digitalasset.canton.sequencing.protocol.{
   AggregationRule,
   Batch,
@@ -31,21 +30,22 @@ import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import org.scalactic.source.Position
 import org.scalatest.Assertion
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.time.{Minutes, Span}
+import org.scalatest.time.{Minutes, Seconds, Span}
+import org.slf4j.event.Level
 
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 trait SequencerRestartTest { self: CommunityIntegrationTest =>
 
-  private val ExpectedLogs: Seq[(LogEntryOptionality, LogEntry => Assertion)] = Seq(
-    (
-      LogEntryOptionality.OptionalMany,
-      // Those test cases may interfere with each other by sending submissions in the background.
-      // Some of the submissions, which started as part of one test case, may time out as part of the next one.
-      _.warningMessage should include("Submission timed out at"),
-    )
-  )
+  // Those test cases may interfere with each other by sending submissions in the background.
+  // Some of the submissions, which started as part of one test case, may time out as part of the next one.
+  private val optionalManySubmissionTimedOut: LogEntry => Assertion =
+    _.warningMessage should include("Submission timed out at")
+
+  // Due to sequencer restart time proof requests get retried, and may get logged as warning after reaching a threshold.
+  private val optionalManyRequestCurrentTime: LogEntry => Assertion =
+    _.warningMessage should include("Now retrying operation 'request current time'")
 
   protected def name: String
 
@@ -144,21 +144,22 @@ trait SequencerRestartTest { self: CommunityIntegrationTest =>
       // To that end, we generate a plain root hash message and send it as part of aggregated submissions to the mediator and one participant.
       // One part is sent before the restart, the other one after.
       // We check the delivery by looking for the alarms in the logs.
-      val rhm = RootHashMessage(
-        RootHash(TestHash.digest(1)),
-        daId,
-        testedProtocolVersion,
-        TransactionViewType,
-        CantonTimestamp.Epoch,
-        EmptyRootHashMessagePayload,
-      )
-      val batch = Batch.of(
-        testedProtocolVersion,
-        rhm -> Recipients.cc(
-          MediatorGroupRecipient(MediatorGroupIndex.zero),
-          MemberRecipient(participant1.id),
-        ),
-      )
+      val batch = {
+        val rhm = RootHashMessage(
+          RootHash(TestHash.digest(1)),
+          daId,
+          TransactionViewType,
+          CantonTimestamp.Epoch,
+          EmptyRootHashMessagePayload,
+        )
+        Batch.of(
+          testedProtocolVersion,
+          rhm -> Recipients.cc(
+            MediatorGroupRecipient(MediatorGroupIndex.zero),
+            MemberRecipient(participant1.id),
+          ),
+        )
+      }
       val ts = env.environment.clock.now
       val maxTs = ts.plusSeconds(300)
       val aggregationRule = AggregationRule(
@@ -169,20 +170,29 @@ trait SequencerRestartTest { self: CommunityIntegrationTest =>
 
       def sendAndWait(participant: LocalParticipantReference): Unit = {
         implicit val metricsContext: MetricsContext = MetricsContext.Empty
+        utils.retry_until_true(
+          participant.underlying.value.sync
+            .readyConnectedSynchronizerById(daId)
+            .nonEmpty
+        )
         val client = participant.underlying.value.sync
           .readyConnectedSynchronizerById(daId)
           .value
           .sequencerClient
         val callback = SendCallback.future
-        val sendAsync = client.sendAsync(
+        val sendAsync = client.send(
           batch,
-          topologyTimestamp = Some(ts),
+          topologyTimestamp = Some(ts.minusSeconds(5)),
           maxSequencingTime = maxTs,
           aggregationRule = Some(aggregationRule),
           callback = callback,
         )
         sendAsync.valueOrFailShutdown("Participant send").futureValue
-        callback.future.onShutdown(fail("shutdown")).futureValue
+        callback.future
+          .onShutdown(fail("shutdown"))
+          .futureValue(Timeout(Span(45, Seconds))) should matchPattern {
+          case SendResult.Success(_) =>
+        }
       }
 
       clue("Sending first part of the aggregatable submission from participant 1") {
@@ -197,37 +207,31 @@ trait SequencerRestartTest { self: CommunityIntegrationTest =>
         }
       }
 
-      val expectedLogs: Seq[(LogEntryOptionality, LogEntry => Assertion)] = ExpectedLogs ++ Seq(
-        (
-          LogEntryOptionality.Required,
-          _.shouldBeCantonError(
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+        sendAndWait(participant2),
+        logs => {
+          val assertSyncServiceAlarm: LogEntry => Assertion = _.shouldBeCantonError(
             SyncServiceAlarm,
             _ should include("Received no encrypted view message of type"),
-          ),
-        ),
-        (
-          LogEntryOptionality.Required,
-          _.shouldBeCantonError(
+          )
+          val assertBadRootHashMessages: LogEntry => Assertion = _.shouldBeCantonError(
             LocalRejectError.MalformedRejects.BadRootHashMessages,
             _ should include("Received no encrypted view message of type TransactionViewType"),
-          ),
-        ),
-        (
-          LogEntryOptionality.Required,
-          _.shouldBeCantonError(
+          )
+          val assertInvalidMessage: LogEntry => Assertion = _.shouldBeCantonError(
             InvalidMessage,
             _ should (include("Received a confirmation response") and include(
               "with an unknown request id"
             )),
-          ),
-        ),
-      )
-
-      loggerFactory.assertLogsUnorderedOptional(
-        clue("Sending second part of the aggregatable submission from participant2") {
-          sendAndWait(participant2)
+          )
+          if (logs.sizeIs > 3) {
+            forAtMost(logs.size - 3, logs)(optionalManySubmissionTimedOut)
+            forAtMost(logs.size - 3, logs)(optionalManyRequestCurrentTime)
+          }
+          forAtLeast(1, logs)(assertSyncServiceAlarm)
+          forAtLeast(1, logs)(assertBadRootHashMessages)
+          forAtLeast(1, logs)(assertInvalidMessage)
         },
-        expectedLogs *,
       )
     }
   }

@@ -5,13 +5,12 @@ package com.digitalasset.canton.console
 
 import better.files.*
 import cats.syntax.either.*
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.StaticSynchronizerParameters
-import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.admin.data.ActiveContractOld
-import com.digitalasset.canton.protocol.SerializableContract
+import com.digitalasset.canton.participant.admin.data.ActiveContract
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -24,8 +23,8 @@ import com.digitalasset.canton.topology.store.{
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, TextFileUtil}
+import com.digitalasset.canton.version.ProtocolVersion
 
-import java.time.Instant
 import scala.annotation.tailrec
 import scala.util.control.NonFatal
 
@@ -67,9 +66,10 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
     def download(
         node: LocalInstanceReference,
         synchronizerId: SynchronizerId,
+        protocolVersion: ProtocolVersion,
         targetPath: String,
     ): Unit =
-      TraceContext.withNewTraceContext { implicit traceContext =>
+      TraceContext.withNewTraceContext("download_identity") { implicit traceContext =>
         val targetDir = createAndCheckTargetDirectory(File(targetPath))
         logger.info(s"Downloading identity from node ${node.name} to $targetDir")
         if (!node.is_running) {
@@ -122,7 +122,8 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
 
         val authorizedFile = File(targetDir, TOPOLOGY_AUTHORIZED)
         StoredTopologyTransactions(transactionsFromAuthorizedStore).writeToFile(
-          authorizedFile.pathAsString
+          authorizedFile.pathAsString,
+          protocolVersion,
         )
 
         if (node.id.member.code == SequencerId.Code) { // The sequencer needs to know more than just its own identity
@@ -130,7 +131,7 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
           // Initial synchronizer state, needed for the sequencer to open the init service offering `assign_from_genesis_state`
           val synchronizerGenesisTransactions = node.topology.transactions
             .list(
-              store = TopologyStoreId.Synchronizer(synchronizerId),
+              store = synchronizerId,
               timeQuery = TimeQuery.Snapshot(
                 SignedTopologyTransaction.InitialTopologySequencingTime.immediateSuccessor // Convention used only by internal Canton tooling
               ),
@@ -146,7 +147,8 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
                 .mkString("\n")}"
           )
           StoredTopologyTransactions(synchronizerGenesisTransactions).writeToFile(
-            synchronizerFile.pathAsString
+            synchronizerFile.pathAsString,
+            protocolVersion,
           )
         }
       }
@@ -209,7 +211,7 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
         staticSynchronizerParameters: StaticSynchronizerParameters,
         sequencerConnections: SequencerConnections,
     ): Unit =
-      TraceContext.withNewTraceContext { implicit traceContext =>
+      TraceContext.withNewTraceContext("upload_identity") { implicit traceContext =>
         val sourceDir = File(sourcePath)
 
         ErrorUtil.requireArgument(sourceDir.exists, s"Directory $sourceDir does not exist")
@@ -271,7 +273,7 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
           case mediator: MediatorReference =>
             mediator.setup
               .assign(
-                synchronizerId,
+                PhysicalSynchronizerId(synchronizerId, staticSynchronizerParameters.toInternal),
                 sequencerConnections,
               )
 
@@ -295,7 +297,7 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
         node: LocalParticipantReference,
         targetPath: String,
     ): Unit =
-      TraceContext.withNewTraceContext { implicit traceContext =>
+      TraceContext.withNewTraceContext("download_dars") { implicit traceContext =>
         val darsDir = createAndCheckTargetDirectory(File(targetPath, DARS))
         node.dars.list().filterNot(_.name.startsWith("AdminWorkflow")).foreach { dar =>
           noTracingLogger.info(s"Downloading dar ${dar.name}")
@@ -307,13 +309,22 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
         node: LocalParticipantReference,
         sourcePath: String,
     ): Unit =
-      TraceContext.withNewTraceContext { implicit traceContext =>
+      TraceContext.withNewTraceContext("upload_dars") { implicit traceContext =>
         ErrorUtil.requireState(node.is_running, s"Node ${node.name} is not running")
         val darsDir = File(sourcePath, DARS)
         val files = darsDir.list
         files.filter(_.name.endsWith(".dar")).foreach { file =>
           logger.info(s"Uploading DAR file $file")
-          node.dars.upload(file.pathAsString, synchronizeVetting = false).discard[String]
+          node.dars
+            .upload(
+              file.pathAsString,
+              // Do not vet, because the DAR may not have been vetted on the
+              // previous participant, and because vetting all recovered DARs
+              // may not be possible.
+              vetAllPackages = false,
+              synchronizeVetting = false,
+            )
+            .discard[String]
         }
       }
   }
@@ -322,22 +333,23 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
   @Help.Group("Active Contract Store")
   object acs extends Helpful {
 
-    @Help.Summary("Load contracts from a file. (DEPRECATED)")
+    @Help.Summary("Read contracts from a file")
     @Help.Description(
-      """Expects a file name. Returns a streaming iterator of serializable contracts.
-        |
-        |DEPRECATION NOTICE: A future release removes this command.
-        |"""
+      "Expects a file name. Returns a streaming iterator of serializable contracts."
     )
-    def import_acs_from_file_old(
+    def read_from_file(
         source: String
-    ): Iterator[
-      (SynchronizerId, SerializableContract)
-    ] = // TODO(#24728) - Remove, use import_acs and then the LAPI
-      ActiveContractOld.fromFile(File(source)).map {
-        case ActiveContractOld(synchronizerId, contract, _) =>
-          synchronizerId -> contract
-      }
+    )(implicit
+        consoleEnvironment: ConsoleEnvironment
+    ): Seq[com.daml.ledger.api.v2.state_service.ActiveContract] =
+      ActiveContract
+        .fromFile(File(source))
+        .map(_.map(_.contract))
+        .valueOr(err =>
+          consoleEnvironment.raiseError(s"Unable to read contracts from $source: $err")
+        )
+        .toSeq
+
   }
 
   @Help.Summary(
@@ -347,16 +359,17 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
   @Help.Group("Party Replication")
   object party_replication extends Helpful {
 
-    private def ensureSynchronizerHasBeenQuiet(
+    private def ensureSynchronizerHasBeenSilent(
         participant: ParticipantReference,
         synchronizerId: SynchronizerId,
     )(implicit env: ConsoleEnvironment): Unit = {
-      val activeSynchronizers = participant.synchronizers
+      val activeSynchronizers: Seq[SynchronizerAlias] = participant.synchronizers
         .list_registered() // this will only return active synchronizers
-        .map { case (synchronizerConnectionConfig, _) =>
-          synchronizerConnectionConfig.synchronizerAlias
+        .flatMap {
+          case (synchronizerConnectionConfig, _, true) =>
+            Some(synchronizerConnectionConfig.synchronizerAlias)
+          case (_, _, false) => None
         }
-        .toList
 
       // Given synchronizer (ID) must be active on the given participant
       val activeSynchronizer =
@@ -396,7 +409,7 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
         _ <- Either.cond(
           maxRate.unwrap == 0,
           (),
-          s"confirmationRequestsMaxRate must be 0, but was ${maxRate.unwrap} for synchronizer $activeSynchronizer. We need a quiet synchronizer for party replication.",
+          s"confirmationRequestsMaxRate must be 0, but was ${maxRate.unwrap} for synchronizer $activeSynchronizer. We need a silent synchronizer for party replication.",
         )
         validFrom <- CantonTimestamp.fromInstant(validFromInstant)
         validAfter = validFrom
@@ -412,57 +425,71 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
       check.valueOr(env.raiseError)
     }
 
+    /** Initiates the first step of the party replication repair macro.
+      *
+      *   - Ensures synchronizer is silent before starting.
+      *   - Finds ledger offset at which the party was activated on the target participant.
+      *   - Exports the party's ACS from the source participant to file.
+      *
+      * Assumptions before running this step:
+      *   - Synchronizer has been silenced.
+      *   - Party has been authorized on the target participant, that is it has been activated.
+      *   - The `beginOffsetExclusive` refers to an offset on the source participant which is before
+      *     the party to participant mapping topology transactions
+      *
+      * @param partyId
+      *   The party to be replicated.
+      * @param synchronizerId
+      *   The synchronizer on which the party replication happens.
+      * @param sourceParticipant
+      *   The participant from where the party's ACS will be exported.
+      * @param targetParticipantId
+      *   The participant which onboards the party through party replication.
+      * @param targetFile
+      *   The party's ACS export file path.
+      * @param beginOffsetExclusive
+      *   The ledger offset after which to begin searching for the party's activation on the target
+      *   participant.
+      */
     def step1_hold_and_store_acs(
         partyId: PartyId,
         synchronizerId: SynchronizerId,
         sourceParticipant: ParticipantReference,
         targetParticipantId: ParticipantId,
         targetFile: String,
-        topologyTransactionEffectiveTime: Instant,
-        synchronize: Boolean = true,
+        beginOffsetExclusive: Long,
     )(implicit env: ConsoleEnvironment): Unit = {
-      ensureSynchronizerHasBeenQuiet(sourceParticipant, synchronizerId)
-      sourceParticipant.parties.export_acs_at_timestamp(
-        Set(partyId),
-        synchronizerId,
-        topologyTransactionEffectiveTime,
-        targetFile,
-      )
+      ensureSynchronizerHasBeenSilent(sourceParticipant, synchronizerId)
 
-      val synchronizers = Set(synchronizerId)
       ensureTargetPartyToParticipantIsPermissioned(
         partyId,
         sourceParticipant,
         targetParticipantId,
-        synchronizers,
+        synchronizerId,
       )
-      if (synchronize) {
-        synchronizers.foreach(synchronizerId =>
-          // wait to observe either the fully authorized party mapping or the proposal.
-          // normally it would be a proposal, but it could be a fully authorized transaction, if
-          // the target participant signed a NamespaceDelegation for a
-          // key available on the source participant
-          ConsoleMacros.utils.retry_until_true(env.commandTimeouts.bounded)(
-            sourceParticipant.topology.party_to_participant_mappings
-              .list(
-                synchronizerId,
-                proposals = true,
-                filterParty = partyId.filterString,
-                filterParticipant = targetParticipantId.filterString,
-              )
-              .nonEmpty ||
-              sourceParticipant.topology.party_to_participant_mappings
-                .list(
-                  synchronizerId,
-                  filterParty = partyId.filterString,
-                  filterParticipant = targetParticipantId.filterString,
-                )
-                .nonEmpty
-          )
-        )
-      }
+
+      sourceParticipant.parties.export_party_acs(
+        partyId,
+        synchronizerId,
+        targetParticipantId,
+        beginOffsetExclusive,
+        exportFilePath = targetFile,
+      )
     }
 
+    /** Completes the party replication repair macro in a second step.
+      *
+      * @param partyId
+      *   The party to be replicated.
+      * @param synchronizerId
+      *   The synchronizer on which the party replication happens.
+      * @param targetParticipant
+      *   The participant which onboards the party through party replication.
+      * @param sourceFile
+      *   The party's ACS export file path.
+      * @param workflowIdPrefix
+      *   Optional prefix for the workflow ID.
+      */
     def step2_import_acs(
         partyId: PartyId,
         synchronizerId: SynchronizerId,
@@ -470,12 +497,11 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
         sourceFile: String,
         workflowIdPrefix: String = "",
     )(implicit env: ConsoleEnvironment): Unit = {
-      val synchronizers = Set(synchronizerId)
       ensureTargetPartyToParticipantIsPermissioned(
         partyId,
         targetParticipant,
         targetParticipant.id,
-        synchronizers,
+        synchronizerId,
       )
       // this is needed to ensure that we can switch to repair mode (necessary party notification is already arrived)
       ConsoleMacros.utils.retry_until_true(env.commandTimeouts.bounded)(
@@ -515,47 +541,33 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
       partyId: PartyId,
       participant: ParticipantReference,
       targetParticipantId: ParticipantId,
-      synchronizerIds: Set[SynchronizerId],
+      synchronizerId: SynchronizerId,
   )(implicit env: ConsoleEnvironment): Unit = {
     noTracingLogger.info(
       s"Participant '${participant.id}' is ensuring that the party '$partyId' is enabled on the target '$targetParticipantId'"
     )
-    synchronizerIds.foreach { synchronizerId =>
-      // check that target participant is present on all synchronizers
-      val active =
-        participant.topology.participant_synchronizer_states.active(
-          synchronizerId,
-          targetParticipantId,
-        )
-      if (!active) {
-        env.raiseError(
-          s"Target participant $targetParticipantId is not active on synchronizer $synchronizerId"
-        )
-      }
+
+    val active =
+      participant.topology.participant_synchronizer_states.active(
+        synchronizerId,
+        targetParticipantId,
+      )
+    if (!active) {
+      env.raiseError(
+        s"Target participant $targetParticipantId is not active on synchronizer $synchronizerId"
+      )
     }
 
-    synchronizerIds.foreach { synchronizerId =>
-      val mappingExists = participant.topology.party_to_participant_mappings.is_known(
-        synchronizerId,
-        partyId,
-        Seq(targetParticipantId),
+    val mappingExists = participant.topology.party_to_participant_mappings.is_known(
+      synchronizerId,
+      partyId,
+      Seq(targetParticipantId),
+    )
+    if (!mappingExists) {
+      env.raiseError(
+        s"Missing party-to-participant mapping $partyId -> $targetParticipantId on store $synchronizerId "
       )
-      if (mappingExists) {
-        noTracingLogger.info(
-          s"The party-to-participant mapping $partyId -> $targetParticipantId already exists on store $synchronizerId"
-        )
-      } else {
-        noTracingLogger.info(
-          s"Adding party-to-participant mapping $partyId -> $targetParticipantId on store $synchronizerId"
-        )
-        participant.topology.party_to_participant_mappings
-          .propose_delta(
-            partyId,
-            adds = List((targetParticipantId, ParticipantPermission.Submission)),
-            store = synchronizerId,
-          )
-          .discard
-      }
     }
   }
+
 }

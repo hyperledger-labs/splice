@@ -1,11 +1,16 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as automation from '@pulumi/pulumi/automation';
+import { config } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
+import {
+  CLUSTER_BASENAME,
+  PULUMI_STACKS_DIR,
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { config } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
-import { CLUSTER_BASENAME, PULUMI_STACKS_DIR } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
+import {spliceEnvConfig} from "@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig";
+import {allowDowngrade} from "@lfdecentralizedtrust/splice-pulumi-common";
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulumi-'));
 
@@ -40,6 +45,8 @@ export function pulumiOptsWithPrefix(
   parallel: 128;
   onOutput: (output: string) => void;
   signal: AbortSignal;
+  color: 'always';
+  policyPacks: string[];
 } {
   return {
     parallel: 128,
@@ -50,6 +57,8 @@ export function pulumiOptsWithPrefix(
       }
     },
     signal: abortSignal,
+    color: 'always',
+    policyPacks: allowDowngrade ? [] : [`${spliceEnvConfig.context.splicePath}/cluster/pulumi/policies`],
   };
 }
 
@@ -71,9 +80,6 @@ export async function stack(
 ): Promise<automation.Stack> {
   const fullStackName = `organization/${project}/${stackName}.${CLUSTER_BASENAME}`;
   const command = await commandPromise;
-  // safe to use process.env as we check if we're in a CI env
-  // eslint-disable-next-line no-process-env
-  const stackMustAlreadyExist = process.env.CI !== undefined && requiresExistingStack;
   const projectDirectory = `${PULUMI_STACKS_DIR}/${project}`;
   const stackOpts: automation.LocalProgramArgs = {
     workDir: projectDirectory,
@@ -87,7 +93,7 @@ export async function stack(
     pulumiHome: tempDir,
   };
 
-  return stackMustAlreadyExist
+  return requiresExistingStack
     ? await automation.LocalWorkspace.selectStack(stackOpts, workspaceOpts)
     : await automation.LocalWorkspace.createOrSelectStack(stackOpts, workspaceOpts);
 }

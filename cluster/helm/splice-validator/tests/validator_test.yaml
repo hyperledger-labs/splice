@@ -11,27 +11,28 @@ chart:
   # Override for testing labels
   version: 0.1.1
   appVersion: 0.1.0
+
+set:
+  # Things we need just to pass the schema
+  nodeIdentifier: "helm-mock-1-validator"
+  validatorPartyHint: "helm-mock-1"
+  validatorWalletUser: "mock-wallet-user-id"
+  spliceInstanceNames:
+    networkName: MockNet
+    networkFaviconUrl: https://mock.net/favicon.ico
+    amuletName: Mocklet
+    amuletNameAcronym: MCK
+    nameServiceName: Mock Name Service
+    nameServiceNameAcronym: MNS
+  topup:
+    enabled: false
+  auth:
+    jwksUrl: "https://mock.com/.well-known/jwks.json"
+    audience: "mock_audience"
+
 tests:
   - it: "sets labels and annotations as expected"
     set:
-      # Things we need just to pass the schema
-      nodeIdentifier: "helm-mock-1-validator"
-      validatorPartyHint: "helm-mock-1"
-      validatorWalletUser: "mock-wallet-user-id"
-      scanAddress: "trusted.scan.mock.com"
-      topup:
-        enabled: false
-      auth:
-        jwksUrl: "https://mock.com/.well-known/jwks.json"
-        audience: "mock_audience"
-      spliceInstanceNames:
-        networkName: MockNet
-        networkFaviconUrl: https://mock.net/favicon.ico
-        amuletName: Mocklet
-        amuletNameAcronym: MCK
-        nameServiceName: Mock Name Service
-        nameServiceNameAcronym: MNS
-      # Extra labels and annotations for testing
       pod:
         labels:
           mock: yes-please
@@ -83,24 +84,6 @@ tests:
 
   - it: "always populates enable-wallet"
     set:
-      # Things we need just to pass the schema
-      nodeIdentifier: "helm-mock-1-validator"
-      validatorPartyHint: "helm-mock-1"
-      validatorWalletUser: "mock-wallet-user-id"
-      scanAddress: "trusted.scan.mock.com"
-      topup:
-        enabled: false
-      auth:
-        jwksUrl: "https://mock.com/.well-known/jwks.json"
-        audience: "mock_audience"
-      spliceInstanceNames:
-        networkName: MockNet
-        networkFaviconUrl: https://mock.net/favicon.ico
-        amuletName: Mocklet
-        amuletNameAcronym: MCK
-        nameServiceName: Mock Name Service
-        nameServiceNameAcronym: MNS
-      # Extra values for testing
       enableWallet: false
       migration:
         migrating: true
@@ -115,24 +98,7 @@ tests:
 
   - it: "sets JWKS timeouts"
     set:
-      # Things we need just to pass the schema
-      nodeIdentifier: "helm-mock-1-validator"
-      validatorPartyHint: "helm-mock-1"
-      validatorWalletUser: "mock-wallet-user-id"
-      scanAddress: "trusted.scan.mock.com"
-      spliceInstanceNames:
-        networkName: MockNet
-        networkFaviconUrl: https://mock.net/favicon.ico
-        amuletName: Mocklet
-        amuletNameAcronym: MCK
-        nameServiceName: Mock Name Service
-        nameServiceNameAcronym: MNS
-      topup:
-        enabled: false
       auth:
-        jwksUrl: "https://mock.com/.well-known/jwks.json"
-        audience: "mock_audience"
-        # actual test
         jwks:
           connectionTimeout: "33s"
           readTimeout: "44s"
@@ -146,3 +112,149 @@ tests:
       - equal:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT')].value
           value: "44s"
+
+  - it: "supports disabling auth"
+    set:
+      disableAuth: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME')].value
+          value: ledger-api-user
+      - exists:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_DISABLE_AUTH')].value
+
+  - it: "configures scan-client for trust-single mode"
+    set:
+      scanClient:
+        scanType: "trust-single"
+        scanAddress: "https://single.scan.url:5004"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"trust-single\""
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: 'canton.validator-apps.validator_backend.scan-client.url = "https://single.scan.url:5004"'
+
+  - it: "configures scan-client for standard bft mode, including multiple seedUrls"
+    set:
+      scanClient:
+        scanType: "bft"
+        seedUrls: [ "https://bft-node-1.url:5003", "https://bft-node-2.url:5003" ]
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"bft\""
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: 'canton.validator-apps.validator_backend.scan-client.seed-urls = \["https://bft-node-1.url:5003","https://bft-node-2.url:5003"\]'
+
+  - it: "configures scan-client for bft-custom mode, including trustedSvs and threshold"
+    set:
+      scanClient:
+        scanType: "bft-custom"
+        seedUrls: [ "https://custom-node-A.com", "https://custom-node-B.com" ]
+        trustedSvs: [ "custom-sv-1", "custom-sv-2", "custom-sv-3" ]
+        threshold: 2
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"bft-custom\""
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: 'canton.validator-apps.validator_backend.scan-client.seed-urls = \["https://custom-node-A.com","https://custom-node-B.com"\]'
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: 'canton.validator-apps.validator_backend.scan-client.trusted-svs = \["custom-sv-1","custom-sv-2","custom-sv-3"\]'
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.threshold = 2"
+
+  - it: "configures scan-client for trust-single when nonSvValidatorTrustSingleScan is true"
+    set:
+      nonSvValidatorTrustSingleScan: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_NON_VALIDATOR_TRUST_SINGLE_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"trust-single\""
+
+  - it: "defaults to BFT scan client with internal scan address if no config is set"
+    set:
+      svValidator: false
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"bft\""
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton\\.validator-apps\\.validator_backend\\.scan-client\\.seed-urls = \\[\\s*\\$\\{_scan\\.admin-api\\.address\\}\\s*\\]"
+
+  - it: "defaults to BFT scan client when scanType is not specified"
+    set:
+      scanClient:
+        seedUrls: [ "https://custom-node-A.com", "https://custom-node-B.com" ]
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: "canton.validator-apps.validator_backend.scan-client.type = \"bft\""
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
+          pattern: 'canton.validator-apps.validator_backend.scan-client.seed-urls = \["https://custom-node-A.com","https://custom-node-B.com"\]'
+  - it: "uses decentralizedSynchronizerUrl when useSequencerConnectionsFromScan is false"
+    set:
+      useSequencerConnectionsFromScan: false
+      decentralizedSynchronizerUrl: "https://legacy-sequencer.mock.com"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL')].value
+          pattern: 'canton\.validator-apps\.validator_backend\.domains\.global\.url = "https://legacy-sequencer\.mock\.com"'
+
+  - it: "uses synchronizer.url when provided"
+    set:
+      synchronizer:
+        connectionType: "trusted-url"
+        url: "https://new-sequencer.mock.com"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_SYNCHRONIZER_URL')].value
+          pattern: 'canton\.validator-apps\.validator_backend\.domains\.global\.url = "https://new-sequencer\.mock\.com"'
+
+  - it: "uses synchronizer.sequencerNames as a JSON array when provided"
+    set:
+      synchronizer:
+        connectionType: "trusted-svs"
+        sequencerNames: [ "sequencer-1", "sequencer-2" ]
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_SYNCHRONIZER_NAMES')].value
+          pattern: 'canton\.validator-apps\.validator_backend\.domains\.global\.sequencer-names = \["sequencer-1","sequencer-2"\]'

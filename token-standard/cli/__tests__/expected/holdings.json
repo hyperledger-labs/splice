@@ -1,6 +1,6 @@
 [
   {
-    "contractId": "0",
+    "contractId": "1",
     "payload": {
       "amount": "1064.0304414400",
       "instrumentId": {
@@ -63,6 +63,24 @@
   {
     "contractId": "4",
     "payload": {
+      "amount": "489.0000000000",
+      "instrumentId": {
+        "admin": "dso::normalized",
+        "id": "Amulet"
+      },
+      "lock": null,
+      "meta": {
+        "values": {
+          "amulet.splice.lfdecentralizedtrust.org/created-in-round": "1",
+          "amulet.splice.lfdecentralizedtrust.org/rate-per-round": "0.00380518"
+        }
+      },
+      "owner": "alice::normalized"
+    }
+  },
+  {
+    "contractId": "5",
+    "payload": {
       "amount": "30.0000000000",
       "instrumentId": {
         "admin": "alice::normalized",
@@ -78,7 +96,7 @@
     }
   },
   {
-    "contractId": "5",
+    "contractId": "6",
     "payload": {
       "amount": "40.0000000000",
       "instrumentId": {

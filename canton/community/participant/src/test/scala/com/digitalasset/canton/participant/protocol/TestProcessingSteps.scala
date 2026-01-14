@@ -35,7 +35,7 @@ import com.digitalasset.canton.participant.protocol.conflictdetection.{
   ActivenessSet,
 }
 import com.digitalasset.canton.participant.store.ReassignmentLookup
-import com.digitalasset.canton.participant.sync.{SyncEphemeralState, SyncEphemeralStateLookup}
+import com.digitalasset.canton.participant.sync.SyncEphemeralState
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.messages.EncryptedViewMessageError.SyncCryptoDecryptError
 import com.digitalasset.canton.protocol.{
@@ -46,12 +46,13 @@ import com.digitalasset.canton.protocol.{
 }
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.store.ConfirmationRequestSessionKeyStore
+import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.{
   DefaultTestIdentities,
   Member,
   ParticipantId,
-  SynchronizerId,
+  PhysicalSynchronizerId,
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.HasToByteString
@@ -74,11 +75,10 @@ class TestProcessingSteps(
       TestProcessingError,
     ]
     with BaseTest {
-  override type SubmissionResultArgs = Unit
   override type RejectionArgs = Unit
   override type PendingSubmissions = concurrent.Map[Int, Unit]
   override type PendingSubmissionId = Int
-  override type PendingSubmissionData = Unit
+  override type PendingSubmissionData = Some[Unit]
   override type SubmissionSendError = TestProcessingError
   override type RequestError = TestProcessingError
   override type ResultError = TestProcessingError
@@ -86,6 +86,8 @@ class TestProcessingSteps(
   override type RequestType = TestPendingRequestDataType
   override val requestType = TestPendingRequestDataType
 
+  override type ViewAbsoluteLedgerEffects = Unit
+  override type FullViewAbsoluteLedgerEffects = Unit
   override type ParsedRequestType = TestParsedRequest
 
   override def embedRequestError(
@@ -104,8 +106,8 @@ class TestProcessingSteps(
   override def removePendingSubmission(
       pendingSubmissions: concurrent.Map[Int, Unit],
       pendingSubmissionId: Int,
-  ): Option[Unit] =
-    pendingSubmissions.remove(pendingSubmissionId)
+  ): Option[Some[Unit]] =
+    pendingSubmissions.remove(pendingSubmissionId).map(Some(_))
 
   override def requestKind: String = "test"
 
@@ -122,14 +124,16 @@ class TestProcessingSteps(
   override def createSubmission(
       submissionParam: Int,
       mediator: MediatorGroupRecipient,
-      ephemeralState: SyncEphemeralStateLookup,
+      ephemeralState: SyncEphemeralState,
       recentSnapshot: SynchronizerSnapshotSyncCryptoApi,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TestProcessingError, Submission] = {
+  ): EitherT[FutureUnlessShutdown, TestProcessingError, (Submission, PendingSubmissionData)] = {
+    pendingSubmissionMap.put(submissionParam, ())
+
     val envelope: ProtocolMessage = mock[ProtocolMessage]
     val recipient: Member = ParticipantId("participant1")
-    EitherT.rightT(new UntrackedSubmission {
+    val submission = new UntrackedSubmission {
       override def batch: Batch[DefaultOpenEnvelope] =
         Batch.of(testedProtocolVersion, (envelope, Recipients.cc(recipient)))
       override def pendingSubmissionId: Int = submissionParam
@@ -140,23 +144,20 @@ class TestProcessingSteps(
       ): TestProcessingError =
         TestProcessorError(err)
       override def toSubmissionError(err: TestProcessingError): TestProcessingError = err
-    })
-  }
-
-  override def updatePendingSubmissions(
-      pendingSubmissionMap: concurrent.Map[Int, Unit],
-      submissionParam: Int,
-      pendingSubmissionId: Int,
-  ): EitherT[Future, TestProcessingError, SubmissionResultArgs] = {
-    pendingSubmissionMap.put(submissionParam, ())
-    EitherT.pure(())
+    }
+    EitherT.rightT((submission, Some(())))
   }
 
   override def createSubmissionResult(
-      deliver: Deliver[Envelope[_]],
-      submissionResultArgs: SubmissionResultArgs,
+      deliver: Deliver[Envelope[?]],
+      submissionResultArgs: PendingSubmissionData,
   ): Unit =
     ()
+
+  override def setDecisionTimeTickRequest(
+      pendingSubmissionData: Some[Unit],
+      requestedTick: SynchronizerTimeTracker.TickRequest,
+  ): Unit = ()
 
   override def decryptViews(
       batch: NonEmpty[Seq[OpenEnvelope[EncryptedViewMessage[TestViewType]]]],
@@ -191,16 +192,35 @@ class TestProcessingSteps(
     )
   }
 
+  override def absolutizeLedgerEffects(
+      viewsWithCorrectRootHashAndRecipientsAndSignature: Seq[
+        (WithRecipients[DecryptedView], Option[Signature])
+      ]
+  ): (
+      Seq[(WithRecipients[DecryptedView], Option[Signature], Unit)],
+      Seq[ProtocolProcessor.MalformedPayload],
+  ) = (
+    viewsWithCorrectRootHashAndRecipientsAndSignature.map { case (view, sig) => (view, sig, ()) },
+    Seq.empty,
+  )
+
   override def computeFullViews(
-      decryptedViewsWithSignatures: Seq[(WithRecipients[DecryptedView], Option[Signature])]
-  ): (Seq[(WithRecipients[FullView], Option[Signature])], Seq[ProtocolProcessor.MalformedPayload]) =
+      decryptedViewsWithSignatures: Seq[
+        (WithRecipients[DecryptedView], Option[Signature], ViewAbsoluteLedgerEffects)
+      ]
+  ): (
+      Seq[(WithRecipients[FullView], Option[Signature], FullViewAbsoluteLedgerEffects)],
+      Seq[ProtocolProcessor.MalformedPayload],
+  ) =
     (decryptedViewsWithSignatures, Seq.empty)
 
   override def computeParsedRequest(
       rc: RequestCounter,
       ts: CantonTimestamp,
       sc: SequencerCounter,
-      rootViewsWithMetadata: NonEmpty[Seq[(WithRecipients[FullView], Option[Signature])]],
+      rootViewsWithMetadata: NonEmpty[
+        Seq[(WithRecipients[FullView], Option[Signature], FullViewAbsoluteLedgerEffects)]
+      ],
       submitterMetadataO: Option[ViewSubmitterMetadata],
       isFreshOwnTimelyRequest: Boolean,
       malformedPayloads: Seq[ProtocolProcessor.MalformedPayload],
@@ -233,6 +253,7 @@ class TestProcessingSteps(
       reassignmentLookup: ReassignmentLookup,
       activenessResultFuture: FutureUnlessShutdown[ActivenessResult],
       engineController: EngineController,
+      decisionTimeTickRequest: SynchronizerTimeTracker.TickRequest,
   )(implicit
       traceContext: TraceContext
   ): EitherT[
@@ -282,7 +303,7 @@ class TestProcessingSteps(
   ): Either[TestProcessingError, Option[SequencedUpdate]] =
     Right(None)
 
-  override def getCommitSetAndContractsToBeStoredAndEvent(
+  override def getCommitSetAndContractsToBeStoredAndEventFactory(
       event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
       verdict: Verdict,
       pendingRequestData: RequestType#PendingRequestData,
@@ -297,10 +318,10 @@ class TestProcessingSteps(
 
   override def postProcessSubmissionRejectedCommand(
       error: TransactionError,
-      pendingSubmission: Unit,
+      pendingSubmission: Some[Unit],
   )(implicit traceContext: TraceContext): Unit = ()
 
-  override def postProcessResult(verdict: Verdict, pendingSubmissionO: Unit)(implicit
+  override def postProcessResult(verdict: Verdict, pendingSubmissionO: Some[Unit])(implicit
       traceContext: TraceContext
   ): Unit = ()
 
@@ -323,7 +344,7 @@ object TestProcessingSteps {
       rootHash: RootHash,
       informees: Set[LfPartyId] = Set.empty,
       viewPosition: ViewPosition = ViewPosition(List(MerkleSeqIndex(List.empty))),
-      synchronizerId: SynchronizerId = DefaultTestIdentities.synchronizerId,
+      psid: PhysicalSynchronizerId = DefaultTestIdentities.physicalSynchronizerId,
       mediator: MediatorGroupRecipient = MediatorGroupRecipient(MediatorGroupIndex.zero),
   ) extends ViewTree
       with HasToByteString {
@@ -371,6 +392,8 @@ object TestProcessingSteps {
     override def rootHashO: Option[RootHash] = None
 
     override def isCleanReplay: Boolean = false
+
+    override def cancelDecisionTimeTickRequest(): Unit = ()
   }
 
   case object TestPendingRequestDataType extends RequestType {

@@ -16,7 +16,9 @@
     "lib": [
       "es2021.string",
       "es2015.iterable",
-      "es2019.array"
-    ]
+      "es2019.array",
+      "dom"
+    ],
+    "resolveJsonModule": true
   }
 }

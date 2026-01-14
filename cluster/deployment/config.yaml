@@ -1,10 +1,4 @@
 # Reference configuration options
-svs:
-  default:
-    logging:
-      appsLogLevel: DEBUG
-      cantonLogLevel: DEBUG
-      cometbftLogLevel: debug
 cluster:
   nodePools:
     apps:
@@ -45,6 +39,8 @@ pulumiProjectConfig:
       # enable enterprise plus for better performance and faster maintenance
       enterprisePlus: false
     skipSynchronizerInitialization: true
+    # default not allowing version downgrades in our apps
+    allowDowngrade: true
   sv-runbook:
     cloudSql:
       enabled: false
@@ -68,11 +64,27 @@ monitoring:
   alerting:
     enableNoDataAlerts: false
     alerts:
+      pruning:
+        participantRetentionDays: 30
+        sequencerRetentionDays: 30
+        mediatorRetentionDays: 30
+      ingestion:
+        thresholdEntriesPerBatch: 80
       delegatelessContention:
         thresholdPerNamespace: 0.05
       trafficWaste:
         kilobytes: 1
         overMinutes: 5
+        quantile: 0.95
+      # confirmation requests correspond to new ledger submissions;
+      # we alert if the rate is higher than expected to spot potential overload situations
+      confirmationRequests:
+        total:
+          rate: 15
+          overMinutes: 5
+        perMember:
+          rate: 3
+          overMinutes: 5
       cloudSql:
         maintenance: false
       cometbft:
@@ -81,6 +93,16 @@ monitoring:
         minRate: 0.95
       mediators:
         acknowledgementLagSeconds: 900
+cloudArmor:
+  enabled: false
+  allRulesPreviewOnly: true
+  publicEndpoints:
+    publicScan:
+      hostname: scan.sv-2.scratcha.global.canton.network.digitalasset.com
+      pathPrefix: /api/scan
+      throttleAcrossAllEndpointsAllIps:
+        withinIntervalSeconds: 60
+        maxRequestsBeforeHttp429: 0
 multiValidator:
   postgresPvcSize: '100Gi'
   resources:
@@ -89,14 +111,12 @@ multiValidator:
         cpu: '1'
         memory: '8Gi'
       limits:
-        cpu: '6'
         memory: '16Gi'
     validator:
       requests:
         cpu: '0.5'
         memory: '2400Mi'
       limits:
-        cpu: '4'
         memory: '8Gi'
     postgres:
       requests:
@@ -104,12 +124,6 @@ multiValidator:
       limits:
         memory: '12Gi'
 sv:
-  participant:
-    resources:
-      requests:
-        memory: '12Gi'
-      limits:
-        memory: '18Gi'
   scan:
     externalRateLimits:
       globalLimits:
@@ -126,3 +140,38 @@ sv:
             maxTokens: 10
             tokensPerFill: 5
             fillInterval: 60s
+svs:
+  default:
+    logging:
+      appsLogLevel: DEBUG
+      appsAsync: false
+      cantonLogLevel: DEBUG
+      cantonAsync: false
+      cometbftLogLevel: debug
+    pruning:
+      sequencer:
+        enabled: false
+    participant:
+      bftSequencerConnection: true
+      resources:
+        requests:
+          memory: '12Gi'
+        limits:
+          memory: '18Gi'
+    validatorApp:
+      additionalEnvVars:
+        # enable https://github.com/hyperledger-labs/splice/pull/2499
+        - name: ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT
+          value: |
+            canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m
+      resources:
+        requests:
+          memory: '2Gi'
+        limits:
+          memory: '4Gi'
+validators:
+  validator-runbook:
+    namespace: validator
+    nodeIdentifier: 'validator-runbook'
+    partyHint: 'digitalasset-testValidator-1'
+    onboardingSecret: 'validatorsecret'

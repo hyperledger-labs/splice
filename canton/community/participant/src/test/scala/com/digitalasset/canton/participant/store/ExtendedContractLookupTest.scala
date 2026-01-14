@@ -3,34 +3,18 @@
 
 package com.digitalasset.canton.participant.store
 
-import cats.syntax.either.*
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.participant.protocol.ContractAuthenticator
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.protocol.ExampleTransactionFactory.{
-  asSerializable,
-  contractInstance,
-  packageName,
-}
+import com.digitalasset.canton.protocol.ExampleTransactionFactory.packageName
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{BaseTest, FailOnShutdown, LfPartyId}
-import com.digitalasset.daml.lf.transaction.FatContractInstance
+import com.digitalasset.daml.lf.transaction.CreationTime
 import com.digitalasset.daml.lf.value.Value.{ValueText, ValueUnit}
 import org.scalatest.wordspec.AsyncWordSpec
 
 class ExtendedContractLookupTest extends AsyncWordSpec with BaseTest with FailOnShutdown {
 
   import com.digitalasset.canton.protocol.ExampleTransactionFactory.suffixedId
-
-  private object dummyAuthenticator extends ContractAuthenticator {
-    override def authenticateSerializable(contract: SerializableContract): Either[String, Unit] =
-      Either.unit
-    override def authenticateFat(contract: FatContractInstance): Either[String, Unit] = Either.unit
-    override def verifyMetadata(
-        contract: SerializableContract,
-        metadata: ContractMetadata,
-    ): Either[String, Unit] = Either.unit
-  }
 
   private val coid00: LfContractId = suffixedId(0, 0)
   private val coid01: LfContractId = suffixedId(0, 1)
@@ -44,9 +28,7 @@ class ExtendedContractLookupTest extends AsyncWordSpec with BaseTest with FailOn
 
   "ExtendedContractLookup" should {
 
-    val instance0 = contractInstance()
-    val instance0Template = instance0.unversioned.template
-    val instance1 = contractInstance()
+    val instance0Template = ExampleContractFactory.templateId
     val key00: LfGlobalKey =
       LfGlobalKey.build(instance0Template, ValueUnit, packageName).value
     val key1: LfGlobalKey =
@@ -58,21 +40,33 @@ class ExtendedContractLookupTest extends AsyncWordSpec with BaseTest with FailOn
     val alice = LfPartyId.assertFromString("alice")
     val bob = LfPartyId.assertFromString("bob")
 
-    val metadata1 =
-      ContractMetadata.tryCreate(signatories = Set(alice), stakeholders = Set(alice), None)
     val metadata2 =
       ContractMetadata.tryCreate(signatories = Set(alice), stakeholders = Set(alice, bob), None)
 
     val overwrites = Map(
-      coid01 -> asSerializable(coid01, instance0, metadata2, let0),
-      coid20 -> asSerializable(coid20, instance0, metadata2, let1),
-      coid21 -> asSerializable(coid21, instance0, metadata2, let0),
+      coid01 -> ExampleContractFactory.build(
+        overrideContractId = Some(coid01),
+        signatories = metadata2.signatories,
+        stakeholders = metadata2.stakeholders,
+        createdAt = CreationTime.CreatedAt(let0.toLf),
+      ),
+      coid20 -> ExampleContractFactory.build(
+        overrideContractId = Some(coid20),
+        signatories = metadata2.signatories,
+        stakeholders = metadata2.stakeholders,
+        createdAt = CreationTime.CreatedAt(let1.toLf),
+      ),
+      coid21 -> ExampleContractFactory.build(
+        overrideContractId = Some(coid21),
+        signatories = metadata2.signatories,
+        stakeholders = metadata2.stakeholders,
+        createdAt = CreationTime.CreatedAt(let0.toLf),
+      ),
     )
 
     val extendedStore = new ExtendedContractLookup(
       overwrites,
       Map(key00 -> Some(coid00), key1 -> None),
-      dummyAuthenticator,
     )
 
     "not make up contracts" in {
@@ -100,13 +94,13 @@ class ExtendedContractLookupTest extends AsyncWordSpec with BaseTest with FailOn
     }
 
     "complain about inconsistent contract ids" in {
-      val contract = asSerializable(coid01, instance1, metadata1, let0)
+      val contract =
+        ExampleContractFactory.build(overrideContractId = Some(coid01))
 
       assertThrows[IllegalArgumentException](
         new ExtendedContractLookup(
           Map(coid10 -> contract),
           Map.empty,
-          dummyAuthenticator,
         )
       )
     }

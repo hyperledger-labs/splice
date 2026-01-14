@@ -1,0 +1,22 @@
+sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
+name: splice-util-featured-app-proxies
+source: daml
+version: 1.2.1
+dependencies:
+  - daml-prim
+  - daml-stdlib
+data-dependencies:
+  - ../../token-standard/splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-current.dar
+  - ../../token-standard/splice-api-token-transfer-instruction-v1/.daml/dist/splice-api-token-transfer-instruction-v1-current.dar
+  - ../../token-standard/splice-api-token-allocation-v1/.daml/dist/splice-api-token-allocation-v1-current.dar
+  - ../../token-standard/splice-api-token-allocation-instruction-v1/.daml/dist/splice-api-token-allocation-instruction-v1-current.dar
+  - ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
+build-options:
+  - --ghc-option=-Wunused-binds
+  - --ghc-option=-Wunused-matches
+  - --target=2.1
+codegen:
+  java:
+    package-prefix: org.lfdecentralizedtrust.splice.codegen.java
+    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceUtilFeaturedAppProxies
+    output-directory: target/daml-codegen-java

@@ -4,6 +4,7 @@
 package com.digitalasset.canton.synchronizer.mediator
 
 import cats.data.EitherT
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
@@ -14,7 +15,7 @@ import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, L
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.mediator.admin.v30.{
   MediatorAdministrationServiceGrpc,
-  MediatorScanServiceGrpc,
+  MediatorInspectionServiceGrpc,
 }
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.resource.Storage
@@ -22,7 +23,7 @@ import com.digitalasset.canton.sequencing.client.RichSequencerClient
 import com.digitalasset.canton.store.{SequencedEventStore, SequencerCounterTrackerStore}
 import com.digitalasset.canton.synchronizer.mediator.service.{
   GrpcMediatorAdministrationService,
-  GrpcMediatorScanService,
+  GrpcMediatorInspectionService,
 }
 import com.digitalasset.canton.synchronizer.mediator.store.{
   FinalizedResponseStore,
@@ -36,9 +37,9 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithInit
 import com.digitalasset.canton.topology.processing.TopologyTransactionProcessor
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.ServerServiceDefinition
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.ExecutionContext
 
@@ -52,8 +53,11 @@ final class MediatorRuntime(
     batchingConfig: BatchingConfig,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
-)(implicit protected val ec: ExecutionContext)
-    extends FlagCloseable
+)(implicit
+    protected val ec: ExecutionContext,
+    esf: ExecutionSequencerFactory,
+    materializer: Materializer,
+) extends FlagCloseable
     with NamedLogging {
   val pruningScheduler: MediatorPruningScheduler = new MediatorPruningScheduler(
     clock = clock,
@@ -66,7 +70,7 @@ final class MediatorRuntime(
 
   val timeService: ServerServiceDefinition = SynchronizerTimeServiceGrpc.bindService(
     GrpcSynchronizerTimeService
-      .forSynchronizerEntity(mediator.synchronizerId, mediator.timeTracker, loggerFactory),
+      .forSynchronizerEntity(mediator.psid, mediator.timeTracker, loggerFactory),
     ec,
   )
   val administrationService: ServerServiceDefinition =
@@ -75,8 +79,8 @@ final class MediatorRuntime(
       ec,
     )
 
-  val scanService: ServerServiceDefinition = MediatorScanServiceGrpc.bindService(
-    new GrpcMediatorScanService(
+  val inspectionService: ServerServiceDefinition = MediatorInspectionServiceGrpc.bindService(
+    new GrpcMediatorInspectionService(
       mediator.state.finalizedResponseStore,
       mediator.state.recordOrderTimeAwaiter,
       batchingConfig.maxItemsInBatch,
@@ -108,7 +112,6 @@ final class MediatorRuntime(
 object MediatorRuntimeFactory {
   def create(
       mediatorId: MediatorId,
-      synchronizerId: SynchronizerId,
       storage: Storage,
       sequencerCounterTrackerStore: SequencerCounterTrackerStore,
       sequencedEventStore: SequencedEventStore,
@@ -120,30 +123,32 @@ object MediatorRuntimeFactory {
       synchronizerOutboxFactory: SynchronizerOutboxFactory,
       timeTracker: SynchronizerTimeTracker,
       nodeParameters: CantonNodeParameters,
-      protocolVersion: ProtocolVersion,
       clock: Clock,
       metrics: MediatorMetrics,
       config: MediatorConfig,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       ec: ExecutionContext,
+      esf: ExecutionSequencerFactory,
+      materializer: Materializer,
       tracer: Tracer,
       traceContext: TraceContext,
   ): EitherT[FutureUnlessShutdown, String, MediatorRuntime] = {
     val finalizedResponseStore = FinalizedResponseStore(
       storage,
       syncCrypto.pureCrypto,
-      protocolVersion,
+      sequencerClient.protocolVersion,
       nodeParameters.cachingConfigs.finalizedMediatorConfirmationRequests,
       nodeParameters.processingTimeouts,
       loggerFactory,
     )
     val deduplicationStore =
       MediatorDeduplicationStore(
-        mediatorId,
         storage,
         nodeParameters.processingTimeouts,
         loggerFactory,
+        config.deduplicationStore.pruneAtMostEvery.toInternal,
+        config.deduplicationStore.persistBatching,
       )
     val state =
       new MediatorState(
@@ -151,13 +156,12 @@ object MediatorRuntimeFactory {
         deduplicationStore,
         clock,
         metrics,
-        protocolVersion,
+        sequencerClient.protocolVersion,
         nodeParameters.processingTimeouts,
         loggerFactory,
       )
 
     val synchronizerOutbox = synchronizerOutboxFactory.create(
-      protocolVersion,
       topologyClient,
       sequencerClient,
       timeTracker,
@@ -166,7 +170,6 @@ object MediatorRuntimeFactory {
     )
 
     val mediator = new Mediator(
-      synchronizerId,
       mediatorId,
       sequencerClient,
       topologyClient,
@@ -179,7 +182,6 @@ object MediatorRuntimeFactory {
       sequencerCounterTrackerStore,
       sequencedEventStore,
       nodeParameters,
-      protocolVersion,
       clock,
       metrics,
       loggerFactory,

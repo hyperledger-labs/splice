@@ -12,6 +12,7 @@ import com.digitalasset.canton.ledger.api.auth.services.StateServiceAuthorizatio
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import io.grpc.ServerServiceDefinition
 import io.grpc.stub.StreamObserver
+import scalapb.lenses.Lens
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -34,9 +35,15 @@ final class StateServiceAuthorization(
   override def getConnectedSynchronizers(
       request: GetConnectedSynchronizersRequest
   ): Future[GetConnectedSynchronizersResponse] =
-    authorizer.rpc(service.getConnectedSynchronizers)(
-      RequiredClaim.ReadAs(request.party)
-    )(request)
+    if (request.party.isEmpty)
+      authorizer.rpc(service.getConnectedSynchronizers)(RequiredClaim.Public())(request)
+    else
+      authorizer.rpc(service.getConnectedSynchronizers)(
+        RequiredClaim.AdminOrIdpAdminOrOperateAsParty(Seq(request.party)),
+        RequiredClaim.MatchIdentityProviderId(
+          Lens.unit[GetConnectedSynchronizersRequest].identityProviderId
+        ),
+      )(request)
 
   override def getLedgerEnd(request: GetLedgerEndRequest): Future[GetLedgerEndResponse] =
     authorizer.rpc(service.getLedgerEnd)(RequiredClaim.Public())(request)
@@ -56,7 +63,5 @@ object StateServiceAuthorization {
   ): List[RequiredClaim[GetActiveContractsRequest]] =
     request.eventFormat.toList.flatMap(
       RequiredClaims.eventFormatClaims[GetActiveContractsRequest]
-    ) ::: request.filter.toList.flatMap(
-      RequiredClaims.transactionFilterClaims[GetActiveContractsRequest]
     )
 }

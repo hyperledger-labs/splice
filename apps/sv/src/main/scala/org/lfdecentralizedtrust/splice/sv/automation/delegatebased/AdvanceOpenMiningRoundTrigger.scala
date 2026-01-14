@@ -18,6 +18,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
@@ -54,7 +55,7 @@ class AdvanceOpenMiningRoundTrigger(
     val rounds = task.work.openRounds
     for {
       dsoRules <- store.getDsoRules()
-      _ = logger.debug(
+      _ = logger.info(
         s"Starting work as for ${task.work}"
       )
       amuletPriceVotes <- store.listSvAmuletPriceVotes()
@@ -68,7 +69,8 @@ class AdvanceOpenMiningRoundTrigger(
           Optional.of(controller),
         )
       )
-      _ <- svTaskContext.connection
+      _ <- svTaskContext
+        .connection(SpliceLedgerConnectionPriority.High)
         .submit(
           Seq(store.key.svParty),
           Seq(store.key.dsoParty),

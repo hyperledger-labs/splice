@@ -1,0 +1,47 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+suite: "Validator UIs"
+templates:
+  - wallet-web-ui.yaml
+
+set:
+  # Things we need just to pass the schema
+  nodeIdentifier: "helm-mock-1-validator"
+  validatorPartyHint: "helm-mock-1"
+  validatorWalletUser: "mock-wallet-user-id"
+  spliceInstanceNames:
+    networkName: MockNet
+    networkFaviconUrl: https://mock.net/favicon.ico
+    amuletName: Mocklet
+    amuletNameAcronym: MCK
+    nameServiceName: Mock Name Service
+    nameServiceNameAcronym: MNS
+  topup:
+    enabled: false
+  auth:
+    jwksUrl: "https://mock.com/.well-known/jwks.json"
+    audience: "mock_audience"
+
+tests:
+
+  - it: "defaults to auth"
+    # tests the defaults (not setting any further values)
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[?(@.name=="wallet-web-ui")].env[?(@.name=="SPLICE_APP_UI_UNSAFE")].value
+
+  - it: "supports disabling auth"
+    set:
+      # actual test
+      disableAuth: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=="wallet-web-ui")].env[?(@.name=="SPLICE_APP_UI_UNSAFE")].value
+          value: "true"

@@ -3,15 +3,15 @@
 
 package com.digitalasset.canton.health
 
-import com.daml.metrics.grpc.GrpcServerMetrics
 import com.daml.tracing.NoOpTelemetry
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.lifecycle.LifeCycle.toCloseableServer
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.metrics.ActiveRequestsMetrics.GrpcServerMetricsX
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.tracing.TracingConfig
-import io.grpc.protobuf.services.ProtoReflectionService
+import io.grpc.protobuf.services.ProtoReflectionServiceV1
 
 import java.util.concurrent.ExecutorService
 
@@ -21,7 +21,7 @@ class GrpcHealthServer(
     override val loggerFactory: NamedLoggerFactory,
     apiConfig: ApiLoggingConfig,
     tracingConfig: TracingConfig,
-    grpcMetrics: GrpcServerMetrics,
+    grpcMetrics: GrpcServerMetricsX,
     override val timeouts: ProcessingTimeout,
     healthManager: io.grpc.protobuf.services.HealthStatusManager,
 ) extends NamedLogging
@@ -37,7 +37,7 @@ class GrpcHealthServer(
       grpcMetrics,
       NoOpTelemetry,
     )
-    .addService(ProtoReflectionService.newInstance(), withLogging = false)
+    .addService(ProtoReflectionServiceV1.newInstance(), withLogging = false)
     .addService(healthManager.getHealthService.bindService())
     .build
     .start()

@@ -31,7 +31,7 @@ class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLogger
   def readStringFromBucket(fileName: Path): String =
     new String(readBytesFromBucket(fileName.toString), StandardCharsets.UTF_8)
 
-  private def dumpBytesToBucket(data: Array[Byte], fileName: String)(implicit
+  def dumpBytesToBucket(data: Array[Byte], fileName: String)(implicit
       traceContext: TraceContext
   ): Unit = {
     val blobId = BlobId.of(config.bucketName, fileName)
@@ -41,7 +41,7 @@ class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLogger
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
-  def list(startOffset: String, endOffset: String): Seq[Blob] = {
+  def listBlobsByOffset(startOffset: String, endOffset: String): Seq[Blob] = {
     val blobs = Seq.newBuilder[Blob]
     var page = storage.list(
       config.bucketName,
@@ -56,9 +56,32 @@ class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLogger
     blobs.result()
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
+  def listBlobsByPrefix(prefix: String): Seq[Blob] = {
+    val blobs = Seq.newBuilder[Blob]
+    var page = storage.list(
+      config.bucketName,
+      Storage.BlobListOption.prefix(prefix),
+    )
+    blobs ++= page.getValues().asScala
+    while (page.hasNextPage) {
+      page = page.getNextPage
+      blobs ++= page.getValues().asScala
+    }
+    blobs.result()
+  }
+
   def readBytesFromBucket(fileName: String): Array[Byte] = {
     val blobId = BlobId.of(config.bucketName, fileName)
     val blob = storage.get(blobId)
     blob.getContent()
+  }
+
+  def fileExists(fileName: String): Boolean = {
+    val blobId = BlobId.of(config.bucketName, fileName)
+    storage.get(blobId) match {
+      case blob: Blob => blob.exists()
+      case _ => false
+    }
   }
 }

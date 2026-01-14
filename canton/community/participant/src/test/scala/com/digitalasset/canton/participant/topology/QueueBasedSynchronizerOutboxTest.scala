@@ -6,17 +6,17 @@ package com.digitalasset.canton.participant.topology
 import cats.implicits.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.common.sequencer.RegisterTopologyTransactionHandle
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{ProcessingTimeout, TopologyConfig}
-import com.digitalasset.canton.crypto.SigningKeyUsage
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout, TopologyConfig}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
+import com.digitalasset.canton.crypto.{SigningKeyUsage, SynchronizerCrypto}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
   PromiseUnlessShutdown,
   UnlessShutdown,
 }
-import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.logging.{LogEntry, SuppressionRule, TracedLogger}
 import com.digitalasset.canton.protocol.messages.TopologyTransactionsBroadcast
 import com.digitalasset.canton.protocol.messages.TopologyTransactionsBroadcast.State
 import com.digitalasset.canton.time.WallClock
@@ -31,7 +31,10 @@ import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.DelegationRestriction.CanSignAllMappings
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
-import com.digitalasset.canton.topology.transaction.TopologyTransaction.GenericTopologyTransaction
+import com.digitalasset.canton.topology.transaction.TopologyTransaction.{
+  GenericTopologyTransaction,
+  TxHash,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{
@@ -43,6 +46,7 @@ import com.digitalasset.canton.{
   SynchronizerAlias,
 }
 import org.scalatest.wordspec.AsyncWordSpec
+import org.slf4j.event.Level
 
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.annotation.nowarn
@@ -58,9 +62,15 @@ class QueueBasedSynchronizerOutboxTest
     with FailOnShutdown {
   import DefaultTestIdentities.*
 
+  private lazy val topologyConfig = TopologyConfig(
+    topologyTransactionObservationTimeout = NonNegativeFiniteDuration.ofSeconds(2),
+    broadcastRetryDelay = NonNegativeFiniteDuration.ofSeconds(1),
+  )
   private lazy val clock = new WallClock(timeouts, loggerFactory)
   private lazy val crypto =
     SymbolicCrypto.create(testedReleaseProtocolVersion, timeouts, loggerFactory)
+  private lazy val synchronizerCrypto =
+    SynchronizerCrypto(crypto, defaultStaticSynchronizerParameters)
   private lazy val publicKey =
     crypto.generateSymbolicSigningKey(usage = SigningKeyUsage.NamespaceOnly)
   private lazy val namespace = Namespace(publicKey.id)
@@ -99,6 +109,7 @@ class QueueBasedSynchronizerOutboxTest
       responses: Iterator[TopologyTransactionsBroadcast.State] =
         Iterator.continually(TopologyTransactionsBroadcast.State.Accepted),
       rejections: Iterator[Option[TopologyTransactionRejection]] = Iterator.continually(None),
+      dropSequencedBroadcast: Iterator[Boolean] = Iterator.continually(false),
   ): FutureUnlessShutdown[
     (
         InMemoryTopologyStore[TopologyStoreId.SynchronizerStore],
@@ -108,7 +119,7 @@ class QueueBasedSynchronizerOutboxTest
     )
   ] = {
     val target = new InMemoryTopologyStore(
-      TopologyStoreId.SynchronizerStore(DefaultTestIdentities.synchronizerId),
+      TopologyStoreId.SynchronizerStore(DefaultTestIdentities.physicalSynchronizerId),
       testedProtocolVersion,
       loggerFactory,
       timeouts,
@@ -117,10 +128,12 @@ class QueueBasedSynchronizerOutboxTest
     val manager = new SynchronizerTopologyManager(
       participant1.uid,
       clock,
-      crypto,
+      synchronizerCrypto,
       defaultStaticSynchronizerParameters,
       target,
       queue,
+      dispatchQueueBackpressureLimit = NonNegativeInt.tryCreate(10),
+      disableOptionalTopologyChecks = false,
       // we don't need the validation logic to run, because we control the outcome of transactions manually
       exitOnFatalFailures = true,
       timeouts,
@@ -129,9 +142,10 @@ class QueueBasedSynchronizerOutboxTest
     )
     val client = new StoreBasedSynchronizerTopologyClient(
       clock,
-      synchronizerId,
+      defaultStaticSynchronizerParameters,
       store = target,
       packageDependenciesResolver = StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
+      topologyConfig = TopologyConfig(),
       timeouts = timeouts,
       futureSupervisor = futureSupervisor,
       loggerFactory = loggerFactory,
@@ -143,10 +157,11 @@ class QueueBasedSynchronizerOutboxTest
         store = target,
         targetClient = client,
         rejections = rejections,
+        dropSequencedBroadcast = dropSequencedBroadcast,
       )
 
     for {
-      // in the this test (as opposed to StoreBasedSynchronizerOutboxTest) we need to
+      // in this test (as opposed to StoreBasedSynchronizerOutboxTest) we need to
       // always have the root certificate in the topology store, otherwise the
       // IDDs won't pass validation.
       rootCert <- rootCertF
@@ -155,8 +170,7 @@ class QueueBasedSynchronizerOutboxTest
           .update(
             sequenced = SequencedTime.MinValue,
             effective = EffectiveTime.MinValue,
-            removeMapping = Map.empty,
-            removeTxs = Set.empty,
+            removals = Map.empty,
             additions = Seq(ValidatedTopologyTransaction(rootCert)),
           )
     } yield (target, manager, handle, client)
@@ -168,6 +182,7 @@ class QueueBasedSynchronizerOutboxTest
       store: TopologyStore[TopologyStoreId],
       targetClient: StoreBasedSynchronizerTopologyClient,
       rejections: Iterator[Option[TopologyTransactionRejection]] = Iterator.continually(None),
+      dropSequencedBroadcast: Iterator[Boolean] = Iterator.continually(false),
   ) extends RegisterTopologyTransactionHandle {
     val buffer: mutable.ListBuffer[GenericSignedTopologyTransaction] = ListBuffer()
     val batches: mutable.ListBuffer[Seq[GenericSignedTopologyTransaction]] = ListBuffer()
@@ -184,28 +199,33 @@ class QueueBasedSynchronizerOutboxTest
     )(implicit
         traceContext: TraceContext
     ): FutureUnlessShutdown[Seq[TopologyTransactionsBroadcast.State]] = {
-      logger.debug(s"Observed ${transactions.length} transactions")
-      buffer ++= transactions
-      batches += transactions
+      logger.debug(s"Submitting ${transactions.length} transactions")
+
+      val dropBroadcast = dropSequencedBroadcast.next()
+
+      if (!dropBroadcast) {
+        buffer ++= transactions
+        batches += transactions
+      }
       val finalResult = transactions.map(_ => responses.next())
       for {
         _ <- MonadUtil.sequentialTraverse(transactions) { x =>
-          logger.debug(s"Processing $x")
+          if (dropBroadcast) logger.debug(s"Dropping $x")
+          else logger.debug(s"Processing $x")
           val ts = CantonTimestamp.now()
-          if (finalResult.forall(_ == State.Accepted))
+          if (finalResult.forall(_ == State.Accepted) && !dropBroadcast)
             store
               .update(
                 SequencedTime(ts),
                 EffectiveTime(ts),
                 additions = List(ValidatedTopologyTransaction(x, rejections.next())),
                 // dumbed down version of how to "append" ValidatedTopologyTransactions:
-                removeMapping = Option
+                removals = Option
                   .when(x.operation == TopologyChangeOp.Remove)(
-                    x.mapping.uniqueKey -> x.serial
+                    x.mapping.uniqueKey -> (x.serial.some, Set.empty[TxHash])
                   )
                   .toList
                   .toMap,
-                removeTxs = Set.empty,
               )
               .flatMap(_ =>
                 targetClient
@@ -245,6 +265,7 @@ class QueueBasedSynchronizerOutboxTest
   private def push(
       manager: SynchronizerTopologyManager,
       transactions: Seq[GenericTopologyTransaction],
+      waitToBecomeEffective: Option[NonNegativeFiniteDuration] = None,
   ): FutureUnlessShutdown[
     Either[TopologyManagerError, Seq[GenericSignedTopologyTransaction]]
   ] =
@@ -257,7 +278,7 @@ class QueueBasedSynchronizerOutboxTest
           signingKeys = Seq(publicKey.fingerprint),
           testedProtocolVersion,
           expectFullAuthorization = true,
-          waitToBecomeEffective = None,
+          waitToBecomeEffective = waitToBecomeEffective,
         )
       )
       .value
@@ -267,21 +288,19 @@ class QueueBasedSynchronizerOutboxTest
       handle: RegisterTopologyTransactionHandle,
       client: SynchronizerTopologyClientWithInit,
       target: TopologyStore[TopologyStoreId.SynchronizerStore],
-      broadcastBatchSize: PositiveInt = TopologyConfig.defaultBroadcastBatchSize,
+      topologyConfig: TopologyConfig = topologyConfig,
   ): FutureUnlessShutdown[QueueBasedSynchronizerOutbox] = {
     val synchronizerOutbox = new QueueBasedSynchronizerOutbox(
       synchronizer,
-      synchronizerId,
       participant1,
-      testedProtocolVersion,
       handle,
       client,
       manager.outboxQueue,
       target,
       timeouts,
       loggerFactory,
-      crypto,
-      broadcastBatchSize,
+      synchronizerCrypto,
+      topologyConfig,
     )
     synchronizerOutbox
       .startup()
@@ -362,7 +381,13 @@ class QueueBasedSynchronizerOutboxTest
       for {
         (target, manager, handle, client) <- mk(slice1.length)
         _res <- push(manager, slice1)
-        _ <- outboxConnected(manager, handle, client, target, broadcastBatchSize = PositiveInt.one)
+        _ <- outboxConnected(
+          manager,
+          handle,
+          client,
+          target,
+          topologyConfig.copy(broadcastBatchSize = PositiveInt.one),
+        )
         _ <- handle.allObserved()
         observed1 = handle.clear(slice2.length)
         _ <- push(manager, slice2)
@@ -424,7 +449,9 @@ class QueueBasedSynchronizerOutboxTest
         (target, manager, handle, client) <-
           mk(
             transactions.size,
-            rejections = Iterator.continually(Some(TopologyTransactionRejection.NotAuthorized)),
+            rejections = Iterator.continually(
+              Some(TopologyTransactionRejection.Authorization.NotAuthorizedByNamespaceKey)
+            ),
           )
         _ <- outboxConnected(manager, handle, client, target)
         res <- push(manager, transactions)
@@ -463,8 +490,42 @@ class QueueBasedSynchronizerOutboxTest
       }
       loggerFactory.assertLogs(
         action,
-        _.errorMessage should include("failed the following topology transactions"),
+        _.warningMessage should include("failed the following topology transactions"),
       )
+    }
+
+    "handle dropped transactions" in {
+      for {
+        (target, manager, handle, client) <- mk(
+          1,
+          // drop the first submission, but not the second
+          dropSequencedBroadcast = Iterator(true, false),
+        )
+        _ <- outboxConnected(manager, handle, client, target)
+        res1 <- loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(
+          push(
+            manager,
+            transactions.take(1),
+            // take into account the timeouts lowered in this test, and be generous in the timeout for getting a response:
+            // * submission timeout (2s)
+            // * retryDelay (1s)
+            Some(NonNegativeFiniteDuration.ofSeconds(8)),
+          ),
+          LogEntry.assertLogSeq(
+            Seq(
+              (
+                _.warningMessage should include(
+                  "Did not observe transactions in target synchronizer store."
+                ),
+                "outbox times out waiting to observe topology transaction",
+              )
+            )
+          ),
+        )
+      } yield {
+        res1.value.map(_.transaction) shouldBe transactions.take(1)
+      }
+
     }
   }
 }

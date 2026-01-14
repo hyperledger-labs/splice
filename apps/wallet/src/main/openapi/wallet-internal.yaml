@@ -10,7 +10,7 @@ paths:
   /v0/wallet/user-status:
     get:
       tags: [wallet]
-      x-jvm-package: wallet
+      x-jvm-package: status.wallet
       operationId: "userStatus"
       responses:
         "200":
@@ -756,7 +756,7 @@ paths:
   /v0/feature-support:
     get:
       tags: [ wallet ]
-      x-jvm-package: wallet
+      x-jvm-package: status.wallet
       operationId: "featureSupport"
       responses:
         "200":
@@ -1434,10 +1434,13 @@ components:
       required:
         - token_standard
         - transfer_preapproval_description
+        - no_holding_fees_on_transfers
       properties:
         token_standard:
           type: boolean
         transfer_preapproval_description:
+          type: boolean
+        no_holding_fees_on_transfers:
           type: boolean
 
     AllocateAmuletRequest:

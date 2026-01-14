@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.platform
 
-import cats.Order.*
 import cats.implicits.{catsSyntaxAlternativeSeparate, toFoldableOps}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
@@ -22,12 +21,14 @@ import com.digitalasset.canton.logging.{
   TracedLogger,
 }
 import com.digitalasset.canton.platform.PackagePreferenceBackend.*
-import com.digitalasset.canton.platform.store.packagemeta.PackageMetadata
+import com.digitalasset.canton.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.SynchronizerId
-import com.digitalasset.canton.util.MapsUtil
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.util.collection.MapsUtil
 import com.digitalasset.canton.{LfPackageId, LfPackageName, LfPackageVersion, LfPartyId}
+import com.digitalasset.daml.lf.language.Ast
 
 import scala.collection.immutable.SortedSet
 import scala.collection.{MapView, mutable}
@@ -83,14 +84,14 @@ class PackagePreferenceBackend(
       synchronizerId: Option[SynchronizerId],
       vettingValidAt: Option[CantonTimestamp],
   )(implicit
-      loggingContext: LoggingContextWithTrace
-  ): FutureUnlessShutdown[Either[String, (Seq[PackageReference], SynchronizerId)]] = {
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Either[String, (Seq[PackageReference], PhysicalSynchronizerId)]] = {
     val routingSynchronizerState = syncService.getRoutingSynchronizerState
     val packageMetadataSnapshot = syncService.getPackageMetadataSnapshot
 
     for {
       _ <- ensurePackageNamesKnown(packageVettingRequirements, packageMetadataSnapshot)
-      packageMapForRequest <- syncService.packageMapFor(
+      packageMapForRequest <- syncService.computePartyVettingMap(
         submitters = Set.empty,
         informees = packageVettingRequirements.allParties,
         vettingValidityTimestamp = vettingValidAt.getOrElse(clock.now),
@@ -114,10 +115,10 @@ class PackagePreferenceBackend(
   }
 
   private def findValidCandidate(
-      synchronizerCandidates: Map[SynchronizerId, Candidate[Set[PackageReference]]]
+      synchronizerCandidates: Map[PhysicalSynchronizerId, Candidate[Set[PackageReference]]]
   )(implicit
-      loggingContextWithTrace: LoggingContextWithTrace
-  ): Either[String, (Seq[PackageReference], SynchronizerId)] = {
+      traceContext: TraceContext
+  ): Either[String, (Seq[PackageReference], PhysicalSynchronizerId)] = {
     val (discardedCandidates, validCandidates) = synchronizerCandidates.view
       .map { case (sync, candidateE) =>
         candidateE.left.map(sync -> _).map(sync -> _)
@@ -130,7 +131,7 @@ class PackagePreferenceBackend(
         // TODO(#25385): Order by the package version with the package precedence set by the order of the vetting requirements
         // Follow the pattern used for SynchronizerRank ordering,
         // where lexicographic order picks the most preferred synchronizer by id
-        implicitly[Ordering[SynchronizerId]].reverse
+        implicitly[Ordering[PhysicalSynchronizerId]].reverse
       )
       .map { case (syncId, packageRefs) =>
         // Valid candidate found
@@ -174,9 +175,7 @@ class PackagePreferenceBackend(
   private def ensurePackageNamesKnown(
       packageVettingRequirements: PackageVettingRequirements,
       packageMetadataSnapshot: PackageMetadata,
-  )(implicit
-      loggingContext: LoggingContextWithTrace
-  ): FutureUnlessShutdown[Unit] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     val requestPackageNames = packageVettingRequirements.allPackageNames
     val knownPackageNames = packageMetadataSnapshot.packageNameMap.keySet
     val unknownPackageNames = requestPackageNames.diff(knownPackageNames)
@@ -220,7 +219,7 @@ object PackagePreferenceBackend {
   }
 
   def computePerSynchronizerPackageCandidates(
-      synchronizersPartiesVettingState: Map[SynchronizerId, Map[LfPartyId, Set[
+      synchronizersPartiesVettingState: Map[PhysicalSynchronizerId, Map[LfPartyId, Set[
         LfPackageId
       ]]],
       packageMetadataSnapshot: PackageMetadata,
@@ -228,8 +227,8 @@ object PackagePreferenceBackend {
       packageFilter: PackageFilter,
       logger: TracedLogger,
   )(implicit
-      loggingContextWithTrace: LoggingContextWithTrace
-  ): Map[SynchronizerId, MapView[LfPackageName, Candidate[SortedPreferences]]] = {
+      traceContext: TraceContext
+  ): Map[PhysicalSynchronizerId, MapView[LfPackageName, Candidate[SortedPreferences]]] = {
     val packageIndex = packageMetadataSnapshot.packageIdVersionMap
     synchronizersPartiesVettingState.view
       .mapValues(
@@ -277,17 +276,28 @@ object PackagePreferenceBackend {
       mutable.Map.empty
 
     // Note: Keeping it simple without tailrec since the dependency graph depth should be limited
-    def allDepsVettedFor(pkgId: LfPackageId): Either[LfPackageId, Unit] = {
-      val dependencies = dependencyGraph(pkgId)
+    def isDeeplyVetted(pkgId: LfPackageId): Either[LfPackageId, Unit] = {
+      val pkg = packageMetadataSnapshot.packages.getOrElse(
+        pkgId,
+        throw new NoSuchElementException(
+          s"Package with id $pkgId not found in the package metadata snapshot"
+        ),
+      )
+      if (
+        // If a package is vetted or it is not a schema package, we continue with checking its dependencies.
+        // We ignore unvetted non-schema packages to support
+        // disjoint versions across informees (e.g. Daml stdlib packages)
+        allVettedPackages(pkgId) || !isSchemaPackage(pkg)
+      ) {
+        val dependencies = dependencyGraph(pkgId)
 
-      dependencies.find(!allVettedPackages(_)) match {
-        case Some(notVetted) => Left(notVetted)
-        case None =>
-          dependencies.foldLeft(Right(()): Either[LfPackageId, Unit]) {
-            case (Right(()), dep) =>
-              allDepsVettedForCached.getOrElseUpdate(dep, allDepsVettedFor(dep))
-            case (left, _) => left
-          }
+        dependencies.foldLeft(Right(()): Either[LfPackageId, Unit]) {
+          case (Right(()), dep) => allDepsVettedForCached.getOrElseUpdate(dep, isDeeplyVetted(dep))
+          case (left, _) => left
+        }
+      } else {
+        // If the schema package is not vetted, return it as an error
+        Left(pkgId)
       }
     }
 
@@ -296,7 +306,7 @@ object PackagePreferenceBackend {
         _.flatMap { candidates =>
           val (packagesWithUnvettedDeps, candidatesWithVettedDeps) = candidates.view
             .map(pkgRef =>
-              allDepsVettedFor(pkgRef.pkgId).left.map(pkgRef.pkgId -> _).map(_ => pkgRef)
+              isDeeplyVetted(pkgRef.pkgId).left.map(pkgRef.pkgId -> _).map(_ => pkgRef)
             )
             .toList
             .separate
@@ -334,7 +344,7 @@ object PackagePreferenceBackend {
       packageIndex: PackageIndex,
       logger: TracedLogger,
   )(implicit
-      loggingContextWithTrace: LoggingContextWithTrace
+      traceContext: TraceContext
   ): Map[LfPackageName, Candidate[SortedPreferences]] =
     pkgIds.view
       .flatMap { pkgId =>
@@ -412,7 +422,10 @@ object PackagePreferenceBackend {
                   acc.updated(
                     missingRequiredPackageName,
                     Left(
-                      show"Party $party has no vetted packages for '$missingRequiredPackageName'"
+                      if (other.isEmpty)
+                        show"Party $party is either not known on the synchronizer or it has no uniformly-vetted packages"
+                      else
+                        show"Party $party has no vetted packages for '$missingRequiredPackageName'"
                     ),
                   )
               }
@@ -439,4 +452,9 @@ object PackagePreferenceBackend {
           preferencesForName <- preferencesForNameE
         } yield acc + preferencesForName.last1
       }
+
+  private def isSchemaPackage(pkg: Ast.PackageSignature): Boolean =
+    pkg.modules.exists { case (_, module) =>
+      module.interfaces.nonEmpty || module.templates.nonEmpty
+    }
 }

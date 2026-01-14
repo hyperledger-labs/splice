@@ -9,7 +9,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
@@ -26,13 +26,13 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwel
 import org.lfdecentralizedtrust.splice.config.SharedSpliceAppParameters
 import org.lfdecentralizedtrust.splice.environment.{
   BaseLedgerConnection,
-  SpliceLedgerClient,
-  SpliceLedgerConnection,
-  Node,
   DarResource,
   DarResources,
+  Node,
   ParticipantAdminConnection,
   RetryFor,
+  SpliceLedgerClient,
+  SpliceLedgerConnection,
 }
 import org.lfdecentralizedtrust.splice.http.v0.splitwell.SplitwellResource
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
@@ -43,6 +43,7 @@ import org.lfdecentralizedtrust.splice.splitwell.automation.SplitwellAutomationS
 import org.lfdecentralizedtrust.splice.splitwell.config.SplitwellAppBackendConfig
 import org.lfdecentralizedtrust.splice.splitwell.metrics.SplitwellAppMetrics
 import org.lfdecentralizedtrust.splice.splitwell.store.SplitwellStore
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.util.HasHealth
 
@@ -56,7 +57,7 @@ class SplitwellApp(
     override val name: InstanceName,
     val config: SplitwellAppBackendConfig,
     val amuletAppParameters: SharedSpliceAppParameters,
-    storage: Storage,
+    storage: DbStorage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
@@ -127,7 +128,9 @@ class SplitwellApp(
       retryProvider,
       migrationInfo,
       participantId,
+      config.automation.ingestion,
     )
+    // splitwell does not need to have UpdateHistory
     automation = new SplitwellAutomationService(
       config.automation,
       clock,
@@ -136,6 +139,7 @@ class SplitwellApp(
       ledgerClient,
       scanConnection,
       retryProvider,
+      config.parameters,
       loggerFactory,
     )
     preferred <- appInitStep(s"Wait for preferred domain connection") {
@@ -205,7 +209,8 @@ class SplitwellApp(
       s"Wait for splitwell rules to be created for domain $domain",
       automation.store.lookupSplitwellRules(domain).flatMap {
         case QueryResult(offset, None) =>
-          automation.connection
+          automation
+            .connection(SpliceLedgerConnectionPriority.Low)
             .submit(
               Seq(automation.store.key.providerParty),
               Seq.empty,
@@ -247,7 +252,7 @@ class SplitwellApp(
 object SplitwellApp {
   case class State(
       automation: SplitwellAutomationService,
-      storage: Storage,
+      storage: DbStorage,
       store: SplitwellStore,
       scanConnection: ScanConnection,
       participantAdminConnection: ParticipantAdminConnection,

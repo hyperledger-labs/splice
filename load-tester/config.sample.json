@@ -24,5 +24,8 @@
   "test": {
     "duration": "$K6_TEST_DURATION",
     "iterationsPerMinute": "$K6_ITERATIONS_PER_MINUTE"
+  },
+  "adaptiveScenario": {
+    "enabled": false
   }
 }

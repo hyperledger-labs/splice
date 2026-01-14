@@ -8,7 +8,8 @@ import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.error.MediatorError.{InvalidMessage, MalformedMessage, Timeout}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.messages.{LocalReject, Verdict}
+import com.digitalasset.canton.protocol.messages.{NonPositiveLocalVerdict, Verdict}
+import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.version.ProtocolVersion
 import pprint.Tree
 
@@ -26,7 +27,7 @@ object MediatorVerdict {
   type MediatorApprove = MediatorApprove.type
 
   final case class ParticipantReject(
-      reasons: NonEmpty[List[(Set[LfPartyId], LocalReject)]]
+      reasons: NonEmpty[List[(Set[LfPartyId], ParticipantId, NonPositiveLocalVerdict)]]
   ) extends MediatorVerdict {
     override def toVerdict(protocolVersion: ProtocolVersion): Verdict =
       Verdict.ParticipantReject(reasons, protocolVersion)
@@ -36,8 +37,8 @@ object MediatorVerdict {
 
       prettyOfClass(
         unnamedParam(
-          _.reasons.map { case (parties, reason) =>
-            Tree.Infix(reason.toTree, "- reported by:", parties.toTree)
+          _.reasons.map { case (parties, participantId, reason) =>
+            Tree.Infix(reason.toTree, s"- reported by $participantId for:", parties.toTree)
           }
         )
       )
@@ -51,6 +52,7 @@ object MediatorVerdict {
         case invalid: InvalidMessage.Reject => invalid
         case malformed: MalformedMessage.Reject => malformed
       }
+
       Verdict.MediatorReject.tryCreate(
         error.rpcStatusWithoutLoggingContext(),
         reason.isMalformed,

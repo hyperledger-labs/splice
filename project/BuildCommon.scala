@@ -21,6 +21,8 @@ import xsbti.compile.CompileAnalysis
 import de.heikoseeberger.sbtheader.HeaderPlugin.autoImport.{headerResources, headerSources}
 import CantonDependencies.daml_ledger_api_value_proto
 
+import java.util.concurrent.atomic.AtomicInteger
+
 object BuildCommon {
 
   object defs {
@@ -80,13 +82,14 @@ object BuildCommon {
         Compile / PB.protoSources ++= (Test / PB.protoSources).value,
         scalacOptions ++= Seq(
           "-Wconf:src=src_managed/.*:silent",
+          // Silencing deprecation warnings for now for javaapi, remove when on canton-3.4
+          "-Wconf:msg=.*package command_service.*|.*CommandService.*|.*package update_service.*|.*UpdateService.*|.*transaction_filter.*|.*package data.*|.*package transaction.*&cat=deprecation:silent",
           // renable once scala is > 2.13.15 https://github.com/scala/bug/issues/13041
-//          "-Wunused:patvars",
+          // "-Wunused:patvars",
           "-Wunused:privates",
           "-Wunused:params",
-          // https://github.com/scala/bug/issues/12883 I have no idea what's the purpouse of that warning
+          // https://github.com/scala/bug/issues/12883 I have no idea what's the purpose of that warning
           "-Wconf:msg=access modifiers for `.*` method are copied from the case class constructor under Scala 3:s",
-          "-quickfix:any",
         ),
         Test / testOptions ++= Seq(
           // Enable logging of begin and end of test cases, test suites, and test runs.
@@ -138,7 +141,6 @@ object BuildCommon {
 
   lazy val removeCompileFlagsForDaml =
     Seq(
-      "-Xsource:3",
       "-deprecation",
       "-Xfatal-warnings",
       "-Wunused:implicits",
@@ -196,7 +198,7 @@ object BuildCommon {
         ) ++
         addCommandAlias(
           "lint",
-          "; damlDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; load-tester/npmLint ; runShellcheck ; syncpackCheck ; illegalDamlReferencesCheck ; headerCheck",
+          "; damlDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; load-tester/npmLint ; party-allocator/npmLint ; runShellcheck ; syncpackCheck ; illegalDamlReferencesCheck ; headerCheck",
         ) ++
         // it might happen that some DARs remain dangling on build config changes,
         // so we explicitly remove all Splice DARs here, just in case
@@ -321,7 +323,7 @@ object BuildCommon {
         `canton-pekko-fork`,
         `canton-magnolify-addon`,
         `canton-wartremover-extension` % "compile->compile;test->test",
-        `canton-util-logging`,
+        `canton-util-observability`,
         // Canton depends on the Daml code via a git submodule and the two
         // projects below. We instead depend on the artifacts released
         // from the Daml repo listed in libraryDependencies below.
@@ -331,6 +333,9 @@ object BuildCommon {
       .settings(
         sharedCantonSettings,
         libraryDependencies ++= Seq(
+          aws_kms,
+          aws_sts,
+          gcp_kms,
           daml_metrics,
           daml_tracing,
           daml_executors,
@@ -389,12 +394,12 @@ object BuildCommon {
       .dependsOn(
         `canton-util-internal`,
         `canton-wartremover-extension` % "compile->compile;test->test",
-        `canton-util-logging`,
+        `canton-util-observability`,
       )
       .settings(
         sharedCantonSettings,
         libraryDependencies ++= Seq(
-          grpc_netty,
+          grpc_netty_shaded,
           netty_handler,
           netty_boring_ssl, // This should be a Runtime dep, but needs to be declared at Compile scope due to https://github.com/sbt/sbt/issues/5568
           scopt,
@@ -481,10 +486,10 @@ object BuildCommon {
       )
   }
 
-  lazy val `canton-util-logging` = {
+  lazy val `canton-util-observability` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-util-logging", file("canton/community/util-logging"))
+      .apply("canton-util-observability", file("canton/community/util-observability"))
       .dependsOn(
         `canton-base-errors` % "compile->compile;test->test",
         `canton-daml-grpc-utils`,
@@ -495,6 +500,7 @@ object BuildCommon {
         sharedSettings ++ cantonWarts,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
         libraryDependencies ++= Seq(
+          better_files,
           daml_lf_data,
           daml_nonempty_cats,
           daml_metrics,
@@ -671,7 +677,7 @@ object BuildCommon {
           scalaVersion,
           sbtVersion,
           BuildInfoKey("damlLibrariesVersion" -> CantonDependencies.daml_libraries_version),
-          BuildInfoKey("stableProtocolVersions" -> List("33")),
+          BuildInfoKey("stableProtocolVersions" -> List("34")),
           BuildInfoKey("betaProtocolVersions" -> List()),
         ),
         buildInfoPackage := "com.digitalasset.canton.buildinfo",
@@ -776,6 +782,13 @@ object BuildCommon {
         `canton-ledger-common` % "compile->compile;test->test",
       )
       .settings(
+        removeTestSources,
+        // We only need 3 files out of a lot of test files so add them explicitly
+        Test / managedSources := Seq(
+          (Test / sourceDirectory).value / "scala/com/digitalasset/canton/HasActorSystem.scala",
+          (Test / sourceDirectory).value / "scala/com/digitalasset/canton/store/db/DbTest.scala",
+          (Test / sourceDirectory).value / "scala/com/digitalasset/canton/store/db/DbStorageIdempotency.scala",
+        ),
         disableTests,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
@@ -814,7 +827,7 @@ object BuildCommon {
           jul_to_slf4j % Test,
           bouncycastle_bcprov_jdk15on,
           bouncycastle_bcpkix_jdk15on,
-          grpc_netty,
+          grpc_netty_shaded,
           grpc_services,
           scalapb_runtime_grpc,
           scalapb_runtime,
@@ -996,21 +1009,21 @@ object BuildCommon {
         Compile / damlCodeGeneration :=
           Seq(
             (
-              (Compile / sourceDirectory).value / "daml" / "AdminWorkflows",
-              (Compile / damlDarOutput).value / "AdminWorkflows-current.dar",
+              (Compile / sourceDirectory).value / "daml" / "canton-builtin-admin-workflow-ping",
+              (Compile / damlDarOutput).value / "canton-builtin-admin-workflow-ping-current.dar",
               "com.digitalasset.canton.participant.admin.workflows",
             ),
             (
-              (Compile / sourceDirectory).value / "daml" / "PartyReplication",
-              (Compile / damlDarOutput).value / "PartyReplication-current.dar",
+              (Compile / sourceDirectory).value / "daml" / "canton-builtin-admin-workflow-party-replication-alpha",
+              (Compile / damlDarOutput).value / "canton-builtin-admin-workflow-party-replication-alpha-current.dar",
               "com.digitalasset.canton.participant.admin.workflows",
             ),
           ),
         Compile / damlEnableJavaCodegen := true,
         Compile / damlCodegenUseProject := false,
         Compile / damlBuildOrder := Seq(
-          "daml/AdminWorkflows/daml.yaml",
-          "daml/PartyReplication/daml.yaml",
+          "daml/canton-builtin-admin-workflow-ping/daml.yaml",
+          "daml/canton-builtin-admin-workflow-party-replication-alpha/daml.yaml",
         ),
         // TODO(DACH-NY/canton-network-node#16168) Before creating the first stable release with backwards compatibility guarantees,
         //  make "AdminWorkflows.dar" stable again
@@ -1171,10 +1184,12 @@ object BuildCommon {
         `canton-daml-errors` % "compile->compile;test->test",
         `canton-bindings-java` % "compile->compile;test->test",
         `canton-daml-grpc-utils`,
-        `canton-util-logging`,
+        `canton-daml-jwt`,
+        `canton-util-observability`,
         `canton-ledger-api`,
       )
       .settings(
+        removeTestSources,
         sharedCantonSettings,
         disableTests,
         sharedSettings,
@@ -1200,7 +1215,7 @@ object BuildCommon {
           slf4j_api,
           grpc_api,
           reflections,
-          grpc_netty,
+          grpc_netty_shaded,
           netty_boring_ssl, // This should be a Runtime dep, but needs to be declared at Compile scope due to https://github.com/sbt/sbt/issues/5568
           netty_handler,
           caffeine,
@@ -1249,6 +1264,7 @@ object BuildCommon {
         ScalafmtPlugin,
       ) // to accommodate different daml repo coding style
       .settings(
+        removeTestSources,
         sharedCantonSettings,
         sharedSettings,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
@@ -1269,7 +1285,7 @@ object BuildCommon {
           bouncycastle_bcprov_jdk15on % Test,
           bouncycastle_bcpkix_jdk15on % Test,
           scalaz_scalacheck % Test,
-          grpc_netty,
+          grpc_netty_shaded,
           grpc_services,
           grpc_protobuf,
           postgres,
@@ -1404,6 +1420,10 @@ object BuildCommon {
         `canton-ledger-api`
       )
       .settings(
+        removeTestSources,
+        Test / managedSources := Seq(
+          (Test / sourceDirectory).value / "scala/com/daml/ledger/javaapi/data/Generators.scala"
+        ),
         sharedCantonSettings,
         Test / unmanagedSources :=
           (Test / unmanagedSources).value.filter(_.getName == "Generators.scala"),
@@ -1445,9 +1465,7 @@ object BuildCommon {
         sharedCantonSettings,
         removeTestSources,
         sharedSettings,
-        scalacOptions --= removeCompileFlagsForDaml
-          // needed for foo.bar.{this as that} imports
-          .filterNot(_ == "-Xsource:3") :+ "-Wnonunit-statement",
+        scalacOptions --= removeCompileFlagsForDaml :+ "-Wnonunit-statement",
         scalacOptions += "-Wconf:src=src_managed/.*:silent" ++ Seq(
           "lint-byname-implicit",
           "other-match-analysis",
@@ -1472,6 +1490,7 @@ object BuildCommon {
           scalaz_scalacheck % Test,
           scalatestScalacheck % Test,
           ujson_circe,
+          upickle,
         ),
         Test / damlCodeGeneration := Seq(
           (
@@ -1489,15 +1508,17 @@ object BuildCommon {
       .apply("canton-transcode", file("canton/community/ledger/transcode/"))
       .settings(
         sharedSettings,
-        scalacOptions --= removeCompileFlagsForDaml
-          // needed for foo.bar.{this as that} imports
-          .filterNot(_ == "-Xsource:3"),
+        scalacOptions --= removeCompileFlagsForDaml,
         libraryDependencies ++= Seq(
           daml_lf_language,
           "com.lihaoyi" %% "ujson" % "4.0.2",
         ),
       )
-      .dependsOn(`canton-ledger-api`)
+      .dependsOn(
+        `canton-ledger-api`,
+        `canton-community-testing` % Test,
+        `canton-community-common` % Test,
+      )
   }
 
   lazy val `canton-sequencer-driver-api` = {
@@ -1535,7 +1556,10 @@ object BuildCommon {
   lazy val `canton-community-reference-driver` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-community-reference-driver", file("canton/community/drivers/reference"))
+      .apply(
+        "canton-community-reference-driver",
+        file("canton/community/reference-sequencer-driver/"),
+      )
       .dependsOn(
         `canton-util-external`,
         `canton-community-common` % "compile->compile;test->test",
@@ -1586,6 +1610,8 @@ object BuildCommon {
     cache(dars.toSet).toSeq
   }
 
+  val id = new AtomicInteger(0)
+
   /** Runs npm-install.sh script, which in turn runs 'npm install' in a dev environment, or
     * 'npm ci' in ci. The source package.json file should be specified in pkg. Rerunning this
     * task will re-execute 'npm install' only if the package file has been modified.
@@ -1599,12 +1625,15 @@ object BuildCommon {
     val cacheDir = streams.value.cacheDirectory / "npmInstall"
     val cache =
       FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
+        val i = id.getAndIncrement()
+        println(s"Npm install called for ${npmRootDir.value}. Id: $i")
         BuildUtil.runCommandWithRetries(
           Seq(npmInstallScript.getAbsolutePath),
           log,
           None,
           Some(npmRootDir.value),
         )
+        println(s"Npm install completed for ${npmRootDir.value}. Id: $i")
         Set(npmRootDir.value / "node_modules")
       }
     val openApiPackageJsons = openApiPkgs.flatMap { case (_, baseDir, hasExternalSpec) =>
@@ -1670,7 +1699,7 @@ object BuildCommon {
       Some(workingDir),
     )
     def openApiSettings(
-        npmName: String,
+        unscopedNpmName: String,
         openApiSpec: String,
         directory: String = "openapi-ts-client",
     ): Seq[Setting[_]] = Seq(
@@ -1682,9 +1711,7 @@ object BuildCommon {
             baseDirectory.value / ".." / "common/src/main/openapi/common-external.yaml"
 
           generateOpenApiClient(
-            npmName = npmName,
-            npmModuleName = npmName,
-            npmProjectName = npmName,
+            unscopedNpmName = unscopedNpmName,
             openApiSpec = openApiSpec,
             cacheFileDependencies = Set(commonInternalOpenApiFile, commonExternalOpenApiFile),
             directory = directory,
@@ -1695,9 +1722,7 @@ object BuildCommon {
     )
 
     def generateOpenApiClient(
-        npmName: String,
-        npmModuleName: String,
-        npmProjectName: String,
+        unscopedNpmName: String,
         openApiSpec: String,
         cacheFileDependencies: Set[File] = Set.empty[File],
         directory: String,
@@ -1707,6 +1732,7 @@ object BuildCommon {
       val log = streams.value.log
       val cacheDir = streams.value.cacheDirectory / directory
 
+      val npmName = s"@lfdecentralizedtrust/$unscopedNpmName"
       val openApiSpecFile = baseDirectory.value / subPath / openApiSpec
       val template = templateDirectory.value
       val outputDir = outputPrefix.fold(baseDirectory.value)(new java.io.File(_)) / directory
@@ -1722,9 +1748,9 @@ object BuildCommon {
             "-p",
             s"npmName=$npmName",
             "-p",
-            s"moduleName=$npmModuleName",
+            s"moduleName=$npmName",
             "-p",
-            s"projectName=$npmProjectName",
+            s"projectName=$npmName",
             "-p",
             "enumPropertyNaming=original",
             "-p",

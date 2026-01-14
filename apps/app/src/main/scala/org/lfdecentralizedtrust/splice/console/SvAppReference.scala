@@ -22,12 +22,13 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.sv.{SvApp, SvAppBootstrap, SvAppClientConfig}
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.{
   HttpSvAdminAppClient,
-  HttpSvAppClient,
+  HttpSvOperatorAppClient,
+  HttpSvPublicAppClient,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.{
   DsoDelegateBasedAutomationService,
-  SvSvAutomationService,
   SvDsoAutomationService,
+  SvSvAutomationService,
 }
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.migration.{DomainDataSnapshot, SynchronizerNodeIdentities}
@@ -37,7 +38,6 @@ import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import org.apache.pekko.actor.ActorSystem
 
 import scala.jdk.OptionConverters.*
 import java.time.Instant
@@ -54,46 +54,51 @@ abstract class SvAppReference(
   def onboardValidator(validator: PartyId, secret: String, contactPoint: String): Unit =
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAppClient.OnboardValidator(validator, secret, BuildInfo.compiledVersion, contactPoint)
+        HttpSvPublicAppClient.OnboardValidator(
+          validator,
+          secret,
+          BuildInfo.compiledVersion,
+          contactPoint,
+        )
       )
     }
 
   def startSvOnboarding(token: String): Unit =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.StartSvOnboarding(token))
+      httpCommand(HttpSvPublicAppClient.StartSvOnboarding(token))
     }
 
-  def getSvOnboardingStatus(candidate: PartyId): HttpSvAppClient.SvOnboardingStatus =
+  def getSvOnboardingStatus(candidate: PartyId): HttpSvPublicAppClient.SvOnboardingStatus =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.getSvOnboardingStatus(candidate.toProtoPrimitive))
+      httpCommand(HttpSvPublicAppClient.getSvOnboardingStatus(candidate.toProtoPrimitive))
     }
 
-  def getSvOnboardingStatus(candidate: String): HttpSvAppClient.SvOnboardingStatus =
+  def getSvOnboardingStatus(candidate: String): HttpSvPublicAppClient.SvOnboardingStatus =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.getSvOnboardingStatus(candidate))
+      httpCommand(HttpSvPublicAppClient.getSvOnboardingStatus(candidate))
     }
 
   @Help.Summary("Prepare a validator onboarding and return an onboarding secret (via client API)")
   def devNetOnboardValidatorPrepare(): String =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.DevNetOnboardValidatorPrepare())
+      httpCommand(HttpSvPublicAppClient.DevNetOnboardValidatorPrepare())
     }
 
-  def getDsoInfo(): HttpSvAppClient.DsoInfo =
+  def getDsoInfo(): HttpSvPublicAppClient.DsoInfo =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.GetDsoInfo)
+      httpCommand(HttpSvPublicAppClient.GetDsoInfo)
     }
 
   @Help.Summary("Get the CometBFT node status")
   def cometBftNodeStatus(): definitions.CometBftNodeStatusResponse =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.GetCometBftNodeStatus())
+      httpCommand(HttpSvPublicAppClient.GetCometBftNodeStatus())
     }
 
   @Help.Summary("Get the CometBFT node dump")
   def cometBftNodeDebugDump(): definitions.CometBftNodeDumpResponse =
     consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.GetCometBftNodeDump())
+      httpCommand(HttpSvOperatorAppClient.GetCometBftNodeDump())
     }
 
   @Help.Summary("Make a CometBFT Json RPC request")
@@ -103,17 +108,17 @@ abstract class SvAppReference(
       params: Map[String, io.circe.Json] = Map.empty,
   ): definitions.CometBftJsonRpcResponse =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.CometBftJsonRpcRequest(id, method, params))
+      httpCommand(HttpSvPublicAppClient.CometBftJsonRpcRequest(id, method, params))
     }
 
   def onboardSvPartyMigrationAuthorize(
       participantId: ParticipantId,
       candidateParty: PartyId,
-  ): HttpSvAppClient.OnboardSvPartyMigrationAuthorizeResponse =
+  ): HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorizeResponse =
     consoleEnvironment
       .run {
         httpCommand(
-          HttpSvAppClient.OnboardSvPartyMigrationAuthorize(
+          HttpSvPublicAppClient.OnboardSvPartyMigrationAuthorize(
             participantId,
             candidateParty,
           )
@@ -134,9 +139,12 @@ abstract class SvAppReference(
     }
 
   @Help.Summary("Dump all the required data for domain migration to the configured location")
-  def triggerDecentralizedSynchronizerMigrationDump(migrationId: Long): Unit =
+  def triggerDecentralizedSynchronizerMigrationDump(
+      migrationId: Long,
+      at: Option[Instant] = None,
+  ): Unit =
     consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.TriggerDomainMigrationDump(migrationId))
+      httpCommand(HttpSvAdminAppClient.TriggerDomainMigrationDump(migrationId, at))
     }
 
   @Help.Summary("Get a snapshot of all the dynamic data from the domain")
@@ -174,7 +182,7 @@ abstract class SvAppReference(
   )(implicit tc: TraceContext): Unit = {
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.CreateVoteRequest(
+        HttpSvOperatorAppClient.CreateVoteRequest(
           requester,
           action,
           reasonUrl,
@@ -190,7 +198,7 @@ abstract class SvAppReference(
   def listVoteRequests(): Seq[Contract[VoteRequest.ContractId, VoteRequest]] = {
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.ListVoteRequests
+        HttpSvOperatorAppClient.ListVoteRequests
       )
     }
   }
@@ -212,7 +220,7 @@ abstract class SvAppReference(
   ): Contract[VoteRequest.ContractId, VoteRequest] = {
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.LookupVoteRequest(trackingCid)()
+        HttpSvOperatorAppClient.LookupVoteRequest(trackingCid)()
       )
     }
   }
@@ -227,7 +235,7 @@ abstract class SvAppReference(
   ): Seq[DsoRules_CloseVoteRequestResult] = {
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.ListVoteRequestResults(
+        HttpSvOperatorAppClient.ListVoteRequestResults(
           actionName,
           accepted,
           requester,
@@ -248,7 +256,7 @@ abstract class SvAppReference(
   ): Unit = {
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.CastVote(trackingCid, isAccepted, reasonUrl, reasonDescription)
+        HttpSvOperatorAppClient.CastVote(trackingCid, isAccepted, reasonUrl, reasonDescription)
       )
     }
   }
@@ -274,8 +282,7 @@ final case class SvAppClientReference(
 class SvAppBackendReference(
     override val consoleEnvironment: SpliceConsoleEnvironment,
     name: String,
-)(implicit actorSystem: ActorSystem)
-    extends SvAppReference(consoleEnvironment, name)
+) extends SvAppReference(consoleEnvironment, name)
     with AppBackendReference
     with BaseInspection[SvApp] {
 
@@ -338,15 +345,15 @@ class SvAppBackendReference(
   def listOngoingValidatorOnboardings(): Seq[ValidatorOnboarding] =
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.ListOngoingValidatorOnboardings
+        HttpSvOperatorAppClient.ListOngoingValidatorOnboardings
       )
     }
 
   @Help.Summary("Prepare a validator onboarding and return an onboarding secret (via admin API)")
-  def prepareValidatorOnboarding(expiresIn: FiniteDuration): String =
+  def prepareValidatorOnboarding(expiresIn: FiniteDuration, partyHint: Option[String]): String =
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.PrepareValidatorOnboarding(expiresIn)
+        HttpSvOperatorAppClient.PrepareValidatorOnboarding(expiresIn, partyHint)
       )
     }
 
@@ -354,7 +361,7 @@ class SvAppBackendReference(
   def updateAmuletPriceVote(amuletPrice: BigDecimal): Unit =
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.UpdateAmuletPriceVote(amuletPrice)
+        HttpSvOperatorAppClient.UpdateAmuletPriceVote(amuletPrice)
       )
     }
 
@@ -362,7 +369,7 @@ class SvAppBackendReference(
   def listAmuletPriceVotes(): Seq[Contract[cp.AmuletPriceVote.ContractId, cp.AmuletPriceVote]] = {
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.ListAmuletPriceVotes
+        HttpSvOperatorAppClient.ListAmuletPriceVotes
       )
     }
   }
@@ -371,7 +378,7 @@ class SvAppBackendReference(
   def listOpenMiningRounds(): Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]] = {
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.ListOpenMiningRounds
+        HttpSvOperatorAppClient.ListOpenMiningRounds
       )
     }
   }
@@ -379,28 +386,20 @@ class SvAppBackendReference(
   @Help.Summary("Get the CometBFT node debug dump")
   def cometBftNodeDump(): definitions.CometBftNodeDumpResponse =
     consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.GetCometBftNodeDump())
+      httpCommand(HttpSvOperatorAppClient.GetCometBftNodeDump())
     }
 
   @Help.Summary("Get the sequencer node status")
   def sequencerNodeStatus(): NodeStatus[SpliceStatus] =
     consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.GetSequencerNodeStatus())
+      httpCommand(HttpSvOperatorAppClient.GetSequencerNodeStatus())
     }
 
   @Help.Summary("Get the mediator node status")
   def mediatorNodeStatus(): NodeStatus[SpliceStatus] =
     consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.GetMediatorNodeStatus())
+      httpCommand(HttpSvOperatorAppClient.GetMediatorNodeStatus())
     }
-
-  /** Remote participant this sv app is configured to interact with. */
-  lazy val participantClient =
-    new ParticipantClientReference(
-      consoleEnvironment,
-      s"remote participant for `$name``",
-      config.participantClient.getParticipantClientConfig(),
-    )
 
   /** Remote participant this sv app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val participantClientWithAdminToken =

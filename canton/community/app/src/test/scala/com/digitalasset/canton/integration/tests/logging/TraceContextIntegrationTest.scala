@@ -6,39 +6,81 @@ package com.digitalasset.canton.integration.tests.logging
 import cats.syntax.functor.*
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.integration.IntegrationTestUtilities.grabCounts
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
   SharedEnvironment,
 }
+import com.digitalasset.canton.ledger.api.services.CommandSubmissionService
 import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
+import com.digitalasset.canton.networking.grpc.ApiRequestLogger
+import com.digitalasset.canton.participant.admin.{AdminWorkflowServices, PingService}
 import com.digitalasset.canton.participant.protocol.TransactionProcessor
 import com.digitalasset.canton.participant.sync.CantonSyncService
+import com.digitalasset.canton.platform.apiserver.services.ApiStateService
 import org.scalatest.compatible.Assertion
+import org.scalatest.matchers.{MatchResult, Matcher}
 import org.slf4j.event.Level
 
 abstract class TraceContextIntegrationTest extends CommunityIntegrationTest with SharedEnvironment {
-  override def environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.P2_S1M1
-      .withSetup { implicit env =>
-        import env.*
+  override def environmentDefinition: EnvironmentDefinition = EnvironmentDefinition.P2_S1M1
 
-        participants.local.foreach(_.synchronizers.connect_local(sequencer1, alias = daName))
-
-        // Wait until all participants are connected
-        utils.retry_until_true {
-          participants.local.forall(_.synchronizers.active(daName))
-        }
-      }
-
-  val CaptureLoggersUsingTraceId: SuppressionRule =
-    SuppressionRule.forLogger[CantonSyncService] ||
+  val CaptureLoggersUsingTraceIdForPing: SuppressionRule =
+    SuppressionRule.forLogger[PingService] ||
+      SuppressionRule.forLogger[CommandSubmissionService] ||
+      SuppressionRule.forLogger[CantonSyncService] ||
       SuppressionRule.forLogger[TransactionProcessor] &&
       SuppressionRule.LevelAndAbove(Level.DEBUG)
+
+  val CaptureAdminServicesStartupTraceIds: SuppressionRule =
+    (SuppressionRule.forLogger[AdminWorkflowServices] ||
+      SuppressionRule.forLogger[ApiRequestLogger] ||
+      SuppressionRule.forLogger[ApiStateService]) &&
+      SuppressionRule.LevelAndAbove(Level.DEBUG)
+
+  private def haveTheSameTraceIdFor(
+      substrings: String*
+  ) = new Matcher[Seq[LogEntry]] {
+    override def apply(left: Seq[LogEntry]): MatchResult = {
+      val allTraceIds = substrings.flatMap { substring =>
+        left
+          .filter(_.message.contains(substring))
+          .flatMap(_.mdc.get("trace-id"))
+      }.toSet
+      MatchResult(
+        allTraceIds.sizeIs == 1,
+        s"Expected the same trace-id for all log, but found multiple distinct trace-ids: ${allTraceIds
+            .mkString(", ")}",
+        "All log messages have the same trace-id",
+      )
+    }
+  }
+
+  "propagate trace-ids set by ping service startup to ledger api" in { implicit env =>
+    import env.*
+
+    participant1.stop()
+
+    loggerFactory.assertLogsSeq(CaptureAdminServicesStartupTraceIds)(
+      {
+        participant1.start()
+        eventually() {
+          participant1.is_running shouldBe true
+        }
+      },
+      { logs =>
+        logs should haveTheSameTraceIdFor(
+          "Loading admin workflows DAR",
+          "PackageService/GetPackageStatus",
+        )
+        logs should haveTheSameTraceIdFor(
+          "Creating admin workflow service admin-ping",
+          "StateService/GetLedgerEnd",
+        )
+      },
+    )
+  }
 
   /** Integration test to verify that trace-ids are flowing through the entirety of Canton's
     * internals
@@ -46,7 +88,14 @@ abstract class TraceContextIntegrationTest extends CommunityIntegrationTest with
   "check trace id set on sync service write is visible on related read events" in { implicit env =>
     import env.*
 
-    loggerFactory.assertLogsSeq(CaptureLoggersUsingTraceId)(
+    participants.local.foreach(_.synchronizers.connect_local(sequencer1, alias = daName))
+
+    // Wait until all participants are connected
+    utils.retry_until_true {
+      participants.local.forall(_.synchronizers.active(daName))
+    }
+
+    loggerFactory.assertLogsSeq(CaptureLoggersUsingTraceIdForPing)(
       {
         val p1InitialCounts = grabCounts(daName, participant1)
         val p2InitialCounts = grabCounts(daName, participant2)
@@ -72,12 +121,29 @@ abstract class TraceContextIntegrationTest extends CommunityIntegrationTest with
           .fmap(_.map(_._2))
           .filter(_._2.exists(_.message contains "Successfully submitted transaction"))
 
+        def isPingServicePingCommand(
+            entry: LogEntry
+        ): Boolean =
+          entry.loggerName.contains(classOf[PingService].getSimpleName) &&
+            entry.message.contains("Starting ping")
+
+        def isCommandServicePingCommand(
+            entry: LogEntry
+        ): Boolean =
+          entry.loggerName.contains(classOf[CommandSubmissionService].getSimpleName) &&
+            entry.message.contains("Submitted commands are: 'create Canton.Internal.Ping:Ping'")
+
         def hasTransactionAcceptedFor(participant: String)(logEntry: LogEntry): Assertion = {
           logEntry.loggerName should include(participant)
           logEntry.message should include("TransactionAccepted")
         }
 
-        assert(submissionTraces.nonEmpty, "No submission traces found")
+        // Ping submission trace exists
+        submissionTraces.exists { case (_traceId, entries) =>
+          entries.exists(isPingServicePingCommand) &&
+          entries.exists(isCommandServicePingCommand) &&
+          entries.exists(_.message contains "Successfully submitted transaction")
+        } shouldBe true withClue "full Ping submission trace not found"
 
         forAll(submissionTraces) {
           // we already know that these traces are submitting a ledger-api transaction
@@ -94,5 +160,5 @@ abstract class TraceContextIntegrationTest extends CommunityIntegrationTest with
 class GrpcTraceContextIntegrationTestPostgres extends TraceContextIntegrationTest {
   // run with postgres to ensure writing to persistent stores is working correctly
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }

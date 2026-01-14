@@ -16,10 +16,12 @@ import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTr
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, TracedLogger}
 import com.digitalasset.canton.platform.apiserver.execution.CommandInterpretationResult
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.EnrichedTransactionData.ExternalInputContract
+import com.digitalasset.canton.protocol.LfFatContractInst
 import com.digitalasset.canton.protocol.hash.HashTracer
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
 import com.digitalasset.daml.lf.data.ImmArray
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.engine.Enricher
 import com.digitalasset.daml.lf.transaction.{
   FatContractInstance,
@@ -39,31 +41,28 @@ object EnrichedTransactionData {
   /** Class that holds both the enriched FCI and the original FCI. This allows to show an enriched
     * version to the external party while maintaining the original contract instance so it stays
     * consistent with its Contract Id.
+    *
+    * @param enrichedContract
+    *   The enriched contract instance. Use for encoding to the PreparedTransaction proto and
+    *   verifying external hash signatures.
+    * @param originalContract
+    *   Original event contract. Use within the Canton protocol.
     */
   final case class ExternalInputContract(
-      private val enrichedFci: FatContractInstance,
-      private val originalFci: FatContractInstance,
+      enrichedContract: FatContractInstance,
+      originalContract: LfFatContractInst,
   ) {
     require(
-      enrichedFci.contractId == originalFci.contractId,
-      s"Mismatching contractIds between enriched (${enrichedFci.contractId}) and original (${originalFci.contractId})",
+      enrichedContract.contractId == originalContract.contractId,
+      s"Mismatching contractIds between enriched (${enrichedContract.contractId}) and original (${originalContract.contractId})",
     )
 
-    lazy val contractId: ContractId = originalFci.contractId
+    def contractId: ContractId = originalContract.contractId
 
     /** Return the created event blob for this contract. This does not contain any enrichment.
       */
     def toCreateEventBlob: Either[ValueCoder.EncodeError, ByteString] =
-      TransactionCoder.encodeFatContractInstance(originalFci)
-
-    /** Return the enriched contract instance. Use for encoding to the PreparedTransaction proto and
-      * verifying external hash signatures.
-      */
-    def enrichedContract: FatContractInstance = enrichedFci
-
-    /** Original event contract. Use within the Canton protocol.
-      */
-    def originalContract: FatContractInstance = originalFci
+      TransactionCoder.encodeFatContractInstance(originalContract)
   }
 }
 
@@ -120,6 +119,7 @@ final case class PrepareTransactionData(
     private[codec] val synchronizerId: SynchronizerId,
     private[codec] val mediatorGroup: Int,
     private[codec] val transactionUUID: UUID,
+    private[codec] val maxRecordTime: Option[Timestamp],
 ) extends EnrichedTransactionData
 
 /** Transaction data for an enriched external submission during the execute phase. This is usually
@@ -140,7 +140,6 @@ final case class ExecuteTransactionData(
 
   def impoverish: CommandInterpretationResult = {
     val normalizedTransaction = Enricher.impoverish(transaction)
-    // val normalizedInputContracts = inputContracts.view.mapValues(Enricher.impoverish).toMap
     CommandInterpretationResult(
       submitterInfo,
       transactionMeta,
@@ -156,7 +155,6 @@ final case class ExecuteTransactionData(
 
   def verifySignature(
       routingSynchronizerState: RoutingSynchronizerState,
-      protocolVersion: ProtocolVersion,
       logger: TracedLogger,
   )(implicit
       loggingContextWithTrace: LoggingContextWithTrace,
@@ -167,24 +165,35 @@ final case class ExecuteTransactionData(
         submitterInfo.externallySignedSubmission
           .toRight("Missing externally signed submission")
       )
+      physicalSynchronizerId <- EitherT.fromEither[FutureUnlessShutdown](
+        routingSynchronizerState
+          .getPhysicalId(synchronizerId)
+          .toRight(
+            s"Cannot find a physical synchronizer for $synchronizerId. Make sure the participant is connected to the synchronizer."
+          )
+      )
+      protocolVersion = physicalSynchronizerId.protocolVersion
       hash <- EitherT
         .fromEither[FutureUnlessShutdown](
           computeHash(
             externallySignedSubmission.version,
             protocolVersion,
           )
+            .leftMap(_.message)
         )
-        .leftMap(_.message)
       topologySnapshot <- EitherT
         .fromEither[FutureUnlessShutdown](
-          routingSynchronizerState.getTopologySnapshotFor(synchronizerId)
+          routingSynchronizerState
+            .getTopologySnapshotFor(physicalSynchronizerId)
+            .leftMap(_.cause)
         )
-        .leftMap(_.cause)
       cryptoPureApi <- EitherT.fromEither[FutureUnlessShutdown](
         routingSynchronizerState
-          .getSyncCryptoPureApi(synchronizerId)
+          .getSyncCryptoPureApi(physicalSynchronizerId)
           .leftMap(_.cause)
-          .flatMap(_.toRight(s"Cannot verify external signature on synchronizer $synchronizerId"))
+          .flatMap(
+            _.toRight(s"Cannot verify external signature on synchronizer $physicalSynchronizerId")
+          )
       )
 
       // Verify signatures

@@ -4,15 +4,21 @@
 package com.digitalasset.canton.crypto.signer
 
 import cats.data.EitherT
+import cats.syntax.either.*
+import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.SessionSigningKeysConfig
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.{CacheConfig, CryptoConfig, CryptoProvider, ProcessingTimeout}
 import com.digitalasset.canton.crypto.store.CryptoPrivateStore
 import com.digitalasset.canton.crypto.{
-  CryptoPrivateApi,
   Hash,
+  KeyPurpose,
+  PublicKey,
   Signature,
   SigningKeyUsage,
+  SigningPublicKey,
   SyncCryptoError,
+  SynchronizerCrypto,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -26,7 +32,9 @@ import scala.concurrent.ExecutionContext
 /** Aggregates all methods related to protocol signing. These methods require a topology snapshot to
   * ensure the correct signing keys are used, based on the current state (i.e., OwnerToKeyMappings).
   */
-trait SyncCryptoSigner extends NamedLogging {
+trait SyncCryptoSigner extends NamedLogging with AutoCloseable {
+
+  protected def cryptoPrivateStore: CryptoPrivateStore
 
   /** Signs a given hash using the currently active signing keys in the current topology state.
     */
@@ -38,20 +46,47 @@ trait SyncCryptoSigner extends NamedLogging {
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncCryptoError, Signature]
 
+  protected def findSigningKey(
+      member: Member,
+      topologySnapshot: TopologySnapshot,
+      usage: NonEmpty[Set[SigningKeyUsage]],
+  )(implicit
+      executionContext: ExecutionContext,
+      traceContext: TraceContext,
+  ): EitherT[FutureUnlessShutdown, SyncCryptoError, SigningPublicKey] =
+    for {
+      signingKeys <- EitherT.right(topologySnapshot.signingKeys(member, usage))
+      existingKeys <- signingKeys.toList
+        .parFilterA(pk => cryptoPrivateStore.existsSigningKey(pk.fingerprint))
+        .leftMap[SyncCryptoError](SyncCryptoError.StoreError.apply)
+      kk <- NonEmpty
+        .from(existingKeys)
+        .map(PublicKey.getLatestKey)
+        .toRight[SyncCryptoError](
+          SyncCryptoError
+            .KeyNotAvailable(
+              member,
+              KeyPurpose.Signing,
+              topologySnapshot.timestamp,
+              signingKeys.map(_.fingerprint),
+            )
+        )
+        .toEitherT[FutureUnlessShutdown]
+    } yield kk
+
 }
 
 object SyncCryptoSigner {
 
   def createWithLongTermKeys(
       member: Member,
-      privateCrypto: CryptoPrivateApi,
-      cryptoPrivateStore: CryptoPrivateStore,
+      crypto: SynchronizerCrypto,
       loggerFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext) =
     new SyncCryptoSignerWithLongTermKeys(
       member,
-      privateCrypto,
-      cryptoPrivateStore,
+      crypto.privateCrypto,
+      crypto.cryptoPrivateStore,
       loggerFactory,
     )
 
@@ -59,26 +94,37 @@ object SyncCryptoSigner {
       synchronizerId: SynchronizerId,
       staticSynchronizerParameters: StaticSynchronizerParameters,
       member: Member,
-      privateCrypto: CryptoPrivateApi,
-      cryptoPrivateStore: CryptoPrivateStore,
-      sessionSigningKeysConfig: SessionSigningKeysConfig,
+      crypto: SynchronizerCrypto,
+      cryptoConfig: CryptoConfig,
+      publicKeyConversionCacheConfig: CacheConfig,
+      futureSupervisor: FutureSupervisor,
+      timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext): SyncCryptoSigner =
-    if (sessionSigningKeysConfig.enabled) {
-      new SyncCryptoSignerWithSessionKeys(
-        synchronizerId,
-        staticSynchronizerParameters,
-        member,
-        privateCrypto,
-        sessionSigningKeysConfig,
-        loggerFactory,
-      )
-    } else
-      SyncCryptoSigner.createWithLongTermKeys(
-        member,
-        privateCrypto,
-        cryptoPrivateStore,
-        loggerFactory,
-      )
+    cryptoConfig.kms.map(_.sessionSigningKeys) match {
+      // session signing keys can only be used if we are directly storing all our private keys in an external KMS
+      case Some(sessionSigningKeysConfig)
+          if cryptoConfig.provider == CryptoProvider.Kms &&
+            cryptoConfig.privateKeyStore.encryption.isEmpty &&
+            sessionSigningKeysConfig.enabled =>
+        new SyncCryptoSignerWithSessionKeys(
+          synchronizerId,
+          staticSynchronizerParameters,
+          member,
+          crypto.privateCrypto,
+          crypto.cryptoPrivateStore,
+          sessionSigningKeysConfig,
+          publicKeyConversionCacheConfig,
+          futureSupervisor: FutureSupervisor,
+          timeouts,
+          loggerFactory,
+        )
+      case _ =>
+        SyncCryptoSigner.createWithLongTermKeys(
+          member,
+          crypto,
+          loggerFactory,
+        )
+    }
 
 }

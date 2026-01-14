@@ -52,9 +52,10 @@ object CommonErrors extends CommonErrorGroup {
         id = "REQUEST_ALREADY_IN_FLIGHT",
         ErrorCategory.ContentionOnSharedResources,
       ) {
-    final case class Reject(requestId: String)(implicit errorLogger: ErrorLoggingContext)
-        extends DamlErrorWithDefiniteAnswer(
-          cause = s"The request $requestId is already in flight"
+    final case class Reject(requestId: String, details: String)(implicit
+        errorLogger: ErrorLoggingContext
+    ) extends DamlErrorWithDefiniteAnswer(
+          cause = s"Request with ID $requestId is already in flight: $details"
         )
   }
 
@@ -111,20 +112,6 @@ object CommonErrors extends CommonErrorGroup {
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"$serviceName is not running.",
           extraContext = Map("service_name" -> serviceName),
-        )
-  }
-
-  @Explanation("This rejection is given when the participant server is shutting down.")
-  @Resolution("Contact the participant operator.")
-  object ServerIsShuttingDown
-      extends ErrorCode(
-        id = "SERVER_IS_SHUTTING_DOWN",
-        ErrorCategory.TransientServerFailure,
-      ) {
-    final case class Reject()(implicit
-        loggingContext: ErrorLoggingContext
-    ) extends DamlErrorWithDefiniteAnswer(
-          cause = "Server is shutting down"
         )
   }
 

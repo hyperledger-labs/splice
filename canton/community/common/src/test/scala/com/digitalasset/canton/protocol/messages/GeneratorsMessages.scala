@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.protocol.messages
 
-import com.daml.nonempty.NonEmptyUtil
 import com.digitalasset.canton.crypto.{
   AsymmetricEncrypted,
   Encrypted,
@@ -17,6 +16,7 @@ import com.digitalasset.canton.data.{
   CantonTimestampSecond,
   FullInformeeTree,
   GeneratorsData,
+  GeneratorsTrafficData,
   UnassignmentViewTree,
   ViewPosition,
   ViewType,
@@ -29,25 +29,28 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyChangeOp,
   TopologyMapping,
 }
-import com.digitalasset.canton.topology.{GeneratorsTopology, ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{GeneratorsTopology, ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{Generators, LfPartyId}
+import com.digitalasset.canton.{Generators, GeneratorsLf, LfPartyId}
 import magnolify.scalacheck.auto.*
 import org.scalacheck.{Arbitrary, Gen}
 
 final class GeneratorsMessages(
     protocolVersion: ProtocolVersion,
     generatorsData: GeneratorsData,
+    generatorsLf: GeneratorsLf,
     generatorsProtocol: GeneratorsProtocol,
     generatorsLocalVerdict: GeneratorsLocalVerdict,
     generatorsVerdict: GeneratorsVerdict,
+    generatorsTopology: GeneratorsTopology,
     generatorTransactions: GeneratorsTransaction,
+    generatorsTrafficData: GeneratorsTrafficData,
 ) {
   import com.digitalasset.canton.Generators.*
-  import com.digitalasset.canton.GeneratorsLf.*
+  import generatorsLf.*
   import com.digitalasset.canton.crypto.GeneratorsCrypto.*
   import com.digitalasset.canton.data.GeneratorsDataTime.*
-  import com.digitalasset.canton.topology.GeneratorsTopology.*
+  import generatorsTopology.*
   import generatorsData.*
   import generatorsLocalVerdict.*
   import generatorsProtocol.*
@@ -56,7 +59,7 @@ final class GeneratorsMessages(
 
   implicit val acsCommitmentArb: Arbitrary[AcsCommitment] = Arbitrary(
     for {
-      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
+      synchronizerId <- Arbitrary.arbitrary[PhysicalSynchronizerId]
       sender <- Arbitrary.arbitrary[ParticipantId]
       counterParticipant <- Arbitrary.arbitrary[ParticipantId]
 
@@ -77,20 +80,17 @@ final class GeneratorsMessages(
 
   implicit val confirmationResultMessageArb: Arbitrary[ConfirmationResultMessage] = Arbitrary(
     for {
-      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
+      psid <- Arbitrary.arbitrary[PhysicalSynchronizerId]
       viewType <- Arbitrary.arbitrary[ViewType]
       requestId <- Arbitrary.arbitrary[RequestId]
       rootHash <- Arbitrary.arbitrary[RootHash]
       verdict <- verdictArb.arbitrary
-
-      // TODO(#14515) Also generate instance that makes pv above cover all the values
     } yield ConfirmationResultMessage.create(
-      synchronizerId,
+      psid,
       viewType,
       requestId,
       rootHash,
       verdict,
-      protocolVersion,
     )
   )
 
@@ -101,7 +101,7 @@ final class GeneratorsMessages(
         if (localVerdict.isMalformed) Gen.const(Set.empty[LfPartyId])
         else nonEmptySet(implicitly[Arbitrary[LfPartyId]]).arbitrary.map(_.forgetNE)
       viewPositionO <- localVerdict match {
-        case _: LocalApprove | _: LocalReject =>
+        case _: LocalApprove | _: LocalReject | _: LocalAbstain =>
           Gen.some(Arbitrary.arbitrary[ViewPosition])
         case _ => Gen.option(Arbitrary.arbitrary[ViewPosition])
       }
@@ -116,10 +116,9 @@ final class GeneratorsMessages(
     for {
       requestId <- Arbitrary.arbitrary[RequestId]
       rootHash <- Arbitrary.arbitrary[RootHash]
-      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
+      synchronizerId <- Arbitrary.arbitrary[PhysicalSynchronizerId]
       sender <- Arbitrary.arbitrary[ParticipantId]
-      responses <- Gen.nonEmptyListOf(confirmationResponseArb.arbitrary)
-      responsesNE = NonEmptyUtil.fromUnsafe(responses)
+      responsesNE <- nonEmptyListGen[ConfirmationResponse]
       confirmationResponses = ConfirmationResponses.tryCreate(
         requestId,
         rootHash,
@@ -131,19 +130,24 @@ final class GeneratorsMessages(
     } yield confirmationResponses
   )
 
-  // TODO(#14515) Check that the generator is exhaustive
-  implicit val signedProtocolMessageContentArb: Arbitrary[SignedProtocolMessageContent] = Arbitrary(
-    Gen.oneOf[SignedProtocolMessageContent](
-      Arbitrary.arbitrary[AcsCommitment],
-      Arbitrary.arbitrary[ConfirmationResponses],
-      Arbitrary.arbitrary[ConfirmationResultMessage],
+  implicit val signedProtocolMessageContentArb: Arbitrary[SignedProtocolMessageContent] =
+    arbitraryForAllSubclasses(classOf[SignedProtocolMessageContent])(
+      GeneratorForClass(Arbitrary.arbitrary[AcsCommitment], classOf[AcsCommitment]),
+      GeneratorForClass(Arbitrary.arbitrary[ConfirmationResponses], classOf[ConfirmationResponses]),
+      GeneratorForClass(
+        generatorsTrafficData.setTrafficPurchasedArb.arbitrary,
+        classOf[SetTrafficPurchasedMessage],
+      ),
+      GeneratorForClass(
+        Arbitrary.arbitrary[ConfirmationResultMessage],
+        classOf[ConfirmationResultMessage],
+      ),
     )
-  )
 
   implicit val typedSignedProtocolMessageContent
       : Arbitrary[TypedSignedProtocolMessageContent[SignedProtocolMessageContent]] = Arbitrary(for {
     content <- Arbitrary.arbitrary[SignedProtocolMessageContent]
-  } yield TypedSignedProtocolMessageContent(content, protocolVersion))
+  } yield TypedSignedProtocolMessageContent(content))
 
   implicit val signedProtocolMessageArb
       : Arbitrary[SignedProtocolMessage[SignedProtocolMessageContent]] = Arbitrary(
@@ -152,9 +156,7 @@ final class GeneratorsMessages(
         .arbitrary[TypedSignedProtocolMessageContent[SignedProtocolMessageContent]]
 
       signatures <- nonEmptyListGen(implicitly[Arbitrary[Signature]])
-    } yield SignedProtocolMessage(typedMessage, signatures)(
-      SignedProtocolMessage.protocolVersionRepresentativeFor(protocolVersion)
-    )
+    } yield SignedProtocolMessage(typedMessage, signatures)
   )
 
   implicit val serializedRootHashMessagePayloadArb: Arbitrary[SerializedRootHashMessagePayload] =
@@ -184,7 +186,7 @@ final class GeneratorsMessages(
     for {
       encrypted <- byteStringArb.arbitrary
       encryptionAlgorithmSpec <- encryptionAlgorithmSpecArb.arbitrary
-      fingerprint <- GeneratorsTopology.fingerprintArb.arbitrary
+      fingerprint <- generatorsTopology.fingerprintArb.arbitrary
     } yield AsymmetricEncrypted(encrypted, encryptionAlgorithmSpec, fingerprint)
   )
 
@@ -196,7 +198,7 @@ final class GeneratorsMessages(
       sessionKey <- Generators.nonEmptyListGen[AsymmetricEncrypted[SecureRandomness]]
       viewType <- viewTypeArb.arbitrary
       encryptedView = EncryptedView(viewType)(Encrypted.fromByteString(encryptedViewBytestring))
-      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
+      synchronizerId <- Arbitrary.arbitrary[PhysicalSynchronizerId]
       viewEncryptionScheme <- genArbitrary[SymmetricKeyScheme].arbitrary
     } yield EncryptedViewMessage.apply(
       submittingParticipantSignature = signatureO,
@@ -209,7 +211,7 @@ final class GeneratorsMessages(
     )
   )
 
-  private val assignmentMediatorMessageArb: Arbitrary[AssignmentMediatorMessage] = Arbitrary(
+  val assignmentMediatorMessageArb: Arbitrary[AssignmentMediatorMessage] = Arbitrary(
     for {
       tree <- Arbitrary.arbitrary[AssignmentViewTree]
       submittingParticipantSignature <- Arbitrary.arbitrary[Signature]
@@ -218,7 +220,7 @@ final class GeneratorsMessages(
     )
   )
 
-  private val unassignmentMediatorMessageArb: Arbitrary[UnassignmentMediatorMessage] = Arbitrary(
+  val unassignmentMediatorMessageArb: Arbitrary[UnassignmentMediatorMessage] = Arbitrary(
     for {
       tree <- Arbitrary.arbitrary[UnassignmentViewTree]
       submittingParticipantSignature <- Arbitrary.arbitrary[Signature]
@@ -230,14 +232,13 @@ final class GeneratorsMessages(
     Arbitrary(
       for {
         rootHash <- Arbitrary.arbitrary[RootHash]
-        synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
+        psid <- Arbitrary.arbitrary[PhysicalSynchronizerId]
         viewType <- viewTypeArb.arbitrary
         submissionTopologyTime <- Arbitrary.arbitrary[CantonTimestamp]
         payload <- Arbitrary.arbitrary[RootHashMessagePayload]
       } yield RootHashMessage.apply(
         rootHash,
-        synchronizerId,
-        protocolVersion,
+        psid,
         viewType,
         submissionTopologyTime,
         payload,
@@ -246,32 +247,40 @@ final class GeneratorsMessages(
 
   implicit val topologyTransactionsBroadcast: Arbitrary[TopologyTransactionsBroadcast] = Arbitrary(
     for {
-      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
-      transactions <- Gen.listOf(
-        Arbitrary.arbitrary[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]]
-      )
-    } yield TopologyTransactionsBroadcast(synchronizerId, transactions, protocolVersion)
+      psid <- Arbitrary.arbitrary[PhysicalSynchronizerId]
+      transactions <- boundedListGen[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]]
+    } yield TopologyTransactionsBroadcast(psid, transactions)
   )
 
-  // TODO(#14515) Check that the generator is exhaustive
   implicit val unsignedProtocolMessageArb: Arbitrary[UnsignedProtocolMessage] =
-    Arbitrary(
-      Gen.oneOf[UnsignedProtocolMessage](
+    arbitraryForAllSubclasses(classOf[UnsignedProtocolMessage])(
+      GeneratorForClass(
         rootHashMessageArb.arbitrary,
-        informeeMessageArb.arbitrary,
-        encryptedViewMessage.arbitrary,
-        assignmentMediatorMessageArb.arbitrary,
+        classOf[RootHashMessage[RootHashMessagePayload]],
+      ),
+      GeneratorForClass(informeeMessageArb.arbitrary, classOf[InformeeMessage]),
+      GeneratorForClass(encryptedViewMessage.arbitrary, classOf[EncryptedViewMessage[ViewType]]),
+      GeneratorForClass(assignmentMediatorMessageArb.arbitrary, classOf[AssignmentMediatorMessage]),
+      GeneratorForClass(
         unassignmentMediatorMessageArb.arbitrary,
+        classOf[UnassignmentMediatorMessage],
+      ),
+      GeneratorForClass(
         topologyTransactionsBroadcast.arbitrary,
-      )
+        classOf[TopologyTransactionsBroadcast],
+      ),
     )
 
-  // TODO(#14515) Check that the generator is exhaustive
   implicit val protocolMessageArb: Arbitrary[ProtocolMessage] =
-    Arbitrary(unsignedProtocolMessageArb.arbitrary)
+    arbitraryForAllSubclasses(classOf[ProtocolMessage])(
+      GeneratorForClass(unsignedProtocolMessageArb.arbitrary, classOf[UnsignedProtocolMessage]),
+      GeneratorForClass(
+        signedProtocolMessageArb.arbitrary,
+        classOf[SignedProtocolMessage[SignedProtocolMessageContent]],
+      ),
+    )
 
-  // TODO(#14515) Check that the generator is exhaustive
   implicit val envelopeContentArb: Arbitrary[EnvelopeContent] = Arbitrary(for {
-    protocolMessage <- protocolMessageArb.arbitrary
-  } yield EnvelopeContent.tryCreate(protocolMessage, protocolVersion))
+    unsignedProtocolMessage <- unsignedProtocolMessageArb.arbitrary
+  } yield EnvelopeContent(unsignedProtocolMessage, protocolVersion))
 }

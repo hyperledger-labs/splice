@@ -17,6 +17,7 @@ scanAddress: "TRUSTED_SCAN_URL"
 # the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``
 # not only the suffix ``43b68e1e4978b000cefba352``:
 # You can specify multiple user ids if you want multiple users to be able to log into your wallet.
+# Note that removing a user from this list does *not* revoke any access that the user might already have; you might want to manually `/admin/users/offboard` the user via the validator app API.
 validatorWalletUsers:
   - "OPERATOR_WALLET_USER_ID"
 auth:

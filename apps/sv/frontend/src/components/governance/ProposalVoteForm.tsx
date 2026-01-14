@@ -8,17 +8,9 @@ import { useMutation, UseMutationResult } from '@tanstack/react-query';
 import { isValidUrl } from '../../utils/validations';
 import { ContractId } from '@daml/types';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
-import { ProposalVote, VoteStatus } from '../../utils/types';
-import {
-  Alert,
-  Box,
-  Button,
-  FormControlLabel,
-  Radio,
-  RadioGroup,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { ProposalVote } from '../../utils/types';
+import { Alert, Box, Button, Stack, TextField, Typography } from '@mui/material';
+import { useEffect } from 'react';
 interface CastVoteArgs {
   accepted: boolean;
   url: string;
@@ -29,13 +21,13 @@ interface ProposalVoteFormProps {
   voteRequestContractId: ContractId<VoteRequest>;
   currentSvPartyId: string;
   votes: ProposalVote[];
+  onSubmissionComplete?: () => void;
 }
 
 export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
-  const { voteRequestContractId, currentSvPartyId, votes } = props;
+  const { voteRequestContractId, currentSvPartyId, votes, onSubmissionComplete } = props;
   const { castVote } = useSvAdminClient();
   const yourVote = votes.find(vote => vote.sv === currentSvPartyId);
-  const previouslyVoted = yourVote?.vote !== 'no-vote';
 
   const castVoteMutation: UseMutationResult<void, string, CastVoteArgs> = useMutation({
     mutationKey: ['castVote', voteRequestContractId],
@@ -43,6 +35,12 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
       return castVote(voteRequestContractId, accepted, url, reason);
     },
   });
+
+  useEffect(() => {
+    if (castVoteMutation.isSuccess || castVoteMutation.isError) {
+      onSubmissionComplete?.();
+    }
+  }, [castVoteMutation.isSuccess, castVoteMutation.isError, onSubmissionComplete]);
 
   const form = useForm({
     defaultValues: {
@@ -52,11 +50,15 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
     },
 
     onSubmit: async ({ value }) => {
-      castVoteMutation.mutate({
-        accepted: value.vote === 'accepted',
-        url: value.url,
-        reason: value.reason,
-      });
+      await castVoteMutation
+        .mutateAsync({
+          accepted: value.vote === 'accepted',
+          url: value.url,
+          reason: value.reason,
+        })
+        .catch(e => {
+          console.error(`Failed to submit vote`, e);
+        });
     },
   });
 
@@ -82,19 +84,65 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
   }
 
   return (
-    <Box data-testid="your-vote-form">
-      <Typography variant="h6" component="h2" mb={2} gutterBottom>
-        Your Vote
-      </Typography>
-
+    <Box
+      data-testid="your-vote-form"
+      sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}
+    >
       <form
         onSubmit={e => {
           e.preventDefault();
           e.stopPropagation();
           form.handleSubmit();
         }}
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}
       >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 3 }}>
+          <form.Field
+            name="reason"
+            validators={{
+              onChange: ({ value }) => {
+                const result = z.string().safeParse(value);
+                return result.success ? undefined : result.error.issues[0].message;
+              },
+            }}
+            children={field => {
+              return (
+                <Stack gap={3}>
+                  <Typography
+                    variant="subtitle2"
+                    color="white"
+                    fontWeight="bold"
+                    fontSize={18}
+                    lineHeight={1}
+                  >
+                    Reason
+                  </Typography>
+                  <TextField
+                    variant="filled"
+                    multiline
+                    rows={5}
+                    name={field.name}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={e => field.handleChange(e.target.value)}
+                    error={!field.state.meta.isValid}
+                    helperText={field.state.meta.errors?.[0]}
+                    inputProps={{ 'data-testid': 'your-vote-reason-input' }}
+                    sx={{
+                      '& .MuiFilledInput-root': {
+                        borderRadius: 1,
+                        paddingTop: 1,
+                        fontFamily: 'Lato',
+                        '&:before, &:after': {
+                          display: 'none',
+                        },
+                      },
+                    }}
+                  />
+                </Stack>
+              );
+            }}
+          />
           <form.Field
             name="url"
             validators={{
@@ -112,112 +160,95 @@ export const ProposalVoteForm: React.FC<ProposalVoteFormProps> = props => {
             }}
             children={field => {
               return (
-                <TextField
-                  label="URL"
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={e => field.handleChange(e.target.value)}
-                  error={!field.state.meta.isValid}
-                  helperText={
-                    <span data-testid="your-vote-url-helper-text">
-                      {field.state.meta.errors?.[0]}
-                    </span>
-                  }
-                  inputProps={{ 'data-testid': 'your-vote-url-input' }}
-                />
-              );
-            }}
-          />
-          <form.Field
-            name="reason"
-            validators={{
-              onChange: ({ value }) => {
-                const result = z.string().safeParse(value);
-                return result.success ? undefined : result.error.issues[0].message;
-              },
-            }}
-            children={field => {
-              return (
-                <TextField
-                  label="Reason"
-                  multiline
-                  rows={4}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={e => field.handleChange(e.target.value)}
-                  error={!field.state.meta.isValid}
-                  helperText={field.state.meta.errors?.[0]}
-                  inputProps={{ 'data-testid': 'your-vote-reason-input' }}
-                />
+                <Stack gap={3}>
+                  <Typography
+                    variant="subtitle2"
+                    color="white"
+                    fontWeight="bold"
+                    fontSize={18}
+                    lineHeight={1}
+                  >
+                    Vote Reason URL
+                  </Typography>
+                  <TextField
+                    variant="filled"
+                    name={field.name}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={e => field.handleChange(e.target.value)}
+                    error={!field.state.meta.isValid}
+                    helperText={
+                      <span data-testid="your-vote-url-helper-text">
+                        {field.state.meta.errors?.[0]}
+                      </span>
+                    }
+                    inputProps={{ 'data-testid': 'your-vote-url-input' }}
+                    sx={{
+                      '& .MuiFilledInput-root': {
+                        borderRadius: 1,
+                        fontFamily: 'Lato',
+                        '&:before, &:after': {
+                          display: 'none',
+                        },
+                      },
+                      '& .MuiFilledInput-input': {
+                        paddingTop: 1.5,
+                        paddingBottom: 1.5,
+                      },
+                    }}
+                  />
+                </Stack>
               );
             }}
           />
         </Box>
 
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4,
-            justifyContent: 'center',
-            alignItems: 'center',
-            mt: 4,
-          }}
-        >
-          <form.Field
-            name="vote"
-            validators={{
-              // Not using onChange here because by default, no vote is selected
-              onMount: ({ value }) => {
-                const result = z.enum(['accepted', 'rejected']).safeParse(value);
-                return result.success ? undefined : result.error.issues[0].message;
-              },
-            }}
-          >
-            {field => (
-              <RadioGroup
-                row
-                aria-labelledby="demo-row-radio-buttons-group-label"
-                name="row-radio-buttons-group"
-                value={field.state.value}
-                onChange={e => field.handleChange(e.target.value as VoteStatus)}
-                onBlur={field.handleBlur}
-                sx={{ gap: 4 }}
-              >
-                <FormControlLabel
-                  value="accepted"
-                  data-testid="your-vote-accept"
-                  control={<Radio color="success" />}
-                  label="Accept"
-                />
-                <FormControlLabel
-                  value="rejected"
-                  data-testid="your-vote-reject"
-                  control={<Radio color="error" />}
-                  label="Reject"
-                  color="error"
-                />
-              </RadioGroup>
-            )}
-          </form.Field>
-
-          <form.Subscribe
-            selector={state => [state.canSubmit, state.isSubmitting]}
-            children={([canSubmit, isSubmitting]) => (
-              <Button
-                type="submit"
-                disabled={!canSubmit || isSubmitting}
-                variant="contained"
-                sx={{ minWidth: 100 }}
-                data-testid="submit-vote-button"
-              >
-                {isSubmitting ? 'Submitting...' : previouslyVoted ? 'Update' : 'Submit'}
-              </Button>
-            )}
-          />
-        </Box>
+        <form.Subscribe
+          selector={state => [state.isSubmitting, state.isValid]}
+          children={([isSubmitting, isValid]) => (
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'row',
+                gap: 3,
+                justifyContent: 'center',
+                alignItems: 'center',
+                mt: 3,
+              }}
+            >
+              {isSubmitting ? (
+                <Typography color="text.secondary">Submitting...</Typography>
+              ) : (
+                <>
+                  <Button
+                    variant="pill"
+                    disabled={!isValid}
+                    onClick={() => {
+                      form.setFieldValue('vote', 'accepted');
+                      form.handleSubmit();
+                    }}
+                    data-testid="your-vote-accept"
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    variant="pill"
+                    color="secondary"
+                    disabled={!isValid}
+                    onClick={() => {
+                      form.setFieldValue('vote', 'rejected');
+                      form.handleSubmit();
+                    }}
+                    sx={{ backgroundColor: 'transparent' }}
+                    data-testid="your-vote-reject"
+                  >
+                    Reject
+                  </Button>
+                </>
+              )}
+            </Box>
+          )}
+        />
       </form>
     </Box>
   );

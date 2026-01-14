@@ -29,7 +29,7 @@ private[multihostedparties] trait UseSilentSynchronizerInTest
     extends CommunityIntegrationTest
     with SharedEnvironment {
 
-  private val loweredTimeout = config.NonNegativeFiniteDuration.ofSeconds(3)
+  private val loweredTimeout = config.NonNegativeFiniteDuration.ofSeconds(4)
   private val bufferTime = config.NonNegativeFiniteDuration.ofMillis(100)
   private val mediatorReactionTimeout = loweredTimeout
   private val confirmationResponseTimeout = loweredTimeout
@@ -73,7 +73,7 @@ private[multihostedparties] trait UseSilentSynchronizerInTest
   ): Instant = {
     sequencers.foreach(
       _.topology.synchronizer_parameters.propose_update(
-        synchronizer.id,
+        synchronizer.logicalSynchronizerId,
         _.update(confirmationRequestsMaxRate = NonNegativeInt.zero),
       )
     )
@@ -114,7 +114,7 @@ private[multihostedparties] trait UseSilentSynchronizerInTest
   ): Unit = {
     sequencers.foreach(
       _.topology.synchronizer_parameters.propose_update(
-        synchronizer.id,
+        synchronizer.logicalSynchronizerId,
         _.update(confirmationRequestsMaxRate =
           DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate
         ),

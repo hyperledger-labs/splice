@@ -1,7 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration
 
-import better.files.{File, Resource}
+import better.files.{File, Resource, *}
 import com.digitalasset.canton.admin.api.client.data.User
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
 import com.digitalasset.canton.config.{
   ClockConfig,
@@ -16,7 +17,7 @@ import com.digitalasset.canton.integration.{
   TestEnvironment,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, SuppressingLogger}
-import com.digitalasset.canton.topology.{ForceFlag, ForceFlags}
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.typesafe.config.ConfigFactory
@@ -78,6 +79,14 @@ case class EnvironmentDefinition(
       // that blocks on all apps being initialized.
       .copy(setup = _ => ())
   }
+
+  def withStandardSetup: EnvironmentDefinition =
+    this
+      .withAllocatedUsers()
+      .withInitializedNodes()
+      .withTrafficTopupsEnabled
+      .withInitialPackageVersions
+      .withEagerAppActivityMarkerConversion
 
   def withAllocatedUsers(
       extraIgnoredSvPrefixes: Seq[String] = Seq.empty,
@@ -168,15 +177,27 @@ case class EnvironmentDefinition(
       preSetup = implicit env => {
         this.preSetup(env)
         participants(env).foreach { p =>
-          logger.info(s"Removing all vetted packages for ${p.name}")(TraceContext.empty)
-          p.topology.vetted_packages.propose(
-            p.id,
-            Seq.empty,
-            force = ForceFlags(
-              ForceFlag.AllowUnvetPackage,
-              ForceFlag.AllowUnvetPackageWithActiveContracts,
-            ),
-          )
+          p.synchronizers.list_connected().foreach { connected =>
+            val currentVettedPackages = p.topology.vetted_packages.list(
+              store = Some(TopologyStoreId.Synchronizer(connected.synchronizerId)),
+              filterParticipant = p.id.filterString,
+            )
+            currentVettedPackages match {
+              case Seq(mapping) if mapping.item.packages.length > 1 =>
+                logger.info(
+                  s"Removing all vetted packages for ${p.name} on ${connected.synchronizerId}"
+                )(TraceContext.empty)
+                p.topology.vetted_packages.propose(
+                  p.id,
+                  Seq.empty,
+                  store = TopologyStoreId.Synchronizer(connected.synchronizerId),
+                )
+              case _ =>
+                logger.info(s"No vetted packages for ${p.name} on ${connected.synchronizerId}")(
+                  TraceContext.empty
+                )
+            }
+          }
         }
         participants(env).foreach { p =>
           logger.info(s"Ensuring vetting topology is effective for ${p.name}")(TraceContext.empty)
@@ -274,10 +295,19 @@ case class EnvironmentDefinition(
   def withBftSequencers: EnvironmentDefinition =
     addConfigTransformToFront((_, config) => ConfigTransforms.withBftSequencers()(config))
 
+  def withEagerAppActivityMarkerConversion: EnvironmentDefinition =
+    addConfigTransforms((_, conf) =>
+      ConfigTransforms.updateAllSvAppConfigs_(config =>
+        config.copy(
+          delegatelessAutomationFeaturedAppActivityMarkerMaxAge = NonNegativeFiniteDuration.Zero
+        )
+      )(conf)
+    )
+
   def withAmuletPrice(price: BigDecimal): EnvironmentDefinition =
     addConfigTransforms((_, conf) => ConfigTransforms.setAmuletPrice(price)(conf))
 
-  /** For an SV’s sequencer to be safely usable, we need to wait for participantResponseTimeout + mediatorResponseTimeout.
+  /** For an SV’s sequencer to be safely usable, we need to wait for confirmationResponseTimeout + mediatorResponseTimeout.
     * However, in some tests, we do care that an SV can connect to their own sequencer reasonably quickly.
     * To make that work, we lower the delay to a number that is not fully safe but empirically
     * long enough that all in-flight transactions succeed or fail before.
@@ -358,6 +388,22 @@ case class EnvironmentDefinition(
       )(config)
     )
 
+  def withoutAliceValidatorConnectingToSplitwell: EnvironmentDefinition = {
+    this
+      .addConfigTransform((_, conf) =>
+        conf.copy(validatorApps =
+          conf.validatorApps.updatedWith(InstanceName.tryCreate("aliceValidator")) {
+            _.map { aliceValidatorConfig =>
+              val withoutExtraDomains = aliceValidatorConfig.domains.copy(extra = Seq.empty)
+              aliceValidatorConfig.copy(
+                domains = withoutExtraDomains
+              )
+            }
+          }
+        )
+      )
+  }
+
   def clearConfigTransforms(): EnvironmentDefinition =
     copy(configTransformsWithContext = _ => Seq())
 
@@ -400,15 +446,7 @@ case class EnvironmentDefinition(
           )
         )
     )
-      .addConfigTransformsToFront(
-        (_, conf) => ConfigTransforms.bumpCantonPortsBy(10_000)(conf),
-        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(10_000)(conf),
-      )
-      // we bump remote app ports separately in order to not confuse
-      // the PreflightIntegrationTest which also uses bumpCantonPortsBy
-      .addConfigTransformsToFront((_, conf) =>
-        ConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
-      )
+      .addConfigTransformsToFront((_, conf) => ConfigTransforms.bumpCantonPortsBy(10_000)(conf))
       .withTrafficTopupsDisabled
       .addConfigTransform((_, conf) =>
         ConfigTransforms
@@ -438,7 +476,7 @@ case class EnvironmentDefinition(
       environment,
       new TestConsoleOutput(loggerFactory),
     ) with TestEnvironment[SpliceConfig] {
-      override val actorSystem = super[TestEnvironment].actorSystem
+      override lazy val actorSystem = super[TestEnvironment].actorSystem
       override val actualConfig: SpliceConfig = this.environment.config
 
     }
@@ -448,19 +486,29 @@ object EnvironmentDefinition extends CommonAppInstanceReferences {
 
   // Prefer this to `4Svs` for better test performance (unless your really need >1 SV of course).
   def simpleTopology1Sv(testName: String): EnvironmentDefinition = {
-    fromResources(Seq("simple-topology-1sv.conf"), testName)
-      .withAllocatedUsers()
-      .withInitializedNodes()
-      .withTrafficTopupsEnabled
-      .withInitialPackageVersions
+    fromResources(Seq("simple-topology-1sv.conf"), testName).withStandardSetup
   }
 
   def simpleTopology4Svs(testName: String): EnvironmentDefinition = {
-    fromResources(Seq("simple-topology.conf"), testName)
-      .withAllocatedUsers()
-      .withInitializedNodes()
-      .withTrafficTopupsEnabled
-      .withInitialPackageVersions
+    fromResources(Seq("simple-topology.conf"), testName).withStandardSetup
+  }
+
+  def simpleTopology1SvWithLocalValidator(testName: String): EnvironmentDefinition = {
+    val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
+    fromFiles(
+      testName,
+      testResourcesPath / "simple-topology-1sv.conf",
+      testResourcesPath / "local-validator-node" / "validator-app" / "app.conf",
+    ).withStandardSetup.withManualStart
+  }
+
+  def simpleTopology4SvsWithLocalValidator(testName: String): EnvironmentDefinition = {
+    val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
+    fromFiles(
+      testName,
+      testResourcesPath / "simple-topology.conf",
+      testResourcesPath / "local-validator-node" / "validator-app" / "app.conf",
+    ).withStandardSetup.withManualStart
   }
 
   def simpleTopology1SvWithSimTime(testName: String): EnvironmentDefinition =

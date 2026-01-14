@@ -73,7 +73,7 @@ object InteractiveSubmission {
     )
 
     def saltFromSerializedContract(serializedNode: SerializableContract): Bytes =
-      Bytes.fromByteString(serializedNode.contractSalt.toProtoV30.salt)
+      serializedNode.authenticationData.toLfBytes
 
     def apply(
         actAs: Set[Ref.Party],
@@ -90,7 +90,7 @@ object InteractiveSubmission {
         .map { case (contractId, serializedNode) =>
           contractId -> FatContractInstance.fromCreateNode(
             serializedNode.toLf,
-            serializedNode.ledgerCreateTime.toLf,
+            serializedNode.ledgerCreateTime,
             saltFromSerializedContract(serializedNode),
           )
         }
@@ -255,20 +255,21 @@ object InteractiveSubmission {
     signatures.toList
       .parTraverse_ { case (party, signatures) =>
         for {
-          authInfo <- EitherT(
+          signingKeysWithThreshold <- EitherT(
             topologySnapshot
-              .partyAuthorization(party)
+              .signingKeysWithThreshold(party)
               .map(
                 _.toRight(s"Could not find party signing keys for $party.")
               )
           )
 
           (invalidSignatures, validSignatures) = signatures.map { signature =>
-            authInfo.signingKeys
-              .find(_.fingerprint == signature.signedBy)
-              .toRight(s"Signing key ${signature.signedBy} is not a valid key for $party")
+            signingKeysWithThreshold.keys
+              .find(_.fingerprint == signature.authorizingLongTermKey)
+              .toRight(
+                s"Signing key ${signature.authorizingLongTermKey} is not a valid key for $party"
+              )
               .flatMap(key =>
-                // TODO(#23551) Add new usage for interactive submission
                 cryptoPureApi
                   .verifySignature(hash.unwrap, key, signature, SigningKeyUsage.ProtocolOnly)
                   .map(_ => key.fingerprint)
@@ -285,13 +286,14 @@ object InteractiveSubmission {
             }
           }
           _ <- EitherT.cond[FutureUnlessShutdown](
-            validSignaturesSet.sizeIs >= authInfo.threshold.unwrap,
+            validSignaturesSet.sizeIs >= signingKeysWithThreshold.threshold.unwrap,
             (),
-            s"Received ${validSignatures.size} valid signatures (${invalidSignatures.size} invalid), but expected at least ${authInfo.threshold} valid for $party",
+            s"Received ${validSignaturesSet.size} valid signatures from distinct keys (${invalidSignatures.size} invalid), but expected at least ${signingKeysWithThreshold.threshold} valid for $party. " +
+              s"Transaction hash to be signed: ${hash.toHexString}. Ensure the correct transaction hash is signed with the correct key(s).",
           )
         } yield {
           logger.debug(
-            s"Found ${validSignaturesSet.size} valid external signatures for $party with threshold ${authInfo.threshold.unwrap}"
+            s"Found ${validSignaturesSet.size} valid external signatures for $party with threshold ${signingKeysWithThreshold.threshold.unwrap}"
           )
         }
       }

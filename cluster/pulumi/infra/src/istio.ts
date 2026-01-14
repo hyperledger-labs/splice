@@ -3,11 +3,14 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { dsoSize } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/dsoConfig';
+import {
+  allSvsToDeploy,
+  coreSvsToDeploy,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/svConfigs';
 import { cometBFTExternalPort } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
-import { DeploySvRunbook } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from '@lfdecentralizedtrust/splice-pulumi-common/src/metrics';
+import { mergeWith } from 'lodash';
 
 import {
   CLUSTER_HOSTNAME,
@@ -25,13 +28,16 @@ import {
 import { clusterBasename, infraConfig, loadIPRanges } from './config';
 
 export const istioVersion = {
-  istio: '1.26.1',
+  istio: '1.28.1',
   //   updated from https://grafana.com/orgs/istio/dashboards, must be updated on each istio version
   dashboards: {
-    general: 259,
-    wasm: 216,
+    general: 280,
+    wasm: 237,
   },
 };
+
+// dsoSize + number of extra SVs added via config.yaml
+const numCoreSvsToDeploy = coreSvsToDeploy.length;
 
 function configureIstioBase(
   ns: k8s.core.v1.Namespace,
@@ -64,6 +70,60 @@ function configureIstiod(
   ingressNs: k8s.core.v1.Namespace,
   base: k8s.helm.v3.Release
 ): k8s.helm.v3.Release {
+  // https://artifacthub.io/packages/helm/istio-official/istiod
+  const defaultValues = {
+    autoscaleMin: 2,
+    autoscaleMax: 30,
+    ...infraAffinityAndTolerations,
+    global: {
+      istioNamespace: ingressNs.metadata.name,
+      logAsJson: true,
+      proxy: {
+        // disable traffic proxying for the postgres port and CometBFT RPC port
+        excludeInboundPorts: '5432,26657',
+        excludeOutboundPorts: '5432,26657',
+        resources: {
+          limits: {
+            memory: '4096Mi',
+          },
+        },
+      },
+    },
+    // https://istio.io/latest/docs/reference/config/istio.mesh.v1alpha1/
+    meshConfig: {
+      // taken from https://github.com/istio/istio/issues/37682
+      accessLogFile: infraConfig.istio.enableClusterAccessLogging ? '/dev/stdout' : '',
+      accessLogEncoding: 'JSON',
+      // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging  disable as we don't use annotations
+      enablePrometheusMerge: false,
+      defaultConfig: {
+        // It is expected that a single load balancer (GCP NLB) is used in front of K8s.
+        // https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#http-https
+        // Also see:
+        // https://istio.io/latest/docs/ops/configuration/traffic-management/network-topologies/#configuring-x-forwarded-for-headers
+        // This controls the value populated by the ingress gateway in the X-Envoy-External-Address header which can be reliably used
+        // by the upstream services to access client’s original IP address.
+        gatewayTopology: {
+          numTrustedProxies: 1,
+        },
+        // wait for the istio container to start before starting apps to avoid network errors
+        holdApplicationUntilProxyStarts: true,
+      },
+      // We have clients retry so we disable istio’s automatic retries.
+      defaultHttpRetryPolicy: {
+        attempts: 0,
+      },
+    },
+    telemetry: {
+      enabled: true,
+      v2: {
+        enabled: true,
+        prometheus: {
+          enabled: true,
+        },
+      },
+    },
+  };
   const istiodRelease = new k8s.helm.v3.Release(
     'istiod',
     {
@@ -74,62 +134,12 @@ function configureIstiod(
       repositoryOpts: {
         repo: 'https://istio-release.storage.googleapis.com/charts',
       },
-      // https://artifacthub.io/packages/helm/istio-official/istiod
-      values: {
-        autoscaleMin: 2,
-        autoscaleMax: 20,
-        ...infraAffinityAndTolerations,
-        global: {
-          istioNamespace: ingressNs.metadata.name,
-          logAsJson: true,
-          proxy: {
-            // disable traffic proxying for the postgres port and CometBFT RPC port
-            excludeInboundPorts: '5432,26657',
-            excludeOutboundPorts: '5432,26657',
-            resources: {
-              limits: {
-                memory: '4096Mi',
-              },
-            },
-          },
-        },
-        // https://istio.io/latest/docs/reference/config/istio.mesh.v1alpha1/
-        meshConfig: {
-          // Uncomment to turn on access logging across the entire cluster (we disabled it by default to reduce cost):
-          // accessLogFile: '/dev/stdout',
-          // taken from https://github.com/istio/istio/issues/37682
-          accessLogFile: '',
-          accessLogEncoding: 'JSON',
-          // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging  disable as we don't use annotations
-          enablePrometheusMerge: false,
-          defaultConfig: {
-            // It is expected that a single load balancer (GCP NLB) is used in front of K8s.
-            // https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#http-https
-            // Also see:
-            // https://istio.io/latest/docs/ops/configuration/traffic-management/network-topologies/#configuring-x-forwarded-for-headers
-            // This controls the value populated by the ingress gateway in the X-Envoy-External-Address header which can be reliably used
-            // by the upstream services to access client’s original IP address.
-            gatewayTopology: {
-              numTrustedProxies: 1,
-            },
-            // wait for the istio container to start before starting apps to avoid network errors
-            holdApplicationUntilProxyStarts: true,
-          },
-          // We have clients retry so we disable istio’s automatic retries.
-          defaultHttpRetryPolicy: {
-            attempts: 0,
-          },
-        },
-        telemetry: {
-          enabled: true,
-          v2: {
-            enabled: true,
-            prometheus: {
-              enabled: true,
-            },
-          },
-        },
-      },
+      values: mergeWith(
+        defaultValues,
+        infraConfig.istio.istiodValues,
+        (_default: unknown, override: unknown) =>
+          Array.isArray(_default) || Array.isArray(override) ? override : undefined
+      ),
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
@@ -212,7 +222,7 @@ function configureCometBFTGatewayService(
   const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
   // For DevNet-like clusters, we always assume at least 4 SVs to reduce churn on the gateway definition,
   // and support easily deploying without refreshing the infra stack.
-  const numSVs = dsoSize < 4 && isDevNet ? 4 : dsoSize;
+  const numSVs = numCoreSvsToDeploy < 4 && isDevNet ? 4 : numCoreSvsToDeploy;
 
   const cometBftIngressPorts = Array.from({ length: numMigrations }, (_, i) => i).flatMap(
     migration => {
@@ -326,11 +336,11 @@ function configureGatewayService(
         resources: {
           requests: {
             cpu: '500m',
-            memory: '512Mi',
+            memory: '1024Mi',
           },
           limits: {
             cpu: '4',
-            memory: '2024Mi',
+            memory: '4096Mi',
           },
         },
         autoscaling: {
@@ -354,10 +364,16 @@ function configureGatewayService(
           ].concat(ingressPorts),
         },
         ...infraAffinityAndTolerations,
+        // The httpLoadBalancing addon needs to be enabled to use backend service-based network load balancers.
+        annotations: {
+          'cloud.google.com/l4-rbs': 'enabled',
+        },
       },
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
+      replaceOnChanges: ['values.annotations'],
+      deleteBeforeReplace: true,
       dependsOn: istioPolicies
         ? istioPolicies.apply(policies => {
             const base: pulumi.Resource[] = [ingressNs, istiod];
@@ -456,7 +472,7 @@ function configureGateway(
   const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
   // For DevNet-like clusters, we always assume at least 4 SVs (not including sv-runbook) to reduce churn on the gateway definition,
   // and support easily deploying without refreshing the infra stack.
-  const numSVs = dsoSize < 4 && isDevNet ? 4 : dsoSize;
+  const numSVs = numCoreSvsToDeploy < 4 && isDevNet ? 4 : numCoreSvsToDeploy;
 
   const server = (migration: number, node: number) => ({
     // We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
@@ -600,13 +616,10 @@ function configurePublicInfo(ingressNs: k8s.core.v1.Namespace): k8s.apiextension
                       hosts: [
                         // We could also have done `info.sv*.whatever` here but enumerating what we expect seems slightly more secure
                         ...new Set(
-                          [
-                            ...Array.from({ length: dsoSize }, (_, index) => `sv-${index + 1}`),
-                            ...(DeploySvRunbook ? ['sv'] : []),
-                          ]
+                          allSvsToDeploy
                             .map(sv => [
-                              `info.${sv}.${getDnsNames().cantonDnsName}`,
-                              `info.${sv}.${getDnsNames().daDnsName}`,
+                              `info.${sv.ingressName}.${getDnsNames().cantonDnsName}`,
+                              `info.${sv.ingressName}.${getDnsNames().daDnsName}`,
                             ])
                             .flat()
                         ),
@@ -620,6 +633,60 @@ function configurePublicInfo(ingressNs: k8s.core.v1.Namespace): k8s.apiextension
         }),
       ]
     : [];
+}
+
+function configureSequencerHighPerformanceGrpcDestinationRules(
+  ingressNs: k8s.core.v1.Namespace
+): Array<k8s.apiextensions.CustomResource> {
+  return [
+    ...(function* () {
+      for (const migration of DecentralizedSynchronizerUpgradeConfig.runningMigrations()) {
+        for (const sv of allSvsToDeploy) {
+          yield configureSequencerHighPerformanceGrpcDestinationRule(
+            ingressNs,
+            sv.nodeName,
+            migration.id
+          );
+        }
+      }
+    })(),
+  ];
+}
+
+function configureSequencerHighPerformanceGrpcDestinationRule(
+  ingressNs: k8s.core.v1.Namespace,
+  nodeName: string,
+  migrationId: number
+): k8s.apiextensions.CustomResource {
+  const sequencerName = `global-domain-${migrationId}-sequencer`;
+  const ruleName = `${nodeName}-${sequencerName}-high-perf-grpc-rule`;
+  return new k8s.apiextensions.CustomResource(ruleName, {
+    apiVersion: 'networking.istio.io/v1beta1',
+    kind: 'DestinationRule',
+    metadata: {
+      name: ruleName,
+      namespace: ingressNs.metadata.name,
+    },
+    spec: {
+      host: `${sequencerName}.${nodeName}.svc.cluster.local`,
+      trafficPolicy: {
+        loadBalancer: {
+          simple: 'LEAST_REQUEST',
+        },
+        connectionPool: {
+          http: {
+            http1MaxPendingRequests: 10000,
+            http2MaxRequests: 10000,
+            maxConcurrentStreams: 10000,
+            maxRequestsPerConnection: 0,
+          },
+          tcp: {
+            maxConnections: 10000,
+          },
+        },
+      },
+    },
+  });
 }
 
 export function configureIstio(
@@ -640,7 +707,10 @@ export function configureIstio(
   const gateways = configureGateway(ingressNs, gwSvc, cometBftSvc);
   const docsAndReleases = configureDocsAndReleases(true, gateways);
   const publicInfo = configurePublicInfo(ingressNs.ns);
-  return [...gateways, ...docsAndReleases, ...publicInfo];
+  const sequencerHighPerformanceGrpcRules = configureSequencerHighPerformanceGrpcDestinationRules(
+    ingressNs.ns
+  );
+  return [...gateways, ...docsAndReleases, ...publicInfo, ...sequencerHighPerformanceGrpcRules];
 }
 
 export function istioMonitoring(

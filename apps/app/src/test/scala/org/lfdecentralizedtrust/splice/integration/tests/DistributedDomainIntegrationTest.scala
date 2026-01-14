@@ -26,12 +26,29 @@ import scala.jdk.OptionConverters.*
 
 class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil with WalletTestUtil {
 
+  // Changed to a non-default value (the default is 250ms) to see that we correctly modify it.
+  val observationLatency = NonNegativeFiniteDuration.ofMillis(500)
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       // We deliberately change amulet conversion rate votes quickly in this test
       .addConfigTransform((_, config) => ConfigTransforms.withNoVoteCooldown(config))
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllValidatorConfigs_(
+          _.copy(
+            timeTrackerObservationLatency = observationLatency
+          )
+        )(config)
+      )
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllSvAppConfigs_(
+          _.copy(
+            timeTrackerObservationLatency = observationLatency
+          )
+        )(config)
+      )
       .withManualStart
 
   private val decentralizedSynchronizer = SynchronizerAlias.tryCreate("global")
@@ -52,14 +69,15 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
             val synchronizerConfig = sv.participantClient.synchronizers
               .config(decentralizedSynchronizer)
               .value
-              .sequencerConnections
-            val connections: Seq[SequencerConnection] = synchronizerConfig.connections.forgetNE
-            synchronizerConfig.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
+            synchronizerConfig.timeTracker.observationLatency shouldBe observationLatency
+            val sequencerConnections = synchronizerConfig.sequencerConnections
+            val connections: Seq[SequencerConnection] = sequencerConnections.connections.forgetNE
+            sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
               PositiveInt.tryCreate(2),
               NonNegativeFiniteDuration.ofSeconds(10),
             )
             val endpoints = connections.map { s =>
-              inside(s) { case GrpcSequencerConnection(endpoint, _, _, _) =>
+              inside(s) { case GrpcSequencerConnection(endpoint, _, _, _, _) =>
                 endpoint
               }
             }
@@ -130,19 +148,18 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
     )
   }
 
-  "SVs can be onboarded a second time" in { implicit env =>
-    initDso()
-  }
-
   "SVs can pause and unpause the domain via SV app API calls" in { implicit env =>
     implicit val ec: ExecutionContext = env.executionContext
     initDso()
     val decentralizedSynchronizerId =
       sv1Backend.participantClient.synchronizers.id_of(decentralizedSynchronizer)
     eventuallySucceeds() {
-      sv1Backend.participantClientWithAdminToken.topology.synchronizer_parameters
+      val parameters = sv1Backend.participantClientWithAdminToken.topology.synchronizer_parameters
         .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
-        .confirmationRequestsMaxRate should be > NonNegativeInt.zero
+      parameters.confirmationRequestsMaxRate should be > NonNegativeInt.zero
+      parameters.mediatorReactionTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
+      parameters.confirmationResponseTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration
+        .ofMicros(1)
     }
 
     bracket(
@@ -169,9 +186,12 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
         "decentralizedSynchronizer is paused",
         _ =>
           forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
-            sv.participantClientWithAdminToken.topology.synchronizer_parameters
+            val parameters = sv.participantClientWithAdminToken.topology.synchronizer_parameters
               .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
-              .confirmationRequestsMaxRate shouldBe NonNegativeInt.zero
+            parameters.confirmationRequestsMaxRate shouldBe NonNegativeInt.zero
+            parameters.mediatorReactionTimeout shouldBe com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
+            parameters.confirmationResponseTimeout shouldBe com.digitalasset.canton.config.NonNegativeFiniteDuration
+              .ofMicros(1)
           },
       )
 
@@ -186,9 +206,12 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
         "decentralizedSynchronizer is un-paused",
         _ =>
           forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
-            sv.participantClientWithAdminToken.topology.synchronizer_parameters
+            val parameters = sv.participantClientWithAdminToken.topology.synchronizer_parameters
               .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
-              .confirmationRequestsMaxRate should be > NonNegativeInt.zero
+            parameters.confirmationRequestsMaxRate should be > NonNegativeInt.zero
+            parameters.mediatorReactionTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration.Zero
+            parameters.confirmationResponseTimeout should be > com.digitalasset.canton.config.NonNegativeFiniteDuration
+              .ofMicros(1)
           },
       )
     }

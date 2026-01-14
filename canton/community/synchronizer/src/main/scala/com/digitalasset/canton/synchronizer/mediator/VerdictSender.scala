@@ -17,6 +17,7 @@ import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.RequestId
 import com.digitalasset.canton.protocol.messages.*
+import com.digitalasset.canton.sequencing.client.SendAsyncClientError.RequestRefused
 import com.digitalasset.canton.sequencing.client.{SendCallback, SendResult, SequencerClientSend}
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
@@ -68,21 +69,21 @@ private[mediator] object VerdictSender {
       sequencerSend: SequencerClientSend,
       crypto: SynchronizerCryptoClient,
       mediatorId: MediatorId,
-      protocolVersion: ProtocolVersion,
       loggerFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext): VerdictSender =
-    new DefaultVerdictSender(sequencerSend, crypto, mediatorId, protocolVersion, loggerFactory)
+    new DefaultVerdictSender(sequencerSend, crypto, mediatorId, loggerFactory)
 }
 
 private[mediator] class DefaultVerdictSender(
     sequencerSend: SequencerClientSend,
     crypto: SynchronizerCryptoClient,
     mediatorId: MediatorId,
-    protocolVersion: ProtocolVersion,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends VerdictSender
     with NamedLogging {
+  private val protocolVersion = sequencerSend.protocolVersion
+
   override def sendResult(
       requestId: RequestId,
       request: MediatorConfirmationRequest,
@@ -146,7 +147,7 @@ private[mediator] class DefaultVerdictSender(
             )
         }
       case UnlessShutdown.Outcome(_: SendResult.Timeout) =>
-        logger.warn("Sequencing result message timed out.")
+        logger.info("Sequencing result message timed out asynchronously.")
       case UnlessShutdown.AbortedDueToShutdown =>
         logger.debug("Sequencing result processing was aborted due to shutdown")
     }
@@ -158,19 +159,28 @@ private[mediator] class DefaultVerdictSender(
       // completed.
       // we use decision-time for max-sequencing-time as recipients will simply ignore the message if received after
       // that point.
-      sequencerSend.sendAsync(
-        batch,
-        Some(requestId.unwrap),
-        callback = callback,
-        maxSequencingTime = decisionTime,
-        aggregationRule = aggregationRule,
-        amplify = true,
-      )
+      EitherTUtil.leftSubflatMap(
+        sequencerSend
+          .send(
+            batch,
+            Some(requestId.unwrap),
+            callback = callback,
+            maxSequencingTime = decisionTime,
+            aggregationRule = aggregationRule,
+            amplify = true,
+          )
+      ) {
+        case RequestRefused(refused) if refused.hasMaxSequencingTimeElapsed =>
+          logger.info("Sequencing result message timed out synchronously.")
+          Right(())
+        case other =>
+          Left(other)
+      }
     } else {
       logger.info(
         s"Not sending the message batch of size ${batch.envelopes.size} for request $requestId as this mediator is passive in the request's mediator group."
       )
-      EitherT.pure[FutureUnlessShutdown, String](())
+      EitherTUtil.unitUS
     }
 
     EitherTUtil
@@ -197,12 +207,11 @@ private[mediator] class DefaultVerdictSender(
         )
       envelopes <- {
         val result = ConfirmationResultMessage.create(
-          crypto.synchronizerId,
+          crypto.psid,
           request.viewType,
           requestId,
           request.rootHash,
           verdict,
-          protocolVersion,
         )
         val recipientSeq = informeesMap.keys.toSeq.map(MemberRecipient.apply)
         val recipients =
@@ -216,7 +225,7 @@ private[mediator] class DefaultVerdictSender(
             )
 
         SignedProtocolMessage
-          .signAndCreate(result, snapshot, protocolVersion)
+          .signAndCreate(result, snapshot)
           .map(signedResult => List(OpenEnvelope(signedResult, recipients)(protocolVersion)))
       }
 
@@ -320,18 +329,17 @@ private[mediator] class DefaultVerdictSender(
         envs <- recipientsByViewTypeAndRootHash.toSeq
           .parTraverse { case ((viewType, rootHash), flatRecipients) =>
             val rejection = ConfirmationResultMessage.create(
-              crypto.synchronizerId,
+              crypto.psid,
               viewType,
               requestId,
               rootHash,
               rejectionReason,
-              protocolVersion,
             )
 
             val recipients = Recipients.recipientGroups(flatRecipients.map(r => NonEmpty(Set, r)))
 
             SignedProtocolMessage
-              .trySignAndCreate(rejection, snapshot, protocolVersion)
+              .trySignAndCreate(rejection, snapshot)
               .map(_ -> recipients)
           }
         batches = envs.map(Batch.of(protocolVersion, _))

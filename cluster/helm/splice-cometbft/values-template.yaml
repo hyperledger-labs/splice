@@ -12,8 +12,13 @@ pod:
 nodeName: ""
 
 stateSync:
-  # state sync speeds up initialization considerably for large chains.
-  enable: true
+  # State sync speeds up initialization considerably for large chains.
+  # WARNING : State sync introduces a dependency on the sponsoring node for fetching the state snapshot on
+  #           startup and therefore a single point of failure. It should only be enabled when joining a
+  #           new node to a chain that has already been running for a while. In all other cases including
+  #           for a new node after it has completed initialization and after network resets, state sync
+  #           should be disabled.
+  enable: false
   # at least 2 not necessarily unique comma-separated entries must be provided for rpc_servers if enable is true
   rpcServers: ""
   # trust all snapshots from the trust height onwards for a period of 1 week
@@ -69,11 +74,10 @@ db:
 
 resources:
   limits:
-    cpu: 4
-    memory: 4Gi
+    memory: 6Gi
   requests:
-    cpu: 1
-    memory: 1Gi
+    cpu: 2
+    memory: 3Gi
 
 metrics:
   enable: false
@@ -94,7 +98,7 @@ metrics:
 
 enableAntiAffinity: true
 
-logLevel: debug
+logLevel: info
 mempool:
   # max number of transactions kept in the mempool
   size: 2000

@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
-import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
 import * as nodePath from 'path';
 import { PathLike } from 'fs';
@@ -10,6 +9,8 @@ import { load } from 'js-yaml';
 import { config, isDevNet, isMainNet } from './config';
 import { spliceConfig } from './config/config';
 import { spliceEnvConfig } from './config/envConfig';
+import { ClusterBasename, GcpProject, GcpRegion, GcpZone } from './config/gcpConfig';
+import { jmxOptions } from './jmx';
 
 /// Environment variables
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 600;
@@ -18,7 +19,11 @@ export const HELM_MAX_HISTORY_SIZE = Number(config.optionalEnv('HELM_MAX_HISTORY
 const MOCK_SPLICE_ROOT = config.optionalEnv('MOCK_SPLICE_ROOT');
 export const SPLICE_ROOT = config.requireEnv('SPLICE_ROOT', 'root directory of the repo');
 export const PULUMI_STACKS_DIR = config.requireEnv('PULUMI_STACKS_DIR');
-export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
+// backwards compatibility
+export const CLUSTER_BASENAME = ClusterBasename;
+export const GCP_PROJECT = GcpProject;
+export const GCP_REGION = GcpRegion;
+export const GCP_ZONE = GcpZone;
 export const CLUSTER_HOSTNAME = config.requireEnv('GCP_CLUSTER_HOSTNAME');
 export const PUBLIC_CONFIGS_PATH = config.optionalEnv('PUBLIC_CONFIGS_PATH');
 export const PRIVATE_CONFIGS_PATH = config.optionalEnv('PRIVATE_CONFIGS_PATH');
@@ -50,48 +55,8 @@ export function getDnsNames(): { daDnsName: string; cantonDnsName: string } {
   }
 }
 
-export const GCP_PROJECT = config.requireEnv('CLOUDSDK_CORE_PROJECT');
-export const GCP_REGION = config.requireEnv('CLOUDSDK_COMPUTE_REGION');
-export const GCP_ZONE = config.optionalEnv('CLOUDSDK_COMPUTE_ZONE');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 
-export const ENABLE_COMETBFT_PRUNING = config.envFlag('ENABLE_COMETBFT_PRUNING', false);
-
-export const COMETBFT_RETAIN_BLOCKS = ENABLE_COMETBFT_PRUNING
-  ? parseInt(config.requireEnv('COMETBFT_RETAIN_BLOCKS'))
-  : 0;
-
-export type ApprovedSvIdentity = {
-  name: string;
-  publicKey: string | pulumi.Output<string>;
-  rewardWeightBps: number;
-};
-
-const enableSequencerPruning = config.envFlag('ENABLE_SEQUENCER_PRUNING', false);
-export const sequencerPruningConfig = enableSequencerPruning
-  ? {
-      enabled: true,
-      pruningInterval: config.requireEnv('SEQUENCER_PRUNING_INTERVAL', ''),
-      retentionPeriod: config.requireEnv('SEQUENCER_RETENTION_PERIOD', ''),
-    }
-  : { enabled: false };
-
-const lowResourceSequencer = config.envFlag('SEQUENCER_LOW_RESOURCES', false);
-export const sequencerResources: { resources?: k8s.types.input.core.v1.ResourceRequirements } =
-  lowResourceSequencer
-    ? {
-        resources: {
-          limits: {
-            cpu: '3',
-            memory: '4Gi',
-          },
-          requests: {
-            cpu: '1',
-            memory: '2Gi',
-          },
-        },
-      }
-    : {};
 export const sequencerTokenExpirationTime: string | undefined = config.optionalEnv(
   'SEQUENCER_TOKEN_EXPIRATION_TIME'
 );
@@ -199,7 +164,7 @@ function getClusterDirectory(): string {
 
 export const clusterDirectory = getClusterDirectory();
 
-function getPathToPrivateConfigFile(fileName: string): string | undefined {
+export function getPathToPrivateConfigFile(fileName: string): string | undefined {
   const path = PRIVATE_CONFIGS_PATH;
 
   if (spliceConfig.pulumiProjectConfig.isExternalCluster && !path) {
@@ -213,7 +178,7 @@ function getPathToPrivateConfigFile(fileName: string): string | undefined {
   return `${path}/configs/${clusterDirectory}/${fileName}`;
 }
 
-function getPathToPublicConfigFile(fileName: string): string | undefined {
+export function getPathToPublicConfigFile(fileName: string): string | undefined {
   const path = PUBLIC_CONFIGS_PATH;
 
   if (spliceConfig.pulumiProjectConfig.isExternalCluster && !path) {
@@ -241,15 +206,6 @@ export function externalIpRangesFile(): string | undefined {
   return getPathToPrivateConfigFile('allowed-ip-ranges.json');
 }
 
-export function approvedSvIdentitiesFile(): string | undefined {
-  return getPathToPublicConfigFile('approved-sv-id-values.yaml');
-}
-
-export function approvedSvIdentities(): ApprovedSvIdentity[] {
-  const file = approvedSvIdentitiesFile();
-  return file ? loadYamlFromFile(file).approvedSvIdentities : [];
-}
-
 // Typically used for overriding chart values.
 // The pulumi documentation also doesn't suggest a better type than this. ¯\_(ツ)_/¯
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -273,3 +229,6 @@ export function conditionalString(condition: boolean, value: string): string {
 }
 
 export const daContactPoint = 'sv-support@digitalasset.com';
+
+export const getAdditionalJvmOptions = (extraOptions: string | undefined): string =>
+  `${jmxOptions()}${extraOptions ? ` ${extraOptions}` : ''}`;

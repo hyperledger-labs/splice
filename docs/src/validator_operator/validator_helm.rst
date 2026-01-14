@@ -69,6 +69,24 @@ Create the application namespace within Kubernetes.
     The validator deployment assumes one validator per namespace.
     If you wish to run multiple validators in the same cluster, please create a separate namespace for each.
 
+.. _validator-http-proxy-helm:
+
+HTTP Proxy configuration
+------------------------
+
+If you need to use an HTTP forward proxy for egress in your environment, you need to set ``https.proxyHost`` and ``https.proxyPort``
+in ``additionalJvmOptions`` in the validator and participant helm charts to use the HTTP proxy for outgoing connections:
+
+.. code-block:: yaml
+
+  additionalJvmOptions: |
+    -Dhttps.proxyHost=your.proxy.host
+    -Dhttps.proxyPort=your_proxy_port
+
+Replace ``your.proxy.host`` and ``your_proxy_port`` with the actual host and port of your HTTP proxy.
+You can set ``https.nonProxyHosts`` as well to prevent proxying for particular addresses.
+Proxy authentication is currently not supported.
+
 .. _validator-postgres-auth:
 
 Configuring PostgreSQL authentication
@@ -113,6 +131,9 @@ You must:
 
 2. Configure your backends to use that OIDC provider.
 
+The validator supports non-authenticated deployments as well, but this is strongly discouraged for production deployments.
+If you wish to run without authentication, please refer to the notes in :ref:`helm-validator-no-auth`.
+
 .. _helm-validator-auth-requirements:
 
 OIDC Provider Requirements
@@ -120,6 +141,8 @@ OIDC Provider Requirements
 
 This section provides pointers for setting up an OIDC provider for use with your Validator node.
 Feel free to skip directly to :ref:`helm-validator-auth0` if you plan to use `Auth0 <https://auth0.com>`_ for your Validator node's authentication needs.
+
+These docs focus on Auth0, and are being continuously tested and maintained. Other OIDC providers can be used, and are in active use by various community members, who have contributed some notes and examples in `Okta and Keycloak community authored examples </community/oidc-config-okta-keycloak.html>`.
 
 Your OIDC provider must be reachable [#reach]_ at a well known (HTTPS) URL.
 In the following, we will refer to this URL as ``OIDC_AUTHORITY_URL``.
@@ -303,6 +326,26 @@ To setup the wallet and CNS UI, create the following two secrets.
     kubectl create --namespace validator secret generic splice-app-cns-ui-auth \
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${CNS_UI_CLIENT_ID}"
+
+.. _helm-validator-no-auth:
+
+Running without Authentication
+++++++++++++++++++++++++++++++
+
+.. warning::
+
+  Running without authentication is highly insecure. Anyone with access to the wallet UI,
+  or to the validator in any other way, may log in to your wallet as a user of their choice,
+  or otherwise transact on-ledger on your behalf. For any production use, you should configure
+  proper authentication as described in the sections above.
+
+In order to run the validator without authentication, add ``disableAuth: true`` to both
+``splice-node/examples/sv-helm/validator-values.yaml`` and ``splice-node/examples/sv-helm/participant-values.yaml``.
+Note that you must disable auth in both places, otherwise the validator will not be able to connect to the participant.
+
+When running without authentication, the username of the validator administrator
+is `administrator`.
+
 
 .. _helm-validator-install:
 
@@ -607,7 +650,7 @@ Configuring automatic traffic purchases
 ---------------------------------------
 
 By default your node will be configured to automatically purchase :ref:`traffic <traffic>` on a pay-as-you-go basis
-:ref:`automatically purchase traffic <traffic_topup>`.
+(see :ref:`automatically purchase traffic <traffic_topup>`).
 To disable or tune to your needs, edit the following section in the validator-values.yaml file:
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
@@ -615,30 +658,7 @@ To disable or tune to your needs, edit the following section in the validator-va
     :start-after: CONFIGURING_TOPUP_START
     :end-before: CONFIGURING_TOPUP_END
 
-On each successful top-up, the validator app purchases a `top-up amount` of roughly ``targetThroughput * minTopupInterval`` bytes of traffic
-(specific amount can vary due to rounding-up).
-The ``minTopupInterval`` allows validator operators to control the upper-bound frequency at which automated top-ups happen.
-If the top-up amount is below the synchronizer-wide ``minTopupAmount`` (see :ref:`traffic_parameters`),
-``minTopupInterval`` is automatically stretched so that at least ``minTopupAmount`` bytes of traffic are
-purchased while respecting the configured ``targetThroughput``.
-
-The next top-up gets triggered when all of the following conditions are met:
-
-- The available :ref:`extra traffic balance <traffic_accounting>` drops below the configured top-up amount
-  (i.e., below ``targetThroughput * minTopupInterval``).
-- At least ``minTopupInterval`` has elapsed since the last top-up.
-- The validator has sufficient CC in its wallet to buy the top-up amount worth on traffic
-  (except on DevNet, where the validator app will automatically tap enough coin to purchase traffic).
-
-
-Validators receive a small amount of free traffic from the Super Validators, which suffices for submitting the
-top-up transaction. However, if many other transactions are submitted, you may run into a situation where
-you have exhausted also the free traffic, thus the validator cannot submit the top-up transaction.
-The free traffic grant accumulates gradually and continuously. When no transactions are submitted, it
-takes about twenty minutes for free traffic to accumulate to the maximum possible.
-If you've consumed your traffic balance by submitting too many transactions without purchasing traffic,
-pause your Validator node (validator app and participant) for twenty minutes to allow your free traffic
-balance to accumulate.
+.. include:: ../common/traffic_topups.rst
 
 
 .. todo::
@@ -757,3 +777,31 @@ values for ``splice-participant`` or ``splice-validator``:
       - name: my-extra-container
         image: busybox
         command: [ "sh", "-c", "echo 'example extra container'" ]
+
+.. _helm-validator-volume-ownership:
+
+Working around volume ownership issues
+--------------------------------------
+
+The containers in the ``splice-validator`` chart run as non-root users (specifically, user:group 1001:1001) for security reasons.
+The pod mounts volumes for use by the containers, and these volumes need to be owned by the user that the containers run as.
+The Helm chart uses an ``fsGroup`` `security context <https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>`_ to ensure that the mounted volumes are owned by the correct user.
+In certain environments, however, this does not work as expected and the mounted volumes are owned by root.
+If you encounter this issue, you can work around it by creating init containers that change the ownership of the mounted volumes to the correct user.
+
+For example, for the `/domain-upgrade-dump` volume (required for synchronizer upgrades),
+you can add the following to your ``validator-values.yaml`` file:
+
+.. code-block:: yaml
+
+    extraInitContainers:
+        - name: chown-domain-upgrade-dump
+          image: busybox:1.37.0
+          command: ["sh", "-c", "chown -R 1001:1001 /domain-upgrade-dump"]
+          volumeMounts:
+            - name: domain-upgrade-dump-volume
+              mountPath: /domain-upgrade-dump
+
+
+A similar workaround will be required for mounting a usable `/participant-bootstrapping-dump`
+(required when recovering from identities backup).

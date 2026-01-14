@@ -3,11 +3,6 @@
 import { config } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import { Output } from '@pulumi/pulumi';
 
-const enableCometbftPruning = config.envFlag('ENABLE_COMETBFT_PRUNING', true);
-export const cometbftRetainBlocks = enableCometbftPruning
-  ? parseInt(config.requireEnv('COMETBFT_RETAIN_BLOCKS'))
-  : 0; // 0 implies retain all blocks
-
 export const disableCometBftStateSync = config.envFlag('DISABLE_COMETBFT_STATE_SYNC', false);
 
 export type StaticCometBftConfig = {
@@ -18,7 +13,6 @@ export type StaticCometBftConfig = {
     publicKey?: Output<string> | string;
   };
   nodeIndex: number;
-  retainBlocks: number;
   id: string;
 };
 

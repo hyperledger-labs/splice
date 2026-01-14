@@ -21,6 +21,7 @@ import org.lfdecentralizedtrust.splice.config.UpgradesConfig
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  GetDsoInfoResponse,
   LookupTransferCommandStatusResponse,
   MigrationSchedule,
 }
@@ -58,6 +59,8 @@ trait ScanConnection
   protected def logger: TracedLogger
 
   def getDsoPartyId()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId]
+
+  def getDsoInfo()(implicit ec: ExecutionContext, tc: TraceContext): Future[GetDsoInfoResponse]
 
   /** Query for the DSO party id, retrying until it succeeds.
     *
@@ -303,6 +306,21 @@ object ScanConnection {
       new SingleScanConnection(config, upgradesConfig, clock, retryProvider, loggerFactory),
       retryConnectionOnInitialFailure,
     )
+
+  def directConnection(
+      config: ScanAppClientConfig,
+      upgradesConfig: UpgradesConfig,
+      clock: Clock,
+      retryProvider: RetryProvider,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      ec: ExecutionContextExecutor,
+      tc: TraceContext,
+      mat: Materializer,
+      httpClient: HttpClient,
+      templateDecoder: TemplateJsonDecoder,
+  ): SingleScanConnection =
+    new SingleScanConnection(config, upgradesConfig, clock, retryProvider, loggerFactory)
 
   private[client] case class CachedAmuletRules(
       cacheValidUntil: CantonTimestamp,

@@ -74,7 +74,6 @@ export const SelectAction: React.FC = () => {
                       field.handleChange(e.target.value as string)
                     }
                     onBlur={field.handleBlur}
-                    placeholder="Select an action"
                   >
                     {createProposalActions.map(actionName => (
                       <MenuItem
@@ -106,6 +105,7 @@ export const SelectAction: React.FC = () => {
 
                     <Button
                       variant="contained"
+                      id="next-button"
                       data-testid="next-button"
                       type="submit"
                       disabled={!canSubmit}

@@ -6,11 +6,13 @@ import { createEnvRefs } from '@lfdecentralizedtrust/splice-pulumi-common/src/op
 import { core } from '@pulumi/kubernetes';
 
 import { spliceEnvConfig } from '../../common/src/config/envConfig';
+import { getGithubActionsStackFromMainReference, installGithubActionsStack } from './stacks/gha';
 import {
   getMigrationSpecificStacksFromMainReference,
   installMigrationSpecificStacks,
 } from './stacks/migration';
 import { getSpliceStacksFromMainReference, installSpliceStacks } from './stacks/splice';
+import { installAllValidatorStacks } from './stacks/validators';
 
 if (!DecentralizedSynchronizerUpgradeConfig.active.releaseReference) {
   throw new Error('No release reference found for active migration');
@@ -19,9 +21,11 @@ if (!DecentralizedSynchronizerUpgradeConfig.active.releaseReference) {
 const namespace = 'operator';
 const envRefs = createEnvRefs('deployment-env', 'operator');
 const mainReference = DecentralizedSynchronizerUpgradeConfig.active.releaseReference;
-const allMainRefStacks = getSpliceStacksFromMainReference().concat(
-  getMigrationSpecificStacksFromMainReference()
-);
+const allMainRefStacks = [
+  ...getSpliceStacksFromMainReference(),
+  ...getMigrationSpecificStacksFromMainReference(),
+  ...getGithubActionsStackFromMainReference(),
+];
 const mainStackReference = gitRepoForRef('active', mainReference, allMainRefStacks);
 const credentialsSecret = new core.v1.Secret('gke-credentials', {
   metadata: {
@@ -36,3 +40,5 @@ const credentialsSecret = new core.v1.Secret('gke-credentials', {
 
 installSpliceStacks(mainStackReference, envRefs, namespace, credentialsSecret);
 installMigrationSpecificStacks(mainStackReference, envRefs, namespace, credentialsSecret);
+installAllValidatorStacks(mainStackReference, envRefs, namespace, credentialsSecret);
+installGithubActionsStack(mainStackReference, envRefs, namespace, credentialsSecret);

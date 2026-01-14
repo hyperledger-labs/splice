@@ -8,7 +8,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, *}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -150,23 +150,19 @@ class SqlIndexInitializationTrigger(
 object SqlIndexInitializationTrigger {
 
   def apply(
-      storage: Storage,
+      storage: DbStorage,
       triggerContext: TriggerContext,
       indexActions: List[IndexAction] = defaultIndexActions,
   )(implicit
       ec: ExecutionContextExecutor,
       tracer: Tracer,
       mat: Materializer,
-  ): SqlIndexInitializationTrigger = storage match {
-    case dbStorage: DbStorage =>
-      new SqlIndexInitializationTrigger(
-        dbStorage,
-        triggerContext,
-        indexActions,
-      )
-    case storageType =>
-      // Same behavior as in `ScanStore.apply` and similar - we only really support DbStorage in our apps.
-      throw new RuntimeException(s"Unsupported storage type $storageType")
+  ): SqlIndexInitializationTrigger = {
+    new SqlIndexInitializationTrigger(
+      storage,
+      triggerContext,
+      indexActions,
+    )
   }
 
   sealed trait IndexStatus
@@ -240,7 +236,15 @@ object SqlIndexInitializationTrigger {
           on update_history_creates (history_id, migration_id, contract_id)
           where record_time = #${CantonTimestamp.MinValue.toMicros}
         """,
-      )
+      ),
+    IndexAction
+      .Create(
+        indexName = "round_party_totals_sid_pid_cr",
+        createAction = sqlu"""
+          create index concurrently if not exists round_party_totals_sid_pid_cr
+          on round_party_totals (store_id, party, closed_round desc)
+        """,
+      ),
   )
 
   sealed trait Task extends Product with Serializable with PrettyPrinting

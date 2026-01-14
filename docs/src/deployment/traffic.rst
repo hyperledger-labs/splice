@@ -169,5 +169,52 @@ Additionally, to prevent top-up transactions from failing due to an already depl
 the validator app will
 :ref:`abort ledger submissions if the balance has fallen below a predefined amount<error-below-reserved-traffic-amount>`.
 
-For configuring the built-in top-up automation, please refer to the :ref:`validator deployment guide <helm_validator_topup>`.
+For configuring the built-in top-up automation, please refer to the :ref:`Kubernetes validator deployment guide <helm_validator_topup>`
+or the corresponding :ref:`Docker-compose one<compose_validator_topup>`.
 Configuring alternative methods for buying traffic, e.g., using third-party services, exceeds the scope of this documentation.
+
+.. _traffic_wasted:
+
+Wasted traffic
+--------------
+
+`Wasted traffic` is defined as synchronizer events that have been sequenced but will not be delivered to their recipients.
+For validators, which are subject to traffic fees,
+wasted traffic implies that :ref:`traffic <traffic_accounting>` has been charged for a message that was ultimately not delivered.
+Not all failed submissions result in wasted traffic:
+wasted traffic only occurs whenever a synchronizer event is rejected after sequencing but before delivery.
+Some level of wasted traffic is expected and unavoidable, due to factors such as:
+
+- Submission request amplification.
+  Participants that use BFT sequencer connections retry submission requests after a timeout to ensure speedy delivery in the face of nonresponsive sequencers;
+  if processing was simply slower than usual but the sequencer was not faulty, the duplicate request counts as wasted traffic.
+- Duplication of messages within the ordering layer, typically linked to transient networking issues or load spikes.
+- Duplication of submissions on the participant/app side, for example when catching up after restoring from a backup or after some crashes.
+
+Validator perspective
++++++++++++++++++++++
+
+Validator operators are encouraged to investigate the causes of repeatedly failing submissions.
+As stated above, not all failed submissions result in wasted traffic, and some wasted traffic is unavoidable.
+Attention is warranted, however, if the rate of wasted traffic increases significantly at some point in time.
+
+The Splice distribution contains a :ref:`Grafana dashboard <metrics_grafana_dashboards>` about `Synchronizer Fees (validator view)`,
+to assist in monitoring traffic-related metrics.
+The `Rejected Event Traffic` panel on this dashboard is especially relevant for determining the rate of wasted traffic.
+(Hover on the ⓘ symbols in panel headers for precise descriptions of the shown data.)
+
+SV perspective
+++++++++++++++
+
+SV operators are encouraged to monitor wasted traffic across all synchronizer members,
+as reported for example by sequencer :ref:`metrics <metrics>`,
+to detect cases where wasted traffic increases significantly and/or in a global manner.
+The Splice distribution contains a :ref:`Grafana dashboard <metrics_grafana_dashboards>` about `Synchronizer Fees (SV view)` that can be helpful,
+as well as an alert definition that focuses on validator participants.
+
+Note that wasted traffic is less relevant for SVs themselves, as SV components have unlimited traffic.
+Note also that SV mediators and sequencers waste traffic as part of their regular operation:
+They heavily use aggregate submissions where sequencers collect messages from a group of senders and only deliver a single message per recipient once a threshold of individual submissions has been sequenced;
+sequenced individual submissions beyond the aggregation threshold count as wasted traffic.
+All that said, should an SV component suddenly exhibit a significant increase in wasted traffic,
+this likely points to an actual issue that should be investigated.

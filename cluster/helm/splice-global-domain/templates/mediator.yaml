@@ -55,6 +55,7 @@ spec:
           value: {{ .Values.mediator.persistence.databaseName }}
         {{- end }}
         {{- include "splice-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
+        {{- include "splice-util-lib.additional-env-vars" .Values.mediator.additionalEnvVars | indent 8}}
         {{- include "splice-util-lib.log-level" .Values | indent 8}}
         {{- with .Values.imagePullPolicy }}
         imagePullPolicy: {{ . }}
@@ -89,6 +90,11 @@ spec:
           periodSeconds: 5
           failureThreshold: 3
           timeoutSeconds: 10
+        {{- end }}
+        {{- if .Values.pvc }}
+        volumeMounts:
+          - name: mediator-volume
+            mountPath: /persistent-data
         {{- end }}
       restartPolicy: Always
       initContainers:
@@ -125,6 +131,31 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      volumes:
+      {{- if .Values.pvc }}
+        - name: mediator-volume
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-mediator-pvc
+      {{- end }}
+---
+{{-  if .Values.pvc }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-mediator-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "splice-util-lib.default-labels" (set . "app" $mediatorLabel) | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.pvc.size }}
+  storageClassName: {{ .Values.pvc.volumeStorageClass }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service

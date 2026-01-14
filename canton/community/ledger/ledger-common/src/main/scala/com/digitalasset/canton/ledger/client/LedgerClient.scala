@@ -32,7 +32,7 @@ import com.digitalasset.canton.ledger.client.services.version.VersionClient
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc, W3CTraceContext}
 import io.grpc.Channel
-import io.grpc.netty.NettyChannelBuilder
+import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder
 import io.grpc.stub.AbstractStub
 
 import java.io.Closeable
@@ -52,49 +52,59 @@ final class LedgerClient private (
     extends Closeable {
 
   lazy val commandService = new CommandServiceClient(
-    LedgerClient.stub(CommandServiceGrpcV2.stub(channel), config.token)
+    CommandServiceGrpcV2.stub(channel),
+    config.token,
   )
   lazy val eventQueryService = new EventQueryServiceClient(
-    LedgerClient.stub(EventQueryServiceGrpc.stub(channel), config.token)
+    EventQueryServiceGrpc.stub(channel),
+    config.token,
   )
   lazy val packageService = new PackageClient(
-    LedgerClient.stub(PackageServiceGrpcV2.stub(channel), config.token)
+    PackageServiceGrpcV2.stub(channel),
+    config.token,
   )
 
   lazy val stateService = new StateServiceClient(
-    LedgerClient.stub(StateServiceGrpc.stub(channel), config.token)
+    StateServiceGrpc.stub(channel),
+    config.token,
   )
 
   lazy val updateService = new UpdateServiceClient(
-    LedgerClient.stub(UpdateServiceGrpc.stub(channel), config.token)
+    UpdateServiceGrpc.stub(channel),
+    config.token,
   )
 
   lazy val versionClient: VersionClient =
-    new VersionClient(LedgerClient.stub(VersionServiceGrpc.stub(channel), config.token))
+    new VersionClient(VersionServiceGrpc.stub(channel), config.token)
 
   lazy val identityProviderConfigClient: IdentityProviderConfigClient =
     new IdentityProviderConfigClient(
-      LedgerClient.stub(IdentityProviderConfigServiceGrpc.stub(channel), config.token)
+      IdentityProviderConfigServiceGrpc.stub(channel),
+      config.token,
     )
 
   lazy val packageManagementClient: PackageManagementClient =
     new PackageManagementClient(
-      LedgerClient.stub(PackageManagementServiceGrpc.stub(channel), config.token)
+      PackageManagementServiceGrpc.stub(channel),
+      config.token,
     )
 
   lazy val partyManagementClient: PartyManagementClient =
     new PartyManagementClient(
-      LedgerClient.stub(PartyManagementServiceGrpc.stub(channel), config.token)
+      PartyManagementServiceGrpc.stub(channel),
+      config.token,
     )
 
   lazy val userManagementClient: UserManagementClient =
     new UserManagementClient(
-      LedgerClient.stub(UserManagementServiceGrpc.stub(channel), config.token)
+      UserManagementServiceGrpc.stub(channel),
+      config.token,
     )
 
   lazy val participantPruningManagementClient: ParticipantPruningManagementClient =
     new ParticipantPruningManagementClient(
-      LedgerClient.stub(ParticipantPruningServiceGrpc.stub(channel), config.token)
+      ParticipantPruningServiceGrpc.stub(channel),
+      config.token,
     )
 
   override def close(): Unit = GrpcChannel.close(channel)
@@ -120,7 +130,7 @@ object LedgerClient {
       // requesting ledger end validates the token, thus guaranteeing that the client is operable
       _ <- new StateServiceClient(
         StateServiceGrpc.stub(channel)
-      ).getLedgerEnd(config.token)
+      ).getLedgerEnd(config.token())
     } yield new LedgerClient(channel, config, loggerFactory)
 
   def withoutToken(
@@ -132,7 +142,7 @@ object LedgerClient {
 
   private[client] def stub[A <: AbstractStub[A]](stub: A, token: Option[String]): A =
     token.fold(stub)(
-      authorizingStub(stub, _).withInterceptors(TraceContextGrpc.clientInterceptor)
+      authorizingStub(stub, _).withInterceptors(TraceContextGrpc.clientInterceptor())
     )
 
   private[client] def stubWithTracing[A <: AbstractStub[A]](stub: A, token: Option[String])(implicit
@@ -140,7 +150,7 @@ object LedgerClient {
   ): A =
     token
       .fold(stub)(authorizingStub(stub, _))
-      .withInterceptors(TraceContextGrpc.clientInterceptor)
+      .withInterceptors(TraceContextGrpc.clientInterceptor())
       .withOption(TraceContextGrpc.TraceContextCallOptionKey, traceContext)
 
   /** A convenient shortcut to build a [[LedgerClient]], use [[fromBuilder]] for a more flexible
@@ -175,8 +185,8 @@ object LedgerClient {
       loggerFactory,
     )
 
-  /** Takes a [[io.grpc.netty.NettyChannelBuilder]], possibly set up with some relevant extra
-    * options that cannot be specified though the
+  /** Takes a [[io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder]], possibly set up with some
+    * relevant extra options that cannot be specified though the
     * [[com.digitalasset.canton.ledger.client.configuration.LedgerClientConfiguration]] (e.g. a set
     * of default [[io.grpc.CallCredentials]] to be used with all calls unless explicitly set on a
     * per-call basis), sets the relevant options specified by the configuration (possibly overriding
@@ -204,7 +214,7 @@ object LedgerClient {
     traceContext match {
       case Some(LedgerApiTraceContext(Some(parent), state)) =>
         W3CTraceContext(parent, state).toTraceContext
-      case _ => TraceContext.withNewTraceContext(identity)
+      case _ => TraceContext.withNewTraceContext("ledger_api")(identity)
     }
 
 }

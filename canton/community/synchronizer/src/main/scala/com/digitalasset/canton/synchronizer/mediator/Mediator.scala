@@ -39,7 +39,7 @@ import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithIni
 import com.digitalasset.canton.topology.processing.TopologyTransactionProcessor
 import com.digitalasset.canton.topology.{
   MediatorId,
-  SynchronizerId,
+  PhysicalSynchronizerId,
   SynchronizerOutboxHandle,
   TopologyManagerStatus,
 }
@@ -58,7 +58,6 @@ import scala.concurrent.ExecutionContext
   * high-availability, several instances need to be created.
   */
 private[mediator] class Mediator(
-    val synchronizerId: SynchronizerId,
     val mediatorId: MediatorId,
     @VisibleForTesting
     val sequencerClient: RichSequencerClient,
@@ -72,7 +71,6 @@ private[mediator] class Mediator(
     private[canton] val sequencerCounterTrackerStore: SequencerCounterTrackerStore,
     sequencedEventStore: SequencedEventStore,
     parameters: CantonNodeParameters,
-    protocolVersion: ProtocolVersion,
     clock: Clock,
     metrics: MediatorMetrics,
     protected val loggerFactory: NamedLoggerFactory,
@@ -81,6 +79,9 @@ private[mediator] class Mediator(
     with FlagCloseableAsync
     with HasCloseContext {
 
+  def psid: PhysicalSynchronizerId = sequencerClient.psid
+  def protocolVersion: ProtocolVersion = sequencerClient.protocolVersion
+
   override protected def timeouts: ProcessingTimeout = parameters.processingTimeouts
 
   private val delayLogger =
@@ -88,20 +89,18 @@ private[mediator] class Mediator(
       clock,
       logger,
       parameters.delayLoggingThreshold,
-      metrics.sequencerClient.handler.delay,
+      metrics.sequencerClient.handler.sequencingTimeMetrics,
     )
 
   private val verdictSender =
-    VerdictSender(sequencerClient, syncCrypto, mediatorId, protocolVersion, loggerFactory)
+    VerdictSender(sequencerClient, syncCrypto, mediatorId, loggerFactory)
 
   private val processor = new ConfirmationRequestAndResponseProcessor(
-    synchronizerId,
     mediatorId,
     verdictSender,
     syncCrypto,
     timeTracker,
     state,
-    protocolVersion,
     loggerFactory,
     timeouts,
   )
@@ -115,7 +114,7 @@ private[mediator] class Mediator(
   )
 
   private val eventsProcessor = new MediatorEventsProcessor(
-    topologyTransactionProcessor.createHandler(synchronizerId),
+    topologyTransactionProcessor.createHandler(psid),
     processor,
     deduplicator,
     loggerFactory,
@@ -126,7 +125,7 @@ private[mediator] class Mediator(
   /** Starts the mediator. NOTE: Must only be called at most once on a mediator instance. */
   private[mediator] def start()(implicit
       initializationTraceContext: TraceContext
-  ): FutureUnlessShutdown[Unit] = performUnlessClosingUSF("start") {
+  ): FutureUnlessShutdown[Unit] = synchronizeWithClosing("start") {
     for {
 
       preheadO <- sequencerCounterTrackerStore.preheadSequencerCounter
@@ -149,7 +148,7 @@ private[mediator] class Mediator(
       newTracedPrehead: Traced[SequencerCounterCursorPrehead]
   ): Unit = newTracedPrehead.withTraceContext { implicit traceContext => newPrehead =>
     FutureUtil.doNotAwait(
-      performUnlessClosingUSF("prune mediator deduplication store")(
+      synchronizeWithClosing("prune mediator deduplication store")(
         state.deduplicationStore.prune(newPrehead.timestamp)
       ).onShutdown(logger.info("Not pruning the mediator deduplication store due to shutdown")),
       "pruning the mediator deduplication store failed",
@@ -234,7 +233,7 @@ private[mediator] class Mediator(
       // After pruning successfully, update the "max-event-age" metric
       // looking up the oldest event (in case prunedAt precedes any events and nothing was pruned).
       oldestEventTimestampO <- EitherT.right(
-        stateInspection.locatePruningTimestamp(NonNegativeInt.zero)
+        stateInspection.findPruningTimestamp(NonNegativeInt.zero)
       )
       _ = MetricsHelper.updateAgeInHoursGauge(clock, metrics.maxEventAge, oldestEventTimestampO)
 
@@ -339,7 +338,7 @@ private[mediator] class Mediator(
         "mediator",
         LifeCycle.close(
           topologyTransactionProcessor,
-          syncCrypto.ips,
+          syncCrypto,
           timeTracker,
           processor,
           sequencerClient,

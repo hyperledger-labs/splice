@@ -8,11 +8,12 @@ import org.lfdecentralizedtrust.splice.automation.{
   SpliceAppAutomationService,
 }
 import AutomationServiceCompanion.TriggerClass
-import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
+  UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.wallet.store.ExternalPartyWalletStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -24,6 +25,7 @@ import scala.concurrent.ExecutionContext
 
 class ExternalPartyWalletAutomationService(
     store: ExternalPartyWalletStore,
+    updateHistory: UpdateHistory,
     ledgerClient: SpliceLedgerClient,
     automationConfig: AutomationConfig,
     clock: Clock,
@@ -32,6 +34,7 @@ class ExternalPartyWalletAutomationService(
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
+    params: SpliceParametersConfig,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -46,11 +49,16 @@ class ExternalPartyWalletAutomationService(
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,
-      ingestUpdateHistoryFromParticipantBegin,
+      params,
     ) {
   override def companion
       : org.lfdecentralizedtrust.splice.wallet.automation.ExternalPartyWalletAutomationService.type =
     ExternalPartyWalletAutomationService
+
+  registerUpdateHistoryIngestion(
+    updateHistory,
+    ingestUpdateHistoryFromParticipantBegin,
+  )
 }
 
 object ExternalPartyWalletAutomationService extends AutomationServiceCompanion {

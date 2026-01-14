@@ -64,10 +64,7 @@ object TopologyChangeOp {
     }
 
   implicit val setParameterTopologyChangeOp: SetParameter[TopologyChangeOp] = (v, pp) =>
-    v match {
-      case Remove => pp.setInt(1)
-      case Replace => pp.setInt(2)
-    }
+    pp.setInt(v.toProto.value)
 
 }
 
@@ -172,6 +169,7 @@ final case class TopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
       unnamedParam(_.mapping),
       param("serial", _.serial),
       param("operation", _.operation),
+      param("hash", _.hash.hash),
     )
 
   @transient override protected lazy val companionObj: TopologyTransaction.type =
@@ -188,10 +186,11 @@ object TopologyTransaction
   override val name: String = "TopologyTransaction"
 
   type GenericTopologyTransaction = TopologyTransaction[TopologyChangeOp, TopologyMapping]
+  type PositiveTopologyTransaction = TopologyTransaction[TopologyChangeOp.Replace, TopologyMapping]
 
   val versioningTable: VersioningTable =
     VersioningTable(
-      ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.TopologyTransaction)(
+      ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.TopologyTransaction)(
         supportedProtoVersionMemoized(_)(fromProtoV30),
         _.toProtoV30,
       )

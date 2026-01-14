@@ -55,6 +55,12 @@ services:
     networks:
       - ${DOCKER_NETWORK:-splice_validator}
 
+  chown-domain-upgrade-dump:
+    image: busybox:1.37.0
+    volumes:
+      - domain-upgrade-dump:/domain-upgrade-dump
+    command: ["chown", "-R", "1001:1001", "/domain-upgrade-dump"]
+
   validator:
     image: "${IMAGE_REPO}validator-app:${IMAGE_TAG}"
     environment:
@@ -105,6 +111,8 @@ services:
             }
       - ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH=canton.validator-apps.validator_backend.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
     depends_on:
+      chown-domain-upgrade-dump:
+        condition: service_completed_successfully
       postgres-splice:
         condition: service_healthy
     restart: always
@@ -150,8 +158,9 @@ services:
     image: "nginx:${NGINX_VERSION}"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx:/etc/nginx/includes
     ports:
-      - 80:80
+      - "${HOST_BIND_IP:-127.0.0.1}:80:80"
     depends_on:
       - ans-web-ui
       - wallet-web-ui

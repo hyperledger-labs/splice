@@ -16,7 +16,7 @@ trait PostgresAround {
   import PostgresAround.*
 
   private val server: AtomicReference[PostgresServer] = new AtomicReference
-  private val ownedServerContainer: AtomicReference[Option[PostgreSQLContainer[_]]] =
+  private val ownedServerContainer: AtomicReference[Option[PostgreSQLContainer[?]]] =
     new AtomicReference(None)
 
   protected def connectToPostgresqlServer(): Unit = {
@@ -40,7 +40,7 @@ trait PostgresAround {
       logger.info(s"Using PostgreSQL on $hostName:$port.")
     } else {
       // using own temporal resource
-      val container = new PostgreSQLContainer(s"${PostgreSQLContainer.IMAGE}:14")
+      val container = new PostgreSQLContainer(s"${PostgreSQLContainer.IMAGE}:17")
       ownedServerContainer.set(Some(container))
       logger.info(s"Starting PostgreSQL Container...")
       container.start()

@@ -1,17 +1,15 @@
 {
   "compilerOptions": {
-    "target": "es6",
+    "target": "es2020",
     "lib": ["dom", "esnext"],
-    "module": "nodenext",
+    "module": "esnext",
     "declaration": true,
     "sourceMap": true,
     "declarationMap": true,
     "strict": true,
-    "moduleResolution": "nodenext",
+    "moduleResolution": "bundler",
     "isolatedModules": true,
-    "esModuleInterop": false,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
-    "jsx": "react-jsx"
   }
 }

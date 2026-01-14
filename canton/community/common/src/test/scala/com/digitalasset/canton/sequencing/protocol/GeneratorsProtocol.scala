@@ -27,10 +27,8 @@ import com.digitalasset.canton.serialization.{
   BytestringWithCryptographicEvidence,
   HasCryptographicEvidence,
 }
-import com.digitalasset.canton.time.TimeProofTestUtil
-import com.digitalasset.canton.topology.{Member, SynchronizerId}
+import com.digitalasset.canton.topology.{GeneratorsTopology, Member, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ReassignmentTag.Target
 import com.digitalasset.canton.version.{GeneratorsVersion, ProtocolVersion}
 import com.google.protobuf.ByteString
 import magnolify.scalacheck.auto.*
@@ -39,14 +37,25 @@ import org.scalacheck.{Arbitrary, Gen}
 final class GeneratorsProtocol(
     protocolVersion: ProtocolVersion,
     generatorsMessages: GeneratorsMessages,
+    generatorsTopology: GeneratorsTopology,
 ) {
-  import GeneratorsProtocol.*
   import com.digitalasset.canton.Generators.*
   import com.digitalasset.canton.config.GeneratorsConfig.*
   import com.digitalasset.canton.crypto.GeneratorsCrypto.*
   import com.digitalasset.canton.data.GeneratorsDataTime.*
-  import com.digitalasset.canton.topology.GeneratorsTopology.*
+  import generatorsTopology.*
   import generatorsMessages.*
+
+  implicit val recipientsArb: Arbitrary[Recipients] = {
+    val protocolVersionDependentRecipientArb = genArbitrary[Recipient]
+
+    Arbitrary(for {
+      depths <- nonEmptyListGen(Arbitrary(Gen.choose(0, 3)))
+      trees <- Gen.sequence[List[RecipientsTree], RecipientsTree](
+        depths.forgetNE.map(recipientsTreeGen(protocolVersionDependentRecipientArb)(_))
+      )
+    } yield Recipients(NonEmptyUtil.fromUnsafe(trees)))
+  }
 
   implicit val acknowledgeRequestArb: Arbitrary[AcknowledgeRequest] = Arbitrary(for {
     ts <- Arbitrary.arbitrary[CantonTimestamp]
@@ -58,15 +67,12 @@ final class GeneratorsProtocol(
       for {
         threshold <- Arbitrary.arbitrary[PositiveInt]
         eligibleMembers <- Generators.nonEmptyListGen[Member]
-      } yield AggregationRule(eligibleMembers, threshold)(
-        AggregationRule.protocolVersionRepresentativeFor(protocolVersion)
-      )
+      } yield AggregationRule(eligibleMembers, threshold, protocolVersion)
     )
 
   implicit val closedEnvelopeArb: Arbitrary[ClosedEnvelope] = Arbitrary(for {
     bytes <- Arbitrary.arbitrary[ByteString]
-    signatures <- Gen.listOfN(5, signatureArb.arbitrary)
-
+    signatures <- boundedListGen[Signature]
     recipients <- recipientsArb.arbitrary
   } yield ClosedEnvelope.create(bytes, recipients, signatures, protocolVersion))
 
@@ -130,11 +136,11 @@ final class GeneratorsProtocol(
     } yield TopologyStateForInitRequest(member, protocolVersion)
   )
 
-  implicit val subscriptionRequestV2Arb: Arbitrary[SubscriptionRequestV2] = Arbitrary(
+  implicit val subscriptionRequestV2Arb: Arbitrary[SubscriptionRequest] = Arbitrary(
     for {
       member <- Arbitrary.arbitrary[Member]
       timestamp <- Arbitrary.arbitrary[Option[CantonTimestamp]]
-    } yield SubscriptionRequestV2.apply(member, timestamp, protocolVersion)
+    } yield SubscriptionRequest.apply(member, timestamp, protocolVersion)
   )
 
   implicit val sequencerChannelMetadataArb: Arbitrary[SequencerChannelMetadata] =
@@ -215,7 +221,7 @@ final class GeneratorsProtocol(
     for {
       pts <- Arbitrary.arbitrary[Option[CantonTimestamp]]
       ts <- Arbitrary.arbitrary[CantonTimestamp]
-      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
+      synchronizerId <- Arbitrary.arbitrary[PhysicalSynchronizerId]
       messageId <- Arbitrary.arbitrary[MessageId]
       error <- sequencerDeliverErrorArb.arbitrary
     } yield DeliverError.create(
@@ -224,19 +230,18 @@ final class GeneratorsProtocol(
       synchronizerId = synchronizerId,
       messageId,
       error,
-      protocolVersion,
       Option.empty[TrafficReceipt],
     )
   )
   private implicit val deliverArbitrary: Arbitrary[Deliver[Envelope[?]]] = Arbitrary(
     for {
-      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
+      synchronizerId <- Arbitrary.arbitrary[PhysicalSynchronizerId]
       batch <- batchArb.arbitrary
-      deliver <- Arbitrary(deliverGen(synchronizerId, batch, protocolVersion)).arbitrary
+      deliver <- Arbitrary(deliverGen(synchronizerId, batch)).arbitrary
     } yield deliver
   )
 
-  implicit val sequencerEventArb: Arbitrary[SequencedEvent[Envelope[?]]] =
+  implicit val sequencedEventArb: Arbitrary[SequencedEvent[Envelope[?]]] =
     Arbitrary(Gen.oneOf(deliverErrorArb.arbitrary, deliverArbitrary.arbitrary))
 
   implicit val signedContent: Arbitrary[SignedContent[HasCryptographicEvidence]] = Arbitrary(
@@ -259,28 +264,7 @@ final class GeneratorsProtocol(
       )
     }
   )
-}
 
-object GeneratorsProtocol {
-  import com.digitalasset.canton.Generators.*
-  import com.digitalasset.canton.config.GeneratorsConfig.*
-  import com.digitalasset.canton.data.GeneratorsDataTime.*
-  import com.digitalasset.canton.topology.GeneratorsTopology.*
-
-  implicit val groupRecipientArb: Arbitrary[GroupRecipient] = genArbitrary
-  implicit val recipientArb: Arbitrary[Recipient] = genArbitrary
-  implicit val memberRecipientArb: Arbitrary[MemberRecipient] = genArbitrary
-
-  implicit val recipientsArb: Arbitrary[Recipients] = {
-    val protocolVersionDependentRecipientGen = Arbitrary.arbitrary[Recipient]
-
-    Arbitrary(for {
-      depths <- nonEmptyListGen(Arbitrary(Gen.choose(0, 3)))
-      trees <- Gen.sequence[List[RecipientsTree], RecipientsTree](
-        depths.forgetNE.map(recipientsTreeGen(Arbitrary(protocolVersionDependentRecipientGen)))
-      )
-    } yield Recipients(NonEmptyUtil.fromUnsafe(trees)))
-  }
   implicit val mediatorGroupRecipientArb: Arbitrary[MediatorGroupRecipient] = Arbitrary(
     Arbitrary.arbitrary[NonNegativeInt].map(MediatorGroupRecipient(_))
   )
@@ -290,7 +274,7 @@ object GeneratorsProtocol {
   private def recipientsTreeGen(
       recipientArb: Arbitrary[Recipient]
   )(depth: Int): Gen[RecipientsTree] = {
-    val maxBreadth = 5
+    val maxBreadth = 3 // lowered from 5 to cap generation time per #26662
     val recipientGroupGen = nonEmptySetGen(recipientArb)
 
     if (depth == 0) {
@@ -303,9 +287,8 @@ object GeneratorsProtocol {
     }
   }
   def deliverGen[Env <: Envelope[?]](
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       batch: Batch[Env],
-      protocolVersion: ProtocolVersion,
   ): Gen[Deliver[Env]] = for {
     previousTimestamp <- Arbitrary.arbitrary[Option[CantonTimestamp]]
     timestamp <- Arbitrary.arbitrary[CantonTimestamp]
@@ -319,22 +302,6 @@ object GeneratorsProtocol {
     messageIdO,
     batch,
     topologyTimestampO,
-    protocolVersion,
     trafficReceipt,
-  )
-
-  def timeProofArb(protocolVersion: ProtocolVersion): Arbitrary[TimeProof] = Arbitrary(
-    for {
-      timestamp <- Arbitrary.arbitrary[CantonTimestamp]
-      previousEventTimestamp <- Arbitrary.arbitrary[Option[CantonTimestamp]]
-      counter <- nonNegativeLongArb.arbitrary.map(_.unwrap)
-      targetSynchronizerId <- Arbitrary.arbitrary[Target[SynchronizerId]]
-    } yield TimeProofTestUtil.mkTimeProof(
-      timestamp,
-      previousEventTimestamp,
-      counter,
-      targetSynchronizerId,
-      protocolVersion,
-    )
   )
 }

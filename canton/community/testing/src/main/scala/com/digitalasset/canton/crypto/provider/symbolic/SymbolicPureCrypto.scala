@@ -9,7 +9,7 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.serialization.{DeserializationError, DeterministicEncoding}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ByteStringUtil
+import com.digitalasset.canton.util.{ByteStringUtil, EitherUtil}
 import com.digitalasset.canton.version.HasToByteString
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
@@ -37,28 +37,27 @@ class SymbolicPureCrypto extends CryptoPureApi {
 
   // NOTE: The following schemes are not really used by Symbolic crypto, but we pretend to support them
   override val defaultSymmetricKeyScheme: SymmetricKeyScheme = SymmetricKeyScheme.Aes128Gcm
-  override val defaultSigningAlgorithmSpec: SigningAlgorithmSpec =
-    SigningAlgorithmSpec.Ed25519
-  override val supportedSigningAlgorithmSpecs: NonEmpty[Set[SigningAlgorithmSpec]] =
-    NonEmpty.mk(Set, SigningAlgorithmSpec.Ed25519)
-  override val defaultEncryptionAlgorithmSpec: EncryptionAlgorithmSpec =
-    EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Gcm
-  override val supportedEncryptionAlgorithmSpecs: NonEmpty[Set[EncryptionAlgorithmSpec]] =
-    NonEmpty.mk(Set, EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Gcm)
+  override val signingAlgorithmSpecs: CryptoScheme[SigningAlgorithmSpec] =
+    CryptoScheme(SigningAlgorithmSpec.Ed25519, NonEmpty.mk(Set, SigningAlgorithmSpec.Ed25519))
+  override val encryptionAlgorithmSpecs: CryptoScheme[EncryptionAlgorithmSpec] =
+    CryptoScheme(
+      EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Cbc,
+      NonEmpty.mk(Set, EncryptionAlgorithmSpec.EciesHkdfHmacSha256Aes128Cbc),
+    )
   override val defaultPbkdfScheme: PbkdfScheme = PbkdfScheme.Argon2idMode1
 
   override protected[crypto] def signBytes(
       bytes: ByteString,
       signingKey: SigningPrivateKey,
       usage: NonEmpty[Set[SigningKeyUsage]],
-      signingAlgorithmSpec: SigningAlgorithmSpec = defaultSigningAlgorithmSpec,
+      signingAlgorithmSpec: SigningAlgorithmSpec = signingAlgorithmSpecs.default,
   )(implicit traceContext: TraceContext): Either[SigningError, Signature] =
     CryptoKeyValidation
       .ensureUsage(
         usage,
         signingKey.usage,
         signingKey.id,
-        _ => SigningError.InvalidKeyUsage(signingKey.id, signingKey.usage.forgetNE, usage.forgetNE),
+        SigningError.InvalidKeyUsage.apply,
       )
       .flatMap { _ =>
         val counter = signatureCounter.getAndIncrement()
@@ -72,9 +71,8 @@ class SymbolicPureCrypto extends CryptoPureApi {
       usage: NonEmpty[Set[SigningKeyUsage]],
   )(implicit traceContext: TraceContext): Either[SignatureCheckError, Unit] =
     for {
-      _ <- Either.cond(
+      _ <- EitherUtil.condUnit(
         publicKey.id == signature.signedBy,
-        (),
         SignatureCheckError.SignatureWithWrongKey(
           s"Signature was signed by ${signature.signedBy} whereas key is ${publicKey.id}"
         ),
@@ -82,26 +80,18 @@ class SymbolicPureCrypto extends CryptoPureApi {
       _ <- CryptoKeyValidation.ensureFormat(
         publicKey.format,
         Set(CryptoKeyFormat.Symbolic),
-        _ => SignatureCheckError.InvalidKeyError(s"Public key $publicKey is not a symbolic key"),
+        SignatureCheckError.UnsupportedKeyFormat.apply,
       )
       _ <- CryptoKeyValidation.ensureSignatureFormat(
         signature.format,
         Set(SignatureFormat.Symbolic),
-        _ =>
-          SignatureCheckError.InvalidSignatureFormat(
-            s"Signature format ${signature.format} is not a symbolic signature"
-          ),
+        SignatureCheckError.UnsupportedSignatureFormat.apply,
       )
       _ <- CryptoKeyValidation.ensureUsage(
         usage,
         publicKey.usage,
         publicKey.id,
-        _ =>
-          SignatureCheckError.InvalidKeyUsage(
-            publicKey.id,
-            publicKey.usage.forgetNE,
-            usage.forgetNE,
-          ),
+        SignatureCheckError.InvalidKeyUsage.apply,
       )
       signedContent <- Either.cond(
         signature.unwrap.size() >= 4,
@@ -112,9 +102,8 @@ class SymbolicPureCrypto extends CryptoPureApi {
           s"Symbolic signature ${signature.unwrap} lacks the four randomness bytes at the end",
         ),
       )
-      _ <- Either.cond(
+      _ <- EitherUtil.condUnit(
         signedContent == bytes,
-        (),
         SignatureCheckError.InvalidSignature(
           signature,
           bytes,
@@ -129,14 +118,16 @@ class SymbolicPureCrypto extends CryptoPureApi {
       scheme: SymmetricKeyScheme
   ): Either[EncryptionKeyGenerationError, SymmetricKey] = {
     val key = ByteString.copyFromUtf8(s"key-${symmetricKeyCounter.incrementAndGet()}")
-    Right(SymmetricKey(CryptoKeyFormat.Symbolic, key, scheme))
+    SymmetricKey
+      .create(CryptoKeyFormat.Symbolic, key, scheme)
+      .leftMap(EncryptionKeyGenerationError.KeyCreationError.apply)
   }
 
   override def createSymmetricKey(
       bytes: SecureRandomness,
       scheme: SymmetricKeyScheme,
   ): Either[EncryptionKeyCreationError, SymmetricKey] =
-    Right(SymmetricKey(CryptoKeyFormat.Symbolic, bytes.unwrap, scheme))
+    SymmetricKey.create(CryptoKeyFormat.Symbolic, bytes.unwrap, scheme)
 
   private def encryptWithInternal[M](
       bytes: ByteString,
@@ -145,9 +136,8 @@ class SymbolicPureCrypto extends CryptoPureApi {
       randomized: Boolean,
   ): Either[EncryptionError, AsymmetricEncrypted[M]] =
     for {
-      _ <- Either.cond(
+      _ <- EitherUtil.condUnit(
         publicKey.format == CryptoKeyFormat.Symbolic,
-        (),
         EncryptionError.InvalidEncryptionKey(s"Provided key not a symbolic key: $publicKey"),
       )
       // For a symbolic encrypted message, prepend the key id that was used to encrypt
@@ -169,14 +159,14 @@ class SymbolicPureCrypto extends CryptoPureApi {
   override def encryptWith[M <: HasToByteString](
       message: M,
       publicKey: EncryptionPublicKey,
-      encryptionAlgorithmSpec: EncryptionAlgorithmSpec = defaultEncryptionAlgorithmSpec,
+      encryptionAlgorithmSpec: EncryptionAlgorithmSpec = encryptionAlgorithmSpecs.default,
   ): Either[EncryptionError, AsymmetricEncrypted[M]] =
     encryptWithInternal(message.toByteString, publicKey, encryptionAlgorithmSpec, randomized = true)
 
   def encryptDeterministicWith[M <: HasToByteString](
       message: M,
       publicKey: EncryptionPublicKey,
-      encryptionAlgorithmSpec: EncryptionAlgorithmSpec = defaultEncryptionAlgorithmSpec,
+      encryptionAlgorithmSpec: EncryptionAlgorithmSpec = encryptionAlgorithmSpecs.default,
   )(implicit traceContext: TraceContext): Either[EncryptionError, AsymmetricEncrypted[M]] =
     encryptWithInternal(
       message.toByteString,
@@ -185,16 +175,21 @@ class SymbolicPureCrypto extends CryptoPureApi {
       randomized = false,
     )
 
-  override protected[crypto] def decryptWithInternal[M](
+  override private[crypto] def decryptWithInternal[M](
       encrypted: AsymmetricEncrypted[M],
       privateKey: EncryptionPrivateKey,
   )(
       deserialize: ByteString => Either[DeserializationError, M]
   ): Either[DecryptionError, M] =
     for {
-      _ <- Either.cond(
+      _ <- EitherUtil.condUnit(
+        privateKey.id == encrypted.encryptedFor,
+        DecryptionError.DecryptionWithWrongKey(
+          s"Ciphertext encrypted for ${encrypted.encryptedFor} instead of ${privateKey.id}"
+        ),
+      )
+      _ <- EitherUtil.condUnit(
         privateKey.format == CryptoKeyFormat.Symbolic,
-        (),
         DecryptionError.InvalidEncryptionKey(s"Provided key not a symbolic key: $privateKey"),
       )
       // Remove iv
@@ -303,6 +298,21 @@ class SymbolicPureCrypto extends CryptoPureApi {
       random
   }
 
+  private[crypto] def computeHmacWithSecretInternal(
+      secret: ByteString,
+      message: ByteString,
+      algorithm: HmacAlgorithm = defaultHmacAlgorithm,
+  ): Either[HmacError, Hmac] = {
+    // We just hash the secret and message, then truncate/pad to desired length
+    val combined = secret.concat(message)
+    val hash = TestHash.build.addWithoutLengthPrefix(combined).finish()
+    val hmacBytes = ByteStringUtil.padOrTruncate(
+      hash.unwrap,
+      NonNegativeInt.tryCreate(algorithm.hashAlgorithm.length.toInt),
+    )
+    Hmac.create(hmacBytes, algorithm)
+  }
+
   override def deriveSymmetricKey(
       password: String,
       symmetricKeyScheme: SymmetricKeyScheme,
@@ -320,9 +330,11 @@ class SymbolicPureCrypto extends CryptoPureApi {
         hash.unwrap,
         NonNegativeInt.tryCreate(symmetricKeyScheme.keySizeInBytes),
       )
-    val key = SymmetricKey(CryptoKeyFormat.Symbolic, keyBytes, symmetricKeyScheme)
 
-    Right(PasswordBasedEncryptionKey(key, salt))
+    SymmetricKey
+      .create(CryptoKeyFormat.Symbolic, keyBytes, symmetricKeyScheme)
+      .leftMap(PasswordBasedEncryptionError.KeyCreationError.apply)
+      .map(key => PasswordBasedEncryptionKey(key, salt))
   }
 
 }

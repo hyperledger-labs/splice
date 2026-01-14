@@ -160,16 +160,8 @@ export const ActionView: React.FC<{
   voteRequestResultTableType?: VoteRequestResultTableType;
   expiresAt?: Date;
   effectiveAt?: Date;
-  expirationInDays?: number;
   confirmationDialogProps?: ConfirmationDialogProps;
-}> = ({
-  action,
-  voteRequestResultTableType,
-  expiresAt,
-  effectiveAt,
-  expirationInDays,
-  confirmationDialogProps,
-}) => {
+}> = ({ action, voteRequestResultTableType, expiresAt, effectiveAt, confirmationDialogProps }) => {
   const votesHooks = useVotesHooks();
   const dsoInfosQuery = votesHooks.useDsoInfos();
 
@@ -204,7 +196,7 @@ export const ActionView: React.FC<{
                 Member: <PartyId id="srarc_offboardsv-member" partyId={dsoAction.value.sv} />,
               }}
             />
-            {getConfirmationDialog(confirmationDialogProps, expirationInDays)}
+            {getConfirmationDialog(confirmationDialogProps, expiresAt)}
           </>
         );
       }
@@ -218,7 +210,7 @@ export const ActionView: React.FC<{
                 Provider: <PartyId partyId={dsoAction.value.provider} />,
               }}
             />
-            {getConfirmationDialog(confirmationDialogProps, expirationInDays)}
+            {getConfirmationDialog(confirmationDialogProps, expiresAt)}
           </>
         );
       }
@@ -232,7 +224,7 @@ export const ActionView: React.FC<{
                 FeatureAppRightCid: <PartyId partyId={dsoAction.value.rightCid} />,
               }}
             />
-            {getConfirmationDialog(confirmationDialogProps, expirationInDays)}
+            {getConfirmationDialog(confirmationDialogProps, expiresAt)}
           </>
         );
       }
@@ -246,10 +238,9 @@ export const ActionView: React.FC<{
               dsoAction={dsoAction}
               expiresAt={expiresAt}
               effectiveAt={effectiveAt}
-              expirationInDays={expirationInDays}
               voteRequestResultTableType={voteRequestResultTableType}
             />
-            {getConfirmationDialog(confirmationDialogProps, expirationInDays)}
+            {getConfirmationDialog(confirmationDialogProps, expiresAt)}
           </>
         );
       }
@@ -274,7 +265,7 @@ export const ActionView: React.FC<{
                 ),
               }}
             />
-            {getConfirmationDialog(confirmationDialogProps, expirationInDays)}
+            {getConfirmationDialog(confirmationDialogProps, expiresAt)}
           </>
         );
       }
@@ -292,7 +283,7 @@ export const ActionView: React.FC<{
                 ),
               }}
             />
-            {getConfirmationDialog(confirmationDialogProps, expirationInDays)}
+            {getConfirmationDialog(confirmationDialogProps, expiresAt)}
           </>
         );
       }
@@ -307,9 +298,9 @@ export const ActionView: React.FC<{
             dsoInfosQuery={dsoInfosQuery}
             actionType={actionType}
             amuletRulesAction={amuletRulesAction}
+            expiresAt={expiresAt}
             voteRequestResultTableType={voteRequestResultTableType}
             confirmationDialogProps={confirmationDialogProps!}
-            expirationInDays={expirationInDays!}
           />
         );
       }
@@ -320,9 +311,9 @@ export const ActionView: React.FC<{
             dsoInfosQuery={dsoInfosQuery}
             actionType={actionType}
             amuletRulesAction={amuletRulesAction}
+            expiresAt={expiresAt}
             voteRequestResultTableType={voteRequestResultTableType}
             confirmationDialogProps={confirmationDialogProps!}
-            expirationInDays={expirationInDays!}
           />
         );
       }
@@ -333,9 +324,9 @@ export const ActionView: React.FC<{
             dsoInfosQuery={dsoInfosQuery}
             actionType={actionType}
             amuletRulesAction={amuletRulesAction}
+            expiresAt={expiresAt}
             voteRequestResultTableType={voteRequestResultTableType}
             confirmationDialogProps={confirmationDialogProps!}
-            expirationInDays={expirationInDays!}
           />
         );
       }
@@ -349,7 +340,6 @@ export const ActionView: React.FC<{
             expiresAt={expiresAt}
             effectiveAt={effectiveAt}
             voteRequestResultTableType={voteRequestResultTableType}
-            expirationInDays={expirationInDays!}
             confirmationDialogProps={confirmationDialogProps!}
           />
         );
@@ -419,19 +409,29 @@ const AddFutureConfigValueTable: React.FC<{
     tag: 'CRARC_AddFutureAmuletConfigSchedule';
     value: AmuletRules_AddFutureAmuletConfigSchedule;
   };
+  expiresAt?: Date;
   voteRequestResultTableType?: VoteRequestResultTableType;
   confirmationDialogProps?: ConfirmationDialogProps;
-  expirationInDays?: number;
 }> = ({
   votesHooks,
   dsoInfosQuery,
   actionType,
   amuletRulesAction,
+  expiresAt,
   voteRequestResultTableType,
   confirmationDialogProps,
-  expirationInDays,
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
+
+  const amuletConfigToCompareWith = dsoInfosQuery.data
+    ? findAmuletRulesScheduleItemToCompareAgainst(
+        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
+        amuletRulesAction.value.newScheduleItem._1,
+        votesHooks,
+        amuletRulesAction.value.newScheduleItem._2,
+        voteRequestResultTableType
+      )
+    : undefined;
 
   if (voteRequests.isPending) {
     return <Loading />;
@@ -444,16 +444,6 @@ const AddFutureConfigValueTable: React.FC<{
   if (!voteRequests.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-
-  const amuletConfigToCompareWith = dsoInfosQuery.data
-    ? findAmuletRulesScheduleItemToCompareAgainst(
-        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
-        amuletRulesAction.value.newScheduleItem._1,
-        votesHooks,
-        amuletRulesAction.value.newScheduleItem._2,
-        voteRequestResultTableType
-      )
-    : undefined;
 
   const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
     ? filterInflightVoteRequests(
@@ -525,7 +515,7 @@ const AddFutureConfigValueTable: React.FC<{
         }}
       />
       {confirmationDialogPropsWithDiffs &&
-        getConfirmationDialog(confirmationDialogPropsWithDiffs, expirationInDays)}
+        getConfirmationDialog(confirmationDialogPropsWithDiffs, expiresAt)}
     </>
   );
 };
@@ -539,19 +529,29 @@ const RemoveFutureConfigValueTable: React.FC<{
     tag: 'CRARC_RemoveFutureAmuletConfigSchedule';
     value: AmuletRules_RemoveFutureAmuletConfigSchedule;
   };
+  expiresAt?: Date;
   voteRequestResultTableType?: VoteRequestResultTableType;
   confirmationDialogProps?: ConfirmationDialogProps;
-  expirationInDays?: number;
 }> = ({
   votesHooks,
   dsoInfosQuery,
   actionType,
   amuletRulesAction,
+  expiresAt,
   voteRequestResultTableType,
   confirmationDialogProps,
-  expirationInDays,
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
+
+  const amuletConfigToCompareWith = dsoInfosQuery.data
+    ? findAmuletRulesScheduleItemToCompareAgainst(
+        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
+        amuletRulesAction.value.scheduleTime,
+        votesHooks,
+        dsoInfosQuery.data?.amuletRules.payload.configSchedule.initialValue,
+        voteRequestResultTableType
+      )
+    : undefined;
 
   if (voteRequests.isPending) {
     return <Loading />;
@@ -564,15 +564,6 @@ const RemoveFutureConfigValueTable: React.FC<{
   if (!voteRequests.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-  const amuletConfigToCompareWith = dsoInfosQuery.data
-    ? findAmuletRulesScheduleItemToCompareAgainst(
-        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
-        amuletRulesAction.value.scheduleTime,
-        votesHooks,
-        dsoInfosQuery.data?.amuletRules.payload.configSchedule.initialValue,
-        voteRequestResultTableType
-      )
-    : undefined;
 
   // TODO(DACH-NY/canton-network-node#15154): Implement config diffs of CRARC_RemoveFutureAmuletConfigSchedule action
   return (
@@ -597,7 +588,7 @@ const RemoveFutureConfigValueTable: React.FC<{
           }}
         />
       )}
-      {getConfirmationDialog(confirmationDialogProps, expirationInDays)}
+      {getConfirmationDialog(confirmationDialogProps, expiresAt)}
     </>
   );
 };
@@ -611,19 +602,29 @@ const UpdateFutureConfigValueTable: React.FC<{
     tag: 'CRARC_UpdateFutureAmuletConfigSchedule';
     value: AmuletRules_UpdateFutureAmuletConfigSchedule;
   };
+  expiresAt?: Date;
   voteRequestResultTableType?: VoteRequestResultTableType;
   confirmationDialogProps?: ConfirmationDialogProps;
-  expirationInDays?: number;
 }> = ({
   votesHooks,
   dsoInfosQuery,
   actionType,
   amuletRulesAction,
+  expiresAt,
   voteRequestResultTableType,
   confirmationDialogProps,
-  expirationInDays,
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
+
+  const amuletConfigToCompareWith = dsoInfosQuery.data
+    ? findAmuletRulesScheduleItemToCompareAgainst(
+        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
+        amuletRulesAction.value.scheduleItem._1,
+        votesHooks,
+        amuletRulesAction.value.scheduleItem._2,
+        voteRequestResultTableType
+      )
+    : undefined;
 
   if (voteRequests.isPending) {
     return <Loading />;
@@ -636,16 +637,6 @@ const UpdateFutureConfigValueTable: React.FC<{
   if (!voteRequests.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-
-  const amuletConfigToCompareWith = dsoInfosQuery.data
-    ? findAmuletRulesScheduleItemToCompareAgainst(
-        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
-        amuletRulesAction.value.scheduleItem._1,
-        votesHooks,
-        amuletRulesAction.value.scheduleItem._2,
-        voteRequestResultTableType
-      )
-    : undefined;
 
   const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
     ? filterInflightVoteRequests(
@@ -709,7 +700,7 @@ const UpdateFutureConfigValueTable: React.FC<{
           foldedAccordions: [],
         }}
       />
-      {getConfirmationDialog(confirmationDialogProps!, expirationInDays!)}
+      {getConfirmationDialog(confirmationDialogProps, expiresAt)}
     </>
   );
 };
@@ -723,7 +714,6 @@ const SetAmuletConfigValueTable: React.FC<{
   effectiveAt?: Date;
   voteRequestResultTableType?: VoteRequestResultTableType; // voteRequestResultTableType is only defined for the Planned, Executed and Rejected tabs
   confirmationDialogProps?: ConfirmationDialogProps;
-  expirationInDays?: number;
 }> = ({
   votesHooks,
   dsoInfosQuery,
@@ -733,9 +723,17 @@ const SetAmuletConfigValueTable: React.FC<{
   effectiveAt,
   voteRequestResultTableType,
   confirmationDialogProps,
-  expirationInDays,
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
+
+  const dsoConfigToCompareWith = getAmuletConfigToCompareWith(
+    effectiveAt,
+    voteRequestResultTableType,
+    votesHooks,
+    amuletAction,
+    dsoInfosQuery
+  );
+
   if (voteRequests.isPending) {
     return <Loading />;
   }
@@ -745,16 +743,6 @@ const SetAmuletConfigValueTable: React.FC<{
   if (!voteRequests.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-
-  const dsoConfigToCompareWith = dsoInfosQuery.data
-    ? getAmuletConfigToCompareWith(
-        effectiveAt,
-        voteRequestResultTableType,
-        votesHooks,
-        amuletAction,
-        dsoInfosQuery
-      )
-    : undefined;
 
   const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
     ? filterInflightVoteRequests(
@@ -772,22 +760,23 @@ const SetAmuletConfigValueTable: React.FC<{
         .filter(v => !dayjs(v[0]).isSame(dayjs(expiresAt)))
     : [];
 
-  const unfoldedAccordions = dsoConfigToCompareWith
-    ? [
-        {
-          title: <DateWithDurationDisplay datetime={dsoConfigToCompareWith[0]} />,
-          content: (
-            <PrettyJsonDiff
-              changes={{
-                newConfig: amuletAction.value.newConfig,
-                baseConfig: amuletAction.value.baseConfig,
-                actualConfig: dsoConfigToCompareWith[1],
-              }}
-            />
-          ),
-        },
-      ]
-    : [];
+  const unfoldedAccordions =
+    dsoInfosQuery.data && dsoConfigToCompareWith
+      ? [
+          {
+            title: <DateWithDurationDisplay datetime={dsoConfigToCompareWith[0]} />,
+            content: (
+              <PrettyJsonDiff
+                changes={{
+                  newConfig: amuletAction.value.newConfig,
+                  baseConfig: amuletAction.value.baseConfig,
+                  actualConfig: dsoConfigToCompareWith[1],
+                }}
+              />
+            ),
+          },
+        ]
+      : [];
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const foldedAccordions = inflightVoteRequests.map(vr => ({
@@ -823,7 +812,7 @@ const SetAmuletConfigValueTable: React.FC<{
         }}
       />
       {confirmationDialogPropsWithDiffs &&
-        getConfirmationDialog(confirmationDialogPropsWithDiffs, expirationInDays)}
+        getConfirmationDialog(confirmationDialogPropsWithDiffs, expiresAt)}
     </>
   );
 };
@@ -837,7 +826,6 @@ const SetDsoConfigValueTable: React.FC<{
   effectiveAt?: Date;
   voteRequestResultTableType?: VoteRequestResultTableType; // voteRequestResultTableType is only defined for the Planned, Executed and Rejected tabs
   confirmationDialogProps?: ConfirmationDialogProps;
-  expirationInDays?: number;
 }> = ({
   votesHooks,
   dsoInfosQuery,
@@ -847,9 +835,17 @@ const SetDsoConfigValueTable: React.FC<{
   effectiveAt,
   voteRequestResultTableType,
   confirmationDialogProps,
-  expirationInDays,
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
+
+  const dsoConfigToCompareWith = getDsoConfigToCompareWith(
+    effectiveAt,
+    voteRequestResultTableType,
+    votesHooks,
+    dsoAction,
+    dsoInfosQuery
+  );
+
   if (voteRequests.isPending) {
     return <Loading />;
   }
@@ -859,14 +855,6 @@ const SetDsoConfigValueTable: React.FC<{
   if (!voteRequests.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-
-  const dsoConfigToCompareWith = getDsoConfigToCompareWith(
-    effectiveAt,
-    voteRequestResultTableType,
-    votesHooks,
-    dsoAction,
-    dsoInfosQuery
-  );
 
   const inflightVoteRequests: [string, DsoRulesConfig][] = !voteRequestResultTableType
     ? filterInflightVoteRequests(
@@ -935,18 +923,20 @@ const SetDsoConfigValueTable: React.FC<{
         }}
       />
       {confirmationDialogPropsWithDiffs &&
-        getConfirmationDialog(confirmationDialogPropsWithDiffs, expirationInDays)}
+        getConfirmationDialog(confirmationDialogPropsWithDiffs, expiresAt)}
     </>
   );
 };
 
 const getConfirmationDialog = (
   confirmationDialogProps?: ConfirmationDialogProps,
-  expirationInDays?: number
+  expiresAt?: Date
 ) => {
   if (!confirmationDialogProps) {
     return <></>;
   }
+
+  const expireDuration = dayjs(expiresAt).fromNow();
 
   return (
     <ConfirmationDialog
@@ -964,7 +954,7 @@ const getConfirmationDialog = (
         <li>This action cannot be undone.</li>
         <li>You will not be able to edit this request afterwards.</li>
         <li>You may only edit your vote after creation.</li>
-        <li>The vote request will expire in {expirationInDays} days.</li>
+        <li>The vote request will expire {expireDuration}.</li>
       </ul>
       {confirmationDialogProps.children}
     </ConfirmationDialog>

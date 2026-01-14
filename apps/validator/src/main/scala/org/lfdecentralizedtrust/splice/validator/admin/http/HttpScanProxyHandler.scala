@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.validator.admin.http
 
-import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.http.v0.definitions.MaybeCachedContractWithState
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scanproxy as v0}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
@@ -12,6 +11,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.auth.AuthenticationOnlyAuthExtractor.AuthenticatedRequest
 import org.lfdecentralizedtrust.splice.http.v0.scanproxy.ScanproxyResource
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -23,7 +23,7 @@ class HttpScanProxyHandler(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends v0.ScanproxyHandler[TracedUser]
+) extends v0.ScanproxyHandler[AuthenticatedRequest]
     with Spanning
     with NamedLogging {
 
@@ -31,8 +31,8 @@ class HttpScanProxyHandler(
 
   override def getDsoPartyId(
       respond: v0.ScanproxyResource.GetDsoPartyIdResponse.type
-  )()(tUser: TracedUser): Future[v0.ScanproxyResource.GetDsoPartyIdResponse] = {
-    implicit val TracedUser(_, traceContext) = tUser
+  )()(tUser: AuthenticatedRequest): Future[v0.ScanproxyResource.GetDsoPartyIdResponse] = {
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
     withSpan(s"$workflowId.getDsoPartyId") { implicit traceContext => _ =>
       for {
         dsoPartyId <- scanConnection.getDsoPartyId()
@@ -44,12 +44,27 @@ class HttpScanProxyHandler(
     }
   }
 
+  override def getDsoInfo(
+      respond: v0.ScanproxyResource.GetDsoInfoResponse.type
+  )()(tUser: AuthenticatedRequest): Future[v0.ScanproxyResource.GetDsoInfoResponse] = {
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
+    withSpan(s"$workflowId.getDsoInfo") { implicit traceContext => _ =>
+      for {
+        dsoInfo <- scanConnection.getDsoInfo()
+      } yield {
+        respond.OK(
+          dsoInfo
+        )
+      }
+    }
+  }
+
   override def lookupFeaturedAppRight(
       respond: v0.ScanproxyResource.LookupFeaturedAppRightResponse.type
   )(
       providerPartyId: String
-  )(tUser: TracedUser): Future[v0.ScanproxyResource.LookupFeaturedAppRightResponse] = {
-    implicit val TracedUser(_, traceContext) = tUser
+  )(tUser: AuthenticatedRequest): Future[v0.ScanproxyResource.LookupFeaturedAppRightResponse] = {
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
     withSpan(s"$workflowId.lookupFeaturedAppRight") { implicit traceContext => _ =>
       for {
         featuredAppRight <- scanConnection.lookupFeaturedAppRight(
@@ -66,8 +81,10 @@ class HttpScanProxyHandler(
   override def getOpenAndIssuingMiningRounds(
       respond: v0.ScanproxyResource.GetOpenAndIssuingMiningRoundsResponse.type
   )(
-  )(tUser: TracedUser): Future[v0.ScanproxyResource.GetOpenAndIssuingMiningRoundsResponse] = {
-    implicit val TracedUser(_, traceContext) = tUser
+  )(
+      tUser: AuthenticatedRequest
+  ): Future[v0.ScanproxyResource.GetOpenAndIssuingMiningRoundsResponse] = {
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
     withSpan(s"$workflowId.getOpenAndIssuingMiningRounds") { implicit traceContext => _ =>
       for {
         (open, issuing) <- scanConnection.getOpenAndIssuingMiningRounds()
@@ -83,9 +100,9 @@ class HttpScanProxyHandler(
   }
 
   override def getAmuletRules(respond: v0.ScanproxyResource.GetAmuletRulesResponse.type)()(
-      tUser: TracedUser
+      tUser: AuthenticatedRequest
   ): Future[v0.ScanproxyResource.GetAmuletRulesResponse] = {
-    implicit val TracedUser(_, traceContext) = tUser
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
     withSpan(s"$workflowId.getAmuletRules") { implicit traceContext => _ =>
       for {
         amuletRules <- scanConnection.getAmuletRulesWithState()
@@ -99,8 +116,8 @@ class HttpScanProxyHandler(
       respond: v0.ScanproxyResource.LookupAnsEntryByPartyResponse.type
   )(
       party: String
-  )(tUser: TracedUser): Future[v0.ScanproxyResource.LookupAnsEntryByPartyResponse] = {
-    implicit val TracedUser(_, traceContext) = tUser
+  )(tUser: AuthenticatedRequest): Future[v0.ScanproxyResource.LookupAnsEntryByPartyResponse] = {
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
     withSpan(s"$workflowId.lookupAnsEntryByParty") { implicit traceContext => _ =>
       for {
         entry <- scanConnection.lookupAnsEntryByParty(PartyId.tryFromProtoPrimitive(party))
@@ -118,8 +135,10 @@ class HttpScanProxyHandler(
 
   override def lookupAnsEntryByName(
       respond: v0.ScanproxyResource.LookupAnsEntryByNameResponse.type
-  )(name: String)(tUser: TracedUser): Future[v0.ScanproxyResource.LookupAnsEntryByNameResponse] = {
-    implicit val TracedUser(_, traceContext) = tUser
+  )(
+      name: String
+  )(tUser: AuthenticatedRequest): Future[v0.ScanproxyResource.LookupAnsEntryByNameResponse] = {
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
     withSpan(s"$workflowId.lookupAnsEntryByParty") { implicit traceContext => _ =>
       for {
         entry <- scanConnection.lookupAnsEntryByName(name)
@@ -138,9 +157,9 @@ class HttpScanProxyHandler(
   override def listAnsEntries(
       respond: v0.ScanproxyResource.ListAnsEntriesResponse.type
   )(namePrefix: Option[String], pageSize: Int)(
-      tUser: TracedUser
+      tUser: AuthenticatedRequest
   ): Future[v0.ScanproxyResource.ListAnsEntriesResponse] = {
-    implicit val TracedUser(_, traceContext) = tUser
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
     withSpan(s"$workflowId.lookupAnsEntryByParty") { implicit traceContext => _ =>
       for {
         entries <- scanConnection.listAnsEntries(namePrefix, pageSize)
@@ -153,8 +172,8 @@ class HttpScanProxyHandler(
       respond: v0.ScanproxyResource.GetAnsRulesResponse.type
   )(
       body: org.lfdecentralizedtrust.splice.http.v0.definitions.GetAnsRulesRequest
-  )(tUser: TracedUser): Future[v0.ScanproxyResource.GetAnsRulesResponse] = {
-    implicit val TracedUser(_, traceContext) = tUser
+  )(tUser: AuthenticatedRequest): Future[v0.ScanproxyResource.GetAnsRulesResponse] = {
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
     withSpan(s"$workflowId.getAnsRules") { implicit traceContext => _ =>
       for {
         response <- scanConnection.getAnsRules()
@@ -172,9 +191,9 @@ class HttpScanProxyHandler(
   override def lookupTransferPreapprovalByParty(
       respond: ScanproxyResource.LookupTransferPreapprovalByPartyResponse.type
   )(party: String)(
-      tUser: TracedUser
+      tUser: AuthenticatedRequest
   ): Future[ScanproxyResource.LookupTransferPreapprovalByPartyResponse] = {
-    implicit val TracedUser(_, traceContext) = tUser
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
     withSpan(s"$workflowId.lookupTransferPreapprovalByParty") { implicit traceContext => _ =>
       for {
         transferPreapprovalOpt <- scanConnection.lookupTransferPreapprovalByParty(
@@ -198,9 +217,9 @@ class HttpScanProxyHandler(
   override def lookupTransferCommandCounterByParty(
       respond: ScanproxyResource.LookupTransferCommandCounterByPartyResponse.type
   )(party: String)(
-      tUser: TracedUser
+      tUser: AuthenticatedRequest
   ): Future[ScanproxyResource.LookupTransferCommandCounterByPartyResponse] = {
-    implicit val TracedUser(_, traceContext) = tUser
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
     withSpan(s"$workflowId.lookupTransferCommandCounterByParty") { implicit traceContext => _ =>
       for {
         transferCommandCounterOpt <- scanConnection.lookupTransferCommandCounterByParty(
@@ -226,9 +245,9 @@ class HttpScanProxyHandler(
   override def lookupTransferCommandStatus(
       respond: ScanproxyResource.LookupTransferCommandStatusResponse.type
   )(sender: String, nonce: Long)(
-      tUser: TracedUser
+      tUser: AuthenticatedRequest
   ): Future[ScanproxyResource.LookupTransferCommandStatusResponse] = {
-    implicit val TracedUser(_, traceContext) = tUser
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
     withSpan(s"$workflowId.lookupTransferCommandStatus") { implicit traceContext => _ =>
       val senderParty = PartyId.tryFromProtoPrimitive(sender)
       for {

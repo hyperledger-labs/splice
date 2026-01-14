@@ -41,6 +41,7 @@ import Splice.Api.Token.AllocationInstructionV1
 import Splice.Api.Token.TransferInstructionV1
 
 import Splice.Amulet
+import Splice.AmuletConfig hiding (Amulet)
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletAllocation
 import Splice.AmuletTransferInstruction
@@ -48,6 +49,7 @@ import Splice.AmuletRules
 import Splice.Expiry
 import Splice.ExternalPartyAmuletRules
 import Splice.Fees
+import Splice.Schedule
 import Splice.Round
 
 import Splice.Testing.Utils
@@ -84,6 +86,8 @@ data AmuletRegistryConfig = AmuletRegistryConfig
   with
     initialAmuletPrice : Decimal
     demoTime : Time
+    noTransferFee : Bool -- ^ If true then the transfer fee is set to zero to test their removal
+    dsoPartyName : Text
   deriving (Eq, Show)
 
 -- | Recommended default configuration for setting up the mock amulet registry.
@@ -91,6 +95,21 @@ defaultAmuletRegistryConfig : AmuletRegistryConfig
 defaultAmuletRegistryConfig = AmuletRegistryConfig with
   initialAmuletPrice = 0.5 -- a non-zero price that still makes it easy to reason about fees and amounts
   demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
+  noTransferFee = False -- charge fees by default as dealing with them is important as long as they are being charged
+  dsoPartyName = "dso-party"
+
+noTransferFeeConfig : TransferConfig USD
+noTransferFeeConfig = TransferConfig with
+  createFee = FixedFee 0.0
+  holdingFee = RatePerRound 0.00002
+  lockHolderFee = FixedFee 0.0
+  transferFee = SteppedRate with
+    initialRate = 0.0
+    steps = []
+  extraFeaturedAppRewardAmount = 1.0
+  maxNumInputs = 100
+  maxNumOutputs = 100
+  maxNumLockHolders = 10
 
 -- | Initialize the mock amulet registry.
 initialize : AmuletRegistryConfig -> Script AmuletRegistry
@@ -98,10 +117,18 @@ initialize config = do
   -- use a time that is easy to reason about in script outputs
   setTime config.demoTime
 
-  dso <- allocateParty "dso-party"
+  dso <- allocatePartyExact config.dsoPartyName
   let registry = AmuletRegistry with
         dso
         instrumentId = amuletInstrumentId dso
+
+  let amuletConfig
+        | config.noTransferFee = defaultAmuletConfig with
+            transferConfig = noTransferFeeConfig
+        | otherwise = defaultAmuletConfig
+  let defaultAmuletConfigSchedule = Schedule with
+        initialValue = amuletConfig
+        futureValues = []
 
   _ <- submit dso $ createCmd AmuletRules with
     configSchedule = defaultAmuletConfigSchedule
@@ -193,7 +220,11 @@ registryApi_getTransferFactory
 registryApi_getTransferFactory registry arg = do
   (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
   transferC <- getAmuletRulesTransferContext registry
-  (optPreapproval, preapprovalC) <- lookupPreapprovalWithContext registry arg.transfer.receiver
+  let isSelfTransfer = arg.transfer.sender == arg.transfer.receiver
+  (optPreapproval, preapprovalC) <-
+    if isSelfTransfer
+      then pure (None, emptyOpenApiChoiceContext)
+      else lookupPreapprovalWithContext registry arg.transfer.receiver
   featuredAppRightC <- case optPreapproval of
     None -> pure emptyOpenApiChoiceContext
     Some preapproval -> getFeaturedAppRightContext registry preapproval.provider
@@ -348,7 +379,7 @@ getAmuletRulesTransferContext registry = do
 
 lookupPreapprovalWithContext : AmuletRegistry -> Party -> Script (Optional TransferPreapproval, OpenApiChoiceContext)
 lookupPreapprovalWithContext registry receiver = do
-  preapprovals  <- queryFilter @TransferPreapproval receiver (\preapproval -> preapproval.receiver == receiver)
+  preapprovals  <- queryFilter @TransferPreapproval registry.dso (\preapproval -> preapproval.receiver == receiver)
   case preapprovals of
     [] -> pure (None, emptyOpenApiChoiceContext)
     (preapprovalCid, preapproval) :: _ ->  do

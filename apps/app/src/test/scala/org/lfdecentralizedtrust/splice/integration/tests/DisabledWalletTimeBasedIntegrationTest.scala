@@ -75,6 +75,7 @@ class DisabledWalletTimeBasedIntegrationTest
         ) - smallAmount
 
       eventually(30.seconds) {
+        advanceTimeForRewardAutomationToRunForCurrentRound
         sv1Backend.participantClient.ledger_api_extensions.acs
           .filterJava(SvRewardCoupon.COMPANION)(
             dsoParty,
@@ -84,7 +85,7 @@ class DisabledWalletTimeBasedIntegrationTest
             },
           ) should not be empty
 
-        advanceRoundsByOneTick
+        advanceRoundsToNextRoundOpening
         currentRound += 1
 
         silentClue(

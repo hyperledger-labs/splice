@@ -17,10 +17,10 @@ import com.daml.ledger.javaapi.data.codegen.{
 import com.digitalasset.daml.lf.value as lf
 import com.digitalasset.daml.lf.data.Ref.Identifier as LfIdentifier
 import com.digitalasset.daml.lf.data.Time.Timestamp
-import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.http.v0.definitions.MaybeCachedContract
 import org.lfdecentralizedtrust.splice.util.JavaDecodeUtil
+import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ledger.api.validation.ValueValidator
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -48,8 +48,8 @@ import scala.util.Try
   */
 final case class Contract[TCid, T](
     identifier: Identifier,
-    override val contractId: TCid & ContractId[_],
-    override val payload: T & DamlRecord[_],
+    override val contractId: TCid & ContractId[?],
+    override val payload: T & DamlRecord[?],
     val createdEventBlob: ByteString,
     val createdAt: Instant,
 ) extends PrettyPrinting
@@ -100,7 +100,7 @@ final case class Contract[TCid, T](
 
 object Contract {
   object Companion {
-    type Template[TCid, Data] = ContractCompanion[_ <: CodegenContract[TCid, Data], TCid, Data]
+    type Template[TCid, Data] = ContractCompanion[? <: CodegenContract[TCid, Data], TCid, Data]
     type Interface[ICid, Marker, View] = InterfaceCompanion[Marker, ICid, View]
   }
 

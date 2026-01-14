@@ -4,13 +4,15 @@
 package com.digitalasset.canton.synchronizer.sequencer
 
 import cats.data.EitherT
+import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.option.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
+import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.metrics.MetricsHelper
@@ -26,6 +28,7 @@ import com.digitalasset.canton.synchronizer.sequencer.admin.data.{
   SequencerAdminStatus,
   SequencerHealthStatus,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.BlockOrderer
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.SnapshotNotFound
 import com.digitalasset.canton.synchronizer.sequencer.errors.{
   CreateSubscriptionError,
@@ -44,7 +47,8 @@ import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   SequencerTrafficStatus,
 }
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration, SynchronizerTimeTracker}
-import com.digitalasset.canton.topology.{Member, SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.processing.EffectiveTime
+import com.digitalasset.canton.topology.{Member, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.util.FutureUtil.doNotAwait
@@ -69,10 +73,9 @@ object DatabaseSequencer {
       timeouts: ProcessingTimeout,
       storage: Storage,
       sequencerStore: SequencerStore,
+      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
       clock: Clock,
-      synchronizerId: SynchronizerId,
       topologyClientMember: Member,
-      protocolVersion: ProtocolVersion,
       cryptoApi: SynchronizerCryptoClient,
       metrics: SequencerMetrics,
       loggerFactory: NamedLoggerFactory,
@@ -106,13 +109,12 @@ object DatabaseSequencer {
       None,
       None,
       clock,
-      synchronizerId,
       topologyClientMember,
-      protocolVersion,
       cryptoApi,
       metrics,
       loggerFactory,
       blockSequencerMode = false,
+      sequencingTimeLowerBoundExclusive = sequencingTimeLowerBoundExclusive,
       rateLimitManagerO = None,
     )
   }
@@ -132,13 +134,12 @@ class DatabaseSequencer(
     exclusiveStorage: Option[Storage],
     health: Option[SequencerHealthConfig],
     clock: Clock,
-    synchronizerId: SynchronizerId,
     topologyClientMember: Member,
-    protocolVersion: ProtocolVersion,
     cryptoApi: SynchronizerCryptoClient,
     metrics: SequencerMetrics,
     loggerFactory: NamedLoggerFactory,
     blockSequencerMode: Boolean,
+    sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
     rateLimitManagerO: Option[SequencerRateLimitManager],
 )(implicit ec: ExecutionContext, tracer: Tracer, materializer: Materializer)
     extends BaseSequencer(
@@ -148,6 +149,9 @@ class DatabaseSequencer(
       SignatureVerifier(cryptoApi),
     )
     with FlagCloseable {
+
+  private val psid = cryptoApi.psid
+  private val protocolVersion: ProtocolVersion = psid.protocolVersion
 
   require(
     blockSequencerMode || config.writer.eventWriteMaxConcurrency == 1,
@@ -168,6 +172,7 @@ class DatabaseSequencer(
     protocolVersion,
     loggerFactory,
     blockSequencerMode,
+    sequencingTimeLowerBoundExclusive,
     metrics,
   )
 
@@ -190,7 +195,7 @@ class DatabaseSequencer(
   protected def resetWatermarkTo: ResetWatermark = SequencerWriter.ResetWatermarkToClockNow
 
   // Only start pruning scheduler after `store` variable above has been initialized to avoid racy NPE
-  withNewTraceContext { implicit traceContext =>
+  withNewTraceContext("db_sequencer_start") { implicit traceContext =>
     timeouts.unbounded.await(s"Waiting for sequencer writer to fully start")(
       writer
         .startOrLogError(initialState, resetWatermarkTo)
@@ -224,9 +229,9 @@ class DatabaseSequencer(
       sequencerStore.markLaggingSequencersOffline(cutoffTime)
     }
 
-    def markOffline(): Unit = withNewTraceContext { implicit traceContext =>
+    def markOffline(): Unit = withNewTraceContext("mark_offline") { implicit traceContext =>
       doNotAwait(
-        performUnlessClosingUSF(functionFullName)(markOfflineF().thereafter { _ =>
+        synchronizeWithClosing(functionFullName)(markOfflineF().thereafter { _ =>
           // schedule next marking sequencers as offline regardless of outcome
           schedule()
         }).onShutdown {
@@ -249,12 +254,10 @@ class DatabaseSequencer(
   private val reader =
     new SequencerReader(
       config.reader,
-      synchronizerId,
       sequencerStore,
       cryptoApi,
       eventSignaller,
       topologyClientMember,
-      protocolVersion,
       timeouts,
       loggerFactory,
     )
@@ -288,7 +291,7 @@ class DatabaseSequencer(
 
   override protected def sendAsyncInternal(submission: SubmissionRequest)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] =
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
     for {
       // TODO(#12405) Support aggregatable submissions in the DB sequencer
       _ <- EitherT.cond[FutureUnlessShutdown](
@@ -309,7 +312,7 @@ class DatabaseSequencer(
           "Group addresses are not yet supported by this database sequencer"
         ),
       )
-      _ <- writer.send(submission)
+      _ <- writer.send(submission).leftWiden[CantonBaseError]
     } yield ()
 
   protected def blockSequencerWriteInternal(
@@ -323,13 +326,13 @@ class DatabaseSequencer(
       signedSubmission: SignedContent[SubmissionRequest]
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] =
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
     sendAsyncInternal(signedSubmission.content)
 
-  override def readInternalV2(member: Member, timestamp: Option[CantonTimestamp])(implicit
+  override def readInternal(member: Member, timestamp: Option[CantonTimestamp])(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CreateSubscriptionError, Sequencer.SequencedEventSource] =
-    reader.readV2(member, timestamp)
+    reader.read(member, timestamp)
 
   /** Internal method to be used in the sequencer integration.
     */
@@ -360,7 +363,7 @@ class DatabaseSequencer(
 
   // For the database sequencer, the SequencerId serves as the local sequencer identity/member
   // until the database and block sequencers are unified.
-  override protected def localSequencerMember: Member = SequencerId(synchronizerId.uid)
+  override protected def localSequencerMember: Member = SequencerId(psid.uid)
 
   /** helper for performing operations that are expected to be called with a registered member so
     * will just throw if we find the member is unregistered.
@@ -403,12 +406,11 @@ class DatabaseSequencer(
         }
     } yield report
 
-  override def locatePruningTimestamp(index: PositiveInt)(implicit
+  override def findPruningTimestamp(index: PositiveInt)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, PruningSupportError, Option[CantonTimestamp]] =
     EitherT.right[PruningSupportError](
-      sequencerStore
-        .locatePruningTimestamp(NonNegativeInt.tryCreate(index.value - 1))
+      sequencerStore.findPruningTimestamp(NonNegativeInt.tryCreate(index.value - 1))
     )
 
   override def reportMaxEventAgeMetric(
@@ -484,6 +486,7 @@ class DatabaseSequencer(
       reader,
       eventSignaller,
       sequencerStore,
+      cryptoApi,
     )(logger)
 
   override def trafficStatus(members: Seq[Member], selector: TimestampSelector)(implicit
@@ -518,4 +521,18 @@ class DatabaseSequencer(
     throw new UnsupportedOperationException(
       "Traffic control is not supported by the database sequencer"
     )
+
+  override private[sequencer] def updateSynchronizerSuccessor(
+      successorO: Option[SynchronizerSuccessor],
+      announcementEffectiveTime: EffectiveTime,
+  )(implicit traceContext: TraceContext): Unit =
+    reader.updateSynchronizerSuccessor(successorO, announcementEffectiveTime)
+
+  // TODO(#27919): provide a proper implementation
+  override def sequencingTime(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[CantonTimestamp]] =
+    FutureUnlessShutdown.pure(None)
+
+  override private[canton] def orderer: Option[BlockOrderer] = None
 }

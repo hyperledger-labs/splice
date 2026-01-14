@@ -11,6 +11,9 @@ import { svPartyId } from '../../mocks/constants';
 import { Wrapper } from '../../helpers';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import dayjs from 'dayjs';
+import { server, svUrl } from '../../setup/setup';
+import { rest } from 'msw';
+import { PROPOSAL_SUMMARY_SUBTITLE } from '../../../utils/constants';
 
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
@@ -37,7 +40,7 @@ describe('Update SV Reward Weight Form', () => {
   test('should render all Update SV Reward Weight Form components', () => {
     render(
       <Wrapper>
-        <UpdateSvRewardWeightForm onSubmit={() => Promise.resolve()} />
+        <UpdateSvRewardWeightForm />
       </Wrapper>
     );
 
@@ -52,9 +55,13 @@ describe('Update SV Reward Weight Form', () => {
     expect(summaryInput).toBeDefined();
     expect(summaryInput.getAttribute('value')).toBeNull();
 
+    const summarySubtitle = screen.getByTestId('update-sv-reward-weight-summary-subtitle');
+    expect(summarySubtitle).toBeDefined();
+    expect(summarySubtitle.textContent).toBe(PROPOSAL_SUMMARY_SUBTITLE);
+
     const urlInput = screen.getByTestId('update-sv-reward-weight-url');
     expect(urlInput).toBeDefined();
-    expect(urlInput.getAttribute('value')).toBe('');
+    expect(urlInput.getAttribute('value')).toBe('https://');
 
     const memberInput = screen.getByTestId('update-sv-reward-weight-member-dropdown');
     expect(memberInput).toBeDefined();
@@ -70,7 +77,7 @@ describe('Update SV Reward Weight Form', () => {
 
     render(
       <Wrapper>
-        <UpdateSvRewardWeightForm onSubmit={() => Promise.resolve()} />
+        <UpdateSvRewardWeightForm />
       </Wrapper>
     );
 
@@ -92,11 +99,11 @@ describe('Update SV Reward Weight Form', () => {
     // completing the form should reenable the submit button
     const summaryInput = screen.getByTestId('update-sv-reward-weight-summary');
     expect(summaryInput).toBeDefined();
-    user.type(summaryInput, 'Summary of the proposal');
+    await user.type(summaryInput, 'Summary of the proposal');
 
     const urlInput = screen.getByTestId('update-sv-reward-weight-url');
     expect(urlInput).toBeDefined();
-    user.type(urlInput, 'https://example.com');
+    await user.type(urlInput, 'https://example.com');
 
     const memberDropdown = screen.getByTestId('update-sv-reward-weight-member-dropdown');
     expect(memberDropdown).toBeDefined();
@@ -116,14 +123,13 @@ describe('Update SV Reward Weight Form', () => {
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-    expect(submitButton.getAttribute('disabled')).toBe('');
+    expect(submitButton.getAttribute('disabled')).toBe(null);
   });
 
   test('expiry date must be in the future', async () => {
-    const user = userEvent.setup();
     render(
       <Wrapper>
-        <UpdateSvRewardWeightForm onSubmit={() => Promise.resolve()} />
+        <UpdateSvRewardWeightForm />
       </Wrapper>
     );
 
@@ -133,25 +139,23 @@ describe('Update SV Reward Weight Form', () => {
     const thePast = dayjs().subtract(1, 'day').format(dateTimeFormatISO);
     const theFuture = dayjs().add(1, 'day').format(dateTimeFormatISO);
 
-    await user.clear(expiryDateInput);
-    await user.type(expiryDateInput, thePast);
+    fireEvent.change(expiryDateInput, { target: { value: thePast } });
 
-    waitFor(() => {
-      expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
+    await waitFor(() => {
+      expect(screen.queryByText('Expiration must be in the future')).toBeInTheDocument();
     });
 
-    await user.clear(expiryDateInput);
-    await user.type(expiryDateInput, theFuture);
+    fireEvent.change(expiryDateInput, { target: { value: theFuture } });
 
-    expect(screen.queryByText('Expiration must be in the future')).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByText('Expiration must be in the future')).not.toBeInTheDocument();
+    });
   });
 
   test('effective date must be after expiry date', async () => {
-    const user = userEvent.setup();
-
     render(
       <Wrapper>
-        <UpdateSvRewardWeightForm onSubmit={() => Promise.resolve()} />
+        <UpdateSvRewardWeightForm />
       </Wrapper>
     );
 
@@ -161,28 +165,32 @@ describe('Update SV Reward Weight Form', () => {
     const expiryDate = dayjs().add(1, 'week');
     const effectiveDate = expiryDate.subtract(1, 'day');
 
-    await user.clear(expiryDateInput);
-    await user.type(expiryDateInput, expiryDate.format(dateTimeFormatISO));
+    fireEvent.change(expiryDateInput, { target: { value: expiryDate.format(dateTimeFormatISO) } });
+    fireEvent.change(effectiveDateInput, {
+      target: { value: effectiveDate.format(dateTimeFormatISO) },
+    });
 
-    await user.clear(effectiveDateInput);
-    await user.type(effectiveDateInput, effectiveDate.format(dateTimeFormatISO));
-
-    waitFor(() => {
-      expect(screen.queryByText('Effective Date must be after expiration date')).toBeDefined();
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Effective Date must be after expiration date')
+      ).toBeInTheDocument();
     });
 
     const validEffectiveDate = expiryDate.add(1, 'day').format(dateTimeFormatISO);
 
-    await user.clear(effectiveDateInput);
-    await user.type(effectiveDateInput, validEffectiveDate);
+    fireEvent.change(effectiveDateInput, { target: { value: validEffectiveDate } });
 
-    expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Effective Date must be after expiration date')
+      ).not.toBeInTheDocument();
+    });
   });
 
   test('sv dropdown contains all svs', async () => {
     render(
       <Wrapper>
-        <UpdateSvRewardWeightForm onSubmit={() => Promise.resolve()} />
+        <UpdateSvRewardWeightForm />
       </Wrapper>
     );
 
@@ -199,11 +207,70 @@ describe('Update SV Reward Weight Form', () => {
     );
   });
 
+  test('Current weight of selected SV is shown', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <UpdateSvRewardWeightForm />
+      </Wrapper>
+    );
+
+    const memberDropdown = screen.getByTestId('update-sv-reward-weight-member-dropdown');
+    expect(memberDropdown).toBeDefined();
+
+    const selectInput = screen.getByRole('combobox');
+
+    const validateCurrentWeightFor = async (sv: string, weight: string) => {
+      await waitFor(async () => {
+        fireEvent.mouseDown(selectInput);
+        const memberToSelect = screen.getByText(sv);
+        expect(memberToSelect).not.toBeNull();
+        await user.click(memberToSelect);
+        expect(await screen.findByText(`Current Weight: ${weight}`)).toBeDefined();
+      });
+    };
+
+    await validateCurrentWeightFor('Digital-Asset-2', '10');
+    await validateCurrentWeightFor('Digital-Asset-Eng-2', '12345');
+  });
+
+  test('Weight is reset when sv changes', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <UpdateSvRewardWeightForm />
+      </Wrapper>
+    );
+
+    const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
+    expect(weightInput).toBeDefined();
+    expect(weightInput.getAttribute('value')).toBe('');
+
+    // set the weight before changing sv
+    await user.type(weightInput, '10999');
+    expect(weightInput.getAttribute('value')).toBe('10999');
+
+    const memberDropdown = screen.getByTestId('update-sv-reward-weight-member-dropdown');
+    expect(memberDropdown).toBeDefined();
+    const selectInput = screen.getByRole('combobox');
+    fireEvent.mouseDown(selectInput);
+
+    await waitFor(async () => {
+      const memberToSelect = screen.getByText('Digital-Asset-Eng-2');
+      expect(memberToSelect).toBeDefined();
+      await user.click(memberToSelect);
+    });
+
+    expect(weightInput.getAttribute('value')).toBe('');
+  });
+
   test('Weight must be a valid number', async () => {
     const user = userEvent.setup();
     render(
       <Wrapper>
-        <UpdateSvRewardWeightForm onSubmit={() => Promise.resolve()} />
+        <UpdateSvRewardWeightForm />
       </Wrapper>
     );
 
@@ -211,7 +278,7 @@ describe('Update SV Reward Weight Form', () => {
     expect(weightInput).toBeDefined();
     await user.type(weightInput, '123abc');
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.getByText('Weight must be a valid number')).toBeDefined();
     });
 
@@ -219,6 +286,170 @@ describe('Update SV Reward Weight Form', () => {
     await user.type(weightInput, '1001');
     await user.click(screen.getByTestId('update-sv-reward-weight-action'));
 
-    expect(screen.queryByText('Weight must be a valid number')).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByText('Weight must be a valid number')).toBeNull();
+    });
+  });
+
+  test('should show error on form if submission fails', async () => {
+    server.use(
+      rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
+        return res(ctx.status(503), ctx.json({ error: 'Service Unavailable' }));
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <UpdateSvRewardWeightForm />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('update-sv-reward-weight-action');
+    const submitButton = screen.getByTestId('submit-button');
+
+    const summaryInput = screen.getByTestId('update-sv-reward-weight-summary');
+    expect(summaryInput).toBeDefined();
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('update-sv-reward-weight-url');
+    expect(urlInput).toBeDefined();
+    await user.type(urlInput, 'https://example.com');
+
+    const memberDropdown = screen.getByTestId('update-sv-reward-weight-member-dropdown');
+    expect(memberDropdown).toBeDefined();
+
+    const selectInput = screen.getByRole('combobox');
+    fireEvent.mouseDown(selectInput);
+
+    await waitFor(async () => {
+      const memberToSelect = screen.getByText('Digital-Asset-Eng-2');
+      expect(memberToSelect).toBeDefined();
+      await user.click(memberToSelect);
+    });
+
+    const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
+    expect(weightInput).toBeDefined();
+    await user.type(weightInput, '1000');
+
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+
+    await user.click(submitButton); //review proposal
+    await user.click(submitButton); //submit proposal
+
+    expect(screen.getByTestId('proposal-submission-error')).toBeDefined();
+    expect(screen.getByText(/Submission failed/)).toBeDefined();
+    expect(screen.getByText(/Service Unavailable/)).toBeDefined();
+  });
+
+  test('show the correct weights for selected sv in summary page', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <UpdateSvRewardWeightForm />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('update-sv-reward-weight-action');
+    const submitButton = screen.getByTestId('submit-button');
+
+    const summaryInput = screen.getByTestId('update-sv-reward-weight-summary');
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('update-sv-reward-weight-url');
+    expect(urlInput).toBeDefined();
+    await user.type(urlInput, 'https://example.com');
+
+    const memberDropdown = screen.getByTestId('update-sv-reward-weight-member-dropdown');
+    expect(memberDropdown).toBeDefined();
+
+    const selectInput = screen.getByRole('combobox');
+    fireEvent.mouseDown(selectInput);
+
+    await waitFor(async () => {
+      const memberToSelect = screen.getByText('Digital-Asset-Eng-2');
+      expect(memberToSelect).toBeDefined();
+      await user.click(memberToSelect);
+    });
+
+    const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
+    expect(weightInput.getAttribute('value')).toBe('');
+    await user.type(weightInput, '1000');
+
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+    await user.click(submitButton); //review proposal
+
+    await waitFor(() => {
+      expect(screen.getByTestId('config-change-current-value').textContent).toBe('12345');
+      expect(screen.getByTestId('config-change-new-value').textContent).toBe('1000');
+    });
+  });
+
+  test('should redirect to governance page after successful submission', async () => {
+    server.use(
+      rest.post(`${svUrl}/v0/admin/sv/voterequest/create`, (_, res, ctx) => {
+        return res(ctx.json({}));
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <UpdateSvRewardWeightForm />
+      </Wrapper>
+    );
+
+    const actionInput = screen.getByTestId('update-sv-reward-weight-action');
+    const submitButton = screen.getByTestId('submit-button');
+
+    const summaryInput = screen.getByTestId('update-sv-reward-weight-summary');
+    expect(summaryInput).toBeDefined();
+    await user.type(summaryInput, 'Summary of the proposal');
+
+    const urlInput = screen.getByTestId('update-sv-reward-weight-url');
+    expect(urlInput).toBeDefined();
+    await user.type(urlInput, 'https://example.com');
+
+    const memberDropdown = screen.getByTestId('update-sv-reward-weight-member-dropdown');
+    expect(memberDropdown).toBeDefined();
+
+    const selectInput = screen.getByRole('combobox');
+    fireEvent.mouseDown(selectInput);
+
+    await waitFor(async () => {
+      const memberToSelect = screen.getByText('Digital-Asset-Eng-2');
+      expect(memberToSelect).toBeDefined();
+      await user.click(memberToSelect);
+    });
+
+    const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
+    expect(weightInput).toBeDefined();
+    await user.type(weightInput, '1000');
+
+    await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
+    });
+    await user.click(submitButton); //review proposal
+    await user.click(submitButton); //submit proposal
+
+    waitFor(() => {
+      expect(screen.getByText('Action Required')).toBeDefined();
+      expect(screen.getByText('Inflight Votes')).toBeDefined();
+      expect(screen.getByText('Vote History')).toBeDefined();
+      expect(screen.getByText('Successfully submitted the proposal')).toBeDefined();
+    });
   });
 });

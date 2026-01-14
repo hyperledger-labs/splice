@@ -5,14 +5,19 @@ package com.digitalasset.canton.integration.tests.bftsynchronizer
 
 import com.digitalasset.canton.SequencerAlias
 import com.digitalasset.canton.config.DbConfig
-import com.digitalasset.canton.integration.plugins.UseCommunityReferenceBlockSequencer
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.console.CommandFailure
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
   SharedEnvironment,
   TestConsoleEnvironment,
 }
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.PartyId
+
+import scala.concurrent.duration.DurationInt
 
 sealed trait BftSynchronizerBootstrapTemplateTest
     extends CommunityIntegrationTest
@@ -39,7 +44,7 @@ sealed trait BftSynchronizerBootstrapTemplateTest
             s.config.publicApi.clientConfig.asSequencerConnection(SequencerAlias.tryCreate(s.name))
           ),
           synchronizerAlias = daName,
-          synchronizerId = Some(daId),
+          physicalSynchronizerId = Some(daId),
         )
       }
       clue("participant3 connects to sequencer1") {
@@ -62,6 +67,54 @@ sealed trait BftSynchronizerBootstrapTemplateTest
         )
       checkPartiesExist(testPartyP1, testPartyP2)
     }
+
+    "modify priority" in { implicit env =>
+      import env.*
+      participant1.synchronizers.config(daName).map(_.priority) shouldBe Some(0)
+      participant1.synchronizers.modify(daName, _.withPriority(10))
+      participant1.synchronizers.config(daName).map(_.priority) shouldBe Some(10)
+    }
+
+    "modify sequencerTrustThreshold" in { implicit env =>
+      import env.*
+      participant2.synchronizers
+        .config(daName)
+        .map(_.sequencerConnections.sequencerTrustThreshold) shouldBe Some(PositiveInt.one)
+      participant2.synchronizers.modify(daName, _.tryWithSequencerTrustThreshold(2))
+      participant2.synchronizers
+        .config(daName)
+        .map(_.sequencerConnections.sequencerTrustThreshold) shouldBe Some(PositiveInt.two)
+
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        participant2.synchronizers.modify(daName, _.tryWithSequencerTrustThreshold(3)),
+        _.errorMessage should include(
+          "Sequencer trust threshold 3 cannot be greater than number of sequencer connections 2"
+        ),
+      )
+    }
+
+    "modify submissionRequestAmplification" in { implicit env =>
+      import env.*
+
+      participant2.synchronizers
+        .config(daName)
+        .map(_.sequencerConnections.submissionRequestAmplification) shouldBe
+        Some(SubmissionRequestAmplification.NoAmplification)
+
+      val amplification = SubmissionRequestAmplification(PositiveInt.two, 0.second)
+      participant2.synchronizers.modify(
+        daName,
+        _.withSubmissionRequestAmplification(
+          SubmissionRequestAmplification(PositiveInt.two, 0.second)
+        ),
+      )
+
+      participant2.synchronizers
+        .config(daName)
+        .map(_.sequencerConnections.submissionRequestAmplification) shouldBe
+        Some(amplification)
+    }
+
   }
 
   private def checkPartiesExist(
@@ -89,7 +142,7 @@ sealed trait BftSynchronizerBootstrapTemplateTest
 
 class BftSynchronizerBootstrapTemplateTestDefault extends BftSynchronizerBootstrapTemplateTest {
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.H2](
+    new UseReferenceBlockSequencer[DbConfig.H2](
       loggerFactory
     )
   )

@@ -242,32 +242,26 @@ object ProtocolVersion {
       ProtocolVersion(30),
       ProtocolVersion(31),
       ProtocolVersion(32),
+      ProtocolVersion(33),
     )
 
   val alpha: NonEmpty[List[ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha]]] =
     NonEmpty.mk(List, ProtocolVersion.dev)
 
   val beta: List[ProtocolVersionWithStatus[ProtocolVersionAnnotation.Beta]] =
-    parseFromBuildInfo(BuildInfo.betaProtocolVersions)
+    parseFromBuildInfo(BuildInfo.betaProtocolVersions.toSeq)
       .map(pv => ProtocolVersion.createBeta(pv.v))
 
   val supported: NonEmpty[List[ProtocolVersion]] = (alpha ++ beta ++ stable).sorted
 
   private val allProtocolVersions = deprecated ++ deleted ++ alpha ++ beta ++ stable
 
-  private val map: Map[String, Seq[ProtocolVersion]] = Map(
-    "deprecated" -> deprecated,
-    "deleted" -> deleted.forgetNE,
-    "alpha" -> alpha.forgetNE,
-    "stable" -> stable.forgetNE,
-  )
-
   require(
     allProtocolVersions.sizeCompare(allProtocolVersions.distinct) == 0,
     s"All the protocol versions should be distinct." +
-      s"Found: $map",
+      s"Found: ${Map("deprecated" -> deprecated, "deleted" -> deleted.forgetNE, "alpha" -> alpha.forgetNE, "stable" -> stable.forgetNE)}",
   )
-
+// All stable protocol versions supported by this release
   val latest: ProtocolVersion = stable.last1
 
   /** The protocol version used to bootstrap a synchronizer.
@@ -287,11 +281,11 @@ object ProtocolVersion {
   lazy val dev: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Alpha] =
     ProtocolVersion.createAlpha(Int.MaxValue)
 
-  lazy val v33: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
-    ProtocolVersion.createStable(33)
+  lazy val v34: ProtocolVersionWithStatus[ProtocolVersionAnnotation.Stable] =
+    ProtocolVersion.createStable(34)
 
   // Minimum stable protocol version introduced
-  lazy val minimum: ProtocolVersion = v33
+  lazy val minimum: ProtocolVersion = v34
 
   private def parseFromBuildInfo(pv: Seq[String]): List[ProtocolVersion] =
     pv.map(parseUncheckedS)
@@ -309,7 +303,7 @@ object ReleaseProtocolVersion {
   val latest: ReleaseProtocolVersion = ReleaseProtocolVersion(ProtocolVersion.latest)
 }
 
-final case class ProtoVersion(v: Int) extends AnyVal
+final case class ProtoVersion(v: Int)
 
 object ProtoVersion {
   implicit val protoVersionOrdering: Ordering[ProtoVersion] =

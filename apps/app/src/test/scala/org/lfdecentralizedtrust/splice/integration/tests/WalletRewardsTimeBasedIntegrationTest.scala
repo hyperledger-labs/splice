@@ -5,6 +5,8 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.Integration
 import org.lfdecentralizedtrust.splice.util.{SpliceUtil, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
 
+import scala.concurrent.duration.DurationInt
+
 class WalletRewardsTimeBasedIntegrationTest
     extends IntegrationTest
     with WalletTestUtil
@@ -46,7 +48,9 @@ class WalletRewardsTimeBasedIntegrationTest
         openRounds
       }
 
-      eventually() {
+      advanceTimeForRewardAutomationToRunForCurrentRound
+
+      eventually(40.seconds) {
         bobValidatorWalletClient.listAppRewardCoupons() should have size 1
         bobValidatorWalletClient.listValidatorRewardCoupons() should have size 1
         aliceValidatorWalletClient.listAppRewardCoupons() should have size 1
@@ -67,29 +71,30 @@ class WalletRewardsTimeBasedIntegrationTest
 
       // Bob's validator collects rewards
       // it takes 3 ticks for the IssuingMiningRound 1 to be created and open.
-      advanceRoundsByOneTick
-      advanceRoundsByOneTick
-      advanceRoundsByOneTick
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
+      advanceRoundsToNextRoundOpening
+      advanceTimeForRewardAutomationToRunForCurrentRound
 
-      eventually()(bobValidatorWalletClient.listAppRewardCoupons() should have size 0)
-      eventually()(bobValidatorWalletClient.listValidatorRewardCoupons() should have size 0)
-      eventually()(
+      eventually() {
+        bobValidatorWalletClient.listAppRewardCoupons() should have size 0
+        bobValidatorWalletClient.listValidatorRewardCoupons() should have size 0
         bobValidatorWalletClient.listValidatorLivenessActivityRecords() should have size 0
-      )
 
-      val newBalance = bobValidatorWalletClient.balance().unlockedQty
+        val newBalance = bobValidatorWalletClient.balance().unlockedQty
 
-      // We just check that the balance has increased by roughly the right amount,
-      // rather then repeating the calculation for the reward amount
-      // 2.85 USD per faucet coupon
-      val faucetCouponAmountUsd = 2.85 * openRounds.size
-      assertInRange(
-        newBalance - prevBalance,
-        (
-          walletUsdToAmulet(-0.1 + faucetCouponAmountUsd),
-          walletUsdToAmulet(0.5 + faucetCouponAmountUsd),
-        ),
-      )
+        // We just check that the balance has increased by roughly the right amount,
+        // rather then repeating the calculation for the reward amount
+        // 2.85 USD per faucet coupon
+        val faucetCouponAmountUsd = 2.85 * openRounds.size
+        assertInRange(
+          newBalance - prevBalance,
+          (
+            walletUsdToAmulet(-0.1 + faucetCouponAmountUsd),
+            walletUsdToAmulet(0.5 + faucetCouponAmountUsd),
+          ),
+        )
+      }
     }
   }
 }

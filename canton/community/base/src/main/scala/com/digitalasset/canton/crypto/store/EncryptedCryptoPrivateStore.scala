@@ -100,8 +100,16 @@ class EncryptedCryptoPrivateStore(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Set[StoredPrivateKey]] =
     for {
-      storedKeys <- store
-        .listPrivateKeys(purpose, encrypted = true)
+      storedKeys <- store.listPrivateKeys(purpose, encrypted = true)
+      keys <- storedKeys.toList.parTraverse(decryptStoredKey(kms, _))
+    } yield keys.toSet
+
+  @VisibleForTesting
+  private[canton] def listPrivateKeys()(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Set[StoredPrivateKey]] =
+    for {
+      storedKeys <- store.listPrivateKeys()
       keys <- storedKeys.toList.parTraverse(decryptStoredKey(kms, _))
     } yield keys.toSet
 
@@ -334,7 +342,7 @@ object EncryptedCryptoPrivateStore extends EncryptedCryptoPrivateStoreHelper wit
     for {
       // get (or generate) a new kms key
       keyId <- kmsKeyId match {
-        // if key is defined and it exists in the KMS use that id
+        // if key is defined, and it exists in the KMS use that id
         case Some(keyId) =>
           kms
             .keyExistsAndIsActive(keyId)
@@ -439,7 +447,7 @@ object EncryptedCryptoPrivateStore extends EncryptedCryptoPrivateStoreHelper wit
   )(implicit
       ec: ExecutionContext
   ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, CryptoPrivateStore] =
-    TraceContext.withNewTraceContext { implicit traceContext =>
+    TraceContext.withNewTraceContext("create_crypto_private_store") { implicit traceContext =>
       val logger = NamedLoggingContext(loggerFactory, traceContext)
       (storage.isActive, reverted) match {
         case (false, false) =>

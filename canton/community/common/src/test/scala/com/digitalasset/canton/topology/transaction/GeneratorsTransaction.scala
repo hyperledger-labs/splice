@@ -12,22 +12,31 @@ import com.digitalasset.canton.crypto.{
   PublicKey,
   Signature,
   SigningKeyUsage,
+  SigningKeysWithThreshold,
   SigningPublicKey,
 }
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.GeneratorsProtocol
+import com.digitalasset.canton.sequencing.GeneratorsSequencing
+import com.digitalasset.canton.topology.store.{
+  StoredTopologyTransaction,
+  StoredTopologyTransactions,
+}
 import com.digitalasset.canton.topology.transaction.DelegationRestriction.{
   CanSignAllButNamespaceDelegations,
   CanSignAllMappings,
   CanSignSpecificMappings,
 }
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
 import com.digitalasset.canton.topology.{
   GeneratorsTopology,
   MediatorId,
+  Member,
   Namespace,
   ParticipantId,
   PartyId,
+  PhysicalSynchronizerId,
   SequencerId,
   SynchronizerId,
 }
@@ -42,21 +51,22 @@ import scala.math.Ordering.Implicits.*
 
 final class GeneratorsTransaction(
     protocolVersion: ProtocolVersion,
+    generatorsLf: GeneratorsLf,
     generatorsProtocol: GeneratorsProtocol,
+    generatorsTopology: GeneratorsTopology,
+    generatorsSequencing: GeneratorsSequencing,
 ) {
   import GeneratorsCrypto.*
-  import GeneratorsLf.*
+  import generatorsLf.*
   import generatorsProtocol.*
-  import GeneratorsTopology.*
+  import generatorsSequencing.*
+  import generatorsTopology.*
+  import Generators.*
   import com.digitalasset.canton.config.GeneratorsConfig.*
 
   implicit val topologyChangeOpArb: Arbitrary[TopologyChangeOp] = Arbitrary(
-    Gen.oneOf(
-      Arbitrary.arbitrary[TopologyChangeOp.Replace],
-      Arbitrary.arbitrary[TopologyChangeOp.Remove],
-    )
+    Gen.oneOf(TopologyChangeOp.Replace, TopologyChangeOp.Remove)
   )
-
   implicit val topologyTransactionNamespacesArb: Arbitrary[NonEmpty[Set[Namespace]]] =
     Generators.nonEmptySet[Namespace]
   implicit val topologyTransactionMediatorIdsArb: Arbitrary[NonEmpty[Seq[MediatorId]]] =
@@ -91,8 +101,15 @@ final class GeneratorsTransaction(
     for {
       pid <- Arbitrary.arbitrary[ParticipantId]
       permission <- Arbitrary.arbitrary[ParticipantPermission]
-    } yield HostingParticipant(pid, permission)
+      onboarding <- Arbitrary.arbBool.arbitrary
+    } yield HostingParticipant(pid, permission, onboarding)
   )
+
+  implicit val synchronizerUpgradeAnnouncementArb: Arbitrary[SynchronizerUpgradeAnnouncement] =
+    Arbitrary(for {
+      psid <- Arbitrary.arbitrary[PhysicalSynchronizerId]
+      upgradeTime <- Arbitrary.arbitrary[CantonTimestamp]
+    } yield SynchronizerUpgradeAnnouncement(psid, upgradeTime))
 
   implicit val topologyMappingArb: Arbitrary[TopologyMapping] = genArbitrary
 
@@ -119,7 +136,7 @@ final class GeneratorsTransaction(
       .value
   )
 
-  val restrictionWithNamespaceDelegation = Gen.oneOf(
+  val restrictionWithNamespaceDelegation: Gen[DelegationRestriction] = Gen.oneOf(
     Gen.const(CanSignAllMappings),
     Generators
       // generate a random sequence of codes,
@@ -129,7 +146,7 @@ final class GeneratorsTransaction(
       .map(CanSignSpecificMappings(_)),
   )
 
-  val restrictionWithoutNamespaceDelegation = Gen.oneOf(
+  val restrictionWithoutNamespaceDelegation: Gen[DelegationRestriction] = Gen.oneOf(
     Gen.const(CanSignAllButNamespaceDelegations),
     Generators
       .nonEmptySetGen(
@@ -157,31 +174,43 @@ final class GeneratorsTransaction(
     } yield NamespaceDelegation.tryCreate(namespace, target, delegationRestriction)
   )
 
-  implicit val purgeTopologyTransactionArb: Arbitrary[PurgeTopologyTransaction] = Arbitrary(
+  implicit val signingKeysWithThresholdArb: Arbitrary[SigningKeysWithThreshold] = Arbitrary(
     for {
-      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
-      mappings <- Arbitrary.arbitrary[NonEmpty[Seq[TopologyMapping]]]
-    } yield PurgeTopologyTransaction.create(synchronizerId, mappings).value
+      signingKeys <- nonEmptyListGen[SigningPublicKey]
+      threshold <- Gen
+        .choose(1, signingKeys.size)
+        .map(PositiveInt.tryCreate)
+    } yield SigningKeysWithThreshold.tryCreate(
+      signingKeys,
+      threshold,
+    )
   )
 
   implicit val partyToParticipantTopologyTransactionArb: Arbitrary[PartyToParticipant] = Arbitrary(
     for {
       partyId <- Arbitrary.arbitrary[PartyId]
-      participants <- Arbitrary.arbitrary[NonEmpty[Seq[HostingParticipant]]]
-      // Not using Arbitrary.arbitrary[PositiveInt] for threshold to honor constraint
+      participants <- nonEmptyListGen[HostingParticipant]
       threshold <- Gen
         .choose(1, participants.count(_.permission >= ParticipantPermission.Confirmation).max(1))
         .map(PositiveInt.tryCreate)
+      signingKeysWithThreshold <- Gen.option(Arbitrary.arbitrary[SigningKeysWithThreshold])
     } yield PartyToParticipant
-      .create(partyId, threshold, participants)
+      .create(partyId, threshold, participants, signingKeysWithThreshold)
       .value
   )
 
   implicit val vettedPackagesTopologyTransactionArb: Arbitrary[VettedPackages] = Arbitrary(
     for {
       participantId <- Arbitrary.arbitrary[ParticipantId]
-      vettedPackages <- Gen.listOf(Arbitrary.arbitrary[VettedPackage])
+      vettedPackages <- boundedListGen[VettedPackage]
     } yield VettedPackages.create(participantId, vettedPackages).value
+  )
+
+  implicit val ownerToKeyTopologyTransactionArb: Arbitrary[OwnerToKeyMapping] = Arbitrary(
+    for {
+      member <- Arbitrary.arbitrary[Member]
+      keys <- Arbitrary.arbitrary[NonEmpty[Seq[PublicKey]]]
+    } yield OwnerToKeyMapping.create(member, keys).value
   )
 
   implicit val partyToKeyTopologyTransactionArb: Arbitrary[PartyToKeyMapping] = Arbitrary(
@@ -223,7 +252,7 @@ final class GeneratorsTransaction(
     Generators.nonEmptySet[Hash].arbitrary.map(_.map(TxHash(_)))
   )
 
-  def multiTransactionSignaturesGen(transactionHash: TxHash) = for {
+  def multiTransactionSignaturesGen(transactionHash: TxHash): Gen[MultiTransactionSignature] = for {
     hashes <- Arbitrary.arbitrary[NonEmpty[Set[TxHash]]]
     signatures <- Arbitrary.arbitrary[Signature]
   } yield MultiTransactionSignature(
@@ -246,18 +275,28 @@ final class GeneratorsTransaction(
     for {
       transaction <- Arbitrary.arbitrary[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
       proposal <- Arbitrary.arbBool.arbitrary
-      topologyTransactionSignatures <- {
-        implicit val localSignatureArb = topologyTransactionSignatureArb(transaction.hash)
-        Generators.nonEmptySetGen[TopologyTransactionSignature]
+
+      signatures <- {
+        implicit val localSignatureArb: Arbitrary[TopologyTransactionSignature] =
+          topologyTransactionSignatureArb(transaction.hash)
+        Generators.nonEmptyListGen[TopologyTransactionSignature]
       }
+
     } yield SignedTopologyTransaction
-      .create(transaction, topologyTransactionSignatures, proposal, protocolVersion)
+      .withTopologySignatures(transaction, signatures, proposal, protocolVersion)
   )
 
   implicit val signedTopologyTransactionsArb
       : Arbitrary[SignedTopologyTransactions[TopologyChangeOp, TopologyMapping]] = Arbitrary(
     for {
-      transactions <- Gen.listOf(signedTopologyTransactionArb.arbitrary)
+      transactions <- boundedListGen[GenericSignedTopologyTransaction]
     } yield SignedTopologyTransactions(transactions, protocolVersion)
+  )
+
+  implicit val storedTopologyTransactionsArb
+      : Arbitrary[StoredTopologyTransactions[TopologyChangeOp, TopologyMapping]] = Arbitrary(
+    for {
+      transactions <- boundedListGen[StoredTopologyTransaction[TopologyChangeOp, TopologyMapping]]
+    } yield StoredTopologyTransactions(transactions)
   )
 }

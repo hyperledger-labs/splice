@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.topology.store
 
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLogging
@@ -12,9 +12,8 @@ import com.digitalasset.canton.topology.store.StoredTopologyTransactions.{
   GenericStoredTopologyTransactions,
   PositiveStoredTopologyTransactions,
 }
+import com.digitalasset.canton.topology.store.TopologyStore.TopologyStoreDeactivations
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
-import com.digitalasset.canton.topology.transaction.TopologyMapping.MappingHash
-import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
 import com.digitalasset.canton.topology.transaction.{TopologyChangeOp, TopologyMapping}
 import com.digitalasset.canton.topology.{Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
@@ -27,14 +26,12 @@ private[store] trait TopologyStoreTestBase extends BaseTest with HasExecutionCon
       store: TopologyStore[TopologyStoreId],
       ts: CantonTimestamp,
       add: Seq[GenericSignedTopologyTransaction] = Seq.empty,
-      removeMapping: Map[MappingHash, PositiveInt] = Map.empty,
-      removeTxs: Set[TxHash] = Set.empty,
+      removals: TopologyStoreDeactivations = Map.empty,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     store.update(
       SequencedTime(ts),
       EffectiveTime(ts),
-      removeMapping,
-      removeTxs,
+      removals = removals,
       add.map(ValidatedTopologyTransaction(_)),
     )
 
@@ -78,8 +75,8 @@ private[store] trait TopologyStoreTestBase extends BaseTest with HasExecutionCon
       asOfInclusive: Boolean = false,
       isProposal: Boolean = false,
       types: Seq[TopologyMapping.Code] = TopologyMapping.Code.all,
-      filterUid: Option[Seq[UniqueIdentifier]] = None,
-      filterNamespace: Option[Seq[Namespace]] = None,
+      filterUid: Option[NonEmpty[Seq[UniqueIdentifier]]] = None,
+      filterNamespace: Option[NonEmpty[Seq[Namespace]]] = None,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[PositiveStoredTopologyTransactions] =
     store.findPositiveTransactions(
       asOf,

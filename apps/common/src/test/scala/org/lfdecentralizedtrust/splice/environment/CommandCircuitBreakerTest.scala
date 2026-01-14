@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.environment
 
-import org.apache.pekko.pattern.CircuitBreaker
 import com.daml.ledger.javaapi.data.Command
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
@@ -11,12 +10,14 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
 }
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.ValidatorRight
+import org.lfdecentralizedtrust.splice.config.CircuitBreakerConfig
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{DedupConfig, LedgerClient}
 import LedgerClient.SubmitAndWaitFor
-import org.lfdecentralizedtrust.splice.util.DisclosedContracts
+import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, SpliceCircuitBreaker}
 import org.scalatest.wordspec.AsyncWordSpec
 
 import io.grpc.{Status, StatusRuntimeException}
@@ -30,21 +31,29 @@ class CommandCircuitBreakerTest
     with HasActorSystem
     with HasExecutionContext {
   val ledgerClient = mock[LedgerClient]
+  val clock = new SimClock(loggerFactory = loggerFactory)
 
-  val circuitBreaker = new CircuitBreaker(
-    actorSystem.scheduler,
-    maxFailures = 5,
-    callTimeout = 0.seconds,
-    resetTimeout = 5.seconds,
-    maxResetTimeout = 5.seconds,
-    exponentialBackoffFactor = 2.0,
-    randomFactor = 0.0,
+  implicit val scheduler: org.apache.pekko.actor.Scheduler = actorSystem.scheduler
+
+  val circuitBreaker = new SpliceCircuitBreaker(
+    "test",
+    CircuitBreakerConfig(
+      maxFailures = 5,
+      resetTimeout = NonNegativeFiniteDuration.ofSeconds(5),
+      maxResetTimeout = NonNegativeFiniteDuration.ofSeconds(5),
+      randomFactor = 0.0,
+      resetFailuresAfter = NonNegativeFiniteDuration.ofMinutes(1),
+    ),
+    clock,
+    loggerFactory,
   )
 
   val retryProvider = new RetryProvider(
     NamedLoggerFactory.root,
     ProcessingTimeout(),
-    new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds))(scheduledExecutor()),
+    new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds), loggerFactory)(
+      scheduledExecutor()
+    ),
     NoOpMetricsFactory,
   )(NoReportingTracerProvider.tracer)
 

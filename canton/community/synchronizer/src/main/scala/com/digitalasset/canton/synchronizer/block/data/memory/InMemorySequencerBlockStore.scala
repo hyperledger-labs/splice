@@ -60,15 +60,15 @@ class InMemorySequencerBlockStore(
     }
   }
 
-  override def partialBlockUpdate(
+  override def storeInflightAggregations(
       inFlightAggregationUpdates: InFlightAggregationUpdates
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     sequencerStore.addInFlightAggregationUpdates(inFlightAggregationUpdates)
 
-  override def finalizeBlockUpdate(block: BlockInfo)(implicit
+  override def finalizeBlockUpdates(blocks: Seq[BlockInfo])(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Unit] = {
-    updateBlockHeight(block)
+    blocks.foreach(updateBlockHeight)
     FutureUnlessShutdown.unit
   }
 
@@ -79,7 +79,7 @@ class InMemorySequencerBlockStore(
 
   override def readHead(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[BlockEphemeralState] =
+  ): FutureUnlessShutdown[Option[BlockEphemeralState]] =
     for {
       watermarkO <- inMemorySequencerStore.safeWatermark
       blockInfoO = watermarkO match {
@@ -89,11 +89,14 @@ class InMemorySequencerBlockStore(
           None
       }
       state <- blockInfoO match {
-        case None => FutureUnlessShutdown.pure(BlockEphemeralState.empty)
+        case None => FutureUnlessShutdown.pure(None)
         case Some(blockInfo) =>
           sequencerStore
-            .readInFlightAggregations(blockInfo.lastTs)
-            .map(inFlightAggregations => BlockEphemeralState(blockInfo, inFlightAggregations))
+            .readInFlightAggregations(
+              blockInfo.lastTs,
+              maxSequencingTimeUpperBound = CantonTimestamp.MaxValue,
+            )
+            .map(inFlightAggregations => Some(BlockEphemeralState(blockInfo, inFlightAggregations)))
       }
 
     } yield state
@@ -112,10 +115,14 @@ class InMemorySequencerBlockStore(
   override def findBlockContainingTimestamp(
       timestamp: CantonTimestamp
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SequencerError, BlockInfo] =
-    readStateForBlockContainingTimestamp(timestamp).map(_.latestBlock)
+    readStateForBlockContainingTimestamp(
+      timestamp,
+      maxSequencingTimeBound = CantonTimestamp.MaxValue,
+    ).map(_.latestBlock)
 
   override def readStateForBlockContainingTimestamp(
-      timestamp: CantonTimestamp
+      timestamp: CantonTimestamp,
+      maxSequencingTimeBound: CantonTimestamp,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerError, BlockEphemeralState] =
@@ -129,7 +136,7 @@ class InMemorySequencerBlockStore(
         EitherT
           .right(
             sequencerStore
-              .readInFlightAggregations(blockTimestamp)
+              .readInFlightAggregations(blockTimestamp, maxSequencingTimeBound)
           )
           .map(inFlightAggregations => BlockEphemeralState(block, inFlightAggregations))
       }

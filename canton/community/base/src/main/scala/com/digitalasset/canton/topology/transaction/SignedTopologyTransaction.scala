@@ -12,6 +12,7 @@ import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
+import com.daml.nonempty.NonEmptyReturningOps.*
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.crypto.*
@@ -40,7 +41,9 @@ import scala.reflect.ClassTag
   * such an authorization, where there is a signature of a given key of the given topology
   * transaction.
   *
-  * Whether the key is eligible to authorize the topology transaction depends on the topology state
+  * Whether the key is eligible to authorize the topology transaction depends on the topology state.
+  *
+  * Invariant: All `signatures` have a different fingerprint.
   */
 @SuppressWarnings(Array("org.wartremover.warts.FinalCaseClass")) // This class is mocked in tests
 case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapping] private (
@@ -60,6 +63,14 @@ case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
     with Product
     with Serializable
     with PrettyPrinting {
+  {
+    val duplicateSigningKeys = signatures.toSeq
+      .map(_.authorizingLongTermKey)
+      .groupBy1(identity)
+      .filter(_._2.sizeIs > 1)
+      .keySet
+    require(duplicateSigningKeys.isEmpty, s"Duplicate signing keys used: $duplicateSigningKeys")
+  }
 
   def allUnvalidatedSignaturesCoveringHash: Set[TopologyTransactionSignature] =
     signatures.filter(_.coversHash(transaction.hash))
@@ -84,41 +95,50 @@ case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
   def hashOfSignatures(protocolVersion: ProtocolVersion): Hash = {
     val builder = Hash.build(HashPurpose.TopologyTransactionSignature, HashAlgorithm.Sha256)
     signatures.toList
-      .sortBy(_.signedBy.toProtoPrimitive)
+      .sortBy(_.authorizingLongTermKey.toProtoPrimitive)
       .foreach(signature => builder.add(signature.signature.toByteString(protocolVersion)))
     builder.finish()
   }
 
   /** Add new signatures into the existing ones. Important: this method DOES NOT check that the
     * added signatures are consistent with this transaction, and specifically does not check that
-    * multi-transaction signatures cover this transaction hash.
+    * multi-transaction signatures cover this transaction hash. New signatures from signing keys,
+    * which have already signed the transaction, are discarded.
     */
   def addSignatures(
       newSignatures: NonEmpty[Set[TopologyTransactionSignature]]
-  ): SignedTopologyTransaction[Op, M] =
+  ): SignedTopologyTransaction[Op, M] = {
+    val signingKeysOfExistingSignatures = signatures.map(_.authorizingLongTermKey)
     SignedTopologyTransaction(
       transaction,
-      signatures ++ newSignatures,
+      signatures ++ newSignatures.filter(newSig =>
+        !signingKeysOfExistingSignatures.contains(newSig.authorizingLongTermKey)
+      ),
       isProposal,
     )(representativeProtocolVersion)
+  }
 
+  /** Add new signature into the existing ones. Important: this method DOES NOT check that the added
+    * signatures are consistent with this transaction, and specifically does not check that
+    * multi-transaction signatures cover this transaction hash. New signatures from signing keys,
+    * which have already signed the transaction, are discarded.
+    */
+  def addSingleSignature(
+      newSignature: Signature
+  ): SignedTopologyTransaction[Op, M] = addSingleSignatures(NonEmpty.mk(Set, newSignature))
+
+  /** Add new signatures into the existing ones. Important: this method DOES NOT check that the
+    * added signatures are consistent with this transaction, and specifically does not check that
+    * multi-transaction signatures cover this transaction hash.
+    */
   def addSingleSignatures(
       newSignatures: NonEmpty[Set[Signature]]
   ): SignedTopologyTransaction[Op, M] =
-    SignedTopologyTransaction(
-      transaction,
-      signatures ++ newSignatures.map(SingleTransactionSignature(transaction.hash, _)),
-      isProposal,
-    )(representativeProtocolVersion)
-
-  def addSignaturesFromTransaction(
-      signedTopologyTransaction: SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]
-  ): SignedTopologyTransaction[Op, M] =
-    addSignatures(signedTopologyTransaction.signatures)
+    addSignatures(newSignatures.map(SingleTransactionSignature(transaction.hash, _)))
 
   def removeSignatures(keys: Set[Fingerprint]): Option[SignedTopologyTransaction[Op, M]] = {
     val updatedSignatures =
-      signatures.filterNot(sig => keys.contains(sig.signedBy))
+      signatures.filterNot(sig => keys.contains(sig.authorizingLongTermKey))
 
     NonEmpty
       .from(updatedSignatures)
@@ -172,7 +192,7 @@ case class SignedTopologyTransaction[+Op <: TopologyChangeOp, +M <: TopologyMapp
       unnamedParam(_.transaction),
       // just calling `signatures.map(_.signedBy)` hides the fact that there could be
       // multiple (possibly invalid) signatures by the same key
-      param("signatures", _.signatures.toSeq.map(_.signedBy).sorted),
+      param("signatures", _.signatures.toSeq.map(_.authorizingLongTermKey).sorted),
       paramIfTrue("proposal", _.isProposal),
     )
 
@@ -213,7 +233,7 @@ object SignedTopologyTransaction
     SignedTopologyTransaction[TopologyChangeOp.Replace, TopologyMapping]
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(
       v30.SignedTopologyTransaction
     )(
       supportedProtoVersion(_)(fromProtoV30),
@@ -223,33 +243,69 @@ object SignedTopologyTransaction
 
   import com.digitalasset.canton.resource.DbStorage.Implicits.*
 
+  def withTopologySignatures[Op <: TopologyChangeOp, M <: TopologyMapping](
+      transaction: TopologyTransaction[Op, M],
+      signatures: NonEmpty[Seq[TopologyTransactionSignature]],
+      isProposal: Boolean,
+      protocolVersion: ProtocolVersion,
+  ): SignedTopologyTransaction[Op, M] = SignedTopologyTransaction(
+    transaction = transaction,
+    signatures = TopologyTransactionSignature.distinctSignatures(signatures),
+    isProposal = isProposal,
+  )(protocolVersionRepresentativeFor(protocolVersion))
+
+  def withSignature[Op <: TopologyChangeOp, M <: TopologyMapping](
+      transaction: TopologyTransaction[Op, M],
+      signature: Signature,
+      isProposal: Boolean,
+      protocolVersion: ProtocolVersion,
+  ): SignedTopologyTransaction[Op, M] =
+    withSignatures(
+      transaction,
+      NonEmpty.mk(Seq, signature),
+      isProposal = isProposal,
+      protocolVersion,
+    )
+
+  def withSignatures[Op <: TopologyChangeOp, M <: TopologyMapping](
+      transaction: TopologyTransaction[Op, M],
+      signatures: NonEmpty[Seq[Signature]],
+      isProposal: Boolean,
+      protocolVersion: ProtocolVersion,
+  ): SignedTopologyTransaction[Op, M] =
+    SignedTopologyTransaction(
+      transaction = transaction,
+      signatures = TopologyTransactionSignature.distinctSignatures(
+        signatures.map(SingleTransactionSignature(transaction.hash, _))
+      ),
+      isProposal = isProposal,
+    )(protocolVersionRepresentativeFor(protocolVersion))
+
+  def duplicateSigningKeys(
+      signatures: NonEmpty[Set[TopologyTransactionSignature]]
+  ): Set[Fingerprint] = signatures.toSeq
+    .map(_.authorizingLongTermKey)
+    .groupBy1(identity)
+    .filter(_._2.sizeIs > 1)
+    .keySet
+
   def create[Op <: TopologyChangeOp, M <: TopologyMapping](
       transaction: TopologyTransaction[Op, M],
       signatures: NonEmpty[Set[TopologyTransactionSignature]],
       isProposal: Boolean,
       protocolVersion: ProtocolVersion,
-  ): SignedTopologyTransaction[Op, M] = SignedTopologyTransaction(
-    transaction = transaction,
-    signatures = signatures,
-    isProposal = isProposal,
-  )(
-    versioningTable.protocolVersionRepresentativeFor(
-      protocolVersion
+  ): Either[String, SignedTopologyTransaction[Op, M]] = {
+    val duplicates = duplicateSigningKeys(signatures)
+    Either.cond(
+      duplicates.isEmpty,
+      SignedTopologyTransaction[Op, M](
+        transaction,
+        signatures,
+        isProposal,
+      )(protocolVersionRepresentativeFor(protocolVersion)),
+      s"Transaction has duplicate signatures: ${duplicates.mkString(", ")}",
     )
-  )
-
-  def create[Op <: TopologyChangeOp, M <: TopologyMapping](
-      transaction: TopologyTransaction[Op, M],
-      signatures: NonEmpty[Set[Signature]],
-      isProposal: Boolean,
-  )(
-      representativeProtocolVersion: RepresentativeProtocolVersion[SignedTopologyTransaction.type]
-  ): SignedTopologyTransaction[Op, M] =
-    SignedTopologyTransaction(
-      transaction = transaction,
-      signatures = signatures.map(SingleTransactionSignature(transaction.hash, _)),
-      isProposal = isProposal,
-    )(representativeProtocolVersion)
+  }
 
   private def signAndCreateWithAssignedKeyUsages[Op <: TopologyChangeOp, M <: TopologyMapping](
       transaction: TopologyTransaction[Op, M],
@@ -345,11 +401,18 @@ object SignedTopologyTransaction
     )
   }
 
+  /** @param crypto
+    *   We use a [[com.digitalasset.canton.crypto.BaseCrypto]] because this method serves both the
+    *   synchronizer outbox dispatcher that requires a
+    *   [[com.digitalasset.canton.crypto.SynchronizerCrypto]] and the GRPC topology manager read
+    *   service that uses a [[com.digitalasset.canton.crypto.Crypto]]. This method is only used to
+    *   produce signatures; and it does not verify signatures from untrusted sources.
+    */
   def asVersion[Op <: TopologyChangeOp, M <: TopologyMapping](
       signedTx: SignedTopologyTransaction[Op, M],
       protocolVersion: ProtocolVersion,
   )(
-      crypto: Crypto
+      crypto: BaseCrypto
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -368,7 +431,7 @@ object SignedTopologyTransaction
           signedTopologyTransaction <- SignedTopologyTransaction
             .signAndCreate(
               convertedTx,
-              signedTx.signatures.map(signature => signature.signedBy),
+              signedTx.signatures.map(signature => signature.authorizingLongTermKey),
               signedTx.isProposal,
               crypto.privateCrypto,
               protocolVersion,
@@ -395,23 +458,36 @@ object SignedTopologyTransaction
     ) = transactionP
     for {
       transaction <- TopologyTransaction.fromByteString(protocolVersionValidation, txBytes)
+
       singleSignatures <- signaturesP
         .traverse(Signature.fromProtoV30)
         .map(
           _.map(SingleTransactionSignature(transaction.hash, _))
         )
-        .map(_.toSet[TopologyTransactionSignature])
+
       multiTransactionHashes <- multiTransactionSignaturesPO
         .flatTraverse(MultiTransactionSignature.fromProtoV30(_, transaction.hash).map(_.forgetNE))
-        .map(_.toSet[TopologyTransactionSignature])
-      allSigs <- NonEmpty
+
+      allSignaturesWithDuplicates <- NonEmpty
         .from(singleSignatures ++ multiTransactionHashes)
         .toRight(
           ProtoDeserializationError
             .InvariantViolation("signatures", "At least one signature must be provided")
         )
+
+      /*
+      Added as part of https://github.com/DACH-NY/canton-network-internal/issues/1063
+      Some signature schemes (e.g., EC-DSA) are non-deterministic which means that one key
+      can lead to arbitrary many signatures. Due to a bug in the validation, we accumulated
+      many signatures for the same key, leading to high validation time and memory usage.
+      As a workaround, we discard duplicate signatures.
+       */
+      allSignaturesWithoutDuplicates = TopologyTransactionSignature.distinctSignatures(
+        allSignaturesWithDuplicates
+      )
+
       rpv <- versioningTable.protocolVersionRepresentativeFor(ProtoVersion(30))
-    } yield SignedTopologyTransaction(transaction, allSigs, isProposal)(rpv)
+    } yield SignedTopologyTransaction(transaction, allSignaturesWithoutDuplicates, isProposal)(rpv)
   }
 
   def createGetResultSynchronizerTopologyTransaction: GetResult[GenericSignedTopologyTransaction] =
@@ -469,7 +545,7 @@ object SignedTopologyTransactions
       ProtocolVersionValidation,
     ] {
   override val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(
       v30.SignedTopologyTransactions
     )(
       supportedProtoVersion(_)(fromProtoV30),
@@ -517,25 +593,21 @@ object SignedTopologyTransactions
     */
   def compact(
       txs: Seq[GenericSignedTopologyTransaction]
-  ): Seq[GenericSignedTopologyTransaction] = {
-    val byHash = txs
-      .groupBy(_.hash)
+  ): Seq[GenericSignedTopologyTransaction] =
+    txs.zipWithIndex
+      .groupBy1 { case (tx, _) => tx.hash }
+      .values
+      .toSeq
       .view
-      .mapValues(
-        _.reduceLeftOption((tx1, tx2) => tx1.addSignaturesFromTransaction(tx2))
+      .map(
+        _.reduceLeft[(GenericSignedTopologyTransaction, Int)] {
+          case ((tx1, index1), (tx2, index2)) =>
+            (tx1.addSignatures(tx2.signatures), index1.min(index2))
+        }
       )
-      .collect { case (k, Some(v)) => k -> v }
-      .toMap
-
-    val (compacted, _) =
-      txs.foldLeft((Vector.empty[GenericSignedTopologyTransaction], byHash)) {
-        case ((result, byHash), tx) =>
-          val newResult = byHash.get(tx.hash).map(result :+ _).getOrElse(result)
-          val txHashRemoved = byHash.removed(tx.hash)
-          (newResult, txHashRemoved)
-      }
-    compacted
-  }
+      .sortBy { case (_, index) => index }
+      .map { case (tx, _) => tx }
+      .toSeq
 
   def collectOfMapping[Op <: TopologyChangeOp, M <: TopologyMapping: ClassTag](
       transactions: Seq[SignedTopologyTransaction[Op, TopologyMapping]]

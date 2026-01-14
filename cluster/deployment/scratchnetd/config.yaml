@@ -1,3 +1,4 @@
+# TODO(#2942) reduce duplication between all scratchnet configs
 infra:
   prometheus:
     retentionDuration: "30d"
@@ -13,7 +14,62 @@ validator1:
     maxDuration: "5m"
     retention: "1h" # Keep 1h
   deduplicationDuration: 30m
-sv:
-  scan:
-    # TODO(#1164): Remove this once the import update backfilling is enabled by default
-    enableImportUpdatesBackfill: true
+svs:
+  default:
+    pruning:
+      cometbft:
+        retainBlocks: 2000 # corresponds to a retention period of ~2 hours
+    svApp:
+      resources:
+        limits:
+          cpu: "3"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+    scanApp:
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: "2"
+          memory: 2Gi
+    participant:
+      resources:
+        requests:
+          cpu: "1"
+    sequencer:
+      # formerly the effect of `SEQUENCER_LOW_RESOURCES=true`
+      resources:
+        limits:
+          cpu: "3"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+    mediator:
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+    cometbft:
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          memory: 2Gi
+  sv-da-1:
+    publicName: Digital-Asset-1
+    subdomain: sv-1
+    cometbft:
+      nodeId: d825622358065aea3cb3b3479cf64d172675037e
+      validatorKeyAddress: 2D21D8AB2306770E9F93E8BD0E0F07B3E86817D7
+    svApp:
+      auth0:
+        clientId: bxjt0vzLyRG2rk2fapXfOzH5lzK4mrl7
+    validatorApp:
+      walletUser: auth0|68c2c41e6470184569e4521e
+      auth0:
+        clientId: fBFpzZSRuufk9ueV2pSEkOXNYXuQtVmY

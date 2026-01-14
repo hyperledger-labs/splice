@@ -4,6 +4,7 @@
 package com.digitalasset.canton.http.json.v2
 
 import com.daml.ledger.api.v2.admin.user_management_service
+import com.digitalasset.canton.auth.AuthInterceptor
 import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
 import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInput}
 import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
@@ -24,7 +25,8 @@ import scala.concurrent.Future
 class JsUserManagementService(
     userManagementClient: UserManagementClient,
     val loggerFactory: NamedLoggerFactory,
-) extends Endpoints
+)(implicit val authInterceptor: AuthInterceptor)
+    extends Endpoints
     with NamedLogging {
   import JsUserManagementService.*
 
@@ -41,6 +43,10 @@ class JsUserManagementService(
     withServerLogic(
       JsUserManagementService.getUserEndpoint,
       getUser,
+    ),
+    withServerLogic(
+      JsUserManagementService.getCurrentUserEndpoint,
+      getCurrentUser,
     ),
     withServerLogic(
       JsUserManagementService.updateUserEndpoint,
@@ -92,22 +98,42 @@ class JsUserManagementService(
 
   private def getUser(
       callerContext: CallerContext
-  ): TracedInput[String] => Future[Either[JsCantonError, user_management_service.GetUserResponse]] =
-    req =>
-      UserId.fromString(req.in) match {
-        case Right(userId) =>
-          userManagementClient
-            .serviceStub(callerContext.token())(req.traceContext)
-            .getUser(
-              user_management_service.GetUserRequest(
-                userId = userId,
-                identityProviderId = "",
-              )
+  ): TracedInput[(String, Option[String])] => Future[
+    Either[JsCantonError, user_management_service.GetUserResponse]
+  ] = { req =>
+    val requestedUserId = (req.in._1)
+    val requestedIdentityProviderId = req.in._2.getOrElse("")
+    UserId.fromString(requestedUserId) match {
+      case Right(userId) =>
+        userManagementClient
+          .serviceStub(callerContext.token())(req.traceContext)
+          .getUser(
+            user_management_service.GetUserRequest(
+              userId = userId,
+              identityProviderId = requestedIdentityProviderId,
             )
-            .resultToRight
-        case Left(error) => malformedUserId(error)(req.traceContext)
+          )
+          .resultToRight
+      case Left(error) => malformedUserId(error)(req.traceContext)
+    }
+  }
 
-      }
+  private def getCurrentUser(
+      callerContext: CallerContext
+  ): TracedInput[Option[String]] => Future[
+    Either[JsCantonError, user_management_service.GetUserResponse]
+  ] = { req =>
+    val requestedIdentityProviderId = req.in.getOrElse("")
+    userManagementClient
+      .serviceStub(callerContext.token())(req.traceContext)
+      .getUser(
+        user_management_service.GetUserRequest(
+          userId = "",
+          identityProviderId = requestedIdentityProviderId,
+        )
+      )
+      .resultToRight
+  }
 
   private def updateUser(
       callerContext: CallerContext
@@ -129,7 +155,7 @@ class JsUserManagementService(
     UserId.fromString(req.in) match {
       case Right(userId) =>
         userManagementClient
-          .deleteUser(userId, callerContext.jwt.map(_.token))(req.traceContext)
+          .deleteUser(userId, callerContext.token())(req.traceContext)
           .resultToRight
       case Left(errorMsg) =>
         malformedUserId(errorMsg)(req.traceContext)
@@ -220,7 +246,11 @@ object JsUserManagementService extends DocumentationEndpoints {
   import JsUserManagementCodecs.*
 
   private val users = v2Endpoint.in("users")
+
+  private val authenticatedUser = v2Endpoint.in("authenticated-user")
+
   private val userIdPath = "user-id"
+
   val listUsersEndpoint =
     users.get
       .out(jsonBody[user_management_service.ListUsersResponse])
@@ -236,8 +266,15 @@ object JsUserManagementService extends DocumentationEndpoints {
   val getUserEndpoint =
     users.get
       .in(path[String](userIdPath))
+      .in(query[Option[String]]("identity-provider-id"))
       .out(jsonBody[user_management_service.GetUserResponse])
       .description("Get user details.")
+
+  val getCurrentUserEndpoint =
+    authenticatedUser.get
+      .in(query[Option[String]]("identity-provider-id"))
+      .out(jsonBody[user_management_service.GetUserResponse])
+      .description("Get current user details (uses user for JWT).")
 
   val updateUserEndpoint =
     users.patch
@@ -286,6 +323,7 @@ object JsUserManagementService extends DocumentationEndpoints {
     listUsersEndpoint,
     createUserEndpoint,
     getUserEndpoint,
+    getCurrentUserEndpoint,
     updateUserEndpoint,
     deleteUserEndpoint,
     grantUserRightsEndpoint,
@@ -298,57 +336,68 @@ object JsUserManagementService extends DocumentationEndpoints {
 object JsUserManagementCodecs {
   import JsSchema.config
 
-  implicit val user: Codec[user_management_service.User] = deriveRelaxedCodec
-  implicit val participantAdmin: Codec[user_management_service.Right.ParticipantAdmin] =
+  implicit val userRW: Codec[user_management_service.User] = deriveRelaxedCodec
+  implicit val participantAdminRW: Codec[user_management_service.Right.ParticipantAdmin] =
     deriveRelaxedCodec
-  implicit val canActAs: Codec[user_management_service.Right.CanActAs] = deriveRelaxedCodec
-  implicit val canReadAs: Codec[user_management_service.Right.CanReadAs] = deriveRelaxedCodec
+  implicit val canActAsRW: Codec[user_management_service.Right.CanActAs] = deriveRelaxedCodec
+  implicit val canReadAsRW: Codec[user_management_service.Right.CanReadAs] = deriveRelaxedCodec
+  implicit val canExecuteAsRW: Codec[user_management_service.Right.CanExecuteAs] =
+    deriveRelaxedCodec
   implicit val rightKindidentityProviderAdminRW
       : Codec[user_management_service.Right.Kind.IdentityProviderAdmin] =
     deriveRelaxedCodec
-  implicit val identityProviderAdmin: Codec[user_management_service.Right.IdentityProviderAdmin] =
+  implicit val identityProviderAdminRW: Codec[user_management_service.Right.IdentityProviderAdmin] =
     deriveRelaxedCodec
-  implicit val canReadAsAnyPartyRW: Codec[user_management_service.Right.CanReadAsAnyParty] =
+  implicit val canReadAsAnyPartyRWRW: Codec[user_management_service.Right.CanReadAsAnyParty] =
     deriveRelaxedCodec
-  implicit val kindCanActAsRW: Codec[user_management_service.Right.Kind.CanActAs] =
+  implicit val canExecuteAsAnyPartyRWRW: Codec[user_management_service.Right.CanExecuteAsAnyParty] =
     deriveRelaxedCodec
-  implicit val kindCanReadAsRW: Codec[user_management_service.Right.Kind.CanReadAs] =
+  implicit val kindCanActAsRWRW: Codec[user_management_service.Right.Kind.CanActAs] =
+    deriveRelaxedCodec
+  implicit val kindCanReadAsRWRW: Codec[user_management_service.Right.Kind.CanReadAs] =
     deriveRelaxedCodec
   implicit val kindCanReadAsAnyPartyRW
       : Codec[user_management_service.Right.Kind.CanReadAsAnyParty] =
     deriveRelaxedCodec
-  implicit val kindParticipantAdminRW: Codec[user_management_service.Right.Kind.ParticipantAdmin] =
+  implicit val kindCanExecuteAsRWRW: Codec[user_management_service.Right.Kind.CanExecuteAs] =
     deriveRelaxedCodec
-  implicit val kind: Codec[user_management_service.Right.Kind] = deriveConfiguredCodec // ADT
-  implicit val right: Codec[user_management_service.Right] = deriveRelaxedCodec
-  implicit val createUserRequest: Codec[user_management_service.CreateUserRequest] =
+  implicit val kindCanExecuteAsAnyPartyRW
+      : Codec[user_management_service.Right.Kind.CanExecuteAsAnyParty] =
     deriveRelaxedCodec
-  implicit val updateUserRequest: Codec[user_management_service.UpdateUserRequest] =
+  implicit val kindParticipantAdminRWRW
+      : Codec[user_management_service.Right.Kind.ParticipantAdmin] =
     deriveRelaxedCodec
-  implicit val listUserResponse: Codec[user_management_service.ListUsersResponse] =
+  implicit val kindRW: Codec[user_management_service.Right.Kind] = deriveConfiguredCodec // ADT
+  implicit val rightRW: Codec[user_management_service.Right] = deriveRelaxedCodec
+  implicit val createUserRequestRW: Codec[user_management_service.CreateUserRequest] =
     deriveRelaxedCodec
-  implicit val createUserResponse: Codec[user_management_service.CreateUserResponse] =
+  implicit val updateUserRequestRW: Codec[user_management_service.UpdateUserRequest] =
     deriveRelaxedCodec
-  implicit val updateUserResponse: Codec[user_management_service.UpdateUserResponse] =
+  implicit val listUserResponseRW: Codec[user_management_service.ListUsersResponse] =
     deriveRelaxedCodec
-  implicit val getUserResponse: Codec[user_management_service.GetUserResponse] = deriveRelaxedCodec
-  implicit val grantUserRightsRequest: Codec[user_management_service.GrantUserRightsRequest] =
+  implicit val createUserResponseRW: Codec[user_management_service.CreateUserResponse] =
     deriveRelaxedCodec
-  implicit val grantUserRightsResponse: Codec[user_management_service.GrantUserRightsResponse] =
+  implicit val updateUserResponseRW: Codec[user_management_service.UpdateUserResponse] =
     deriveRelaxedCodec
-  implicit val revokeUserRightsRequest: Codec[user_management_service.RevokeUserRightsRequest] =
+  implicit val getUserResponseRW: Codec[user_management_service.GetUserResponse] =
     deriveRelaxedCodec
-  implicit val revokeUserRightsResponse: Codec[user_management_service.RevokeUserRightsResponse] =
+  implicit val grantUserRightsRequestRW: Codec[user_management_service.GrantUserRightsRequest] =
+    deriveRelaxedCodec
+  implicit val grantUserRightsResponseRW: Codec[user_management_service.GrantUserRightsResponse] =
+    deriveRelaxedCodec
+  implicit val revokeUserRightsRequestRW: Codec[user_management_service.RevokeUserRightsRequest] =
+    deriveRelaxedCodec
+  implicit val revokeUserRightsResponseRW: Codec[user_management_service.RevokeUserRightsResponse] =
     deriveRelaxedCodec
 
-  implicit val listUserRightsRequest: Codec[user_management_service.ListUserRightsRequest] =
+  implicit val listUserRightsRequestRW: Codec[user_management_service.ListUserRightsRequest] =
     deriveRelaxedCodec
-  implicit val listUserRightsResponse: Codec[user_management_service.ListUserRightsResponse] =
+  implicit val listUserRightsResponseRW: Codec[user_management_service.ListUserRightsResponse] =
     deriveRelaxedCodec
 
-  implicit val updateIdentityProviderRequest
+  implicit val updateIdentityProviderRequestRW
       : Codec[user_management_service.UpdateUserIdentityProviderIdRequest] = deriveRelaxedCodec
-  implicit val updateIdentityProviderResponse
+  implicit val updateIdentityProviderResponseRW
       : Codec[user_management_service.UpdateUserIdentityProviderIdResponse] = deriveRelaxedCodec
 
   // Schema mappings are added to align generated tapir docs with a circe mapping of ADTs

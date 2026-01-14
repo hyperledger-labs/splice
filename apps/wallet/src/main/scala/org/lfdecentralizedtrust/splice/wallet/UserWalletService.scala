@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.wallet
 
-import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
@@ -11,8 +11,10 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
+  HistoryMetrics,
+  UpdateHistory,
 }
-import org.lfdecentralizedtrust.splice.util.{HasHealth, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{HasHealth, SpliceCircuitBreaker, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService
 import org.lfdecentralizedtrust.splice.wallet.config.{
   AutoAcceptTransfersConfig,
@@ -24,11 +26,14 @@ import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.ParticipantId
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 
 import scala.concurrent.ExecutionContext
 
@@ -42,7 +47,7 @@ class UserWalletService(
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
     treasuryConfig: TreasuryConfig,
-    storage: Storage,
+    storage: DbStorage,
     override protected[this] val retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
     scanConnection: BftScanConnection,
@@ -57,6 +62,7 @@ class UserWalletService(
     dedupDuration: DedupDuration,
     txLogBackfillEnabled: Boolean,
     txLogBackfillingBatchSize: Int,
+    params: SpliceParametersConfig,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -68,6 +74,8 @@ class UserWalletService(
     with NamedLogging
     with HasHealth {
 
+  private implicit val scheduler: Scheduler = mat.system.scheduler
+
   val store: UserWalletStore =
     UserWalletStore(
       key,
@@ -76,6 +84,21 @@ class UserWalletService(
       retryProvider,
       domainMigrationInfo,
       participantId,
+      automationConfig.ingestion,
+    )
+
+  val updateHistory: UpdateHistory =
+    new UpdateHistory(
+      storage,
+      domainMigrationInfo,
+      store.storeName,
+      participantId,
+      store.acsContractFilter.ingestionFilter.primaryParty,
+      BackfillingRequirement.BackfillingNotRequired,
+      loggerFactory,
+      enableissue12777Workaround = true,
+      enableImportUpdateBackfill = false,
+      HistoryMetrics(retryProvider.metricsFactory, domainMigrationInfo.currentMigrationId),
     )
 
   val treasury: TreasuryService = new TreasuryService(
@@ -83,6 +106,12 @@ class UserWalletService(
     ledgerClient.connection(
       this.getClass.getSimpleName,
       loggerFactory,
+      SpliceCircuitBreaker(
+        "treasury",
+        params.circuitBreakers.mediumPriority,
+        clock,
+        loggerFactory,
+      ),
     ),
     treasuryConfig,
     clock,
@@ -95,6 +124,7 @@ class UserWalletService(
 
   val automation = new UserWalletAutomationService(
     store,
+    updateHistory,
     treasury,
     ledgerClient,
     automationConfig,
@@ -113,12 +143,14 @@ class UserWalletService(
     dedupDuration,
     txLogBackfillEnabled = txLogBackfillEnabled,
     txLogBackfillingBatchSize = txLogBackfillingBatchSize,
+    params,
   )
 
   /** The connection to use when submitting commands based on reads from the WalletStore.
     * The submission will wait for the store to ingest the effect of the command before completing the future.
     */
-  val connection: SpliceLedgerConnection = automation.connection
+  val connection: SpliceLedgerConnection =
+    automation.connection(SpliceLedgerConnectionPriority.Medium)
 
   override def isHealthy: Boolean =
     automation.isHealthy && treasury.isHealthy

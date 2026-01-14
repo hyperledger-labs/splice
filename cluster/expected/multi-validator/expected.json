@@ -124,50 +124,6 @@
     "id": "",
     "inputs": {
       "apiVersion": "networking.istio.io/v1alpha3",
-      "kind": "VirtualService",
-      "metadata": {
-        "name": "cometbft-loopback",
-        "namespace": "multi-validator"
-      },
-      "spec": {
-        "exportTo": [
-          "."
-        ],
-        "gateways": [
-          "mesh"
-        ],
-        "hosts": [
-          "mock.global.canton.network.digitalasset.com"
-        ],
-        "tcp": [
-          {
-            "match": [
-              {
-                "gateways": [
-                  "mesh"
-                ]
-              }
-            ],
-            "route": [
-              {
-                "destination": {
-                  "host": "istio-ingress-cometbft.cluster-ingress.svc.cluster.local"
-                }
-              }
-            ]
-          }
-        ]
-      }
-    },
-    "name": "loopback-cometbft-multi-validator",
-    "provider": "",
-    "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "networking.istio.io/v1alpha3",
       "kind": "ServiceEntry",
       "metadata": {
         "name": "loopback",
@@ -195,56 +151,6 @@
             "name": "grpc-domain",
             "number": 5008,
             "protocol": "GRPC"
-          },
-          {
-            "name": "cometbft-0-0-p2p",
-            "number": 26006,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-0-1-p2p",
-            "number": 26016,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-1-0-p2p",
-            "number": 26106,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-1-1-p2p",
-            "number": 26116,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-2-0-p2p",
-            "number": 26206,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-2-1-p2p",
-            "number": 26216,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-3-0-p2p",
-            "number": 26306,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-3-1-p2p",
-            "number": 26316,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-4-0-p2p",
-            "number": 26406,
-            "protocol": "TCP"
-          },
-          {
-            "name": "cometbft-4-1-p2p",
-            "number": 26416,
-            "protocol": "TCP"
           }
         ],
         "resolution": "DNS"
@@ -273,8 +179,6 @@
         ],
         "hosts": [
           "mock.global.canton.network.digitalasset.com",
-          "sv.mock.global.canton.network.digitalasset.com",
-          "*.sv.mock.global.canton.network.digitalasset.com",
           "validator.mock.global.canton.network.digitalasset.com",
           "*.validator.mock.global.canton.network.digitalasset.com",
           "validator1.mock.global.canton.network.digitalasset.com",
@@ -282,7 +186,11 @@
           "splitwell.mock.global.canton.network.digitalasset.com",
           "*.splitwell.mock.global.canton.network.digitalasset.com",
           "sv-2.mock.global.canton.network.digitalasset.com",
-          "*.sv-2.mock.global.canton.network.digitalasset.com"
+          "*.sv-2.mock.global.canton.network.digitalasset.com",
+          "sv-1.mock.global.canton.network.digitalasset.com",
+          "*.sv-1.mock.global.canton.network.digitalasset.com",
+          "sv.mock.global.canton.network.digitalasset.com",
+          "*.sv.mock.global.canton.network.digitalasset.com"
         ],
         "http": [
           {
@@ -311,8 +219,6 @@
                 ],
                 "sniHosts": [
                   "mock.global.canton.network.digitalasset.com",
-                  "sv.mock.global.canton.network.digitalasset.com",
-                  "*.sv.mock.global.canton.network.digitalasset.com",
                   "validator.mock.global.canton.network.digitalasset.com",
                   "*.validator.mock.global.canton.network.digitalasset.com",
                   "validator1.mock.global.canton.network.digitalasset.com",
@@ -320,7 +226,11 @@
                   "splitwell.mock.global.canton.network.digitalasset.com",
                   "*.splitwell.mock.global.canton.network.digitalasset.com",
                   "sv-2.mock.global.canton.network.digitalasset.com",
-                  "*.sv-2.mock.global.canton.network.digitalasset.com"
+                  "*.sv-2.mock.global.canton.network.digitalasset.com",
+                  "sv-1.mock.global.canton.network.digitalasset.com",
+                  "*.sv-1.mock.global.canton.network.digitalasset.com",
+                  "sv.mock.global.canton.network.digitalasset.com",
+                  "*.sv.mock.global.canton.network.digitalasset.com"
                 ]
               }
             ],
@@ -349,7 +259,7 @@
         "labels": {
           "release": "prometheus-grafana-monitoring"
         },
-        "name": "multi-participant-0-service-monitor",
+        "name": "multi-participant-0-3-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -364,12 +274,12 @@
         },
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-0"
+            "app": "multi-participant-0-3"
           }
         }
       }
     },
-    "name": "multi-participant-0-service-monitor",
+    "name": "multi-participant-0-3-service-monitor",
     "provider": "",
     "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
   },
@@ -377,7 +287,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "multi-participant-0",
+    "name": "multi-participant-0-3",
     "provider": "",
     "type": "canton:network:Deployment"
   },
@@ -389,7 +299,7 @@
       "kind": "Deployment",
       "metadata": {
         "labels": {
-          "app": "multi-participant-0"
+          "app": "multi-participant-0-3"
         },
         "namespace": "multi-validator"
       },
@@ -397,7 +307,7 @@
         "replicas": 1,
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-0"
+            "app": "multi-participant-0-3"
           }
         },
         "strategy": {
@@ -406,7 +316,7 @@
         "template": {
           "metadata": {
             "labels": {
-              "app": "multi-participant-0"
+              "app": "multi-participant-0-3"
             }
           },
           "spec": {
@@ -435,7 +345,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -612,7 +522,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "6",
                     "memory": "16Gi"
                   },
                   "requests": {
@@ -627,7 +536,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-0 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-0 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
@@ -644,6 +553,11 @@
                 "name": "pg-init"
               }
             ],
+            "securityContext": {
+              "fsGroup": 1001,
+              "runAsGroup": 1001,
+              "runAsUser": 1001
+            },
             "tolerations": [
               {
                 "effect": "NoSchedule",
@@ -655,7 +569,7 @@
         }
       }
     },
-    "name": "multi-participant-0",
+    "name": "multi-participant-0-3",
     "provider": "",
     "type": "kubernetes:apps/v1:Deployment"
   },
@@ -667,9 +581,9 @@
       "kind": "Service",
       "metadata": {
         "labels": {
-          "app": "multi-participant-0"
+          "app": "multi-participant-0-3"
         },
-        "name": "multi-participant-0",
+        "name": "multi-participant-0-3",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -764,11 +678,11 @@
           }
         ],
         "selector": {
-          "app": "multi-participant-0"
+          "app": "multi-participant-0-3"
         }
       }
     },
-    "name": "multi-participant-0",
+    "name": "multi-participant-0-3",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
   },
@@ -782,7 +696,7 @@
         "labels": {
           "release": "prometheus-grafana-monitoring"
         },
-        "name": "multi-participant-1-service-monitor",
+        "name": "multi-participant-1-3-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -797,12 +711,12 @@
         },
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-1"
+            "app": "multi-participant-1-3"
           }
         }
       }
     },
-    "name": "multi-participant-1-service-monitor",
+    "name": "multi-participant-1-3-service-monitor",
     "provider": "",
     "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
   },
@@ -810,7 +724,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "multi-participant-1",
+    "name": "multi-participant-1-3",
     "provider": "",
     "type": "canton:network:Deployment"
   },
@@ -822,7 +736,7 @@
       "kind": "Deployment",
       "metadata": {
         "labels": {
-          "app": "multi-participant-1"
+          "app": "multi-participant-1-3"
         },
         "namespace": "multi-validator"
       },
@@ -830,7 +744,7 @@
         "replicas": 1,
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-1"
+            "app": "multi-participant-1-3"
           }
         },
         "strategy": {
@@ -839,7 +753,7 @@
         "template": {
           "metadata": {
             "labels": {
-              "app": "multi-participant-1"
+              "app": "multi-participant-1-3"
             }
           },
           "spec": {
@@ -868,7 +782,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -1045,7 +959,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "6",
                     "memory": "16Gi"
                   },
                   "requests": {
@@ -1060,7 +973,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-1 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-1 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
@@ -1077,6 +990,11 @@
                 "name": "pg-init"
               }
             ],
+            "securityContext": {
+              "fsGroup": 1001,
+              "runAsGroup": 1001,
+              "runAsUser": 1001
+            },
             "tolerations": [
               {
                 "effect": "NoSchedule",
@@ -1088,7 +1006,7 @@
         }
       }
     },
-    "name": "multi-participant-1",
+    "name": "multi-participant-1-3",
     "provider": "",
     "type": "kubernetes:apps/v1:Deployment"
   },
@@ -1100,9 +1018,9 @@
       "kind": "Service",
       "metadata": {
         "labels": {
-          "app": "multi-participant-1"
+          "app": "multi-participant-1-3"
         },
-        "name": "multi-participant-1",
+        "name": "multi-participant-1-3",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -1197,11 +1115,11 @@
           }
         ],
         "selector": {
-          "app": "multi-participant-1"
+          "app": "multi-participant-1-3"
         }
       }
     },
-    "name": "multi-participant-1",
+    "name": "multi-participant-1-3",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
   },
@@ -1215,7 +1133,7 @@
         "labels": {
           "release": "prometheus-grafana-monitoring"
         },
-        "name": "multi-participant-2-service-monitor",
+        "name": "multi-participant-2-3-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -1230,12 +1148,12 @@
         },
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-2"
+            "app": "multi-participant-2-3"
           }
         }
       }
     },
-    "name": "multi-participant-2-service-monitor",
+    "name": "multi-participant-2-3-service-monitor",
     "provider": "",
     "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
   },
@@ -1243,7 +1161,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "multi-participant-2",
+    "name": "multi-participant-2-3",
     "provider": "",
     "type": "canton:network:Deployment"
   },
@@ -1255,7 +1173,7 @@
       "kind": "Deployment",
       "metadata": {
         "labels": {
-          "app": "multi-participant-2"
+          "app": "multi-participant-2-3"
         },
         "namespace": "multi-validator"
       },
@@ -1263,7 +1181,7 @@
         "replicas": 1,
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-2"
+            "app": "multi-participant-2-3"
           }
         },
         "strategy": {
@@ -1272,7 +1190,7 @@
         "template": {
           "metadata": {
             "labels": {
-              "app": "multi-participant-2"
+              "app": "multi-participant-2-3"
             }
           },
           "spec": {
@@ -1301,7 +1219,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -1478,7 +1396,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "6",
                     "memory": "16Gi"
                   },
                   "requests": {
@@ -1493,7 +1410,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-2 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-2 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
@@ -1510,6 +1427,11 @@
                 "name": "pg-init"
               }
             ],
+            "securityContext": {
+              "fsGroup": 1001,
+              "runAsGroup": 1001,
+              "runAsUser": 1001
+            },
             "tolerations": [
               {
                 "effect": "NoSchedule",
@@ -1521,7 +1443,7 @@
         }
       }
     },
-    "name": "multi-participant-2",
+    "name": "multi-participant-2-3",
     "provider": "",
     "type": "kubernetes:apps/v1:Deployment"
   },
@@ -1533,9 +1455,9 @@
       "kind": "Service",
       "metadata": {
         "labels": {
-          "app": "multi-participant-2"
+          "app": "multi-participant-2-3"
         },
-        "name": "multi-participant-2",
+        "name": "multi-participant-2-3",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -1630,11 +1552,11 @@
           }
         ],
         "selector": {
-          "app": "multi-participant-2"
+          "app": "multi-participant-2-3"
         }
       }
     },
-    "name": "multi-participant-2",
+    "name": "multi-participant-2-3",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
   },
@@ -1648,7 +1570,7 @@
         "labels": {
           "release": "prometheus-grafana-monitoring"
         },
-        "name": "multi-participant-3-service-monitor",
+        "name": "multi-participant-3-3-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -1663,12 +1585,12 @@
         },
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-3"
+            "app": "multi-participant-3-3"
           }
         }
       }
     },
-    "name": "multi-participant-3-service-monitor",
+    "name": "multi-participant-3-3-service-monitor",
     "provider": "",
     "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
   },
@@ -1676,7 +1598,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "multi-participant-3",
+    "name": "multi-participant-3-3",
     "provider": "",
     "type": "canton:network:Deployment"
   },
@@ -1688,7 +1610,7 @@
       "kind": "Deployment",
       "metadata": {
         "labels": {
-          "app": "multi-participant-3"
+          "app": "multi-participant-3-3"
         },
         "namespace": "multi-validator"
       },
@@ -1696,7 +1618,7 @@
         "replicas": 1,
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-3"
+            "app": "multi-participant-3-3"
           }
         },
         "strategy": {
@@ -1705,7 +1627,7 @@
         "template": {
           "metadata": {
             "labels": {
-              "app": "multi-participant-3"
+              "app": "multi-participant-3-3"
             }
           },
           "spec": {
@@ -1734,7 +1656,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -1911,7 +1833,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "6",
                     "memory": "16Gi"
                   },
                   "requests": {
@@ -1926,7 +1847,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-3 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-3 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
@@ -1943,6 +1864,11 @@
                 "name": "pg-init"
               }
             ],
+            "securityContext": {
+              "fsGroup": 1001,
+              "runAsGroup": 1001,
+              "runAsUser": 1001
+            },
             "tolerations": [
               {
                 "effect": "NoSchedule",
@@ -1954,7 +1880,7 @@
         }
       }
     },
-    "name": "multi-participant-3",
+    "name": "multi-participant-3-3",
     "provider": "",
     "type": "kubernetes:apps/v1:Deployment"
   },
@@ -1966,9 +1892,9 @@
       "kind": "Service",
       "metadata": {
         "labels": {
-          "app": "multi-participant-3"
+          "app": "multi-participant-3-3"
         },
-        "name": "multi-participant-3",
+        "name": "multi-participant-3-3",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -2063,11 +1989,11 @@
           }
         ],
         "selector": {
-          "app": "multi-participant-3"
+          "app": "multi-participant-3-3"
         }
       }
     },
-    "name": "multi-participant-3",
+    "name": "multi-participant-3-3",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
   },
@@ -2081,7 +2007,7 @@
         "labels": {
           "release": "prometheus-grafana-monitoring"
         },
-        "name": "multi-participant-4-service-monitor",
+        "name": "multi-participant-4-3-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -2096,12 +2022,12 @@
         },
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-4"
+            "app": "multi-participant-4-3"
           }
         }
       }
     },
-    "name": "multi-participant-4-service-monitor",
+    "name": "multi-participant-4-3-service-monitor",
     "provider": "",
     "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
   },
@@ -2109,7 +2035,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "multi-participant-4",
+    "name": "multi-participant-4-3",
     "provider": "",
     "type": "canton:network:Deployment"
   },
@@ -2121,7 +2047,7 @@
       "kind": "Deployment",
       "metadata": {
         "labels": {
-          "app": "multi-participant-4"
+          "app": "multi-participant-4-3"
         },
         "namespace": "multi-validator"
       },
@@ -2129,7 +2055,7 @@
         "replicas": 1,
         "selector": {
           "matchLabels": {
-            "app": "multi-participant-4"
+            "app": "multi-participant-4-3"
           }
         },
         "strategy": {
@@ -2138,7 +2064,7 @@
         "template": {
           "metadata": {
             "labels": {
-              "app": "multi-participant-4"
+              "app": "multi-participant-4-3"
             }
           },
           "spec": {
@@ -2167,7 +2093,7 @@
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_DB",
-                    "value": "cantonnet_p"
+                    "value": "participant_3"
                   },
                   {
                     "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
@@ -2344,7 +2270,6 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "6",
                     "memory": "16Gi"
                   },
                   "requests": {
@@ -2359,7 +2284,7 @@
                 "command": [
                   "bash",
                   "-c",
-                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-4 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-4 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb participant_3_00\ncreateDb participant_3_01\ncreateDb participant_3_02\ncreateDb participant_3_03\ncreateDb participant_3_04\ncreateDb participant_3_05\ncreateDb participant_3_06\ncreateDb participant_3_07\ncreateDb participant_3_08\ncreateDb participant_3_09\n                      "
                 ],
                 "env": [
                   {
@@ -2376,6 +2301,11 @@
                 "name": "pg-init"
               }
             ],
+            "securityContext": {
+              "fsGroup": 1001,
+              "runAsGroup": 1001,
+              "runAsUser": 1001
+            },
             "tolerations": [
               {
                 "effect": "NoSchedule",
@@ -2387,7 +2317,7 @@
         }
       }
     },
-    "name": "multi-participant-4",
+    "name": "multi-participant-4-3",
     "provider": "",
     "type": "kubernetes:apps/v1:Deployment"
   },
@@ -2399,9 +2329,9 @@
       "kind": "Service",
       "metadata": {
         "labels": {
-          "app": "multi-participant-4"
+          "app": "multi-participant-4-3"
         },
-        "name": "multi-participant-4",
+        "name": "multi-participant-4-3",
         "namespace": "multi-validator"
       },
       "spec": {
@@ -2496,13 +2426,39 @@
           }
         ],
         "selector": {
-          "app": "multi-participant-4"
+          "app": "multi-participant-4-3"
         }
       }
     },
-    "name": "multi-participant-4",
+    "name": "multi-participant-4-3",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "multi-validator-0-domain-migration-pvc",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "20G"
+          }
+        },
+        "storageClassName": "standard-rwo"
+      }
+    },
+    "name": "multi-validator-0-domain-migration-pvc",
+    "provider": "",
+    "type": "kubernetes:core/v1:PersistentVolumeClaim"
   },
   {
     "custom": true,
@@ -2600,7 +2556,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
-                    "value": "multi-participant-0"
+                    "value": "multi-participant-0-3"
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
@@ -2664,6 +2620,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -2682,6 +2642,10 @@
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
                     "value": "canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger\"\ncanton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger\"\n"
+                  },
+                  {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+                    "value": "canton.validator-apps.validator_backend_INDEX.participant-pruning-schedule {\n  cron = \"0 /10 * * * ?\"\n  max-duration = \"5m\"\n  retention = \"25h\"\n}\n"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
@@ -2774,14 +2738,19 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "4",
                     "memory": "8Gi"
                   },
                   "requests": {
                     "cpu": "0.5",
                     "memory": "2400Mi"
                   }
-                }
+                },
+                "volumeMounts": [
+                  {
+                    "mountPath": "/domain-upgrade-dump",
+                    "name": "domain-upgrade-dump-volume"
+                  }
+                ]
               }
             ],
             "initContainers": [
@@ -2806,11 +2775,24 @@
                 "name": "pg-init"
               }
             ],
+            "securityContext": {
+              "fsGroup": 1001,
+              "runAsGroup": 1001,
+              "runAsUser": 1001
+            },
             "tolerations": [
               {
                 "effect": "NoSchedule",
                 "key": "cn_apps",
                 "operator": "Exists"
+              }
+            ],
+            "volumes": [
+              {
+                "name": "domain-upgrade-dump-volume",
+                "persistentVolumeClaim": {
+                  "claimName": "multi-validator-0-domain-migration-pvc"
+                }
               }
             ]
           }
@@ -2893,6 +2875,32 @@
     "name": "multi-validator-0",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "multi-validator-1-domain-migration-pvc",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "20G"
+          }
+        },
+        "storageClassName": "standard-rwo"
+      }
+    },
+    "name": "multi-validator-1-domain-migration-pvc",
+    "provider": "",
+    "type": "kubernetes:core/v1:PersistentVolumeClaim"
   },
   {
     "custom": true,
@@ -2990,7 +2998,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
-                    "value": "multi-participant-1"
+                    "value": "multi-participant-1-3"
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
@@ -3054,6 +3062,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3072,6 +3084,10 @@
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
                     "value": "canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger\"\ncanton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger\"\n"
+                  },
+                  {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+                    "value": "canton.validator-apps.validator_backend_INDEX.participant-pruning-schedule {\n  cron = \"0 /10 * * * ?\"\n  max-duration = \"5m\"\n  retention = \"25h\"\n}\n"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
@@ -3164,14 +3180,19 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "4",
                     "memory": "8Gi"
                   },
                   "requests": {
                     "cpu": "0.5",
                     "memory": "2400Mi"
                   }
-                }
+                },
+                "volumeMounts": [
+                  {
+                    "mountPath": "/domain-upgrade-dump",
+                    "name": "domain-upgrade-dump-volume"
+                  }
+                ]
               }
             ],
             "initContainers": [
@@ -3196,11 +3217,24 @@
                 "name": "pg-init"
               }
             ],
+            "securityContext": {
+              "fsGroup": 1001,
+              "runAsGroup": 1001,
+              "runAsUser": 1001
+            },
             "tolerations": [
               {
                 "effect": "NoSchedule",
                 "key": "cn_apps",
                 "operator": "Exists"
+              }
+            ],
+            "volumes": [
+              {
+                "name": "domain-upgrade-dump-volume",
+                "persistentVolumeClaim": {
+                  "claimName": "multi-validator-1-domain-migration-pvc"
+                }
               }
             ]
           }
@@ -3283,6 +3317,32 @@
     "name": "multi-validator-1",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "multi-validator-2-domain-migration-pvc",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "20G"
+          }
+        },
+        "storageClassName": "standard-rwo"
+      }
+    },
+    "name": "multi-validator-2-domain-migration-pvc",
+    "provider": "",
+    "type": "kubernetes:core/v1:PersistentVolumeClaim"
   },
   {
     "custom": true,
@@ -3380,7 +3440,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
-                    "value": "multi-participant-2"
+                    "value": "multi-participant-2-3"
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
@@ -3444,6 +3504,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3462,6 +3526,10 @@
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
                     "value": "canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger\"\ncanton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger\"\n"
+                  },
+                  {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+                    "value": "canton.validator-apps.validator_backend_INDEX.participant-pruning-schedule {\n  cron = \"0 /10 * * * ?\"\n  max-duration = \"5m\"\n  retention = \"25h\"\n}\n"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
@@ -3554,14 +3622,19 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "4",
                     "memory": "8Gi"
                   },
                   "requests": {
                     "cpu": "0.5",
                     "memory": "2400Mi"
                   }
-                }
+                },
+                "volumeMounts": [
+                  {
+                    "mountPath": "/domain-upgrade-dump",
+                    "name": "domain-upgrade-dump-volume"
+                  }
+                ]
               }
             ],
             "initContainers": [
@@ -3586,11 +3659,24 @@
                 "name": "pg-init"
               }
             ],
+            "securityContext": {
+              "fsGroup": 1001,
+              "runAsGroup": 1001,
+              "runAsUser": 1001
+            },
             "tolerations": [
               {
                 "effect": "NoSchedule",
                 "key": "cn_apps",
                 "operator": "Exists"
+              }
+            ],
+            "volumes": [
+              {
+                "name": "domain-upgrade-dump-volume",
+                "persistentVolumeClaim": {
+                  "claimName": "multi-validator-2-domain-migration-pvc"
+                }
               }
             ]
           }
@@ -3673,6 +3759,32 @@
     "name": "multi-validator-2",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "multi-validator-3-domain-migration-pvc",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "20G"
+          }
+        },
+        "storageClassName": "standard-rwo"
+      }
+    },
+    "name": "multi-validator-3-domain-migration-pvc",
+    "provider": "",
+    "type": "kubernetes:core/v1:PersistentVolumeClaim"
   },
   {
     "custom": true,
@@ -3770,7 +3882,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
-                    "value": "multi-participant-3"
+                    "value": "multi-participant-3-3"
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
@@ -3834,6 +3946,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3852,6 +3968,10 @@
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
                     "value": "canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger\"\ncanton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger\"\n"
+                  },
+                  {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+                    "value": "canton.validator-apps.validator_backend_INDEX.participant-pruning-schedule {\n  cron = \"0 /10 * * * ?\"\n  max-duration = \"5m\"\n  retention = \"25h\"\n}\n"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
@@ -3944,14 +4064,19 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "4",
                     "memory": "8Gi"
                   },
                   "requests": {
                     "cpu": "0.5",
                     "memory": "2400Mi"
                   }
-                }
+                },
+                "volumeMounts": [
+                  {
+                    "mountPath": "/domain-upgrade-dump",
+                    "name": "domain-upgrade-dump-volume"
+                  }
+                ]
               }
             ],
             "initContainers": [
@@ -3976,11 +4101,24 @@
                 "name": "pg-init"
               }
             ],
+            "securityContext": {
+              "fsGroup": 1001,
+              "runAsGroup": 1001,
+              "runAsUser": 1001
+            },
             "tolerations": [
               {
                 "effect": "NoSchedule",
                 "key": "cn_apps",
                 "operator": "Exists"
+              }
+            ],
+            "volumes": [
+              {
+                "name": "domain-upgrade-dump-volume",
+                "persistentVolumeClaim": {
+                  "claimName": "multi-validator-3-domain-migration-pvc"
+                }
               }
             ]
           }
@@ -4063,6 +4201,32 @@
     "name": "multi-validator-3",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "multi-validator-4-domain-migration-pvc",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "20G"
+          }
+        },
+        "storageClassName": "standard-rwo"
+      }
+    },
+    "name": "multi-validator-4-domain-migration-pvc",
+    "provider": "",
+    "type": "kubernetes:core/v1:PersistentVolumeClaim"
   },
   {
     "custom": true,
@@ -4160,7 +4324,7 @@
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
-                    "value": "multi-participant-4"
+                    "value": "multi-participant-4-3"
                   },
                   {
                     "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
@@ -4224,6 +4388,10 @@
                     "value": "INFO"
                   },
                   {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH",
+                    "value": "canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = \"/domain-upgrade-dump/INDEX/domain_migration_dump.json\""
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -4242,6 +4410,10 @@
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
                     "value": "canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger\"\ncanton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger\"\n"
+                  },
+                  {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+                    "value": "canton.validator-apps.validator_backend_INDEX.participant-pruning-schedule {\n  cron = \"0 /10 * * * ?\"\n  max-duration = \"5m\"\n  retention = \"25h\"\n}\n"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
@@ -4334,14 +4506,19 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "4",
                     "memory": "8Gi"
                   },
                   "requests": {
                     "cpu": "0.5",
                     "memory": "2400Mi"
                   }
-                }
+                },
+                "volumeMounts": [
+                  {
+                    "mountPath": "/domain-upgrade-dump",
+                    "name": "domain-upgrade-dump-volume"
+                  }
+                ]
               }
             ],
             "initContainers": [
@@ -4366,11 +4543,24 @@
                 "name": "pg-init"
               }
             ],
+            "securityContext": {
+              "fsGroup": 1001,
+              "runAsGroup": 1001,
+              "runAsUser": 1001
+            },
             "tolerations": [
               {
                 "effect": "NoSchedule",
                 "key": "cn_apps",
                 "operator": "Exists"
+              }
+            ],
+            "volumes": [
+              {
+                "name": "domain-upgrade-dump-volume",
+                "persistentVolumeClaim": {
+                  "claimName": "multi-validator-4-domain-migration-pvc"
+                }
               }
             ]
           }
@@ -4572,6 +4762,16 @@
     "name": "multi-validator",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
   },
   {
     "custom": true,

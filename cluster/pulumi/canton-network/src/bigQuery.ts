@@ -9,19 +9,21 @@ import {
   InstalledHelmChart,
   installPostgresPasswordSecret,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { config } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
+import { clusterProdLike, config } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import {
   Postgres,
   CloudPostgres,
   generatePassword,
-  privateNetwork,
-  protectCloudSql,
+  privateNetworkId,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import {
   ExactNamespace,
   CLUSTER_BASENAME,
   commandScriptPath,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
+
+import { spliceConfig } from '../../common/src/config/config';
+import { allDashboardFunctions, allScanFunctions, computedDataTable } from './bigQuery_functions';
 
 interface ScanBigQueryConfig {
   dataset: string;
@@ -38,7 +40,13 @@ const replicatorUserName = 'bqdatastream';
 const replicationSlotName = 'update_history_datastream_r_slot';
 const publicationName = 'update_history_datastream_pub';
 // what tables from Scan to replicate to BigQuery
-const tablesToReplicate = ['update_history_creates', 'update_history_exercises'];
+const tablesToReplicate = [
+  'update_history_creates',
+  'update_history_exercises',
+  'scan_verdict_store',
+  'scan_verdict_transaction_view_store',
+];
+const flywayMigrationToWaitFor = 'V047__verdict_history_id.sql';
 
 function cloudsdkComputeRegion() {
   return config.requireEnv('CLOUDSDK_COMPUTE_REGION');
@@ -157,6 +165,9 @@ function installDatastream(
           singleTargetDataset: {
             datasetId: pulumi.interpolate`projects/${bigQueryDataset.project}/datasets/${bigQueryDataset.datasetId}`,
           },
+          // editing dataFreshness does not alter existing BQ tables, see its
+          // docstring or https://github.com/hyperledger-labs/splice/issues/2011
+          dataFreshness: clusterProdLike ? '14400s' : '0s',
         },
         destinationConnectionProfile: destination.name,
       },
@@ -181,6 +192,101 @@ function installBigqueryDataset(scanBigQuery: ScanBigQueryConfig): gcp.bigquery.
       cluster: CLUSTER_BASENAME,
     },
   });
+}
+
+function installDashboardsDataset(): gcp.bigquery.Dataset {
+  const datasetName = 'dashboards';
+  const dataset = new gcp.bigquery.Dataset(datasetName, {
+    datasetId: datasetName,
+    friendlyName: `${datasetName} Dataset`,
+    location: cloudsdkComputeRegion(),
+    deleteContentsOnDestroy: true,
+    labels: {
+      cluster: CLUSTER_BASENAME,
+    },
+  });
+
+  computedDataTable.toPulumi(
+    dataset,
+    // TODO(DACH-NY/canton-network-internal#1461) consider making deletionProtection configurable
+    false
+  );
+
+  return dataset;
+}
+
+function installFunctions(
+  scanDataset: gcp.bigquery.Dataset,
+  dashboardsDataset: gcp.bigquery.Dataset,
+  dependsOn: pulumi.Resource[]
+): gcp.bigquery.Dataset {
+  const datasetName = 'functions';
+  const functionsDataset = new gcp.bigquery.Dataset(datasetName, {
+    datasetId: datasetName,
+    friendlyName: `${datasetName} Dataset`,
+    location: cloudsdkComputeRegion(),
+    deleteContentsOnDestroy: true,
+    labels: {
+      cluster: CLUSTER_BASENAME,
+    },
+  });
+
+  scanDataset.project.apply(project => {
+    // We don't just run allFunctions.map() because we want to sequence the creation, since every function
+    // might depend on those before it.
+    let lastResource: pulumi.Resource | undefined = undefined;
+    for (const f in allScanFunctions) {
+      lastResource = allScanFunctions[f].toPulumi(
+        project,
+        functionsDataset,
+        functionsDataset,
+        scanDataset,
+        dashboardsDataset,
+        lastResource
+          ? [lastResource]
+          : [...dependsOn, functionsDataset, scanDataset, dashboardsDataset]
+      );
+    }
+
+    for (const f in allDashboardFunctions) {
+      lastResource = allDashboardFunctions[f].toPulumi(
+        project,
+        dashboardsDataset,
+        functionsDataset,
+        scanDataset,
+        dashboardsDataset,
+        lastResource
+          ? [lastResource]
+          : [...dependsOn, functionsDataset, scanDataset, dashboardsDataset]
+      );
+    }
+  });
+
+  return functionsDataset;
+}
+
+function installScheduledTasks(
+  dashboardsDataset: gcp.bigquery.Dataset,
+  dependsOn: pulumi.Resource[]
+): void {
+  pulumi
+    .all([dashboardsDataset.project, dashboardsDataset.datasetId])
+    .apply(([project, dataset]) => {
+      new gcp.bigquery.DataTransferConfig(
+        'scheduled_dashboard_update',
+        {
+          displayName: 'scheduled_dashboard_update',
+          dataSourceId: 'scheduled_query',
+          schedule: 'every day 13:00', // UTC
+          location: cloudsdkComputeRegion(),
+          serviceAccountName: `bigquery@${project}.iam.gserviceaccount.com`,
+          params: {
+            query: `CALL \`${project}.${dataset}.fill_all_stats\`();`,
+          },
+        },
+        { dependsOn: dependsOn }
+      );
+    });
 }
 
 /* TODO (DACH-NY/canton-network-internal#341) remove this comment when enabled on all relevant clusters
@@ -267,7 +373,7 @@ function installPrivateConnectivityConfiguration(
       privateConnectionId: privateConnectionName,
       displayName: privateConnectionName,
       location: cloudsdkComputeRegion(),
-      vpcPeeringConfig: { subnet: pickDatastreamPeeringCidr(), vpc: privateNetwork.id },
+      vpcPeeringConfig: { subnet: pickDatastreamPeeringCidr(), vpc: privateNetworkId },
       labels: {
         cluster: CLUSTER_BASENAME,
       },
@@ -306,7 +412,7 @@ function installReplicatorPassword(postgres: CloudPostgres): PostgresPassword {
   const secretName = `${postgres.namespace.logicalName}-${replicatorUserName}-passwd`;
   const password = generatePassword(`${postgres.instanceName}-${replicatorUserName}-passwd`, {
     parent: postgres,
-    protect: protectCloudSql,
+    protect: spliceConfig.pulumiProjectConfig.cloudSql.protected,
   }).result;
   return {
     contents: password,
@@ -330,7 +436,7 @@ function createPostgresReplicatorUser(
       parent: postgres,
       deletedWith: postgres.databaseInstance,
       retainOnDelete: true,
-      protect: protectCloudSql,
+      protect: spliceConfig.pulumiProjectConfig.cloudSql.protected,
       dependsOn: [postgres.databaseInstance, password.secret],
     }
   );
@@ -350,20 +456,19 @@ function createPublicationAndReplicationSlots(
   const schemaName = dbName;
   const path = commandScriptPath('cluster/pulumi/canton-network/bigquery-cloudsql.sh');
   const scriptArgs = pulumi.interpolate`\\
-      --private-network-project="${privateNetwork.project}" \\
+      --private-network-project="${gcp.organizations.getProjectOutput({}).apply(proj => proj.name)}" \\
       --compute-region="${cloudsdkComputeRegion()}" \\
       --service-account-email="${postgres.databaseInstance.serviceAccountEmailAddress}" \\
-      --tables-to-replicate-length="${tablesToReplicate.length}" \\
-      --db-name="${dbName}" \\
       --schema-name="${schemaName}" \\
-      --tables-to-replicate-list="${tablesToReplicate.map(n => `'${n}'`).join(', ')}" \\
       --tables-to-replicate-joined="${tablesToReplicate.join(', ')}" \\
       --postgres-user-name="${postgres.user.name}" \\
       --publication-name="${publicationName}" \\
       --replication-slot-name="${replicationSlotName}" \\
       --replicator-user-name="${replicatorUserName}" \\
       --postgres-instance-name="${postgres.databaseInstance.name}" \\
-      --scan-app-database-name="${scanAppDatabaseName(postgres)}"`;
+      --scan-app-database-name="${scanAppDatabaseName(postgres)}" \\
+      --flyway-migration-to-wait-for="${flywayMigrationToWaitFor}" \\
+      `;
   return new command.local.Command(
     `${postgres.namespace.logicalName}-${replicatorUserName}-pub-replicate-slots`,
     {
@@ -373,6 +478,7 @@ function createPublicationAndReplicationSlots(
     {
       deletedWith: postgres.databaseInstance,
       dependsOn: [scan, postgres.databaseInstance, replicatorUser],
+      deleteBeforeReplace: true,
     }
   );
 }
@@ -401,6 +507,15 @@ export function configureScanBigQuery(
     passwordSecret
   );
   installDatastreamToNatVmFirewallRule(postgres.namespace, pcc, natVm);
-  installDatastream(postgres, sourceProfile, destinationProfile, dataset, pubRepSlots);
+  const stream = installDatastream(
+    postgres,
+    sourceProfile,
+    destinationProfile,
+    dataset,
+    pubRepSlots
+  );
+  const dashboardsDataset = installDashboardsDataset();
+  const functionsDataset = installFunctions(dataset, dashboardsDataset, [stream]);
+  installScheduledTasks(dashboardsDataset, [functionsDataset, dataset]);
   return;
 }

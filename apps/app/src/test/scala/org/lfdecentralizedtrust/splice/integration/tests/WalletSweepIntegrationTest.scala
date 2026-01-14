@@ -222,11 +222,11 @@ abstract class WalletSweepIntegrationTest
           50.0
         ) // validator needs to have some funds to create preapproval
         walletClient.tap(50.0)
-        walletClient.createTransferPreapproval()
+        createTransferPreapprovalEnsuringItExists(walletClient, aliceValidatorBackend)
       },
     )(
       "Transfer preapproval is visible in scan",
-      _ => sv1ScanBackend.lookupTransferPreapprovalByParty(alicePartyId) shouldBe a[Some[_]],
+      _ => sv1ScanBackend.lookupTransferPreapprovalByParty(alicePartyId) shouldBe a[Some[?]],
     )
     clue("Sweep no longer errors now that preapproval is created") {
       bobValidatorBackend
@@ -426,7 +426,8 @@ class WalletSweepToEndUserIntegrationTest extends WalletSweepIntegrationTest {
         .list()
         .exists(e => e.party == aliceEndUserPartyId)
     ) {
-      aliceValidatorBackend.participantClientWithAdminToken.ledger_api.parties.allocate(user)
+      aliceValidatorBackend.participantClientWithAdminToken.ledger_api.parties
+        .allocate(user, synchronizerId = Some(decentralizedSynchronizerId))
     }
     val newPartyId =
       aliceValidatorBackend.onboardUser(

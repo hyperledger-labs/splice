@@ -22,6 +22,14 @@ export type StackFromRef = { project: string; stack: string };
 // Trim non-splitwell DARs to avoid blowing the hardcoded operator size limit of 50mb
 const repoIgnore = '**/daml/dars\n!**/daml/dars/splitwell*';
 
+function expandGitReference(gitReference: string): { name: string } | { commit: string } {
+  if (gitReference.startsWith('refs/')) {
+    return { name: gitReference };
+  } else {
+    return { commit: gitReference };
+  }
+}
+
 // https://github.com/fluxcd/source-controller/blob/main/docs/spec/v1/gitrepositories.md
 export function gitRepoForRef(
   nameSuffix: string,
@@ -46,9 +54,7 @@ export function gitRepoForRef(
         spec: {
           interval: '5m',
           url: ref.repoUrl,
-          ref: {
-            name: ref.gitReference,
-          },
+          ref: expandGitReference(ref.gitReference),
           secretRef: { name: 'github' },
           recurseSubmodules: true,
           ignore: repoIgnore,
@@ -74,12 +80,10 @@ export function gitRepoForRef(
       spec: {
         interval: '5m',
         url: ref.repoUrl,
-        ref: {
-          name: ref.gitReference,
-        },
+        ref: expandGitReference(ref.gitReference),
         include: stacksToCopy.map(stack => ({
-          fromPath: `${ref.pulumiStacksDir}/${stack.project}/Pulumi.${stack.project}.${stack.stack}.yaml`,
-          toPath: `${ref.pulumiBaseDir}/${stack.project}/Pulumi.${stack.project}.${stack.stack}.yaml`,
+          fromPath: `${ref.pulumiStacksDir}/${stack.project}/Pulumi.${stack.stack}.yaml`,
+          toPath: `${ref.pulumiBaseDir}/${stack.project}/Pulumi.${stack.stack}.yaml`,
           repository: {
             name: `splice-node-${nameSuffix}-base`,
           },

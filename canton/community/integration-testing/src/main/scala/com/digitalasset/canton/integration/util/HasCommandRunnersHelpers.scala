@@ -74,7 +74,7 @@ private[integration] trait HasCommandRunnersHelpers {
         s"Retrieving updates stream for party $submittingParty hosted on ${participant.id} with offsets $startOffset/$endOffset"
       )
 
-      val updates = participant.ledger_api.updates.flat(
+      val updates = participant.ledger_api.updates.transactions(
         partyIds = Set(submittingParty),
         completeAfter = 1,
         beginOffsetExclusive = startOffset,
@@ -108,14 +108,15 @@ private[integration] trait HasCommandRunnersHelpers {
         userId = userId,
       )
 
-  protected def getTransactionFilter(
+  protected def getEventFormat(
       stakeholders: List[LfPartyId]
-  ): proto.transaction_filter.TransactionFilter = {
-    val noTemplateFilter = Filters(Seq.empty)
+  ): proto.transaction_filter.EventFormat = {
+    val wildcardTemplateFilter = Filters(Seq.empty)
 
-    proto.transaction_filter.TransactionFilter(
-      stakeholders.map(party => party -> noTemplateFilter).toMap,
-      None,
+    proto.transaction_filter.EventFormat(
+      filtersByParty = stakeholders.map(party => party -> wildcardTemplateFilter).toMap,
+      filtersForAnyParty = None,
+      verbose = false,
     )
   }
 

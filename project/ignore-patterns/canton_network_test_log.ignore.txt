@@ -33,6 +33,7 @@ ErrorBoundary caught an unhandled promise rejection AbortError: The operation wa
 ErrorBoundary caught an unhandled promise rejection AbortError: Aborted
 AbortError: The operation was aborted
 TypeError: NetworkError when attempting to fetch resource
+oidc login error: NetworkError when attempting to fetch resource
 
 # Testcontainers tries to read the configuration file but it's not available on CI
 Attempted to read Testcontainers configuration file at file:
@@ -54,7 +55,7 @@ Trying to re-register template.*
 
 # TODO(#979) Ignore errors related to global domain disconnection and reconnection after sequencers connections changed for now.
 # Revisit later to see if we can remove these.
-.*NOT_FOUND/UNKNOWN_INFORMEES.*The participant is not connected to any domain where the given informees are known.
+.*NOT_FOUND/UNKNOWN_INFORMEES.*The participant is not connected to any .* where the given informees are known.
 .*NOT_FOUND/SUBMISSION_DOMAIN_NOT_READY.*Trying to submit to a disconnected or not configured domain.
 
 # TODO(#975): investigate and remove once fixed
@@ -68,7 +69,7 @@ Noticed an DsoRules epoch change.*DecentralizedSynchronizerMigrationIntegrationT
 # Nevertheless, it is still useful to have the warning in production environments, where this should never happen.
 Skipped.*faucet coupons from last claimed round.*to current round
 
-# Sometimes the CircleCI executor seems to take a break, which leads to spurious failed DB activeness checks, see #9388
+# Sometimes CI the executor seems to take a break, which leads to spurious failed DB activeness checks, see #9388
 DB_CONNECTION_LOST.*Database health check failed to establish a valid connection.*Connection is not available, request timed out
 
 # The prometheus export server does not wait for any ongoing requests when shutting down https://github.com/prometheus/client_java/issues/938
@@ -86,8 +87,10 @@ unexpected exception: Task slick.*rejected from slick.util.AsyncExecutorWithMetr
 
 # TODO (#944): investigate what task is it still running and see if we can somehow fix it
 Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
+ForkJoinIdlenessExecutorService.*shutdown did not complete gracefully in allotted
 
 Consensus not reached.*BftScanConnection:BftScanConnectionTest.*
+Consensus not reached.*BftScanConnection:ConfigurationProvidedBftScanConnectionIntegrationTest.*
 
 # internal selenium error. Potentially intermittent
 Exception managing firefox: error sending request for url .* http2 error: stream error received: refused stream before processing any application
@@ -113,6 +116,7 @@ Failed to connect to scan of Digital-Asset-Eng-3.*AppUpgradeIntegrationTest
 # Ignore scan issues in disaster recovery tests as we don't start scan there
 Failed to connect to scan of .*DisasterRecoveryIntegrationTest
 Failed to connect to scan of .*AppUpgradeIntegrationTest
+Failed to connect to scan of .*ConfigurationProvidedBftScanConnectionIntegrationTest
 
 # Ignore scan connection issues in reonboarding test.
 Failed to connect to scan of .*SvDevNetReonboardingIntegrationTest
@@ -121,9 +125,16 @@ Failed to connect to scan of .*SvDevNetReonboardingIntegrationTest
 GENERIC_CONFIG_ERROR.*SpliceConfigTest
 
 # ExecutorServiceMetrics closes the gauges twice through shutdown and shutownNow in cases where shutdown times out
-.*InstrumentDescriptor.*name=daml.executor.* has called close() multiple times
+.*InstrumentDescriptor.*name=daml.executor.* has called close\(\) multiple times
 
-# flyway update
-cleanOnValidationError is deprecated and will be removed in a later release
+Circuit breaker .* tripped after .* failures.*(Command|Splice)CircuitBreakerTest
 
-# Make sure to have a trailing newline
+# See DACH-NY/cn-test-failures#6328: In rare cases, creating an index asynchronously can fail.
+# This is more likely in test code where we run multiple apps against the same database, all trying to create the same index.
+Index .* should be created and is invalid, dropping it
+
+# Injected errors in s3Mock
+Simulated S3 write error
+
+# Warnings in s3Mock log (which we redirect to our logs), that we don't care about
+\[s3Mock\].*Ignoring option --illegal-access=warn

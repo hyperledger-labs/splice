@@ -7,6 +7,7 @@ import cats.data.EitherT
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{BatchingConfig, CachingConfigs, ProcessingTimeout}
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -14,11 +15,12 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.synchronizer.block.SequencerDriver
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.DriverBlockSequencerFactory
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftSequencerFactory
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.sequencing.BftSequencerFactory
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameters
 import com.digitalasset.canton.synchronizer.sequencer.store.SequencerStore
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerTrafficConfig
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import io.opentelemetry.api.trace.Tracer
@@ -38,13 +40,12 @@ trait SequencerFactory extends FlagCloseable with HasCloseContext {
   ): EitherT[FutureUnlessShutdown, String, Unit]
 
   def create(
-      synchronizerId: SynchronizerId,
       sequencerId: SequencerId,
       clock: Clock,
-      driverClock: Clock, // this clock is only used in tests, otherwise can the same clock as above can be passed
       synchronizerSyncCryptoApi: SynchronizerCryptoClient,
       futureSupervisor: FutureSupervisor,
       trafficConfig: SequencerTrafficConfig,
+      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
       runtimeReady: FutureUnlessShutdown[Unit],
       sequencerSnapshot: Option[SequencerSnapshot],
       authenticationServices: Option[AuthenticationServices],
@@ -64,6 +65,7 @@ abstract class DatabaseSequencerFactory(
     protocolVersion: ProtocolVersion,
     sequencerId: SequencerId,
     blockSequencerMode: Boolean,
+    metrics: SequencerMetrics,
 )(implicit ec: ExecutionContext)
     extends SequencerFactory
     with NamedLogging {
@@ -83,6 +85,7 @@ abstract class DatabaseSequencerFactory(
       // Overriding the store's close context with the writers, so that when the writer gets closed, the store
       // stops retrying forever
       overrideCloseContext = Some(this.closeContext),
+      sequencerMetrics = metrics,
     )
 
   override def initialize(
@@ -113,16 +116,16 @@ class CommunityDatabaseSequencerFactory(
       sequencerProtocolVersion,
       sequencerId,
       blockSequencerMode = false,
+      metrics,
     ) {
 
   override def create(
-      synchronizerId: SynchronizerId,
       sequencerId: SequencerId,
       clock: Clock,
-      driverClock: Clock,
       synchronizerSyncCryptoApi: SynchronizerCryptoClient,
       futureSupervisor: FutureSupervisor,
       trafficConfig: SequencerTrafficConfig,
+      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
       runtimeReady: FutureUnlessShutdown[Unit],
       sequencerSnapshot: Option[SequencerSnapshot],
       authenticationServices: Option[AuthenticationServices],
@@ -137,10 +140,9 @@ class CommunityDatabaseSequencerFactory(
       nodeParameters.processingTimeouts,
       storage,
       sequencerStore,
+      sequencingTimeLowerBoundExclusive,
       clock,
-      synchronizerId,
       sequencerId,
-      sequencerProtocolVersion,
       synchronizerSyncCryptoApi,
       metrics,
       loggerFactory,
@@ -165,7 +167,7 @@ trait MkSequencerFactory {
       metrics: SequencerMetrics,
       storage: Storage,
       sequencerId: SequencerId,
-      nodeParameters: CantonNodeParameters,
+      nodeParameters: SequencerNodeParameters,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
   )(
@@ -183,7 +185,7 @@ object CommunitySequencerFactory extends MkSequencerFactory {
       metrics: SequencerMetrics,
       storage: Storage,
       sequencerId: SequencerId,
-      nodeParameters: CantonNodeParameters,
+      nodeParameters: SequencerNodeParameters,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
   )(sequencerConfig: SequencerConfig)(implicit
@@ -219,16 +221,8 @@ object CommunitySequencerFactory extends MkSequencerFactory {
           blockSequencerConfig,
           config,
         ) =>
-      // Each external sequencer driver must have a unique identifier. Yet, we have two
-      // implementations of the external reference sequencer driver:
-      // - `community-reference` for the community edition
-      // - `reference` for the enterprise edition
-      // So if the sequencer type is `reference` and we're in community edition,
-      // we need to convert it to `community-reference`.
-      val actualSequencerType =
-        if (sequencerType == "reference") "community-reference" else sequencerType
       DriverBlockSequencerFactory(
-        actualSequencerType,
+        sequencerType,
         SequencerDriver.DriverApiVersion,
         config,
         blockSequencerConfig,

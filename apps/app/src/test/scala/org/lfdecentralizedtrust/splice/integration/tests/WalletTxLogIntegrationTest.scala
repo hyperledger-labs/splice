@@ -7,7 +7,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions 
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
-import org.lfdecentralizedtrust.splice.store.Limit
+import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit}
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AnsSubscriptionRenewalPaymentTrigger
 import org.lfdecentralizedtrust.splice.sv.config.InitialAnsConfig
 import org.lfdecentralizedtrust.splice.util.{
@@ -1226,19 +1226,34 @@ class WalletTxLogIntegrationTest
         logEntry.senderHoldingFees should beWithin(0, smallAmount)
         logEntry.amuletPrice shouldBe amuletPrice
       }
+      val expectedTxLogEntries = Seq(renewTxLog, creationTxLog, tapTxLog)
       checkTxHistory(
         bobValidatorWalletClient,
-        Seq(renewTxLog, creationTxLog, tapTxLog),
+        expectedTxLogEntries,
         trafficTopups = IgnoreTopupsDevNet,
       )
 
+      clue("Check UpdateHistory works for external parties") {
+        inside(
+          bobValidatorBackend.appState.walletManager
+            .valueOrFail("WalletManager is expected to be defined")
+            .externalPartyWalletManager
+            .lookupExternalPartyWallet(onboarding.party)
+            .valueOrFail(s"Expected ${onboarding.party} to have an external party wallet")
+            .updateHistory
+            .getAllUpdates(None, PageLimit.Max)
+            .futureValue
+        ) { history =>
+          history.size should be >= expectedTxLogEntries.size
+        }
+      }
     }
 
     "handle failed automation (direct transfer)" in { implicit env =>
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val validatorTxLogBefore =
-        aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
+        aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
 
       val (offerCid, _) =
         actAndCheck(
@@ -1269,7 +1284,8 @@ class WalletTxLogIntegrationTest
       )
 
       // Only Alice should see notification (note that aliceValidator is shared between tests)
-      val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
+      val validatorTxLogAfter =
+        aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
 
       withoutDevNetTopups(validatorTxLogBefore) should be(
         withoutDevNetTopups(validatorTxLogAfter)
@@ -1398,7 +1414,7 @@ class WalletTxLogIntegrationTest
       val aliceUserId = aliceWalletClient.config.ledgerApiUser
       val charlieUserId = charlieWalletClient.config.ledgerApiUser
       val validatorTxLogBefore =
-        aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
+        aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
 
       // Note: using Alice and Charlie because manually creating subscriptions requires both
       // the sender and the receiver to be hosted on the same participant.
@@ -1519,7 +1535,7 @@ class WalletTxLogIntegrationTest
 
           // Validator should not see any notification (note that aliceValidator is shared between tests)
           val validatorTxLogAfter =
-            aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
+            aliceValidatorWalletClient.listTransactions(None, Limit.DefaultMaxPageSize)
           withoutDevNetTopups(validatorTxLogBefore) should be(
             withoutDevNetTopups(validatorTxLogAfter)
           )
@@ -1552,9 +1568,10 @@ class WalletTxLogIntegrationTest
       val sv1UserParty = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
 
       // Note: SV1 is reused between tests, ignore TxLog entries created by previous tests
-      val previousEventId = sv1WalletClient
-        .listTransactions(None, Limit.MaxPageSize)
-        .headOption
+      val previousEventId = withoutDevNetTopups(
+        sv1WalletClient
+          .listTransactions(None, Limit.DefaultMaxPageSize)
+      ).headOption
         .map(_.eventId)
 
       val amuletAmount = BigDecimal(42)
@@ -1619,6 +1636,36 @@ class WalletTxLogIntegrationTest
         ),
         entries => forAll(entries)(_.errorMessage should include("Failed to parse transaction")),
       )
+    }
+
+    "not blow up with failed CO_TransferPreapprovalSend" in { implicit env =>
+      // the renewal of the preapproval can cause a LOCAL_VERDICT_LOCKED_CONTRACTS conflict with the send
+      setTriggersWithin(
+        triggersToPauseAtStart =
+          Seq(aliceValidatorBackend.validatorAutomation.trigger[RenewTransferPreapprovalTrigger]),
+        triggersToResumeAtStart = Seq.empty,
+      ) {
+        // Note: using Alice and Charlie because manually creating subscriptions requires both
+        // the sender and the receiver to be hosted on the same participant.
+        onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+
+        aliceValidatorWalletClient.tap(100) // funds to create preapproval
+        createTransferPreapprovalEnsuringItExists(charlieWalletClient, aliceValidatorBackend)
+
+        val dedupId = UUID.randomUUID().toString
+
+        assertCommandFailsDueToInsufficientFunds(
+          aliceWalletClient.transferPreapprovalSend(
+            charlieUserParty,
+            BigDecimal(10000000),
+            dedupId,
+            Some("this should not go through"),
+          )
+        )
+
+        aliceWalletClient.listTransactions(None, Limit.DefaultMaxPageSize) shouldBe empty
+      }
     }
 
   }

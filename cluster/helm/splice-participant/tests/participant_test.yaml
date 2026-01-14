@@ -104,7 +104,22 @@ tests:
           content:
             # We don't really care about the name of the env var but helm unittest wants it
             name: ADDITIONAL_CONFIG_SPLICE_PARTICIPANT_CRYPTO_PROVIDER_KMS
-            value: "canton.participants.participant.crypto {\n  provider = kms\n  kms = {\n    extra-canton-key = mock_value\n    map-canton-key = {\n      first-map-entry = first_map_value\n      recursive-map-entry = {\n        recursive-map = recursive_value\n      }\n      second-map-entry = second_map_value\n    }\n    region = mock_region\n    type = awwws\n  }\n}        \n"
+            value: |
+              canton.participants.participant.crypto {
+                provider = kms
+                kms = {
+                  extra-canton-key = mock_value
+                  map-canton-key = {
+                    first-map-entry = first_map_value
+                    recursive-map-entry = {
+                      recursive-map = recursive_value
+                    }
+                    second-map-entry = second_map_value
+                  }
+                  region = mock_region
+                  type = awwws
+                }
+              }
       # Secret configured via Helm with valueFrom
       - contains:
           path: spec.template.spec.containers[0].env
@@ -166,3 +181,135 @@ tests:
               persistentVolumeClaim:
                 claimName: claim_name
             - name: empty-dir-volume
+  - it: "defaults to auth"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='CANTON_PARTICIPANT_ADMIN_USER_NAME')].value
+      - notExists:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='ADDITIONAL_CONFIG_DISABLE_AUTH')].value
+  - it: "supports disabling auth"
+    set:
+      disableAuth: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='CANTON_PARTICIPANT_ADMIN_USER_NAME')].value
+          value: ledger-api-user
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='ADDITIONAL_CONFIG_DISABLE_AUTH')].value
+          value: |
+            canton.participants.participant.ledger-api.auth-services=[{
+              type = unsafe-jwt-hmac-256
+              target-audience = "https://ledger_api.example.com"
+              secret = "unsafe"
+            }]
+      - notExists:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='AUTH_JWKS_URL')].value
+      - notExists:
+          path: spec.template.spec.containers[?(@.name=='participant')].env[?(@.name=='AUTH_TARGET_AUDIENCE')].value
+  - it: "pvc creates persistent volume claim and volume mount"
+    set:
+      pvc:
+        size: "20Gi"
+        volumeStorageClass: "standard"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      # Sanity check
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: participant
+      # Volume is created
+      - equal:
+          path: spec.template.spec.volumes
+          value:
+            - name: participant-volume
+              persistentVolumeClaim:
+                claimName: participant-1-participant-pvc
+      # Volume mount is created
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts
+          value:
+            - name: participant-volume
+              mountPath: /persistent-data
+  - it: "pvc creates PersistentVolumeClaim resource"
+    set:
+      pvc:
+        size: "20Gi"
+        volumeStorageClass: "standard"
+    documentSelector:
+      path: kind
+      value: PersistentVolumeClaim
+    asserts:
+      - equal:
+          path: metadata.name
+          value: participant-1-participant-pvc
+      - equal:
+          path: spec.accessModes[0]
+          value: ReadWriteOnce
+      - equal:
+          path: spec.resources.requests.storage
+          value: "20Gi"
+      - equal:
+          path: spec.storageClassName
+          value: "standard"
+      - equal:
+          path: metadata.annotations
+          value:
+            helm.sh/resource-policy: keep
+  - it: "pvc and extraVolumes work together correctly"
+    set:
+      pvc:
+        size: "10Gi"
+        volumeStorageClass: "fast-ssd"
+      extraVolumes:
+        - name: secret-volume
+          secret:
+            secretName: my-secret
+        - name: config-volume
+          persistentVolumeClaim:
+            claimName: external-pvc
+      extraVolumeMounts:
+        - name: secret-volume
+          mountPath: /secrets
+          readOnly: true
+        - name: config-volume
+          mountPath: /config
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      # Sanity check
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: participant
+      # All volumes are created (extraVolumes + pvc volume)
+      - equal:
+          path: spec.template.spec.volumes
+          value:
+            - name: secret-volume
+              secret:
+                secretName: my-secret
+            - name: config-volume
+              persistentVolumeClaim:
+                claimName: external-pvc
+            - name: participant-volume
+              persistentVolumeClaim:
+                claimName: participant-1-participant-pvc
+      # All volume mounts are created (extraVolumeMounts + pvc mount)
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts
+          value:
+            - name: secret-volume
+              mountPath: /secrets
+              readOnly: true
+            - name: config-volume
+              mountPath: /config
+            - name: participant-volume
+              mountPath: /persistent-data

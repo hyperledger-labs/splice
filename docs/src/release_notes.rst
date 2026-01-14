@@ -5,9 +5,554 @@
 
 .. _release_notes:
 
-Release Notes
-=============
+.. release-notes:: 0.5.5
 
+  - API security
+
+    - Tightened authorization checks for all non-public API endpoints.
+
+      All non-public endpoints now properly respect the current user rights
+      defined in the participant user management service.
+      Revoking user rights on the participant will revoke access to the corresponding API endpoints.
+
+      In general, endpoints that required authentication before will now check that the authenticated user
+      is not deactivated on the participant and has ``actAs`` rights for the relevant party
+      (wallet party for the wallet app API, SV operator party for the SV app API, etc).
+
+    - Administrative SV app endpoints now require participant admin rights.
+
+      The following SV app endpoints now require the user to have participant admin rights in
+      the participant user management service.
+
+        - ``/v0/admin/domain/pause``
+        - ``/v0/admin/domain/unpause``
+        - ``/v0/admin/domain/migration-dump``
+        - ``/v0/admin/domain/identities-dump``
+        - ``/v0/admin/domain/data-snapshot``
+
+      This allows for finer grained access control
+      where users with ``actAs`` rights for the SV operator party but without participant admin
+      rights may use the SV or wallet UIs, but may not perform administrative actions like
+      hard synchronizer migrations.
+
+      Note that only the service users of the SV and validator apps should automatically have participant admin rights.
+      If you are using other users to access the above endpoints, check their rights.
+
+    - Some endpoints will have changed authorization rules in an upcoming release.
+
+        - SV app ``/v0/dso`` is currently public, but will require authorization as SV operator,
+          similar to most other SV app endpoints.
+          Use the public ``/v0/dso`` endpoint in the scan app if you need to fetch DSO info.
+
+  - Validator
+
+    - Added support for picking a custom name for new parties created when onboarding users via the `/v0/admin/users` API. See :ref:`docs <validator-users>`.
+
+    - Added an optional ``excludeDebugFields``` boolean to the request body of allocation and transfer endpoints for the Token Standard component
+      (``splice-api-token-allocation-v1`` and ``splice-api-token-transfer-instruction-v1``).
+      Clients can now set this to true to omit debug information from the response in order to save on bandwidth.
+
+.. release-notes:: 0.5.4
+
+  - Participant
+
+    - Fix a bug introduced in 0.5.0/0.5.1 that could cause participant pruning to prune active data.
+      The bug only manifests in a rare edge case involving a manual ACS import on a participant that was already running for some time.
+
+    - Fix a performance regression in participants that causes the processing of events to pause for multiple minutes at random times,
+      due to a bad database query plan on the critical part of the indexer pipeline.
+
+  - Scan
+
+    - Removed the non-existing `command_id` field from the OpenAPI spec of all
+      scan endpoints that return transactions.
+      The field was included in the "required" section without being a property
+      of the returned transaction object. This is only a bugfix in the OpenAPI spec
+      and has no impact on the actual API behavior.
+
+.. release-notes:: 0.5.3
+
+  Note: 0.5.2 mistakingly introduced default pruning for Canton participants and should be skipped in favor of 0.5.3.
+  Participants **do not** prune any data by default.
+  Pruning can be enabled explicitly by any validator operator.
+  For more information please check the :ref:`docs <validator_participant_pruning>`.
+
+  - Sequencer connections
+
+    - Improve retries for sending sequencer submissions when a sequencer rejects the request with an overloaded error code by retrying immediately on another node.
+    - The network timeout for the connection was lowered to 15 seconds to detect failures faster.
+
+  - Validator
+
+    - Fix bug that caused validators to fail on restoring participant users without rights during a synchronizer migration.
+
+  - Scan
+
+    - The round-based aggregates for balance values (changes to holding fees and initial amounts since round zero)
+      have diverged between scans because of the way amulet expiration is counted in rounds.
+      The balance values recorded in the round aggregates are effectively not depended upon anymore by scan APIs,
+      and are now set to zero to avoid consensus problems when an SV reads aggregates
+      from the rest of the network when first joining.
+
+    - Please note that ``/v0/total-amulet-balance`` and ``/v0/wallet-balance`` endpoints are marked for removal, and will be removed in an upcoming release.
+      See the Scan OpenAPI documentation for details: `/v0/total-amulet-balance <app_dev/scan_api/scan_openapi.html#get--v0-total-amulet-balance>`_
+      and `/v0/wallet-balance <app_dev/scan_api/scan_openapi.html#get--v0-wallet-balance>`_.
+
+  - Daml
+
+    - Fixed a bug in ``WalletUserProxy_TransferInstruction_Withdraw``, where the controller was
+      required to be the ``receiver`` instead of the ``sender`` of the transfer instruction. Upgrade
+      to ``splice-util-featured-app-proxies`` version ``1.2.1`` or newer to get the fix.
+
+  - SV app
+
+    - The SV app will no longer store the update history and such, will not be able to answer historical queries.
+      All updates involving the DSO party will still be stored and returned by Scan.
+
+    - Deployment
+
+      - The helm values under ``scan``, that is ``publicUrl`` and ``internalUrl`` are now mandatory.
+        All SVs already deploy scan on DevNet, TestNet and MainNet so this should have no impact.
+
+  - Docs
+
+    - Improvements to validator docs on :ref:`Synchronizer Upgrades with Downtime <validator-upgrades>`.
+
+.. release-notes:: 0.5.1
+
+  - Canton Participant
+
+    - Fix an issue where after a restart the participant could fail to
+      come up as a query exceeded the 65353 query parameter limit. This
+      should only an issue for SVs or participants with very high
+      traffic.
+
+
+.. release-notes:: 0.5.0
+
+  .. important::
+
+      Upgrade to Canton 3.4: This upgrade requires a Synchronizer Migration with Downtime and cannot be applied through a regular upgrade.
+      For details refer to the approved `CIP <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0089/cip-0089.md>`_
+      as well as the respective documentation pages for :ref:`validators <validator-upgrades>` and :ref:`SVs <sv-upgrades>`.
+
+  - Deployment
+
+      - **Breaking**: Docker-compose based deployments of LocalNet, validator, and SV expose only to 127.0.0.1 by default. If you want to expose externally, use ``-E`` in validator and superValidator ``start.sh``. For LocalNet, set ``export HOST_BIND_IP=0.0.0.0`` manually.
+
+  - Validator
+
+      - ``/v0/admin/users/offboard``:
+        Offboarding a user now also deletes the ledger API user in the participant node.
+      - If you need to use an HTTP proxy in your environment, you can now use `https.proxyHost` and `https.proxyPort` Java system properties.
+        Please see :ref:`HTTP Proxy configuration <validator-http-proxy-helm>` for Kubernetes-Based deployment and :ref:`HTTP Proxy configuration <validator-http-proxy-compose>` for Docker Compose-Based deployment.
+
+  - Scan
+
+    - Added a ``record_time_match`` property to ``/v0/state/acs``, ``/v0/holdings/state`` and ``/v0/holdings/summary`` API requests.
+      Finds a snapshot that exactly matches the specified ``record_time`` if set to ``exact`` (default),
+      or finds the first snapshot at or before the specified ``record_time`` if set to ``at-or-before```.
+
+  - Docs
+
+    - Document additional approach for resuming a :ref:`validator disaster recovery <validator_dr>` process that has failed at the step of importing the :term:`ACS`.
+    - Added a section on :ref:`configuring traffic <compose_validator_topup>` topups for Docker-compose deployments
+    - Add a section on :ref:`wallet_how_to_earn_featured_app_rewards`
+
+  - Mediator
+
+    - Mediators now prune data to only retain the last 30 days matching the 30 day pruning interval of sequencers.
+
+.. release-notes:: 0.4.25
+
+  Note: 0.4.24 was published incorrectly and should be skipped in favor of 0.4.25.
+
+  - Canton Participant
+
+    - Fix an issue where after a restart the participant could fail to
+      come up as a query exceeded the 65353 query parameter limit. This
+      should only an issue for SVs or participants with very high
+      traffic.
+
+
+.. release-notes:: 0.4.23
+
+  - Daml
+
+    - Added the ``splice-util-token-standard-wallet.dar``
+      :ref:`package <package-splice-util-token-standard-wallet>` that provides support for
+      implementing auto-merging of holdings and airdrop campaigns, as
+      explained in :ref:`holding_utxo_management`.
+      The package is optional and not uploaded by default to a validator node.
+    - Extended the ``splice-util-featured-app-proxies.dar``
+      :ref:`package <package-featured-app-proxies>` to
+      support executing :ref:`batch/bulk transfers <type-splice-util-featuredapp-walletuserproxy-walletuserproxybatchtransfer-93002>` of Canton Network token standard tokens,
+      both for featured and unfeatured apps.
+
+
+  - Performance improvements
+
+    - Scan
+
+        - Cache open rounds with a default TTL of 30s. This should reduce load when rounds change and lots of clients try to read the open rounds. `View PR 2860. <https://github.com/hyperledger-labs/splice/pull/2860>`_
+
+        - Reduce database load when the connection to the mediator verdict ingestion is restarted. `View PR 2861. <https://github.com/hyperledger-labs/splice/pull/2861>`_
+
+  - Deployment
+
+    - Increased the resource allocation for most apps, double check any changes if you override the default resources. `View PR 2972. <https://github.com/hyperledger-labs/splice/pull/2972>`_
+
+.. release-notes:: 0.4.22
+
+  - SV
+
+    - Improve throughput of ``FeaturedAppActivityMarkerTrigger``, which converts ``FeaturedAppActivityMarker`` contracts
+      to ``AppRewardCoupon`` contracts as described in `CIP-0047 Featured App Activity Markers <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0047/cip-0047.md>`__.
+      The new implementation uses larger batches (100 markers by default, instead of 5) and
+      parallelizes their execution (by default up to 4x).
+      The work is split between different SVs in a way that completely avoids contention when there are not too
+      many (by default 10k) markers, and that minimizes contention using random sampling of batches when the automation
+      is in catchup mode because there are too many markers.
+      Catchup mode only triggers when one or more of the SVs failed to convert the markers assigned to them for too long.
+
+
+.. release-notes:: 0.4.21
+
+  - Deployment
+
+    - Validator deployments on k8s now support no-auth mode. Please note that this is not recommended for production deployments
+      and relies purely on network-level access control for securing the validator, i.e. anyone with access to your node
+      can act on your behalf.
+
+    - The ``chown`` init containers in the validator and SV helm charts have been replaced by setting the ``fsGroup`` in the security context of the pods.
+      This overcomes certain security policies that disallow init containers from having ``chown`` capabilities, and in most environments should
+      achieve the same effect. In certain environments, the ``fsGroup`` directive might be ignored. In that case, you can add
+      an init container using the ``extraInitContainers`` helm value to achieve the same effect as before, as documented in
+      :ref:`this section <helm-validator-volume-ownership>`.
+
+  - Reward collection
+
+    - Changed the behavior of automation around rewards and coupons to run for the first time in the interval of ``round open time`` -> ``round open time + tick duration``. This might increase the observed duration between rewards and coupons being issued and until they are collected. Once the first tick elapses, retries will happen more aggressively.
+
+  - Scan
+
+    - Add the ``v0/events`` API. For private transactions, this API returns events that contain only mediator verdicts. For transactions visible to the DSO (like Amulet transfers), the API combines mediator verdicts and associated updates by ``update_id``.
+      Events can be retrieved by ``update_id`` by using ``/v0/events/{update_id}``.
+      Please see the new section about :ref:`Events <scan_events_api>` in the Scan Bulk Data API for more details.
+
+  - SV
+
+    - Published conversion rates are now clamped to the configured range, and the clamped value is published instead of
+      only logging a warning and not publishing an updated value for out-of-range values.
+
+    - UI usability improvements.
+
+  - Monitoring
+
+    - The SV App now exposes metrics for SV-voted coin prices and the coin price in latest open mining round.
+
+
+.. release-notes:: 0.4.20
+
+  - Deployment
+
+    - Fix a bug where the setting the affinity for the ``splice-cometbft`` and ``splice-global-domain`` helm charts would remove the anti affinity for the ``cometbft`` and the ``sequencer`` deployment. This ensures that if multiple SVs are run on the same nodes, not more than one ``cometbft`` pod can be deployed on the same node and that no more than one ``sequencer`` pod can be deployed to the same node (a ``cometbft`` pod can still share a node with a ``sequencer`` pod). This can be disabled by setting the ``enableAntiAffinity`` helm value to ``false`` (default ``true``).
+
+    - Replace ``-Dscala.concurrent.context.minThreads=8`` with ``-Dscala.concurrent.context.numThreads=8`` and set ``-XX:ActiveProcessorCount=8``  in the ``defaultJvmOptions`` for all the helm charts that deploy scala apps. This should ensure that the internal execution contexts spawn 8 threads to handle processing and that the JVM is configured for 8 CPUs as well. The previous behavior would spawn up to number of available processors, which can be up to the number of CPUs on the actual node if no CPU limit is set. This should avoid overloading the nodes during heavy processing.
+
+  - SV
+
+    - UI
+
+      - Add the ability to specify a validator party hint when generating onboarding secrets.
+
+      - The UI now provides a formatted message for easily sharing onboarding details with validator operators.
+
+
+0.4.19
+------
+
+  - Sequencer
+
+    - Fix a regression introduced in 0.4.18 that made topology transactions significantly more expensive to process.
+
+  - Docker images
+
+    - All app & UI images now use a non-root user.
+
+  - Validator
+
+     - Add a trigger to export these party metrics:
+
+        - ``validator_synchronizer_topology_num_parties``:
+          Counts the number of parties allocated on the Global Synchronizer
+        - ``validator_synchronizer_topology_num_parties_per_participant``:
+          Uses the label ``participant_id`` and
+          counts the number of parties hosted on the Global Synchronizer per participant.
+          Note that multi-hosted parties are counted for each participant they are hosted on.
+
+       The trigger does not run by default. See :ref:`enable_extra_metric_triggers`
+       for instructions on how to enable it.
+
+  - SV
+
+    - Deployment
+
+      - Remove CPU limits from the helm charts for ``scan``, ``mediator`` and ``sequencer`` apps.
+        This should avoid issues with cpu scheduling that might lead to performance degradations.
+
+    - UI
+
+      - When updating the ``AmuletRules`` config, the UI will omit any transfer fee steps with value zero from the ``AmuletRules`` config stored on-ledger.
+        Thereby making the ``AmuletRules`` contract smaller and saving traffic for transactions using it.
+        This is motivated by `CIP-0078 CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`__ .
+
+  - Canton and SDK:
+
+     - Introduction of 2 new alpha primitives in ``DA.Crypto.Text`` Module
+       in SDK version ``3.3.0-snapshot.20250930.0``. Note: To make use
+       of the functionality added here, you must compile against SDK
+       version ``3.3.0-snapshot.20250930.0`` and newer and you must
+       first upgrade Canton to the version in Splice ``0.4.19`` before you can
+       upload those dars to your validator.
+
+       - sha256 : BytesHex -> BytesHex: Computes the SHA-256 hash of
+         the given hexadecimal bytes.
+
+       - secp256k1WithEcdsaOnly : SignatureHex -> BytesHex ->
+         PublicKeyHex -> Bool: Verifies an ECDSA signature on the
+         secp256k1 curve, checking if the signature matches the
+         message and public key.
+
+0.4.18
+------
+
+  - Daml
+
+    - release ``splice-util-featured-app-proxies-1.1.0`` with
+      support for a ``WalletUserProxy``, which simplifies
+      the creation of featured app activity markers for wallet app providers
+      when their users engage in token standard workflows.
+    - Implement Daml changes for `CIP-0079 - Demonstrate Third-Party Price Feed Integration for CC Listing <https://github.com/global-synchronizer-foundation/cips/pull/101/files>`__:
+
+       These Daml changes require an upgrade to the following Daml versions:
+
+       ================== =======
+       name               version
+       ================== =======
+       amulet             0.1.14
+       amuletNameService  0.1.15
+       dsoGovernance      0.1.20
+       validatorLifecycle 0.1.5
+       wallet             0.1.14
+       walletPayments     0.1.14
+       ================== =======
+
+  - Scan
+
+    - Performance bugfix for the ``/v0/wallet-balance`` endpoint, especially when requesting a balance for a party that does not exist, which previously would timeout.
+
+  - UIs
+
+    - Implement changes from CIP-78 CC Fee Removal.
+
+0.4.17
+------
+
+.. important::
+
+    **Action required from app devs:**
+
+    1. **App devs whose app's Daml code statically depends on** ``splice-amulet < 0.1.14`` must recompile their Daml code
+       to link against ``splice-amulet >= 0.1.14``.
+
+       The reason being that earlier versions of the ``AmuletRules`` template
+       do not support setting the transfer fees to zero. Attempting to downgrade to them will raise a
+       ``PRECONDITION_FAILED`` error stating that the ``ensure`` clause evaluated to ``false``.
+
+       No change is required for apps that build against the :ref:`token_standard`
+       or :ref:`featured_app_activity_markers_api`.
+
+    2. **App devs whose app predicts holding fees on transfers** must adjust their code to
+       no longer expect any holding fees once this Daml change gets voted in.
+
+       The simplest option is to make your code independent of whether the change was voted in
+       by removing the prediction of holding fees. You can instead
+       extract the actual holding fees charged from the transfer transaction itself;
+       i.e., using the :ref:`"holdingFees" <type-splice-amuletrules-transfersummary-17366>` field
+       of the ``TransferSummary`` in the :ref:`"summary" field <type-splice-amuletrules-transferresult-93164>`
+       of the ``TransferResult``.
+
+- Daml
+
+  - Implement Daml changes for `CIP-0078 - CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`__:
+
+     - Change all Amulet transfers to not charge holding fees on inputs.
+     - Fix a bug in the ``ensure`` clause of ``AmuletRules`` that prevented
+       setting the Amulet transfer fees to zero.
+     - Fix a bug in the featured app rewards issuance for ``AmuletRules_Transfer``
+       that prevented featured app rewards to be issued when the Amulet transfer fees are set zero.
+
+     These Daml changes require an upgrade to the following Daml versions **before**
+     voting to set the transfer fees to zero:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.14
+     amuletNameService  0.1.14
+     dsoGovernance      0.1.19
+     validatorLifecycle 0.1.5
+     wallet             0.1.14
+     walletPayments     0.1.14
+     ================== =======
+
+- Canton
+
+  - Add ``CanExecuteAs`` and ``CanExecuteAsAnyParty`` user rights that can be used for the
+    ``InteractiveSubmissionService/ExecuteSubmission`` endpoint. ``CanActAs`` permissions imply
+    ``CanExecuteAs`` so this is backwards compatible.
+
+- Validator
+
+  - Expose ``/dso`` endpoint from scan proxy
+
+- Wallet
+
+  - Do not deduct holding fees from available balance if ``splice-amulet >= 0.1.14``
+    is configured in the ``AmuletConfig`` of the network.
+
+- Deployment
+
+  - Participant
+
+     - Remove CPU limits in the ``splice-participant`` helm chart, to avoid throttling because of the way K8s handles CPU limits
+
+  - Validator
+
+    - Allow disabling the deployment of ``ans-web-ui`` and ``wallet-web-ui`` in the ``splice-validator`` helm chart by setting
+      ``.ansWebUi.enabled`` and ``validatorWebUi.enabled`` to ``false``.
+      Thanks to Marcin Kocur for contributing this change in https://github.com/hyperledger-labs/splice/pull/2171
+
+- LocalNet
+
+  - Add the environment variable ``LATEST_PACKAGES_ONLY`` (default: true). This modifies the previous default behavior — if set to true, only the latest version of each package is uploaded instead of all versions. This reduces resource usage but might cause issues if you try to use localnet to test an app that is compiled against an older version. In that case, set the environment variable to false to restore the prior behavior.
+
+- Community docs
+
+  - Add :ref:`Keycloak Configuration Guide for Validators <keycloak_canton_validator_config_guide>`.
+    Thanks to mikeProDev for contributing this change in https://github.com/hyperledger-labs/splice/pull/2247
+
+0.4.16
+------
+
+- Daml
+
+  - Add the ``splice-util-featured-app-proxies``
+    :ref:`package <featured_app_activity_markers_api>` to simplify
+    the creation of featured app activity markers for token standard actions.
+    This is a utility package that is not uploaded by default to a validator node.
+    An example use-case for this package is an exchange that wants to
+    `earn app rewards on deposits and withdrawals <https://docs.digitalasset.com/integrate/devnet/exchange-integration/extensions.html>`__
+    of CN token standard tokens.
+
+- Docs
+
+  - SV
+
+    - Document process for :ref:`ignoring party IDs for reward expiry automation <sv_ops_ignored_rewards_party_ids>`
+      that is currently recommended after each Daml upgrade,
+      to reduce the impact of validators that are unable to complete
+      the Daml upgrade due to being on an outdated version of Splice.
+
+    - Make the filter for ignoring party ids for reward expiry automation also ignore beneficiaries for SV reward coupons so
+      that it is not required to ignore the SV if only one beneficiary has problems.
+
+0.4.15
+------
+
+- Canton
+
+    - SV
+        - Increase default events buffer sizes to a maximum of 200MiB for the sequencer. This should improve performance for the sequencer when serving events to nodes have subscriptions that are slightly lagging behind. This will slightly increase memory usage for the sequencer.
+
+    - Ledger API
+
+        - Add ``maxRecordTime`` to ``PrepareSubmissionRequest`` to limit the record time until which
+          a prepared transaction can be used.
+        - Add an alpha version of ``com.daml.ledger.api.v2.admin.PartyManagementService/GenerateExternalPartyTopology`` and
+          ``com.daml.ledger.api.v2.admin.PartyManagementService/AllocateExternalParty``. These endpoints can be used instead of
+          the validator endpoints ``/v0/admin/external-party/topology/generate`` and ``/v0/admin/external-party/topology/submit``
+          and will eventually supersede them.
+
+- Docs
+
+  - Various improvements to the docs on :ref:`recovering a validator from an identities backup <validator_reonboard>`,
+    including adding a section on :ref:`obtaining an identities backup from a database backup <validator_manual_dump>`.
+  - Add documentation about :ref:`Wasted traffic <traffic_wasted>`.
+
+- Deployment
+
+  - Cometbft
+
+     - Increase resource requests from 1 CPU and 1Gi to 2 CPUs and 2Gi, to better fit observed resource usage.
+     - Remove CPU limits to avoid throttling because of the way K8s handles CPU limits
+
+0.4.14
+------
+
+- SV app
+
+   - Add the option to ignore certain parties when running expiry on reward contracts. This can added to the app configuration. Example: ``canton.sv-apps.sv.automation.ignored-expired-rewards-party-ids = [ "test-party::1220b3eeb21b02e14945e419c5d9e986ce8102171c50e1444010ab054e11eba262c9" ]``
+
+
+0.4.13
+------
+
+- Deployment
+
+  - SV
+    - Increase the CPU limits assigned to the sequencer from 4 CPUs to 8 CPUs. This should avoid any throttling during periods of high load and during catch-up after downtime.
+
+  - Cometbft
+
+    - State sync is disabled by default.
+      State sync introduces a dependency on the sponsoring node for fetching the state snapshot on
+      startup and therefore a single point of failure. It should only be enabled when joining a
+      new node to a chain that has already been running for a while. In all other cases, including
+      for a new node after it has completed initialization and after network resets, state sync
+      should be disabled.
+
+  - Observability
+
+    - Global Synchronizer Utilization dashboard now includes an average over an hour of the transaction rate.
+    - Canton/Sequencer Messages dashboard now includes hourly totals, and a pie chart of the
+      distribution of message types over the last 24 hours.
+
+- Validator Compose Deployment
+
+  - Expose Canton ledger API by default. Reference the  :ref:`docs <compose_canton_apis>` for details.
+
+- Daml
+
+  - Fix a bug where activity record expiration had a reference to the ``AmuletRules`` contract which resulted in transactions
+    failing when trying to expire an activity record for a party that has not upgraded to the latest version of the
+    Daml models. This caused an issue on DevNet where transactions submitted by the SV app
+    failed repeatedly which resulted in the circuit breaker getting triggered and blocking
+    all submissions.
+
+     These Daml changes requires an upgrade to the following Daml versions:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.13
+     amuletNameService  0.1.13
+     dsoGovernance      0.1.18
+     validatorLifecycle 0.1.5
+     wallet             0.1.13
+     walletPayments     0.1.13
+     ================== =======
 
 0.4.12
 ------
@@ -443,7 +988,7 @@ which can happen in certain cases when the sequencer is down.
 
   - Improve the :ref:`application development documentation <app_dev_overview>` to better explain the available APIs and how to use them.
   - Add relevant links to the new application developer documentation pages published by Digital Asset at
-    https://docs.digitalasset.com/build/3.3/.
+    https://docs.digitalasset.com/build/3.4/.
   - Fixed docker-compose docs around migrating from a non-authenticated validator to
     an authenticated validator. A complete wipe of the validator database is not required, as
     opposed to what the docs previously stated. See the relevant section on :ref:`authenticated

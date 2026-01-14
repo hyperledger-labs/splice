@@ -10,7 +10,6 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
   TransferTxLogEntry,
   TxLogEntry,
-  TxLogEntry as walletLogEntry,
 }
 import org.scalatest.Assertion
 
@@ -45,7 +44,7 @@ trait WalletTxLogTestUtil extends TestCommon with WalletTestUtil with TimeTestUt
   ): Unit = {
 
     eventually() {
-      val actual = wallet.listTransactions(None, pageSize = Limit.MaxPageSize)
+      val actual = wallet.listTransactions(None, pageSize = Limit.DefaultMaxPageSize)
       val withoutIgnored = actual
         .takeWhile(e => !previousEventId.contains(e.eventId))
         .filterNot(ignore)
@@ -74,26 +73,31 @@ trait WalletTxLogTestUtil extends TestCommon with WalletTestUtil with TimeTestUt
 
       // ingestion can happen in-between the call `actual=listTransactions()` and the paginated ones,
       // so both need to be inside the same `eventually` block
-      clue("Paginated result should be equal to non-paginated result") {
-        val paginatedResult = Iterator
-          .unfold[Seq[TxLogEntry], Option[String]](None)(beginAfterId => {
-            val page = wallet.listTransactions(beginAfterId, pageSize = 2)
-            if (page.isEmpty)
-              None
-            else
-              Some(page -> Some(page.last.eventId))
-          })
-          .toSeq
-          .flatten
 
-        paginatedResult should contain theSameElementsInOrderAs actual
-      }
+      // Confirm that the paginated result is equal to the non-paginated result
+      val paginatedResult = Iterator
+        .unfold[Seq[TxLogEntry], Option[String]](None)(beginAfterId => {
+          val page = wallet.listTransactions(beginAfterId, pageSize = 2)
+          if (page.isEmpty)
+            None
+          else
+            Some(page -> Some(page.last.eventId))
+        })
+        .toSeq
+        .flatten
+
+      paginatedResult should contain theSameElementsInOrderAs actual
     }
   }
 
-  def withoutDevNetTopups(txs: Seq[walletLogEntry]): Seq[walletLogEntry] = {
+  def withoutDevNetTopups(
+      txs: Seq[TxLogEntry.TransactionHistoryTxLogEntry]
+  ): Seq[TxLogEntry.TransactionHistoryTxLogEntry] = {
     @tailrec
-    def go(txs: List[walletLogEntry], acc: Seq[walletLogEntry]): Seq[walletLogEntry] =
+    def go(
+        txs: List[TxLogEntry.TransactionHistoryTxLogEntry],
+        acc: Seq[TxLogEntry.TransactionHistoryTxLogEntry],
+    ): Seq[TxLogEntry.TransactionHistoryTxLogEntry] =
       txs match {
         case Nil => acc
         case (first: TransferTxLogEntry) :: (second: BalanceChangeTxLogEntry) :: tail =>
@@ -113,7 +117,10 @@ trait WalletTxLogTestUtil extends TestCommon with WalletTestUtil with TimeTestUt
     go(txs.toList, Seq.empty)
   }
 
-  def withoutNonDevNetTopups(txs: Seq[walletLogEntry]): Seq[walletLogEntry] = {
+  // prevents flakes from traffic purchases - possible to happen in Validator wallets
+  def withoutNonDevNetTopups(
+      txs: Seq[TxLogEntry.TransactionHistoryTxLogEntry]
+  ): Seq[TxLogEntry.TransactionHistoryTxLogEntry] = {
     // On non-DevNet like clusters, traffic topups take input amulets that must have been created beforehand.
     txs.filterNot {
       case transfer: TransferTxLogEntry =>

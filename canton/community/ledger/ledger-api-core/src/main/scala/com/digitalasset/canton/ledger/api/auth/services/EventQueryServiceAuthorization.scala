@@ -41,8 +41,7 @@ object EventQueryServiceAuthorization {
   def getEventsByContractIdClaims(
       request: GetEventsByContractIdRequest
   ): List[RequiredClaim[GetEventsByContractIdRequest]] =
-    RequiredClaims.readAsForAllParties[GetEventsByContractIdRequest](request.requestingParties) :::
-      request.eventFormat.toList.flatMap(
-        RequiredClaims.eventFormatClaims[GetEventsByContractIdRequest]
-      )
+    request.eventFormat.toList.flatMap(
+      RequiredClaims.eventFormatClaims[GetEventsByContractIdRequest]
+    )
 }

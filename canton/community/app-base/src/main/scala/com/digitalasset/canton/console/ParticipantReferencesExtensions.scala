@@ -10,7 +10,7 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.google.protobuf.ByteString
 
 class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(implicit
@@ -27,12 +27,13 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
   object dars extends Helpful {
     @Help.Summary("Upload DARs to participants")
     @Help.Description(
-      """If vetAllPackages is true, the participants will vet the package on all synchronizers they are registered.
+      """If synchronizerId is set, the participants will vet the packages on the specified synchronizer.
         If synchronizeVetting is true, the command will block until the package vetting transaction has been registered with all connected synchronizers."""
     )
     def upload(
         darPath: String,
         description: String = "",
+        synchronizerId: Option[SynchronizerId] = None,
         vetAllPackages: Boolean = true,
         synchronizeVetting: Boolean = true,
         expectedMainPackageId: String = "",
@@ -45,6 +46,7 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
             _,
             path = darPath,
             description = description,
+            synchronizerId = synchronizerId,
             vetAllPackages = vetAllPackages,
             synchronizeVetting = synchronizeVetting,
             expectedMainPackageId = expectedMainPackageId,
@@ -61,11 +63,12 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
 
     @Help.Summary("Upload DARs to participants")
     @Help.Description(
-      """If vetAllPackages is true, the participants will vet the packages on all synchronizers they are registered.
+      """If synchronizerId is set, the participants will vet the packages on the specified synchronizer.
         If synchronizeVetting is true, the command will block until the package vetting transaction has been registered with all connected synchronizers."""
     )
     def upload_many(
         paths: Seq[String],
+        synchronizerId: Option[SynchronizerId],
         vetAllPackages: Boolean,
         synchronizeVetting: Boolean,
         requestHeaders: Map[String, String],
@@ -75,6 +78,7 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
         ParticipantCommands.dars.upload_many(
           _,
           paths = paths,
+          synchronizerId = synchronizerId,
           vetAllPackages = vetAllPackages,
           synchronizeVetting = synchronizeVetting,
           requestHeaders = requestHeaders,
@@ -176,14 +180,14 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
           sequencer - A local sequencer reference
           alias - A synchronizer alias to register this connection for.
           manualConnect - Whether this connection should be handled manually and also excluded from automatic re-connect.
-          synchronizerId - An optional Synchronizer Id to ensure the connection is made to the correct synchronizer.
+          physicalSynchronizerId - An optional Synchronizer Id to ensure the connection is made to the correct synchronizer.
           synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.
         """)
     def connect_local(
         sequencer: SequencerReference,
         alias: SynchronizerAlias,
         manualConnect: Boolean = false,
-        synchronizerId: Option[SynchronizerId] = None,
+        physicalSynchronizerId: Option[PhysicalSynchronizerId] = None,
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
@@ -193,7 +197,7 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
           Seq(sequencer),
           alias,
           manualConnect,
-          synchronizerId,
+          physicalSynchronizerId,
         )
 
       connect(config)

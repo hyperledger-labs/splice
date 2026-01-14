@@ -308,7 +308,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
         actAndCheck(
           "Load second page", {
-            click on id("view-more-transactions")
+            eventuallyClickOn(id("view-more-transactions"))
           },
         )(
           "Alice sees second page of transactions appended",
@@ -319,7 +319,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
         actAndCheck(
           "Load third page", {
-            click on id("view-more-transactions")
+            eventuallyClickOn(id("view-more-transactions"))
           },
         )(
           "Alice sees third page of transactions appended",
@@ -331,7 +331,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         // we have to click the button one last time to know there's no more data to fetch
         actAndCheck(
           "Load final empty page", {
-            click on id("view-more-transactions")
+            eventuallyClickOn(id("view-more-transactions"))
           },
         )(
           "Alice sees there are no more transactions to load",
@@ -346,7 +346,8 @@ class WalletTransactionHistoryFrontendIntegrationTest
     "show notification transactions" in { implicit env =>
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      val validatorTxLogBefore = aliceValidatorWalletClient.listTransactions(None, 1000)
+      val validatorTxLogBefore =
+        withoutDevNetTopups(aliceValidatorWalletClient.listTransactions(None, 1000))
 
       val (offerCid, _) =
         actAndCheck(
@@ -377,7 +378,8 @@ class WalletTransactionHistoryFrontendIntegrationTest
       )
 
       // Only Alice should see notification (note that aliceValidator is shared between tests)
-      val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, 1000)
+      val validatorTxLogAfter =
+        withoutDevNetTopups(aliceValidatorWalletClient.listTransactions(None, 1000))
       validatorTxLogBefore should be(validatorTxLogAfter)
       checkTxHistory(bobWalletClient, Seq.empty)
 
@@ -419,7 +421,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         browseToSv1Wallet(sv1ValidatorWalletUser)
         actAndCheck(
           "SV1 creates a transfer preapproval and automation renews it immediately",
-          sv1WalletClient.createTransferPreapproval(),
+          createTransferPreapprovalEnsuringItExists(sv1WalletClient, sv1ValidatorBackend),
         )(
           "SV1 sees the creation and renewal transactions",
           _ => {

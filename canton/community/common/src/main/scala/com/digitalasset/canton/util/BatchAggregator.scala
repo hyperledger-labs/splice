@@ -21,8 +21,6 @@ import com.digitalasset.canton.util.TryUtil.ForFailedOps
 
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
-import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
 
@@ -203,7 +201,8 @@ class BatchAggregatorImpl[A, B](
             }
           } else {
             val items = queueItemsNE.map(_._1)
-            val batchTraceContext = TraceContext.ofBatch(items.toList)(processor.logger)
+            val batchTraceContext =
+              TraceContext.ofBatch("run_batch_queued_queries")(items.toList)(processor.logger)
 
             FutureUnlessShutdown
               .fromTry(Try(processor.executeBatch(items)(batchTraceContext, callerCloseContext)))
@@ -240,7 +239,7 @@ class BatchAggregatorImpl[A, B](
                     }
                   case Success(UnlessShutdown.AbortedDueToShutdown) =>
                     queueItems.foreach { case (_, promise) =>
-                      promise.shutdown()
+                      promise.shutdown_()
                     }
                   case Failure(ex) =>
                     implicit val prettyItem = processor.prettyItem
@@ -262,18 +261,11 @@ class BatchAggregatorImpl[A, B](
   }
 
   // Return at most maximumBatchSize requests from the queue
-  private def pollItemsFromQueue(): Seq[QueueType] = {
-    val polledItems = new mutable.ArrayDeque[QueueType](maximumBatchSize)
-
-    @tailrec def go(remaining: Int): Unit =
-      Option(queuedRequests.poll()) match {
-        case Some(queueItem) =>
-          polledItems.addOne(queueItem)
-          if (remaining > 0) go(remaining - 1)
-        case None => ()
-      }
-
-    go(maximumBatchSize)
-    polledItems.toSeq
-  }
+  private def pollItemsFromQueue(): Seq[QueueType] =
+    Iterator
+      .continually(Option(queuedRequests.poll()))
+      .takeWhile(_.nonEmpty)
+      .take(maximumBatchSize)
+      .flatten
+      .toSeq
 }

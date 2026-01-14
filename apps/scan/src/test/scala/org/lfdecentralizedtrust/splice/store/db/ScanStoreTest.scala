@@ -1,6 +1,17 @@
 package org.lfdecentralizedtrust.splice.store.db
 
 import com.daml.ledger.javaapi.data.{DamlRecord, Unit as damlUnit}
+import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.crypto.Fingerprint
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   Amulet,
@@ -12,84 +23,45 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules_BuyMemberTrafficResult,
   AmuletRules_MintResult,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer as decentralizedsynchronizerCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules, Reason, Vote}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.FaucetState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
-  round as roundCodegen,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
-import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   cometbft as cometbftCodegen,
   dsorules as dsorulesCodegen,
+  round as roundCodegen,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer as decentralizedsynchronizerCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules, Reason, Vote}
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
-import org.lfdecentralizedtrust.splice.history.{
-  AmuletExpire,
-  ExternalPartyAmuletRules_CreateTransferCommand,
-  LockedAmuletExpireAmulet,
-  Transfer,
-  TransferCommand_Expire,
-  TransferCommand_Send,
-  TransferCommand_Withdraw,
-}
+import org.lfdecentralizedtrust.splice.history.*
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
-import org.lfdecentralizedtrust.splice.scan.store.{
-  OpenMiningRoundTxLogEntry,
-  ReceiverAmount,
-  SenderAmount,
-  TransferCommandCreated,
-  TransferCommandExpired,
-  TransferCommandFailed,
-  TransferCommandSent,
-  TransferCommandTxLogEntry,
-  TransferCommandWithdrawn,
-  TransferTxLogEntry,
-}
-import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbScanStore,
   DbScanStoreMetrics,
   ScanAggregatesReader,
   ScanAggregator,
 }
-import org.lfdecentralizedtrust.splice.store.{PageLimit, SortOrder, StoreErrors, StoreTest}
+import org.lfdecentralizedtrust.splice.scan.store.*
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState.Assigned
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.events.DsoRulesCloseVoteRequest
+import org.lfdecentralizedtrust.splice.store.*
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.damlDecimal
-import org.lfdecentralizedtrust.splice.util.{
-  Contract,
-  ContractWithState,
-  EventId,
-  ResourceTemplateDecoder,
-  TemplateJsonDecoder,
-}
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.crypto.Fingerprint
-import com.digitalasset.canton.data.CantonTimestamp
-import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
+import org.lfdecentralizedtrust.splice.util.*
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.{Collections, Optional}
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.reflect.ClassTag
-import com.digitalasset.canton.util.MonadUtil
-
-import java.time.temporal.ChronoUnit
-import scala.concurrent.ExecutionContext
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 
 abstract class ScanStoreTest
     extends StoreTest
@@ -138,10 +110,11 @@ abstract class ScanStoreTest
           )
           _ <- store.aggregate()
         } yield {
-          store.getTotalAmuletBalance(1).futureValue shouldBe (0.0)
+          // nothing occurs before the mint so there is no total amulet balance
+          store.getTotalAmuletBalance(1).futureValue shouldBe empty
           // 100.0 is the initial amount as of round 0, so at the end of round 2 the holding fee was applied three times
-          store.getTotalAmuletBalance(2).futureValue shouldBe (amuletAmount - 3 * holdingFee)
-          store.getTotalAmuletBalance(3).futureValue shouldBe (amuletAmount - 4 * holdingFee)
+          store.getTotalAmuletBalance(2).futureValue.value shouldBe (amuletAmount - 3 * holdingFee)
+          store.getTotalAmuletBalance(3).futureValue.value shouldBe (amuletAmount - 4 * holdingFee)
         }
       }
 
@@ -179,13 +152,15 @@ abstract class ScanStoreTest
           )
           _ <- store.aggregate()
         } yield {
-          store.getTotalAmuletBalance(1).futureValue shouldBe (amuletRound1 - 1 * holdingFee)
+          store.getTotalAmuletBalance(1).futureValue.value shouldBe (amuletRound1 - 1 * holdingFee)
           store
             .getTotalAmuletBalance(2)
-            .futureValue shouldBe (amuletRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
+            .futureValue
+            .value shouldBe (amuletRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
           store
             .getTotalAmuletBalance(3)
-            .futureValue shouldBe (amuletRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
+            .futureValue
+            .value shouldBe (amuletRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
         }
       }
 
@@ -226,13 +201,15 @@ abstract class ScanStoreTest
           )
           _ <- store.aggregate()
         } yield {
-          store.getTotalAmuletBalance(1).futureValue shouldBe (amuletRound1 - 1 * holdingFee)
+          store.getTotalAmuletBalance(1).futureValue.value shouldBe (amuletRound1 - 1 * holdingFee)
           store
             .getTotalAmuletBalance(2)
-            .futureValue shouldBe (amuletRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
+            .futureValue
+            .value shouldBe (amuletRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
           store
             .getTotalAmuletBalance(3)
-            .futureValue shouldBe (amuletRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
+            .futureValue
+            .value shouldBe (amuletRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
         }
       }
 
@@ -253,10 +230,11 @@ abstract class ScanStoreTest
           )
           _ <- store.aggregate()
         } yield {
-          store.getTotalAmuletBalance(1).futureValue shouldBe (0.0)
+          // nothing occurs before the mint so there is no total amulet balance calculated
+          store.getTotalAmuletBalance(1).futureValue shouldBe empty
           // The amulet is minted at round 2, so at the end of that round it's already incurring 1 x holding fee
-          store.getTotalAmuletBalance(2).futureValue shouldBe (mintAmount - 1 * holdingFee)
-          store.getTotalAmuletBalance(3).futureValue shouldBe (mintAmount - 2 * holdingFee)
+          store.getTotalAmuletBalance(2).futureValue.value shouldBe (mintAmount - 1 * holdingFee)
+          store.getTotalAmuletBalance(3).futureValue.value shouldBe (mintAmount - 2 * holdingFee)
         }
       }
 
@@ -1826,24 +1804,26 @@ abstract class ScanStoreTest
         val recordTimeThird = now.plusSeconds(9).toInstant
         for {
           store <- mkStore()
-          _ <- store.updateHistory.ingestionSink.initialize()
+          updateHistory <- mkUpdateHistory(domainMigrationId)
+          _ <- updateHistory.ingestionSink.initialize()
           first <- dummyDomain.create(
             firstDsoRules,
             recordTime = recordTimeFirst,
           )(
-            store.updateHistory
+            updateHistory
           )
           firstRecordTime = CantonTimestamp.fromInstant(first.getRecordTime).getOrElse(now)
           _ <- dummyDomain.create(
             secondDsoRules,
             recordTime = recordTimeSecond,
-          )(store.updateHistory)
+          )(updateHistory)
           _ <- dummyDomain.create(
             thirdDsoRules,
             recordTime = recordTimeThird,
-          )(store.updateHistory)
+          )(updateHistory)
           result <- store.lookupContractByRecordTime(
             DsoRules.COMPANION,
+            updateHistory,
             firstRecordTime.plusSeconds(1),
           )
         } yield {
@@ -1863,26 +1843,28 @@ abstract class ScanStoreTest
         val recordTimeThird = now.plusSeconds(9).toInstant
         for {
           store <- mkStore()
-          _ <- store.updateHistory.ingestionSink.initialize()
+          updateHistory <- mkUpdateHistory(domainMigrationId)
+          _ <- updateHistory.ingestionSink.initialize()
           first <- dummyDomain.create(
             firstAmuletRules,
             recordTime = recordTimeFirst,
           )(
-            store.updateHistory
+            updateHistory
           )
           firstRecordTime = CantonTimestamp.fromInstant(first.getRecordTime).getOrElse(now)
           _ <- dummyDomain.create(
             secondAmuletRules,
             recordTime = recordTimeSecond,
           )(
-            store.updateHistory
+            updateHistory
           )
           _ <- dummyDomain.create(
             thirdAmuletRules,
             recordTime = recordTimeThird,
-          )(store.updateHistory)
+          )(updateHistory)
           result <- store.lookupContractByRecordTime(
             AmuletRules.COMPANION,
+            updateHistory,
             firstRecordTime.plusSeconds(1),
           )
         } yield {
@@ -1897,6 +1879,10 @@ abstract class ScanStoreTest
   protected def mkStore(
       dsoParty: PartyId = dsoParty
   ): Future[ScanStore]
+
+  protected def mkUpdateHistory(
+      migrationId: Long
+  ): Future[UpdateHistory]
 
   private lazy val user1 = userParty(1)
   private lazy val user2 = userParty(2)
@@ -2347,7 +2333,7 @@ class DbScanStoreTest
         None,
       ),
       participantId = mkParticipantId("ScanStoreTest"),
-      enableImportUpdateBackfill = true,
+      IngestionConfig(),
       new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, timeouts),
       initialRound = 0,
     )(parallelExecutionContext, implicitly, implicitly)
@@ -2360,6 +2346,24 @@ class DbScanStoreTest
         Map(SynchronizerAlias.tryCreate(domain) -> dummyDomain)
       )
     } yield store
+  }
+
+  override def mkUpdateHistory(
+      migrationId: Long
+  ): Future[UpdateHistory] = {
+    val updateHistory = new UpdateHistory(
+      storage.underlying, // not under test
+      new DomainMigrationInfo(migrationId, None),
+      "update_history_scan_store_test",
+      mkParticipantId("whatever"),
+      dsoParty,
+      BackfillingRequirement.BackfillingNotRequired,
+      loggerFactory,
+      enableissue12777Workaround = true,
+      enableImportUpdateBackfill = true,
+      HistoryMetrics(NoOpMetricsFactory, migrationId),
+    )
+    updateHistory.ingestionSink.initialize().map(_ => updateHistory)
   }
 
   override protected def cleanDb(

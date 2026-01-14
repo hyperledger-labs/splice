@@ -6,9 +6,9 @@ package com.digitalasset.canton.integration.tests
 import com.digitalasset.canton.config.{DbConfig, StorageConfig}
 import com.digitalasset.canton.integration.plugins.{
   UseBftSequencer,
-  UseCommunityReferenceBlockSequencer,
   UseH2,
   UsePostgres,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -21,7 +21,7 @@ import monocle.macros.syntax.lens.*
 import scala.concurrent.duration.*
 
 /** Trivial test which can be used as a first end to end test */
-trait SimplestPingIntegrationTest extends CommunityIntegrationTest with SharedEnvironment {
+sealed trait SimplestPingIntegrationTest extends CommunityIntegrationTest with SharedEnvironment {
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2_S1M1
@@ -50,18 +50,18 @@ class SimplestPingIntegrationTestInMemory extends SimplestPingIntegrationTest {
       .addConfigTransform(ConfigTransforms.allInMemory)
       .addConfigTransform(_.focus(_.monitoring.logging.api.messagePayloads).replace(false))
 
-  registerPlugin(new UseCommunityReferenceBlockSequencer[StorageConfig.Memory](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[StorageConfig.Memory](loggerFactory))
 
 }
 
 class SimplestPingReferenceIntegrationTestH2 extends SimplestPingIntegrationTest {
   registerPlugin(new UseH2(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 }
 
 class SimplestPingReferenceIntegrationTestPostgres extends SimplestPingIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }
 
 class SimplestPingBftOrderingIntegrationTestPostgres extends SimplestPingIntegrationTest {

@@ -11,10 +11,7 @@ import com.daml.test.evidence.tag.Reliability.{
   Remediation,
 }
 import com.digitalasset.canton.config.{ClockConfig, DbConfig}
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   EnvironmentDefinition,
@@ -101,13 +98,13 @@ abstract class ClockSkewIntegrationTest(skews: Map[String, FiniteDuration])
       // because of the clock skew, we may get delay warnings
       (
         LogEntryOptionality.OptionalMany,
-        _.warningMessage should include("Late processing (or clock skew)"),
+        _.warningMessage should include("Detected late processing (or clock skew)"),
       ),
     )
   }
 
   registerPlugin(new UsePostgres(loggerFactory))
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.Postgres](loggerFactory))
 }
 
 // We test with each node either ahead or behind of all the other nodes

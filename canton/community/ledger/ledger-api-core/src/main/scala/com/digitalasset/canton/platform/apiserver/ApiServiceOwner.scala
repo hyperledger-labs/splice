@@ -6,18 +6,25 @@ package com.digitalasset.canton.platform.apiserver
 import com.daml.jwt.JwtTimestampLeeway
 import com.daml.ledger.resources.ResourceOwner
 import com.daml.tracing.Telemetry
-import com.digitalasset.canton.auth.{AuthService, Authorizer}
+import com.digitalasset.canton.auth.{
+  AuthInterceptor,
+  AuthService,
+  Authorizer,
+  GrpcAuthInterceptor,
+  JwtVerifierLoader,
+}
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.config.{
   KeepAliveServerConfig,
   NonNegativeDuration,
   NonNegativeFiniteDuration,
+  ServerConfig,
   TlsServerConfig,
 }
 import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher
 import com.digitalasset.canton.ledger.api.IdentityProviderConfig
 import com.digitalasset.canton.ledger.api.auth.*
-import com.digitalasset.canton.ledger.api.auth.interceptor.UserBasedAuthInterceptor
+import com.digitalasset.canton.ledger.api.auth.interceptor.UserBasedClaimResolver
 import com.digitalasset.canton.ledger.api.health.HealthChecks
 import com.digitalasset.canton.ledger.api.util.TimeProvider
 import com.digitalasset.canton.ledger.localstore.api.{
@@ -32,10 +39,7 @@ import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.PackagePreferenceBackend
 import com.digitalasset.canton.platform.apiserver.SeedService.Seeding
 import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
-import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.{
-  AuthenticateFatContractInstance,
-  AuthenticateSerializableContract,
-}
+import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.ContractAuthenticatorFn
 import com.digitalasset.canton.platform.apiserver.execution.{
   CommandProgressTracker,
   DynamicSynchronizerParameterGetter,
@@ -47,6 +51,7 @@ import com.digitalasset.canton.platform.config.{
   CommandServiceConfig,
   IdentityProviderManagementConfig,
   InteractiveSubmissionServiceConfig,
+  PackageServiceConfig,
   PartyManagementServiceConfig,
   UserManagementServiceConfig,
 }
@@ -68,6 +73,7 @@ object ApiServiceOwner {
       // configuration parameters
       address: Option[String] = DefaultAddress, // This defaults to "localhost" when set to `None`.
       maxInboundMessageSize: Int = DefaultMaxInboundMessageSize,
+      maxInboundMetadataSize: Int = ServerConfig.defaultMaxInboundMetadataSize.unwrap,
       port: Port = DefaultPort,
       tls: Option[TlsServerConfig] = DefaultTls,
       seeding: Seeding = DefaultSeeding,
@@ -105,11 +111,11 @@ object ApiServiceOwner {
       userManagement: UserManagementServiceConfig = ApiServiceOwner.DefaultUserManagement,
       partyManagementServiceConfig: PartyManagementServiceConfig =
         ApiServiceOwner.DefaultPartyManagementServiceConfig,
+      packageServiceConfig: PackageServiceConfig = ApiServiceOwner.DefaultPackageServiceConfig,
       engineLoggingConfig: EngineLoggingConfig,
       telemetry: Telemetry,
       loggerFactory: NamedLoggerFactory,
-      authenticateSerializableContract: AuthenticateSerializableContract,
-      authenticateFatContractInstance: AuthenticateFatContractInstance,
+      contractAuthenticator: ContractAuthenticatorFn,
       dynParamGetter: DynamicSynchronizerParameterGetter,
       interactiveSubmissionServiceConfig: InteractiveSubmissionServiceConfig,
       interactiveSubmissionEnricher: InteractiveSubmissionEnricher,
@@ -120,7 +126,7 @@ object ApiServiceOwner {
       materializer: Materializer,
       traceContext: TraceContext,
       tracer: Tracer,
-  ): ResourceOwner[ApiService] = {
+  ): ResourceOwner[(ApiService, AuthInterceptor)] = {
     import com.digitalasset.canton.platform.ResourceOwnerOps
     val logger = loggerFactory.getTracedLogger(getClass)
 
@@ -152,7 +158,19 @@ object ApiServiceOwner {
           commandExecutionContext,
         )
     }
-
+    val userAuthInterceptor = new AuthInterceptor(
+      authServices = authServices :+ new IdentityProviderAwareAuthService(
+        identityProviderConfigLoader = identityProviderConfigLoader,
+        jwtVerifierLoader = jwtVerifierLoader,
+        loggerFactory = loggerFactory,
+      )(commandExecutionContext),
+      loggerFactory = loggerFactory,
+      ec = commandExecutionContext,
+      claimResolver = new UserBasedClaimResolver(
+        userManagementStoreO = Option.when(userManagement.enabled)(userManagementStore),
+        ec = commandExecutionContext,
+      ),
+    )
     for {
       executionSequencerFactory <- new ExecutionSequencerFactoryOwner()
         .afterReleased(logger.info(s"ExecutionSequencerFactory is released for LedgerApiService"))
@@ -187,11 +205,11 @@ object ApiServiceOwner {
         maxDeduplicationDuration = maxDeduplicationDuration,
         userManagementServiceConfig = userManagement,
         partyManagementServiceConfig = partyManagementServiceConfig,
+        packageServiceConfig = packageServiceConfig,
         engineLoggingConfig = engineLoggingConfig,
         telemetry = telemetry,
         loggerFactory = loggerFactory,
-        authenticateSerializableContract = authenticateSerializableContract,
-        authenticateFatContractInstance = authenticateFatContractInstance,
+        contractAuthenticator = contractAuthenticator,
         dynParamGetter = dynParamGetter,
         interactiveSubmissionServiceConfig = interactiveSubmissionServiceConfig,
         interactiveSubmissionEnricher = interactiveSubmissionEnricher,
@@ -203,19 +221,16 @@ object ApiServiceOwner {
         apiServicesOwner,
         port,
         maxInboundMessageSize,
+        maxInboundMetadataSize,
         address,
         tls,
-        new UserBasedAuthInterceptor(
-          authServices = authServices :+ new IdentityProviderAwareAuthService(
-            identityProviderConfigLoader = identityProviderConfigLoader,
-            jwtVerifierLoader = jwtVerifierLoader,
-            loggerFactory = loggerFactory,
-          )(commandExecutionContext),
-          Option.when(userManagement.enabled)(userManagementStore),
+        new GrpcAuthInterceptor(
+          userAuthInterceptor,
           telemetry,
           loggerFactory,
           commandExecutionContext,
-        ) :: otherInterceptors,
+        )
+          :: otherInterceptors,
         commandExecutionContext,
         metrics,
         keepAlive,
@@ -226,14 +241,14 @@ object ApiServiceOwner {
         s"Initialized API server listening to port = ${apiService.port} ${if (tls.isDefined) "using tls"
           else "without tls"}."
       )
-      apiService
+      (apiService, userAuthInterceptor)
     }
   }
 
   val DefaultPort: Port = Port.tryCreate(6865)
   val DefaultAddress: Option[String] = None
   val DefaultTls: Option[TlsServerConfig] = None
-  val DefaultMaxInboundMessageSize: Int = 64 * 1024 * 1024
+  val DefaultMaxInboundMessageSize: Int = 64 * 1024 * 1024 // Larger than ServerConfig default
   val DefaultSeeding: Seeding = Seeding.Strong
   val DefaultManagementServiceTimeout: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.ofMinutes(2)
@@ -241,6 +256,8 @@ object ApiServiceOwner {
     UserManagementServiceConfig.default(enabled = false)
   val DefaultPartyManagementServiceConfig: PartyManagementServiceConfig =
     PartyManagementServiceConfig.default
+  val DefaultPackageServiceConfig: PackageServiceConfig =
+    PackageServiceConfig.default
   val DefaultIdentityProviderManagementConfig: IdentityProviderManagementConfig =
     IdentityProviderManagementConfig()
   val DefaultCommandServiceConfig: CommandServiceConfig = CommandServiceConfig.Default

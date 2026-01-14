@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.digitalasset.canton.config.{NonNegativeDuration}
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -50,7 +50,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
   VoteRequestTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
@@ -64,6 +64,7 @@ import org.lfdecentralizedtrust.splice.store.{
   PageLimit,
   SortOrder,
   TxLogStore,
+  UpdateHistory,
 }
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
@@ -74,7 +75,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import io.grpc.Status
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
@@ -96,7 +97,7 @@ class DbScanStore(
     createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
-    enableImportUpdateBackfill: Boolean,
+    ingestionConfig: IngestionConfig,
     storeMetrics: DbScanStoreMetrics,
     initialRound: Long,
 )(implicit
@@ -111,7 +112,7 @@ class DbScanStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
-        version = 2, // TODO (DACH-NY/canton-network-node#13454): bump when it will backfill.
+        version = 3,
         name = "DbScanStore",
         party = key.dsoParty,
         participant = participantId,
@@ -129,11 +130,7 @@ class DbScanStore(
         ),
       ),
       domainMigrationInfo,
-      participantId,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = enableImportUpdateBackfill,
-      BackfillingRequirement.NeedsBackfilling,
-      Some(storeMetrics.history),
+      ingestionConfig,
     )
     with ScanStore
     with AcsTables
@@ -234,9 +231,7 @@ class DbScanStore(
               ScanTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(
-                  AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}""",
+              AmuletRules.COMPANION,
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
             "lookupAmuletRules",
@@ -259,9 +254,7 @@ class DbScanStore(
               ScanTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(
-                  ExternalPartyAmuletRules.TEMPLATE_ID
-                )}""",
+              ExternalPartyAmuletRules.COMPANION,
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
             "lookupExternalPartyAmuletRules",
@@ -288,9 +281,7 @@ class DbScanStore(
               ScanTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(
-                  AnsRules.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}""",
+              AnsRules.COMPANION,
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
             "lookupAnsRules",
@@ -319,10 +310,9 @@ class DbScanStore(
             ScanTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                template_id_qualified_name = ${QualifiedName(
-                AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
-              )} and ans_entry_name ^@ $limitedPrefix
+            AnsEntry.COMPANION,
+            additionalWhere = sql"""
+              and ans_entry_name ^@ $limitedPrefix
               and acs.contract_expires_at >= $now
             """,
             orderLimit = sql"""
@@ -350,10 +340,8 @@ class DbScanStore(
             ScanTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                template_id_qualified_name = ${QualifiedName(
-                AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
+            AnsEntry.COMPANION,
+            additionalWhere = sql"""
                 and ans_entry_owner = $partyId
                 and ans_entry_name >= ''
                 and acs.contract_expires_at >= $now
@@ -380,10 +368,8 @@ class DbScanStore(
             ScanTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-              template_id_qualified_name = ${QualifiedName(
-                AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
+            AnsEntry.COMPANION,
+            additionalWhere = sql"""
               and ans_entry_name = ${lengthLimited(name)}
               and acs.contract_expires_at >= $now
                  """,
@@ -406,10 +392,8 @@ class DbScanStore(
             ScanTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                template_id_qualified_name = ${QualifiedName(
-                TransferPreapproval.COMPANION.TEMPLATE_ID
-              )}
+            TransferPreapproval.COMPANION,
+            additionalWhere = sql"""
                 and transfer_preapproval_receiver = $partyId
             """,
             orderLimit = sql"""
@@ -433,10 +417,8 @@ class DbScanStore(
             ScanTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
-                template_id_qualified_name = ${QualifiedName(
-                TransferCommandCounter.COMPANION.TEMPLATE_ID
-              )}
+            TransferCommandCounter.COMPANION,
+            additionalWhere = sql"""
                 and wallet_party = $partyId
             """,
             orderLimit = sql"limit 1",
@@ -513,10 +495,8 @@ class DbScanStore(
               ScanTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""
-                  template_id_qualified_name = ${QualifiedName(
-                  FeaturedAppRight.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}
+              FeaturedAppRight.COMPANION,
+              additionalWhere = sql"""
                     and featured_app_right_provider = $providerPartyId
                  """,
               orderLimit = sql"limit 1",
@@ -593,36 +573,30 @@ class DbScanStore(
 
   override def getTotalAmuletBalance(asOfEndOfRound: Long)(implicit
       tc: TraceContext
-  ): Future[BigDecimal] =
+  ): Future[Option[BigDecimal]] =
     waitUntilAcsIngested {
       for {
-        result <- ensureAggregated(asOfEndOfRound) {
-          // There exists no row for a (round, party) in round_party_totals where the party is not active in round,
-          // so it is necessary to find the most recent round where the party was active
-          // and sum the most recent total_amulet_balances for all parties.
-          // using greatest(0, ...) to handle negative balances caused by amulets never expiring.
+        result <- ensureAggregated(asOfEndOfRound) { _ =>
           storage.query(
             // TODO(#800) change to query from round_totals when amulet expiry works again
+            // the round_total_amulet_balance is sparse and might not have an entry for the requested round
+            // which is why the first entry found <= asOfEndOfRound is used
             sql"""
-              with most_recent as (
-                select   max(closed_round) as closed_round,
-                         party
-                from     round_party_totals
-                where    store_id = $roundTotalsStoreId
-                and      closed_round <= $asOfEndOfRound
-                group by party
+              select greatest(
+                0,
+                sum_cumulative_change_to_initial_amount_as_of_round_zero -
+                sum_cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)
               )
-              select sum(greatest(0, rpt.cumulative_change_to_initial_amount_as_of_round_zero - rpt.cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)))
-              from   round_party_totals rpt,
-                     most_recent mr
-              where  rpt.store_id = $roundTotalsStoreId
-              and    rpt.party = mr.party
-              and    rpt.closed_round = mr.closed_round;
-              """.as[Option[BigDecimal]].headOption,
+              from    round_total_amulet_balance
+              where   store_id = $roundTotalsStoreId
+              and     closed_round <= $asOfEndOfRound
+              order by closed_round desc
+              limit 1;
+              """.as[BigDecimal].headOption,
             "getTotalAmuletBalance",
           )
         }
-      } yield result.flatten.getOrElse(0)
+      } yield result
     }
 
   override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =
@@ -648,7 +622,7 @@ class DbScanStore(
       tc: TraceContext
   ): Future[BigDecimal] = waitUntilAcsIngested {
     for {
-      result <- ensureAggregated(round) {
+      result <- ensureAggregated(round) { _ =>
         storage.query(
           sql"""
             select coalesce(app_rewards, 0) + coalesce(validator_rewards, 0)
@@ -666,22 +640,36 @@ class DbScanStore(
       tc: TraceContext
   ): Future[BigDecimal] = waitUntilAcsIngested {
     for {
-      result <- ensureAggregated(asOfEndOfRound) {
-        storage.query(
-          // The round_party_totals might not have a row for the given round, (when the party has not been active in that round)
-          // in that case just take the most recent round.
-          // This is also why the total_amulet_balance is calculated from the two cumulative fields.
-          sql"""
-             select   greatest(0, cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)) as total_amulet_balance
-             from     round_party_totals
-             where    store_id = $roundTotalsStoreId
-             and      closed_round <= $asOfEndOfRound
-             and      party = $partyId
-             order by closed_round desc
-             limit    1;
+      result <- ensureAggregated(asOfEndOfRound) { lastAggregatedRound =>
+        // if the asOfEndOrRound is the latest aggregated round, we can use the active_parties for a faster query.
+        if (lastAggregatedRound == asOfEndOfRound) {
+          storage.query(
+            sql"""
+             select  greatest(0, cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)) as total_amulet_balance
+             from    round_party_totals rpt
+             join    active_parties ap
+             on      rpt.store_id = ap.store_id
+             and     rpt.party = ap.party
+             and     rpt.closed_round = ap.closed_round
+             where   rpt.store_id = $roundTotalsStoreId
+             and     rpt.party = $partyId;
            """.as[Option[BigDecimal]].headOption,
-          "getWalletBalance",
-        )
+            "getWalletBalanceForLastAggregatedRound",
+          )
+        } else {
+          storage.query(
+            sql"""
+            select   greatest(0, cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)) as total_amulet_balance
+            from     round_party_totals
+            where    store_id = $roundTotalsStoreId
+            and      closed_round <= $asOfEndOfRound
+            and      party = $partyId
+            order by closed_round desc
+            limit    1;
+            """.as[Option[BigDecimal]].headOption,
+            "getWalletBalanceForEarlierRound",
+          )
+        }
       }
     } yield result.flatten.getOrElse(0)
   }
@@ -690,27 +678,27 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
     for {
-      rows <- ensureAggregated(asOfEndOfRound) {
-        storage.query(
-          sql"""
-              with ranked_providers_by_app_rewards as (
-                select   party as provider,
-                         max(cumulative_app_rewards) as cumulative_app_rewards,
-                         rank() over (order by max(cumulative_app_rewards) desc) as rank_nr
-                from     round_party_totals
-                where    store_id = $roundTotalsStoreId
-                and      closed_round <= $asOfEndOfRound
-                and      cumulative_app_rewards > 0
-                group by party
-              )
-              select   provider,
-                       cumulative_app_rewards
-              from     ranked_providers_by_app_rewards
-              where    rank_nr <= $limit
-              order by rank_nr;
+      rows <- ensureAggregated(asOfEndOfRound) { lastAggregatedRound =>
+        if (lastAggregatedRound == asOfEndOfRound) {
+          storage.query(
+            sql"""
+              select   rpt.party as provider,
+                       rpt.cumulative_app_rewards as cumulative_app_rewards
+              from     round_party_totals rpt
+              join     active_parties ap
+              on       rpt.store_id = ap.store_id
+              and      rpt.party = ap.party
+              and      rpt.closed_round = ap.closed_round
+              and      rpt.store_id = $roundTotalsStoreId
+              and      cumulative_app_rewards > 0
+              order by cumulative_app_rewards desc, rpt.party desc
+              limit $limit;
             """.as[(PartyId, BigDecimal)],
-          "getTopProvidersByAppRewards",
-        )
+            "getTopProvidersByAppRewards",
+          )
+        } else {
+          Future.successful(Seq())
+        }
       }
     } yield rows
   }
@@ -719,27 +707,27 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
     for {
-      rows <- ensureAggregated(asOfEndOfRound) {
-        storage.query(
-          sql"""
-              with ranked_validators_by_validator_rewards as (
-                select   party as validator,
-                         max(cumulative_validator_rewards) as cumulative_validator_rewards,
-                         rank() over (order by max(cumulative_validator_rewards) desc) as rank_nr
-                from     round_party_totals
-                where    store_id = $roundTotalsStoreId
-                and      closed_round <= $asOfEndOfRound
-                and      cumulative_validator_rewards > 0
-                group by party
-              )
-              select   validator,
-                       cumulative_validator_rewards
-              from     ranked_validators_by_validator_rewards
-              where    rank_nr <= $limit
-              order by rank_nr;
-           """.as[(PartyId, BigDecimal)],
-          "getTopValidatorsByValidatorRewards",
-        )
+      rows <- ensureAggregated(asOfEndOfRound) { lastAggregatedRound =>
+        if (lastAggregatedRound == asOfEndOfRound) {
+          storage.query(
+            sql"""
+              select   rpt.party as validator,
+                       rpt.cumulative_validator_rewards as cumulative_validator_rewards
+              from     round_party_totals rpt
+              join     active_parties ap
+              on       rpt.store_id = ap.store_id
+              and      rpt.party = ap.party
+              and      rpt.closed_round = ap.closed_round
+              and      rpt.store_id = $roundTotalsStoreId
+              and      cumulative_validator_rewards > 0
+              order by cumulative_validator_rewards desc, rpt.party desc
+              limit $limit;
+            """.as[(PartyId, BigDecimal)],
+            "getTopValidatorsByValidatorRewards",
+          )
+        } else {
+          Future.successful(Seq())
+        }
       }
     } yield rows
   }
@@ -748,46 +736,42 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.ValidatorPurchasedTraffic]] = waitUntilAcsIngested {
     for {
-      rows <- ensureAggregated(asOfEndOfRound) {
-        // There might not be a row for a party where closed_round = asOfEndOfRound, so we need to use the
-        // max cumulatives for each party up to including asOfEndOfRound
-        // and separately get the last purchased round for each party in the leaderboard
-        storage.query(
-          sql"""
-              with ranked_validators_by_purchased_traffic as (
-                select   party as validator,
-                         max(cumulative_traffic_num_purchases) as cumulative_traffic_num_purchases,
-                         max(cumulative_traffic_purchased) as cumulative_traffic_purchased,
-                         max(cumulative_traffic_purchased_cc_spent) as cumulative_traffic_purchased_cc_spent,
-                         rank() over (order by max(cumulative_traffic_purchased) desc) as rank_nr
-                from     round_party_totals
-                where    store_id = $roundTotalsStoreId
-                and      closed_round <= $asOfEndOfRound
-                and      cumulative_traffic_purchased > 0
-                group by party
-              ),
-              last_purchases as (
-                select   party as validator,
-                         max(closed_round) as last_purchased_in_round
-                from     round_party_totals
-                where    store_id = $roundTotalsStoreId
-                and      closed_round <= $asOfEndOfRound
-                and      traffic_purchased > 0
-                group by party
-              )
-              select    rv.validator,
-                        rv.cumulative_traffic_num_purchases,
-                        rv.cumulative_traffic_purchased,
-                        rv.cumulative_traffic_purchased_cc_spent,
-                        coalesce(lp.last_purchased_in_round, 0)
-              from      ranked_validators_by_purchased_traffic rv
-              left join last_purchases lp
-              on        rv.validator = lp.validator
-              where     rv.rank_nr <= $limit
-              order by  rv.rank_nr;
-           """.as[(PartyId, Long, Long, BigDecimal, Long)],
-          "getTopValidatorsByPurchasedTraffic",
-        )
+      rows <- ensureAggregated(asOfEndOfRound) { lastAggregatedRound =>
+        if (lastAggregatedRound == asOfEndOfRound) {
+          storage.query(
+            sql"""
+              select   rpt.party as validator,
+                       rpt.cumulative_traffic_num_purchases,
+                       rpt.cumulative_traffic_purchased,
+                       rpt.cumulative_traffic_purchased_cc_spent,
+                       coalesce(
+                         (
+                           select   closed_round as last_purchased_in_round
+                           from     round_party_totals
+                           where    store_id = rpt.store_id
+                           and      store_id = $roundTotalsStoreId
+                           and      party = rpt.party
+                           and      traffic_purchased > 0
+                           order by closed_round desc
+                           limit 1
+                         ),
+                         0
+                       ) as last_purchased_in_round
+              from     round_party_totals rpt
+              join     active_parties ap
+              on       rpt.store_id = ap.store_id
+              and      rpt.party = ap.party
+              and      rpt.closed_round = ap.closed_round
+              and      rpt.store_id = $roundTotalsStoreId
+              and      cumulative_traffic_purchased > 0
+              order by cumulative_traffic_purchased desc, rpt.party desc
+              limit $limit;
+            """.as[(PartyId, Long, Long, BigDecimal, Long)],
+            "getTopValidatorsByPurchasedTraffic",
+          )
+        } else {
+          Future.successful(Seq())
+        }
       }
     } yield rows.map((HttpScanAppClient.ValidatorPurchasedTraffic.apply _).tupled)
   }
@@ -802,9 +786,7 @@ class DbScanStore(
             ScanTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                ValidatorLicense.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}""",
+            ValidatorLicense.COMPANION,
             orderLimit =
               sql"""order by validator_license_rounds_collected desc limit ${sqlLimit(limit)}""",
           ),
@@ -828,9 +810,8 @@ class DbScanStore(
             ScanTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = (sql"""template_id_qualified_name = ${QualifiedName(
-                ValidatorLicense.TEMPLATE_ID
-              )} and validator in """ ++ validatorPartyIds).toActionBuilder,
+            ValidatorLicense.COMPANION,
+            where = (sql"""validator in """ ++ validatorPartyIds).toActionBuilder,
           ),
           "getValidatorLicenseByValidator",
         )
@@ -853,6 +834,7 @@ class DbScanStore(
                from #${ScanTables.acsTableName}
                where store_id = $acsStoreId
                 and migration_id = $domainMigrationId
+                and package_name = ${MemberTraffic.PACKAGE_NAME}
                 and template_id_qualified_name = ${QualifiedName(
               MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID
             )}
@@ -939,7 +921,7 @@ class DbScanStore(
   ): Future[Option[ContractWithState[SvNodeState.ContractId, SvNodeState]]] =
     lookupContractBySvParty(SvNodeState.COMPANION, svPartyId)
 
-  private def lookupContractBySvParty[C, TCId <: ContractId[_], T](
+  private def lookupContractBySvParty[C, TCId <: ContractId[?], T](
       companion: C,
       svPartyId: PartyId,
   )(implicit
@@ -955,9 +937,8 @@ class DbScanStore(
               ScanTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""
-         template_id_qualified_name = ${QualifiedName(templateId)}
-     and sv_party = $svPartyId""",
+              companion,
+              additionalWhere = sql"""and sv_party = $svPartyId""",
               orderLimit = sql"""limit 1""",
             ).headOption,
             s"lookupContractBySvParty[$templateId]",
@@ -1073,30 +1054,30 @@ class DbScanStore(
         .toMap
     }
 
-  override def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
+  // TODO (#934): this method probably belongs in UpdateHistory instead
+  override def lookupContractByRecordTime[C, TCId <: ContractId[?], T](
       companion: C,
+      updateHistory: UpdateHistory,
       recordTime: CantonTimestamp,
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
       tc: TraceContext,
   ): Future[Option[Contract[TCId, T]]] = {
-    val templateId = companionClass.typeId(companion)
-    val packageName = PackageQualifiedName.getFromResources(templateId).packageName
+    val pqn @ PackageQualifiedName(packageName, QualifiedName(moduleName, entityName)) =
+      companionClass.packageQualifiedName(companion)
     for {
       row <- storage
         .querySingle(
           selectFromUpdateCreatesTableResult(
             updateHistory.historyId,
-            where = sql"""template_id_module_name = ${lengthLimited(
-                templateId.getModuleName
-              )} and template_id_entity_name = ${lengthLimited(
-                templateId.getEntityName
-              )} and package_name = ${lengthLimited(packageName)}
+            where = sql"""template_id_module_name = ${lengthLimited(moduleName)}
+              and template_id_entity_name = ${lengthLimited(entityName)}
+              and package_name = ${lengthLimited(packageName)}
               and record_time > $recordTime""",
             // TODO(#934): Order by row_id is suspicious
             orderLimit = sql"""order by row_id asc limit 1""",
           ).headOption,
-          s"lookup[$templateId]",
+          s"lookup[$pqn]",
         )
         .value
     } yield {

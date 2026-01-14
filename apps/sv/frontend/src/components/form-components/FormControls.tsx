@@ -6,14 +6,24 @@ import { useFormContext } from '../../hooks/formContext';
 import { useNavigate } from 'react-router-dom';
 
 export interface FormControlsProps {
-  cancelTitle?: string;
-  submitTitle?: string;
+  showConfirmation?: boolean;
+  onEdit: () => void;
 }
 
 export const FormControls: React.FC<FormControlsProps> = props => {
-  const { cancelTitle, submitTitle } = props;
+  const { showConfirmation, onEdit } = props;
   const form = useFormContext();
   const navigate = useNavigate();
+  const submitTitle = showConfirmation ? 'Submit Proposal' : 'Review Proposal';
+  const cancelTitle = showConfirmation ? 'Edit Proposal' : 'Cancel';
+
+  const handleCancel = () => {
+    if (showConfirmation) {
+      onEdit();
+    } else {
+      navigate('/governance-beta/proposals/create');
+    }
+  };
 
   return (
     <Box
@@ -21,7 +31,6 @@ export const FormControls: React.FC<FormControlsProps> = props => {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        mt: 4,
         spacing: 4,
       }}
       data-testid="form-controls"
@@ -30,9 +39,9 @@ export const FormControls: React.FC<FormControlsProps> = props => {
         variant="outlined"
         sx={{ mr: 8 }}
         data-testid="cancel-button"
-        onClick={() => navigate('/governance-beta/proposals/create')}
+        onClick={() => handleCancel()}
       >
-        {cancelTitle || 'Cancel'}
+        {cancelTitle}
       </Button>
 
       <form.Subscribe
@@ -43,9 +52,10 @@ export const FormControls: React.FC<FormControlsProps> = props => {
             type={'submit'}
             size="large"
             disabled={!canSubmit || isSubmitting}
+            id="submit-button"
             data-testid="submit-button"
           >
-            {isSubmitting ? 'Submitting' : submitTitle || 'Submit Proposal'}
+            {isSubmitting ? 'Submitting' : submitTitle}
           </Button>
         )}
       />

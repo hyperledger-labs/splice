@@ -1,26 +1,30 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+/** Note: to execute this locally, you might need to first `export GCLOUD_PROJECT=$CLOUDSDK_CORE_PROJECT` * */
+
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.*
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import com.digitalasset.canton.BaseTest.getResourcePath
-import com.digitalasset.canton.lifecycle.{HasCloseContext, FlagCloseable}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, HasCloseContext}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.daml.lf.data.Time.Timestamp as LfTimestamp
 import com.google.cloud.bigquery as bq
-import bq.{Field, JobInfo, Schema, TableId}
+import bq.{Field, FieldValueList, JobInfo, Schema, TableId, TableResult}
 import bq.storage.v1.{JsonStreamWriter, TableSchema}
+import org.scalatest.concurrent.TimeLimits.failAfter
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.*
-
 import slick.jdbc.GetResult
 
-import java.nio.file.Paths
+import java.io.File
+import java.nio.file.{Path, Paths}
 import java.util.UUID
 import scala.concurrent.duration.*
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.DurationConverters.*
+import scala.sys.process.Process
+import java.time.temporal.ChronoUnit
 
 class ScanTotalSupplyBigQueryIntegrationTest
     extends SpliceTests.IntegrationTest
@@ -32,7 +36,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
     with FlagCloseable
     with HasCloseContext
     with UpdateHistoryTestUtil {
-  private val totalSupplySqlPath = getResourcePath("total-supply-bigquery.sql")
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -41,14 +44,16 @@ class ScanTotalSupplyBigQueryIntegrationTest
       .withScanDisabledMiningRoundsCache()
       .withAmuletPrice(walletAmuletPrice)
 
-  override def walletAmuletPrice = SpliceUtil.damlDecimal(0.00001)
+  def coinPrice = BigDecimal(0.00001)
+  override def walletAmuletPrice = SpliceUtil.damlDecimal(coinPrice)
 
   override protected def runTokenStandardCliSanityCheck = false
 
   // BigQuery client instance and test dataset
   private lazy val bigquery: bq.BigQuery = bq.BigQueryOptions.getDefaultInstance.getService
+  private val uuid = UUID.randomUUID().toString.replace("-", "_")
   private val datasetName =
-    s"scantotalsupply_test_dataset_${UUID.randomUUID().toString.replace("-", "_")}"
+    s"scantotalsupply_test_dataset_$uuid"
   private val (createsBqTableName, exercisesBqTableName) = {
     val prefix = "scan_sv_1_"
     (
@@ -56,18 +61,39 @@ class ScanTotalSupplyBigQueryIntegrationTest
       s"${prefix}update_history_exercises",
     )
   }
+  private val functionsDatasetName = s"functions_$uuid"
+  private val dashboardsDatasetName = s"dashboards_$uuid"
+  private val allDatasetNames = Seq(
+    datasetName,
+    functionsDatasetName,
+    dashboardsDatasetName,
+  )
 
   // Test data parameters
-  private val mintedAmount = BigDecimal("2587519.0258740704")
-  private val aliceValidatorMintedAmount = BigDecimal("26046.0426105176")
+  private val mintedAppRewardsAmount = BigDecimal(0)
+  private val mintedValidatorRewardsAmount = BigDecimal("152207.0015220704")
+  private val mintedSvRewardsAmount = BigDecimal("2435312.024352")
+  private val mintedUnclaimedsAmount = BigDecimal(0)
+  private val mintedAmount =
+    mintedAppRewardsAmount + mintedValidatorRewardsAmount + mintedSvRewardsAmount + mintedUnclaimedsAmount
+  private val aliceValidatorMintedAmount = BigDecimal("26051.7503805176")
   private val lockedAmount = BigDecimal("5000")
-  private val burnedAmount = BigDecimal("60032.83108")
+  private val burnedAmount = BigDecimal("60010")
   private val unlockedAmount = mintedAmount - lockedAmount - burnedAmount
   private val unmintedAmount = BigDecimal("570776.255709163")
+  private val amuletHolders = 5
+  private val validators = 4 // one SV + 3 validators
+  // The test currently produces 80 transactions, which is 0.000926 tps over 24 hours,
+  // so we assert for a range of 70-85 transactions, or 0.0008-0.00099 tps.
+  private val avgTps = (0.0008, 0.00099)
+  // The peak is 18 transactions in a (simulated) minute, or 0.3 tps over a minute,
+  // so we assert 15-21 transactions, or 0.25-0.35 tps
+  private val peakTps = (0.25, 0.35)
+  private val totalRounds = 4
 
   override def beforeAll() = {
     super.beforeAll()
-    logger.info(s"Creating BigQuery dataset: $datasetName")
+    logger.info(s"Creating BigQuery dataset: $datasetName as user: ${inferBQUser()}")
 
     // Create a temporary BigQuery dataset for testing
     // 1hr is the minimum per https://github.com/googleapis/java-bigquery/blob/v2.53.0/google-cloud-bigquery/src/main/java/com/google/cloud/bigquery/DatasetInfo.java#L97-L108
@@ -76,13 +102,62 @@ class ScanTotalSupplyBigQueryIntegrationTest
     bigquery.create(datasetInfo)
 
     createEmptyTables()
+
+    val functionsDatasetInfo =
+      bq.DatasetInfo
+        .newBuilder(functionsDatasetName)
+        .setDefaultTableLifetime(1.hour.toMillis)
+        .build()
+    bigquery.create(functionsDatasetInfo)
+
+    // Note that the dashboard tables are never actually populated in this test,
+    // but we do test creating them from the codegen'ed schemas, and creating the
+    // functions and procedures for populating them, so we get some sanity check
+    // on the queries for syntax and type errors.
+    val dashboardsDatasetInfo =
+      bq.DatasetInfo
+        .newBuilder(dashboardsDatasetName)
+        .setDefaultTableLifetime(1.hour.toMillis)
+        .build()
+    bigquery.create(dashboardsDatasetInfo)
+  }
+
+  private[this] def inferBQUser(): String = {
+    import com.google.auth.oauth2 as o
+    val credentials = bigquery.getOptions.getCredentials
+    credentials match {
+      case sa: o.ServiceAccountCredentials => sa.getClientEmail
+      case sa: o.ServiceAccountJwtAccessCredentials => sa.getClientEmail
+      case _ => "unknown"
+    }
   }
 
   override def afterAll() = {
-    logger.info(s"Cleaning up BigQuery dataset: $datasetName")
+    val singleDeleteTryTime = 13.seconds
 
-    // Delete the temporary BigQuery dataset after tests
-    bigquery.delete(datasetName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+    Future
+      .traverse(allDatasetNames) { dsName =>
+        val logMsg = s"Cleaning up BigQuery dataset: $dsName"
+        Future {
+          logger.info(logMsg)
+          // afterAll only has 60s to complete before its thread gets
+          // interrupted
+          eventuallySucceeds(timeUntilSuccess = 45.seconds, suppressErrors = false) {
+            failAfter(singleDeleteTryTime) {
+              // can hang, so we force retry after singleDeleteTryTime;
+              // even when it hangs it's still likely to succeed, and delete
+              // just succeeds with `false` if already deleted
+              bigquery.delete(dsName, bq.BigQuery.DatasetDeleteOption.deleteContents())
+            }
+          }
+          logger.info(s"Finished $logMsg")
+        }.recoverWith { case util.control.NonFatal(e) =>
+          logger.warn(s"Failed $logMsg")
+          Future failed e
+        }
+      }
+      .futureValue
+
     super.afterAll()
   }
 
@@ -99,12 +174,18 @@ class ScanTotalSupplyBigQueryIntegrationTest
       exportPostgresToBigQuery()
     }
 
-    val results = withClue("running total supply queries in BigQuery") {
-      runTotalSupplyQueries()
+    withClue("Creating BigQuery functions") {
+      createBigQueryFunctions()
     }
 
-    withClue(s"verify total supply results") {
-      verifyResults(results)
+    withClue("testing total supply queries in BigQuery") {
+      val results = runDashboardQueries()
+      verifyDashboardResults(results)
+    }
+
+    withClue("testing finance queries") {
+      val results = runFinanceQueries()
+      verifyFinanceResults(results)
     }
   }
 
@@ -214,19 +295,26 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def createTestData(bobParty: PartyId)(implicit
       env: FixtureParam
   ): Unit = {
-    actAndCheck(
-      "step forward many rounds", {
-        advanceTimeToRoundOpen
-        (1 to 5).foreach { _ =>
-          advanceRoundsByOneTick
-        }
-      },
-    )(
-      "alice validator receives rewards",
-      _ => {
-        aliceValidatorWalletClient.balance().unlockedQty shouldBe aliceValidatorMintedAmount
-      },
-    )
+    forAll(
+      Table(
+        ("round", "expected balance"),
+        (2, BigDecimal("0")),
+        (3, BigDecimal("6512.93759512940")),
+        (4, BigDecimal("13025.8751902588")),
+        (5, BigDecimal("19538.8127853882")),
+        (6, aliceValidatorMintedAmount),
+      )
+    ) { (expectRound, expectedBalance) =>
+      actAndCheck(timeUntilSuccess = 30.seconds)(
+        s"Advance round ${expectRound - 1}", {
+          advanceRoundsToNextRoundOpening
+          advanceTimeForRewardAutomationToRunForCurrentRound
+        },
+      )(
+        s"alice validator receives rewards up to round $expectRound",
+        _ => aliceValidatorWalletClient.balance().unlockedQty should be >= expectedBalance,
+      )
+    }
 
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
     val (lockingParty, lockingClient) = (aliceValidatorParty, aliceValidatorWalletClient)
@@ -258,7 +346,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
       case db: DbStorage => db
       case s => fail(s"non-DB storage configured, unsupported for BigQuery: ${s.getClass}")
     }
-    val sourceHistoryId = sv1ScanBackend.appState.store.updateHistory.historyId
+    val sourceHistoryId = sv1ScanBackend.appState.automation.updateHistory.historyId
 
     copyTableToBigQuery(
       "update_history_creates",
@@ -436,29 +524,69 @@ class ScanTotalSupplyBigQueryIntegrationTest
       )
   }
 
-  /** Runs the total supply queries from the SQL file
+  /** Creates all auxiliary functions in BigQuery. First codegen's from the Pulumi definitions
+    * the query that creates them, then runs that query in BQ.
     */
-  private def runTotalSupplyQueries(): ExpectedMetrics = {
-    // slurp BigQuery SQL file
-    val sqlContent = java.nio.file.Files
-      .readString(Paths get totalSupplySqlPath, java.nio.charset.StandardCharsets.UTF_8)
+  private def createBigQueryFunctions() = {
+    val sqlDir: Path = Paths.get("apps/app/src/test/resources/dumps/sql")
+    if (!sqlDir.toFile.exists())
+      sqlDir.toFile.mkdirs()
+    val sqlFile = sqlDir.resolve("functions.sql")
 
-    val modifiedSql = Seq(
-      ("mainnet_da2_scan".r, datasetName), // Replace prod dataset name with test dataset name
-      (raw"SET migration_id = \d+".r, "SET migration_id = 0"), // migration ID with 0
-      (
-        raw"SET as_of_record_time = iso_timestamp\('\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z'\)".r,
-        "SET as_of_record_time = iso_timestamp('1971-01-01T00:00:00Z')",
-      ), // as-of time with later canton timestamp
-    ).foldLeft(sqlContent) { case (sqlContent, (origin, replacement)) =>
-      val modifiedSql = origin.replaceAllIn(sqlContent, replacement)
-      modifiedSql should not be sqlContent withClue s"inserting $replacement"
-      modifiedSql
+    val ret = Process(
+      s"npm run sql-codegen ${bigquery.getOptions.getProjectId} ${functionsDatasetName} ${datasetName} ${dashboardsDatasetName} ${sqlFile.toAbsolutePath}",
+      new File("cluster/pulumi/canton-network"),
+    ).!
+    if (ret != 0) {
+      fail("Failed to codegen the sql query for creating functions in BigQuery")
     }
+
+    val sqlContent =
+      java.nio.file.Files.readString(sqlFile, java.nio.charset.StandardCharsets.UTF_8)
+
+    logger.info(s"Creating BQ functions using the following SQL statement: $sqlContent")
 
     // Execute the query
     val queryConfig = bq.QueryJobConfiguration
-      .newBuilder(modifiedSql)
+      .newBuilder(sqlContent)
+      .setUseLegacySql(false)
+      .build()
+
+    val jobId = bq.JobId.of(UUID.randomUUID().toString)
+    val job = bigquery.create(JobInfo.newBuilder(queryConfig).setJobId(jobId).build())
+
+    job.waitFor()
+  }
+
+  private def runFinanceQueries()(implicit env: FixtureParam): FinanceMetrics = {
+    val project = bigquery.getOptions.getProjectId
+    // The TPS query assumes staleness of up to 4 hours, so we query for stats 5 hours after the current ledger time.
+    val timestamp = getLedgerTime.toInstant.plus(5, ChronoUnit.HOURS).toString
+    logger.info(s"Querying all dashboard stats as of $timestamp")
+    val sql =
+      s"SELECT * FROM `$project.$functionsDatasetName.all_finance_stats`('$timestamp', 0);"
+
+    parseFinanceResults(runTableSqlQuery(sql))
+  }
+
+  /** Runs the dashboard queries from the SQL file
+    */
+  private def runDashboardQueries()(implicit env: FixtureParam): DashboardMetrics = {
+    val project = bigquery.getOptions.getProjectId
+    // The TPS query assumes staleness of up to 4 hours, so we query for stats 5 hours after the current ledger time.
+    val timestamp = getLedgerTime.toInstant.plus(5, ChronoUnit.HOURS).toString
+    logger.info(s"Querying all dashboard stats as of $timestamp")
+    val sql =
+      s"SELECT * FROM `$project.$functionsDatasetName.all_dashboard_stats`('$timestamp', 0);"
+
+    parseDashboardResults(runTableSqlQuery(sql))
+  }
+
+  private def runTableSqlQuery(sql: String): TableResult = {
+
+    // Execute the query
+    val queryConfig = bq.QueryJobConfiguration
+      .newBuilder(sql)
       .setUseLegacySql(false)
       .build()
 
@@ -471,60 +599,122 @@ class ScanTotalSupplyBigQueryIntegrationTest
     job.waitFor()
 
     // results should be available now
-    val result = job.getQueryResults()
-    parseQueryResults(result)
+    job.getQueryResults()
   }
 
-  private case class ExpectedMetrics(
+  private case class FinanceMetrics(
+      // Most metrics reuse the same code as the dasboard computation, so we don't bother validating them again
+      latestRound: Long
+  )
+
+  private case class DashboardMetrics(
       locked: BigDecimal,
       unlocked: BigDecimal,
       currentSupplyTotal: BigDecimal,
       unminted: BigDecimal,
-      minted: BigDecimal,
-      allowedMint: BigDecimal,
+      mintedAppRewards: BigDecimal,
+      mintedValidatorRewards: BigDecimal,
+      mintedSvRewards: BigDecimal,
+      mintedUnclaimed: BigDecimal,
       burned: BigDecimal,
+      numAmuletHolders: Long,
+      numActiveValidators: Long,
+      avgTps: Double,
+      peakTps: Double,
+      minCoinPrice: BigDecimal,
+      maxCoinPrice: BigDecimal,
+      avgCoinPrice: BigDecimal,
   )
 
-  private def parseQueryResults(result: bq.TableResult) = {
+  private def required(row: FieldValueList, column: String) = {
+    val field = row get column
+    if (field.isNull)
+      fail(s"Column '$column' in all-stats results is null")
+    field
+  }
+
+  def bd(row: FieldValueList, column: String) = {
+    BigDecimal(required(row, column).getStringValue)
+  }
+
+  def int(row: FieldValueList, column: String) = {
+    required(row, column).getLongValue
+  }
+
+  def float(row: FieldValueList, column: String) = {
+    required(row, column).getDoubleValue
+  }
+
+  private def parseFinanceResults(result: bq.TableResult) = {
+    val row = result.iterateAll().iterator().next()
+    logger.debug(s"Query row: $row; schema ${result.getSchema}")
+
+    FinanceMetrics(
+      latestRound = int(row, "latest_round")
+    )
+  }
+
+  private def parseDashboardResults(result: bq.TableResult) = {
     // We expect the final query to return a single row with all metrics
     val row = result.iterateAll().iterator().next()
     logger.debug(s"Query row: $row; schema ${result.getSchema}")
 
-    def bd(column: String) = {
-      val field = row get column
-      if (field.isNull)
-        fail(s"Column '$column' in total-supply results is null")
-      else
-        BigDecimal(field.getStringValue)
-    }
-
-    ExpectedMetrics(
-      locked = bd("locked"),
-      unlocked = bd("unlocked"),
-      currentSupplyTotal = bd("current_supply_total"),
-      unminted = bd("unminted"),
-      minted = bd("minted"),
-      allowedMint = bd("allowed_mint"),
-      burned = bd("burned"),
+    DashboardMetrics(
+      locked = bd(row, "locked"),
+      unlocked = bd(row, "unlocked"),
+      currentSupplyTotal = bd(row, "current_supply_total"),
+      unminted = bd(row, "unminted"),
+      mintedAppRewards = bd(row, "daily_mint_app_rewards"),
+      mintedValidatorRewards = bd(row, "daily_mint_validator_rewards"),
+      mintedSvRewards = bd(row, "daily_mint_sv_rewards"),
+      mintedUnclaimed = bd(row, "daily_mint_unclaimed_activity_records"),
+      burned = bd(row, "daily_burn"),
+      numAmuletHolders = int(row, "num_amulet_holders"),
+      numActiveValidators = int(row, "num_active_validators"),
+      avgTps = float(row, "average_tps"),
+      peakTps = float(row, "peak_tps"),
+      minCoinPrice = bd(row, "daily_min_coin_price"),
+      maxCoinPrice = bd(row, "daily_max_coin_price"),
+      avgCoinPrice = bd(row, "daily_avg_coin_price"),
     )
   }
 
-  private def verifyResults(results: ExpectedMetrics): Unit = {
+  private def verifyFinanceResults(results: FinanceMetrics): Unit = {
+    results.latestRound shouldBe totalRounds withClue "total_rounds"
+  }
+
+  private def verifyDashboardResults(results: DashboardMetrics): Unit = {
     // Verify individual metrics
     forEvery(
       Seq(
         // base metrics
-        ("minted", results.minted, mintedAmount),
+        ("minted_appRewards", results.mintedAppRewards, mintedAppRewardsAmount),
+        ("minted_validatorRewards", results.mintedValidatorRewards, mintedValidatorRewardsAmount),
+        ("minted_svRewards", results.mintedSvRewards, mintedSvRewardsAmount),
+        ("minted_unclaimed", results.mintedUnclaimed, mintedUnclaimedsAmount),
         ("locked", results.locked, lockedAmount),
         ("unlocked", results.unlocked, unlockedAmount),
         ("unminted", results.unminted, unmintedAmount),
         ("burned", results.burned, burnedAmount),
-        // internally-derived metrics
         ("current_supply_total", results.currentSupplyTotal, lockedAmount + unlockedAmount),
-        ("allowed_mint", results.allowedMint, unmintedAmount + mintedAmount),
+        ("num_amulet_holders", results.numAmuletHolders, amuletHolders),
+        ("num_active_validators", results.numActiveValidators, validators),
+        ("daily_min_coin_price", results.minCoinPrice, coinPrice),
+        ("daily_max_coin_price", results.maxCoinPrice, coinPrice),
+        ("daily_avg_coin_price", results.avgCoinPrice, coinPrice),
       )
     ) { case (clue, actual, expected) =>
       actual shouldBe expected withClue clue
+    }
+
+    forEvery(
+      Seq(
+        ("average_tps", results.avgTps, avgTps),
+        ("peak_tps", results.peakTps, peakTps),
+      )
+    ) { case (clue, actual, expected) =>
+      actual shouldBe >=(expected._1) withClue clue
+      actual shouldBe <=(expected._2) withClue clue
     }
 
     // other derived metrics

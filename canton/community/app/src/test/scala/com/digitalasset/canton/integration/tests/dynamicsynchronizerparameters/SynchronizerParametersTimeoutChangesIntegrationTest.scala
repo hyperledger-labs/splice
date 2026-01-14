@@ -7,8 +7,8 @@ import com.digitalasset.canton.config
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -138,37 +138,22 @@ trait SynchronizerParametersTimeoutChangesIntegrationTest
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(WARN))(
         clue("doing a ping") {
           participant1.health.maybe_ping(participant2.id, timeout = 600.seconds) shouldBe None
+          // Advance the clock so that the mediator observes the timeout of its result message.
+          val mediatorMinObservationDuration =
+            mediator1.underlying.value.replicaManager.mediatorRuntime.value.mediator.timeTracker.config.minObservationDuration
+          env.environment.simClock.value
+            .advance(mediatorMinObservationDuration.asJava.plusSeconds(1))
         },
         LogEntry.assertLogSeq(
           Seq(
-            (_.warningMessage shouldBe "Sequencing result message timed out.", "mediator timeout"),
-            (
-              entry => {
-                entry.shouldBeCantonErrorCode(LocalTimeout)
-                entry.mdc.getOrElse("participant", "") shouldBe participant1.name
-              },
-              "participant1 local timeout",
-            ),
-            (
-              entry => {
-                entry.shouldBeCantonErrorCode(LocalTimeout)
-                entry.mdc.getOrElse("participant", "") shouldBe participant2.name
-              },
-              "participant2 local timeout",
-            ),
             (
               entry => {
                 entry.shouldBeCantonErrorCode(LocalTimeout)
                 entry.warningMessage should include regex ("Failed to submit ping.*due to a participant determined timeout")
               },
               "Ping service timeout",
-            ),
-          ),
-          Seq(
-            _.warningMessage should include regex (
-              "has exceeded the max-sequencing-time .* of the send request"
             )
-          ),
+          )
         ),
       )
     }
@@ -177,7 +162,7 @@ trait SynchronizerParametersTimeoutChangesIntegrationTest
 
 class SynchronizerParametersTimeoutChangesReferenceIntegrationTestDefault
     extends SynchronizerParametersTimeoutChangesIntegrationTest {
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
   // we need to register the ProgrammableSequencer after the ReferenceBlockSequencer
   registerPlugin(new UseProgrammableSequencer(this.getClass.toString, loggerFactory))
 }

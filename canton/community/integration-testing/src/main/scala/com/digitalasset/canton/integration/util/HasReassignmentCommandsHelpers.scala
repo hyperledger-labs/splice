@@ -8,14 +8,12 @@ import com.daml.ledger.api.v2.completion.Completion
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService
 import com.digitalasset.canton.config.CantonConfig
 import com.digitalasset.canton.console.{ConsoleCommandResult, LocalParticipantReference}
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.TestConsoleEnvironment
 import com.digitalasset.canton.integration.util.GrpcAdminCommandSupport.ParticipantReferenceOps
 import com.digitalasset.canton.integration.util.GrpcServices.ReassignmentsService
-import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId}
+import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import com.digitalasset.canton.util.ReassignmentTag.Source
 import com.digitalasset.canton.{
   BaseTest,
   LedgerCommandId,
@@ -66,16 +64,27 @@ trait HasReassignmentCommandsHelpers {
       userId = userId,
     )
 
-    val updates = participant.ledger_api.updates.flat(
+    val updates = participant.ledger_api.updates.reassignments(
       partyIds = Set(submittingParty),
+      filterTemplates = Seq.empty,
       completeAfter = 1,
       beginOffsetExclusive = ledgerEnd,
+      verbose = true,
     )
 
     val unassignmentCompletion = completions.headOption.value
 
     updates.headOption.value match {
-      case w: UpdateService.UnassignedWrapper => (w, unassignmentCompletion)
+      case w: UpdateService.UnassignedWrapper =>
+        w.synchronizerId shouldBe source.toProtoPrimitive
+        w.source shouldBe source.toProtoPrimitive
+        w.target shouldBe target.toProtoPrimitive
+        w.reassignment.synchronizerId shouldBe source.toProtoPrimitive
+        w.events.foreach { unassignedEvent =>
+          unassignedEvent.source shouldBe source.toProtoPrimitive
+          unassignedEvent.target shouldBe target.toProtoPrimitive
+        }
+        (w, unassignmentCompletion)
       case other => throw new RuntimeException(s"Expected a reassignment event but got $other")
     }
   }
@@ -111,7 +120,7 @@ trait HasReassignmentCommandsHelpers {
   }
 
   protected def assign(
-      unassignId: String,
+      reassignmentId: String,
       source: SynchronizerId,
       target: SynchronizerId,
       submittingParty: LfPartyId,
@@ -125,11 +134,11 @@ trait HasReassignmentCommandsHelpers {
     val ledgerEnd = participant.ledger_api.state.end()
 
     logger.debug(
-      s"Submitting assignment of $unassignId on behalf of $submittingParty (source=$source, target=$target)"
+      s"Submitting assignment of $reassignmentId on behalf of $submittingParty (source=$source, target=$target)"
     )
     participant.ledger_api.commands.submit_assign_async(
       submitter = submittingParty,
-      unassignId = unassignId,
+      reassignmentId = reassignmentId,
       source = source,
       target = target,
       commandId = commandId,
@@ -146,22 +155,33 @@ trait HasReassignmentCommandsHelpers {
       userId = userId,
     )
 
-    val updates = participant.ledger_api.updates.flat(
+    val updates = participant.ledger_api.updates.reassignments(
       partyIds = Set(submittingParty),
+      filterTemplates = Seq.empty,
       completeAfter = 1,
       beginOffsetExclusive = ledgerEnd,
+      verbose = true,
     )
 
     val assignmentCompletion = completions.headOption.value
     updates.headOption.value match {
-      case w: UpdateService.AssignedWrapper => (w, assignmentCompletion)
+      case w: UpdateService.AssignedWrapper =>
+        w.synchronizerId shouldBe target.toProtoPrimitive
+        w.source shouldBe source.toProtoPrimitive
+        w.target shouldBe target.toProtoPrimitive
+        w.reassignment.synchronizerId shouldBe target.toProtoPrimitive
+        w.events.foreach { unassignedEvent =>
+          unassignedEvent.source shouldBe source.toProtoPrimitive
+          unassignedEvent.target shouldBe target.toProtoPrimitive
+        }
+        (w, assignmentCompletion)
       case other =>
         throw new RuntimeException(s"Expected an assignment event but got $other")
     }
   }
 
   protected def failingAssignment(
-      unassignId: String,
+      reassignmentId: String,
       source: SynchronizerId,
       target: SynchronizerId,
       submittingParty: PartyId,
@@ -173,7 +193,7 @@ trait HasReassignmentCommandsHelpers {
       cmd = getAssignmentCmd(
         source = source,
         target = target,
-        unassignmentId = unassignId,
+        reassignmentId = reassignmentId,
       ),
       userId = userId,
       workflowId = Some(workflowId),
@@ -224,18 +244,18 @@ trait HasReassignmentCommandsHelpers {
   protected def getAssignmentCmd(
       source: SynchronizerId,
       target: SynchronizerId,
-      unassignmentId: String,
+      reassignmentId: String,
   ): proto.reassignment_commands.ReassignmentCommand.Command.AssignCommand =
     proto.reassignment_commands.ReassignmentCommand.Command.AssignCommand(
       proto.reassignment_commands.AssignCommand(
-        unassignId = unassignmentId,
+        reassignmentId = reassignmentId,
         source = source.toProtoPrimitive,
         target = target.toProtoPrimitive,
       )
     )
 
-  protected def getReassignmentCommand(
-      cmd: proto.reassignment_commands.ReassignmentCommand.Command,
+  protected def getReassignmentCommands(
+      cmds: Seq[proto.reassignment_commands.ReassignmentCommand.Command],
       userId: LedgerUserId = HasCommandRunnersHelpers.userId,
       submissionId: Option[LedgerSubmissionId] = HasCommandRunnersHelpers.submissionId,
       commandId: LedgerCommandId = HasCommandRunnersHelpers.commandId,
@@ -247,13 +267,23 @@ trait HasReassignmentCommandsHelpers {
       userId = userId,
       commandId = commandId,
       submitter = submittingParty.toLf,
-      commands = Seq(proto.reassignment_commands.ReassignmentCommand(cmd)),
+      commands = cmds.map(proto.reassignment_commands.ReassignmentCommand(_)),
       submissionId = submissionId.getOrElse(""),
     )
 
-  protected def getReassignmentId(out: UpdateService.UnassignedWrapper): ReassignmentId =
-    ReassignmentId(
-      sourceSynchronizer = Source(SynchronizerId.tryFromString(out.source)),
-      unassignmentTs = CantonTimestamp.assertFromLong(out.unassignId.toLong),
-    )
+  protected def getReassignmentCommand(
+      cmd: proto.reassignment_commands.ReassignmentCommand.Command,
+      userId: LedgerUserId = HasCommandRunnersHelpers.userId,
+      submissionId: Option[LedgerSubmissionId] = HasCommandRunnersHelpers.submissionId,
+      commandId: LedgerCommandId = HasCommandRunnersHelpers.commandId,
+      workflowId: Option[LfWorkflowId] = None,
+      submittingParty: PartyId,
+  ): proto.reassignment_commands.ReassignmentCommands = getReassignmentCommands(
+    Seq(cmd),
+    userId,
+    submissionId,
+    commandId,
+    workflowId,
+    submittingParty,
+  )
 }
