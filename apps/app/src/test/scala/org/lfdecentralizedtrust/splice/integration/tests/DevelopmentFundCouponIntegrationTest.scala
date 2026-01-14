@@ -43,17 +43,19 @@ class DevelopmentFundCouponIntegrationTest
       )
 
   "UnclaimedDevelopmentFundCoupons are merged" in { implicit env =>
-    actAndCheck(
+    val (_, couponAmount) = actAndCheck(
       "Advance 5 rounds", {
         Range(0, 5).foreach(_ => advanceRoundsByOneTickViaAutomation())
       },
     )(
       "5 UnclaimedDevelopmentFundCoupons are created, and the trigger does not merge the coupons, " +
         "as it only acts when the number of coupons is ≥ 2 × threshold",
-      _ =>
-        sv1Backend.participantClient.ledger_api_extensions.acs
+      _ => {
+        val coupons = sv1Backend.participantClient.ledger_api_extensions.acs
           .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
-          .size shouldBe 5,
+        coupons.size shouldBe 5
+        coupons.head.data.amount
+      },
     )
 
     actAndCheck(
@@ -65,7 +67,32 @@ class DevelopmentFundCouponIntegrationTest
       _ => {
         sv1Backend.participantClient.ledger_api_extensions.acs
           .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
-          .size shouldBe threshold + 1
+          .map(_.data.amount)
+          .sorted shouldBe Seq(
+          couponAmount,
+          couponAmount,
+          couponAmount,
+          couponAmount.multiply(new java.math.BigDecimal(3)),
+        )
+      },
+    )
+
+    actAndCheck(
+      "Advance two rounds to create two more UnclaimedDevelopmentFundCoupon, " +
+        "reaching 2 × threshold coupons and triggering a second merge",
+      Range(0, 2).foreach(_ => advanceRoundsByOneTickViaAutomation()),
+    )(
+      "The MergeUnclaimedDevelopmentFundCouponsTrigger merges the `threshold` smallest coupons",
+      _ => {
+        sv1Backend.participantClient.ledger_api_extensions.acs
+          .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
+          .map(_.data.amount)
+          .sorted shouldBe Seq(
+          couponAmount,
+          couponAmount,
+          couponAmount.multiply(new java.math.BigDecimal(3)),
+          couponAmount.multiply(new java.math.BigDecimal(3)),
+        )
       },
     )
   }
