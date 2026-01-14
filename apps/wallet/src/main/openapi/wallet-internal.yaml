@@ -913,8 +913,8 @@ paths:
       operationId: "acceptMintingDelegationProposal"
       description: |
         As the delegate, accept a MintingDelegationProposal, creating a MintingDelegation contract.
-        Any existing MintingDelegation contracts with the same beneficiary will
-        be archived to keep only one active contract per beneficiary.
+        If an existing MintingDelegation contract exists with the same beneficiary it will
+        be archived while accepting this proposal.
       parameters:
         - in: path
           name: contract_id

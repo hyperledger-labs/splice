@@ -617,7 +617,7 @@ abstract class WalletAppReference(
 
   @Help.Summary("Accept MintingDelegationProposal")
   @Help.Description(
-    "Accept a MintingDelegationProposal, creating a MintingDelegation contract and archiving any existing contracts."
+    "Accept a MintingDelegationProposal, creating a MintingDelegation contract and archiving an existing contract."
   )
   def acceptMintingDelegationProposal(contractId: String): String =
     consoleEnvironment.run {
