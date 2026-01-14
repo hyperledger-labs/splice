@@ -46,7 +46,7 @@ const istio = configureIstio(
 if (useGKEL7Gateway) {
   configureGKEL7Gateway({
     ingressNs: network.ingressNs,
-    ingressIp,
+    ingressAddress: network.ingressIp,
     gatewayName: 'cn-gke-l7-gateway',
     backendServiceName: istio.httpServiceName,
     serviceTarget: { port: 443 },

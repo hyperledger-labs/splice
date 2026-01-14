@@ -11,7 +11,9 @@ const gcpGatewayClass = 'gke-l7-regional-external-managed';
 interface L7GatewayConfig {
   gatewayName: string;
   ingressNs: ExactNamespace;
-  ingressIp: pulumi.Output<string>;
+  // the pre-reserved GCP ingress IP. The Gateway will reference this
+  // as a NamedAddress
+  ingressAddress: gcp.compute.Address;
   // should be the name of the Service (k8s resource) that is the backend target;
   // see backendTargetRef for mapping from gateway name
   backendServiceName: pulumi.Input<string>;
@@ -89,7 +91,9 @@ function createL7Gateway(
               ]
             : []),
         ],
-        addresses: [{ type: 'IPAddress', value: config.ingressIp }],
+        // per gateway Error GWCER106: unsupported address type "IPAddress",
+        // only "NamedAddress" is supported
+        addresses: [{ type: 'NamedAddress', value: config.ingressAddress.name }],
       },
     },
     opts
@@ -169,8 +173,9 @@ function createHealthCheckPolicy(
           config: {
             type: 'HTTP',
             httpHealthCheck: {
-              port: config.serviceTarget.port,
-              requestPath: '/healthz',
+              // TODO (#2723) confirm Istio's default status port answers readyz
+              port: 15021,
+              requestPath: '/readyz',
             },
           },
         },
