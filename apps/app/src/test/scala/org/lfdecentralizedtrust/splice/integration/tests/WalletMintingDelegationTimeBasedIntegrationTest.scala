@@ -57,93 +57,97 @@ class WalletMintingDelegationTimeBasedIntegrationTest
 
         val beneficiaryParty = onboardExternalParty(aliceValidatorBackend, Some("beneficiary"))
 
+        val expiresAt = env.environment.clock.now.plus(Duration.ofDays(30)).toInstant
+
         // Use a separate party to test that its proposals/delegation remain
         // unaffected when modifying beneficiaryParty's proposals/delegations
-        val beneficiary2Party =
-          onboardExternalParty(aliceValidatorBackend, Some("beneficiary2"))
-        createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiary2Party)
+        clue("Init setup: create a delegation + proposal for beneficiary2Party") {
+          val beneficiary2Party =
+            onboardExternalParty(aliceValidatorBackend, Some("beneficiary2"))
+          createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiary2Party)
 
-        // Verify initial state
-        aliceValidatorWalletClient.listMintingDelegationProposals().proposals shouldBe empty
-        aliceValidatorWalletClient.listMintingDelegations().delegations shouldBe empty
+          // Verify initial state
+          aliceValidatorWalletClient.listMintingDelegationProposals().proposals shouldBe empty
+          aliceValidatorWalletClient.listMintingDelegations().delegations shouldBe empty
 
-        val expiresAt = env.environment.clock.now.plus(Duration.ofDays(30)).toInstant
-        // Init setup: create a delegation + proposal for beneficiary2Party
-        val (_, proposal0Cid) = actAndCheck(
-          "Create minting delegation proposal for beneficiary2",
-          createMintingDelegationProposal(beneficiary2Party, validatorParty, expiresAt),
-        )(
-          "Proposal is visible to validator",
-          _ => {
-            val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-            proposals.proposals should have size 1
-            proposals.proposals.head.contract.contractId
-          },
-        )
+          val (_, proposal0Cid) = actAndCheck(
+            "Create minting delegation proposal for beneficiary2",
+            createMintingDelegationProposal(beneficiary2Party, validatorParty, expiresAt),
+          )(
+            "Proposal is visible to validator",
+            _ => {
+              val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
+              proposals.proposals should have size 1
+              proposals.proposals.head.contract.contractId
+            },
+          )
 
-        actAndCheck(
-          "Accept proposal and create delegation for beneficiary2",
-          aliceValidatorWalletClient.acceptMintingDelegationProposal(proposal0Cid),
-        )(
-          "Delegation is created",
-          _ => {
-            val delegations = aliceValidatorWalletClient.listMintingDelegations()
-            delegations.delegations should have size 1
-          },
-        )
+          actAndCheck(
+            "Accept proposal and create delegation for beneficiary2",
+            aliceValidatorWalletClient.acceptMintingDelegationProposal(proposal0Cid),
+          )(
+            "Delegation is created",
+            _ => {
+              val delegations = aliceValidatorWalletClient.listMintingDelegations()
+              delegations.delegations should have size 1
+            },
+          )
 
-        actAndCheck(
-          "Create another proposal for beneficiary2",
-          createMintingDelegationProposal(beneficiary2Party, validatorParty, expiresAt),
-        )(
-          "Proposal is visible to validator",
-          _ => {
-            val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-            proposals.proposals should have size 1
-          },
-        )
+          actAndCheck(
+            "Create another proposal for beneficiary2",
+            createMintingDelegationProposal(beneficiary2Party, validatorParty, expiresAt),
+          )(
+            "Proposal is visible to validator",
+            _ => {
+              val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
+              proposals.proposals should have size 1
+            },
+          )
+        }
 
-        // Test beneficiaryOnboarded status: create proposal before onboarding beneficiary
-        val (_, proposalBeforeOnboardingCid) = actAndCheck(
-          "Create minting delegation proposal before beneficiary is onboarded",
-          createMintingDelegationProposal(beneficiaryParty, validatorParty, expiresAt),
-        )(
-          "Proposal is visible with beneficiaryOnboarded = false",
-          _ => {
-            val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-            proposals.proposals should have size 2
-            val beneficiaryProposal = proposals.proposals
-              .find(
-                _.contract.payload.hcursor
-                  .downField("delegation")
-                  .get[String]("beneficiary")
-                  .contains(beneficiaryParty.party.toProtoPrimitive)
-              )
-              .value
-            beneficiaryProposal.beneficiaryOnboarded shouldBe false
-            beneficiaryProposal.contract.contractId
-          },
-        )
+        // Test 1
+        clue("Test beneficiaryOnboarded status") {
+          val (_, proposalBeforeOnboardingCid) = actAndCheck(
+            "Create minting delegation proposal before beneficiary is onboarded",
+            createMintingDelegationProposal(beneficiaryParty, validatorParty, expiresAt),
+          )(
+            "Proposal is visible with beneficiaryOnboarded = false",
+            _ => {
+              val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
+              proposals.proposals should have size 2
+              val beneficiaryProposal = proposals.proposals
+                .find(
+                  _.contract.payload.hcursor
+                    .downField("delegation")
+                    .get[String]("beneficiary")
+                    .contains(beneficiaryParty.party.toProtoPrimitive)
+                )
+                .value
+              beneficiaryProposal.beneficiaryOnboarded shouldBe false
+              beneficiaryProposal.contract.contractId
+            },
+          )
 
-        // Accept the proposal before onboarding and verify beneficiaryOnboarded = false in delegations
-        actAndCheck(
-          "Accept proposal before beneficiary is onboarded",
-          aliceValidatorWalletClient.acceptMintingDelegationProposal(proposalBeforeOnboardingCid),
-        )(
-          "Delegation is created with beneficiaryOnboarded = false",
-          _ => {
-            val delegations = aliceValidatorWalletClient.listMintingDelegations()
-            delegations.delegations should have size 2
-            val beneficiaryDelegation = delegations.delegations
-              .find(
-                _.contract.payload.hcursor
-                  .get[String]("beneficiary")
-                  .contains(beneficiaryParty.party.toProtoPrimitive)
-              )
-              .value
-            beneficiaryDelegation.beneficiaryOnboarded shouldBe false
-          },
-        )
+          // Accept the proposal before onboarding and verify beneficiaryOnboarded = false in delegations
+          actAndCheck(
+            "Accept proposal before beneficiary is onboarded",
+            aliceValidatorWalletClient.acceptMintingDelegationProposal(proposalBeforeOnboardingCid),
+          )(
+            "Delegation is visible with beneficiaryOnboarded = false",
+            _ => {
+              val delegations = aliceValidatorWalletClient.listMintingDelegations()
+              delegations.delegations should have size 2
+              val beneficiaryDelegation = delegations.delegations
+                .find(
+                  _.contract.payload.hcursor
+                    .get[String]("beneficiary")
+                    .contains(beneficiaryParty.party.toProtoPrimitive)
+                )
+                .value
+              beneficiaryDelegation.beneficiaryOnboarded shouldBe false
+            },
+          )
+        }
 
         // Onboard beneficiary
         createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiaryParty)
@@ -160,7 +164,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
           beneficiaryDelegation.beneficiaryOnboarded shouldBe true
         }
 
-        // Test 1: Creates a proposal and test reject
+        // Test 2: Creates a proposal and test reject
         clue("Test reject minting delegation proposal") {
           val (_, proposal1Cid) = actAndCheck(
             "Create minting delegation proposal",
@@ -195,7 +199,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
           )
         }
 
-        // Test 2: Create a second proposal and test accept
+        // Test 3: Create a second proposal and test accept
         clue("Test accept minting delegation proposal") {
           val (_, proposal2Cid) = actAndCheck(
             "Create minting delegation proposal",
@@ -234,7 +238,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
           )
         }
 
-        // Test 3: Create a new proposal and confirm that accepting it archives existing delegation
+        // Test 4: Create a new proposal and confirm that accepting it archives existing delegation
         clue("Test accepting new proposal archives existing delegation") {
           val (_, proposal3Cid) = actAndCheck(
             "Create minting delegation proposal",
