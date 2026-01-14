@@ -41,6 +41,7 @@ import org.lfdecentralizedtrust.splice.util.{
   SpliceUtil,
 }
 import org.lfdecentralizedtrust.splice.wallet.store.ExternalPartyWalletStore
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -50,7 +51,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 // Although this trigger is part of external-party automation
-// The work performed here is done as the validatorParty (ie as the delegate of MintingDelegation)
+// The work performed here is done as the delegate of the MintingDelegation contract
 class MintingDelegationCollectRewardsTrigger(
     override protected val context: TriggerContext,
     store: ExternalPartyWalletStore,
@@ -62,7 +63,6 @@ class MintingDelegationCollectRewardsTrigger(
     materializer: Materializer,
 ) extends PollingTrigger {
 
-  private def validatorParty = store.key.validatorParty
   private def externalParty = store.key.externalParty
 
   override protected def extraMetricLabels = Seq("party" -> externalParty.toString)
@@ -98,28 +98,36 @@ class MintingDelegationCollectRewardsTrigger(
       assignedDelegation: AssignedContract[MintingDelegation.ContractId, MintingDelegation]
   )(implicit tc: TraceContext): Future[Boolean] = {
     val delegation = assignedDelegation.contract
-    val now = context.clock.now.toInstant
-    if (delegation.payload.expiresAt.isBefore(now)) {
-      logger.info(
-        s"Skipping reward collection for expired minting delegation (expired at ${delegation.payload.expiresAt})"
-      )
-      Future.successful(false)
-    } else {
-      for {
-        (openRound, openIssuingRounds, issuingRoundsMap, amuletRules) <- fetchDataFromScan()
-        couponsData <- fetchCouponsData(issuingRoundsMap)
-        amulets <- store.listAmulets()
-        validatorRightOpt <- store.lookupValidatorRight()
-        result <- performMintIfNeeded(
-          delegation,
-          openRound,
-          openIssuingRounds,
-          amuletRules,
-          couponsData,
-          amulets,
-          validatorRightOpt,
-        )
-      } yield result
+    val delegateParty = PartyId.tryFromProtoPrimitive(delegation.payload.delegate)
+
+    // Confirm that delegate is an active local party, else ignore
+    spliceLedgerConnection.getParty(delegateParty).flatMap {
+      case Some(partyDetails) if partyDetails.isLocal =>
+        val now = context.clock.now.toInstant
+        if (delegation.payload.expiresAt.isBefore(now)) {
+          logger.info(
+            s"Skipping reward collection for expired minting delegation (expired at ${delegation.payload.expiresAt})"
+          )
+          Future.successful(false)
+        } else {
+          for {
+            (openRound, openIssuingRounds, issuingRoundsMap, amuletRules) <- fetchDataFromScan()
+            couponsData <- fetchCouponsData(issuingRoundsMap)
+            amulets <- store.listAmulets()
+            validatorRightOpt <- store.lookupValidatorRight()
+            result <- performMintIfNeeded(
+              delegation,
+              openRound,
+              openIssuingRounds,
+              amuletRules,
+              couponsData,
+              amulets,
+              validatorRightOpt,
+            )
+          } yield result
+        }
+      case _ =>
+        Future.successful(false)
     }
   }
 
@@ -178,10 +186,12 @@ class MintingDelegationCollectRewardsTrigger(
         openRound,
       ) addAll openIssuingRounds
 
+      val delegateParty = PartyId.tryFromProtoPrimitive(delegation.payload.delegate)
+
       spliceLedgerConnection
         .submit(
-          actAs = Seq(validatorParty),
-          readAs = Seq(validatorParty, externalParty),
+          actAs = Seq(delegateParty),
+          readAs = Seq(delegateParty, externalParty),
           delegation.contractId.exerciseMintingDelegation_Mint(inputs.asJava, paymentContext),
         )
         .withDisclosedContracts(contractsToDisclose)

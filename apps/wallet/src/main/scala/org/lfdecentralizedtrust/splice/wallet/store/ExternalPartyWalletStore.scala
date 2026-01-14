@@ -151,7 +151,6 @@ object ExternalPartyWalletStore {
   ] = {
     val externalParty = key.externalParty.toProtoPrimitive
     val dso = key.dsoParty.toProtoPrimitive
-    val validator = key.validatorParty.toProtoPrimitive
 
     SimpleContractFilter(
       key.externalParty,
@@ -182,7 +181,6 @@ object ExternalPartyWalletStore {
         }(ExternalPartyWalletAcsStoreRowData(_)),
         mkFilter(mintingDelegationCodegen.MintingDelegation.COMPANION) { co =>
           co.payload.dso == dso &&
-          co.payload.delegate == validator &&
           co.payload.beneficiary == externalParty
         }(ExternalPartyWalletAcsStoreRowData(_)),
         mkFilter(validatorCodegen.ValidatorLivenessActivityRecord.COMPANION) { co =>
