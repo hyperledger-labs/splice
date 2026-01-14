@@ -76,8 +76,6 @@ import scala.collection.mutable
 import scala.reflect.ClassTag
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
-import java.lang
-import java.time.Instant
 
 final class DbMultiDomainAcsStore[TXE](
     storage: DbStorage,
@@ -1432,69 +1430,54 @@ final class DbMultiDomainAcsStore[TXE](
     )(implicit tc: TraceContext) = {
       val summary = MutableIngestionSummary.empty
 
-      val workTodo: Seq[OperationToDo] = trees.batch
-        .map(tree =>
-          Trees
-            .foldTree(
-              tree.tree,
-              VectorMap.empty[String, OperationToDo],
-            )(
-              onCreate = (st, ev, _) => {
-                if (contractFilter.contains(ev)) {
-                  contractFilter.ensureStakeholderOf(ev)
-                  st + (ev.getContractId -> Insert(
-                    ev,
-                    tree.synchronizerId,
-                  ))
-                } else {
-                  summary.numFilteredCreatedEvents += 1
-                  st
-                }
-              },
-              onExercise = (st, ev, _) => {
-                if (ev.isConsuming && contractFilter.shouldArchive(ev)) {
-                  st + (ev.getContractId -> Delete(ev))
-                } else {
-                  st
-                }
-              },
-            )
-        )
-        // optimization: a delete on a contract cancels-out with the corresponding insert
-        .foldLeft(VectorMap.empty[String, OperationToDo]) { case (acc, treeOps) =>
-          val (toRemove, toAdd) = treeOps.partition {
-            case (contractId, Delete(_)) if acc.contains(contractId) => true
-            case _ => false
-          }
-          (acc -- toRemove.keys) ++ toAdd
-        }
-        .values
-        .toSeq
-
-      val txLogEntries: Seq[(Instant, (TXE, lang.Long, SynchronizerId))] = trees.batch
-        // do not parse events imported from acs
-        .filter(tree => !tree.tree.getWorkflowId.startsWith(IMPORT_ACS_WORKFLOW_ID_PREFIX))
-        .flatMap(tree =>
-          txLogConfig.parser
-            .parse(tree.tree, tree.synchronizerId, logger)
-            .map(tree.tree.getRecordTime -> (_, tree.tree.getOffset, tree.synchronizerId))
-        )
-      val synchronizerIdsToMinRecordTime =
-        trees.batch.groupBy(_.synchronizerId).map { case (synchronizerId, batch) =>
-          synchronizerId -> batch.map(_.tree.getRecordTime).minimumBy(_.toEpochMilli)
-        }
-
       val allDbOps = for {
-        insertContractIdsWithIncompleteReassignments <- checkIncompleteReassignments(
-          workTodo.collect { case insert: Insert =>
-            insert.evt.getContractId
-          }
-        )
+//        insertContractIdsWithIncompleteReassignments <- checkIncompleteReassignments(
+//          workTodo.collect { case insert: Insert =>
+//            insert.evt.getContractId
+//          }
+//        )
+        _ <- DBIO.successful(())
         beforeAcs = System.nanoTime()
-        insertsToDo = workTodo.collect {
-          case insert: Insert
-              if !insertContractIdsWithIncompleteReassignments.contains(insert.evt.getContractId) =>
-            insert
+        workTodo = trees.batch
+          .map(tree =>
+            Trees
+              .foldTree(
+                tree.tree,
+                VectorMap.empty[String, OperationToDo],
+              )(
+                onCreate = (st, ev, _) => {
+                  if (contractFilter.contains(ev)) {
+                    contractFilter.ensureStakeholderOf(ev)
+                    st + (ev.getContractId -> Insert(
+                      ev,
+                      tree.synchronizerId,
+                    ))
+                  } else {
+                    summary.numFilteredCreatedEvents += 1
+                    st
+                  }
+                },
+                onExercise = (st, ev, _) => {
+                  if (ev.isConsuming && contractFilter.shouldArchive(ev)) {
+                    st + (ev.getContractId -> Delete(ev))
+                  } else {
+                    st
+                  }
+                },
+              )
+          )
+          // optimization: a delete on a contract cancels-out with the corresponding insert
+          .foldLeft(VectorMap.empty[String, OperationToDo]) { case (acc, treeOps) =>
+            val (toRemove, toAdd) = treeOps.partition {
+              case (contractId, Delete(_)) if acc.contains(contractId) => true
+              case _ => false
+            }
+            (acc -- toRemove.keys) ++ toAdd
+          }
+          .values
+          .toSeq
+        insertsToDo = workTodo.collect { case insert: Insert =>
+          insert
         }
         _ <- NonEmptyList.fromList(insertsToDo.toList) match {
           case Some(inserts) =>
@@ -1518,6 +1501,14 @@ final class DbMultiDomainAcsStore[TXE](
         _ <- doDeleteContracts(toDelete, summary)
         afterDeletes = System.nanoTime()
         // TODO (#3048): batch this
+        txLogEntries = trees.batch
+          // do not parse events imported from acs
+          .filter(tree => !tree.tree.getWorkflowId.startsWith(IMPORT_ACS_WORKFLOW_ID_PREFIX))
+          .flatMap(tree =>
+            txLogConfig.parser
+              .parse(tree.tree, tree.synchronizerId, logger)
+              .map(tree.tree.getRecordTime -> (_, tree.tree.getOffset, tree.synchronizerId))
+          )
         _ <- DBIO.seq(txLogEntries.map { case (recordTime, (txe, offset, synchronizerId)) =>
           doIngestTxLogInsert(
             domainMigrationId,
@@ -1529,6 +1520,10 @@ final class DbMultiDomainAcsStore[TXE](
           )
         }*)
         afterTxlog = System.nanoTime()
+        synchronizerIdsToMinRecordTime =
+          trees.batch.groupBy(_.synchronizerId).map { case (synchronizerId, batch) =>
+            synchronizerId -> batch.map(_.tree.getRecordTime).minimumBy(_.toEpochMilli)
+          }
         _ <- DBIO.seq(synchronizerIdsToMinRecordTime.toSeq.map {
           case (synchronizerId, recordTime) =>
             doInitializeFirstIngestedUpdate(
@@ -1550,7 +1545,9 @@ final class DbMultiDomainAcsStore[TXE](
         txLogTotal += afterTxlog - afterDeletes
         txLogCount += txLogEntries.size
         if (txLogCount > 0 && acsCount > 0)
-          logger.info(s"Averages: txlog: ${txLogTotal / txLogCount} ns. ACS: ${acsTotal / acsCount} ns")
+          logger.info(
+            s"Averages: txlog: ${txLogTotal / txLogCount} ns. ACS: ${acsTotal / acsCount} ns"
+          )
         summary
       }
 
