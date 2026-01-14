@@ -1310,8 +1310,7 @@ class HttpWalletHandler(
   }
 
   // Accepts a MintingDelegationProposal, atomically archiving (one) existing delegation from the
-  // same beneficiary if present. Any additional delegations from the same beneficiary are rejected
-  // as well, as there should be only one active delegation per beneficiary.
+  // same beneficiary if present.
   override def acceptMintingDelegationProposal(
       respond: WalletResource.AcceptMintingDelegationProposalResponse.type
   )(contractId: String)(
