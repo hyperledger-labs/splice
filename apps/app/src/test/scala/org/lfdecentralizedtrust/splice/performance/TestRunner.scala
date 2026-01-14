@@ -8,6 +8,7 @@ import org.lfdecentralizedtrust.splice.performance.tests.{
   ScanStoreIngestionPerformanceTest,
   StoreIngestionPerformanceTest,
   SvDsoStoreIngestionPerformanceTest,
+  UpdateHistoryIngestionPerformanceTest,
 }
 
 import java.nio.file.Path
@@ -31,7 +32,15 @@ class TestRunner(testNames: String, configPath: Path, updateHistoryDumpPath: Pat
         SvDsoStoreIngestionPerformanceTest.tryCreate(updateHistoryDumpPath, config, loggerFactory)
       ),
       "DbScanStore" -> (() =>
-        ScanStoreIngestionPerformanceTest.tryCreate(updateHistoryDumpPath, config, loggerFactory)
+        ScanStoreIngestionPerformanceTest
+          .tryCreate(updateHistoryDumpPath, config, loggerFactory)
+      ),
+      "UpdateHistory" -> (() =>
+        UpdateHistoryIngestionPerformanceTest.tryCreate(
+          updateHistoryDumpPath,
+          config,
+          loggerFactory,
+        )
       ),
     )
 

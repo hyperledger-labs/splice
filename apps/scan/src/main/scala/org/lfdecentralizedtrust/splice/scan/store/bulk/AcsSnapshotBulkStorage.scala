@@ -27,18 +27,6 @@ import scala.concurrent.duration.FiniteDuration
 
 import Position.*
 
-case class BulkStorageConfig(
-    dbReadChunkSize: Int,
-    maxFileSize: Long,
-)
-
-object BulkStorageConfigs {
-  val bulkStorageConfigV1 = BulkStorageConfig(
-    1000,
-    64L * 1024 * 1024,
-  )
-}
-
 object Position {
   sealed trait Position
 
@@ -73,7 +61,7 @@ class AcsSnapshotBulkStorage(
       )
     } yield {
       val encoded = snapshot.createdEventsInPage.map(event =>
-        CompactJsonScanHttpEncodings.javaToHttpCreatedEvent(event.eventId, event.event)
+        CompactJsonScanHttpEncodings().javaToHttpCreatedEvent(event.eventId, event.event)
       )
       val contractsStr = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n") + "\n"
       val contractsBytes = ByteString(contractsStr.getBytes(StandardCharsets.UTF_8))

@@ -62,13 +62,13 @@ describe('Inflight Vote Requests', () => {
           sectionTitle="Inflight Vote Requests"
           data={inflightVoteRequests}
           noDataMessage="No Inflight Vote Requests available"
-          uniqueId="inflight-vote-request"
+          uniqueId="proposals-request"
           showStatus
         />
       </MemoryRouter>
     );
 
-    expect(screen.getByTestId('inflight-vote-request-section')).toBeDefined();
+    expect(screen.getByTestId('proposals-request-section')).toBeDefined();
     expect(await screen.findByText('Inflight Vote Requests')).toBeDefined();
   });
 
@@ -79,18 +79,18 @@ describe('Inflight Vote Requests', () => {
           sectionTitle="Inflight Vote Requests"
           data={inflightVoteRequests}
           noDataMessage="No Inflight Vote Requests available"
-          uniqueId="inflight-vote-request"
+          uniqueId="proposals-request"
           showStatus
         />
       </MemoryRouter>
     );
 
-    const rows = screen.getAllByTestId('inflight-vote-request-row');
+    const rows = screen.getAllByTestId('proposals-request-row');
     expect(rows.length).toBe(inflightVoteRequests.length);
   });
 
   test('should render inflight vote request details', () => {
-    const uniqueId = 'inflight-vote-request';
+    const uniqueId = 'proposals-request';
     const data = {
       actionName: 'Feature Application',
       votingThresholdDeadline: '2025-09-25 11:00',
@@ -141,7 +141,7 @@ describe('Inflight Vote Requests', () => {
   });
 
   test('should render Accepted inflight vote request', () => {
-    const uniqueId = 'inflight-vote-request';
+    const uniqueId = 'proposals-request';
     const data = {
       actionName: 'Feature Application',
       votingThresholdDeadline: '2025-09-25 11:00',
@@ -172,7 +172,7 @@ describe('Inflight Vote Requests', () => {
   });
 
   test('should render Rejected inflight vote request', () => {
-    const uniqueId = 'inflight-vote-request';
+    const uniqueId = 'proposals-request';
     const data = {
       actionName: 'Feature Application',
       votingThresholdDeadline: '2025-09-25 11:00',
@@ -203,7 +203,7 @@ describe('Inflight Vote Requests', () => {
   });
 
   test('should render info when no data is available', async () => {
-    const uniqueId = 'inflight-vote-request';
+    const uniqueId = 'proposals-request';
 
     render(
       <MemoryRouter>
