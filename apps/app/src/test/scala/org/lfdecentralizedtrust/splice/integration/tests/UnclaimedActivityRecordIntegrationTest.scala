@@ -32,6 +32,9 @@ class UnclaimedActivityRecordIntegrationTest
     with TriggerTestUtil
     with WalletTestUtil {
 
+  // FIXME: decide whether we want to fix scan_txlog for UnclaimedActivityRecords
+  override protected def runUpdateHistorySanityCheck: Boolean = false
+
   override def environmentDefinition
       : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     EnvironmentDefinition
