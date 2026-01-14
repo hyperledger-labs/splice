@@ -80,11 +80,11 @@ object UpdateHistoryIngestionPerformanceTest {
     )
 
     configReader
-      .from(config.getValue("performance.tests.UpdateHistoryIngestionPerformanceTest"))
+      .from(config.getValue("performance.tests.UpdateHistory"))
       .fold(
         err =>
           throw new IllegalArgumentException(
-            s"Failed to read SvDsoStoreIngestionPerformanceTest config: $err"
+            s"Failed to read UpdateHistory config: $err"
           ),
         cfg =>
           new UpdateHistoryIngestionPerformanceTest(
