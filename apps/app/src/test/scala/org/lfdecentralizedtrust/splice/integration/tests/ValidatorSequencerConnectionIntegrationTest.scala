@@ -74,7 +74,7 @@ class ValidatorSequencerConnectionIntegrationTest
       // some (like SV3) have an 'availableAfter' timestamp in the future.
       // Alice's DomainConnector correctly ignores these "not yet available" sequencers.
       // If Alice only finds 1 valid sequencer but is configured with a trust threshold of 2,
-      // she will crash on startup to prevent operating with insufficient trust.
+      // her validator app will crash on startup to prevent operating with insufficient trust.
       withClue("Wait for all 4 SV sequencers to be available and valid in Scan") {
         eventually(60.seconds, 1.second) {
           val allDomains = sv1ScanBackend.listDsoSequencers()
