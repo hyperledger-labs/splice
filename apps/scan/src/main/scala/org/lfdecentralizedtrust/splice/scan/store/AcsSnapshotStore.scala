@@ -68,6 +68,34 @@ class AcsSnapshotStore(
       .value
   }
 
+  def lookupSnapshotAfter(
+      migrationId: Long,
+      after: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Option[AcsSnapshot]] = {
+
+    val select =
+      sql"select snapshot_record_time, migration_id, history_id, first_row_id, last_row_id, unlocked_amulet_balance, locked_amulet_balance"
+    val orderLimit = sql"order by snapshot_record_time asc limit 1"
+    val sameMig = select ++ sql"""from acs_snapshot
+            where snapshot_record_time > $after
+              and migration_id = $migrationId
+              and history_id = $historyId""" ++ orderLimit
+    val largerMig = select ++ sql"""from acs_snapshot
+            where migration_id > $migrationId
+              and history_id = $historyId""" ++ orderLimit
+
+    val query =
+      sql"select * from (" ++ sameMig ++ sql" union all " ++ largerMig ++ sql") all_queries order by snapshot_record_time asc limit 1"
+
+    storage
+      .querySingle(
+        query.toActionBuilder.as[AcsSnapshot].headOption,
+        "lookupSnapshotAfter",
+      )
+      .value
+
+  }
+
   def insertNewSnapshot(
       lastSnapshot: Option[AcsSnapshot],
       migrationId: Long,

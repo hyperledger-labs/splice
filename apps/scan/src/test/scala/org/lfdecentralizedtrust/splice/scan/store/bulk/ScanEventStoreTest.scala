@@ -1,18 +1,19 @@
-package org.lfdecentralizedtrust.splice.scan.store
+package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
-import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, PageLimit, StoreTest, UpdateHistory}
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
-import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
-import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.scan.store.ScanEventStore
+import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
+import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, PageLimit, StoreTest, UpdateHistory}
 
 import scala.concurrent.Future
 

@@ -473,6 +473,9 @@ class ScanTimeBasedIntegrationTest
       snapshotAfter
     }
 
+    sv1ScanBackend.getDateOfFirstSnapshotAfter(CantonTimestamp.MinValue, 0) shouldBe snapshotBefore.value
+    sv1ScanBackend.getDateOfFirstSnapshotAfter(CantonTimestamp.tryFromInstant(snapshotBefore.value.toInstant), 0) shouldBe snapshotAfter
+
     val snapshotAfterData = sv1ScanBackend.getAcsSnapshotAt(
       CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant),
       migrationId,
@@ -484,6 +487,7 @@ class ScanTimeBasedIntegrationTest
       ),
       partyIds = Some(Vector(aliceUserParty)),
     )
+
 
     advanceTime(java.time.Duration.ofMinutes(10))
 
