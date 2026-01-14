@@ -317,6 +317,12 @@ class LogicalSynchronizerUpgradeIntegrationTest
                   newBackend.config.localSynchronizerNode.value.mediator.sequencerRequestAmplification,
                 )
                 .futureValue
+              eventually(2.minutes) {
+                newBackend.mediatorClient.topology.transactions
+                  .list(decentralizedSynchronizerId)
+                  .result
+                  .size shouldBe topologyTransactionsOnTheSync
+              }
             }
 
           }
