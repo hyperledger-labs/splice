@@ -18,6 +18,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SyncConnectionStalenessCheck
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.CollectionHasAsScala
@@ -33,12 +34,13 @@ import scala.jdk.OptionConverters.RichOptional
 class SvOffboardingSequencerTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
-    participantAdminConnection: ParticipantAdminConnection,
+    val participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
     override val tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[SequencerId] {
+) extends PollingParallelTaskExecutionTrigger[SequencerId]
+    with SyncConnectionStalenessCheck {
 
   // TODO(tech-debt): this is an almost exact copy of SvOffboardingMediatorTrigger => share the code to avoid missed bugfixes
   override protected def retrieveTasks()(implicit
@@ -102,8 +104,9 @@ class SvOffboardingSequencerTrigger(
         dsoRules.domain,
         AuthorizedState,
       )
+      notConnected <- isNotConnectedToSync()
     } yield {
-      !sequencerSyncState.mapping.active.contains(task)
+      !sequencerSyncState.mapping.active.contains(task) || notConnected
     }
   }
 

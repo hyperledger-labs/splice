@@ -130,6 +130,7 @@ class SvNamespaceMembershipTrigger(
 ) extends SvTopologyStatePollingAndAssignedTrigger[NamespaceDiff](
       baseContext,
       store,
+      Some(participantAdminConnection),
     ) {
 
   override val reconciler: DsoRulesTopologyStateReconciler[NamespaceDiff] =
