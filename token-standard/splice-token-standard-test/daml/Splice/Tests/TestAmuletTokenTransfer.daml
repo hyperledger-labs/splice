@@ -139,8 +139,8 @@ setupTwoStepTransfer = do
     transfer
     extraArgs = emptyExtraArgs
 
-  TextMap.size enrichedChoice.arg.extraArgs.context.values === 2
-  Map.size enrichedChoice.disclosures.disclosures === 3
+  TextMap.size enrichedChoice.arg.extraArgs.context.values === 1
+  Map.size enrichedChoice.disclosures.disclosures === 2
 
   -- Trigger a two-step transfer
   -- TODO(tech-debt): test here and for all steps that the expected ledger time bounds are present on the submissions
@@ -186,8 +186,8 @@ test_happy_path_self = script do
 
   debug enrichedChoice.arg
 
-  TextMap.size enrichedChoice.arg.extraArgs.context.values === 2
-  Map.size enrichedChoice.disclosures.disclosures === 3
+  TextMap.size enrichedChoice.arg.extraArgs.context.values === 1
+  Map.size enrichedChoice.disclosures.disclosures === 2
 
   WalletClient.checkBalance bob registry.instrumentId 50.0
 
@@ -222,8 +222,8 @@ test_happy_path_direct = script do
     transfer
     extraArgs = emptyExtraArgs
 
-  TextMap.size enrichedChoice.arg.extraArgs.context.values === 4
-  Map.size enrichedChoice.disclosures.disclosures === 5
+  TextMap.size enrichedChoice.arg.extraArgs.context.values === 3
+  Map.size enrichedChoice.disclosures.disclosures === 4
 
   WalletClient.checkBalance bob registry.instrumentId 50.0
 

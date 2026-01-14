@@ -34,7 +34,6 @@ module Splice.Testing.Registries.AmuletRegistry
 import DA.Action (unless, when)
 import DA.Date
 import DA.Foldable (forA_)
-import qualified DA.Traversable as Traversable
 import qualified DA.TextMap as TextMap
 import DA.Optional (isSome)
 import DA.List.Total
@@ -210,7 +209,7 @@ registryApi_getTransferFactory
   -> Script (EnrichedFactoryChoice TransferFactory TransferFactory_Transfer)
 registryApi_getTransferFactory registry arg = do
   (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
-  transferC <- getAmuletRulesTransferContext registry
+  transferC <- getExternalPartyConfigStateContext registry
   let isSelfTransfer = arg.transfer.sender == arg.transfer.receiver
   (optPreapproval, preapprovalC) <-
     if isSelfTransfer
@@ -231,7 +230,7 @@ registryApi_getAllocationFactory
   -> Script (EnrichedFactoryChoice AllocationFactory AllocationFactory_Allocate)
 registryApi_getAllocationFactory registry arg = do
   (extAmuletRulesCid, extAmuletRulesD) <- getExtAmuletRulesWithDisclosures registry
-  transferC <- getAmuletRulesTransferContext registry
+  transferC <- getExternalPartyConfigStateContext registry
   let fullContext = withExtraDisclosures extAmuletRulesD transferC
   pure EnrichedFactoryChoice with
     factoryCid = toInterfaceContractId @AllocationFactory extAmuletRulesCid
@@ -241,7 +240,7 @@ registryApi_getAllocationFactory registry arg = do
 registryApi_getAllocationTransferContext
   : AmuletRegistry -> ContractId Allocation -> Script OpenApiChoiceContext
 registryApi_getAllocationTransferContext registry allocCid = do
-  transferC <- getAmuletRulesTransferContext registry
+  transferC <- getExternalPartyConfigStateContext registry
   Some amuletAlloc <- queryContractId @AmuletAllocation registry.dso (coerceContractId allocCid)
   featuredAppRightC <- getFeaturedAppRightContext registry amuletAlloc.allocation.settlement.executor
   -- need to disclose the amulet contract, as the executor has no visibility into it
@@ -251,7 +250,7 @@ registryApi_getAllocationTransferContext registry allocCid = do
 registryApi_getTransferInstruction_AcceptContext
   : AmuletRegistry -> ContractId TransferInstruction -> Script OpenApiChoiceContext
 registryApi_getTransferInstruction_AcceptContext registry instrCid = do
-  transferC <- getAmuletRulesTransferContext registry
+  transferC <- getExternalPartyConfigStateContext registry
   Some amuletInstr <- queryContractId @AmuletTransferInstruction registry.dso (coerceContractId instrCid)
   -- need to disclose the amulet contract, as the receiver has no visibility into it
   lockedAmuletD <- queryDisclosure' @LockedAmulet registry.dso amuletInstr.lockedAmulet
@@ -277,8 +276,7 @@ registryApi_getTransferInstruction_abortTwoStepTransferContext registry instrCid
     then do
       -- disclose the amulet contract, as the caller might not be able to see it
       lockedAmuletD <- queryDisclosure' @LockedAmulet registry.dso amuletInstr.lockedAmulet
-      openRoundC <- getOpenRoundContext registry
-      pure $ withExtraDisclosures lockedAmuletD (openRoundC <> expireLockC)
+      pure $ withExtraDisclosures lockedAmuletD expireLockC
     else
       pure expireLockC
 
@@ -302,8 +300,7 @@ registryApi_getAllocation_abortTwoStepTransferContext registry instrCid = do
     then do
       -- disclose the amulet contract, as the caller might not be able to see it
       lockedAmuletD <- queryDisclosure' @LockedAmulet registry.dso amuletAlloc.lockedAmulet
-      openRoundC <- getOpenRoundContext registry
-      pure $ withExtraDisclosures lockedAmuletD (openRoundC <> expireLockC)
+      pure $ withExtraDisclosures lockedAmuletD expireLockC
     else
       pure expireLockC
 
@@ -349,47 +346,17 @@ getExtAmuletRulesWithDisclosures registry = do
   extAmuletRulesD <- queryDisclosure' registry.dso extAmuletRulesCid
   pure (extAmuletRulesCid, extAmuletRulesD)
 
-getAmuletRulesContext : AmuletRegistry -> Script OpenApiChoiceContext
-getAmuletRulesContext registry = do
-  (amuletRulesCid, _) <- getAmuletRules registry
-  amuletRulesD <- queryDisclosure' @AmuletRules registry.dso amuletRulesCid
-  pure OpenApiChoiceContext with
-    choiceContext = mkAmuletContext $ TextMap.fromList
-        [(amuletRulesContextKey, AV_ContractId $ coerceContractId amuletRulesCid)]
-    disclosures = amuletRulesD
-
-getOpenRoundContext : AmuletRegistry -> Script OpenApiChoiceContext
-getOpenRoundContext registry = do
-  (openRoundCid, _) <- getLatestOpenRound registry
-  openRoundD <- queryDisclosure' @OpenMiningRound registry.dso openRoundCid
-  pure OpenApiChoiceContext with
-    choiceContext = mkAmuletContext $ TextMap.fromList
-        [(openRoundContextKey, AV_ContractId $ coerceContractId openRoundCid)]
-    disclosures = openRoundD
-
-lookupExternalPartyConfigStateContext : AmuletRegistry -> Script (Optional OpenApiChoiceContext)
-lookupExternalPartyConfigStateContext registry = do
+getExternalPartyConfigStateContext : AmuletRegistry -> Script OpenApiChoiceContext
+getExternalPartyConfigStateContext registry = do
   extPartyConfigs <- query @ExternalPartyConfigState registry.dso
-  Traversable.forA (DA.List.Total.maximumOn (\(_, c) -> c.targetArchiveAfter) extPartyConfigs) $ \(extConfigId, _) -> do
-    extConfigDD <- queryDisclosure' @ExternalPartyConfigState registry.dso extConfigId
-    pure OpenApiChoiceContext with
-      choiceContext = mkAmuletContext $ TextMap.fromList
-          [(externalPartyConfigStateContextKey, AV_ContractId $ coerceContractId extConfigId)]
-      disclosures = extConfigDD
-
-getExternalPartyConfigStateWithFallbackContext : AmuletRegistry -> Script OpenApiChoiceContext
-getExternalPartyConfigStateWithFallbackContext registry = do
-  optContext <- lookupExternalPartyConfigStateContext registry
-  case optContext of
-    Some ctx -> pure ctx
-    None -> getOpenRoundContext registry
-
--- | Context required to call an amulet rules transfer choice.
-getAmuletRulesTransferContext : AmuletRegistry -> Script OpenApiChoiceContext
-getAmuletRulesTransferContext registry = do
-  rulesC <- getAmuletRulesContext registry
-  extConfigC <- getExternalPartyConfigStateWithFallbackContext registry
-  pure $ rulesC <> extConfigC
+  let (newestConfigCid, _) = case maximumOn (\(_, c) -> c.targetArchiveAfter) extPartyConfigs of
+        None -> error "No ExternalPartyConfigState found: have you initialized the Amulet registry?"
+        Some c -> c
+  extConfigDD <- queryDisclosure' @ExternalPartyConfigState registry.dso newestConfigCid
+  pure OpenApiChoiceContext with
+    choiceContext = mkAmuletContext $ TextMap.fromList
+        [(externalPartyConfigStateContextKey, AV_ContractId $ coerceContractId newestConfigCid)]
+    disclosures = extConfigDD
 
 lookupPreapprovalWithContext : AmuletRegistry -> Party -> Script (Optional TransferPreapproval, OpenApiChoiceContext)
 lookupPreapprovalWithContext registry receiver = do
