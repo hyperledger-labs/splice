@@ -171,7 +171,3 @@ Connection has failed validation since.*server-Digital-Asset-Eng-4-0.*Causes: Fi
 Connection has failed validation since.*server-Digital-Asset-Eng-4-0.*GrpcServiceUnavailable: UNAVAILABLE/io exception
 
 # Make sure to have a trailing newline
-
-# This can be dropped after 3.4
-Flyway upgrade recommended: PostgreSQL 17.* is newer than this version of Flyway and support has not been tested
-Expected Postgres version 13, 14, 15, or 16 but got higher version 17
