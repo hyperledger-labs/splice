@@ -94,6 +94,7 @@ class UpdateHistoryBulkStorageTest
           val allUpdatesFromS3 = objectKeys.flatMap(
             readUncompressAndDecode(bucketConnection, io.circe.parser.decode[UpdateHistoryItemV2])
           )
+          allUpdatesFromS3.length shouldBe allUpdates.length
           allUpdatesFromS3
             .map(
               CompactJsonScanHttpEncodingsWithFieldLabels().httpToLapiUpdate
@@ -124,11 +125,9 @@ class UpdateHistoryBulkStorageTest
         (
             afterO: Option[(Long, CantonTimestamp)],
             limit: Limit,
-            afterIsInclusive: Boolean,
         ) =>
           Future {
-            val afterIdx = afterO.map { case (_, t) => t.toEpochMilli }.getOrElse(0L)
-            val fromIdx = if (afterIsInclusive) afterIdx else afterIdx + 1
+            val fromIdx = afterO.map { case (_, t) => t.toEpochMilli }.getOrElse(0L) + 1
             val remaining = storeSize - fromIdx
             val numElems = math.min(limit.limit.toLong, remaining)
             Seq
