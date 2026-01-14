@@ -18,7 +18,6 @@ import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
 import org.lfdecentralizedtrust.splice.wallet.automation.{
   CollectRewardsAndMergeAmuletsTrigger,
   MintingDelegationCollectRewardsTrigger,
-  RejectInvalidMintingDelegationProposalTrigger,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
@@ -106,211 +105,187 @@ class WalletMintingDelegationTimeBasedIntegrationTest
         )
 
         // Test 1: Creates a proposal and test reject
-        val (_, proposal1Cid) = actAndCheck(
-          "Create minting delegation proposal",
-          createMintingDelegationProposal(beneficiaryParty, validatorParty, expiresAt),
-        )(
-          "Proposal is visible to validator",
-          _ => {
-            val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-            proposals.proposals should have size 2
-            proposals.proposals
-              .find(
-                _.payload.hcursor
-                  .downField("delegation")
-                  .get[String]("beneficiary")
-                  .contains(beneficiaryParty.party.toProtoPrimitive)
-              )
-              .value
-              .contractId
-          },
-        )
+        clue("Test reject minting delegation proposal") {
+          val (_, proposal1Cid) = actAndCheck(
+            "Create minting delegation proposal",
+            createMintingDelegationProposal(beneficiaryParty, validatorParty, expiresAt),
+          )(
+            "Proposal is visible to validator",
+            _ => {
+              val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
+              proposals.proposals should have size 2
+              proposals.proposals
+                .find(
+                  _.payload.hcursor
+                    .downField("delegation")
+                    .get[String]("beneficiary")
+                    .contains(beneficiaryParty.party.toProtoPrimitive)
+                )
+                .value
+                .contractId
+            },
+          )
 
-        actAndCheck(
-          "Validator rejects the proposal",
-          aliceValidatorWalletClient.rejectMintingDelegationProposal(proposal1Cid),
-        )(
-          "Rejected proposal disappears from list",
-          _ =>
-            aliceValidatorWalletClient.listMintingDelegationProposals().proposals should have size 1,
-        )
+          actAndCheck(
+            "Validator rejects the proposal",
+            aliceValidatorWalletClient.rejectMintingDelegationProposal(proposal1Cid),
+          )(
+            "Rejected proposal disappears from list",
+            _ =>
+              aliceValidatorWalletClient.listMintingDelegationProposals().proposals should have size 1,
+          )
+        }
 
         // Test 2: Create a second proposal and test accept
-        val (_, proposal2Cid) = actAndCheck(
-          "Create minting delegation proposal",
-          createMintingDelegationProposal(beneficiaryParty, validatorParty, expiresAt),
-        )(
-          "Proposal is visible to validator",
-          _ => {
-            val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-            proposals.proposals should have size 2
-            proposals.proposals
-              .find(
-                _.payload.hcursor
-                  .downField("delegation")
-                  .get[String]("beneficiary")
-                  .contains(beneficiaryParty.party.toProtoPrimitive)
-              )
-              .value
-              .contractId
-          },
-        )
+        clue("Test accept minting delegation proposal") {
+          val (_, proposal2Cid) = actAndCheck(
+            "Create minting delegation proposal",
+            createMintingDelegationProposal(beneficiaryParty, validatorParty, expiresAt),
+          )(
+            "Proposal is visible to validator",
+            _ => {
+              val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
+              proposals.proposals should have size 2
+              proposals.proposals
+                .find(
+                  _.payload.hcursor
+                    .downField("delegation")
+                    .get[String]("beneficiary")
+                    .contains(beneficiaryParty.party.toProtoPrimitive)
+                )
+                .value
+                .contractId
+            },
+          )
 
-        val (delegationCid, _) = actAndCheck(
-          "Validator accepts the proposal",
-          aliceValidatorWalletClient.acceptMintingDelegationProposal(proposal2Cid),
-        )(
-          "Proposal is archived and delegation is created",
-          delegationCid => {
-            aliceValidatorWalletClient.listMintingDelegationProposals().proposals should have size 1
-            val delegations = aliceValidatorWalletClient.listMintingDelegations()
-            delegations.delegations should have size 2
-            delegationCid
-          },
-        )
+          val (delegationCid, _) = actAndCheck(
+            "Validator accepts the proposal",
+            aliceValidatorWalletClient.acceptMintingDelegationProposal(proposal2Cid),
+          )(
+            "Proposal is archived and delegation is created",
+            delegationCid => {
+              aliceValidatorWalletClient.listMintingDelegationProposals().proposals should have size 1
+              val delegations = aliceValidatorWalletClient.listMintingDelegations()
+              delegations.delegations should have size 2
+              delegationCid
+            },
+          )
+        }
 
         // Test 3: Create a new proposal and confirm that accepting it archives existing delegation
-        val (_, proposal3Cid) = actAndCheck(
-          "Create minting delegation proposal",
-          createMintingDelegationProposal(beneficiaryParty, validatorParty, expiresAt),
-        )(
-          "Proposal is visible to validator",
-          _ => {
-            val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-            proposals.proposals should have size 2
-            proposals.proposals
-              .find(
-                _.payload.hcursor
-                  .downField("delegation")
-                  .get[String]("beneficiary")
-                  .contains(beneficiaryParty.party.toProtoPrimitive)
-              )
-              .value
-              .contractId
-          },
-        )
-
-        val (newDelegationCid, _) = actAndCheck(
-          "Validator accepts new proposal",
-          aliceValidatorWalletClient.acceptMintingDelegationProposal(proposal3Cid),
-        )(
-          "Old delegation is archived, only the new delegation exists",
-          newDelegationCid => {
-            aliceValidatorWalletClient.listMintingDelegationProposals().proposals should have size 1
-            val delegations = aliceValidatorWalletClient.listMintingDelegations()
-            delegations.delegations should have size 2
-            val beneficiaryDelegation = delegations.delegations
-              .find(
-                _.payload.hcursor
-                  .get[String]("beneficiary")
-                  .contains(beneficiaryParty.party.toProtoPrimitive)
-              )
-              .value
-            beneficiaryDelegation.contractId shouldBe newDelegationCid
-            newDelegationCid
-          },
-        )
-    }
-  }
-
-  "RejectInvalidMintingDelegationProposalTrigger" should {
-    "auto reject invalid minting delegation proposals" in { implicit env =>
-      val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
-      aliceValidatorWalletClient.tap(100.0)
-
-      val expiresAt = env.environment.clock.now.plus(Duration.ofDays(30)).toInstant
-
-      val validatorWalletRejectTrigger = rejectInvalidMintingDelegationProposalTrigger(
-        aliceValidatorBackend,
-        aliceValidatorWalletClient.config.ledgerApiUser,
-      )
-
-      clue("Auto-reject proposals from non-onboarded external parties") {
-        // Note: We intentionally skip createAndAcceptExternalPartySetupProposal
-        // to ensure that this party is not fully onboarded
-        val nonOnboardedParty = onboardExternalParty(aliceValidatorBackend, Some("nonOnboarded"))
-
-        aliceValidatorWalletClient.listMintingDelegationProposals().proposals shouldBe empty
-
-        setTriggersWithin(triggersToPauseAtStart = Seq(validatorWalletRejectTrigger)) {
-          actAndCheck(
-            "Create proposal",
-            createMintingDelegationProposal(nonOnboardedParty, aliceValidatorParty, expiresAt),
+        clue("Test accepting new proposal archives existing delegation") {
+          val (_, proposal3Cid) = actAndCheck(
+            "Create minting delegation proposal",
+            createMintingDelegationProposal(beneficiaryParty, validatorParty, expiresAt),
           )(
-            "Proposal should be visible while trigger is paused",
-            _ =>
-              aliceValidatorWalletClient
-                .listMintingDelegationProposals()
-                .proposals should have size 1,
-          )
-        }
-
-        clue("Proposal should be auto-rejected because beneficiary is not onboarded") {
-          eventually() {
-            aliceValidatorWalletClient.listMintingDelegationProposals().proposals shouldBe empty
-          }
-        }
-      }
-
-      val beneficiaryParty =
-        onboardExternalParty(aliceValidatorBackend, Some("beneficiary"))
-      createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiaryParty)
-
-      clue("Auto-reject proposals when delegate is not a validator") {
-        val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-
-        val aliceWalletRejectTrigger = rejectInvalidMintingDelegationProposalTrigger(
-          aliceValidatorBackend,
-          aliceWalletClient.config.ledgerApiUser,
-        )
-
-        setTriggersWithin(triggersToPauseAtStart = Seq(aliceWalletRejectTrigger)) {
-          actAndCheck(
-            "Create proposal",
-            createMintingDelegationProposal(beneficiaryParty, aliceParty, expiresAt),
-          )(
-            "Proposal should be visible while trigger is paused",
-            _ => aliceWalletClient.listMintingDelegationProposals().proposals should have size 1,
-          )
-        }
-
-        clue("Proposal should be auto-rejected because delegate is not the validator") {
-          eventually() {
-            aliceWalletClient.listMintingDelegationProposals().proposals shouldBe empty
-          }
-        }
-      }
-
-      clue("Auto-reject duplicate proposals from same beneficiary") {
-        val now = env.environment.clock.now
-        val expiresAt1 = now.plus(Duration.ofDays(10)).toInstant
-        val expiresAt2 = now.plus(Duration.ofDays(30)).toInstant
-        val expiresAt3 = now.plus(Duration.ofDays(20)).toInstant
-
-        setTriggersWithin(triggersToPauseAtStart = Seq(validatorWalletRejectTrigger)) {
-          actAndCheck(
-            "Create three proposals", {
-              createMintingDelegationProposal(beneficiaryParty, aliceValidatorParty, expiresAt1)
-              createMintingDelegationProposal(beneficiaryParty, aliceValidatorParty, expiresAt2)
-              createMintingDelegationProposal(beneficiaryParty, aliceValidatorParty, expiresAt3)
+            "Proposal is visible to validator",
+            _ => {
+              val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
+              proposals.proposals should have size 2
+              proposals.proposals
+                .find(
+                  _.payload.hcursor
+                    .downField("delegation")
+                    .get[String]("beneficiary")
+                    .contains(beneficiaryParty.party.toProtoPrimitive)
+                )
+                .value
+                .contractId
             },
+          )
+
+          val (newDelegationCid, _) = actAndCheck(
+            "Validator accepts new proposal",
+            aliceValidatorWalletClient.acceptMintingDelegationProposal(proposal3Cid),
           )(
-            "All three proposals should be visible while trigger is paused",
-            _ =>
-              aliceValidatorWalletClient
-                .listMintingDelegationProposals()
-                .proposals should have size 3,
+            "Old delegation is archived, only the new delegation exists",
+            newDelegationCid => {
+              aliceValidatorWalletClient.listMintingDelegationProposals().proposals should have size 1
+              val delegations = aliceValidatorWalletClient.listMintingDelegations()
+              delegations.delegations should have size 2
+              val beneficiaryDelegation = delegations.delegations
+                .find(
+                  _.payload.hcursor
+                    .get[String]("beneficiary")
+                    .contains(beneficiaryParty.party.toProtoPrimitive)
+                )
+                .value
+              beneficiaryDelegation.contractId shouldBe newDelegationCid
+              newDelegationCid
+            },
           )
         }
 
-        clue("Trigger should reject duplicates, keeping only one proposal") {
-          eventually() {
-            aliceValidatorWalletClient
-              .listMintingDelegationProposals()
-              .proposals should have size 1
+        // Test 4: Test auto-expiry of delegation and proposal
+        clue("Test expiry of MintingDelegation and MintingDelegationProposal") {
+          val expiresAtOneMin = env.environment.clock.now.plus(Duration.ofMinutes(1)).toInstant
+
+          // Create a third beneficiary for expiry testing
+          val beneficiary3Party =
+            onboardExternalParty(aliceValidatorBackend, Some("beneficiary3"))
+          createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiary3Party)
+
+          // Create proposal and accept it to create a delegation
+          val (_, proposalCidExpiry) = actAndCheck(
+            "Create minting delegation proposal with short expiry",
+            createMintingDelegationProposal(beneficiary3Party, validatorParty, expiresAtOneMin),
+          )(
+            "Proposal is visible",
+            _ => {
+              val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
+              proposals.proposals should have size 2
+              proposals.proposals
+                .find(
+                  _.payload.hcursor
+                    .downField("delegation")
+                    .get[String]("beneficiary")
+                    .contains(beneficiary3Party.party.toProtoPrimitive)
+                )
+                .value
+                .contractId
+            },
+          )
+
+          actAndCheck(
+            "Accept proposal to create delegation with short expiry",
+            aliceValidatorWalletClient.acceptMintingDelegationProposal(proposalCidExpiry),
+          )(
+            "Delegation is created",
+            _ => {
+              val delegations = aliceValidatorWalletClient.listMintingDelegations()
+              delegations.delegations should have size 3
+            },
+          )
+
+          // Create another proposal and leave it unaccepted
+          actAndCheck(
+            "Create another proposal with short expiry",
+            createMintingDelegationProposal(beneficiary3Party, validatorParty, expiresAtOneMin),
+          )(
+            "Second proposal is visible",
+            _ => {
+              val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
+              proposals.proposals should have size 2
+            },
+          )
+
+          // Advance time past expiry
+          advanceTime(Duration.ofMinutes(2))
+
+          clue("Expired delegation should be auto-rejected") {
+            eventually() {
+              val delegations = aliceValidatorWalletClient.listMintingDelegations().delegations
+              delegations.size shouldBe 2
+            }
+          }
+
+          clue("Expired proposal should be auto-rejected") {
+            eventually() {
+              val proposals = aliceValidatorWalletClient.listMintingDelegationProposals().proposals
+              proposals should have size 1
+            }
           }
         }
-      }
     }
   }
 
@@ -537,15 +512,6 @@ class WalletMintingDelegationTimeBasedIntegrationTest
       }
     }
   }
-
-  private def rejectInvalidMintingDelegationProposalTrigger(
-      validatorBackend: ValidatorAppBackendReference,
-      userName: String,
-  ): Trigger =
-    validatorBackend
-      .userWalletAutomation(userName)
-      .futureValue
-      .trigger[RejectInvalidMintingDelegationProposalTrigger]
 
   private def collectRewardsAndMergeAmuletsTrigger(
       validatorBackend: ValidatorAppBackendReference,

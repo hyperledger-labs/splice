@@ -228,6 +228,20 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
     )
   } yield page.mapResultsInPage(_.contract)
 
+  def listExpiredMintingDelegations: ListExpiredContracts[
+    mintingDelegationCodegen.MintingDelegation.ContractId,
+    mintingDelegationCodegen.MintingDelegation,
+  ] = multiDomainAcsStore.listExpiredFromPayloadExpiry(
+    mintingDelegationCodegen.MintingDelegation.COMPANION
+  )
+
+  def listExpiredMintingDelegationProposals: ListExpiredContracts[
+    mintingDelegationCodegen.MintingDelegationProposal.ContractId,
+    mintingDelegationCodegen.MintingDelegationProposal,
+  ] = multiDomainAcsStore.listExpiredFromPayloadExpiry(
+    mintingDelegationCodegen.MintingDelegationProposal.COMPANION
+  )
+
   def getAmuletBalanceWithHoldingFees(asOfRound: Long, deductHoldingFees: Boolean)(implicit
       tc: TraceContext
   ): Future[(BigDecimal, BigDecimal)] = for {
@@ -758,7 +772,13 @@ object UserWalletStore {
         mkFilter(mintingDelegationCodegen.MintingDelegationProposal.COMPANION)(co =>
           co.payload.delegation.dso == dso &&
             co.payload.delegation.delegate == endUser
-        )(UserWalletAcsStoreRowData(_)),
+        )(contract =>
+          UserWalletAcsStoreRowData(
+            contract,
+            contractExpiresAt =
+              Some(Timestamp.assertFromInstant(contract.payload.delegation.expiresAt)),
+          )
+        ),
         mkFilter(mintingDelegationCodegen.MintingDelegation.COMPANION)(co =>
           co.payload.dso == dso &&
             co.payload.delegate == endUser

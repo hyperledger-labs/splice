@@ -23,7 +23,6 @@ import org.lfdecentralizedtrust.splice.store.{
 }
 import org.lfdecentralizedtrust.splice.util.QualifiedName
 import org.lfdecentralizedtrust.splice.wallet.config.{AutoAcceptTransfersConfig, WalletSweepConfig}
-import org.lfdecentralizedtrust.splice.wallet.ExternalPartyWalletManager
 import org.lfdecentralizedtrust.splice.wallet.store.{TxLogEntry, UserWalletStore}
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
@@ -57,7 +56,6 @@ class UserWalletAutomationService(
     txLogBackfillEnabled: Boolean,
     txLogBackfillingBatchSize: Int,
     paramsConfig: SpliceParametersConfig,
-    externalPartyWalletManager: ExternalPartyWalletManager,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -198,11 +196,18 @@ class UserWalletAutomationService(
   }
 
   registerTrigger(
-    new RejectInvalidMintingDelegationProposalTrigger(
+    new ExpireMintingDelegationTrigger(
       triggerContext,
       store,
-      externalPartyWalletManager,
-      connection(SpliceLedgerConnectionPriority.Medium),
+      connection(SpliceLedgerConnectionPriority.Low),
+    )
+  )
+
+  registerTrigger(
+    new ExpireMintingDelegationProposalTrigger(
+      triggerContext,
+      store,
+      connection(SpliceLedgerConnectionPriority.Low),
     )
   )
 }
@@ -230,6 +235,7 @@ object UserWalletAutomationService extends AutomationServiceCompanion {
       aTrigger[AutoAcceptTransferOffersTrigger],
       aTrigger[AmuletMetricsTrigger],
       aTrigger[TxLogBackfillingTrigger[TxLogEntry]],
-      aTrigger[RejectInvalidMintingDelegationProposalTrigger],
+      aTrigger[ExpireMintingDelegationTrigger],
+      aTrigger[ExpireMintingDelegationProposalTrigger],
     )
 }
