@@ -125,7 +125,7 @@ template AmuletRules
     -- | Bootstrap new network state
     choice AmuletRules_UpdateToLatestSchemaVersion : AmuletRules_UpdateToLatestSchemaVersionResult
       with
-        -- mining rounds are passed in new state can depend on it.
+        -- mining rounds are passed in, as new state can depend on it.
         openMiningRound0Cid : ContractId OpenMiningRound -- oldest mining round
         openMiningRound1Cid : ContractId OpenMiningRound -- middle mining round
         openMiningRound2Cid : ContractId OpenMiningRound -- newest mining round
