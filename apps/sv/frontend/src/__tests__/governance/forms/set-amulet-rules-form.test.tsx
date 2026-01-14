@@ -61,7 +61,7 @@ describe('Set Amulet Config Rules Form', () => {
 
     const urlInput = screen.getByTestId('set-amulet-config-rules-url');
     expect(urlInput).toBeDefined();
-    expect(urlInput.getAttribute('value')).toBe('https://');
+    expect(urlInput.getAttribute('value')).toBe('');
 
     // Amulet Rules has a lot of fields to process so this can get flakey if not given enough time
     waitFor(

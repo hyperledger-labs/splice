@@ -61,7 +61,7 @@ describe('Grant Featured App Form', () => {
 
     const urlInput = screen.getByTestId('grant-featured-app-url');
     expect(urlInput).toBeDefined();
-    expect(urlInput.getAttribute('value')).toBe('https://');
+    expect(urlInput.getAttribute('value')).toBe('');
 
     const idInput = screen.getByTestId('grant-featured-app-idValue');
     expect(idInput).toBeDefined();
@@ -231,7 +231,7 @@ describe('Revoke Featured App Form', () => {
 
     const urlInput = screen.getByTestId('revoke-featured-app-url');
     expect(urlInput).toBeDefined();
-    expect(urlInput.getAttribute('value')).toBe('https://');
+    expect(urlInput.getAttribute('value')).toBe('');
 
     const idInput = screen.getByTestId('revoke-featured-app-idValue');
     expect(idInput).toBeDefined();
