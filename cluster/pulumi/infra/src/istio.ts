@@ -175,7 +175,7 @@ function ingressPort(name: string, port: number): IngressPort {
 // service and the istio-ingress pod.
 function configureInternalGatewayService(
   ingressNs: k8s.core.v1.Namespace,
-  ingressIp: pulumi.Output<string>,
+  ingress: { ip: pulumi.Output<string>; viaGKEL7: false } | { viaGKEL7: true },
   istiod: k8s.helm.v3.Release
 ) {
   const cluster = gcp.container.getCluster({
@@ -193,7 +193,13 @@ function configureInternalGatewayService(
   return configureGatewayService(
     ingressNs,
     pulumi.all([externalIPRanges, internalIPRanges]).apply(([a, b]) => a.concat(b)),
-    { type: 'LoadBalancer', ingressIp, externalIPRangesInLB: pulumi.output(['0.0.0.0/0']) },
+    ingress.viaGKEL7
+      ? { type: 'ClusterIP' }
+      : {
+          type: 'LoadBalancer',
+          ingressIp: ingress.ip,
+          externalIPRangesInLB: pulumi.output(['0.0.0.0/0']),
+        },
     [
       ingressPort('grpc-cd-pub-api', 5008),
       ingressPort('grpc-cs-p2p-api', 5010),
@@ -722,7 +728,8 @@ function configureSequencerHighPerformanceGrpcDestinationRule(
 export function configureIstio(
   ingressNs: ExactNamespace,
   ingressIp: pulumi.Output<string>,
-  cometBftIngressIp: pulumi.Output<string>
+  cometBftIngressIp: pulumi.Output<string>,
+  expectGKEL7Gateway: boolean
 ): ConfiguredIstio {
   const nsName = 'istio-system';
   const istioSystemNs = new k8s.core.v1.Namespace(nsName, {
@@ -732,7 +739,11 @@ export function configureIstio(
   });
   const base = configureIstioBase(istioSystemNs, ingressNs.ns);
   const istiod = configureIstiod(ingressNs.ns, base);
-  const gwSvc = configureInternalGatewayService(ingressNs.ns, ingressIp, istiod);
+  const gwSvc = configureInternalGatewayService(
+    ingressNs.ns,
+    expectGKEL7Gateway ? { viaGKEL7: true } : { viaGKEL7: false, ip: ingressIp },
+    istiod
+  );
   const cometBftSvc = configureCometBFTGatewayService(ingressNs.ns, cometBftIngressIp, istiod);
   const gateways = configureGateway(ingressNs, gwSvc, cometBftSvc);
   const docsAndReleases = configureDocsAndReleases(true, gateways);

@@ -35,11 +35,18 @@ export const egressIp = network.egressIp.address;
 
 const cloudArmorSecurityPolicy = configureCloudArmorPolicy(cloudArmorConfig, network.ingressNs);
 
-const istio = configureIstio(network.ingressNs, ingressIp, network.cometbftIngressIp.address);
+const useGKEL7Gateway = !!cloudArmorSecurityPolicy;
+const istio = configureIstio(
+  network.ingressNs,
+  ingressIp,
+  network.cometbftIngressIp.address,
+  useGKEL7Gateway
+);
 
-if (cloudArmorSecurityPolicy) {
+if (useGKEL7Gateway) {
   configureGKEL7Gateway({
     ingressNs: network.ingressNs,
+    ingressIp,
     gatewayName: 'cn-gke-l7-gateway',
     backendServiceName: istio.httpServiceName,
     serviceTarget: { port: 443 },

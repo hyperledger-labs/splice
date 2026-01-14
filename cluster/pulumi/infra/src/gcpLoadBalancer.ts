@@ -11,6 +11,7 @@ const gcpGatewayClass = 'gke-l7-regional-external-managed';
 interface L7GatewayConfig {
   gatewayName: string;
   ingressNs: ExactNamespace;
+  ingressIp: pulumi.Output<string>;
   // should be the name of the Service (k8s resource) that is the backend target;
   // see backendTargetRef for mapping from gateway name
   backendServiceName: pulumi.Input<string>;
@@ -88,6 +89,7 @@ function createL7Gateway(
               ]
             : []),
         ],
+        addresses: [{ type: 'IPAddress', value: config.ingressIp }],
       },
     },
     opts
