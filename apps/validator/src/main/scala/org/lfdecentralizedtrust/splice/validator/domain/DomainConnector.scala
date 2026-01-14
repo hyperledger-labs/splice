@@ -160,6 +160,10 @@ class DomainConnector(
                       case None =>
                         Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size)
                     }
+
+                  // max(threshold, sequencerConnectionsSizeThreshold) is used to ensure that even in small configurations
+                  // (e.g., N=3, f+1=1) we have enough retries to make sure that the request is eventually processed by a live sequencer.
+
                   val amplificationFactor = PositiveInt.tryCreate(
                     Math.max(
                       threshold.unwrap,
@@ -168,6 +172,7 @@ class DomainConnector(
                         .unwrap,
                     )
                   )
+
                   SequencerConnections.tryMany(
                     nonEmptyConnections.forgetNE,
                     threshold,
