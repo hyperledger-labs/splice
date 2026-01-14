@@ -64,22 +64,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
-      .addConfigTransforms((_, config) => {
-        ConfigTransforms
-          .bumpCantonSyncPortsBy(22_000, _.contains("Local"))
-          .compose(
-            ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
-              if (name.endsWith("Local")) {
-                config
-              } else {
-                config.copy(
-                  domainMigrationDumpPath =
-                    Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
-                )
-              }
-            }
-          )(config)
-      })
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllScanAppConfigs_(conf =>
           conf.copy(cache =
@@ -104,6 +88,25 @@ class LogicalSynchronizerUpgradeIntegrationTest
             ),
           )
         )
+      )
+      .addConfigTransforms((_, config) => {
+        ConfigTransforms
+          .bumpCantonSyncPortsBy(22_000, _.contains("Local"))
+          .compose(
+            ConfigTransforms.updateAllSvAppConfigs { (name, config) =>
+              if (name.endsWith("Local")) {
+                config
+              } else {
+                config.copy(
+                  domainMigrationDumpPath =
+                    Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
+                )
+              }
+            }
+          )(config)
+      })
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
       )
       .withManualStart
 
@@ -209,7 +212,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       ),
       participants = false,
       logSuffix = "global-domain-migration",
-      enableBftSequencer = true,
+      enableBftSequencer = false,
     )() {
       // Upload after starting validator which connects to global
       // synchronizers as upload_dar_unless_exists vets on all
@@ -274,31 +277,54 @@ class LogicalSynchronizerUpgradeIntegrationTest
             val mediatorInitializer =
               new NodeInitializer(newMediatorAdminConnection, retryProvider, loggerFactory)
 
-            sequencerInitializer
-              .initializeFromDump(dump.nodeIdentities.sequencer)
-              .futureValue
-            mediatorInitializer.initializeFromDump(dump.nodeIdentities.mediator).futureValue
+            clue(s"init ${oldBackend.name} sequencer and mediator from dump") {
+              sequencerInitializer
+                .initializeFromDump(dump.nodeIdentities.sequencer)
+                .futureValue
 
+              mediatorInitializer.initializeFromDump(dump.nodeIdentities.mediator).futureValue
+            }
             val staticSynchronizerParameters =
               oldBackend.sequencerClient.synchronizer_parameters.static.get()
             val newStaticSyncParams = staticSynchronizerParameters.copy(
               serial = staticSynchronizerParameters.serial + NonNegativeInt.one
             )
-            newBackend.sequencerClient.setup.initialize_from_synchronizer_predecessor(
-              lsuSynchronizerState,
-              newStaticSyncParams,
-            )
 
-            newMediatorAdminConnection.initialize(
-              PhysicalSynchronizerId(
-                decentralizedSynchronizerId,
-                newStaticSyncParams.toInternal,
-              ),
-              GrpcSequencerConnection.tryCreate(
-                newBackend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
-              ),
-              newBackend.config.localSynchronizerNode.value.mediator.sequencerRequestAmplification,
-            )
+            val oldSequencerNumberOfTopologyTransactions =
+              oldBackend.sequencerClient.topology.transactions
+                .list(store = decentralizedSynchronizerId)
+                .result
+                .size - 1 // minus 1 for the logical upgrade transaction
+
+            clue(s"init ${oldBackend.name} sequencer from synchronizer predecessor") {
+              newBackend.sequencerClient.health.wait_for_ready_for_initialization()
+              newBackend.sequencerClient.setup.initialize_from_synchronizer_predecessor(
+                lsuSynchronizerState,
+                newStaticSyncParams,
+              )
+              eventually(2.minutes) {
+                newBackend.sequencerClient.topology.transactions
+                  .list(decentralizedSynchronizerId)
+                  .result
+                  .size shouldBe oldSequencerNumberOfTopologyTransactions
+              }
+            }
+
+            clue(s"init ${oldBackend.name} mediator") {
+              newMediatorAdminConnection
+                .initialize(
+                  PhysicalSynchronizerId(
+                    decentralizedSynchronizerId,
+                    newStaticSyncParams.toInternal,
+                  ),
+                  GrpcSequencerConnection.tryCreate(
+                    newBackend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+                  ),
+                  newBackend.config.localSynchronizerNode.value.mediator.sequencerRequestAmplification,
+                )
+                .futureValue
+            }
+
           }
         }
       }
