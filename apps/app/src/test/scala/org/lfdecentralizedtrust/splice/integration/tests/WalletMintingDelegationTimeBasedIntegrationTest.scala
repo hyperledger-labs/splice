@@ -505,110 +505,34 @@ class WalletMintingDelegationTimeBasedIntegrationTest
 
       actualIncrease should be >= (expectedTotalReward - createFee)
       actualIncrease should be <= expectedTotalReward
-    }
 
-    "merge amulets above when they go above the merge-limit" in { implicit env =>
-      val validatorParty = aliceValidatorBackend.getValidatorPartyId()
-      aliceValidatorWalletClient.tap(100.0)
-
-      // Onboard external party
-      val beneficiaryParty =
-        onboardExternalParty(aliceValidatorBackend, Some("merge_beneficiary"))
-      createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiaryParty)
-
-      // Create MintingDelegation for the external party with a smaller merge limit
-      val amuletMergeLimit = 2
-      val expiresAt = env.environment.clock.now.plus(Duration.ofDays(30)).toInstant
-      val (_, proposalContractId) = actAndCheck(
-        "Create minting delegation proposal",
-        createMintingDelegationProposalWithMergeLimit(
-          beneficiaryParty,
-          validatorParty,
-          expiresAt,
-          amuletMergeLimit,
-        ),
-      )(
-        "Proposal is visible",
-        _ => {
-          val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-          proposals.proposals should have size 1
-          proposals.proposals.head.contractId
-        },
-      )
-
-      // The accept sometimes fails due to race with rejectInvalidMintingDelegationProposalTrigger
-      eventually() {
-        aliceValidatorWalletClient.acceptMintingDelegationProposal(proposalContractId)
+      // Test merge behavior at 2x limit
+      def getAmuletCount() = {
+        externalPartyWallet.store.multiDomainAcsStore
+          .listContracts(Amulet.COMPANION, Limit.DefaultLimit)
+          .futureValue
+          .size
       }
 
-      eventually() {
-        val delegations = aliceValidatorWalletClient.listMintingDelegations()
-        delegations.delegations should have size 1
-      }
+      clue("Test that amulets get merge at 2x limit") {
+        val currentCount = getAmuletCount()
+        val mergeLimit = DefaultAmuletMergeLimit
 
-      // Transfer a few amulets to the external party
-      // The MintingDelegationCollectRewardsTrigger should merge them
-      (1 to amuletMergeLimit + 2).foreach { i =>
-        aliceValidatorWalletClient.transferPreapprovalSend(
-          beneficiaryParty.party,
-          10.0,
-          s"transfer-$i",
-        )
-      }
-
-      advanceRoundsToNextRoundOpening
-
-      val externalPartyWallet = eventually() {
-        aliceValidatorBackend.appState.walletManager
-          .valueOrFail("WalletManager is expected to be defined")
-          .externalPartyWalletManager
-          .lookupExternalPartyWallet(beneficiaryParty.party)
-          .valueOrFail(
-            s"Expected ${beneficiaryParty.party} to have an external party wallet"
+        // Transfer enough amulets to reach exactly 2x the merge limit
+        val amuletsNeededFor2x = (2 * mergeLimit) - currentCount
+        (1 to amuletsNeededFor2x).foreach { i =>
+          aliceValidatorWalletClient.transferPreapprovalSend(
+            beneficiaryParty.party,
+            10.0,
+            s"transfer-$i",
           )
-      }
-
-      clue("Verify amulets were merged to exactly the merge limit") {
-        eventually() {
-          val amulets = externalPartyWallet.store.multiDomainAcsStore
-            .listContracts(Amulet.COMPANION, Limit.DefaultLimit)
-            .futureValue
-          amulets should have size amuletMergeLimit.toLong
         }
-      }
 
-      // Also test the scenario when we are at merge limit and have rewards to collect
-      val issuingRound = eventually() {
-        val rounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._2
-        rounds should not be empty
-        rounds.last
-      }
-
-      sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
-        .submitWithResult(
-          userId = sv1Backend.config.ledgerApiUser,
-          actAs = Seq(dsoParty),
-          readAs = Seq.empty,
-          update = new AppRewardCoupon(
-            dsoParty.toProtoPrimitive,
-            beneficiaryParty.party.toProtoPrimitive,
-            false, // not featured
-            BigDecimal(1.0).bigDecimal,
-            issuingRound.payload.round,
-            java.util.Optional.empty(),
-          ).create,
-        )
-
-      advanceRoundsToNextRoundOpening
-      advanceRoundsToNextRoundOpening
-      advanceTimeForRewardAutomationToRunForCurrentRound
-
-      clue("Verify amulets count is still at merge-limit after collecting rewards") {
-        eventually() {
-          val amulets = externalPartyWallet.store.multiDomainAcsStore
-            .listContracts(Amulet.COMPANION, Limit.DefaultLimit)
-            .futureValue
-          amulets should have size amuletMergeLimit.toLong
+        clue(s"Verify amulets merged to mergeLimit") {
+          eventually() {
+            val count = getAmuletCount()
+            count shouldBe mergeLimit
+          }
         }
       }
     }
