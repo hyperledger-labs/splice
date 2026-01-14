@@ -27,6 +27,11 @@ import {
 } from '../../common';
 import { clusterBasename, infraConfig, loadIPRanges } from './config';
 
+interface ConfiguredIstio {
+  allResources: pulumi.Resource[];
+  httpServiceName: string;
+}
+
 export const istioVersion = {
   istio: '1.28.1',
   //   updated from https://grafana.com/orgs/istio/dashboards, must be updated on each istio version
@@ -693,7 +698,7 @@ export function configureIstio(
   ingressNs: ExactNamespace,
   ingressIp: pulumi.Output<string>,
   cometBftIngressIp: pulumi.Output<string>
-): pulumi.Resource[] {
+): ConfiguredIstio {
   const nsName = 'istio-system';
   const istioSystemNs = new k8s.core.v1.Namespace(nsName, {
     metadata: {
@@ -710,7 +715,15 @@ export function configureIstio(
   const sequencerHighPerformanceGrpcRules = configureSequencerHighPerformanceGrpcDestinationRules(
     ingressNs.ns
   );
-  return [...gateways, ...docsAndReleases, ...publicInfo, ...sequencerHighPerformanceGrpcRules];
+  return {
+    allResources: [
+      ...gateways,
+      ...docsAndReleases,
+      ...publicInfo,
+      ...sequencerHighPerformanceGrpcRules,
+    ],
+    httpServiceName: 'cn-http-gateway', // TODO (#2723) local service name
+  };
 }
 
 export function istioMonitoring(

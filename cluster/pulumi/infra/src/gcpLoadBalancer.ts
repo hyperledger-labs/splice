@@ -24,8 +24,8 @@ interface L7GatewayConfig {
   tlsSecretName?: pulumi.Input<string>;
 }
 
-const httpListenerName = 'http';
-const httpsListenerName = 'https';
+const httpListenerName = 'listen-http';
+const httpsListenerName = 'listen-https';
 
 /**
  * Creates a GKE L7 Gateway
@@ -180,7 +180,7 @@ function createHealthCheckPolicy(
 }
 
 /**
- * Creates an HTTPRoute for the L7 Gateway
+ * Creates HTTPRoutes for the L7 Gateway
  */
 function createHTTPRoute(
   config: L7GatewayConfig,
