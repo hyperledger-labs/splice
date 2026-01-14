@@ -115,7 +115,7 @@ case class ValidatorTrustedSynchronizerConfig(
     sequencerNames: NonEmptyList[String],
 
     /** parameter to specify the BFT threshold for the domain connections.
-      * If not specified, length(sequencerNames) / 3 +1 will be used.
+      * If not specified, f +1 will be used.
       */
     threshold: Int,
 )
