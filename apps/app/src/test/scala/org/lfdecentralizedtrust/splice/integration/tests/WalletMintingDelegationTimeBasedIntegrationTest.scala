@@ -189,7 +189,9 @@ class WalletMintingDelegationTimeBasedIntegrationTest
           )(
             "Rejected proposal disappears from list",
             _ =>
-              aliceValidatorWalletClient.listMintingDelegationProposals().proposals should have size 1,
+              aliceValidatorWalletClient
+                .listMintingDelegationProposals()
+                .proposals should have size 1,
           )
         }
 
@@ -222,7 +224,9 @@ class WalletMintingDelegationTimeBasedIntegrationTest
           )(
             "Proposal is archived and delegation is created",
             delegationCid => {
-              aliceValidatorWalletClient.listMintingDelegationProposals().proposals should have size 1
+              aliceValidatorWalletClient
+                .listMintingDelegationProposals()
+                .proposals should have size 1
               val delegations = aliceValidatorWalletClient.listMintingDelegations()
               delegations.delegations should have size 2
               delegationCid
@@ -259,7 +263,9 @@ class WalletMintingDelegationTimeBasedIntegrationTest
           )(
             "Old delegation is archived, only the new delegation exists",
             newDelegationCid => {
-              aliceValidatorWalletClient.listMintingDelegationProposals().proposals should have size 1
+              aliceValidatorWalletClient
+                .listMintingDelegationProposals()
+                .proposals should have size 1
               val delegations = aliceValidatorWalletClient.listMintingDelegations()
               delegations.delegations should have size 2
               val beneficiaryDelegation = delegations.delegations
