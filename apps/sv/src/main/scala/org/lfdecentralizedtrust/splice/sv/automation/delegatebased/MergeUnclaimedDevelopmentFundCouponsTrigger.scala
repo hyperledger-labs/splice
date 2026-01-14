@@ -47,6 +47,8 @@ class MergeUnclaimedDevelopmentFundCouponsTrigger(
       if (unclaimedDevelopmentFundCoupons.length >= 2 * threshold) {
         Seq(
           MergeUnclaimedDevelopmentFundCouponsTask(
+            // Merge the `threshold` smallest coupons (by amount) to keep larger coupons stable and
+            // reduce contention with externally prepared transactions referencing contract-ids.
             unclaimedDevelopmentFundCoupons.sortBy(_.payload.amount).take(threshold)
           )
         )
