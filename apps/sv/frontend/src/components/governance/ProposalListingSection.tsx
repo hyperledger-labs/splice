@@ -19,6 +19,9 @@ import { useNavigate } from 'react-router-dom';
 import { PageSectionHeader, VoteStats } from '../../components/beta';
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 import { InfoOutlined } from '@mui/icons-material';
+import dayjs from 'dayjs';
+
+export type ProposalSortOrder = 'effectiveAtAsc' | 'effectiveAtDesc';
 
 interface ProposalListingSectionProps {
   sectionTitle: string;
@@ -29,11 +32,39 @@ interface ProposalListingSectionProps {
   showVoteStats?: boolean;
   showAcceptanceThreshold?: boolean;
   showStatus?: boolean;
+  sortOrder?: ProposalSortOrder;
 }
 
 const getColumnsCount = (alwaysShown: number, ...sometimesShown: (boolean | undefined)[]) =>
   alwaysShown +
   sometimesShown.reduce((columnsCount, isShown) => columnsCount + (isShown ? 1 : 0), 0);
+
+const sortProposals = (
+  data: ProposalListingData[],
+  sortOrder?: ProposalSortOrder
+): ProposalListingData[] => {
+  if (!sortOrder) return data;
+
+  return data.toSorted((a, b) => {
+    if (sortOrder === 'effectiveAtAsc') {
+      // For ascending sort: items with "Threshold" (no specific effective date) go after items with dates
+      const aIsThreshold = a.voteTakesEffect === 'Threshold';
+      const bIsThreshold = b.voteTakesEffect === 'Threshold';
+
+      if (aIsThreshold && bIsThreshold) {
+        // Both are threshold-based, sort by voting deadline
+        return dayjs(a.votingThresholdDeadline).isBefore(dayjs(b.votingThresholdDeadline)) ? -1 : 1;
+      }
+      if (aIsThreshold) return 1;
+      if (bIsThreshold) return -1;
+
+      return dayjs(a.voteTakesEffect).isBefore(dayjs(b.voteTakesEffect)) ? -1 : 1;
+    } else {
+      // effectiveAtDesc: most recent first
+      return dayjs(a.voteTakesEffect).isAfter(dayjs(b.voteTakesEffect)) ? -1 : 1;
+    }
+  });
+};
 
 export const ProposalListingSection: React.FC<ProposalListingSectionProps> = props => {
   const {
@@ -45,7 +76,10 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
     showVoteStats,
     showAcceptanceThreshold,
     showStatus,
+    sortOrder,
   } = props;
+
+  const sortedData = sortProposals(data, sortOrder);
 
   const columnsCount = getColumnsCount(
     3,
@@ -59,7 +93,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
     <Box sx={{ mb: 6 }} data-testid={`${uniqueId}-section`}>
       <PageSectionHeader title={sectionTitle} data-testid={`${uniqueId}-section`} />
 
-      {data.length === 0 ? (
+      {sortedData.length === 0 ? (
         <InfoBox info={noDataMessage} data-testid={`${uniqueId}-section-info`} />
       ) : (
         <TableContainer data-testid={`${uniqueId}-section-table`}>
@@ -79,7 +113,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
               </TableRow>
             </TableHead>
             <TableBody sx={{ display: 'contents' }}>
-              {data.map((vote, index) => (
+              {sortedData.map((vote, index) => (
                 <VoteRow
                   key={index}
                   actionName={vote.actionName}
