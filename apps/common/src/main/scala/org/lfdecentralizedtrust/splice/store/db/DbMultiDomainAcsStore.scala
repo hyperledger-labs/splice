@@ -1539,17 +1539,32 @@ final class DbMultiDomainAcsStore[TXE](
         }*)
       } yield {
         val afterAll = System.nanoTime()
-        println(s"""
+        logger.info(s"""
             |ACS ingestion took ${afterAcs - beforeAcs} ns for ${insertsToDo.size} inserts
             |Deletes took ${afterDeletes - afterAcs} ns for ${toDelete.size} deletes
             |TxLog ingestion took ${afterTxlog - afterDeletes} ns for ${txLogEntries.size} entries
             |Initialize first ingested took ${afterAll - afterTxlog} ns
             |""".stripMargin)
+        acsTotal += afterAcs - beforeAcs
+        acsCount += insertsToDo.size
+        txLogTotal += afterTxlog - afterDeletes
+        txLogCount += txLogEntries.size
+        if (txLogCount > 0 && acsCount > 0)
+          logger.info(s"Averages: txlog: ${txLogTotal / txLogCount} ns. ACS: ${acsTotal / acsCount} ns")
         summary
       }
 
       ingestUpdateAtOffset(trees.batch.last.tree.getOffset, allDbOps).map(_ => summary)
     }
+
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
+    private var acsTotal = 0L
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
+    private var acsCount = 0L
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
+    private var txLogTotal = 0L
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
+    private var txLogCount = 0L
 
     private def hasAcsEntry(contractId: String) = (sql"""
            select count(*) from #$acsTableName
