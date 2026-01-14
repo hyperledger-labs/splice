@@ -37,17 +37,17 @@ class MergeUnclaimedDevelopmentFundCouponsTrigger(
     with SvTaskBasedTrigger[MergeUnclaimedDevelopmentFundCouponsTask] {
 
   private val store = svTaskContext.dsoStore
-  private val threshold = svConfig.unclaimedDevelopmentFundCouponsThreshold
 
   protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[MergeUnclaimedDevelopmentFundCouponsTask]] = {
+    val threshold = svConfig.unclaimedDevelopmentFundCouponsThreshold
     val limit = PageLimit.tryCreate(2 * threshold)
     store.listUnclaimedDevelopmentFundCoupons(limit).map { unclaimedDevelopmentFundCoupons =>
       if (unclaimedDevelopmentFundCoupons.length >= 2 * threshold) {
         Seq(
           MergeUnclaimedDevelopmentFundCouponsTask(
-            unclaimedDevelopmentFundCoupons.sortBy(_.payload.amount)
+            unclaimedDevelopmentFundCoupons.sortBy(_.payload.amount).take(threshold)
           )
         )
       } else {
@@ -59,7 +59,7 @@ class MergeUnclaimedDevelopmentFundCouponsTrigger(
   protected def isStaleTask(
       unclaimedDevelopmentFundCouponsTask: MergeUnclaimedDevelopmentFundCouponsTask
   )(implicit tc: TraceContext): Future[Boolean] = store.multiDomainAcsStore.containsArchived(
-    unclaimedDevelopmentFundCouponsTask.contracts.map(_.contractId)
+    unclaimedDevelopmentFundCouponsTask.contractsToMerge.map(_.contractId)
   )
 
   override def completeTaskAsDsoDelegate(
@@ -70,7 +70,9 @@ class MergeUnclaimedDevelopmentFundCouponsTrigger(
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
       choiceArg = new AmuletRules_MergeUnclaimedDevelopmentFundCoupons(
-        unclaimedDevelopmentFundCouponsTask.contracts.take(threshold).map(_.contractId).asJava
+        unclaimedDevelopmentFundCouponsTask.contractsToMerge
+          .map(_.contractId)
+          .asJava
       )
       arg = new DsoRules_MergeUnclaimedDevelopmentFundCoupons(
         amuletRules.contractId,
@@ -102,10 +104,10 @@ class MergeUnclaimedDevelopmentFundCouponsTrigger(
 }
 
 case class MergeUnclaimedDevelopmentFundCouponsTask(
-    contracts: Seq[
+    contractsToMerge: Seq[
       Contract[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
     ]
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =
-    prettyOfClass(param("contracts", _.contracts))
+    prettyOfClass(param("contractsToMerge", _.contractsToMerge))
 }
