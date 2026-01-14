@@ -1324,8 +1324,8 @@ class HttpWalletHandler(
       )(contractId)
       val store = userWallet.store
       for {
-        // Accept the proposal while archiving existing delegation, and get any remaining delegations to clean up
-        (newDelegationCid, remainingDelegations) <- retryProvider.retryForClientCalls(
+        // Accept the proposal while archiving existing delegation
+        newDelegationCid <- retryProvider.retryForClientCalls(
           "accept_minting_delegation_proposal",
           "Accept minting delegation proposal",
           for {
@@ -1361,41 +1361,9 @@ class HttpWalletHandler(
               .noDedup
               .withSynchronizerId(proposal.domain)
               .yieldResult()
-          } yield (result.exerciseResult.mintingDelegationCid, sameBeneficiaryDelegations.drop(1)),
+          } yield result.exerciseResult.mintingDelegationCid,
           logger,
         )
-        // Reject any remaining delegations outside the retry block
-        // In normal circumstances we should never have more than one active
-        // delegation, so the following cleanup is mainly for some edge cases.
-        _ <- remainingDelegations.foldLeft(Future.successful(())) { (acc, delegation) =>
-          acc.flatMap { _ =>
-            (for {
-              assignedDelegation <- store.multiDomainAcsStore
-                .getContractById(mintingDelegationCodegen.MintingDelegation.COMPANION)(
-                  delegation.contractId
-                )
-                .map(_.toAssignedContract)
-              _ <- assignedDelegation match {
-                case Some(assigned) =>
-                  userWallet.connection
-                    .submit(
-                      Seq(store.key.endUserParty),
-                      Seq.empty,
-                      assigned.exercise(_.exerciseMintingDelegation_Reject()),
-                    )
-                    .noDedup
-                    .withSynchronizerId(assigned.domain)
-                    .yieldUnit()
-                case None =>
-                  Future.unit
-              }
-            } yield ()).recover { case ex =>
-              logger.warn(
-                s"Failed to reject stale MintingDelegation ${delegation.contractId}: ${ex.getMessage}"
-              )
-            }
-          }
-        }
       } yield WalletResource.AcceptMintingDelegationProposalResponseOK(
         d0.AcceptMintingDelegationProposalResponse(
           Codec.encodeContractId(newDelegationCid)
