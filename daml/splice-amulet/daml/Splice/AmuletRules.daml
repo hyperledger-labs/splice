@@ -1222,7 +1222,7 @@ scaleFees s c = TransferConfig with
     maxNumOutputs = c.maxNumOutputs
     maxNumLockHolders = c.maxNumLockHolders
 
--- | Scale the 'AmuletConfig' such that the fees charged are scaled by the same scale factor.
+-- | Scale the 'TranserConfigV2' such that the fees charged are scaled by the same scale factor.
 scaleFees2 : Decimal -> TransferConfigV2 Unit.USD -> TransferConfigV2 Amulet
 scaleFees2 s c = TransferConfigV2 with
     holdingFee = scaleRatePerRound s c.holdingFee
