@@ -632,7 +632,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     // TODO(DACH-NY/canton-network-node#13038) Add asserts back for listValidatorRewardCoupons
     // replace _ with validatorRewardAmount
     val (appRewardAmount, _) =
-      getRewardCouponsValue(appRewardCoupons, validatorRewardCoupons, featured = false)
+      getRewardCouponsValue(appRewardCoupons, validatorRewardCoupons)
 
     clue("Checking app and validator reward and faucet amounts") {
       eventually() {
