@@ -193,8 +193,10 @@ object ExternalPartyWalletStore {
           co.payload.dso == dso &&
           co.payload.beneficiary == externalParty
         }(ExternalPartyWalletAcsStoreRowData(_)),
-        // ValidatorRight needed for collecting ValidatorRewardCoupons via MintingDelegation
-        // The external party is both the user AND the "validator" in this case
+        // ValidatorRight is needed for collecting ValidatorRewardCoupons which
+        // may have been issued to the external party for traffic purchases, via
+        // MintingDelegation. The external party is both the user AND the
+        // "validator" in this case.
         mkFilter(ValidatorRight.COMPANION) { co =>
           co.payload.dso == dso &&
           co.payload.user == externalParty &&
