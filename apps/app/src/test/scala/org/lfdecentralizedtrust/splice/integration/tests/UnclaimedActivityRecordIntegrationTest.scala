@@ -32,7 +32,9 @@ class UnclaimedActivityRecordIntegrationTest
     with TriggerTestUtil
     with WalletTestUtil {
 
-  // TODO(#3527): decide whether we want to fix scan_txlog for UnclaimedActivityRecords
+  // TODO(#3527): scan_txlog does not handle unclaimed activity records correctly, so this is currently disabled.
+  //  We should decide whether we want to fix scan_txlog for UnclaimedActivityRecords, or narrow its scope enough that we won't care
+  //  (i.e. don't try to be complete, don't use it to assert on scan's aggregates, etc)
   override protected def runUpdateHistorySanityCheck: Boolean = false
 
   override def environmentDefinition
