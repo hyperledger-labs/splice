@@ -106,7 +106,7 @@ instance HasCheckedFetch TransferCommandCounter ForOwner where
       owner = sender
       dso
 
--- | Deprecated: The token standard transfer APIs now support 24h signing delays so this is not required.
+-- | Deprecated: The token standard transfer APIs now support 24h signing delays so this contract is no longer required.
 --
 -- One-time delegation to execute a transfer to the given receiver
 -- for the given amount.

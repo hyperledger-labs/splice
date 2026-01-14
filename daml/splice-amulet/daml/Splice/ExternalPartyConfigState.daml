@@ -14,9 +14,9 @@ import Splice.Types
 template ExternalPartyConfigState
   with
     dso : Party
-    holdingFeesOpenRoundNumber : Round -- ^ The round number used
-    amuletPrice : Decimal
-    transferConfig : TransferConfigV2 Unit.USD
+    holdingFeesOpenRoundNumber : Round -- ^ The round number to use for charging holding fees for newly created contracts.
+    amuletPrice : Decimal -- ^ Amulet price at the time the config state was created. 
+    transferConfig : TransferConfigV2 Unit.USD -- ^ Transfer config at the time the config state was created.
     targetArchiveAfter : Time -- ^ Lower bound on the time the contract gets archived, not enforced as a strict upper bound but the SVs will archive it shortly after this time has been reached.
   where
     signatory dso

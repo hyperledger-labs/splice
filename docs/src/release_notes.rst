@@ -9,13 +9,14 @@
 
   - Daml
 
-    - Support 24h signing delays for CC transfers and allocations
+    - Support 24h signing delays for token standard CC transfers and allocations
 
-      - This is exposed through the existing token standard APIs so no
-        change is required. Scan returns a slightly different choice
-        context so make sure to just pass that along opaquely.
-      - As part of this change additional restrictions are imposed on ``AmuletConfig``. All of these restrictions
-        already hold on the current configs on DevNet, TestNet and MainNet:
+      - This change concern the CC implementation of the token standard APIs, 
+        so no change is required for clients of these APIs to make use of the
+        new 24h submission delay. However, Scan returns a slightly different choice
+        context, so make sure that your app passes that along opaquely.
+      - As part of this change additional constraints are imposed on ``AmuletConfig``. All of these constraints
+        are satisfied by the current configs on DevNet, TestNet and MainNet:
 
         - CC usage fees can no longer be set to non-zero values. They were set to zero in CIP 78.
 
