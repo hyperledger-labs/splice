@@ -718,6 +718,9 @@ object ConfigTransforms {
     }
   }
 
+  def withDevelopmentFundPercentage(percentage: BigDecimal): ConfigTransform =
+    updateAllSvAppFoundDsoConfigs_(c => c.copy(developmentFundPercentage = Some(percentage)))
+
   private def portTransform(bump: Int, c: AdminServerConfig): AdminServerConfig =
     c.copy(internalPort = c.internalPort.map(_ + bump))
 
