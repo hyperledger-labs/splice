@@ -3907,6 +3907,8 @@ class State:
                 return HandleTransactionResult.empty()
             case "DsoRules_MergeValidatorLicense":
                 return HandleTransactionResult.empty()
+            case "DsoRules_MergeUnclaimedDevelopmentFundCoupons":
+                return HandleTransactionResult.empty()
             case "ExternalPartyAmuletRules_CreateTransferCommand":
                 return HandleTransactionResult.empty()
             case "FeaturedAppRight_CreateActivityMarker":

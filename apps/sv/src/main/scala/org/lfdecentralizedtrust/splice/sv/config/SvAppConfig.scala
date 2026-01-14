@@ -102,6 +102,7 @@ object SvOnboardingConfig {
       initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = Some(BigDecimal(1.0)),
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
       initialRound: Long = 0L,
+      developmentFundPercentage: Option[BigDecimal] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -363,6 +364,8 @@ case class SvAppBackendConfig(
     // If true, we check that topology on mediator and sequencer is the same after
     // a migration. This can be a useful assertion but is very slow so should not be enabled on clusters with large topology state.
     validateTopologyAfterMigration: Boolean = false,
+    // The threshold above which unclaimed development fund coupons will be merged.
+    unclaimedDevelopmentFundCouponsThreshold: Int = 10,
 ) extends SpliceBackendConfig {
 
   def shouldSkipSynchronizerInitialization =
