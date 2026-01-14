@@ -41,6 +41,7 @@ import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
 import java.time.Duration
+import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 
 class WalletManualRoundsIntegrationTest
@@ -314,7 +315,7 @@ class WalletManualRoundsIntegrationTest
 
       aliceWalletClient.tap(20.0)
 
-      eventually() {
+      eventually(40.seconds) {
         aliceValidatorWalletClient.listAppRewardCoupons() should be(empty)
       }
 

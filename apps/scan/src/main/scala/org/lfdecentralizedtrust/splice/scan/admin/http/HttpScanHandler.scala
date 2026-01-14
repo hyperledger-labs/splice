@@ -1550,7 +1550,7 @@ class HttpScanHandler(
             migrationId,
             result.createdEventsInPage
               .map(event =>
-                CompactJsonScanHttpEncodings.javaToHttpCreatedEvent(
+                CompactJsonScanHttpEncodings().javaToHttpCreatedEvent(
                   event.eventId,
                   event.event,
                 )
@@ -1609,7 +1609,7 @@ class HttpScanHandler(
             migrationId,
             result.createdEventsInPage
               .map(event =>
-                CompactJsonScanHttpEncodings.javaToHttpCreatedEvent(
+                CompactJsonScanHttpEncodings().javaToHttpCreatedEvent(
                   event.eventId,
                   event.event,
                 )

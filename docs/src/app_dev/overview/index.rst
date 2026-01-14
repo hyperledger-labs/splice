@@ -8,10 +8,13 @@
 Overview
 ========
 
+If you are a new Canton Network developer, please check out the
+`TL;DR for new Canton Network developers <https://docs.digitalasset.com/build/3.4/overview/tldr.html>`__.
+
 Canton Network Applications
 ---------------------------
 
-`Canton Network applications <https://docs.digitalasset.com/build/3.3/overview/introduction>`__
+`Canton Network applications <https://docs.digitalasset.com/build/3.4/overview/introduction>`__
 are used to operate business processes spanning
 multiple organizations or business entities.
 Use the following documentation to build Canton Network applications and get them featured on the Canton Network:
@@ -20,7 +23,7 @@ Use the following documentation to build Canton Network applications and get the
 
 * Review the summary of the Canton Network tokenomics at :ref:`app_tokenomics`.
 * Learn to build Canton Network applications from the tutorials, how-tos, explanations, and reference documentation at
-  https://docs.digitalasset.com/build/3.3/
+  https://docs.digitalasset.com/build/3.4/
 * Browse the currently featured apps: https://sync.global/featured-apps/
 * Request your app to be featured: https://sync.global/featured-app-request/
 
@@ -60,12 +63,12 @@ See the diagram below to learn about which components serve which APIs and how t
 Splice Daml APIs Overview
 -------------------------
 
-Splice implements several decentralized applications whose on-ledger state and workflows are implemented in Daml.  An `Interface <https://docs.digitalasset.com/build/3.3/reference/daml/interfaces.html#reference-interfaces>`__
+Splice implements several decentralized applications whose on-ledger state and workflows are implemented in Daml.  An `Interface <https://docs.digitalasset.com/build/3.4/reference/daml/interfaces.html#reference-interfaces>`__
 defined in Daml code is a public API that you should develop against because they are stable.
 These public APIs are used in interoperability standards,
 like the :ref:`Canton Network Token Standard <app_dev_token_standard_overview>`.
 Use these Daml APIs to minimize the coupling between your application's Daml code and the Daml code of your dependencies.
-For example, the ``Interfaces`` in the Splice implementaiton loosely
+For example, the ``Interfaces`` in the Splice implementation loosely
 couple an application with the implementation so that a Splice upgrade avoids forcing a corresponding upgrade of an application's Daml code.
 
 See the :ref:`app_dev_daml_api` for an overview of the Daml APIs defined in Splice and their purpose.
@@ -74,8 +77,8 @@ See the :ref:`app_dev_daml_api` for an overview of the Daml APIs defined in Spli
 Splice Daml Models Overview
 ---------------------------
 
-A Daml model's `Templates <https://docs.digitalasset.com/build/3.3/reference/daml/templates.html>`__ and
-`Choices <https://docs.digitalasset.com/build/3.3/reference/daml/choices.html>`__ are considered internal implementation details.  For example,
+A Daml model's `Templates <https://docs.digitalasset.com/build/3.4/reference/daml/templates.html>`__ and
+`Choices <https://docs.digitalasset.com/build/3.4/reference/daml/choices.html>`__ are considered internal implementation details.  For example,
 the :ref:`Canton Network Token Standard <app_dev_token_standard_overview>` is the public API for working with tokens, including Canton Coin.
 The :ref:`Canton Network Token Standard <app_dev_token_standard_overview>` implementation
 operates on top of the :ref:`AmuletRules_Transfer <type-splice-amuletrules-amuletrulestransfer-23235>` choice (this provides backwards compatibility).
@@ -84,6 +87,6 @@ It is worthwhile and recommended to study these implementation details because y
 Use the following resources to learn how to interact with the Daml models state and workflows.
 
 * Learn how to read and write Daml code from:
-  https://docs.digitalasset.com/build/3.3/
+  https://docs.digitalasset.com/build/3.4/
 * Learn about the Daml packages that are part of Splice and their data models and workflows from
   :ref:`app_dev_daml_models`.

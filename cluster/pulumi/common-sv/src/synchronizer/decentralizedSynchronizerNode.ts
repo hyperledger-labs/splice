@@ -4,7 +4,10 @@ import * as pulumi from '@pulumi/pulumi';
 import { CLUSTER_HOSTNAME, DomainMigrationIndex } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { Resource } from '@pulumi/pulumi';
 
-import { SvParticipant } from '../participant';
+export interface SvParticipant {
+  readonly asDependencies: pulumi.Resource[];
+  readonly internalClusterAddress: pulumi.Output<string>;
+}
 
 export interface CantonBftSynchronizerNode {
   externalSequencerP2pAddress: string;

@@ -10,9 +10,9 @@ import {
   numNodesPerInstance,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { ServiceMonitor } from '@lfdecentralizedtrust/splice-pulumi-common/src/metrics';
+import { versionFromDefault } from '@lfdecentralizedtrust/splice-pulumi-common/src/version';
 import _ from 'lodash';
 
-import { Version } from '../version';
 import { EnvironmentVariable, multiValidatorConfig } from './config';
 
 export interface BaseMultiNodeArgs {
@@ -89,7 +89,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
               containers: [
                 {
                   name: args.imageName,
-                  image: `${DOCKER_REPO}/${args.imageName}:${Version}`,
+                  image: `${DOCKER_REPO}/${args.imageName}:${versionFromDefault()}`,
                   ...imagePullPolicy,
                   ...args.container,
                   ports: args.container.ports.concat([

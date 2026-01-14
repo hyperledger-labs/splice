@@ -4,13 +4,12 @@
 package org.lfdecentralizedtrust.splice.scan.admin.api.client.commands
 
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes, Uri}
-import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.ledger.api.v2.CommandsOuterClass
 import com.digitalasset.canton.config.{RequireTypes, TlsClientConfig}
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
@@ -29,7 +28,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
-import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as http}
 import org.lfdecentralizedtrust.tokenstandard.{
   allocation,
@@ -40,7 +38,6 @@ import org.lfdecentralizedtrust.tokenstandard.{
 import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
-  ScanClient,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   CompactJsonScanHttpEncodings,
@@ -70,7 +67,6 @@ import com.digitalasset.canton.topology.{
   SequencerId,
   SynchronizerId,
 }
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
@@ -85,95 +81,54 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
 }
-
 import java.util.Base64
 import java.time.Instant
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 import scala.jdk.OptionConverters.*
 import scala.util.Try
 
 object HttpScanAppClient {
+  import http.ScanClient as ScanClient
+  import transferinstruction.v1.Client as TClient
+  import allocationinstruction.v1.Client as IClient
+  import allocation.v1.Client as AClient
+  import metadata.v1.Client as MClient
 
-  abstract class InternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = http.ScanClient
-
-    def createClient(host: String)(implicit
-        httpClient: HttpClient,
-        tc: TraceContext,
-        ec: ExecutionContext,
-        mat: Materializer,
-    ): Client =
-      http.ScanClient.httpClient(HttpClientBuilder().buildClient(Set(StatusCodes.NotFound)), host)
+  abstract class InternalBaseCommand[Res, Result] extends HttpCommand[Res, Result, ScanClient] {
+    override val createGenClientFn = (fn, host, ec, mat) => ScanClient.httpClient(fn, host)(ec, mat)
+    override val nonErrorStatusCodes = Set(StatusCodes.NotFound)
   }
 
-  abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = http.ScanClient
-
-    def createClient(host: String)(implicit
-        httpClient: HttpClient,
-        tc: TraceContext,
-        ec: ExecutionContext,
-        mat: Materializer,
-    ): Client =
-      http.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
+  abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result, ScanClient] {
+    override val createGenClientFn = (fn, host, ec, mat) => ScanClient.httpClient(fn, host)(ec, mat)
   }
 
   abstract class TokenStandardTransferInstructionBaseCommand[Res, Result]
-      extends HttpCommand[Res, Result] {
-    override type Client = transferinstruction.v1.Client
-
-    override def createClient(host: String)(implicit
-        httpClient: HttpClient,
-        tc: TraceContext,
-        ec: ExecutionContext,
-        mat: Materializer,
-    ): Client =
-      transferinstruction.v1.Client.httpClient(HttpClientBuilder().buildClient(), host)
+      extends HttpCommand[Res, Result, TClient] {
+    override val createGenClientFn = (fn, host, ec, mat) => TClient.httpClient(fn, host)(ec, mat)
   }
 
   abstract class TokenStandardAllocationInstructionBaseCommand[Res, Result]
-      extends HttpCommand[Res, Result] {
-    override type Client = allocationinstruction.v1.Client
-
-    override def createClient(host: String)(implicit
-        httpClient: HttpClient,
-        tc: TraceContext,
-        ec: ExecutionContext,
-        mat: Materializer,
-    ): Client =
-      allocationinstruction.v1.Client.httpClient(HttpClientBuilder().buildClient(), host)
+      extends HttpCommand[Res, Result, IClient] {
+    override val createGenClientFn = (fn, host, ec, mat) => IClient.httpClient(fn, host)(ec, mat)
   }
 
-  abstract class TokenStandardMetadataBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = metadata.v1.Client
-
-    override def createClient(host: String)(implicit
-        httpClient: HttpClient,
-        tc: TraceContext,
-        ec: ExecutionContext,
-        mat: Materializer,
-    ): Client =
-      metadata.v1.Client
-        .httpClient(HttpClientBuilder().buildClient(Set(StatusCodes.NotFound)), host)
+  abstract class TokenStandardMetadataBaseCommand[Res, Result]
+      extends HttpCommand[Res, Result, MClient] {
+    override val createGenClientFn = (fn, host, ec, mat) => MClient.httpClient(fn, host)(ec, mat)
+    override val nonErrorStatusCodes = Set(StatusCodes.NotFound)
   }
 
-  abstract class TokenStandardAllocationBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = allocation.v1.Client
-
-    override def createClient(host: String)(implicit
-        httpClient: HttpClient,
-        tc: TraceContext,
-        ec: ExecutionContext,
-        mat: Materializer,
-    ): Client =
-      allocation.v1.Client.httpClient(HttpClientBuilder().buildClient(), host)
+  abstract class TokenStandardAllocationBaseCommand[Res, Result]
+      extends HttpCommand[Res, Result, AClient] {
+    override val createGenClientFn = (fn, host, ec, mat) => AClient.httpClient(fn, host)(ec, mat)
   }
 
   case class GetDsoPartyId(headers: List[HttpHeader])
       extends InternalBaseCommand[http.GetDsoPartyIdResponse, PartyId] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetDsoPartyIdResponse] =
       client.getDsoPartyId(headers)
@@ -191,7 +146,7 @@ object HttpScanAppClient {
       ]] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListDsoRulesVoteRequestsResponse] =
       client.listDsoRulesVoteRequests(headers)
@@ -209,7 +164,7 @@ object HttpScanAppClient {
       extends InternalBaseCommand[http.GetDsoInfoResponse, definitions.GetDsoInfoResponse] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetDsoInfoResponse] =
       client.getDsoInfo(headers)
@@ -264,7 +219,7 @@ object HttpScanAppClient {
       cachedIssuingRounds.map(r => (r.contractId.contractId, r)).toMap
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -311,7 +266,7 @@ object HttpScanAppClient {
       ] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetAmuletRulesResponse] = {
       import MultiDomainAcsStore.ContractState.*
@@ -348,7 +303,7 @@ object HttpScanAppClient {
       ] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[
       Future,
@@ -389,7 +344,7 @@ object HttpScanAppClient {
       ] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetAnsRulesResponse] = {
       import MultiDomainAcsStore.ContractState.*
@@ -423,7 +378,7 @@ object HttpScanAppClient {
       ] {
 
     def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetClosedRoundsResponse] =
       client.getClosedRounds(headers)
@@ -444,7 +399,7 @@ object HttpScanAppClient {
       ] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListFeaturedAppRightsResponse] =
       client.listFeaturedAppRights(headers)
@@ -465,7 +420,7 @@ object HttpScanAppClient {
       ] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.LookupFeaturedAppRightResponse] =
       client.lookupFeaturedAppRight(providerPartyId.toProtoPrimitive, headers)
@@ -484,7 +439,7 @@ object HttpScanAppClient {
       pageSize: Int,
   ) extends InternalBaseCommand[http.ListAnsEntriesResponse, Seq[definitions.AnsEntry]] {
 
-    def submitRequest(client: Client, headers: List[HttpHeader]) =
+    def submitRequest(client: ScanClient, headers: List[HttpHeader]) =
       client.listAnsEntries(namePrefix, pageSize, headers = headers)
 
     override def handleOk()(implicit
@@ -499,7 +454,7 @@ object HttpScanAppClient {
   ) extends InternalBaseCommand[http.LookupAnsEntryByPartyResponse, Option[definitions.AnsEntry]] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ) = client.lookupAnsEntryByParty(party.toProtoPrimitive, headers)
 
@@ -518,7 +473,7 @@ object HttpScanAppClient {
   ) extends InternalBaseCommand[http.LookupAnsEntryByNameResponse, Option[definitions.AnsEntry]] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ) = client.lookupAnsEntryByName(name, headers)
 
@@ -539,7 +494,7 @@ object HttpScanAppClient {
       ]] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ) = client.lookupTransferPreapprovalByParty(party.toProtoPrimitive, headers)
 
@@ -563,7 +518,7 @@ object HttpScanAppClient {
       ]] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ) = client.lookupTransferCommandCounterByParty(party.toProtoPrimitive, headers)
 
@@ -588,7 +543,7 @@ object HttpScanAppClient {
       ]] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ) = client.lookupTransferCommandStatus(Codec.encode(sender), nonce, headers)
 
@@ -606,7 +561,7 @@ object HttpScanAppClient {
       extends InternalBaseCommand[http.GetTotalAmuletBalanceResponse, Option[BigDecimal]] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetTotalAmuletBalanceResponse] =
       client.getTotalAmuletBalance(asOfEndOfRound, headers)
@@ -637,7 +592,7 @@ object HttpScanAppClient {
       extends InternalBaseCommand[http.GetAmuletConfigForRoundResponse, AmuletConfig] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetAmuletConfigForRoundResponse] =
       client.getAmuletConfigForRound(round, headers)
@@ -865,7 +820,7 @@ object HttpScanAppClient {
       ] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -936,7 +891,7 @@ object HttpScanAppClient {
       ] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -1621,7 +1576,7 @@ object HttpScanAppClient {
         ),
       ] {
     override def submitRequest(
-        client: Client,
+        client: TClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -1686,7 +1641,7 @@ object HttpScanAppClient {
         transferinstruction.v1.definitions.TransferFactoryWithChoiceContext,
       ] {
     override def submitRequest(
-        client: Client,
+        client: TClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -1708,7 +1663,7 @@ object HttpScanAppClient {
         ChoiceContextWithDisclosures,
       ] {
     override def submitRequest(
-        client: Client,
+        client: TClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -1743,7 +1698,7 @@ object HttpScanAppClient {
         transferinstruction.v1.definitions.ChoiceContext,
       ] {
     override def submitRequest(
-        client: Client,
+        client: TClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -1771,7 +1726,7 @@ object HttpScanAppClient {
         transferinstruction.v1.definitions.ChoiceContext,
       ] {
     override def submitRequest(
-        client: Client,
+        client: TClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -1798,7 +1753,7 @@ object HttpScanAppClient {
         ChoiceContextWithDisclosures,
       ] {
     override def submitRequest(
-        client: Client,
+        client: TClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -1833,7 +1788,7 @@ object HttpScanAppClient {
         transferinstruction.v1.definitions.ChoiceContext,
       ] {
     override def submitRequest(
-        client: Client,
+        client: TClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -1860,7 +1815,7 @@ object HttpScanAppClient {
         ChoiceContextWithDisclosures,
       ] {
     override def submitRequest(
-        client: Client,
+        client: TClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -1893,7 +1848,7 @@ object HttpScanAppClient {
         allocationinstruction.v1.definitions.FactoryWithChoiceContext,
       ] {
     override def submitRequest(
-        client: Client,
+        client: IClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -1917,7 +1872,7 @@ object HttpScanAppClient {
         ],
       ] {
     override def submitRequest(
-        client: Client,
+        client: IClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -1977,7 +1932,7 @@ object HttpScanAppClient {
         allocation.v1.definitions.ChoiceContext,
       ] {
     override def submitRequest(
-        client: Client,
+        client: AClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -2004,7 +1959,7 @@ object HttpScanAppClient {
         ChoiceContextWithDisclosures,
       ] {
     override def submitRequest(
-        client: Client,
+        client: AClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -2039,7 +1994,7 @@ object HttpScanAppClient {
         allocation.v1.definitions.ChoiceContext,
       ] {
     override def submitRequest(
-        client: Client,
+        client: AClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -2066,7 +2021,7 @@ object HttpScanAppClient {
         ChoiceContextWithDisclosures,
       ] {
     override def submitRequest(
-        client: Client,
+        client: AClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -2101,7 +2056,7 @@ object HttpScanAppClient {
         allocation.v1.definitions.ChoiceContext,
       ] {
     override def submitRequest(
-        client: Client,
+        client: AClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -2128,7 +2083,7 @@ object HttpScanAppClient {
         ChoiceContextWithDisclosures,
       ] {
     override def submitRequest(
-        client: Client,
+        client: AClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -2161,7 +2116,7 @@ object HttpScanAppClient {
         metadata.v1.definitions.GetRegistryInfoResponse,
       ] {
     override def submitRequest(
-        client: Client,
+        client: MClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -2184,7 +2139,7 @@ object HttpScanAppClient {
         metadata.v1.definitions.Instrument
       ]] {
     override def submitRequest(
-        client: Client,
+        client: MClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -2211,7 +2166,7 @@ object HttpScanAppClient {
       ]] {
 
     override def submitRequest(
-        client: Client,
+        client: MClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], metadata.v1.ListInstrumentsResponse] =
       client.listInstruments(pageSize, pageToken, headers)
@@ -2246,7 +2201,7 @@ object HttpScanAppClient {
       )
       .setSynchronizerId(disclosedContract.synchronizerId)
       .setTemplateId(
-        CompactJsonScanHttpEncodings.parseTemplateId(disclosedContract.templateId).toProto
+        CompactJsonScanHttpEncodings().parseTemplateId(disclosedContract.templateId).toProto
       )
       .build()
   }
@@ -2264,7 +2219,7 @@ object HttpScanAppClient {
       )
       .setSynchronizerId(disclosedContract.synchronizerId)
       .setTemplateId(
-        CompactJsonScanHttpEncodings.parseTemplateId(disclosedContract.templateId).toProto
+        CompactJsonScanHttpEncodings().parseTemplateId(disclosedContract.templateId).toProto
       )
       .build()
   }
@@ -2282,7 +2237,7 @@ object HttpScanAppClient {
       )
       .setSynchronizerId(disclosedContract.synchronizerId)
       .setTemplateId(
-        CompactJsonScanHttpEncodings.parseTemplateId(disclosedContract.templateId).toProto
+        CompactJsonScanHttpEncodings().parseTemplateId(disclosedContract.templateId).toProto
       )
       .build()
   }
@@ -2293,7 +2248,7 @@ object HttpScanAppClient {
       ]] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListDsoRulesVoteRequestsResponse] =
       client.listDsoRulesVoteRequests(
@@ -2316,7 +2271,7 @@ object HttpScanAppClient {
       ] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.LookupDsoRulesVoteRequestResponse] =
       client.lookupDsoRulesVoteRequest(
@@ -2349,7 +2304,7 @@ object HttpScanAppClient {
       ]] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ListVoteRequestResultsResponse] =
       client.listVoteRequestResults(
@@ -2388,7 +2343,7 @@ object HttpScanAppClient {
         Contract[VoteRequest.ContractId, VoteRequest]
       ]] {
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
@@ -2417,7 +2372,7 @@ object HttpScanAppClient {
       ] {
 
     override def submitRequest(
-        client: Client,
+        client: ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,

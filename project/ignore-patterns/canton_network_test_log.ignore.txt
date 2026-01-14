@@ -132,3 +132,9 @@ Circuit breaker .* tripped after .* failures.*(Command|Splice)CircuitBreakerTest
 # See DACH-NY/cn-test-failures#6328: In rare cases, creating an index asynchronously can fail.
 # This is more likely in test code where we run multiple apps against the same database, all trying to create the same index.
 Index .* should be created and is invalid, dropping it
+
+# Injected errors in s3Mock
+Simulated S3 write error
+
+# Warnings in s3Mock log (which we redirect to our logs), that we don't care about
+\[s3Mock\].*Ignoring option --illegal-access=warn

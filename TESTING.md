@@ -28,6 +28,7 @@
     - [Helm checks](#helm-checks)
     - [Pulumi tests](#pulumi-tests)
     - [Pulumi state checks](#pulumi-state-checks)
+  - [Performance Tests](#performance-tests)
 - [CI Without Approval](#ci-without-approval)
 
 # Testing in Splice
@@ -420,6 +421,18 @@ Static deployment tests are run on every commit to `main` and on every PR tagged
 They guard against unintended changes to deployed state resulting from changes to Helm charts and Pulumi deployment scripts.
 The tests described here are **not a replacement for testing via cluster deployment**.
 They are meant to provide a quick feedback loop and to offer additional protection against regressions for code paths that are not sufficiently well covered by automatic cluster tests.
+
+## Performance Tests
+
+We have a performance test runner that can be used to run store ingestion performance tests locally. (In the future, also CI).
+To run it and see all options available, run this command in the root of the project:
+
+```
+sbt "apps-app/test:runMain org.lfdecentralizedtrust.splice.performance.SplicePerf"
+```
+
+See also the [design document](https://docs.google.com/document/d/1rvAec6BuKx61TdJ6sY07QRAUA1p_WgedDIisgczFDPI) for upcoming changes.
+
 
 ### Helm checks
 
