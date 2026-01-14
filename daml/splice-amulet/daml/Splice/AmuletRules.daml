@@ -367,7 +367,7 @@ template AmuletRules
     -- - one immediately open-mining-round with 2 ticks left
     -- - one open-mining round that opens in 1 tick
     -- Should only be called ONCE at network genesis.
-    -- Name is slightly outdated, this also takes care of exercising AmuletRules_BootstrapContractStateSchemaVersion
+    -- Name is slightly outdated, as this also takes care of exercising AmuletRules_BootstrapContractStateSchemaVersion
     nonconsuming choice AmuletRules_Bootstrap_Rounds : AmuletRules_Bootstrap_RoundsResult
       with
         amuletPrice : Decimal
