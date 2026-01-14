@@ -51,9 +51,18 @@ abstract class StoreIngestionPerformanceTest(
       .withNewTraceContext(this.getClass.getName) { implicit tc =>
         for {
           _ <- store.ingestionSink.initialize()
+          _ <- sanityCheckTables(storage) { count =>
+            Option.when(count != 0)(
+              s"Expected table to be empty before ingestion, but found $count rows."
+            )
+          }
           txs = loadTxsFromDump()
           _ <- ingestAll(store, txs)
-          _ <- sanityCheckTables(storage)
+          _ <- sanityCheckTables(storage) { count =>
+            Option.when(count == 0)(
+              s"Expected table to be non-empty after ingestion, but no rows were inserted."
+            )
+          }
         } yield ()
       }
   }
@@ -143,10 +152,11 @@ abstract class StoreIngestionPerformanceTest(
   }
 
   protected val tablesToSanityCheck: Seq[String]
+  private type ErrorMessage = String
 
-  /** Make sure that there's at least one row, as otherwise things might not be wired up properly.
-    */
-  private def sanityCheckTables(storage: DbStorage)(implicit tc: TraceContext) = {
+  private def sanityCheckTables(
+      storage: DbStorage
+  )(check: Int => Option[ErrorMessage])(implicit tc: TraceContext) = {
     import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
     Future.traverse(tablesToSanityCheck) { tableName =>
       storage
@@ -157,13 +167,20 @@ abstract class StoreIngestionPerformanceTest(
         .value
         .failOnShutdownToAbortException("Should not be shutting down.")
         .flatMap {
-          case Some(count) if count > 0 =>
-            logger.info(s"Table $tableName has $count rows, sanity check passed.")
-            Future.unit
-          case err =>
+          case Some(count) =>
+            check(count).fold {
+              Future.successful(
+                logger.info(s"Sanity check passed for table $tableName with count $count.")
+              )
+            } { errMsg =>
+              Future.failed(
+                new IllegalStateException(s"Sanity check failed for table $tableName: $errMsg")
+              )
+            }
+          case None =>
             Future.failed(
               new IllegalStateException(
-                s"Sanity check failed for table $tableName. There are $err rows."
+                s"Sanity check failed for table $tableName. Row Count was None."
               )
             )
         }
