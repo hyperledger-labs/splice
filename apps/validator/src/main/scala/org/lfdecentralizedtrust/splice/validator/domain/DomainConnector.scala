@@ -161,19 +161,12 @@ class DomainConnector(
                         Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size)
                     }
 
-                  val amplificationFactor = PositiveInt.tryCreate(
-                    Math.max(
-                      threshold.unwrap,
-                      Thresholds
-                        .sequencerSubmissionRequestAmplification(nonEmptyConnections.size)
-                        .unwrap,
-                    )
-                  )
                   SequencerConnections.tryMany(
                     nonEmptyConnections.forgetNE,
                     threshold,
                     submissionRequestAmplification = SubmissionRequestAmplification(
-                      amplificationFactor,
+                      Thresholds
+                        .sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
                       config.sequencerRequestAmplificationPatience,
                     ),
                     sequencerLivenessMargin =
