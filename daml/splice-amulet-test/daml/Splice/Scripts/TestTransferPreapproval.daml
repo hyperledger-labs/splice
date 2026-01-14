@@ -15,6 +15,8 @@ import Splice.Amulet.TokenApiUtils
 import Splice.ExternalPartyAmuletRules
 import Splice.Fees
 import Splice.Types
+import Splice.Testing.Registries.AmuletRegistry (convertAllFeaturedAppActivityMarkers)
+
 
 createTransferPreapproval : Party -> Party -> Party -> Time -> Script (ContractId TransferPreapproval)
 createTransferPreapproval receiver provider dso expiresAt = do
@@ -171,6 +173,7 @@ testTransferCommand = script do
   featuredAppRight <- featureApp app aliceValidator
 
   context <- getPaymentTransferContextFeaturedApp app alice (Some featuredAppRight)
+  convertAllFeaturedAppActivityMarkers app.dso
 
   amulets <- query @Amulet externalParty
   amulets === []
@@ -208,6 +211,7 @@ testTransferCommand = script do
   amulets <- query @Amulet externalParty
   map snd amulets === [Amulet app.dso externalParty (ExpiringAmount 42.0 (Round 1) (RatePerRound 0.00002))]
   None <- queryContractId app.dso transferCmd
+  convertAllFeaturedAppActivityMarkers app.dso
   appRewards <- query @AppRewardCoupon aliceValidator.primaryParty
   map snd appRewards === [AppRewardCoupon app.dso aliceValidator.primaryParty True 1.0 (Round 1) (Some aliceValidator.primaryParty)]
 
