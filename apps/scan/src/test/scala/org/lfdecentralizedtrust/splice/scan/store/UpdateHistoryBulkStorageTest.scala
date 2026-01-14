@@ -86,7 +86,6 @@ class UpdateHistoryBulkStorageTest
           allUpdates <- mockStore.store.getUpdatesWithoutImportUpdates(
             None,
             HardLimit.tryCreate(segmentSize.toInt, segmentSize.toInt),
-            afterIsInclusive = true,
           )
         } yield {
           val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
@@ -120,7 +119,6 @@ class UpdateHistoryBulkStorageTest
         store.getUpdatesWithoutImportUpdates(
           any[Option[(Long, CantonTimestamp)]],
           any[Limit],
-          anyBoolean,
         )(any[TraceContext])
       ).thenAnswer {
         (
