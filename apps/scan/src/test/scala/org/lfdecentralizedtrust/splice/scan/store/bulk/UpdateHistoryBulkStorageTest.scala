@@ -36,16 +36,21 @@ class UpdateHistoryBulkStorageTest
       withS3Mock {
         val initialStoreSize = 1500
         val segmentSize = 2200L
+        val segmentFromTimestamp = 100L
         val mockStore = new MockUpdateHistoryStore(initialStoreSize)
         val bucketConnection = getS3BucketConnection(loggerFactory)
+        val fromTimestamp =
+          CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp))
+        val toTimestamp =
+          CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp + segmentSize))
         val segment = new UpdateHistorySegmentBulkStorage(
           bulkStorageTestConfig,
           mockStore.store,
           bucketConnection,
           0,
-          CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(0)),
+          fromTimestamp,
           0,
-          CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentSize)),
+          toTimestamp,
           loggerFactory,
         )
         clue(
@@ -74,8 +79,11 @@ class UpdateHistoryBulkStorageTest
             .asScala
           allUpdates <- mockStore.store.getUpdatesWithoutImportUpdates(
             None,
-            HardLimit.tryCreate(segmentSize.toInt, segmentSize.toInt),
-            afterIsInclusive = true,
+            HardLimit.tryCreate(segmentSize.toInt * 2, segmentSize.toInt * 2),
+          )
+          segmentUpdates = allUpdates.filter(update =>
+            update.update.update.recordTime > fromTimestamp &&
+              update.update.update.recordTime <= toTimestamp
           )
         } yield {
           val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
@@ -84,10 +92,11 @@ class UpdateHistoryBulkStorageTest
           val allUpdatesFromS3 = objectKeys.flatMap(
             readUncompressAndDecode(bucketConnection, io.circe.parser.decode[UpdateHistoryItemV2])
           )
+          allUpdatesFromS3.length shouldBe segmentUpdates.length
           allUpdatesFromS3
             .map(
               CompactJsonScanHttpEncodingsWithFieldLabels().httpToLapiUpdate
-            ) should contain theSameElementsInOrderAs allUpdates
+            ) should contain theSameElementsInOrderAs segmentUpdates
         }
       }
     }
@@ -109,17 +118,14 @@ class UpdateHistoryBulkStorageTest
         store.getUpdatesWithoutImportUpdates(
           any[Option[(Long, CantonTimestamp)]],
           any[Limit],
-          anyBoolean,
         )(any[TraceContext])
       ).thenAnswer {
         (
             afterO: Option[(Long, CantonTimestamp)],
             limit: Limit,
-            afterIsInclusive: Boolean,
         ) =>
           Future {
-            val afterIdx = afterO.map { case (_, t) => t.toEpochMilli }.getOrElse(0L)
-            val fromIdx = if (afterIsInclusive) afterIdx else afterIdx + 1
+            val fromIdx = afterO.map { case (_, t) => t.toEpochMilli }.getOrElse(0L) + 1
             val remaining = storeSize - fromIdx
             val numElems = math.min(limit.limit.toLong, remaining)
             Seq
