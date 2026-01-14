@@ -243,7 +243,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       val topologyTransactionsOnTheSync = sv1Backend.sequencerClient.topology.transactions
         .list(store = Synchronizer(decentralizedSynchronizerId))
         .result
-        .size
+        .size - 1 // minus 1 for the logical upgrade transaction
 
       clue("trigger dump") {
         allBackends.par.map { backend =>
@@ -290,12 +290,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
               serial = staticSynchronizerParameters.serial + NonNegativeInt.one
             )
 
-            val oldSequencerNumberOfTopologyTransactions =
-              oldBackend.sequencerClient.topology.transactions
-                .list(store = decentralizedSynchronizerId)
-                .result
-                .size - 1 // minus 1 for the logical upgrade transaction
-
             clue(s"init ${oldBackend.name} sequencer from synchronizer predecessor") {
               newBackend.sequencerClient.health.wait_for_ready_for_initialization()
               newBackend.sequencerClient.setup.initialize_from_synchronizer_predecessor(
@@ -306,7 +300,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
                 newBackend.sequencerClient.topology.transactions
                   .list(decentralizedSynchronizerId)
                   .result
-                  .size shouldBe oldSequencerNumberOfTopologyTransactions
+                  .size shouldBe topologyTransactionsOnTheSync
               }
             }
 
