@@ -722,7 +722,7 @@ export function configureIstio(
       ...publicInfo,
       ...sequencerHighPerformanceGrpcRules,
     ],
-    httpServiceName: 'cn-http-gateway', // TODO (#2723) local service name
+    httpServiceName: 'istio-ingress',
   };
 }
 
