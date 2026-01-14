@@ -99,7 +99,7 @@ class AcsSnapshotStoreTest
         } yield result should be(None)
       }
 
-      "return the latest snapshot before the given timestamp" in {
+      "return correct snapshots before and after given timestamps" in {
         for {
           updateHistory <- mkUpdateHistory()
           store = mkStore(updateHistory)
