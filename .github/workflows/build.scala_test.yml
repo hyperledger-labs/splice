@@ -58,6 +58,11 @@ on:
         required: false
         type: boolean
         default: false
+      postgres_image:
+        description: "The image to use for PostgreSQL"
+        required: false
+        type: string
+        default: "postgres:17"
 
 jobs:
 
@@ -109,10 +114,9 @@ jobs:
 
     services:
       postgres:
-        image: postgres:17
+        image: ${{ inputs.postgres_image }}
         env:
           POSTGRES_PASSWORD: postgres
-          # allegedly this env var only works from pg 16 onwards
           POSTGRES_INITDB_ARGS: "-c max_connections=16000"
 
     steps:

@@ -1,0 +1,28 @@
+name: Wall Clock Tests with Postgres 14
+
+on:
+  # Scheduled workflows run on the latest commit on the default or base branch.
+  schedule:
+    - cron: "0 5 * * *" # Runs every night at 5AM UTC
+
+permissions:
+  id-token: write # Required for GCP Workload Identity for failure notifications
+  contents: read
+
+jobs:
+  scala_test_wall_clock_time:
+    uses: ./.github/workflows/build.scala_test.yml
+    with:
+      runs_on: self-hosted-k8s-large
+      test_names_file: 'test-full-class-names.log'
+      start_canton_options: -w
+      # TODO(DACH-NY/canton-network-node#10912) Investigate why things got slower
+      parallelism: 11
+      test_name: wall-clock-time
+      with_gcp_creds: true
+      skip_if_regex: "\\[bft\\]"
+      commit_sha: ""
+      daml_base_version: ""
+      # This is the Postgres 14 image we built for testing. From 17 onwards, we use the official image.
+      postgres_image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-postgres:0.3.12
+    secrets: inherit

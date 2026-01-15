@@ -71,7 +71,6 @@ jobs:
         image: postgres:17
         env:
           POSTGRES_PASSWORD: postgres
-          # allegedly this env var only works from pg 16 onwards
           POSTGRES_INITDB_ARGS: "-c max_connections=16000"
 
       cometbft1:
