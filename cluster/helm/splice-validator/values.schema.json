@@ -16,10 +16,14 @@
         "connectionType": {
           "type": "string",
           "enum": [
-            "from-scan",
-            "trusted-url",
-            "trusted-svs"
+            "trust-single",
+            "bft",
+            "bft-custom"
           ]
+        },
+        "url": {
+          "type": "string",
+          "description": "Trusted sequencer Url."
         },
         "sequencerNames": {
           "type": "array",
@@ -27,11 +31,12 @@
             "type": "string"
           },
           "default": [],
-          "description": "Optional list of trusted sequencer / SV names."
+          "description": "list of trusted sequencer / SV names. Optional unless connectionType is bft-custom."
         },
-        "url": {
-          "type": "string",
-          "description": "Trusted sequencer Url."
+        "threshold": {
+            "type": "integer",
+            "default": 1,
+            "description": "bft-custom threshold. Optional unless connectionType is bft-custom."
         }
       }
     },
@@ -590,23 +595,35 @@
       "if": {
         "required": ["synchronizer"],
         "properties": {
-          "synchronizer": {
-            "required": ["connectionType"]
-          }
+          "synchronizer": { "required": ["connectionType"] }
         }
       },
       "then": {
         "allOf": [
           {
             "if": {
-              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "from-scan" } } } }
+              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "bft" } } } }
             },
             "then": {
               "properties": {
                 "synchronizer": {
+                  "not": { "required": ["url", "sequencerNames", "threshold"] }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "trust-single" } } } }
+            },
+            "then": {
+              "properties": {
+                "synchronizer": {
+                  "required": ["url"],
                   "properties": {
-                    "url": { "not": {} },
-                    "sequencerNames": { "not": {} }
+                    "url": { "minLength": 1 },
+                    "sequencerNames": false,
+                    "threshold": false
                   }
                 }
               }
@@ -614,27 +631,14 @@
           },
           {
             "if": {
-              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "trusted-url" } } } }
+              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "bft-custom" } } } }
             },
             "then": {
               "properties": {
                 "synchronizer": {
-                  "required": ["url"],
-                  "properties": { "sequencerNames": { "not": {} } }
-                }
-              }
-            }
-          },
-          {
-            "if": {
-              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "trusted-svs" } } } }
-            },
-            "then": {
-              "properties": {
-                "synchronizer": {
-                  "required": ["sequencerNames"],
+                  "required": ["sequencerNames", "threshold"],
                   "properties": {
-                    "url": { "not": {} },
+                    "url": false,
                     "sequencerNames": { "minItems": 1 }
                   }
                 }
