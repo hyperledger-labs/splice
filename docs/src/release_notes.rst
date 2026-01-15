@@ -9,7 +9,8 @@
 
   - Scan
 
-    - ``/v0/total-amulet-balance`` and ``/v0/wallet-balance`` endpoints have been removed.
+    - deprecated ``/v0/total-amulet-balance`` and ``/v0/wallet-balance`` endpoints have been removed in favor of using `/registry/metadata/v1/instruments/{instrumentId} <app_dev/token_standard/openapi/token_metadata.html#get--registry-metadata-v1-instruments-instrumentId>`_
+      and `/v0/holdings/summary <app_dev/scan_api/scan_openapi.html#post--v0-holdings-summary>`_, respectively.
 
 .. release-notes:: 0.5.7
 
