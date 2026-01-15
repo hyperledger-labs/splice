@@ -761,6 +761,55 @@ describe('Wallet user can', () => {
     expect(calledArgs).toHaveLength(1);
   });
 
+  test('shows replacement dialog when accepting proposal for beneficiary with existing delegation', async () => {
+    server.use(featureSupportHandler(true, true));
+
+    const calledAcceptArgs: string[] = [];
+    server.use(
+      rest.post(`${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/accept`, (req, res, ctx) => {
+        calledAcceptArgs.push(req.params.cid.toString());
+        return res(ctx.status(200));
+      })
+    );
+
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+
+    const delegationsLink = await screen.findByRole('link', { name: 'Delegations' });
+    await user.click(delegationsLink);
+
+    // Wait for proposals to load - eve's proposal is first (sorted by expiration, current date first)
+    // Eve has both a delegation (amuletMergeLimit=15) and a proposal (amuletMergeLimit=25)
+    const acceptButtons = await screen.findAllByRole('button', { name: 'Accept' });
+    expect(acceptButtons.length).toBe(mockMintingDelegationProposals.length);
+
+    // Click Accept on eve's proposal (first one after sorting)
+    await user.click(acceptButtons[0]);
+
+    // Verify replacement dialog title appears
+    const dialogTitle = await screen.findByText('Replace Minting Delegation');
+    expect(dialogTitle).toBeInTheDocument();
+
+    // Verify comparison values are shown
+    // Eve's existing delegation: amuletMergeLimit=15
+    // Eve's proposal: amuletMergeLimit=25
+    const existingMaxAmulets = document.querySelector('.existing-max-amulets');
+    const newMaxAmulets = document.querySelector('.new-max-amulets');
+    expect(existingMaxAmulets?.textContent).toBe('15');
+    expect(newMaxAmulets?.textContent).toBe('25');
+
+    // Click proceed
+    const proceedButton = await screen.findByRole('button', { name: 'Proceed' });
+    await user.click(proceedButton);
+
+    // Verify accept was called (backend handles replacement automatically)
+    expect(calledAcceptArgs).toHaveLength(1);
+  });
+
   test('transfer preapproval (without token standard) does not show nor send description if not supported', async () => {
     // token standard as not supported
     server.use(featureSupportHandler(false, false));

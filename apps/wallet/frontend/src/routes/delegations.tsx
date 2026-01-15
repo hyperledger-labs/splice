@@ -3,7 +3,9 @@
 import React, { useState } from 'react';
 
 import {
+  Box,
   Button,
+  Paper,
   Stack,
   Table,
   TableBody,
@@ -96,9 +98,18 @@ export const Delegations: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {proposals.map(proposal => (
-              <ProposalRow key={proposal.contract.contractId} proposal={proposal} />
-            ))}
+            {proposals.map(proposal => {
+              const existingDelegation = delegations.find(
+                d => d.contract.payload.beneficiary === proposal.contract.payload.delegation.beneficiary
+              )?.contract;
+              return (
+                <ProposalRow
+                  key={proposal.contract.contractId}
+                  proposal={proposal}
+                  existingDelegation={existingDelegation}
+                />
+              );
+            })}
           </TableBody>
         </Table>
       )}
@@ -226,9 +237,10 @@ const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
 
 interface ProposalRowProps {
   proposal: MintingDelegationProposalWithStatus;
+  existingDelegation?: Contract<MintingDelegation>;
 }
 
-const ProposalRow: React.FC<ProposalRowProps> = ({ proposal }) => {
+const ProposalRow: React.FC<ProposalRowProps> = ({ proposal, existingDelegation }) => {
   const { acceptMintingDelegationProposal, rejectMintingDelegationProposal } = useWalletClient();
   const { contract, beneficiaryOnboarded } = proposal;
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
@@ -328,13 +340,54 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal }) => {
           showDialog={acceptDialogOpen}
           onAccept={handleAcceptConfirm}
           onClose={handleAcceptClose}
-          title="Accept Minting Delegation Proposal"
+          title={existingDelegation ? "Replace Minting Delegation" : "Accept Minting Delegation Proposal"}
           attributePrefix="accept-proposal"
         >
-          <Typography>
-            Are you sure you want to accept this minting delegation proposal from{' '}
-            {shortenPartyId(delegation.beneficiary)}?
-          </Typography>
+          {existingDelegation ? (
+            <Stack spacing={2}>
+              <Typography variant="body1">
+                A delegation already exists for {shortenPartyId(delegation.beneficiary)}.
+                Accepting this proposal will replace the existing delegation.
+              </Typography>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Max Amulets:
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" color="text.secondary">Current</Typography>
+                    <Typography className="existing-max-amulets">{existingDelegation.payload.amuletMergeLimit}</Typography>
+                  </Box>
+                  <Typography variant="h6">→</Typography>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" color="text.secondary">New</Typography>
+                    <Typography className="new-max-amulets">{delegation.amuletMergeLimit}</Typography>
+                  </Box>
+                </Paper>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Expiration:
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" color="text.secondary">Current</Typography>
+                    <Typography className="existing-expiration"><DateDisplay datetime={existingDelegation.payload.expiresAt} /></Typography>
+                  </Box>
+                  <Typography variant="h6">→</Typography>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" color="text.secondary">New</Typography>
+                    <Typography className="new-expiration"><DateDisplay datetime={delegation.expiresAt} /></Typography>
+                  </Box>
+                </Paper>
+              </Box>
+            </Stack>
+          ) : (
+            <Typography>
+              Are you sure you want to accept this minting delegation proposal from{' '}
+              {shortenPartyId(delegation.beneficiary)}?
+            </Typography>
+          )}
         </ConfirmationDialog>
       </TableCell>
       <TableCell>
