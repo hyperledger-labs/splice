@@ -125,7 +125,7 @@ function backendTargetRef(config: L7GatewayConfig): BackendTargetRef {
  * Creates a GCPBackendPolicy for Cloud Armor integration
  */
 function createGCPBackendPolicy(
-  config: L7GatewayConfig & Required<Pick<L7GatewayConfig, 'securityPolicy'>>,
+  config: L7GatewayConfig,
   gateway: k8s.apiextensions.CustomResource,
   opts?: pulumi.CustomResourceOptions
 ): k8s.apiextensions.CustomResource {
@@ -141,7 +141,7 @@ function createGCPBackendPolicy(
       },
       spec: {
         default: {
-          securityPolicy: config.securityPolicy.name,
+          securityPolicy: config.securityPolicy.id,
         },
         targetRef: backendTargetRef(config),
       },
