@@ -45,25 +45,21 @@ const sortProposals = (
 ): ProposalListingData[] => {
   if (!sortOrder) return data;
 
-  return data.toSorted((a, b) => {
-    if (sortOrder === 'effectiveAtAsc') {
-      // For ascending sort: items with "Threshold" (no specific effective date) go after items with dates
-      const aIsThreshold = a.voteTakesEffect === 'Threshold';
-      const bIsThreshold = b.voteTakesEffect === 'Threshold';
-
-      if (aIsThreshold && bIsThreshold) {
-        // Both are threshold-based, sort by voting deadline
-        return dayjs(a.votingThresholdDeadline).isBefore(dayjs(b.votingThresholdDeadline)) ? -1 : 1;
+  return data
+    .map(item => ({
+      item,
+      effectiveDate: dayjs(
+        item.voteTakesEffect === 'Threshold' ? item.votingThresholdDeadline : item.voteTakesEffect
+      ),
+    }))
+    .toSorted((a, b) => {
+      if (sortOrder === 'effectiveAtAsc') {
+        return a.effectiveDate.isBefore(b.effectiveDate) ? -1 : 1;
+      } else {
+        return a.effectiveDate.isAfter(b.effectiveDate) ? -1 : 1;
       }
-      if (aIsThreshold) return 1;
-      if (bIsThreshold) return -1;
-
-      return dayjs(a.voteTakesEffect).isBefore(dayjs(b.voteTakesEffect)) ? -1 : 1;
-    } else {
-      // effectiveAtDesc: most recent first
-      return dayjs(a.voteTakesEffect).isAfter(dayjs(b.voteTakesEffect)) ? -1 : 1;
-    }
-  });
+    })
+    .map(({ item }) => item);
 };
 
 export const ProposalListingSection: React.FC<ProposalListingSectionProps> = props => {

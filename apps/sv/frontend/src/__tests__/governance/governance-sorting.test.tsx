@@ -15,7 +15,6 @@ import { ProposalListingData } from '../../utils/types';
 describe('Governance Page Sorting', () => {
   describe('Action Required Section', () => {
     test('should render items sorted by voting closes date ascending (closest deadline first)', () => {
-      // Pass data intentionally in unsorted order
       const unsortedRequests: ActionRequiredData[] = [
         {
           actionName: 'Action C - Latest deadline',
@@ -49,7 +48,6 @@ describe('Governance Page Sorting', () => {
       const cards = screen.getAllByTestId('action-required-card');
       expect(cards).toHaveLength(3);
 
-      // Verify order: earliest deadline first
       const actionNames = cards.map(
         card => card.querySelector('[data-testid="action-required-action-content"]')?.textContent
       );
@@ -103,7 +101,6 @@ describe('Governance Page Sorting', () => {
     };
 
     test('should render items sorted by effective date ascending (closest first)', () => {
-      // Pass data intentionally in unsorted order
       const unsortedRequests: ProposalListingData[] = [
         {
           ...baseData,
@@ -154,7 +151,7 @@ describe('Governance Page Sorting', () => {
       expect(actionNames[2]).toBe('Action C - Latest effective');
     });
 
-    test('should place Threshold items after items with specific effective dates', () => {
+    test('should sort Threshold items by their voting deadline alongside dated items', () => {
       const unsortedRequests: ProposalListingData[] = [
         {
           ...baseData,
@@ -192,9 +189,8 @@ describe('Governance Page Sorting', () => {
         row => row.querySelector('[data-testid="inflight-votes-row-action-name"]')?.textContent
       );
 
-      // Dated items should come before Threshold items
-      expect(actionNames[0]).toBe('Dated Action');
-      expect(actionNames[1]).toBe('Threshold Action');
+      expect(actionNames[0]).toBe('Threshold Action');
+      expect(actionNames[1]).toBe('Dated Action');
     });
 
     test('should sort multiple Threshold items by voting deadline', () => {
@@ -260,7 +256,6 @@ describe('Governance Page Sorting', () => {
     };
 
     test('should render items sorted by effective date descending (most recent first)', () => {
-      // Pass data intentionally in unsorted order
       const unsortedRequests: ProposalListingData[] = [
         {
           ...baseData,
@@ -349,7 +344,6 @@ describe('Governance Page Sorting', () => {
         row => row.querySelector('[data-testid="vote-history-row-action-name"]')?.textContent
       );
 
-      // Later time should come first (most recent)
       expect(actionNames[0]).toBe('Action B - Later time');
       expect(actionNames[1]).toBe('Action A - Earlier time');
     });
