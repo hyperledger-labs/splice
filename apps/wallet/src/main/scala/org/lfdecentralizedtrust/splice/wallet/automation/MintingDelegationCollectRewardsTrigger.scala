@@ -255,6 +255,8 @@ class MintingDelegationCollectRewardsTrigger(
         UnclaimedActivityRecord.ContractId,
         UnclaimedActivityRecord,
       ]],
+      // TODO: Handle DevelopmentFundCoupon once it lands on main branch
+      // Issue: https://github.com/hyperledger-labs/splice/issues/3554
   )
 
   private def fetchCouponsData(
