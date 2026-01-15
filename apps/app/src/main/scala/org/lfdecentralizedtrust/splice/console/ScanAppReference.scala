@@ -611,7 +611,7 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.LookupInstrument(instrumentId))
     }
   @Help.Summary(
-    "Get the total amulet balance (total supply)."
+    "Get the total amulet balance (total supply), automatically forces a new acs snapshot to get an up2date response"
   )
   def getTotalAmuletBalance(): Option[BigDecimal] = {
     val _ = forceAcsSnapshotNow()
