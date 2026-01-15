@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 images := \
-	canton \
 	canton-participant \
 	canton-domain \
 	canton-sequencer \
