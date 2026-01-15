@@ -236,7 +236,8 @@ function createHTTPRoute(
                   requestRedirect: {
                     // https://gateway-api.sigs.k8s.io/reference/spec/#httprequestredirectfilter
                     scheme: 'https',
-                    port: 443,
+                    // `port` is unsupported in GKE: https://docs.cloud.google.com/kubernetes-engine/docs/how-to/gatewayclass-capabilities#spec-rules-filters
+                    // but `scheme` is, and the standard port for the scheme is inferred
                     statusCode: 301,
                   },
                 },
