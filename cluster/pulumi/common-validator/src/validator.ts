@@ -47,14 +47,6 @@ export type ValidatorBackupConfig = {
   config: BackupConfig;
 };
 
-export type ValidatorSecrets = {
-  validatorSecret: Secret;
-  legacyValidatorSecret?: Secret;
-  wallet: Secret;
-  cns: Secret;
-  auth0Client: Auth0Client;
-};
-
 type BasicValidatorConfig = {
   xns: ExactNamespace;
   topupConfig?: ValidatorTopupConfig;
@@ -179,8 +171,6 @@ export async function installValidatorApp(
     },
   };
 
-  const chartVersion = config.version;
-
   return installSpliceHelmChart(
     config.xns,
     `validator-${config.xns.logicalName}`,
@@ -249,7 +239,7 @@ export async function installValidatorApp(
       resources: baseConfig.svValidator ? config.resources : {},
       ...spliceInstanceNames,
     },
-    chartVersion,
+    config.version,
     { dependsOn }
   );
 }

@@ -81,6 +81,7 @@ class AcsSnapshotStore(
       }
     }.flatMap { _ =>
       val from = lastSnapshot.map(_.snapshotRecordTime).getOrElse(CantonTimestamp.MinValue)
+      val gtFrom = lastSnapshot.fold(">=")(_ => ">")
       val previousSnapshotDataFilter = lastSnapshot match {
         case Some(AcsSnapshot(_, _, _, firstRowId, lastRowId, _, _)) =>
           sql"where snapshot.row_id >= $firstRowId and snapshot.row_id <= $lastRowId"
@@ -91,8 +92,8 @@ class AcsSnapshotStore(
         sql"""
           where #$tableAlias.history_id = $historyId
             and #$tableAlias.migration_id = $migrationId
-            and #$tableAlias.record_time >= $from -- this will be >= MinValue for the first snapshot, which includes ACS imports
-            and #$tableAlias.record_time < $until
+            and #$tableAlias.record_time #$gtFrom $from -- this will be >= MinValue for the first snapshot, which includes ACS imports, otherwise >
+            and #$tableAlias.record_time <= $until
            """
       val statement = (sql"""
             with previous_snapshot_data as (select contract_id

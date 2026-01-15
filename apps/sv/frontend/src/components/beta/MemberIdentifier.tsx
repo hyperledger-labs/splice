@@ -30,6 +30,7 @@ const MemberIdentifier: React.FC<MemberIdentifierProps> = ({
 }) => (
   <CopyableIdentifier
     value={abbreviatePartyId(partyId)}
+    copyValue={partyId}
     badge={isYou ? 'You' : undefined}
     size={size}
     data-testid={testId}

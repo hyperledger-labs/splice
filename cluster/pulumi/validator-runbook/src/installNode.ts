@@ -220,6 +220,7 @@ async function installValidator(
         : validatorValuesFromYamlFiles.migration.migrating,
     },
     scanClient: validatorConfig.validatorApp?.scanClient,
+    synchronizer: validatorConfig.validatorApp?.synchronizer,
     metrics: {
       enable: true,
     },
@@ -246,6 +247,7 @@ async function installValidator(
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     additionalEnvVars: validatorConfig.validatorApp?.additionalEnvVars,
     additionalJvmOptions: validatorConfig.validatorApp?.additionalJvmOptions,
+    resources: validatorConfig.validatorApp?.resources,
   };
 
   const validatorValuesWithOnboardingOverride = onboardingSecret

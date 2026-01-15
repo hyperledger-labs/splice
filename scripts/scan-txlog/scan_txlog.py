@@ -3796,6 +3796,8 @@ class State:
                 return self.handle_transfer_preapproval_send(transaction, event)
             case "TransferPreapproval_Cancel":
                 return HandleTransactionResult.empty()
+            case "DsoRules_ExpireTransferPreapproval":
+                return HandleTransactionResult.empty()
             case "TransferCommand_Send":
                 return self.handle_transfer_command_send(transaction, event)
             case "LockedAmulet_Unlock":
@@ -4360,7 +4362,7 @@ async def main():
                     TransactionTree.parse(tx)
                     for tx in json_batch
                     if (stop_at_record_time is None)
-                    or (datetime.fromisoformat(tx["record_time"]) < stop_at_record_time)
+                    or (datetime.fromisoformat(tx["record_time"]) <= stop_at_record_time)
                 ]
                 LOG.debug(
                     f"Processing batch of size {len(batch)} starting at {app_state.pagination_key}"

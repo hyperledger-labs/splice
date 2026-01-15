@@ -3,45 +3,37 @@
 
 package org.lfdecentralizedtrust.splice.scan.store
 
-import com.daml.ledger.javaapi.data as javaapi
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import com.github.luben.zstd.ZstdDirectBufferDecompressingStream
-import com.google.protobuf.ByteString
-import io.netty.buffer.PooledByteBufAllocator
-import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
 import org.lfdecentralizedtrust.splice.scan.store.bulk.{
   AcsSnapshotBulkStorage,
   BulkStorageConfig,
   S3BucketConnection,
-  S3Config,
 }
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest}
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
-import org.lfdecentralizedtrust.splice.util.{EventId, PackageQualifiedName, ValueJsonCodecCodegen}
+import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito
 import org.mockito.invocation.InvocationOnMock
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
-import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.model.{ListObjectsRequest, S3Object}
+import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
-import java.net.URI
 import java.nio.ByteBuffer
-import java.nio.charset.StandardCharsets
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.FutureConverters.*
 import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.*
-import scala.sys.process.*
-import scala.util.Using
 
-class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with HasActorSystem {
+class AcsSnapshotBulkStorageTest
+    extends StoreTest
+    with HasExecutionContext
+    with HasActorSystem
+    with HasS3Mock {
 
   val acsSnapshotSize = 48500
   val bulkStorageTestConfig = BulkStorageConfig(
@@ -49,12 +41,12 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
     50000L,
   )
 
-  "AcsSnapshotSourceTest" should {
+  "AcsSnapshotBulkStorage" should {
     "work" in {
-      withS3Mock({
+      withS3Mock {
         val store = mockAcsSnapshotStore(acsSnapshotSize)
         val timestamp = CantonTimestamp.now()
-        val s3BucketConnection = getS3BucketConnectionWithInjectedErrors()
+        val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(loggerFactory)
         for {
           _ <- new AcsSnapshotBulkStorage(
             bulkStorageTestConfig,
@@ -86,79 +78,18 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
           }
           objectKeys.last.key() should endWith("_last.zstd")
 
-          val allContractsFromS3 = objectKeys
-            .map(readUncompressAndDecode(s3BucketConnection))
-            .flatten
+          val allContractsFromS3 = objectKeys.flatMap(
+            readUncompressAndDecode(
+              s3BucketConnection,
+              io.circe.parser.decode[httpApi.CreatedEvent],
+            )
+          )
           allContractsFromS3.map(
-            reconstructFromS3
+            CompactJsonScanHttpEncodingsWithFieldLabels().httpToJavaCreatedEvent
           ) should contain theSameElementsInOrderAs allContracts.map(_.event)
         }
-      })
+      }
     }
-  }
-
-  // TODO(#3429): consider running s3Mock container as a service in GHA instead of starting it here
-  def withS3Mock[A](test: => Future[A]): Future[A] = {
-    Seq(
-      "docker",
-      "run",
-      "-p",
-      "9090:9090",
-      "-e",
-      "COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS=bucket",
-      "-d",
-      "--rm",
-      "--name",
-      "s3mock",
-      "adobe/s3mock",
-    ).!
-    test.andThen({ case _ => Seq("docker", "stop", "s3mock").! })
-  }
-
-  def readUncompressAndDecode(
-      s3BucketConnection: S3BucketConnection
-  )(s3obj: S3Object): Array[httpApi.CreatedEvent] = {
-    val bufferAllocator = PooledByteBufAllocator.DEFAULT
-    val compressed = s3BucketConnection.readFullObject(s3obj.key()).futureValue
-    val compressedDirect = bufferAllocator.directBuffer(compressed.capacity())
-    val uncompressedDirect = bufferAllocator.directBuffer(compressed.capacity() * 200)
-    val uncompressedNio = uncompressedDirect.nioBuffer(0, uncompressedDirect.capacity())
-    compressedDirect.writeBytes(compressed)
-    Using(new ZstdDirectBufferDecompressingStream(compressedDirect.nioBuffer())) {
-      _.read(uncompressedNio)
-    }
-    uncompressedNio.flip()
-    val allContractsStr = StandardCharsets.UTF_8.newDecoder().decode(uncompressedNio).toString
-    val allContracts = allContractsStr.split("\n")
-    compressedDirect.release()
-    uncompressedDirect.release()
-    allContracts.map(io.circe.parser.decode[httpApi.CreatedEvent](_).value)
-  }
-
-  // Similar to CompactJsonScanHttpEncodings.httpToJavaCreatedEvent, but does preserve field names, as we want to assert on their equality.
-  def reconstructFromS3(createdEvent: httpApi.CreatedEvent): javaapi.CreatedEvent = {
-    val templateId = CompactJsonScanHttpEncodings.parseTemplateId(createdEvent.templateId)
-    new javaapi.CreatedEvent(
-      /*witnessParties = */ java.util.Collections.emptyList(),
-      /*offset = */ 0, // not populated
-      /*nodeId = */ EventId.nodeIdFromEventId(createdEvent.eventId),
-      templateId,
-      createdEvent.packageName,
-      createdEvent.contractId,
-      ValueJsonCodecCodegen
-        .deserializableContractPayload(templateId, createdEvent.createArguments.noSpaces)
-        .value,
-      /*createdEventBlob = */ ByteString.EMPTY,
-      /*interfaceViews = */ java.util.Collections.emptyMap(),
-      /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
-      /* contractKey = */ None.toJava,
-      createdEvent.signatories.asJava,
-      createdEvent.observers.asJava,
-      createdEvent.createdAt.toInstant,
-      /* acsDelta = */ false,
-      /* representativePackageId = */ templateId.getPackageId,
-    )
-
   }
 
   def mockAcsSnapshotStore(snapshotSize: Int): AcsSnapshotStore = {
@@ -209,14 +140,10 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
     store
   }
 
-  def getS3BucketConnectionWithInjectedErrors(): S3BucketConnection = {
-    val s3Config = S3Config(
-      URI.create("http://localhost:9090"),
-      "bucket",
-      Region.US_EAST_1,
-      AwsBasicCredentials.create("mock_id", "mock_key"),
-    )
-    val s3BucketConnection = S3BucketConnection(s3Config, "bucket", loggerFactory)
+  def getS3BucketConnectionWithInjectedErrors(
+      loggerFactory: NamedLoggerFactory
+  ): S3BucketConnection = {
+    val s3BucketConnection: S3BucketConnection = getS3BucketConnection(loggerFactory)
     val s3BucketConnectionWithErrors = Mockito.spy(s3BucketConnection)
     var failureCount = 0
     val _ = doAnswer { (invocation: InvocationOnMock) =>
@@ -236,4 +163,5 @@ class AcsSnapshotBulkStorageTest extends StoreTest with HasExecutionContext with
       .writeFullObject(anyString(), any[ByteBuffer])(any[TraceContext], any[ExecutionContext])
     s3BucketConnectionWithErrors
   }
+
 }

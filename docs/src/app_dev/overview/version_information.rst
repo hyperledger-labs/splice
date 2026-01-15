@@ -56,6 +56,6 @@ Follow these steps to install a recent, compatible OSS Daml SDK version:
    while replacing ``3.3.0-snapshot.20250603.0`` with the version you selected in the first step.
 
 For more information about installing the Daml SDK, see the
-`Daml assistant installation guide <https://docs.digitalasset.com/build/3.3/component-howtos/smart-contracts/assistant.html#install>`__.
+`Daml assistant installation guide <https://docs.digitalasset.com/build/3.4/component-howtos/smart-contracts/assistant.html#install>`__.
 
 
