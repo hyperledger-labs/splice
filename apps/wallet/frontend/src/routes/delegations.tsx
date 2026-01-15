@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import React from 'react';
+import React, { useState } from 'react';
 
 import {
   Button,
@@ -12,7 +12,12 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { DateDisplay, DisableConditionally, Loading } from '@lfdecentralizedtrust/splice-common-frontend';
+import {
+  ConfirmationDialog,
+  DateDisplay,
+  DisableConditionally,
+  Loading,
+} from '@lfdecentralizedtrust/splice-common-frontend';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useMutation } from '@tanstack/react-query';
 
@@ -129,6 +134,7 @@ interface DelegationRowProps {
 const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
   const { withdrawMintingDelegation } = useWalletClient();
   const { contract, beneficiaryOnboarded } = delegation;
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
   const withdrawMutation = useMutation({
     mutationFn: async () => {
@@ -138,6 +144,19 @@ const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
       console.error('Failed to withdraw minting delegation', error);
     },
   });
+
+  const handleWithdrawClick = () => {
+    setConfirmDialogOpen(true);
+  };
+
+  const handleConfirmAccept = () => {
+    withdrawMutation.mutate();
+    setConfirmDialogOpen(false);
+  };
+
+  const handleConfirmClose = () => {
+    setConfirmDialogOpen(false);
+  };
 
   return (
     <TableRow
@@ -178,11 +197,23 @@ const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
             variant="outlined"
             size="small"
             className="delegation-withdraw"
-            onClick={() => withdrawMutation.mutate()}
+            onClick={handleWithdrawClick}
           >
             Withdraw
           </Button>
         </DisableConditionally>
+        <ConfirmationDialog
+          showDialog={confirmDialogOpen}
+          onAccept={handleConfirmAccept}
+          onClose={handleConfirmClose}
+          title="Withdraw Minting Delegation"
+          attributePrefix="withdraw-delegation"
+        >
+          <Typography>
+            Are you sure you want to withdraw this minting delegation for{' '}
+            {shortenPartyId(contract.payload.beneficiary)}?
+          </Typography>
+        </ConfirmationDialog>
       </TableCell>
     </TableRow>
   );
@@ -195,6 +226,8 @@ interface ProposalRowProps {
 const ProposalRow: React.FC<ProposalRowProps> = ({ proposal }) => {
   const { acceptMintingDelegationProposal, rejectMintingDelegationProposal } = useWalletClient();
   const { contract, beneficiaryOnboarded } = proposal;
+  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
 
   const acceptMutation = useMutation({
     mutationFn: async () => {
@@ -213,6 +246,32 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal }) => {
       console.error('Failed to reject minting delegation proposal', error);
     },
   });
+
+  const handleAcceptClick = () => {
+    setAcceptDialogOpen(true);
+  };
+
+  const handleAcceptConfirm = () => {
+    acceptMutation.mutate();
+    setAcceptDialogOpen(false);
+  };
+
+  const handleAcceptClose = () => {
+    setAcceptDialogOpen(false);
+  };
+
+  const handleRejectClick = () => {
+    setRejectDialogOpen(true);
+  };
+
+  const handleRejectConfirm = () => {
+    rejectMutation.mutate();
+    setRejectDialogOpen(false);
+  };
+
+  const handleRejectClose = () => {
+    setRejectDialogOpen(false);
+  };
 
   const delegation = contract.payload.delegation;
 
@@ -255,11 +314,23 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal }) => {
             variant="outlined"
             size="small"
             className="proposal-accept"
-            onClick={() => acceptMutation.mutate()}
+            onClick={handleAcceptClick}
           >
             Accept
           </Button>
         </DisableConditionally>
+        <ConfirmationDialog
+          showDialog={acceptDialogOpen}
+          onAccept={handleAcceptConfirm}
+          onClose={handleAcceptClose}
+          title="Accept Minting Delegation Proposal"
+          attributePrefix="accept-proposal"
+        >
+          <Typography>
+            Are you sure you want to accept this minting delegation proposal from{' '}
+            {shortenPartyId(delegation.beneficiary)}?
+          </Typography>
+        </ConfirmationDialog>
       </TableCell>
       <TableCell>
         <DisableConditionally
@@ -274,11 +345,23 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal }) => {
             variant="outlined"
             size="small"
             className="proposal-reject"
-            onClick={() => rejectMutation.mutate()}
+            onClick={handleRejectClick}
           >
             Reject
           </Button>
         </DisableConditionally>
+        <ConfirmationDialog
+          showDialog={rejectDialogOpen}
+          onAccept={handleRejectConfirm}
+          onClose={handleRejectClose}
+          title="Reject Minting Delegation Proposal"
+          attributePrefix="reject-proposal"
+        >
+          <Typography>
+            Are you sure you want to reject this minting delegation proposal from{' '}
+            {shortenPartyId(delegation.beneficiary)}?
+          </Typography>
+        </ConfirmationDialog>
       </TableCell>
     </TableRow>
   );
