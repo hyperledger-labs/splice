@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLivenessActivityRecord
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.mintingdelegation as mintingDelegationCodegen
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.automation.Trigger
 import org.lfdecentralizedtrust.splice.console.ValidatorAppBackendReference
@@ -47,6 +48,11 @@ class WalletMintingDelegationTimeBasedIntegrationTest
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withTrafficTopupsDisabled
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+          _.copy(zeroTransferFees = true)
+        )(config)
+      )
 
   "Wallet MintingDelegation APIs" should {
     "allow validator to list, accept, and reject minting delegation proposals and delegations" in {
@@ -554,14 +560,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
           (validatorRewardAmount * BigDecimal(issuingRound.issuancePerValidatorRewardCoupon)) +
           unclaimedActivityAmount
 
-      val (openRoundsForFee, _) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
-      val openRoundForFee = openRoundsForFee.head
-      val createFee = BigDecimal(
-        openRoundForFee.payload.transferConfigUsd.createFee.fee
-      ) / BigDecimal(openRoundForFee.payload.amuletPrice)
-
-      actualIncrease should be >= (expectedTotalReward - createFee)
-      actualIncrease should be <= expectedTotalReward
+      actualIncrease shouldBe expectedTotalReward
 
       // Test merge behavior at 2x limit
       def getAmuletCount() = {
