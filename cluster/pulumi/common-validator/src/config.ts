@@ -3,6 +3,7 @@
 import {
   DeployValidatorRunbook,
   EnvVarConfigSchema,
+  K8sResourceSchema,
   KmsConfigSchema,
   LogLevelSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
@@ -64,11 +65,20 @@ export const ValidatorAppConfigSchema = z.object({
   additionalJvmOptions: z.string().optional(),
   scanClient: ScanClientConfigSchema.optional(),
   synchronizer: SynchronizerConfigSchema.optional(),
+  resources: K8sResourceSchema,
 });
 
 export const ParticipantConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
   additionalJvmOptions: z.string().optional(),
+  resources: K8sResourceSchema.default({
+    requests: {
+      memory: '4Gi',
+    },
+    limits: {
+      memory: '8Gi',
+    },
+  }),
 });
 
 export const ValidatorNodeConfigSchema = z.object({
@@ -86,7 +96,7 @@ export const ValidatorNodeConfigSchema = z.object({
       retention: z.string(),
     })
     .optional(),
-  participant: ParticipantConfigSchema.optional(),
+  participant: ParticipantConfigSchema.default({}),
   validatorApp: ValidatorAppConfigSchema.optional(),
   disableAuth: z.boolean().default(false), // Note that this is currently ignored everywhere except for validator1, where it is used for testing only
 });
