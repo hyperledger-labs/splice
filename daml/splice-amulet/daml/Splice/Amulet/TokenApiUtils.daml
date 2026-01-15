@@ -43,7 +43,7 @@ nonZeroMetadata k n m
 
 -- | Add an metadata entry for an optional value if it is non-zero number.
 optionalNonZeroMetadata : (Eq a, Additive a, Show a) => Text -> Optional a -> TextMap Text -> TextMap Text
-optionalNonZeroMetadata k optN m = 
+optionalNonZeroMetadata k optN m =
   case optN of
     None -> m
     Some n -> nonZeroMetadata k n m
@@ -140,11 +140,8 @@ instance Monoid Metadata  where
 -- Choice context keys for splice
 ---------------------------------
 
-amuletRulesContextKey : Text
-amuletRulesContextKey = "amulet-rules"
-
-openRoundContextKey : Text
-openRoundContextKey = "open-round"
+externalPartyConfigStateContextKey : Text
+externalPartyConfigStateContextKey = "external-party-config-state"
 
 featuredAppRightContextKey : Text
 featuredAppRightContextKey = "featured-app-right"

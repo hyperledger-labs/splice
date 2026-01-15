@@ -37,6 +37,7 @@ import qualified Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferIns
 import Splice.Api.Token.MetadataV1
 import Splice.Testing.Apps.TradingApp
 import Splice.Testing.TokenStandard.WalletClient qualified as WalletClient
+import Splice.Testing.Registries.AmuletRegistry (convertAllFeaturedAppActivityMarkers)
 
 createPaymentRequest : AmuletApp -> Party -> Party -> [(Party, PaymentAmount)] -> Script (ContractId AppPaymentRequest)
 createPaymentRequest app provider sender receiverAmounts = do
@@ -267,6 +268,8 @@ testAmuletPaymentRequest = script do
 
   let transferConfigAmulet = transferConfigAmuletFromOpenRound round
 
+  convertAllFeaturedAppActivityMarkers app.dso
+
   [] <- query @AppRewardCoupon provider1.primaryParty
 
   [(_, coupon)] <- query @AppRewardCoupon aliceValidator.primaryParty
@@ -493,6 +496,7 @@ testInsufficientFundsBatchAmuletPaymentRequests = script do
     context
 
   -- first command errors, second command is still executed
+  debug outcomes
   let [COO_Error _, COO_AcceptedAppPayment payment3Cid] = outcomes
   Some acceptedPayment4 <- queryContractId alice.primaryParty payment3Cid
 

@@ -427,6 +427,7 @@ data DsoRulesConfig = DsoRulesConfig with
 getVoteCooldownTime : DsoRulesConfig -> RelTime
 getVoteCooldownTime config = fromOptional (minutes 1) config.voteCooldownTime
 
+
 data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     time : Time
       -- ^ The time at which the migration is scheduled to start.
@@ -1502,7 +1503,6 @@ template DsoRules with
         UnclaimedActivityRecord_DsoExpireResult unclaimedRewardCid <-
           exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
-
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =

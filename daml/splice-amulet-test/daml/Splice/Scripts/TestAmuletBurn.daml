@@ -11,6 +11,8 @@ import Splice.ValidatorLicense
 
 import Splice.Scripts.Util
 
+import Splice.Testing.Registries.AmuletRegistry (advanceToNextRoundChange)
+
 -- | Note to readers: try commenting suffixes of this script out to
 -- see the various steps in action.
 testAmuletBurn : Script ()
@@ -18,7 +20,7 @@ testAmuletBurn = do
   -- bootstrap app
   app <- setupApp
 
-  advanceToNextRoundChange app
+  advanceToNextRoundChange app.dso
 
   -- -- start issuing
   runNextIssuance app
