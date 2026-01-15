@@ -8,10 +8,10 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, PekkoUtil}
-import com.digitalasset.canton.util.PekkoUtil.{RetrySourcePolicy, WithKillSwitch}
+import com.digitalasset.canton.util.PekkoUtil.RetrySourcePolicy
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, OverflowStrategy}
-import org.apache.pekko.stream.scaladsl.{Keep, Source}
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
@@ -24,8 +24,8 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration.FiniteDuration
+
 import Position.*
-import org.apache.pekko.Done
 
 object Position {
   sealed trait Position
@@ -73,10 +73,7 @@ class AcsSnapshotBulkStorage(
 
   }
 
-  private[bulk] def getSingleAcsSnapshotDumpSource(
-      migrationId: Long,
-      timestamp: CantonTimestamp,
-  ): Source[WithKillSwitch[Int], (KillSwitch, Future[Done])] = {
+  def dumpAcsSnapshot(migrationId: Long, timestamp: CantonTimestamp): Future[Unit] = {
 
     def mksrc = {
       val idx = new AtomicInteger(0)
@@ -132,5 +129,7 @@ class AcsSnapshotBulkStorage(
         mkSource = (_: Unit) => mksrc,
         policy = policy,
       )
-  }
+      .runWith(Sink.ignore)
+
+  }.map(_ => ())
 }
