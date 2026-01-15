@@ -13,19 +13,24 @@ import { z } from 'zod';
 export const SynchronizerConfigSchema = z.union([
   z
     .object({
-      connectionType: z.literal('trusted-url'),
+      connectionType: z.literal('trust-single'),
       url: z.string().min(1),
     })
     .strict(),
   z
     .object({
-      connectionType: z.literal('trusted-svs'),
+      connectionType: z.literal('bft-custom'),
       sequencerNames: z.array(z.string()).min(1),
+      threshold: z.number().int().min(1),
     })
-    .strict(),
+    .strict()
+    .refine(data => data.sequencerNames.length >= data.threshold, {
+      message: 'sequencerNames length must be greater than or equal to the threshold',
+      path: ['threshold'], // Point the error to the threshold field
+    }),
   z
     .object({
-      connectionType: z.literal('from-scan').default('from-scan'),
+      connectionType: z.literal('bft').default('bft'),
     })
     .strict(),
 ]);
