@@ -35,7 +35,7 @@
         },
         "threshold": {
             "type": "integer",
-            "default": 1,
+            "minimum": 0,
             "description": "bft-custom threshold. Optional unless connectionType is bft-custom."
         }
       }
@@ -59,7 +59,7 @@
         },
         "threshold": {
           "type": "integer",
-          "default": 0,
+          "minimum": 0,
           "description": "bft-custom threshold. Optional unless scan-type is bft-custom."
         },
         "trustedSvs": {
