@@ -147,6 +147,7 @@ class MintingDelegationCollectRewardsTrigger(
       validatorRightOpt: Option[Contract[ValidatorRight.ContractId, ValidatorRight]],
   )(implicit tc: TraceContext): Future[Boolean] = {
     val mergeLimit = delegation.payload.amuletMergeLimit.longValue()
+    val maxNumInputs = openRound.payload.transferConfigUsd.maxNumInputs.intValue()
     // Ignore ValidatorRewardCoupons if we don't have the ValidatorRight to collect them as beneficiary
     val validatorRewardCouponsToCollect =
       if (validatorRightOpt.isDefined) couponsData.validatorRewardCoupons else Seq.empty
@@ -173,7 +174,7 @@ class MintingDelegationCollectRewardsTrigger(
         validatorRewardCoupons = validatorRewardCouponsToCollect
       )
 
-      val inputs = buildTransferInputs(filteredCouponsData, amuletsToMerge)
+      val inputs = buildTransferInputs(filteredCouponsData, amuletsToMerge, maxNumInputs)
       val transferContext =
         buildTransferContext(openRound, openIssuingRounds, filteredCouponsData, validatorRightOpt)
       val paymentContext = new PaymentTransferContext(
@@ -284,6 +285,7 @@ class MintingDelegationCollectRewardsTrigger(
         Amulet.ContractId,
         Amulet,
       ]],
+      maxNumInputs: Int,
   ): Seq[TransferInput] = {
     val livenessInputs: Seq[TransferInput] = couponsData.livenessActivityRecords.map { record =>
       new InputValidatorLivenessActivityRecord(record.contractId): TransferInput
@@ -307,7 +309,9 @@ class MintingDelegationCollectRewardsTrigger(
       new InputAmulet(amulet.contractId): TransferInput
     }
 
-    livenessInputs ++ validatorCouponInputs ++ appCouponInputs ++ unclaimedActivityRecordInputs ++ amuletInputs
+    val allInputs = livenessInputs ++ validatorCouponInputs ++ appCouponInputs ++
+      unclaimedActivityRecordInputs ++ amuletInputs
+    allInputs.take(maxNumInputs)
   }
 
   private def buildTransferContext(
