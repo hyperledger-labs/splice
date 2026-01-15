@@ -58,6 +58,11 @@ on:
         required: false
         type: boolean
         default: false
+      postgres_image:
+        description: "The image to use for PostgreSQL"
+        required: false
+        type: string
+        default: "postgres:17"
 
 jobs:
 
@@ -109,9 +114,10 @@ jobs:
 
     services:
       postgres:
-        image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-postgres:0.3.12
+        image: ${{ inputs.postgres_image }}
         env:
           POSTGRES_PASSWORD: postgres
+          POSTGRES_INITDB_ARGS: "-c max_connections=16000"
 
     steps:
 
