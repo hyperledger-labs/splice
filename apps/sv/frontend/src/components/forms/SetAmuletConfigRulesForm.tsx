@@ -71,7 +71,7 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
             type: 'custom',
             effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
           },
-          url: 'https://',
+          url: '',
           summary: '',
         },
         config: {},
@@ -89,7 +89,7 @@ export const SetAmuletConfigRulesForm: () => JSX.Element = () => {
           type: 'custom',
           effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
         },
-        url: 'https://',
+        url: '',
         summary: '',
       },
       config: amuletConfigChanges.reduce((acc, field) => {

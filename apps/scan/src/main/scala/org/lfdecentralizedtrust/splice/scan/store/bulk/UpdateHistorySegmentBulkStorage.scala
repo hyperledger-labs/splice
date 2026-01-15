@@ -112,20 +112,17 @@ class UpdateHistorySegmentBulkStorage(
           updateHistory.getUpdatesWithoutImportUpdates(
             Some((fromMigrationId, fromTimestamp)),
             HardLimit.tryCreate(config.dbReadChunkSize),
-            afterIsInclusive = true,
           )
         )(after =>
           updateHistory.getUpdatesWithoutImportUpdates(
             Some((after._1, after._2)),
             HardLimit.tryCreate(config.dbReadChunkSize),
-            afterIsInclusive = false,
           )
         )
 
-      // TODO(#3429): Figure out the < vs <= issue
       updatesInSegment = updates.filter(update =>
         update.migrationId < toMigrationId ||
-          update.migrationId == toMigrationId && update.update.update.recordTime < toTimestamp
+          update.migrationId == toMigrationId && update.update.update.recordTime <= toTimestamp
       )
       _ <-
         if (updatesInSegment.length < updates.length || updates.length == config.dbReadChunkSize) {

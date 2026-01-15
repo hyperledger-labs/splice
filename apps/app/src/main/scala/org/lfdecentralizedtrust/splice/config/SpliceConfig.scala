@@ -678,6 +678,9 @@ object SpliceConfig {
       deriveReader[ValidatorExtraSynchronizerConfig]
     implicit val validatorSynchronizerConfigReader: ConfigReader[ValidatorSynchronizerConfig] =
       deriveReader[ValidatorSynchronizerConfig]
+    implicit val validatorTrustedSynchronizerConfigReader
+        : ConfigReader[ValidatorTrustedSynchronizerConfig] =
+      deriveReader[ValidatorTrustedSynchronizerConfig]
     implicit val offsetDateTimeConfigurationReader: ConfigReader[java.time.OffsetDateTime] =
       implicitly[ConfigReader[String]].map(java.time.OffsetDateTime.parse)
     implicit val transferPreapprovalConfigReader: ConfigReader[TransferPreapprovalConfig] =
@@ -700,10 +703,19 @@ object SpliceConfig {
           ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(conf).participant
         for {
           _ <- Either.cond(
-            !(conf.domains.global.url.isDefined && conf.domains.global.sequencerNames.isDefined),
+            !(conf.domains.global.url.isDefined && conf.domains.global.trustedSynchronizerConfig.isDefined),
             (),
             ConfigValidationFailed(
-              "Configuration error: `url` and `sequencerNames` cannot both be specified for the global domain."
+              "Configuration error: `url` and `trustedSynchronizerConfig` are mutually exclusive parameters."
+            ),
+          )
+          _ <- Either.cond(
+            conf.domains.global.trustedSynchronizerConfig.forall(c =>
+              c.sequencerNames.length >= c.threshold
+            ),
+            (),
+            ConfigValidationFailed(
+              "Configuration error: Length of sequencerNames should be greater than or equal to threshold."
             ),
           )
           _ <- Either.cond(
@@ -1028,6 +1040,9 @@ object SpliceConfig {
       deriveWriter[ValidatorExtraSynchronizerConfig]
     implicit val validatorSynchronizerConfigWriter: ConfigWriter[ValidatorSynchronizerConfig] =
       deriveWriter[ValidatorSynchronizerConfig]
+    implicit val validatorTrustedSynchronizerConfigWriter
+        : ConfigWriter[ValidatorTrustedSynchronizerConfig] =
+      deriveWriter[ValidatorTrustedSynchronizerConfig]
     implicit val offsetDateTimeConfigurationWriter: ConfigWriter[java.time.OffsetDateTime] =
       implicitly[ConfigWriter[String]].contramap(_.toString)
     implicit val transferPreapprovalConfigWriter: ConfigWriter[TransferPreapprovalConfig] =
