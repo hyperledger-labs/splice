@@ -35,7 +35,10 @@ import {
   AcceptedTransferOffer,
   TransferOffer,
 } from '@daml.js/splice-wallet/lib/Splice/Wallet/TransferOffer';
-import { MintingDelegation } from '@daml.js/splice-wallet/lib/Splice/Wallet/MintingDelegation/module';
+import {
+  MintingDelegation,
+  MintingDelegationProposal,
+} from '@daml.js/splice-wallet/lib/Splice/Wallet/MintingDelegation/module';
 
 import {
   BalanceChange,
@@ -104,6 +107,10 @@ export interface WalletClient {
   listAmuletAllocations: () => Promise<Contract<AmuletAllocation>[]>;
   listAllocationRequests: () => Promise<Contract<AllocationRequest>[]>;
   listMintingDelegations: () => Promise<Contract<MintingDelegation>[]>;
+  listMintingDelegationProposals: () => Promise<Contract<MintingDelegationProposal>[]>;
+  acceptMintingDelegationProposal: (
+    proposalContractId: ContractId<MintingDelegationProposal>
+  ) => Promise<void>;
   rejectAllocationRequest: (allocationRequestCid: ContractId<AllocationRequest>) => Promise<void>;
   createAllocation: (allocateAmuletRequest: AllocateAmuletRequest) => Promise<void>;
   withdrawAllocation: (allocationCid: ContractId<AmuletAllocation>) => Promise<void>;
@@ -338,6 +345,13 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       listMintingDelegations: async () => {
         const res = await walletClient.listMintingDelegations();
         return res.delegations.map(d => Contract.decodeOpenAPI(d.contract, MintingDelegation));
+      },
+      listMintingDelegationProposals: async () => {
+        const res = await walletClient.listMintingDelegationProposals();
+        return res.proposals.map(p => Contract.decodeOpenAPI(p.contract, MintingDelegationProposal));
+      },
+      acceptMintingDelegationProposal: async proposalContractId => {
+        await walletClient.acceptMintingDelegationProposal(proposalContractId);
       },
       rejectAllocationRequest: async allocationRequestCid => {
         await walletClient.rejectAllocationRequest(allocationRequestCid);
