@@ -343,6 +343,7 @@ function configureGatewayService(
   const serviceValues =
     gatewayVariant.type == 'LoadBalancer'
       ? {
+          // type's default is LoadBalancer; see values.yaml
           loadBalancerIP: gatewayVariant.ingressIp,
           loadBalancerSourceRanges: gatewayVariant.externalIPRangesInLB,
           // See https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#network
@@ -354,6 +355,7 @@ function configureGatewayService(
       : // Create a ClusterIP Service for the istio ingress so the GKE L7 Gateway can
         // target it (the GKE controller will create NEGs for the service ports).
         {
+          type: gatewayVariant.type,
           annotations: {
             // Expose the HTTP/HTTPS ports as NEGs so the GKE L7 Gateway's backend can reach them
             'cloud.google.com/neg': JSON.stringify({ exposed_ports: { http2: {}, https: {} } }),
@@ -388,7 +390,6 @@ function configureGatewayService(
           maxUnavailable: 1,
         },
         service: {
-          type: gatewayVariant.type,
           ...serviceValues,
           ports: [
             ingressPort('status-port', 15021), // istio default
