@@ -247,6 +247,7 @@ async function installValidator(
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     additionalEnvVars: validatorConfig.validatorApp?.additionalEnvVars,
     additionalJvmOptions: validatorConfig.validatorApp?.additionalJvmOptions,
+    resources: validatorConfig.validatorApp?.resources,
   };
 
   const validatorValuesWithOnboardingOverride = onboardingSecret
