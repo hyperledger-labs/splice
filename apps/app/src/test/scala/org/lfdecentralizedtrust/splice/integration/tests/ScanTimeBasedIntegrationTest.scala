@@ -460,7 +460,7 @@ class ScanTimeBasedIntegrationTest
         migrationId,
       )
       snapshot1 should not be None
-      snapshot1.value shouldBe > (startTime)
+      snapshot1.value.toInstant shouldBe > (startTime.toInstant)
       snapshot1
     }
 
