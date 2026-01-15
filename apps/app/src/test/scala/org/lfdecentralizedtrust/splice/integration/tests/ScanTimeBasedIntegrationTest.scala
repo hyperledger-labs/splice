@@ -473,8 +473,10 @@ class ScanTimeBasedIntegrationTest
       snapshotAfter
     }
 
-    sv1ScanBackend.getDateOfFirstSnapshotAfter(CantonTimestamp.MinValue, 0) shouldBe snapshotBefore.value
-    sv1ScanBackend.getDateOfFirstSnapshotAfter(CantonTimestamp.tryFromInstant(snapshotBefore.value.toInstant), 0) shouldBe snapshotAfter
+    sv1ScanBackend.getDateOfFirstSnapshotAfter(CantonTimestamp.MinValue, 0) should not be None
+    sv1ScanBackend.getDateOfFirstSnapshotAfter(CantonTimestamp.MinValue, 0).value shouldBe snapshotBefore.value
+    sv1ScanBackend.getDateOfFirstSnapshotAfter(CantonTimestamp.tryFromInstant(snapshotBefore.value.toInstant), 0) should not be None
+    sv1ScanBackend.getDateOfFirstSnapshotAfter(CantonTimestamp.tryFromInstant(snapshotBefore.value.toInstant), 0).value shouldBe snapshotAfter.value
 
     val snapshotAfterData = sv1ScanBackend.getAcsSnapshotAt(
       CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant),
