@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.digitalasset.canton.data.CantonTimestamp
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, AppRewardCoupon, ValidatorRewardCoupon}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
@@ -50,6 +50,11 @@ class ScanTimeBasedIntegrationTest
         // start at a point where the reward trigers can run so that we avoid warnings about missed rewards
         advanceTimeForRewardAutomationToRunForCurrentRound
       }
+
+  override protected lazy val sanityChecksIgnoredRootCreates = Seq(
+    AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+    ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID
+  )
 
   def firstRound(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Long =
     sv1ScanBackend.getDsoInfo().initialRound match {
@@ -136,6 +141,8 @@ class ScanTimeBasedIntegrationTest
     val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
     waitForWalletUser(aliceValidatorWalletClient)
     waitForWalletUser(bobValidatorWalletClient)
+    val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+    val bobValidatorParty = bobValidatorBackend.getValidatorPartyId()
 
     clue("Tap to get some amulets") {
       aliceWalletClient.tap(500.0)
@@ -149,32 +156,36 @@ class ScanTimeBasedIntegrationTest
         _.errorMessage should include("No data has been made available yet"),
       )
     })
-    clue("Transfer some CC, to generate reward coupons")({
-      p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
-      p2pTransfer(bobWalletClient, aliceWalletClient, aliceUserParty, 100.0)
+    // Note: The rewards in this test are relatively arbitrary.
+    // They used to come from CC transfers but as this changed with the removal of CC usage fees
+    // we now create them directly matching the previous values.
+    clue("Generate some generate reward coupons")({
+      createRewards(appRewards = Seq((aliceValidatorParty, 6.4, false), (bobValidatorParty, 7.0, false)), validatorRewards = Seq((aliceUserParty, 6.4), (bobUserParty, 7.0)))
     })
     clue(
       "Advance a round and generate some more reward coupons - this time with alice's validator being featured"
     )({
       advanceRoundsToNextRoundOpening
+      // Note: The featured app right is not actually used
       grantFeaturedAppRight(aliceValidatorWalletClient)
-      p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 41.0)
-      p2pTransfer(bobWalletClient, aliceWalletClient, aliceUserParty, 101.0)
+      createRewards(appRewards = Seq((aliceValidatorParty, 6.41, false), (bobValidatorParty, 7.01, false)), validatorRewards = Seq((aliceUserParty, 6.41), (bobUserParty, 7.01)))
     })
     clue("Advance 2 ticks for the first coupons to be collectable")({
       advanceRoundsToNextRoundOpening
       advanceRoundsToNextRoundOpening
     })
-    clue("Alice's and Bob's validators use their app&validator rewards when transfering CC")({
+    clue("Alice's and Bob's validators mint their app&validator rewards when transfering CC and create some more rewards")({
       p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0)
       p2pTransfer(bobValidatorWalletClient, aliceWalletClient, aliceUserParty, 10.0)
+      createRewards(appRewards = Seq((aliceValidatorParty, 6.1, false), (bobValidatorParty, 6.1, false)), validatorRewards = Seq((aliceValidatorParty, 6.1), (bobValidatorParty, 6.1)))
     })
     clue(
-      s"Some more transfers collect more rewards in round ${firstRound + 5} (issued in round ${firstRound + 1})"
+      s"Some more transfers mint more rewards in round ${firstRound + 5} (issued in round ${firstRound + 1}) and create some more rewards"
     )({
       advanceRoundsToNextRoundOpening
       p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0)
       p2pTransfer(bobValidatorWalletClient, aliceWalletClient, aliceUserParty, 10.0)
+      createRewards(appRewards = Seq((aliceValidatorParty, 6.1, false), (bobValidatorParty, 6.1, false)), validatorRewards = Seq((aliceValidatorParty, 6.1), (bobValidatorParty, 6.1)))
     })
     val baseRoundWithLatestData = clue(
       "Advance 1 more tick to make sure we capture at least one round change in the tx history"
