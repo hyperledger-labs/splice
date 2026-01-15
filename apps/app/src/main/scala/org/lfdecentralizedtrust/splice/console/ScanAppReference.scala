@@ -610,8 +610,11 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.LookupInstrument(instrumentId))
     }
-
+  @Help.Summary(
+    "Get the total amulet balance (total supply)."
+  )
   def getTotalAmuletBalance(): Option[BigDecimal] = {
+    val _ = forceAcsSnapshotNow()
     lookupInstrument("Amulet")
       .flatMap(_.totalSupply.map(s => BigDecimal(s)))
   }
