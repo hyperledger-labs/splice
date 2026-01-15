@@ -19,6 +19,7 @@ export const LoadTesterConfigSchema = z.object({
       chartVersion: z.string().optional(),
       minRate: z.number().default(0.9),
       iterationsPerMinute: z.number().default(60),
+      maxVUs: z.number().optional(),
       adaptiveScenario: LoadTesterAdaptiveScenarioConfigSchema.default({}),
     })
     .optional(),
