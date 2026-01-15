@@ -678,19 +678,20 @@ describe('Wallet user can', () => {
 
     await user.click(withdrawButtons[0]);
 
+    // Confirm the withdrawal in the confirmation dialog
+    const proceedButton = await screen.findByRole('button', { name: 'Proceed' });
+    await user.click(proceedButton);
+
     // Assert the withdraw API was called once
     expect(calledWithdrawArgs).toHaveLength(1);
   });
 
-  test.each([
-    { action: 'accept', buttonName: 'Accept' },
-    { action: 'reject', buttonName: 'Reject' },
-  ])('can $action a minting delegation proposal', async ({ action, buttonName }) => {
+  test("can 'accept' a minting delegation proposal", async () => {
     server.use(featureSupportHandler(true, true));
 
     const calledArgs: string[] = [];
     server.use(
-      rest.post(`${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/${action}`, (req, res, ctx) => {
+      rest.post(`${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/accept`, (req, res, ctx) => {
         calledArgs.push(req.params.cid.toString());
         return res(ctx.status(200));
       })
@@ -706,10 +707,47 @@ describe('Wallet user can', () => {
     const delegationsLink = await screen.findByRole('link', { name: 'Delegations' });
     await user.click(delegationsLink);
 
-    const buttons = await screen.findAllByRole('button', { name: buttonName });
+    const buttons = await screen.findAllByRole('button', { name: 'Accept' });
     expect(buttons.length).toBe(mockMintingDelegationProposals.length);
 
     await user.click(buttons[0]);
+
+    // Confirm the acceptance in the confirmation dialog
+    const proceedButton = await screen.findByRole('button', { name: 'Proceed' });
+    await user.click(proceedButton);
+
+    expect(calledArgs).toHaveLength(1);
+  });
+
+  test("can 'reject' a minting delegation proposal", async () => {
+    server.use(featureSupportHandler(true, true));
+
+    const calledArgs: string[] = [];
+    server.use(
+      rest.post(`${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/reject`, (req, res, ctx) => {
+        calledArgs.push(req.params.cid.toString());
+        return res(ctx.status(200));
+      })
+    );
+
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+
+    const delegationsLink = await screen.findByRole('link', { name: 'Delegations' });
+    await user.click(delegationsLink);
+
+    const buttons = await screen.findAllByRole('button', { name: 'Reject' });
+    expect(buttons.length).toBe(mockMintingDelegationProposals.length);
+
+    await user.click(buttons[0]);
+
+    // Confirm the rejection in the confirmation dialog
+    const proceedButton = await screen.findByRole('button', { name: 'Proceed' });
+    await user.click(proceedButton);
 
     expect(calledArgs).toHaveLength(1);
   });
