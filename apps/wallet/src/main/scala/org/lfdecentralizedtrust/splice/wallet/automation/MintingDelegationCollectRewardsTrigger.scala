@@ -86,7 +86,8 @@ class MintingDelegationCollectRewardsTrigger(
         Limit.DefaultLimit,
       )
 
-      // We expect either none, or only one active delegation per beneficiary
+      // In the steady state there is at most one active delegation per beneficiary.
+      // Thus if there are multiple ones, we can just pick one of them.
       result <- delegations.flatMap(_.toAssignedContract).headOption match {
         case Some(delegation) => processDelegation(delegation)
         case None => Future.successful(false)
