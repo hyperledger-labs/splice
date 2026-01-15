@@ -87,8 +87,6 @@ class AcsSnapshotStore(
     val query =
       sql"select * from ((" ++ sameMig ++ sql") union all (" ++ largerMig ++ sql")) all_queries order by snapshot_record_time asc limit 1"
 
-    logger.debug(s"ISEGALL: SQL query is: ${query.toActionBuilder.sql}")
-
     storage
       .querySingle(
         query.toActionBuilder.as[AcsSnapshot].headOption,
