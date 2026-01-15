@@ -1271,6 +1271,40 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       )
     }
 
+  // Creating rewards normally can require a fair amount of setup now that fees are gone
+  // (the two easiest options are usually either a transfer through a featured TransferPreapproval or
+  // a traffic purchase). So for cases where you just need some rewards to test somtehing, e.g.,
+  // test the minting automation you can use this helper to directly create rewards through
+  // actAs = dso. Note that this only works in single-SV tests.
+  def createRewards(
+    party: PartyId,
+    appRewardAmounts : Seq[BigDecimal],
+    validatorRewardAmounts : Seq[BigDecimal],
+  )(implicit env: SpliceTestConsoleEnvironment): Unit = {
+    val now = env.environment.clock.now
+    val openRound = sv1ScanBackend.getLatestOpenMiningRound(now)
+    sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+      actAs = Seq(dsoParty),
+      commands = appRewardAmounts.flatMap(amount =>
+        new splice.amulet.AppRewardCoupon(
+          dsoParty.toProtoPrimitive,
+          party.toProtoPrimitive,
+          true,
+          amount.bigDecimal,
+          openRound.payload.round,
+          java.util.Optional.empty(),
+        ).create.commands.asScala
+      ) ++ validatorRewardAmounts.flatMap(amount =>
+        new splice.amulet.ValidatorRewardCoupon(
+          dsoParty.toProtoPrimitive,
+          party.toProtoPrimitive,
+          amount.bigDecimal,
+          openRound.payload.round,
+        ).create.commands.asScala
+      ),
+    )
+  }
+
   /** Directly exercises the AmuletRules_Transfer choice.
     * Note that all parties participating in the transfer need to be hosted on the same participant
     */
