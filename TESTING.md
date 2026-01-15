@@ -364,6 +364,28 @@ lnav docker://canton docker://splice
 
 shows the docker logs from the `canton` and `splice` containers. The format set up above will automatically be applied.
 
+#### lnav SQL filters
+
+The normal lnav `:filter-in` and `:filter-out` operate
+line-based. However some of our logs are multi-line, e.g., sometimes
+you want to filter for the `Ingested transaction` logs for a specific
+template. For those cases you can use `:filter-expr` which accepts a SQL expression. E.g.,
+
+```
+:filter-expr :log_text LIKE '%SV=sv1%' AND :log_text LIKE '%Ingested transaction%' AND :log_text LIKE '%RewardCoupon%' OR :log_text LIKE '%clue%'
+```
+
+`log_text` is the full log string. You can also access specific
+columns like `logger_name`. The available columns correspond to the
+fields defined in our lnav format. You can see the schema through
+`;.schema` and look for the `canton_logstack_json` table.
+
+Note that while lnav lets you put in multiple `filter-expr` or
+combinations of `filter-expr` and `filter-in` and `filter-out`, the
+results seem to be nonsense so stick to a single `filter-expr`.
+
+For more details refer to the [lnav docs](https://docs.lnav.org/en/latest/sqlext.html).
+
 ### Handling Errors in Integration Tests
 
 Generally, errors in integration tests should be handled through using Canton's `com.digitalasset.canton.logging.SuppressingLogger`.
