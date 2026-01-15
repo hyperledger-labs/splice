@@ -65,7 +65,7 @@ describe('Create Unallocated Unclaimed Activity Record Form', () => {
 
     const urlInput = screen.getByTestId('create-unallocated-unclaimed-activity-record-url');
     expect(urlInput).toBeInTheDocument();
-    expect(urlInput.getAttribute('value')).toBe('https://');
+    expect(urlInput.getAttribute('value')).toBe('');
 
     const beneficiaryInput = screen.getByTestId(
       'create-unallocated-unclaimed-activity-record-beneficiary'

@@ -72,7 +72,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
             type: 'custom',
             effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
           },
-          url: 'https://',
+          url: '',
           summary: '',
         },
         config: {},
@@ -90,7 +90,7 @@ export const SetDsoConfigRulesForm: () => JSX.Element = () => {
           type: 'custom',
           effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
         },
-        url: 'https://',
+        url: '',
         summary: '',
       },
       config: dsoConfigChanges.reduce((acc, field) => {
