@@ -108,8 +108,7 @@ class TokenStandardMetadataTimeBasedIntegrationTest
         _ => {
           val totalBalance =
             sv1ScanBackend
-              .getTotalAmuletBalance()
-              .valueOrFail("total balance not yet defined")
+              .getTotalAmuletBalance("Amulet")
           totalBalance should be >= walletUsdToAmulet(99.0)
         },
       )
