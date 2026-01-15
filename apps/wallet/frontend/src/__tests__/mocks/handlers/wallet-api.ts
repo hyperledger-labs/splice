@@ -11,10 +11,14 @@ import { ListTransferOffersResponse } from '@lfdecentralizedtrust/wallet-externa
 import {
   GetBalanceResponse,
   ListMintingDelegationsResponse,
+  ListMintingDelegationProposalsResponse,
   ListTransactionsResponse,
   UserStatusResponse,
 } from '@lfdecentralizedtrust/wallet-openapi';
-import { MintingDelegation } from '@daml.js/splice-wallet/lib/Splice/Wallet/MintingDelegation/module';
+import {
+  MintingDelegation,
+  MintingDelegationProposal,
+} from '@daml.js/splice-wallet/lib/Splice/Wallet/MintingDelegation/module';
 
 import {
   aliceEntry,
@@ -25,7 +29,10 @@ import {
   miningRounds,
   nameServiceEntries,
 } from '../constants';
-import { mockMintingDelegations } from '../delegation-constants';
+import {
+  mockMintingDelegations,
+  mockMintingDelegationProposals,
+} from '../delegation-constants';
 import { mkContract } from '../contract';
 
 export const buildWalletMock = (walletUrl: string): RestHandler[] => [
@@ -231,6 +238,16 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
         delegations: mockMintingDelegations.map(delegation => ({
           contract: mkContract(MintingDelegation, delegation),
           beneficiary_onboarded: true,
+        })),
+      })
+    );
+  }),
+
+  rest.get(`${walletUrl}/v0/wallet/minting-delegation-proposals`, (_, res, ctx) => {
+    return res(
+      ctx.json<ListMintingDelegationProposalsResponse>({
+        proposals: mockMintingDelegationProposals.map(proposal => ({
+          contract: mkContract(MintingDelegationProposal, proposal),
         })),
       })
     );

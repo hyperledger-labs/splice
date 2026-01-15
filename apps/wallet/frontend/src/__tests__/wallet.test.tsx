@@ -19,6 +19,7 @@ import {
 } from './mocks/constants';
 import {
   mockMintingDelegations,
+  mockMintingDelegationProposals,
   delegationExpiresAt,
 } from './mocks/delegation-constants';
 import { requestMocks } from './mocks/handlers/transfers-api';
@@ -497,7 +498,7 @@ describe('Wallet user can', () => {
     expect(await screen.findAllByText('@')).toHaveLength(3);
   });
 
-  test('navigate to delegations tab and see delegations table', async () => {
+  test('navigate to delegations tab and see proposals and delegations tables', async () => {
     server.use(featureSupportHandler(true, true));
     const user = userEvent.setup();
     render(
@@ -511,19 +512,47 @@ describe('Wallet user can', () => {
     const delegationsLink = screen.getByRole('link', { name: 'Delegations' });
     await user.click(delegationsLink);
 
-    // Wait for the delegations content to load
-    expect(await screen.findByRole('heading', { name: 'Active' })).toBeDefined();
+    // Verify both headings are present
+    expect(screen.getByRole('heading', { name: 'Proposed' })).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Active' })).toBeDefined();
 
-    // Now verify the table exists with correct structure
+    // Verify both tables exist
+    expect(screen.getByRole('table', { name: 'proposals table' })).toBeDefined();
     expect(screen.getByRole('table', { name: 'delegations table' })).toBeDefined();
 
-    // Verify table headers
-    expect(screen.getByRole('columnheader', { name: 'Beneficiary' })).toBeDefined();
-    expect(screen.getByRole('columnheader', { name: 'Max Amulets' })).toBeDefined();
-    expect(screen.getByRole('columnheader', { name: 'Expiration' })).toBeDefined();
-    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeDefined();
+    // ---- Verify Proposals table ----
+    const proposalRows = document.querySelectorAll('.proposal-row');
+    expect(proposalRows.length).toBe(mockMintingDelegationProposals.length);
 
-    // Verify all delegation rows are rendered
+    // Verify proposal beneficiary values
+    const proposalBeneficiaries = document.querySelectorAll('.proposal-beneficiary');
+    expect(proposalBeneficiaries.length).toBe(mockMintingDelegationProposals.length);
+    mockMintingDelegationProposals.forEach((proposal, index) => {
+      expect(proposalBeneficiaries[index].textContent).toBe(proposal.delegation.beneficiary);
+    });
+
+    // Verify proposal max amulets values
+    const proposalMaxAmulets = document.querySelectorAll('.proposal-max-amulets');
+    expect(proposalMaxAmulets.length).toBe(mockMintingDelegationProposals.length);
+    mockMintingDelegationProposals.forEach((proposal, index) => {
+      expect(proposalMaxAmulets[index].textContent).toBe(proposal.delegation.amuletMergeLimit);
+    });
+
+    // Verify proposal expiration values
+    const proposalExpirations = document.querySelectorAll('.proposal-expiration');
+    expect(proposalExpirations.length).toBe(mockMintingDelegationProposals.length);
+    proposalExpirations.forEach(expiration => {
+      expect(expiration.textContent).toBe(delegationExpiresAt);
+    });
+
+    // Verify Accept buttons are present for each proposal
+    const acceptButtons = document.querySelectorAll('.proposal-accept');
+    expect(acceptButtons.length).toBe(mockMintingDelegationProposals.length);
+    acceptButtons.forEach(button => {
+      expect(button.textContent).toBe('Accept');
+    });
+
+    // ---- Verify Delegations table ----
     const delegationRows = document.querySelectorAll('.delegation-row');
     expect(delegationRows.length).toBe(mockMintingDelegations.length);
 
@@ -556,16 +585,16 @@ describe('Wallet user can', () => {
     });
   });
 
-  test('navigate to delegations tab and see empty state when no delegations', async () => {
+  test('navigate to delegations tab and see empty state when no proposals or delegations', async () => {
     server.use(featureSupportHandler(true, true));
-    // Override the minting-delegations endpoint to return empty list
+    // Override endpoints to return empty lists
     server.use(
-      rest.get(
-        `${walletUrl}/v0/wallet/minting-delegations`,
-        (_, res, ctx) => {
-          return res(ctx.json({ delegations: [] }));
-        }
-      )
+      rest.get(`${walletUrl}/v0/wallet/minting-delegations`, (_, res, ctx) => {
+        return res(ctx.json({ delegations: [] }));
+      }),
+      rest.get(`${walletUrl}/v0/wallet/minting-delegation-proposals`, (_, res, ctx) => {
+        return res(ctx.json({ proposals: [] }));
+      })
     );
 
     const user = userEvent.setup();
@@ -580,13 +609,16 @@ describe('Wallet user can', () => {
     const delegationsLink = screen.getByRole('link', { name: 'Delegations' });
     await user.click(delegationsLink);
 
-    // Verify the heading is present
+    // Verify both headings are present
+    expect(screen.getByRole('heading', { name: 'Proposed' })).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Active' })).toBeDefined();
 
-    // Verify the "No delegations" message is displayed
+    // Verify the empty state messages are displayed
+    expect(await screen.findByText('No proposals')).toBeDefined();
     expect(await screen.findByText('None active')).toBeDefined();
 
-    // Verify the table is NOT rendered
+    // Verify the tables are NOT rendered
+    expect(screen.queryByRole('table', { name: 'proposals table' })).toBeNull();
     expect(screen.queryByRole('table', { name: 'delegations table' })).toBeNull();
   });
 
