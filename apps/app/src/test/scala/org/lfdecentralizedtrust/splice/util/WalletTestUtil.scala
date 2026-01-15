@@ -1277,31 +1277,30 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
   // test the minting automation you can use this helper to directly create rewards through
   // actAs = dso. Note that this only works in single-SV tests.
   def createRewards(
-    party: PartyId,
-    appRewardAmounts : Seq[BigDecimal],
-    validatorRewardAmounts : Seq[BigDecimal],
+    appRewards : Seq[(PartyId, BigDecimal, Boolean)],
+    validatorRewards: Seq[(PartyId, BigDecimal)],
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     val now = env.environment.clock.now
     val openRound = sv1ScanBackend.getLatestOpenMiningRound(now)
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
       actAs = Seq(dsoParty),
-      commands = appRewardAmounts.flatMap(amount =>
+      commands = appRewards.flatMap{ case (party, amount, featured) =>
         new splice.amulet.AppRewardCoupon(
           dsoParty.toProtoPrimitive,
           party.toProtoPrimitive,
-          true,
+          featured,
           amount.bigDecimal,
           openRound.payload.round,
           java.util.Optional.empty(),
         ).create.commands.asScala
-      ) ++ validatorRewardAmounts.flatMap(amount =>
+      } ++ validatorRewards.flatMap { case (party, amount) =>
         new splice.amulet.ValidatorRewardCoupon(
           dsoParty.toProtoPrimitive,
           party.toProtoPrimitive,
           amount.bigDecimal,
           openRound.payload.round,
         ).create.commands.asScala
-      ),
+      },
     )
   }
 

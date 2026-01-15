@@ -124,10 +124,10 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     // Because in the first part of the issuance curve already, apps (40%) gain a lot more rewards than validators (12%)
     // the app rewards, the app reward from the second transfer is prioritized over the validator reward from the
     // third (larger) transfer.
+    val aliceValidator = aliceValidatorBackend.getValidatorPartyId()
     createRewards(
-      aliceValidatorBackend.getValidatorPartyId(),
-      appRewardAmounts = Seq(5, 2000, 2010),
-      validatorRewardAmounts = Seq(5, 2000, 2010),
+      appRewards = Seq((aliceValidator, 5, false), (aliceValidator, 2000, false), (aliceValidator, 2010, false)),
+      validatorRewards = Seq((aliceValidator, 5), (aliceValidator, 2000), (aliceValidator, 2010))
     )
 
     // by advancing three rounds, round 1 is in the issuing phase.
@@ -292,10 +292,10 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   "adjust maxNumInput if there is a tap operation in the batch" in { implicit env =>
     val (alice, _) = onboardAliceAndBob()
     aliceValidatorWalletClient.tap(50)
+    val aliceValidator = aliceValidatorBackend.getValidatorPartyId()
     createRewards(
-      aliceValidatorBackend.getValidatorPartyId(),
-      appRewardAmounts = Seq(10.0),
-      validatorRewardAmounts = Seq(10.0),
+      appRewards = Seq((aliceValidator, 10.0, false)),
+      validatorRewards = Seq((aliceValidator, 10.0)),
     )
     aliceValidatorWalletClient.tap(50)
 
@@ -454,10 +454,10 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       validatorWallet: WalletAppClientReference,
       round: Int,
   )(implicit env: SpliceTestConsoleEnvironment) = {
+    val party = PartyId.tryFromProtoPrimitive(validatorWallet.userStatus().party)
     createRewards(
-      PartyId.tryFromProtoPrimitive(validatorWallet.userStatus().party),
-      appRewardAmounts = Seq(10.0),
-      validatorRewardAmounts = Seq(10.0),
+      appRewards = Seq((party, 10.0, false)),
+      validatorRewards = Seq((party, 10.0)),
     )
 
     eventually() {
