@@ -1,23 +1,20 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package org.lfdecentralizedtrust.splice.scan.store
+package org.lfdecentralizedtrust.splice.scan.store.bulk
 
-import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
+import org.apache.pekko.stream.scaladsl.Sink
+import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
+import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
-import org.lfdecentralizedtrust.splice.scan.store.bulk.{
-  AcsSnapshotBulkStorage,
-  BulkStorageConfig,
-  S3BucketConnection,
-}
-import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest}
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
+import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest}
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito
@@ -26,8 +23,8 @@ import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
 import java.nio.ByteBuffer
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.FutureConverters.*
 import scala.jdk.CollectionConverters.*
+import scala.jdk.FutureConverters.*
 
 class AcsSnapshotBulkStorageTest
     extends StoreTest
@@ -53,7 +50,7 @@ class AcsSnapshotBulkStorageTest
             store,
             s3BucketConnection,
             loggerFactory,
-          ).dumpAcsSnapshot(0, timestamp)
+          ).getSingleAcsSnapshotDumpSource(0, timestamp).runWith(Sink.ignore)
 
           s3Objects <- s3BucketConnection.s3Client
             .listObjects(
