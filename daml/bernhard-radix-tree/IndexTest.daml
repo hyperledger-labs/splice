@@ -1,0 +1,258 @@
+module Com.Daml.App.Template.Test.IndexTest where
+
+import Com.Daml.App.Template.RadixTree
+import Com.Daml.App.Template.Install
+import Com.Daml.App.Template.Model
+import Com.Daml.App.Template.Test.Util
+import Com.Daml.App.Template.Test.IndexTestData
+import Daml.Script 
+import qualified DA.Set as S
+import DA.List (head)
+import DA.Foldable (forA_)
+import DA.Assert ((===))
+import DA.Text (sha256, stripPrefix)
+import DA.Text qualified as T (length)
+
+getNodeForKey : Index -> K -> [(ContractId Node, Node)] -> (ContractId Node, Node)
+getNodeForKey idx k all_nodes = 
+  let
+    hash = sha256 k
+    match (_, node) = case node.np of
+      NPLeaf (k', _) -> k' == k && node.path == hash
+      NPPath children -> case stripPrefix node.path hash of
+        None -> False
+        Some suffix -> -- See whether there's a child with matching first chunk and same length
+          let
+            headChunk s = head (textChunksOf idx.chunkSize s)
+            suffixHead = headChunk suffix
+            matchChild c = headChunk c == suffixHead
+          in case (find matchChild (S.toList children)) of
+            None -> True
+            Some matched -> T.length matched == T.length suffix && matched /= suffix
+  in      
+    case filter match all_nodes of
+      [m] -> m
+      [] -> error ("Couldn't find node for " <> show (k, hash))
+      ms -> error ("Multiple nodes found for " <> hash <> "\n" <> show ms)
+
+getNode : Path -> [(ContractId Node, Node)] -> (ContractId Node, Node)
+getNode path all_nodes =
+  let
+    match (_, node) = node.path == path
+  in      
+    case filter match all_nodes of
+      [m] -> m
+      [] -> error ("Couldn't find parent for " <> path)
+      ms -> error ("Multiple parents found for " <> path <> "\n" <> show ms)
+
+getParent : Path -> [(ContractId Node, Node)] -> (ContractId Node, Node)
+getParent path all_nodes =
+  let
+    match (_, node) = case node.np of
+      NPLeaf _ -> False -- Leafs are never parents
+      NPPath children -> case stripPrefix node.path path of
+        None -> False
+        Some suffix -> suffix `S.member` children
+  in      
+    case filter match all_nodes of
+      [m] -> m
+      [] -> error ("Couldn't find parent for " <> path)
+      ms -> error ("Multiple parents found for " <> path <> "\n" <> show ms)
+
+removableAncestors : Index -> Path -> [(ContractId Node, Node)] -> [ContractId Node]
+removableAncestors idx path all_nodes = 
+  let
+    (parentCid, parent) = getParent path all_nodes
+    ancestorCids = if S.size (children parent.np) == 1 && (T.length parent.path > 0)
+      then removableAncestors idx parent.path all_nodes
+      else []
+  in parentCid::ancestorCids
+
+indexLookup : Index -> [(ContractId Node, Node)] -> K -> Values
+indexLookup idx all_nodes k =
+  let
+    (_, n) = getNodeForKey idx k all_nodes
+  in case n.np of
+    NPPath _ -> S.empty
+    NPLeaf (_, vs) -> vs
+
+test_radix_tree_nonunique : Script ()
+test_radix_tree_nonunique = do
+  app <- setupApp False
+  appUser <- setupUser app "alice"
+
+  let 
+    provider = app.provider
+    idxCid = app.idxCid
+  
+  Some idx <- queryContractId provider idxCid
+  
+  let 
+    ex ch = submitMulti [appUser.party] [provider] do
+      exerciseCmd appUser.install ch
+    
+  let
+    n = 50
+    nextChunk = return . splitAt n
+
+  (names, texts) <- nextChunk texts
+
+  nrs <- forA names (\name -> do
+    allNodes <- query @Node provider
+    let nodeCid = fst $ getNodeForKey idx name allNodes
+    ex AppInstall_ClaimName with ..
+    )
+
+  (names2, _texts) <- nextChunk texts
+
+  _nrs2 <- forA names2 (\name -> do
+  allNodes <- query @Node provider 
+  let nodeCid = fst $ getNodeForKey idx name allNodes
+  ex AppInstall_ClaimName with ..
+  )
+
+  nrs3 <- forA names (\name -> do
+  allNodes <- query @Node provider 
+  let nodeCid = fst $ getNodeForKey idx name allNodes
+  ex AppInstall_ClaimName with ..
+  )
+
+  -- Check a lookup on a key.
+  allNodes <- query @Node provider
+  debug (show (length allNodes))
+  indexLookup idx allNodes (head names) === (S.fromList[head nrs , head nrs3])
+
+  -- Get a third name record and return the second ones.
+  _nrs4 <- forA names (\name -> do
+  allNodes <- query @Node provider 
+  let nodeCid = fst $ getNodeForKey idx name allNodes
+  ex AppInstall_ClaimName with ..
+  )
+
+  forA_ (zip names nrs3) (\(name, nrCid) -> do
+  allNodes <- query @Node provider 
+  let nodeCid = fst $ getNodeForKey idx name allNodes
+  submitMulti [appUser.party] [provider] do
+      exerciseCmd appUser.install AppInstall_ReturnName with ..
+  )
+
+  -- Removing node with key (head ks) shouldn't work without forcing
+  allNodes <- query @Node provider 
+
+  let
+    (nodeCid, _) = getNodeForKey idx (head names) allNodes
+    (parentCid, _) = getParent (sha256 (head names)) allNodes
+
+  submitMustFail provider do
+    exerciseCmd idxCid Remove with
+      nodeCid
+      ancestorCids = [parentCid]
+      force = False
+
+  -- But it should work with forcing.
+  submit provider do
+    exerciseCmd idxCid Remove with
+      nodeCid
+      ancestorCids = [parentCid]
+      force = True 
+
+  -- Removing node with children should not work.
+  let
+    pathWithChildren n = case n.np of
+      NPLeaf _ -> False
+      NPPath cs -> S.size cs > 0 && T.length n.path > 0
+    Some (nodeCid, node) = find (\(_, n) -> pathWithChildren n) allNodes
+    (parentCid, _) = getParent node.path allNodes
+
+  submitMustFail provider do
+    exerciseCmd idxCid Remove with
+      nodeCid
+      ancestorCids = [parentCid]
+      force = False
+
+  -- Tidy up.
+  allNrs <- query @NameRecord appUser.party
+  forA_ allNrs (\(nrCid, nr) ->
+    -- Special case for dangling records
+    if nr.name == head names
+      then submitMulti[appUser.party, provider] [] do archiveCmd nrCid
+      else do
+        allNodes <- query @Node provider 
+        let nodeCid = fst $ getNodeForKey idx nr.name allNodes
+        submitMulti [appUser.party] [provider] do
+          exerciseCmd appUser.install AppInstall_ReturnName with ..
+    )
+
+  allNodes <- query @Node provider
+  let
+    isLeaf np = case np of
+      NPLeaf _ -> True
+      _ -> False
+    allLeafs = filter (\(_, n) -> isLeaf n.np) allNodes
+
+  forA_ allLeafs (\(leafCid, leaf) -> do
+    allNodes <- query @Node provider
+    let
+      leafPath = leaf.path 
+      ancestorCids = removableAncestors idx leafPath allNodes
+    submit provider do
+      exerciseCmd idxCid Remove with
+        nodeCid = leafCid
+        ancestorCids = ancestorCids
+        force = False
+    )
+
+
+
+
+
+
+
+
+test_radix_tree_unique : Script ()
+test_radix_tree_unique = do
+  app <- setupApp True
+  appUser <- setupUser app "alice"
+
+  let 
+    provider = app.provider
+    idxCid = app.idxCid
+
+  let 
+    ex ch = submitMulti [appUser.party] [provider] do
+      exerciseCmd appUser.install ch
+    exMustFail ch = submitMultiMustFail [appUser.party] [provider] do
+      exerciseCmd appUser.install ch
+      
+  Some idx <- queryContractId provider idxCid
+      
+  let
+    n = 50
+    nextChunk = return . splitAt n
+
+  (names, texts) <- nextChunk texts
+
+  nrs <- forA names (\name -> do
+    allNodes <- query @Node provider
+    let nodeCid = fst $ getNodeForKey idx name allNodes
+    ex AppInstall_ClaimName with ..
+    )
+
+  (names2, _texts) <- nextChunk texts
+
+  forA_ names2 (\name -> do
+  allNodes <- query @Node provider 
+  let nodeCid = fst $ getNodeForKey idx name allNodes
+  ex AppInstall_ClaimName with ..
+  )
+
+  forA_ names (\name -> do
+  allNodes <- query @Node provider 
+  let nodeCid = fst $ getNodeForKey idx name allNodes
+  exMustFail AppInstall_ClaimName with ..
+  )
+
+  -- Check a lookup on a key.
+  allNodes <- query @Node provider
+  debug (show (length allNodes))
+  indexLookup idx allNodes (head names) === S.singleton (head nrs)

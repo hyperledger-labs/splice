@@ -655,6 +655,23 @@ template AmuletRules
              else pure []
          pure AmuletRules_ConvertFeaturedAppActivityMarkersResult with appRewardCouponCids = concat markerCids
 
+    nonconsuming choice AmuletRules_UpdateUserStates : AmuletRules_UpdateUserStatesResult
+      with
+        userStateCids : [ContractId UserState]
+        dsoUserStateCids : [ContractId DsoUserState]
+      controller dso
+      do
+        require "equal length" (length userStateCids == length dsoUserStateCids)
+        updatedCids <- forA (zip userStateCids dsoUserStateCids) $ \(userStateCid, dsoUserStateCid) -> do
+          userState <- fetchAndArchive (ForDso with dso) userStateCid
+          dsoUserState <- fetch (ForDso with dso) dsoUserStateCid
+          require "Not yet updated" (dsoUserState.lastIncreasedIn > userState.lastIncreasedIn)
+          create userState with
+            totalAvailableRewards = dsoUserState.totalAvailableRewards
+            lastIncreasedIn = dsoUserState.lastIncreasedIn
+
+        return AmuletRules_UpdateUserStatesResult with updatedUserStateCids = updatedCids
+
 
 -- Transfer logic
 -- ==============
@@ -971,6 +988,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
 
+
 -- | Deduplicate lock-holders to store them and charge for them at most once
 dedupOutputLockHolders : TransferOutput -> TransferOutput
 dedupOutputLockHolders out =
@@ -1245,6 +1263,8 @@ data TransferInput
         -- ^ Added in CIP-3. Optional validator faucet coupon input into this transfer.
   | InputValidatorLivenessActivityRecord (ContractId ValidatorLivenessActivityRecord)
   | InputUnclaimedActivityRecord (ContractId UnclaimedActivityRecord)
+  | InputUserState (ContractId AmuletUserState)
+      -- ^ Unminted rewards tracked in the AmuletUserState.
   deriving (Eq, Ord, Show)
 
 -- | Smart constructor for inputing validator faucet coupons into a transfer.
@@ -1259,6 +1279,7 @@ data Transfer = Transfer with
     outputs : [TransferOutput]
     beneficiaries : Optional [AppRewardBeneficiary]
       -- ^ Beneficiaries between which the app reward is split.
+      -- FIXME: determine whether we should still support this
   deriving (Eq, Ord, Show)
 
 
