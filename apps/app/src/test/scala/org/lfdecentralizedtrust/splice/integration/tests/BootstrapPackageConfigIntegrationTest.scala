@@ -227,8 +227,8 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
           DarResources.wallet.bootstrap.metadata.version.toString(),
           DarResources.walletPayments.bootstrap.metadata.version.toString(),
         ),
-        java.util.Optional.empty(),
-        java.util.Optional.empty(),
+        amuletConfig.transferPreapprovalFee,
+        amuletConfig.featuredAppActivityMarkerAmount,
       )
 
       val upgradeAction = new ARC_AmuletRules(
@@ -365,8 +365,8 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
         amuletConfig.decentralizedSynchronizer,
         amuletConfig.tickDuration,
         amuletConfig.packageConfig,
-        java.util.Optional.empty(),
-        java.util.Optional.empty(),
+        amuletConfig.transferPreapprovalFee,
+        amuletConfig.featuredAppActivityMarkerAmount,
       )
 
       val upgradeAction = new ARC_AmuletRules(
