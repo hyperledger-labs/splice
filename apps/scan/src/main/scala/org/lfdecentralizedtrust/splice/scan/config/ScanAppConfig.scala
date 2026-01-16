@@ -72,10 +72,6 @@ final case class ScanCacheConfig(
       ttl = NonNegativeFiniteDuration.ofSeconds(30),
       maxSize = 100,
     ),
-    totalAmuletBalance: CacheConfig = CacheConfig(
-      ttl = NonNegativeFiniteDuration.ofMinutes(2),
-      maxSize = 1000,
-    ),
     openMiningRounds: CacheConfig = CacheConfig(
       ttl = NonNegativeFiniteDuration.ofSeconds(30),
       maxSize = 1,
@@ -95,10 +91,6 @@ final case class ScanCacheConfig(
     rewardsCollectedInRound: CacheConfig = CacheConfig(
       ttl = NonNegativeFiniteDuration.ofMinutes(1),
       maxSize = 1000,
-    ),
-    walletBalance: CacheConfig = CacheConfig(
-      ttl = NonNegativeFiniteDuration.ofMinutes(1),
-      maxSize = 2000,
     ),
     amuletConfigForRound: CacheConfig = CacheConfig(
       ttl = NonNegativeFiniteDuration.ofMinutes(1),

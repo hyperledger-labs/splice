@@ -440,16 +440,6 @@ class ScanFrontendTimeBasedIntegrationTest
         "Wait for round to close in scan",
         _ => sv1ScanBackend.getRoundOfLatestData()._1 shouldBe (firstRound + 1),
       )
-      // We do not check the backend computation here, nor do we want to rely on the exact amulet balance created in other tests,
-      // so here we simply test that:
-      // The total balance increased as a result of our tap by the tap amount minus some amount to account for holding fees
-      // The frontend shows the balance from the backend
-      sv1ScanBackend
-        .getTotalAmuletBalance(firstRound + 1)
-        .valueOrFail("Amulet balance not yet computed") should
-        (be > (sv1ScanBackend
-          .getTotalAmuletBalance(firstRound)
-          .valueOrFail("Amulet balance not yet computed") + 99.0))
 
       withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck(
