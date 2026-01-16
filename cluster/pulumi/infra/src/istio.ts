@@ -357,8 +357,9 @@ function configureGatewayService(
         {
           type: gatewayVariant.type,
           annotations: {
-            // Expose the HTTP/HTTPS ports as NEGs so the GKE L7 Gateway's backend can reach them
-            'cloud.google.com/neg': JSON.stringify({ exposed_ports: { http2: {}, https: {} } }),
+            // Use numeric port keys (as strings) to avoid
+            // error parsing value of NEG annotation "cloud.google.com/neg" on service "cluster-ingress"/"istio-ingress": NEG annotation is invalid
+            'cloud.google.com/neg': JSON.stringify({ exposed_ports: { '80': {}, '443': {} } }),
           },
         };
 
