@@ -39,27 +39,29 @@ const getColumnsCount = (alwaysShown: number, ...sometimesShown: (boolean | unde
   alwaysShown +
   sometimesShown.reduce((columnsCount, isShown) => columnsCount + (isShown ? 1 : 0), 0);
 
+const getTotalVotes = (item: ProposalListingData): number =>
+  item.voteStats['accepted'] + item.voteStats['rejected'];
+
+const getEffectiveDate = (item: ProposalListingData): dayjs.Dayjs =>
+  item.voteTakesEffect === 'Threshold' ? dayjs(0) : dayjs(item.voteTakesEffect);
+
+// Using stable sort: chain sorts from least to most significant criterion
 const sortProposals = (
   data: ProposalListingData[],
   sortOrder?: ProposalSortOrder
 ): ProposalListingData[] => {
   if (!sortOrder) return data;
 
+  if (sortOrder === 'effectiveAtDesc') {
+    return data.toSorted((a, b) => dayjs(b.voteTakesEffect).diff(dayjs(a.voteTakesEffect)));
+  }
+
+  // For effectiveAtAsc (Inflight Votes):
+  // Threshold items first (by votes desc, then deadline asc), then dated items (by effective date asc)
   return data
-    .map(item => ({
-      item,
-      effectiveDate: dayjs(
-        item.voteTakesEffect === 'Threshold' ? item.votingThresholdDeadline : item.voteTakesEffect
-      ),
-    }))
-    .toSorted((a, b) => {
-      if (sortOrder === 'effectiveAtAsc') {
-        return a.effectiveDate.isBefore(b.effectiveDate) ? -1 : 1;
-      } else {
-        return a.effectiveDate.isAfter(b.effectiveDate) ? -1 : 1;
-      }
-    })
-    .map(({ item }) => item);
+    .toSorted((a, b) => dayjs(a.votingThresholdDeadline).diff(dayjs(b.votingThresholdDeadline)))
+    .toSorted((a, b) => getTotalVotes(b) - getTotalVotes(a))
+    .toSorted((a, b) => getEffectiveDate(a).diff(getEffectiveDate(b)));
 };
 
 export const ProposalListingSection: React.FC<ProposalListingSectionProps> = props => {

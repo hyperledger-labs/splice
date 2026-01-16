@@ -14,64 +14,29 @@ import { ProposalListingData } from '../../utils/types';
 
 describe('Governance Page Sorting', () => {
   describe('Action Required Section', () => {
-    test('should render items sorted by voting closes date ascending (closest deadline first)', () => {
+    test('should sort by voting closes date ascending (closest deadline first)', () => {
       const unsortedRequests: ActionRequiredData[] = [
         {
-          actionName: 'Action C - Latest deadline',
+          actionName: 'Action C - Latest',
           contractId: 'c' as ContractId<VoteRequest>,
           votingCloses: '2025-01-25 12:00',
           createdAt: '2025-01-10 12:00',
           requester: 'sv1',
         },
         {
-          actionName: 'Action A - Earliest deadline',
-          contractId: 'a' as ContractId<VoteRequest>,
-          votingCloses: '2025-01-15 12:00',
-          createdAt: '2025-01-10 12:00',
-          requester: 'sv1',
-        },
-        {
-          actionName: 'Action B - Middle deadline',
-          contractId: 'b' as ContractId<VoteRequest>,
-          votingCloses: '2025-01-20 12:00',
-          createdAt: '2025-01-10 12:00',
-          requester: 'sv1',
-        },
-      ];
-
-      render(
-        <MemoryRouter>
-          <ActionRequiredSection actionRequiredRequests={unsortedRequests} />
-        </MemoryRouter>
-      );
-
-      const cards = screen.getAllByTestId('action-required-card');
-      expect(cards).toHaveLength(3);
-
-      const actionNames = cards.map(
-        card => card.querySelector('[data-testid="action-required-action-content"]')?.textContent
-      );
-      expect(actionNames[0]).toBe('Action A - Earliest deadline');
-      expect(actionNames[1]).toBe('Action B - Middle deadline');
-      expect(actionNames[2]).toBe('Action C - Latest deadline');
-    });
-
-    test('should handle same-day deadlines with different times', () => {
-      const unsortedRequests: ActionRequiredData[] = [
-        {
-          actionName: 'Action B - Later time',
-          contractId: 'b' as ContractId<VoteRequest>,
-          votingCloses: '2025-01-15 18:00',
-          createdAt: '2025-01-10 12:00',
-          requester: 'sv1',
-        },
-        {
-          actionName: 'Action A - Earlier time',
+          actionName: 'Action A - Earliest',
           contractId: 'a' as ContractId<VoteRequest>,
           votingCloses: '2025-01-15 10:00',
           createdAt: '2025-01-10 12:00',
           requester: 'sv1',
         },
+        {
+          actionName: 'Action B - Middle',
+          contractId: 'b' as ContractId<VoteRequest>,
+          votingCloses: '2025-01-15 18:00',
+          createdAt: '2025-01-10 12:00',
+          requester: 'sv1',
+        },
       ];
 
       render(
@@ -84,88 +49,66 @@ describe('Governance Page Sorting', () => {
       const actionNames = cards.map(
         card => card.querySelector('[data-testid="action-required-action-content"]')?.textContent
       );
-      expect(actionNames[0]).toBe('Action A - Earlier time');
-      expect(actionNames[1]).toBe('Action B - Later time');
+
+      expect(actionNames).toEqual([
+        'Action A - Earliest',
+        'Action B - Middle',
+        'Action C - Latest',
+      ]);
     });
   });
 
   describe('Inflight Votes Section', () => {
     const baseData: Omit<
       ProposalListingData,
-      'actionName' | 'contractId' | 'voteTakesEffect' | 'votingThresholdDeadline'
+      'actionName' | 'contractId' | 'voteTakesEffect' | 'votingThresholdDeadline' | 'voteStats'
     > = {
       yourVote: 'accepted',
       status: 'In Progress',
-      voteStats: { accepted: 5, rejected: 2, 'no-vote': 1 },
       acceptanceThreshold: BigInt(11),
     };
 
-    test('should render items sorted by effective date ascending (closest first)', () => {
+    test('should sort with Threshold items first (by votes desc, then deadline asc), then dated items by effective date asc', () => {
       const unsortedRequests: ProposalListingData[] = [
         {
           ...baseData,
-          actionName: 'Action C - Latest effective',
-          contractId: 'c' as ContractId<VoteRequest>,
+          actionName: 'Dated - Later',
+          contractId: 'd2' as ContractId<VoteRequest>,
           voteTakesEffect: '2025-01-30 12:00',
           votingThresholdDeadline: '2025-01-25 12:00',
+          voteStats: { accepted: 5, rejected: 2, 'no-vote': 1 },
         },
         {
           ...baseData,
-          actionName: 'Action A - Earliest effective',
-          contractId: 'a' as ContractId<VoteRequest>,
+          actionName: 'Threshold - 5 votes, later deadline',
+          contractId: 't2' as ContractId<VoteRequest>,
+          voteTakesEffect: 'Threshold',
+          votingThresholdDeadline: '2025-01-25 12:00',
+          voteStats: { accepted: 3, rejected: 2, 'no-vote': 3 },
+        },
+        {
+          ...baseData,
+          actionName: 'Dated - Earlier',
+          contractId: 'd1' as ContractId<VoteRequest>,
           voteTakesEffect: '2025-01-20 12:00',
           votingThresholdDeadline: '2025-01-15 12:00',
+          voteStats: { accepted: 5, rejected: 2, 'no-vote': 1 },
         },
         {
           ...baseData,
-          actionName: 'Action B - Middle effective',
-          contractId: 'b' as ContractId<VoteRequest>,
-          voteTakesEffect: '2025-01-25 12:00',
-          votingThresholdDeadline: '2025-01-20 12:00',
+          actionName: 'Threshold - 10 votes',
+          contractId: 't1' as ContractId<VoteRequest>,
+          voteTakesEffect: 'Threshold',
+          votingThresholdDeadline: '2025-01-30 12:00',
+          voteStats: { accepted: 7, rejected: 3, 'no-vote': 0 },
         },
-      ];
-
-      render(
-        <MemoryRouter>
-          <ProposalListingSection
-            sectionTitle="Inflight Votes"
-            data={unsortedRequests}
-            noDataMessage="No data"
-            uniqueId="inflight-votes"
-            showVoteStats
-            showAcceptanceThreshold
-            showThresholdDeadline
-            sortOrder="effectiveAtAsc"
-          />
-        </MemoryRouter>
-      );
-
-      const rows = screen.getAllByTestId('inflight-votes-row');
-      expect(rows).toHaveLength(3);
-
-      const actionNames = rows.map(
-        row => row.querySelector('[data-testid="inflight-votes-row-action-name"]')?.textContent
-      );
-      expect(actionNames[0]).toBe('Action A - Earliest effective');
-      expect(actionNames[1]).toBe('Action B - Middle effective');
-      expect(actionNames[2]).toBe('Action C - Latest effective');
-    });
-
-    test('should sort Threshold items by their voting deadline alongside dated items', () => {
-      const unsortedRequests: ProposalListingData[] = [
         {
           ...baseData,
-          actionName: 'Threshold Action',
-          contractId: 't' as ContractId<VoteRequest>,
+          actionName: 'Threshold - 5 votes, earlier deadline',
+          contractId: 't3' as ContractId<VoteRequest>,
           voteTakesEffect: 'Threshold',
           votingThresholdDeadline: '2025-01-15 12:00',
-        },
-        {
-          ...baseData,
-          actionName: 'Dated Action',
-          contractId: 'd' as ContractId<VoteRequest>,
-          voteTakesEffect: '2025-01-30 12:00',
-          votingThresholdDeadline: '2025-01-25 12:00',
+          voteStats: { accepted: 4, rejected: 1, 'no-vote': 3 },
         },
       ];
 
@@ -189,58 +132,13 @@ describe('Governance Page Sorting', () => {
         row => row.querySelector('[data-testid="inflight-votes-row-action-name"]')?.textContent
       );
 
-      expect(actionNames[0]).toBe('Threshold Action');
-      expect(actionNames[1]).toBe('Dated Action');
-    });
-
-    test('should sort multiple Threshold items by voting deadline', () => {
-      const unsortedRequests: ProposalListingData[] = [
-        {
-          ...baseData,
-          actionName: 'Threshold C - Latest deadline',
-          contractId: 'c' as ContractId<VoteRequest>,
-          voteTakesEffect: 'Threshold',
-          votingThresholdDeadline: '2025-01-25 12:00',
-        },
-        {
-          ...baseData,
-          actionName: 'Threshold A - Earliest deadline',
-          contractId: 'a' as ContractId<VoteRequest>,
-          voteTakesEffect: 'Threshold',
-          votingThresholdDeadline: '2025-01-15 12:00',
-        },
-        {
-          ...baseData,
-          actionName: 'Threshold B - Middle deadline',
-          contractId: 'b' as ContractId<VoteRequest>,
-          voteTakesEffect: 'Threshold',
-          votingThresholdDeadline: '2025-01-20 12:00',
-        },
-      ];
-
-      render(
-        <MemoryRouter>
-          <ProposalListingSection
-            sectionTitle="Inflight Votes"
-            data={unsortedRequests}
-            noDataMessage="No data"
-            uniqueId="inflight-votes"
-            showVoteStats
-            showAcceptanceThreshold
-            showThresholdDeadline
-            sortOrder="effectiveAtAsc"
-          />
-        </MemoryRouter>
-      );
-
-      const rows = screen.getAllByTestId('inflight-votes-row');
-      const actionNames = rows.map(
-        row => row.querySelector('[data-testid="inflight-votes-row-action-name"]')?.textContent
-      );
-
-      expect(actionNames[0]).toBe('Threshold A - Earliest deadline');
-      expect(actionNames[1]).toBe('Threshold B - Middle deadline');
-      expect(actionNames[2]).toBe('Threshold C - Latest deadline');
+      expect(actionNames).toEqual([
+        'Threshold - 10 votes', // Threshold first, most votes
+        'Threshold - 5 votes, earlier deadline', // Same 5 votes, earlier deadline wins
+        'Threshold - 5 votes, later deadline', // Same 5 votes, later deadline
+        'Dated - Earlier', // Dated items sorted by effective date asc
+        'Dated - Later',
+      ]);
     });
   });
 
@@ -255,7 +153,7 @@ describe('Governance Page Sorting', () => {
       acceptanceThreshold: BigInt(11),
     };
 
-    test('should render items sorted by effective date descending (most recent first)', () => {
+    test('should sort by effective date descending (most recent first)', () => {
       const unsortedRequests: ProposalListingData[] = [
         {
           ...baseData,
@@ -268,7 +166,14 @@ describe('Governance Page Sorting', () => {
           ...baseData,
           actionName: 'Action C - Most recent',
           contractId: 'c' as ContractId<VoteRequest>,
-          voteTakesEffect: '2025-01-20 12:00',
+          voteTakesEffect: '2025-01-20 18:00',
+          votingThresholdDeadline: '2025-01-15 12:00',
+        },
+        {
+          ...baseData,
+          actionName: 'Action D - Same day, earlier time',
+          contractId: 'd' as ContractId<VoteRequest>,
+          voteTakesEffect: '2025-01-20 10:00',
           votingThresholdDeadline: '2025-01-15 12:00',
         },
         {
@@ -296,56 +201,16 @@ describe('Governance Page Sorting', () => {
       );
 
       const rows = screen.getAllByTestId('vote-history-row');
-      expect(rows).toHaveLength(3);
-
-      const actionNames = rows.map(
-        row => row.querySelector('[data-testid="vote-history-row-action-name"]')?.textContent
-      );
-      expect(actionNames[0]).toBe('Action C - Most recent');
-      expect(actionNames[1]).toBe('Action B - Middle');
-      expect(actionNames[2]).toBe('Action A - Oldest');
-    });
-
-    test('should handle same-day effective dates with different times', () => {
-      const unsortedRequests: ProposalListingData[] = [
-        {
-          ...baseData,
-          actionName: 'Action A - Earlier time',
-          contractId: 'a' as ContractId<VoteRequest>,
-          voteTakesEffect: '2025-01-15 10:00',
-          votingThresholdDeadline: '2025-01-10 12:00',
-        },
-        {
-          ...baseData,
-          actionName: 'Action B - Later time',
-          contractId: 'b' as ContractId<VoteRequest>,
-          voteTakesEffect: '2025-01-15 18:00',
-          votingThresholdDeadline: '2025-01-10 12:00',
-        },
-      ];
-
-      render(
-        <MemoryRouter>
-          <ProposalListingSection
-            sectionTitle="Vote History"
-            data={unsortedRequests}
-            noDataMessage="No data"
-            uniqueId="vote-history"
-            showStatus
-            showVoteStats
-            showAcceptanceThreshold
-            sortOrder="effectiveAtDesc"
-          />
-        </MemoryRouter>
-      );
-
-      const rows = screen.getAllByTestId('vote-history-row');
       const actionNames = rows.map(
         row => row.querySelector('[data-testid="vote-history-row-action-name"]')?.textContent
       );
 
-      expect(actionNames[0]).toBe('Action B - Later time');
-      expect(actionNames[1]).toBe('Action A - Earlier time');
+      expect(actionNames).toEqual([
+        'Action C - Most recent',
+        'Action D - Same day, earlier time',
+        'Action B - Middle',
+        'Action A - Oldest',
+      ]);
     });
   });
 });
