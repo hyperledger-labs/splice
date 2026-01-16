@@ -33,6 +33,7 @@ test('version service should return the correct version', async () => {
 
   const versionService = installClusterVersion();
 
+  // check the version service spec for the correct version endpoint configuration
   const spec =
     'spec' in versionService
       ? (versionService.spec as pulumi.Output<{
