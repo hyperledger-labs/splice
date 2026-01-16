@@ -226,7 +226,13 @@ data DsoRules_ExpireSvOnboardingConfirmedResult = DsoRules_ExpireSvOnboardingCon
 data DsoRules_Amulet_ExpireResult = DsoRules_Amulet_ExpireResult with
     expireSum : AmuletExpireSummary
 
+data DsoRules_Amulet_ExpireV2Result = DsoRules_Amulet_ExpireV2Result with
+  expireSum : AmuletExpireSummary
+
 data DsoRules_LockedAmulet_ExpireAmuletResult = DsoRules_LockedAmulet_ExpireAmuletResult with
+    expireSum : AmuletExpireSummary
+
+data DsoRules_LockedAmulet_ExpireAmuletV2Result = DsoRules_LockedAmulet_ExpireAmuletV2Result with
     expireSum : AmuletExpireSummary
 
 data DsoRules_AdvanceOpenMiningRoundsResult = DsoRules_AdvanceOpenMiningRoundsResult with
@@ -1099,10 +1105,18 @@ template DsoRules with
         choiceArg : Amulet_Expire
         sv : Optional Party
       controller sv
+      do deprecatedChoice "splice-dso-governance" "FIXME" "DsoRules_Amulet_Expire"
+
+    nonconsuming choice DsoRules_Amulet_ExpireV2 : DsoRules_Amulet_ExpireV2Result
+      with
+        cid : ContractId Amulet
+        choiceArg : Amulet_ExpireV2
+        sv : Optional Party
+      controller sv
       do
         _ <- getAndValidateSvParty this sv
         result <- exercise cid choiceArg
-        return DsoRules_Amulet_ExpireResult with
+        return DsoRules_Amulet_ExpireV2Result with
           expireSum = result.expireSum
 
     nonconsuming choice DsoRules_LockedAmulet_ExpireAmulet : DsoRules_LockedAmulet_ExpireAmuletResult
@@ -1115,6 +1129,18 @@ template DsoRules with
         _ <- getAndValidateSvParty this sv
         result <- exercise cid choiceArg
         return DsoRules_LockedAmulet_ExpireAmuletResult with
+          expireSum = result.expireSum
+
+    nonconsuming choice DsoRules_LockedAmulet_ExpireV2Amulet : DsoRules_LockedAmulet_ExpireAmuletV2Result
+      with
+        cid : ContractId LockedAmulet
+        choiceArg : LockedAmulet_ExpireAmuletV2
+        sv : Optional Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this sv
+        result <- exercise cid choiceArg
+        return DsoRules_LockedAmulet_ExpireAmuletV2Result with
           expireSum = result.expireSum
 
 

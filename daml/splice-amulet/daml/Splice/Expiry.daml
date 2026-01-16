@@ -20,7 +20,6 @@ import Splice.Amulet.TokenApiUtils
 
 import Splice.Fees
 import Splice.Types
-import Splice.Round
 import Splice.RelRound
 
 import DA.Date
@@ -140,13 +139,13 @@ data TimeLock = TimeLock with
 
 -- | `isAmuletExpired openRound amuletAmount` computes whether the expiring `amuletAmount`
 -- is definitely expired in case the `openRound` is open.
-isAmuletExpired : OpenMiningRound -> ExpiringAmount -> Bool
+isAmuletExpired : Round -> ExpiringAmount -> Bool
 isAmuletExpired round amuletAmount =
   let expiresAtRound = amountExpiresAt amuletAmount
   in case expiresAtRound of
     -- Expiring round cannot be represented by Round due to amulet amount is too large.
     -- This amulet will never expire unless it is broken into smaller amount.
-    Singleton x -> x.number <= round.round.number - 2
+    Singleton x -> x.number <= round.number
     AfterMaxBound -> False
 
 
