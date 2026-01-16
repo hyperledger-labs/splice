@@ -5,6 +5,13 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
 
+/*
+If you see the error
+  no matches for kind "Gateway" in version "gateway.networking.k8s.io/v1"
+you need to add the CRD; on a cncluster-controlled dev cluster directory you can do
+  gcloud container clusters update "cn-${GCP_CLUSTER_BASENAME}net" --gateway-api=standard
+ */
+
 // possible values and their meaning: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gatewayclass
 const gcpGatewayClass = 'gke-l7-global-external-managed';
 
