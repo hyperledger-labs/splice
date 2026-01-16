@@ -39,18 +39,22 @@ class AcsSnapshotBulkStorageTest
   )
 
   "AcsSnapshotBulkStorage" should {
-    "work" in {
+    "successfully dump a single ACS snapshot" in {
       withS3Mock {
         val store = mockAcsSnapshotStore(acsSnapshotSize)
         val timestamp = CantonTimestamp.now()
         val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(loggerFactory)
         for {
-          _ <- new AcsSnapshotBulkStorage(
-            bulkStorageTestConfig,
-            store,
-            s3BucketConnection,
-            loggerFactory,
-          ).getSingleAcsSnapshotDumpSource(0, timestamp).runWith(Sink.ignore)
+          _ <- SingleAcsSnapshotBulkStorage
+            .asSource(
+              0,
+              timestamp,
+              bulkStorageTestConfig,
+              store,
+              s3BucketConnection,
+              loggerFactory,
+            )
+            .runWith(Sink.ignore)
 
           s3Objects <- s3BucketConnection.s3Client
             .listObjects(
