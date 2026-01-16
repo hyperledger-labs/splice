@@ -736,12 +736,6 @@ class HttpWalletHandler(
   )(implicit tc: TraceContext) = {
     val store = wallet.store
     for {
-      supportsExpectedDsoParty <- packageVersionSupport
-        .supportsExpectedDsoParty(
-          Seq(store.key.validatorParty, store.key.endUserParty, store.key.dsoParty),
-          walletManager.clock.now,
-        )
-        .map(_.supported)
       _ <- wallet.connection
         .submit(
           Seq(store.key.validatorParty, store.key.endUserParty),
@@ -749,7 +743,7 @@ class HttpWalletHandler(
           new TransferPreapprovalProposal(
             store.key.endUserParty.toProtoPrimitive,
             store.key.validatorParty.toProtoPrimitive,
-            Option.when(supportsExpectedDsoParty)(store.key.dsoParty.toProtoPrimitive).toJava,
+            java.util.Optional.of(store.key.dsoParty.toProtoPrimitive),
           ).create,
         )
         .withDedup(

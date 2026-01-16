@@ -43,7 +43,6 @@ import scala.concurrent.Future
 import scala.util.Try
 import cats.syntax.parallel.*
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
-import scala.jdk.OptionConverters.*
 
 class WalletIntegrationTest
     extends IntegrationTestWithSharedEnvironment
@@ -789,12 +788,6 @@ class WalletIntegrationTest
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
       aliceValidatorWalletClient.tap(10.0)
 
-      val supportsExpectedDsoParty = validatorSupportsExpectedDsoParty(
-        sv1ScanBackend.getAmuletRules(),
-        aliceValidatorBackend,
-        env.environment.clock.now,
-      )
-
       def createTransferPreapprovalProposal =
         aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
           .submitWithResult(
@@ -805,7 +798,7 @@ class WalletIntegrationTest
               .create(
                 aliceUserParty.toProtoPrimitive,
                 aliceValidatorParty.toProtoPrimitive,
-                Option.when(supportsExpectedDsoParty)(dsoParty.toProtoPrimitive).toJava,
+                java.util.Optional.of(dsoParty.toProtoPrimitive),
               ),
           )
           .contractId
