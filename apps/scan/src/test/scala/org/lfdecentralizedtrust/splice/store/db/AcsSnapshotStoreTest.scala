@@ -58,7 +58,10 @@ class AcsSnapshotStoreTest
         for {
           updateHistory <- mkUpdateHistory()
           store = mkStore(updateHistory)
-          resultBefore <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, CantonTimestamp.MaxValue)
+          resultBefore <- store.lookupSnapshotAtOrBefore(
+            DefaultMigrationId,
+            CantonTimestamp.MaxValue,
+          )
           resultAfter <- store.lookupSnapshotAfter(DefaultMigrationId, CantonTimestamp.MinValue)
         } yield {
           resultBefore should be(None)
@@ -115,7 +118,10 @@ class AcsSnapshotStoreTest
           }
           resultBefore4 <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, timestamp4)
           firstResult <- store.lookupSnapshotAfter(DefaultMigrationId, CantonTimestamp.MinValue)
-          secondResult <- store.lookupSnapshotAfter(DefaultMigrationId, firstResult.value.snapshotRecordTime)
+          secondResult <- store.lookupSnapshotAfter(
+            DefaultMigrationId,
+            firstResult.value.snapshotRecordTime,
+          )
         } yield {
           resultBefore4.map(_.snapshotRecordTime) should be(Some(timestamp3))
           firstResult.map(_.snapshotRecordTime) should be(Some(timestamp1))
