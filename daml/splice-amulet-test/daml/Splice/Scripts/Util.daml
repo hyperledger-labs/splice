@@ -25,6 +25,7 @@ import Splice.Amulet.TokenApiUtils
 import Splice.AmuletRules
 import Splice.AmuletConfig (AmuletConfig(..))
 import qualified Splice.AmuletConfig as Unit
+import Splice.ExternalPartyConfigState
 import Splice.Expiry
 import Splice.ExternalPartyAmuletRules
 import Splice.Round
@@ -238,6 +239,18 @@ skipNRounds app n = do
     *> createCmd r3 with round = newRound3
   pure ()
 
+updateExternalPartyConfigState : AmuletApp -> Script ()
+updateExternalPartyConfigState app = do
+  (externalPartyConfigStateCid0, externalPartyConfigStateCid1) <- getExternalPartyConfigStates app
+  [(openRoundCid0, _), (openRoundCid1, _), (openRoundCid2, _)] <- Registry.getActiveOpenRoundsSorted app.dso
+  submitExerciseAmuletRulesByKey app [app.dso] [] AmuletRules_UpdateExternalPartyConfigStates with
+    externalPartyConfigStateCid0
+    externalPartyConfigStateCid1
+    openRoundCid0
+    openRoundCid1
+    openRoundCid2
+  pure ()
+
 -- Asset handling utilities
 ---------------------------
 
@@ -448,6 +461,15 @@ getLatestOpenRound app = do
   case maximumOn (\(_, r) -> r.round) rounds of
     None -> abort "No open open mining rounds"
     Some r-> pure r
+
+getExternalPartyConfigStates : AmuletApp -> Script (ContractId ExternalPartyConfigState, ContractId ExternalPartyConfigState)
+getExternalPartyConfigStates app = do
+  externalPartyConfigStates <- query @ExternalPartyConfigState app.dso
+  case externalPartyConfigStates of
+    [config0, config1] -> if config0._2.targetArchiveAfter < config1._2.targetArchiveAfter
+      then pure (config0._1, config1._1)
+      else pure (config1._1, config0._1)
+    _ -> abort ("Expected exactly two ExternalPartyConfigState contracts but got: " <> show externalPartyConfigStates)
 
 getLatestActiveOpenRound : AmuletApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
 getLatestActiveOpenRound app = do

@@ -65,33 +65,39 @@ testExpireLockedAmulet = do
   cid <- getLockedAmulet app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (seconds 90 - convertMicrosecondsToRelTime 1)
   Some(lockedAmulet) <- queryContractId @LockedAmulet alice.primaryParty cid
 
-  roundCid <- advanceRound app (Round 3)
+  _ <- advanceRound app (Round 3)
+  updateExternalPartyConfigState app
+  passTime (hours 24)
+  updateExternalPartyConfigState app
 
   -- Lock is not yet expired
   -- DSO party fails to expire the amulet
+  (externalPartyConfigState0Cid, externalPartyConfigState1Cid) <- getExternalPartyConfigStates app
   testChoiceFailed [app.dso] [app.dso] $
-    exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
+    exerciseCmd cid (LockedAmulet_ExpireAmuletV2 with
+      externalPartyConfigState0Cid
+      externalPartyConfigState1Cid)
+
+  debug "past first"
 
   -- Current round is 4
-  roundCid <- advanceRound app (Round 4)
-
-  -- Amulet is not yet expired
-  -- 2 rounds before current round = 4 - 2 = 2 which is before round 3 when the amulet expires
-  -- DSO party fails to expire the amulet
-  testChoiceFailed [app.dso] [app.dso] $
-    exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
-
-  -- Current round is 5
-  roundCid <- advanceRound app (Round 5)
+  _ <- advanceRound app (Round 4)
+  passTime (hours 24)
+  updateExternalPartyConfigState app
+  passTime (hours 24)
+  updateExternalPartyConfigState app
 
   normalizedBalanceBeforeExpiry <- getNormalizedBalance app.dso
 
   -- Amulet is expired
   -- 2 rounds before current round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
   -- DSO party expires the amulet
-  result <- checkTxMetadata app TxKind_ExpireDust alice.primaryParty $
+  (externalPartyConfigState0Cid, externalPartyConfigState1Cid) <- getExternalPartyConfigStates app
+  result <- checkTxMetadata' app TxKind_ExpireDust alice.primaryParty $
     testChoice [app.dso] [app.dso] $
-      exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
+      exerciseCmd cid $ LockedAmulet_ExpireAmuletV2 with
+        externalPartyConfigState0Cid
+        externalPartyConfigState1Cid
   let expireSummary = result.expireSum
 
   normalizedBalanceAfterExpiry <- getNormalizedBalance app.dso
@@ -120,41 +126,51 @@ testExpireAmulet = do
   amulet.amount.createdAt === Round 1
 
   -- current latest active round is 3
-  latestActiveRoundCid <- advanceRound app (Round 3)
+  _ <- advanceRound app (Round 3)
+  updateExternalPartyConfigState app
+  passTime (hours 24)
+  updateExternalPartyConfigState app
 
   -- 2 rounds before latest active round = 3 - 2 = 1 which is before round 3 when the amulet expires
   -- DSO party fails to expire the amulet
+  (externalPartyConfigState0Cid, externalPartyConfigState1Cid) <- getExternalPartyConfigStates app
   testChoiceFailed [app.dso] [app.dso] $
-    exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
+    exerciseCmd cid Amulet_ExpireV2 with
+      externalPartyConfigState0Cid
+      externalPartyConfigState1Cid
 
   -- current latest active round is 4
-  latestActiveRoundCid <- advanceRound app (Round 4)
-
-  -- 2 rounds before current latest active round => 4 - 2 = 2 which is before round 3 when the amulet expires
-  -- DSO party fails to expire the amulet
-  testChoiceFailed [app.dso] [app.dso] $
-    exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
-
-  -- current latest active round is 5
-  latestActiveRoundCid <- advanceRound app (Round 5)
+  _ <- advanceRound app (Round 4)
+  passTime (hours 24)
+  updateExternalPartyConfigState app
+  passTime (hours 24)
+  updateExternalPartyConfigState app
 
   normalizedBalanceBeforeExpiry <- getNormalizedBalance app.dso
 
+  passTime (hours 24)
+  updateExternalPartyConfigState app
+  passTime (hours 24)
+  updateExternalPartyConfigState app
+
   -- 2 rounds before current latest active round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
   -- DSO party expires the amulet
-  result <- checkTxMetadata app TxKind_ExpireDust alice.primaryParty $
+  (externalPartyConfigState0Cid, externalPartyConfigState1Cid) <- getExternalPartyConfigStates app
+  result <- checkTxMetadata' app TxKind_ExpireDust alice.primaryParty $
     testChoice [app.dso] [app.dso] $
-    exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
+    exerciseCmd cid $ Amulet_ExpireV2 with
+      externalPartyConfigState0Cid
+      externalPartyConfigState1Cid
   let expireSummary = result.expireSum
 
   normalizedBalanceAfterExpiry <- getNormalizedBalance app.dso
   expireSummary.changeToInitialAmountAsOfRoundZero === normalizedBalanceAfterExpiry - normalizedBalanceBeforeExpiry
   expireSummary.changeToHoldingFeesRate === - (amulet.amount.ratePerRound.rate)
 
-  -- current active current mining round is 3, 4 and 5
+  -- current active current mining round is 2, 3 and 4
   allActiveOpenMiningRoundCids <- query @OpenMiningRound app.dso
   forA_ allActiveOpenMiningRoundCids $ \(_, openRound) -> do
-    assert $ openRound.round.number >= 3 && openRound.round.number <= 5
+    assert $ openRound.round.number >= 2 && openRound.round.number <= 4
 
   -- alice now only owns a amulet with initial amount of 1.0
   [(_, onlyAmulet)] <- query @Amulet alice.primaryParty
