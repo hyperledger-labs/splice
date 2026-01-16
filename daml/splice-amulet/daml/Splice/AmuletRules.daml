@@ -716,6 +716,15 @@ template AmuletRules
         newExternalPartyConfigStateCid <- create ExternalPartyConfigState with
           dso
           targetArchiveAfter = now `addRelTime` (getExternalPartyConfigStateTickDuration config + getExternalPartyConfigStateTickDuration config)
+          -- FIXME: This should probably be the oldest mining round
+          -- not the newest (while still using the config values from the newest).
+          -- This ensures that the mining rounds on ExternalPartyConfigState <=
+          -- the mining round on the oldest active open mining round.
+          -- That in turn ensures that you cannot end up in a situation where
+          -- an amulet was created in the oldest round and can be immediately expired
+          -- before external party config state is already ahead.
+          -- The difference doesn't really matter in practice
+          -- as you can only really trigger this if rounds stop advancing.
           holdingFeesOpenRoundNumber = openRound.round
           amuletPrice = openRound.amuletPrice
           transferConfig = transferConfigToTransferConfigV2 openRound.transferConfigUsd
