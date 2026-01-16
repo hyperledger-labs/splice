@@ -176,6 +176,7 @@ export async function installSplitwell(
     nodeIdentifier: 'splitwell',
     logLevel: splitwellConfig.logging?.level,
     logAsync: splitwellConfig.logging?.async,
+    version: activeVersion,
   });
 }
 
