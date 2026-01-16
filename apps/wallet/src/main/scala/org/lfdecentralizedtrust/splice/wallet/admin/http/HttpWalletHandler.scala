@@ -7,7 +7,11 @@ import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletAllocationCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as validatorLicenseCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  Amulet,
+  LockedAmulet,
+  UnclaimedDevelopmentFundCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_AcceptedAppPayment
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{
   AmuletOperationOutcome,
@@ -77,8 +81,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferins
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AllocateAmuletRequest,
+  AllocateDevelopmentFundCouponRequest,
+  AllocateDevelopmentFundCouponResponse,
   CreateTokenStandardTransferRequest,
 }
+import org.lfdecentralizedtrust.splice.util.SpliceUtil.damlDecimal
 import org.lfdecentralizedtrust.splice.wallet.admin.http.UserWalletAuthExtractor.WalletUserRequest
 
 import java.math.RoundingMode as JRM
@@ -1275,6 +1282,83 @@ class HttpWalletHandler(
           .yieldResult()
       } yield WalletResource.RejectAllocationRequestResponseOK(
         d0.ChoiceExecutionMetadata(result.exerciseResult.meta.values.asScala.toMap)
+      )
+    }
+  }
+
+  override def allocateDevelopmentFundCoupon(
+      respond: WalletResource.AllocateDevelopmentFundCouponResponse.type
+  )(body: AllocateDevelopmentFundCouponRequest)(
+      extracted: WalletUserRequest
+  ): Future[WalletResource.AllocateDevelopmentFundCouponResponse] = {
+    // TODO: Check http errors
+    implicit val WalletUserRequest(user, userWallet, traceContext) = extracted
+    withSpan(s"$workflowId.rejectAllocationRequest") { implicit traceContext => _ =>
+      val store = userWallet.store
+      for {
+        domain <- scanConnection.getAmuletRulesDomain()(traceContext)
+        amuletRules <- scanConnection.getAmuletRulesWithState()
+        amuletRulesCt = amuletRules.toAssignedContract.getOrElse(
+          throw Status.Code.FAILED_PRECONDITION.toStatus
+            .withDescription(
+              s"AmuletRules contract is not assigned to a domain."
+            )
+            .asRuntimeException()
+        )
+        beneficiary = Codec.tryDecode(Codec.Party)(body.beneficiary)
+        fundManagerFromRequest = Codec.tryDecode(Codec.Party)(body.fundManager)
+        amount = Codec.tryDecode(Codec.BigDecimal)(body.amount)
+        expiresAt = Codec.tryDecode(Codec.Timestamp)(body.expiresAt)
+        unclaimedDevelopmentFundCouponContractIds = body.unclaimedDevelopmentFundCouponContractIds
+          .map(
+            Codec.tryDecodeJavaContractId(UnclaimedDevelopmentFundCoupon.COMPANION)(_)
+          )
+        optDevelopmentFundManager =
+          amuletRulesCt.contract.payload.configSchedule.initialValue.optDevelopmentFundManager
+            .map(Codec.tryDecode(Codec.Party)(_))
+            .toScala
+        // validate development fund manager
+        _ =
+          optDevelopmentFundManager match {
+            case None =>
+              throw Status.FAILED_PRECONDITION
+                .withDescription("Development fund manager has not been configured.")
+                .asRuntimeException()
+            case Some(developmentFundManager)
+                if developmentFundManager == fundManagerFromRequest &&
+                  fundManagerFromRequest == store.key.endUserParty =>
+              ()
+            case Some(_) =>
+              throw Status.PERMISSION_DENIED
+                .withDescription("Invalid fundManager")
+                .asRuntimeException()
+          }
+        cmd = amuletRulesCt
+          .exercise(
+            _.exerciseAmuletRules_AllocateDevelopmentFundCoupon(
+              unclaimedDevelopmentFundCouponContractIds.asJava,
+              beneficiary.toProtoPrimitive,
+              damlDecimal(amount),
+              expiresAt.toInstant,
+              fundManagerFromRequest.toProtoPrimitive,
+              body.reason,
+            )
+          )
+        result <- userWallet.connection
+          .submit(
+            Seq(store.key.validatorParty, store.key.endUserParty),
+            Seq.empty,
+            cmd,
+          )
+          .withSynchronizerId(domain)
+          .noDedup
+          .withDisclosedContracts(userWallet.connection.disclosedContracts(amuletRules))
+          .yieldResult()
+      } yield WalletResource.AllocateDevelopmentFundCouponResponseOK(
+        AllocateDevelopmentFundCouponResponse(
+          result.exerciseResult.developmentFundCouponCid.contractId,
+          result.exerciseResult.optUnclaimedDevelopmentFundCouponCid.toScala.map(_.contractId),
+        )
       )
     }
   }
