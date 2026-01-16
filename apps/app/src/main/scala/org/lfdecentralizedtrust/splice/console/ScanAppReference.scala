@@ -613,12 +613,16 @@ abstract class ScanAppReference(
   @Help.Summary(
     "Get the total amulet balance (total supply), automatically forces a new acs snapshot to get an up2date response"
   )
-  def getTotalAmuletBalance(amuletName: String = getSpliceInstanceNames().amuletName): BigDecimal = {
+  def getTotalAmuletBalance(
+      amuletName: String = getSpliceInstanceNames().amuletName
+  ): BigDecimal = {
     val _ = forceAcsSnapshotNow()
     lookupInstrument(amuletName)
       .flatMap(_.totalSupply.map(s => BigDecimal(s)))
       .getOrElse(
-        throw new RuntimeException(s"'$amuletName' instrument not found or total supply not defined")
+        throw new RuntimeException(
+          s"'$amuletName' instrument not found or total supply not defined"
+        )
       )
   }
 
