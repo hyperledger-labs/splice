@@ -204,14 +204,14 @@ class AcsSnapshotStoreTest
           _ <- ingestCreate(
             updateHistory,
             omr1,
-            timestamp1.minusSeconds(2L),
+            timestamp1,
           )
           _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
           // t2
           _ <- ingestCreate(
             updateHistory,
             omr2,
-            timestamp2.minusSeconds(1L),
+            timestamp2,
           )
           lastSnapshot <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, timestamp2)
           _ <- store.insertNewSnapshot(lastSnapshot, DefaultMigrationId, timestamp2)

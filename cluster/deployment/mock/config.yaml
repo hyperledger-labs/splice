@@ -120,6 +120,7 @@ loadTester:
   iterationsPerMinute: 30
   minRate: 0.123
   chartVersion: 1.2.3
+  maxVUs: 30
   adaptiveScenario:
     enabled: true
 svs:
