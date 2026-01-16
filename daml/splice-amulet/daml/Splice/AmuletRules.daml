@@ -99,12 +99,6 @@ data AmuletRules_ConvertFeaturedAppActivityMarkersResult = AmuletRules_ConvertFe
     appRewardCouponCids : [ContractId AppRewardCoupon]
 
 
-data AmuletRules_BootstrapExternalPartyConfigStateResult = AmuletRules_BootstrapExternalPartyConfigStateResult
-  with
-    externalPartyConfigStateCid0 : ContractId ExternalPartyConfigState
-    externalPartyConfigStateCid1 : ContractId ExternalPartyConfigState
-  deriving (Show, Eq)
-
 data AmuletRules_AdvanceExternalPartyConfigStatesResult = AmuletRules_AdvanceExternalPartyConfigStatesResult
   with
     newExternalPartyConfigStateCid : ContractId ExternalPartyConfigState
