@@ -200,6 +200,7 @@ object ConfigTransforms {
       updateAllAutomationConfigs(
         _.copy(rewardOperationRoundsCloseBufferDuration = NonNegativeFiniteDuration.ofMillis(100))
       ),
+      disableDevelopmentFund(),
     )
   }
 
@@ -298,6 +299,9 @@ object ConfigTransforms {
 
   def disableZeroFees(): ConfigTransform =
     updateAllSvAppFoundDsoConfigs_(c => c.copy(zeroTransferFees = false))
+
+  def disableDevelopmentFund(): ConfigTransform =
+    updateAllSvAppFoundDsoConfigs_(c => c.copy(developmentFundPercentage = Some(0.0)))
 
   def updateAllValidatorAppConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig
