@@ -1,0 +1,248 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.Wallet.TestMintingDelegation where
+
+import DA.Time
+import Daml.Script
+
+import qualified DA.Map as Map
+import DA.List.Total (head)
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Round
+import Splice.Util
+import Splice.Wallet.MintingDelegation
+import Splice.ValidatorLicense
+
+import Splice.Scripts.Util
+
+testMintingDelegation : Script ()
+testMintingDelegation = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  beneficiary <- allocateParty "beneficiary"
+  let delegate = aliceValidator.primaryParty
+
+  -- Create a MintingDelegation
+  now <- getTime
+  proposalCid <- submit beneficiary $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary
+      delegate
+      expiresAt = now `addRelTime` days 30
+      amuletMergeLimit = 10
+
+  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submit delegate $ exerciseCmd proposalCid MintingDelegationProposal_Accept with
+    existingDelegationCid = None
+
+  -- Create a ValidatorRight for beneficiary (needed for ValidatorRewardCoupon)
+  validatorRightCid <- submit beneficiary $ createCmd ValidatorRight with
+    dso = app.dso
+    user = beneficiary
+    validator = beneficiary
+
+  (_, openRound) <- getLatestOpenRound app
+
+  livenessActivityRecordCid <- submit app.dso $ createCmd ValidatorLivenessActivityRecord with
+    dso = app.dso
+    validator = beneficiary
+    round = openRound.round
+
+  let appRewardCouponAmount = 2.0
+  appRewardCouponCid <- submit app.dso $ createCmd AppRewardCoupon with
+    dso = app.dso
+    provider = delegate
+    featured = False
+    amount = appRewardCouponAmount
+    round = openRound.round
+    beneficiary = Some beneficiary
+
+  let validatorRewardCouponAmount = 10.0
+  validatorRewardCouponCid <- submit app.dso $ createCmd ValidatorRewardCoupon with
+    dso = app.dso
+    user = beneficiary
+    amount = validatorRewardCouponAmount
+    round = openRound.round
+
+  let unclaimedRewardCouponAmount = 30.0
+  unclaimedActivityRecordCid <- submit app.dso $ createCmd UnclaimedActivityRecord with
+    dso = app.dso
+    beneficiary = beneficiary
+    amount = unclaimedRewardCouponAmount
+    reason = ""
+    expiresAt = now `addRelTime` days 60
+
+  -- Wait for rounds to advance so coupons can be minted
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+
+  balanceBefore <- getNormalizedBalance beneficiary
+  (openMiningRoundCid, _) <- getLatestOpenRound app
+  now2 <- getTime
+  issuingRounds <- query @IssuingMiningRound app.dso
+  let context = TransferContext with
+        openMiningRound = openMiningRoundCid
+        issuingMiningRounds = Map.fromList
+          [ (round.round, roundCid) | (roundCid, round) <- issuingRounds, round.opensAt <= now2 ]
+        validatorRights = Map.fromList [(beneficiary, validatorRightCid)]
+        featuredAppRight = None
+  (amuletRulesCid, _) <- getAmuletRules app
+
+  submitMulti [delegate] [beneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_Mint with
+    inputs = [
+        InputValidatorLivenessActivityRecord livenessActivityRecordCid,
+        InputAppRewardCoupon appRewardCouponCid,
+        InputValidatorRewardCoupon validatorRewardCouponCid,
+        InputUnclaimedActivityRecord unclaimedActivityRecordCid
+      ]
+    context = PaymentTransferContext with
+      context
+      amuletRules = amuletRulesCid
+
+  balanceAfter <- getNormalizedBalance beneficiary
+  let reward = balanceAfter - balanceBefore
+
+  let Some (_, issuingRound) = head issuingRounds
+
+  -- expected rewards based on issuance rates
+  let expectedValidatorFaucetAmount = getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingRound
+  let expectedAppReward = appRewardCouponAmount * issuingRound.issuancePerUnfeaturedAppRewardCoupon
+  let expectedValidatorReward = validatorRewardCouponAmount * issuingRound.issuancePerValidatorRewardCoupon
+  let expectedTotal = expectedValidatorFaucetAmount + expectedAppReward + expectedValidatorReward + unclaimedRewardCouponAmount
+
+  require ("Combined reward should match expected " <> show expectedTotal <> ", got: " <> show reward)
+    (reward >= expectedTotal - 1.0 && reward <= expectedTotal + 1.0)
+
+  pure ()
+
+testMintingDelegation_checksExpiry : Script ()
+testMintingDelegation_checksExpiry = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  beneficiary <- allocateParty "beneficiary"
+  let delegate = aliceValidator.primaryParty
+  let delegationLifetime = days 30
+
+  now <- getTime
+  proposalCid <- submit beneficiary $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary
+      delegate
+      expiresAt = now `addRelTime` delegationLifetime
+      amuletMergeLimit = 10
+
+  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submit delegate $ exerciseCmd proposalCid MintingDelegationProposal_Accept with
+    existingDelegationCid = None
+
+  validatorLicenseCid <- submit app.dso $ createCmd ValidatorLicense with
+    validator = beneficiary
+    sponsor = app.dso
+    dso = app.dso
+    faucetState = None
+    metadata = None
+    lastActiveAt = None
+
+  -- Record an activity before expiry to have a valid livenessActivityRecordCid
+  (openRoundCid, _) <- getLatestOpenRound app
+  submitMulti [beneficiary] [app.dso] $ exerciseCmd validatorLicenseCid (ValidatorLicense_RecordValidatorLivenessActivity openRoundCid)
+
+  [(livenessActivityRecordCid, _)] <- query @ValidatorLivenessActivityRecord beneficiary
+
+  -- Advance rounds so record can be minted
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+
+  -- Advance time past expiry
+  passTime delegationLifetime
+
+  -- Mint should fail after expiry
+  context <- getTransferContext app alice None
+  (amuletRulesCid, _) <- getAmuletRules app
+
+  submitMultiMustFail [delegate] [beneficiary, app.dso] $ exerciseCmd mintingDelegationCid MintingDelegation_Mint with
+    inputs = [InputValidatorLivenessActivityRecord livenessActivityRecordCid]
+    context = PaymentTransferContext with
+      context
+      amuletRules = amuletRulesCid
+
+  pure ()
+
+-- Archival of existing delegation succeeds only if the delegation parties match
+-- with the new delegation being proposed
+testMintingDelegation_AcceptWithExistingDelegationArchival : Script ()
+testMintingDelegation_AcceptWithExistingDelegationArchival = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  beneficiary1 <- allocateParty "beneficiary1"
+  let delegate1 = aliceValidator.primaryParty
+
+  now <- getTime
+
+  proposalCid1 <- submit beneficiary1 $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary = beneficiary1
+      delegate = delegate1
+      expiresAt = now `addRelTime` days 30
+      amuletMergeLimit = 10
+
+  MintingDelegationProposal_AcceptResult mintingDelegationCid1 <- submit delegate1 $ exerciseCmd proposalCid1 MintingDelegationProposal_Accept with
+    existingDelegationCid = None
+
+  proposalSameParties <- submit beneficiary1 $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary = beneficiary1
+      delegate = delegate1
+      expiresAt = now `addRelTime` days 60
+      amuletMergeLimit = 20
+
+  -- Happy path, should archive mintingDelegationCid1
+  MintingDelegationProposal_AcceptResult mintingDelegationCid2 <- submit delegate1 $ exerciseCmd proposalSameParties MintingDelegationProposal_Accept with
+    existingDelegationCid = Some mintingDelegationCid1
+
+  oldDelegation <- queryContractId beneficiary1 mintingDelegationCid1
+  require "Old delegation should be archived" (oldDelegation == None)
+
+  -- Test 1: Should fail for wrong beneficiary
+  proposalWrongBeneficiary <- submit bobValidator.primaryParty $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary = bobValidator.primaryParty -- mismatch
+      delegate = delegate1
+      expiresAt = now `addRelTime` days 60
+      amuletMergeLimit = 20
+
+  submitMustFail delegate1 $ exerciseCmd proposalWrongBeneficiary MintingDelegationProposal_Accept with
+    existingDelegationCid = Some mintingDelegationCid2
+
+  -- Test 2: Should fail for wrong DSO party
+  proposalWrongDso <- submit beneficiary1 $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = bobValidator.primaryParty -- mismatch
+      beneficiary = beneficiary1
+      delegate = delegate1
+      expiresAt = now `addRelTime` days 60
+      amuletMergeLimit = 20
+
+  submitMustFail delegate1 $ exerciseCmd proposalWrongDso MintingDelegationProposal_Accept with
+    existingDelegationCid = Some mintingDelegationCid2
+
+  -- Test 3: Should fail for wrong delegate
+  proposalWrongDelegate <- submit beneficiary1 $ createCmd MintingDelegationProposal with
+    delegation = MintingDelegation with
+      dso = app.dso
+      beneficiary = beneficiary1
+      delegate = bobValidator.primaryParty -- mismatch
+      expiresAt = now `addRelTime` days 60
+      amuletMergeLimit = 20
+
+  submitMustFail bobValidator.primaryParty $ exerciseCmd proposalWrongDelegate MintingDelegationProposal_Accept with
+    existingDelegationCid = Some mintingDelegationCid2
+
+  pure ()

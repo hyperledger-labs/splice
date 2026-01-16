@@ -8,8 +8,10 @@ import org.lfdecentralizedtrust.splice.automation.{
   SpliceAppAutomationService,
 }
 import AutomationServiceCompanion.TriggerClass
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.config.{AutomationConfig, SpliceParametersConfig}
 import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -35,6 +37,7 @@ class ExternalPartyWalletAutomationService(
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
     params: SpliceParametersConfig,
+    scanConnection: BftScanConnection,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -58,6 +61,15 @@ class ExternalPartyWalletAutomationService(
   registerUpdateHistoryIngestion(
     updateHistory,
     ingestUpdateHistoryFromParticipantBegin,
+  )
+
+  registerTrigger(
+    new MintingDelegationCollectRewardsTrigger(
+      triggerContext,
+      store,
+      scanConnection,
+      connection(SpliceLedgerConnectionPriority.Low),
+    )
   )
 }
 

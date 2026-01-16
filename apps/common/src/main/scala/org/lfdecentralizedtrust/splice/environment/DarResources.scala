@@ -203,6 +203,7 @@ object DarResources {
   val splitwell_0_1_12 = DarResource("splitwell-0.1.12.dar")
   val splitwell_0_1_13 = DarResource("splitwell-0.1.13.dar")
   val splitwell_0_1_14 = DarResource("splitwell-0.1.14.dar")
+  val splitwell_0_1_15 = DarResource("splitwell-0.1.15.dar")
   val splitwell_current = DarResource("splitwell-current.dar")
   val splitwell = PackageResource(
     splitwell_current,
@@ -223,6 +224,7 @@ object DarResources {
       splitwell_0_1_12,
       splitwell_0_1_13,
       splitwell_0_1_14,
+      splitwell_0_1_15,
     ),
   )
 
@@ -241,6 +243,7 @@ object DarResources {
   val wallet_0_1_12 = DarResource("splice-wallet-0.1.12.dar")
   val wallet_0_1_13 = DarResource("splice-wallet-0.1.13.dar")
   val wallet_0_1_14 = DarResource("splice-wallet-0.1.14.dar")
+  val wallet_0_1_15 = DarResource("splice-wallet-0.1.15.dar")
   val wallet_current = DarResource("splice-wallet-current.dar")
   val wallet = PackageResource(
     wallet_current,
@@ -261,6 +264,7 @@ object DarResources {
       wallet_0_1_12,
       wallet_0_1_13,
       wallet_0_1_14,
+      wallet_0_1_15,
     ),
   )
 

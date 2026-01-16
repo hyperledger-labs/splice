@@ -1,0 +1,113 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Wallet.MintingDelegation where
+
+import DA.Assert
+import Splice.AmuletRules
+import Splice.Types (ForOwner(..))
+import Splice.Util
+
+-- | Proposal by the user to setup a minting delegation.
+template MintingDelegationProposal
+  with
+    delegation : MintingDelegation
+      -- ^ The delegation to be created if accepted.
+  where
+    signatory delegation.beneficiary
+    observer delegation.delegate
+
+    choice MintingDelegationProposal_Accept : MintingDelegationProposal_AcceptResult
+      with
+        existingDelegationCid : Optional (ContractId MintingDelegation)
+          -- ^ Optional existing delegation to archive while creating the new one.
+          -- Useful for changing the parameters of the delegation.
+      controller delegation.delegate
+      do
+        case existingDelegationCid of
+          Some cid -> do
+            existingDelegation <- fetchAndArchive (ForOwner with dso = delegation.dso; owner = delegation.beneficiary) cid
+            existingDelegation.delegate === delegation.delegate
+          None -> pure ()
+        MintingDelegationProposal_AcceptResult <$> create delegation
+
+    choice MintingDelegationProposal_Reject : MintingDelegationProposal_RejectResult
+      controller delegation.delegate
+      do pure MintingDelegationProposal_RejectResult {}
+
+    choice MintingDelegationProposal_Withdraw : MintingDelegationProposal_WithdrawResult
+      controller delegation.beneficiary
+      do pure MintingDelegationProposal_WithdrawResult {}
+
+-- | The right allowing the delegate to mint rewards on behalf of the beneficiary.
+template MintingDelegation
+  with
+    beneficiary : Party
+      -- ^ The party on whose behalf minting is performed.
+    delegate : Party
+      -- ^ The party authorized to perform minting operations.
+    dso : Party
+      -- ^ Expected DSO party.
+    expiresAt : Time
+      -- ^ The time after which this delegation is no longer valid.
+    amuletMergeLimit : Int
+      -- ^ The number of amulet contracts to keep after auto-merging; i.e.,
+      -- auto-merge contracts once there are strictly more than this number of contracts.
+      -- This is a suggestion to the delegate and is not enforced in daml
+  where
+    signatory beneficiary, delegate
+
+    nonconsuming choice MintingDelegation_Mint : MintingDelegation_MintResult
+      with
+        inputs : [TransferInput]
+          -- ^ The inputs to the transfer, like the validator liveness activity records owned by the beneficiary.
+        context : PaymentTransferContext
+          -- ^ The transfer context including amulet rules.
+      controller delegate
+      do assertWithinDeadline "expiresAt" expiresAt
+         transferResult <- exercise context.amuletRules AmuletRules_Transfer with
+           transfer = Transfer with
+             sender = beneficiary
+             provider = delegate
+             inputs
+             outputs = []
+             beneficiaries = None
+           context = context.context with featuredAppRight = None
+           expectedDso = Some dso
+         pure MintingDelegation_MintResult with transferResult
+
+    choice MintingDelegation_Reject : MintingDelegation_RejectResult
+      controller delegate
+      do pure MintingDelegation_RejectResult {}
+
+    choice MintingDelegation_Withdraw : MintingDelegation_WithdrawResult
+      controller beneficiary
+      do pure MintingDelegation_WithdrawResult {}
+
+data MintingDelegationProposal_AcceptResult = MintingDelegationProposal_AcceptResult
+  with
+    mintingDelegationCid : ContractId MintingDelegation
+  deriving (Show, Eq)
+
+data MintingDelegationProposal_RejectResult = MintingDelegationProposal_RejectResult {}
+  deriving (Show, Eq)
+
+data MintingDelegationProposal_WithdrawResult = MintingDelegationProposal_WithdrawResult {}
+  deriving (Show, Eq)
+
+data MintingDelegation_RejectResult = MintingDelegation_RejectResult {}
+  deriving (Show, Eq)
+
+data MintingDelegation_WithdrawResult = MintingDelegation_WithdrawResult {}
+  deriving (Show, Eq)
+
+data MintingDelegation_MintResult = MintingDelegation_MintResult
+  with
+    transferResult : TransferResult
+  deriving (Show, Eq)
+
+instance HasCheckedFetch MintingDelegation ForOwner where
+  contractGroupId MintingDelegation{beneficiary, dso} = ForOwner with owner = beneficiary; dso
+
+instance HasCheckedFetch MintingDelegationProposal ForOwner where
+  contractGroupId MintingDelegationProposal{delegation = MintingDelegation{beneficiary, dso}} = ForOwner with owner = beneficiary; dso
