@@ -79,7 +79,7 @@ object DarResources {
   val amulet_current = DarResource("splice-amulet-current.dar")
   val amulet = PackageResource(
     amulet_current,
-    amulet_0_1_10,
+    amulet_0_1_14,
     Seq(
       amulet_0_1_0,
       amulet_0_1_1,
@@ -125,7 +125,7 @@ object DarResources {
   val dsoGovernance_current = DarResource("splice-dso-governance-current.dar")
   val dsoGovernance = PackageResource(
     dsoGovernance_current,
-    dsoGovernance_0_1_14,
+    dsoGovernance_0_1_19,
     Seq(
       dsoGovernance_0_1_0,
       dsoGovernance_0_1_1,
@@ -172,7 +172,7 @@ object DarResources {
   val amuletNameService_current = DarResource("splice-amulet-name-service-current.dar")
   val amuletNameService = PackageResource(
     amuletNameService_current,
-    amuletNameService_0_1_10,
+    amuletNameService_0_1_14,
     Seq(
       amuletNameService_0_1_0,
       amuletNameService_0_1_1,
@@ -253,7 +253,7 @@ object DarResources {
   val wallet_current = DarResource("splice-wallet-current.dar")
   val wallet = PackageResource(
     wallet_current,
-    wallet_0_1_10,
+    wallet_0_1_14,
     Seq(
       wallet_0_1_0,
       wallet_0_1_1,
@@ -293,7 +293,7 @@ object DarResources {
   val walletPayments_current = DarResource("splice-wallet-payments-current.dar")
   val walletPayments = PackageResource(
     walletPayments_current,
-    walletPayments_0_1_10,
+    walletPayments_0_1_14,
     Seq(
       walletPayments_0_1_0,
       walletPayments_0_1_1,
@@ -323,7 +323,7 @@ object DarResources {
   val validatorLifecycle_current = DarResource("splice-validator-lifecycle-current.dar")
   val validatorLifecycle = PackageResource(
     validatorLifecycle_current,
-    validatorLifecycle_0_1_3,
+    validatorLifecycle_0_1_5,
     Seq(
       validatorLifecycle_0_1_0,
       validatorLifecycle_0_1_1,
