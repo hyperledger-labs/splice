@@ -63,6 +63,11 @@ on:
         required: false
         type: string
         default: "postgres:17"
+      postgres_init_args:
+        description: "Additional arguments to pass to Postgres on initialization via POSTGRES_INITDB_ARGS"
+        required: false
+        type: string
+        default: "-c max_connections=16000"
 
 jobs:
 
@@ -117,7 +122,7 @@ jobs:
         image: ${{ inputs.postgres_image }}
         env:
           POSTGRES_PASSWORD: postgres
-          POSTGRES_INITDB_ARGS: "-c max_connections=16000"
+          POSTGRES_INITDB_ARGS: ${{ inputs.postgres_init_args }}
 
     steps:
 
