@@ -102,7 +102,7 @@ computeIssuingRoundParameters tickDuration amuletPrice config summary =
       issuancePerValidatorFaucetCoupon = validatorFaucetIssuance.issuancePerCoupon
       optAmuletsToIssueToDevelopmentFund = Some amuletsToIssueToDevelopmentFund
   where
-    developmentFundPercentage = fromOptional 0.0 config.optDevelopmentFundPercentage
+    developmentFundPercentage = fromOptional 0.05 config.optDevelopmentFundPercentage
 
     amuletsToIssueToSvs =
       adjustedAmuletsToIssueInRound
