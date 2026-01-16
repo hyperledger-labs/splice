@@ -60,7 +60,7 @@ Participant console
 
     .. parsed-literal::
 
-        docker run -it --rm --network host -v $(pwd)/console.conf:/app/app.conf |docker_repo_prefix|/canton:|version_literal| --console
+        docker run -it --rm --network host -v $(pwd)/console.conf:/app/app.conf europe-docker.pkg.dev/da-images/public-all/docker/canton-base:|canton_version| --console
 
     .. important::
         If you run the participant using the docker compose setup the docker command must be run with the docker network used by the participant.
@@ -91,7 +91,7 @@ Participant console
 
         .. parsed-literal::
 
-            docker run -it --rm --network splice-validator -v $(pwd)/console.conf:/app/app.conf |docker_repo_prefix|/canton:|version_literal| --console
+            docker run -it --rm --network splice-validator -v $(pwd)/console.conf:/app/app.conf europe-docker.pkg.dev/da-images/public-all/docker/canton-base:|canton_version| --console
 
 Sequencer console
 +++++++++++++++++
@@ -123,7 +123,7 @@ Sequencer console
 
     .. parsed-literal::
 
-        docker run -it --rm --network host -v $(pwd)/console.conf:/app/app.conf |docker_repo_prefix|/canton:|version_literal| --console
+        docker run -it --rm --network host -v $(pwd)/console.conf:/app/app.conf europe-docker.pkg.dev/da-images/public-all/docker/canton-base:|canton_version| --console
 
 Mediator console
 +++++++++++++++++
@@ -151,7 +151,7 @@ Mediator console
 
     .. parsed-literal::
 
-        docker run -it --rm --network host -v $(pwd)/console.conf:/app/app.conf |docker_repo_prefix|/canton:|version_literal| --console
+        docker run -it --rm --network host -v $(pwd)/console.conf:/app/app.conf europe-docker.pkg.dev/da-images/public-all/docker/canton-base:|canton_version| --console
 
 
 Access in a K8s cluster

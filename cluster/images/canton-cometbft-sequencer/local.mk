@@ -8,8 +8,6 @@ target-driver := $(dir)/target/driver.jar
 $(dir)/$(docker-build): $(target-driver)
 $(dir)/$(docker-build): build_arg := --build-arg base_version=$(shell get-snapshot-version)
 
-include cluster/images/canton-base-image-dep.mk
-
 $(target-driver): ${COMETBFT_DRIVER}/driver.jar
 	cp $< $@
 

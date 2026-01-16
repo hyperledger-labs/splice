@@ -460,7 +460,7 @@ class ScanTimeBasedIntegrationTest
         migrationId,
       )
       snapshot1 should not be None
-      snapshot1.value.toInstant shouldBe > (startTime.toInstant)
+      snapshot1.value.toInstant shouldBe >(startTime.toInstant)
       snapshot1
     }
 
@@ -487,7 +487,9 @@ class ScanTimeBasedIntegrationTest
     }
 
     sv1ScanBackend.getDateOfFirstSnapshotAfter(startTime, 0).value shouldBe snapshot1.value
-    sv1ScanBackend.getDateOfFirstSnapshotAfter(CantonTimestamp.tryFromInstant(snapshot1.value.toInstant), 0).value shouldBe snapshotAfter.value
+    sv1ScanBackend
+      .getDateOfFirstSnapshotAfter(CantonTimestamp.tryFromInstant(snapshot1.value.toInstant), 0)
+      .value shouldBe snapshotAfter.value
 
     val snapshotAfterData = sv1ScanBackend.getAcsSnapshotAt(
       CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant),
@@ -500,7 +502,6 @@ class ScanTimeBasedIntegrationTest
       ),
       partyIds = Some(Vector(aliceUserParty)),
     )
-
 
     advanceTime(java.time.Duration.ofMinutes(10))
 
