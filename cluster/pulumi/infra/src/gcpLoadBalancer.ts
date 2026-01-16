@@ -141,7 +141,8 @@ function createGCPBackendPolicy(
       },
       spec: {
         default: {
-          securityPolicy: config.securityPolicy.id,
+          // TODO (#2723) compare to format in cni experiment
+          securityPolicy: config.securityPolicy.selfLink,
         },
         targetRef: backendTargetRef(config),
       },
