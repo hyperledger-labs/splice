@@ -7,6 +7,7 @@ import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.{MetricName, MetricsContext}
 import com.digitalasset.canton.environment.BaseMetrics
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.ActiveRequestsMetrics.GrpcServerMetricsX
 import com.digitalasset.canton.metrics.{
   DbStorageHistograms,
@@ -33,6 +34,7 @@ abstract class BaseSpliceMetrics(
     nodeType: String,
     override val openTelemetryMetricsFactory: LabeledMetricsFactory,
     storageHistograms: DbStorageHistograms,
+    loggerFactory: NamedLoggerFactory,
 ) extends SpliceMetrics {
 
   override val prefix = MetricName(nodeType)
@@ -48,7 +50,8 @@ abstract class BaseSpliceMetrics(
     new DbStorageMetrics(storageHistograms, openTelemetryMetricsFactory)
 
   override def httpServerMetrics: HttpServerMetrics = new HttpServerMetrics(
-    openTelemetryMetricsFactory
+    openTelemetryMetricsFactory,
+    loggerFactory,
   )
   override def httpClientMetrics: HttpClientMetrics = new HttpClientMetrics(
     openTelemetryMetricsFactory

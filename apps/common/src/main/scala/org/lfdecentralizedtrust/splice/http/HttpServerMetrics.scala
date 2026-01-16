@@ -6,11 +6,29 @@ package org.lfdecentralizedtrust.splice.http
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricQualification.Latency
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.server.{Directive0, RouteResult}
 
 import scala.util.{Failure, Success}
 
-class HttpServerMetrics(metricsFactory: LabeledMetricsFactory) {
+object HttpServerMetrics {
+  val customSourceUiHeader = "x-source-ui"
+  object LabelNames {
+    val Operation = "operation"
+    val Status = "status"
+    val StatusCode = "status_code"
+    val HttpService = "http_service"
+    val SourceUi = "source_ui"
+  }
+}
+
+class HttpServerMetrics(
+    metricsFactory: LabeledMetricsFactory,
+    override protected val loggerFactory: NamedLoggerFactory,
+) extends NamedLogging {
+  import HttpServerMetrics.*
+  import HttpServerMetrics.LabelNames.*
 
   private val prefix: MetricName = MetricName.Daml :+ "http"
 
@@ -20,8 +38,8 @@ class HttpServerMetrics(metricsFactory: LabeledMetricsFactory) {
       summary = "Histogram for http request durations",
       qualification = Latency,
       labelsWithDescription = Map(
-        "operation" -> "Descriptor of the HTTP operation done, as per the OpenAPI spec",
-        "status" -> "Status of the HTTP request: completed, rejected, failure",
+        Operation -> "Descriptor of the HTTP operation done, as per the OpenAPI spec",
+        Status -> "Status of the HTTP request: completed, rejected, failure",
       ),
     )
   )
@@ -32,23 +50,27 @@ class HttpServerMetrics(metricsFactory: LabeledMetricsFactory) {
       summary = "Count of in-flight http requests",
       qualification = Latency,
       labelsWithDescription = Map(
-        "operation" -> "Descriptor of the HTTP operation done, as per the OpenAPI spec"
+        Operation -> "Descriptor of the HTTP operation done, as per the OpenAPI spec"
       ),
     )
   )
 
   // This directive is used to wrap HTTP routes with metrics collection.
   // We need to pass the operation explicitly, which represents the OpenAPI operation ID.
-  def withMetrics(service: String)(operation: String): Directive0 = {
+  def withMetrics(service: String)(operation: String)(implicit tc: TraceContext): Directive0 = {
     import org.apache.pekko.http.scaladsl.server.Directives.*
 
     extractExecutionContext.flatMap { implicit ec =>
       extractRequest.flatMap { req =>
-        val c = MetricsContext("operation" -> operation, "http_service" -> service)
+        val c = MetricsContext(Operation -> operation, HttpService -> service)
         implicit val mc: MetricsContext = req.headers
-          .find(_.is("x-source-ui")) // custom header added by the UI
+          .find(_.is(customSourceUiHeader)) // custom header added by the UI
           .map { header =>
-            c.withExtraLabels("source_ui" -> header.value)
+            val sourceUi = header.value
+            logger.debug(
+              s"Request from UI($customSourceUiHeader: $sourceUi): service = $service, operation= $operation"
+            )
+            c.withExtraLabels(SourceUi -> sourceUi)
           }
           .getOrElse(c)
 
@@ -59,17 +81,17 @@ class HttpServerMetrics(metricsFactory: LabeledMetricsFactory) {
             case res @ RouteResult.Complete(response) =>
               timing.stop()(
                 MetricsContext(
-                  "status_code" -> response.status.intValue().toString,
-                  "status" -> "completed",
+                  StatusCode -> response.status.intValue().toString,
+                  Status -> "completed",
                 )
               )
               res
             case res @ RouteResult.Rejected(_) =>
-              timing.stop()(MetricsContext("status" -> "rejected"))
+              timing.stop()(MetricsContext(Status -> "rejected"))
               res
           } andThen {
             case Failure(_) =>
-              timing.stop()(MetricsContext("status" -> "failure"))
+              timing.stop()(MetricsContext(Status -> "failure"))
               inFlightRequests.dec()
             case Success(_) =>
               inFlightRequests.dec()
