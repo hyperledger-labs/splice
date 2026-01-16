@@ -13,6 +13,12 @@
       docker-compose based deployments has been removed from its current location. The docs have been updated
       to use the `canton-base` image from upstream Canton instead. See :ref:`console_access`.
 
+.. release-notes:: 0.5.6
+
+ - Sequencer
+
+    - Includes a number of performance improvements that should improve the stability of the sequencer under higher load.
+
 .. release-notes:: 0.5.5
 
   - API security

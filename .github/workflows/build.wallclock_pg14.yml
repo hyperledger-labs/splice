@@ -24,5 +24,7 @@ jobs:
       commit_sha: ""
       daml_base_version: ""
       # This is the Postgres 14 image we built for testing. From 17 onwards, we use the official image.
+      # It doesn't support `-c` init args. `max_connections` is set in the image itself.
       postgres_image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-postgres:0.3.12
+      postgres_init_args: ""
     secrets: inherit
