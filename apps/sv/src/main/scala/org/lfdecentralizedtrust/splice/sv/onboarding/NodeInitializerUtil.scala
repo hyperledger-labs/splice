@@ -277,8 +277,6 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
   protected def establishInitialRound(
       connection: BaseLedgerConnection,
       upgradesConfig: UpgradesConfig,
-      packageVersionSupport: PackageVersionSupport,
-      svParty: PartyId,
   )(implicit
       tc: TraceContext,
       ece: ExecutionContextExecutor,
@@ -296,14 +294,8 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
             logger.info(s"Initial round $round is already set in user's metadata.")
             Future.successful(round.toLong)
           case None =>
-            packageVersionSupport
-              .supportBootstrapWithNonZeroRound(
-                Seq(svParty),
-                clock.now,
-              )
-              .flatMap { bootstrapWithNonZeroRound =>
                 config.onboarding match {
-                  case Some(onboardingConfig) if bootstrapWithNonZeroRound.supported =>
+                  case Some(onboardingConfig) =>
                     onboardingConfig match {
                       case onboardingConfig: FoundDso =>
                         logger.info(
@@ -337,17 +329,11 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                         }
                         setInitialRound(connection, initialRound.toLong)
                     }
-                  case Some(_) =>
-                    logger.debug(
-                      "Feature to set initial round to non-zero not supported, setting it to 0."
-                    )
-                    setInitialRound(connection, 0L)
                   case None =>
                     logger.debug(
                       "No SV onboarding config was found, setting the initial round to 0."
                     )
                     setInitialRound(connection, 0L)
-                }
               }
         }
     } yield initialRound

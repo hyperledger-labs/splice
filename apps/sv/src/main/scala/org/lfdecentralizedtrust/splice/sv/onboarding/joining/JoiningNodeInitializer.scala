@@ -301,8 +301,6 @@ class JoiningNodeInitializer(
       _ <- establishInitialRound(
         connection,
         upgradesConfig,
-        packageVersionSupport,
-        svParty,
       )
       _ <- ensureCometBftGovernanceKeysAreSet(
         cometBftNode,
