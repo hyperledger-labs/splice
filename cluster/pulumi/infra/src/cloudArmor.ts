@@ -3,7 +3,7 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
-import { CLUSTER_BASENAME } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CLUSTER_BASENAME, ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import * as config from './config';
 
@@ -37,11 +37,13 @@ export interface PredefinedWafRule {
 /**
  * Creates a Cloud Armor security policy
  * @param cac loaded configuration
+ * @param bothGatewaysNs namespace where both the L7 ALB and the Istio gateways are installed
  * @param opts Pulumi resource options
  * @returns The created security policy resource, if enabled
  */
 export function configureCloudArmorPolicy(
   cac: CloudArmorConfig,
+  bothGatewaysNs: ExactNamespace,
   opts?: pulumi.ComponentResourceOptions
 ): gcp.compute.SecurityPolicy | undefined {
   if (!cac.enabled) {
