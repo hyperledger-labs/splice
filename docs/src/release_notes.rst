@@ -5,6 +5,12 @@
 
 .. _release_notes:
 
+.. release-notes:: 0.5.6
+
+ - Sequencer
+
+    - Includes a number of performance improvements that should improve the stability of the sequencer under higher load.
+
 .. release-notes:: 0.5.5
 
   - API security
