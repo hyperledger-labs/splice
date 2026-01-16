@@ -31,14 +31,6 @@
               <Name>hacoordinator_message</Name>
               <regex>(Check successful|Scheduled checking|Acquiring lock)</regex>
             </matcher>
-            <matcher>
-              <Name>requestlogger_logger</Name>
-              <regex>ApiRequestLogger</regex>
-            </matcher>
-            <matcher>
-              <Name>requestlogger_message</Name>
-              <regex>StateService/GetConnectedDomains</regex>
-            </matcher>
             <expression>
                 level &lt;= INFO &amp;&amp;
                 ( hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) ||
@@ -49,6 +41,28 @@
           <OnMismatch>NEUTRAL</OnMismatch>
           <OnMatch>DENY</OnMatch>
         </filter>
+        <if condition='!isDefined("LOG_LEVEL_API_REQUEST")'>
+          <then>
+            <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
+              <evaluator>
+                <matcher>
+                  <Name>requestlogger_logger</Name>
+                  <regex>ApiRequestLogger</regex>
+                </matcher>
+                <matcher>
+                  <Name>requestlogger_message</Name>
+                  <regex>StateService/GetConnectedDomains</regex>
+                </matcher>
+                <expression>
+                  level &lt;= INFO &amp;&amp;
+                  requestlogger_logger.matches(logger) &amp;&amp; requestlogger_message.matches(message)
+                </expression>
+              </evaluator>
+              <OnMismatch>NEUTRAL</OnMismatch>
+              <OnMatch>DENY</OnMatch>
+            </filter>
+          </then>
+        </if>
       </appender>
     </then>
     <else>
@@ -133,14 +147,6 @@
                       <Name>hacoordinator_message</Name>
                       <regex>(Check successful|Scheduled checking|Acquiring lock)</regex>
                     </matcher>
-                    <matcher>
-                      <Name>requestlogger_logger</Name>
-                      <regex>ApiRequestLogger</regex>
-                    </matcher>
-                    <matcher>
-                      <Name>requestlogger_message</Name>
-                      <regex>StateService/GetConnectedDomains</regex>
-                    </matcher>
                     <expression>
                         level &lt;= INFO &amp;&amp;
                         ( hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) ||
@@ -151,6 +157,28 @@
                   <OnMismatch>NEUTRAL</OnMismatch>
                   <OnMatch>DENY</OnMatch>
                 </filter>
+                <if condition='!isDefined("LOG_LEVEL_API_REQUEST")'>
+                  <then>
+                    <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
+                      <evaluator>
+                        <matcher>
+                          <Name>requestlogger_logger</Name>
+                          <regex>ApiRequestLogger</regex>
+                        </matcher>
+                        <matcher>
+                          <Name>requestlogger_message</Name>
+                          <regex>StateService/GetConnectedDomains</regex>
+                        </matcher>
+                        <expression>
+                          level &lt;= INFO &amp;&amp;
+                          requestlogger_logger.matches(logger) &amp;&amp; requestlogger_message.matches(message)
+                        </expression>
+                      </evaluator>
+                      <OnMismatch>NEUTRAL</OnMismatch>
+                      <OnMatch>DENY</OnMatch>
+                    </filter>
+                  </then>
+                </if>
                 <!-- Allow for disabling flush on each log-line (faster, but may miss logs when crashing) -->
                 <immediateFlush>${LOG_IMMEDIATE_FLUSH:-true}</immediateFlush>
                 <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
@@ -244,6 +272,12 @@
         <lastErrorsFileAppenderName>FILE_LAST_ERRORS</lastErrorsFileAppenderName>
         <appender-ref ref="FILE_LAST_ERRORS"/>
       </appender>
+    </then>
+  </if>
+
+  <if condition='isDefined("LOG_LEVEL_API_REQUEST")'>
+    <then>
+      <logger name="com.digitalasset.canton.networking.grpc.ApiRequestLogger" level="${LOG_LEVEL_API_REQUEST:-DEBUG}"/>
     </then>
   </if>
 
