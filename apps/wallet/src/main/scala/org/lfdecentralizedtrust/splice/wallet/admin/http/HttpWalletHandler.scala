@@ -583,21 +583,16 @@ class HttpWalletHandler(
     implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
     withSpan(s"$workflowId.getBalance") { _ => _ =>
       for {
-        noHoldingFeesOnTransfers <- packageVersionSupport.noHoldingFeesOnTransfers(
-          userWallet.store.key.dsoParty,
-          walletManager.clock.now,
-        )
-        deductHoldingFees = !noHoldingFeesOnTransfers.supported
         currentRound <- scanConnection
           .getLatestOpenMiningRound()
           .map(_.payload.round.number)
         (unlockedQty, unlockedHoldingFees) <- userWallet.store.getAmuletBalanceWithHoldingFees(
           currentRound,
-          deductHoldingFees = deductHoldingFees,
+          deductHoldingFees = false,
         )
         lockedQty <- userWallet.store.getLockedAmuletBalance(
           currentRound,
-          deductHoldingFees = deductHoldingFees,
+          deductHoldingFees = false,
         )
       } yield {
         d0.GetBalanceResponse(
@@ -741,12 +736,6 @@ class HttpWalletHandler(
   )(implicit tc: TraceContext) = {
     val store = wallet.store
     for {
-      supportsExpectedDsoParty <- packageVersionSupport
-        .supportsExpectedDsoParty(
-          Seq(store.key.validatorParty, store.key.endUserParty, store.key.dsoParty),
-          walletManager.clock.now,
-        )
-        .map(_.supported)
       _ <- wallet.connection
         .submit(
           Seq(store.key.validatorParty, store.key.endUserParty),
@@ -754,7 +743,7 @@ class HttpWalletHandler(
           new TransferPreapprovalProposal(
             store.key.endUserParty.toProtoPrimitive,
             store.key.validatorParty.toProtoPrimitive,
-            Option.when(supportsExpectedDsoParty)(store.key.dsoParty.toProtoPrimitive).toJava,
+            java.util.Optional.of(store.key.dsoParty.toProtoPrimitive),
           ).create,
         )
         .withDedup(

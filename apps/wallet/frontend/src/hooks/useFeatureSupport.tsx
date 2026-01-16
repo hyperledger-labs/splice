@@ -18,7 +18,6 @@ export const useFeatureSupport = (): UseQueryResult<WalletFeatureSupport> => {
       return {
         tokenStandard: result.token_standard,
         transferPreapprovalDescription: result.transfer_preapproval_description,
-        noHoldingFeesOnTransfers: result.no_holding_fees_on_transfers,
       };
     },
   });

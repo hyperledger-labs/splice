@@ -38,7 +38,6 @@ export const useFeatureSupport = (): UseQueryResult<{
     queryFn: async () => {
       const resp = await featureSupport();
       return {
-        noHoldingFeesOnTransfers: resp.no_holding_fees_on_transfers,
       };
     },
   });

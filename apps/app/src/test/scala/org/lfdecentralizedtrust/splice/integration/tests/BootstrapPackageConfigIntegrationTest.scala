@@ -61,7 +61,7 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
   // Factored out so we can reuse it in the test
-  val initialAmulet: DarResource = DarResources.amulet_0_1_10
+  val initialAmulet: DarResource = DarResources.amulet_0_1_14
 
   private val initialPackageConfig = InitialPackageConfig.minimumInitialPackageConfig
 
@@ -227,8 +227,8 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
           DarResources.wallet.bootstrap.metadata.version.toString(),
           DarResources.walletPayments.bootstrap.metadata.version.toString(),
         ),
-        java.util.Optional.empty(),
-        java.util.Optional.empty(),
+        amuletConfig.transferPreapprovalFee,
+        amuletConfig.featuredAppActivityMarkerAmount,
       )
 
       val upgradeAction = new ARC_AmuletRules(
@@ -360,14 +360,13 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
         SpliceUtil.defaultTransferConfig(
           amuletConfig.transferConfig.maxNumInputs.toInt,
           amuletConfig.transferConfig.holdingFee.rate,
-          zeroTransferFees = true,
         ),
         amuletConfig.issuanceCurve,
         amuletConfig.decentralizedSynchronizer,
         amuletConfig.tickDuration,
         amuletConfig.packageConfig,
-        java.util.Optional.empty(),
-        java.util.Optional.empty(),
+        amuletConfig.transferPreapprovalFee,
+        amuletConfig.featuredAppActivityMarkerAmount,
       )
 
       val upgradeAction = new ARC_AmuletRules(

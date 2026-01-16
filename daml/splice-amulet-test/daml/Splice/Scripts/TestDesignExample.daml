@@ -61,7 +61,7 @@ template Escrow
          exerciseAppTransfer dso transferContext transfer
 
 test_designExample : Script ()
-test_designExample= do
+test_designExample = do
   -- bootstrap app
   app <- setupApp
 
@@ -87,15 +87,8 @@ test_designExample= do
   let lockedAmuletAmount = 1000.25
   lockTo1 app alice arbiter.primaryParty lockedAmuletAmount (days 90)
 
-  -- check rewards that are issued for the locking tx
-  [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.dso (\reward -> reward.round.number == 2)
-  appRewardCoupon === AppRewardCoupon with
-    dso = app.dso
-    provider = alice.primaryParty
-    beneficiary = Some alice.primaryParty
-    featured = False
-    amount = transferConfig.createFee.fee + transferConfig.lockHolderFee.fee
-    round = Round 2
+  -- no rewards as it isunfeatured
+  [] <- queryFilter @AppRewardCoupon app.dso (\reward -> reward.round.number == 2)
 
   [(lockedAmulet, _)] <- query @LockedAmulet alice.primaryParty
   -- advance 40k rounds
@@ -104,15 +97,8 @@ test_designExample= do
 
   let refreshAmuletAmount = 5.0
   pay app alice alice.primaryParty refreshAmuletAmount
-  -- check reward issued by this payment
-  [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.dso (\reward -> reward.round.number == 40002)
-  appRewardCoupon === AppRewardCoupon with
-    dso = app.dso
-    provider = alice.primaryParty
-    beneficiary = Some alice.primaryParty
-    featured = False
-    amount = transferConfig.createFee.fee
-    round = Round 40002
+  -- no rewards as unfeatured
+  [] <- queryFilter @AppRewardCoupon app.dso (\reward -> reward.round.number == 40002)
 
   [(paymentAmulet, _)] <- queryFilter @Amulet alice.primaryParty (\c -> c.amount.initialAmount == refreshAmuletAmount)
 

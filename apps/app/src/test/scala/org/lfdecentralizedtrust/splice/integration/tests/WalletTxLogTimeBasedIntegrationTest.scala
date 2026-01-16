@@ -24,6 +24,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{AppRewardCoupon, ValidatorRewardCoupon}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.http.v0.definitions.Transfer.TransferKind
@@ -55,6 +56,11 @@ class WalletTxLogTimeBasedIntegrationTest
       .addConfigTransform((_, config) => ConfigTransforms.setAmuletPrice(amuletPrice)(config))
   }
 
+  override protected lazy val sanityChecksIgnoredRootCreates = Seq(
+    AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+    ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID
+  )
+
   "A wallet" should {
 
     "handle app and validator rewards" taggedAs (org.lfdecentralizedtrust.splice.util.Tags.SpliceAmulet_0_1_14) in {
@@ -62,6 +68,7 @@ class WalletTxLogTimeBasedIntegrationTest
         val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
         waitForWalletUser(aliceValidatorWalletClient)
         waitForWalletUser(bobValidatorWalletClient)
+      val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
 
         clue("Tap to get some amulets") {
           aliceWalletClient.tap(100.0)
@@ -69,8 +76,13 @@ class WalletTxLogTimeBasedIntegrationTest
         }
 
         actAndCheck(
-          "Alice transfers some CC to Bob",
-          p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 40.0),
+          "Alice transfers some CC to Bob and create rewards", {
+            p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
+            createRewards(
+                    validatorRewards = Seq((aliceUserParty, 0.43)),
+                    appRewards = Seq((aliceValidatorParty, 0.43, false)),
+             )
+          }
         )(
           "Bob has received the CC",
           _ => bobWalletClient.balance().unlockedQty should be > BigDecimal(39.0),
@@ -93,7 +105,7 @@ class WalletTxLogTimeBasedIntegrationTest
         val appRewards = aliceValidatorWalletClient.listAppRewardCoupons()
         val validatorRewards = aliceValidatorWalletClient.listValidatorRewardCoupons()
         val (appRewardAmount, validatorRewardAmount) =
-          getRewardCouponsValue(appRewards, validatorRewards, false)
+          getRewardCouponsValue(appRewards, validatorRewards)
 
         actAndCheck(
           "Alice's validator transfers some CC to Bob (using her app & validator rewards)",

@@ -12,7 +12,6 @@ export const useFeatureSupport = (): UseQueryResult<{
     queryFn: async () => {
       const result = await scanClient.featureSupport();
       return {
-        noHoldingFeesOnTransfers: result.no_holding_fees_on_transfers,
       };
     },
   });

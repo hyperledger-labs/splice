@@ -46,13 +46,7 @@ testWithSubscription = script do
     walletProvider = app.dso
   let initialPaymentCid = result.subscriptionPayment
 
-  (_, round) <- getLatestActiveOpenRound app
-  let transferConfigAmulet = transferConfigAmuletFromOpenRound round
-  [(acceptRewardCid, reward)] <- query @Splice.Amulet.AppRewardCoupon app.dso
-  reward.amount ===
-    transferConfigAmulet.createFee.fee +
-    transferConfigAmulet.lockHolderFee.fee
-  reward.featured === False
+  [] <- query @Splice.Amulet.AppRewardCoupon app.dso
 
   -- DSO party is used to transactionally unlock & transfer amulets and creates ans entry and a subscription in return.
   appContext <- getAppTransferContext app app.dsoUser
@@ -65,11 +59,7 @@ testWithSubscription = script do
   dsoAmulets <- queryFilter @Amulet app.dso (\amulet -> amulet.owner == app.dso)
   dsoAmulets === []
 
-  [(_, reward)] <- filter (\(cid, _) -> cid /= acceptRewardCid) <$> query @Splice.Amulet.AppRewardCoupon app.dso
-  reward.amount ===
-    transferConfigAmulet.createFee.fee +
-    transferConfigAmulet.transferFee.initialRate * defaultAnsRulesConfig.entryFee
-  reward.featured === False
+  [] <- query @Splice.Amulet.AppRewardCoupon app.dso
 
   Some entry <- queryContractId alice.primaryParty collectPaymentSummary.entryCid
   Some subscriptionState <- queryContractId alice.primaryParty collectPaymentSummary.subscriptionStateCid
