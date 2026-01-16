@@ -9,7 +9,7 @@
 
  - Sequencer
 
-    - Includes a number of performance improvements that should improve the stability of the sequencer under higher load
+    - Includes a number of performance improvements that should improve the stability of the sequencer under higher load.
 
 .. release-notes:: 0.5.5
 
