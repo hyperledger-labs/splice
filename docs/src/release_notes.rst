@@ -7,12 +7,6 @@
 
 .. release-notes:: upcoming
 
-  - Docs
-
-    - Due to changes in the release process, the `canton` docker image used in the docs for obtaining console access to
-      docker-compose based deployments has been removed from its current location. The docs have been updated
-      to use the `canton-base` image from upstream Canton instead. See :ref:`console_access`.
-
 .. release-notes:: 0.5.6
 
  - Sequencer
