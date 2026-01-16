@@ -446,10 +446,23 @@ class ScanTimeBasedIntegrationTest
       }
     }
 
-    val snapshotBefore = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
-      getLedgerTime,
-      migrationId,
+    val startTime = getLedgerTime
+
+    advanceTime(
+      java.time.Duration
+        .ofHours(sv1ScanBackend.config.acsSnapshotPeriodHours.toLong)
+        .plusSeconds(1L)
     )
+
+    val snapshot1 = eventually() {
+      val snapshot1 = sv1ScanBackend.getDateOfMostRecentSnapshotBefore(
+        getLedgerTime,
+        migrationId,
+      )
+      snapshot1 should not be None
+      snapshot1.value.toInstant shouldBe >(startTime.toInstant)
+      snapshot1
+    }
 
     createAnsEntry(
       aliceAnsExternalClient,
@@ -469,9 +482,14 @@ class ScanTimeBasedIntegrationTest
         getLedgerTime,
         migrationId,
       )
-      snapshotBefore should not(be(snapshotAfter))
+      snapshot1 should not(be(snapshotAfter))
       snapshotAfter
     }
+
+    sv1ScanBackend.getDateOfFirstSnapshotAfter(startTime, 0).value shouldBe snapshot1.value
+    sv1ScanBackend
+      .getDateOfFirstSnapshotAfter(CantonTimestamp.tryFromInstant(snapshot1.value.toInstant), 0)
+      .value shouldBe snapshotAfter.value
 
     val snapshotAfterData = sv1ScanBackend.getAcsSnapshotAt(
       CantonTimestamp.assertFromInstant(snapshotAfter.value.toInstant),

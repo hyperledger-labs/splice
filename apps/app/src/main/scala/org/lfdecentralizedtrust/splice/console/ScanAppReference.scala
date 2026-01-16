@@ -394,6 +394,16 @@ abstract class ScanAppReference(
       )
     }
 
+  def getDateOfFirstSnapshotAfter(after: CantonTimestamp, migrationId: Long) =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetDateOfFirstSnapshotAfter(
+          after.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          migrationId,
+        )
+      )
+    }
+
   def getAcsSnapshotAt(
       at: CantonTimestamp,
       migrationId: Long,

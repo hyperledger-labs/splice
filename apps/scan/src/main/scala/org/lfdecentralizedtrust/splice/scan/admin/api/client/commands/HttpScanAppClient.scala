@@ -38,6 +38,7 @@ import org.lfdecentralizedtrust.tokenstandard.{
 import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
   GetDateOfMostRecentSnapshotBeforeResponse,
+  GetDateOfFirstSnapshotAfterResponse,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   CompactJsonScanHttpEncodings,
@@ -1012,6 +1013,32 @@ object HttpScanAppClient {
       case http.GetDateOfMostRecentSnapshotBeforeResponse.OK(value) =>
         Right(Some(value.recordTime))
       case http.GetDateOfMostRecentSnapshotBeforeResponse.NotFound(_) =>
+        Right(None)
+    }
+  }
+
+  case class GetDateOfFirstSnapshotAfter(
+      after: java.time.OffsetDateTime,
+      migrationId: Long,
+  ) extends InternalBaseCommand[
+        http.GetDateOfFirstSnapshotAfterResponse,
+        Option[java.time.OffsetDateTime],
+      ] {
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], GetDateOfFirstSnapshotAfterResponse] =
+      client.getDateOfFirstSnapshotAfter(after, migrationId, headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[GetDateOfFirstSnapshotAfterResponse, Either[
+      String,
+      Option[java.time.OffsetDateTime],
+    ]] = {
+      case http.GetDateOfFirstSnapshotAfterResponse.OK(value) =>
+        Right(Some(value.recordTime))
+      case http.GetDateOfFirstSnapshotAfterResponse.NotFound(_) =>
         Right(None)
     }
   }

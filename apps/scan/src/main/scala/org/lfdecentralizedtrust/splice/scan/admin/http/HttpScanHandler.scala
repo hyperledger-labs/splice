@@ -1428,6 +1428,31 @@ class HttpScanHandler(
     }
   }
 
+  override def getDateOfFirstSnapshotAfter(
+      respond: ScanResource.GetDateOfFirstSnapshotAfterResponse.type
+  )(after: OffsetDateTime, migrationId: Long)(
+      extracted: TraceContext
+  ): Future[ScanResource.GetDateOfFirstSnapshotAfterResponse] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getDateOfFirstSnapshotAfter") { _ => _ =>
+      snapshotStore
+        .lookupSnapshotAfter(migrationId, Codec.tryDecode(Codec.OffsetDateTime)(after))
+        .map {
+          case Some(snapshot) =>
+            ScanResource.GetDateOfFirstSnapshotAfterResponseOK(
+              definitions
+                .AcsSnapshotTimestampResponse(
+                  Codec.encode(snapshot.snapshotRecordTime)
+                )
+            )
+          case None =>
+            ScanResource.GetDateOfFirstSnapshotAfterResponseNotFound(
+              definitions.ErrorResponse(s"No snapshots found after $after")
+            )
+        }
+    }
+  }
+
   override def forceAcsSnapshotNow(
       respond: ScanResource.ForceAcsSnapshotNowResponse.type
   )()(extracted: TraceContext): Future[ScanResource.ForceAcsSnapshotNowResponse] = {
