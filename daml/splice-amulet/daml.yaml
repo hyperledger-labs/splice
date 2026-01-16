@@ -18,6 +18,7 @@ data-dependencies:
   - ../../token-standard/splice-api-token-allocation-instruction-v1/.daml/dist/splice-api-token-allocation-instruction-v1-current.dar
   - ../splice-util/.daml/dist/splice-util-current.dar
   - ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
+  - ../splice-api-credential-registry-v1/.daml/dist/splice-api-credential-registry-v1-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches

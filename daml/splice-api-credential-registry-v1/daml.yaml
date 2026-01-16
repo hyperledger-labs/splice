@@ -1,0 +1,18 @@
+sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
+name: splice-api-credential-registry-v1
+source: daml
+version: 1.0.0
+dependencies:
+  - daml-prim
+  - daml-stdlib
+data-dependencies:
+  - ../../token-standard/splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-current.dar
+build-options:
+  - --ghc-option=-Wunused-binds
+  - --ghc-option=-Wunused-matches
+  - --target=2.1
+codegen:
+  java:
+    package-prefix: org.lfdecentralizedtrust.splice.codegen.java
+    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceCredentialRegistryV1
+    output-directory: target/daml-codegen-java

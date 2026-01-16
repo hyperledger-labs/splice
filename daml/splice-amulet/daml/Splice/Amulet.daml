@@ -13,6 +13,7 @@ import DA.Optional (fromOptional)
 
 import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+import Splice.Api.Credential.RegistryV1 qualified as Api.Credential.RegistryV1
 
 import Splice.Amulet.TokenApiUtils
 import Splice.Expiry
@@ -81,7 +82,7 @@ data SvRewardCoupon_ArchiveAsBeneficiaryResult = SvRewardCoupon_ArchiveAsBenefic
 
 data UnclaimedActivityRecord_ArchiveAsBeneficiaryResult = UnclaimedActivityRecord_ArchiveAsBeneficiaryResult
 
-data UnclaimedActivityRecord_DsoExpireResult = UnclaimedActivityRecord_DsoExpireResult with 
+data UnclaimedActivityRecord_DsoExpireResult = UnclaimedActivityRecord_DsoExpireResult with
   unclaimedRewardCid : ContractId UnclaimedReward
 
 -- | A amulet, which can be locked and whose amount expires over time.
@@ -246,6 +247,30 @@ template FeaturedAppRight with
                weight = weight
          pure (Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarkerResult $ map toInterfaceContractId cids)
 
+    interface instance Api.Credential.RegistryV1.Credential for FeaturedAppRight where
+      view = Api.Credential.RegistryV1.CredentialView with
+        admin = dso
+        issuer = dso
+        holder = provider
+        claims = Api.Credential.RegistryV1.Claims with
+          values = TextMap.fromList [
+              ("cip-TBD/is-featured-app", "")
+              -- TODO: replace TBD with the actual CIP number once it is assigned; factor it out into a constant
+            ]
+          validFrom = None
+          validUntil = None
+          meta = Api.Token.MetadataV1.emptyMetadata
+        createdAt = None
+        expiresAt = None
+        meta = Api.Token.MetadataV1.emptyMetadata
+
+      credential_publicFetchImpl _self _arg = pure (view (toInterface @Api.Credential.RegistryV1.Credential this))
+
+      credential_archiveAsHolderImpl _self _arg = do
+        pure Api.Credential.RegistryV1.Credential_ArchiveAsHolderResult with
+          archivedCredential = view (toInterface @Api.Credential.RegistryV1.Credential this)
+          meta = Api.Token.MetadataV1.emptyMetadata
+
 validateAppRewardBeneficiaries : [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary] -> Update ()
 validateAppRewardBeneficiaries beneficiaries = do
   -- Note: we limit the minimal weight to limit the management overhead of the SVs
@@ -392,29 +417,29 @@ template UnclaimedReward with
 
     signatory dso
 
--- | A record of activity that can be minted by the beneficiary. 
--- Note that these do not come out of the per-round issuance but are instead created by burning 
--- UnclaimedRewardCoupon as defined through a vote by the SVs. That's also why expiry is a separate 
+-- | A record of activity that can be minted by the beneficiary.
+-- Note that these do not come out of the per-round issuance but are instead created by burning
+-- UnclaimedRewardCoupon as defined through a vote by the SVs. That's also why expiry is a separate
 -- time-based expiry instead of being tied to a round like the other activity records.
 template UnclaimedActivityRecord
   with
     dso : Party
     beneficiary : Party -- ^ The owner of the `Amulet` to be minted.
     amount : Decimal -- ^ The amount of `Amulet` to be minted.
-    reason : Text -- ^ A reason to mint the `Amulet`. 
-    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the contract. 
-  where 
+    reason : Text -- ^ A reason to mint the `Amulet`.
+    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the contract.
+  where
     signatory dso
     observer beneficiary
     ensure amount > 0.0
 
     choice UnclaimedActivityRecord_DsoExpire : UnclaimedActivityRecord_DsoExpireResult
       controller dso
-      do 
+      do
         assertDeadlineExceeded "UnclaimedActivityRecord.expiresAt" expiresAt
         unclaimedRewardCid <- create UnclaimedReward with dso; amount
         pure UnclaimedActivityRecord_DsoExpireResult with unclaimedRewardCid
-  
+
 
 requireAmuletExpiredForAllOpenRounds : ContractId OpenMiningRound -> Amulet -> Update ()
 requireAmuletExpiredForAllOpenRounds roundCid amulet = do
