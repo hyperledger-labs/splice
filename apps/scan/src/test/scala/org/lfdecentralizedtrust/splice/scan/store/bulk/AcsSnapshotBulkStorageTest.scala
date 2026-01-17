@@ -8,8 +8,10 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.PekkoUtil.WithKillSwitch
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.apache.pekko.stream.scaladsl.Sink
+import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
@@ -22,9 +24,11 @@ import org.mockito.invocation.InvocationOnMock
 import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
 import java.nio.ByteBuffer
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
+import scala.concurrent.duration.*
 
 class AcsSnapshotBulkStorageTest
     extends StoreTest
@@ -41,7 +45,7 @@ class AcsSnapshotBulkStorageTest
   "AcsSnapshotBulkStorage" should {
     "successfully dump a single ACS snapshot" in {
       withS3Mock {
-        val store = mockAcsSnapshotStore(acsSnapshotSize)
+        val store = new MockAcsSnapshotStore().store
         val timestamp = CantonTimestamp.now()
         val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(loggerFactory)
         for {
@@ -91,54 +95,125 @@ class AcsSnapshotBulkStorageTest
         }
       }
     }
+
+    "correctly process multiple ACS snapshots" in {
+      withS3Mock {
+        val store = new MockAcsSnapshotStore()
+        val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(loggerFactory)
+        val probe = new AcsSnapshotBulkStorage(
+          bulkStorageTestConfig,
+          store.store,
+          s3BucketConnection,
+          loggerFactory,
+        ).getSource
+          .runWith(TestSink.probe[WithKillSwitch[(Long, CantonTimestamp)]])
+
+        clue("Initially, a single snapshot is dumped") {
+          probe.request(2)
+          probe.expectNext(2.minutes).value shouldBe (0, CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(10)))
+          probe.expectNoMessage(10.seconds)
+        }
+
+        clue("Add another snapshot to the store, it is also dumped") {
+          store.addSnapshot(CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20)))
+          probe.expectNext(2.minutes).value shouldBe (0, CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20)))
+          probe.expectNoMessage(10.seconds)
+        }
+
+        succeed
+      }
+    }
   }
 
-  def mockAcsSnapshotStore(snapshotSize: Int): AcsSnapshotStore = {
-    val store = mock[AcsSnapshotStore]
-    val partyId = mkPartyId("alice")
-    when(
-      store.queryAcsSnapshot(
-        anyLong,
-        any[CantonTimestamp],
-        any[Option[Long]],
-        any[Limit],
-        any[Seq[PartyId]],
-        any[Seq[PackageQualifiedName]],
-      )(any[TraceContext])
-    ).thenAnswer {
-      (
-          migration: Long,
-          timestamp: CantonTimestamp,
-          after: Option[Long],
-          limit: Limit,
-          _: Seq[PartyId],
-          _: Seq[PackageQualifiedName],
-      ) =>
-        Future {
-          val remaining = snapshotSize - after.getOrElse(0L)
-          val numElems = math.min(limit.limit.toLong, remaining)
-          val result = QueryAcsSnapshotResult(
-            migration,
-            timestamp,
-            Vector
-              .range(0, numElems)
-              .map(i => {
-                val idx = i + after.getOrElse(0L)
-                val amt = amulet(
-                  partyId,
-                  BigDecimal(idx),
+  class MockAcsSnapshotStore {
+    private var snapshots = Seq(CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(10)))
+    val store = mockAcsSnapshotStore(acsSnapshotSize)
+
+    def addSnapshot(timestamp: CantonTimestamp) = { snapshots = snapshots :+ timestamp }
+
+    def mockAcsSnapshotStore(snapshotSize: Int): AcsSnapshotStore = {
+      val store = mock[AcsSnapshotStore]
+      val partyId = mkPartyId("alice")
+      when(
+        store.queryAcsSnapshot(
+          anyLong,
+          any[CantonTimestamp],
+          any[Option[Long]],
+          any[Limit],
+          any[Seq[PartyId]],
+          any[Seq[PackageQualifiedName]],
+        )(any[TraceContext])
+      ).thenAnswer {
+        (
+            migration: Long,
+            timestamp: CantonTimestamp,
+            after: Option[Long],
+            limit: Limit,
+            _: Seq[PartyId],
+            _: Seq[PackageQualifiedName],
+        ) =>
+          if (snapshots.contains(timestamp)) {
+            Future {
+              val remaining = snapshotSize - after.getOrElse(0L)
+              val numElems = math.min(limit.limit.toLong, remaining)
+              val result = QueryAcsSnapshotResult(
+                migration,
+                timestamp,
+                Vector
+                  .range(0, numElems)
+                  .map(i => {
+                    val idx = i + after.getOrElse(0L)
+                    val amt = amulet(
+                      partyId,
+                      BigDecimal(idx),
+                      0L,
+                      BigDecimal(0.1),
+                      contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
+                    )
+                    SpliceCreatedEvent(s"#event_id_$idx:1", toCreatedEvent(amt))
+                  }),
+                if (numElems < remaining) Some(after.getOrElse(0L) + numElems) else None,
+              )
+              result
+            }
+          } else {
+            Future.failed(new RuntimeException("Unexpected timestamp"))
+          }
+      }
+
+      when(
+        store.lookupSnapshotAfter(
+          anyLong,
+          any[CantonTimestamp],
+        )(any[TraceContext])
+      ).thenAnswer {
+        (
+            _: Long,
+            timestamp: CantonTimestamp,
+        ) =>
+          Future.successful {
+            snapshots
+              .filter(_ > timestamp)
+              .sorted
+              .headOption
+              .map(next =>
+                AcsSnapshotStore.AcsSnapshot(
+                  // only record time and migration ID are used, everything else is ignored
+                  snapshotRecordTime = next,
+                  migrationId = 0L,
                   0L,
-                  BigDecimal(0.1),
-                  contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
+                  0L,
+                  0L,
+                  None,
+                  None,
                 )
-                SpliceCreatedEvent(s"#event_id_$idx:1", toCreatedEvent(amt))
-              }),
-            if (numElems < remaining) Some(after.getOrElse(0L) + numElems) else None,
-          )
-          result
-        }
+              )
+          }
+
+      }
+
+      store
     }
-    store
   }
 
   def getS3BucketConnectionWithInjectedErrors(
@@ -155,6 +230,7 @@ class AcsSnapshotBulkStorageTest
             failureCount += 1
             Future.failed(new RuntimeException("Simulated S3 write error"))
           } else {
+            failureCount = 0
             invocation.callRealMethod().asInstanceOf[Future[Unit]]
           }
         case _ =>

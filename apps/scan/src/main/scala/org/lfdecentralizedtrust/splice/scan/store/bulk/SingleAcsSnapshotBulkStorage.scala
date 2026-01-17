@@ -75,44 +75,65 @@ class SingleAcsSnapshotBulkStorage(
 
   }
 
-  private def getSource: Source[WithKillSwitch[Int], (KillSwitch, Future[Done])] = {
+  private def getSource: Source[String, NotUsed] = {
+    val idx = new AtomicInteger(0)
+    Source
+      .unfoldAsync(Start: Position) {
+        case Start => getAcsSnapshotChunk(migrationId, timestamp, None).map(Some(_))
+        case Index(i) => getAcsSnapshotChunk(migrationId, timestamp, Some(i)).map(Some(_))
+        case End => Future.successful(None)
+      }
+      .via(ZstdGroupedWeight(config.maxFileSize))
+      // Add a buffer so that the next object continues accumulating while we write the previous one
+      .buffer(
+        1,
+        OverflowStrategy.backpressure,
+      )
+      .mapAsync(1) { case ByteStringWithTermination(zstdObj, isLast) =>
+        // TODO(#3429): use actual prefixes for segments, for now we just use the snapshot
+        val objectKeyPrefix = s"${timestamp.toInstant.toString}"
+        val objectKey =
+          if (isLast) s"$objectKeyPrefix/snapshot_${idx}_last.zstd"
+          else s"$objectKeyPrefix/snapshot_$idx.zstd"
+        // TODO(#3429): For now, we accumulate the full object in memory, then write it as a whole.
+        //    Consider streaming it to S3 instead. Need to make sure that it then handles crashes correctly,
+        //    i.e. that until we tell S3 that we're done writing, if we stop, then S3 throws away the
+        //    partially written object.
+        for {
+          _ <- s3Connection.writeFullObject(objectKey, ByteBuffer.wrap(zstdObj.toArrayUnsafe()))
+        } yield {
+          idx.addAndGet(1)
+          objectKey
+        }
+      }
+  }
+
+  // TODO(#3429): I'm no longer sure the retrying source is actually useful,
+  //  we probably want to move the retry higher up to the larger stream, but keeping it for now until that is fully resolved
+  private def getRetryingSource: Source[WithKillSwitch[String], (KillSwitch, Future[Done])] = {
 
     def mksrc = {
-      val idx = new AtomicInteger(0)
-      val base = Source
-        .unfoldAsync(Start: Position) {
-          case Start => getAcsSnapshotChunk(migrationId, timestamp, None).map(Some(_))
-          case Index(i) => getAcsSnapshotChunk(migrationId, timestamp, Some(i)).map(Some(_))
-          case End => Future.successful(None)
-        }
-        .via(ZstdGroupedWeight(config.maxFileSize))
-        // Add a buffer so that the next object continues accumulating while we write the previous one
-        .buffer(
-          1,
-          OverflowStrategy.backpressure,
-        )
-        .mapAsync(1) { case ByteStringWithTermination(zstdObj, isLast) =>
-          val objectKey = if (isLast) s"snapshot_${idx}_last.zstd" else s"snapshot_$idx.zstd"
-          // TODO(#3429): For now, we accumulate the full object in memory, then write it as a whole.
-          //    Consider streaming it to S3 instead. Need to make sure that it then handles crashes correctly,
-          //    i.e. that until we tell S3 that we're done writing, if we stop, then S3 throws away the
-          //    partially written object.
-          for {
-            _ <- s3Connection.writeFullObject(objectKey, ByteBuffer.wrap(zstdObj.toArrayUnsafe()))
-          } yield {
-            idx.addAndGet(1)
-          }
-        }
+      val base = getSource
       val withKs = base.viaMat(KillSwitches.single)(Keep.right)
-      withKs.watchTermination() { case (ks, done) => (ks: KillSwitch, done) }
+      withKs.watchTermination() { case (ks, done) =>
+        (
+          ks: KillSwitch,
+          done.map { done =>
+            logger.debug(
+              s"Finished dumping to bulk storage the ACS snapshot for migration $migrationId, timestamp $timestamp"
+            )
+            done
+          },
+        )
+      }
     }
 
     // TODO(#3429): tweak the retry parameters here
     val delay = FiniteDuration(5, "seconds")
-    val policy = new RetrySourcePolicy[Unit, Int] {
+    val policy = new RetrySourcePolicy[Unit, String] {
       override def shouldRetry(
           lastState: Unit,
-          lastEmittedElement: Option[Int],
+          lastEmittedElement: Option[String],
           lastFailure: Option[Throwable],
       ): Option[(scala.concurrent.duration.FiniteDuration, Unit)] = {
         lastFailure.map { t =>
@@ -144,17 +165,21 @@ object SingleAcsSnapshotBulkStorage {
       actorSystem: ActorSystem,
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Flow[(Long, CantonTimestamp), WithKillSwitch[Int], NotUsed] =
+  ): Flow[(Long, CantonTimestamp), (Long, CantonTimestamp), NotUsed] =
     Flow[(Long, CantonTimestamp)].flatMapConcat {
       case (migrationId: Long, timestamp: CantonTimestamp) =>
-        SingleAcsSnapshotBulkStorage.asSource(
+        new SingleAcsSnapshotBulkStorage(
           migrationId,
           timestamp,
           config,
           acsSnapshotStore,
           s3Connection,
           loggerFactory,
-        )
+        ).getSource
+          // emit a Unit upon completion
+          .fold(()) { case ((), _) => () }
+          // emit back the (migration, timestamp) upon completion
+          .map(_ => (migrationId, timestamp))
     }
 
   def asSource(
@@ -168,7 +193,7 @@ object SingleAcsSnapshotBulkStorage {
       actorSystem: ActorSystem,
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Source[WithKillSwitch[Int], (KillSwitch, Future[Done])] =
+  ): Source[WithKillSwitch[String], (KillSwitch, Future[Done])] =
     new SingleAcsSnapshotBulkStorage(
       migrationId,
       timestamp,
@@ -176,6 +201,6 @@ object SingleAcsSnapshotBulkStorage {
       acsSnapshotStore,
       s3Connection,
       loggerFactory,
-    ).getSource
+    ).getRetryingSource
 
 }

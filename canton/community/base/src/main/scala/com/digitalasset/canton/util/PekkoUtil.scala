@@ -547,9 +547,10 @@ object PekkoUtil extends HasLoggerName {
     // Kick it off with the initial state
     restartFrom(initial)
 
+    val lastObservedElem: AtomicReference[Option[A]] = new AtomicReference[Option[A]](None)
+
     source
       .flatMapConcat { state =>
-        val lastObservedElem: AtomicReference[Option[A]] = new AtomicReference[Option[A]](None)
         val lastObservedError: AtomicReference[Option[Throwable]] =
           new AtomicReference[Option[Throwable]](None)
 
