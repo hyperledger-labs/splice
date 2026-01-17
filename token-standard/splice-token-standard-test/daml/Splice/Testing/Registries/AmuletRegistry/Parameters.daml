@@ -133,7 +133,7 @@ issuanceConfig_10plus = IssuanceConfig with
   featuredAppRewardCap = 100.0
   unfeaturedAppRewardCap = 0.6
   optValidatorFaucetCap = None -- We use the default of 2.85 USD introduced in the upgrade for CIP-3
-  optDevelopmentFundPercentage = None
+  optDevelopmentFundPercentage = Some 0.0
 
 
 defaultIssuanceCurve : Schedule RelTime IssuanceConfig
