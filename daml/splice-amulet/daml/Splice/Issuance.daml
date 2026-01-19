@@ -25,6 +25,8 @@ data IssuanceConfig = IssuanceConfig with
     optValidatorFaucetCap : Optional Decimal
       -- ^ Maximal amount in $ for the per-validator issuance of validator faucet coupons;
       -- Introduced as part of CIP-3. Defaults to 2.85 USD.
+    optDevelopmentFundPercentage : Optional Decimal
+      -- ^ Percentage of each mint emission allocated to the Development Fund under CIP-0082.
   deriving (Eq, Show)
 
 -- | Getter with the right default value for the validator faucet cap.
@@ -45,6 +47,7 @@ validIssuanceConfig this@IssuanceConfig{..} =
     && featuredAppRewardCap >= 0.0
     && unfeaturedAppRewardCap >= 0.0
     && getValidatorFaucetCap this >= 0.0
+    && optional True (\pct -> pct >= 0.0 && pct <= 1.0) optDevelopmentFundPercentage
 
 
 -- computation of issuance per round
@@ -73,6 +76,9 @@ data IssuingRoundParameters = IssuingRoundParameters with
     unclaimedValidatorRewards : Decimal
     unclaimedSvRewards : Decimal -- ^ Can be non-zero due to rounding, or no SV having had the chance to claim their coupons.
     issuancePerValidatorFaucetCoupon : Decimal
+    optAmuletsToIssueToDevelopmentFund : Optional Decimal
+      -- ^ Note: Made optional as the addition of this field is checked by the upgrade checker
+      -- on package upload because `IssuingRoundParameters` is serializable.
   deriving (Eq, Show)
 
 validateOpenMiningRoundSummary : CanAssert m => OpenMiningRoundSummary -> m ()
@@ -94,9 +100,14 @@ computeIssuingRoundParameters tickDuration amuletPrice config summary =
       unclaimedAppRewards = featuredAppIssuance.unclaimedRewards
       unclaimedSvRewards
       issuancePerValidatorFaucetCoupon = validatorFaucetIssuance.issuancePerCoupon
+      optAmuletsToIssueToDevelopmentFund = Some amuletsToIssueToDevelopmentFund
   where
+    developmentFundPercentage = fromOptional 0.05 config.optDevelopmentFundPercentage
+
     amuletsToIssueToSvs =
-      amuletsToIssueInRound - validatorRewardIssuance.rewardsToIssue - unfeaturedAppIssuance.rewardsToIssue
+      adjustedAmuletsToIssueInRound
+        - validatorRewardIssuance.rewardsToIssue
+        - unfeaturedAppIssuance.rewardsToIssue
 
     issuancePerSvRewardCoupon =
       if summary.totalSvRewardWeight == 0
@@ -114,8 +125,11 @@ computeIssuingRoundParameters tickDuration amuletPrice config summary =
       intToDecimal (convertRelTimeToMicroseconds tickDuration)
     amuletsToIssueInRound = config.amuletToIssuePerYear / roundsPerYear
 
+    amuletsToIssueToDevelopmentFund = amuletsToIssueInRound * developmentFundPercentage
+    adjustedAmuletsToIssueInRound = amuletsToIssueInRound - amuletsToIssueToDevelopmentFund
+
     validatorRewardIssuance = computeIssuanceTranche
-      (amuletsToIssueInRound * config.validatorRewardPercentage)
+      (adjustedAmuletsToIssueInRound * config.validatorRewardPercentage)
       config.validatorRewardCap
       summary.totalValidatorRewardCoupons
 
@@ -126,7 +140,7 @@ computeIssuingRoundParameters tickDuration amuletPrice config summary =
       (intToDecimal $ getTotalValidatorFaucetCoupons summary)
 
     unfeaturedAppIssuance = computeIssuanceTranche
-      (amuletsToIssueInRound * config.appRewardPercentage)
+      (adjustedAmuletsToIssueInRound * config.appRewardPercentage)
       config.unfeaturedAppRewardCap
       (summary.totalFeaturedAppRewardCoupons + summary.totalUnfeaturedAppRewardCoupons)
 
@@ -179,3 +193,4 @@ instance Patchable IssuanceConfig where
     featuredAppRewardCap = patch new.featuredAppRewardCap base.featuredAppRewardCap current.featuredAppRewardCap
     unfeaturedAppRewardCap = patch new.unfeaturedAppRewardCap base.unfeaturedAppRewardCap current.unfeaturedAppRewardCap
     optValidatorFaucetCap = patch new.optValidatorFaucetCap base.optValidatorFaucetCap current.optValidatorFaucetCap
+    optDevelopmentFundPercentage = patch new.optDevelopmentFundPercentage base.optDevelopmentFundPercentage current.optDevelopmentFundPercentage

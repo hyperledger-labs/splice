@@ -141,6 +141,7 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
     amuletConfig.packageConfig,
     java.util.Optional.empty(),
     java.util.Optional.empty(),
+    java.util.Optional.empty(),
   )
 
 }
