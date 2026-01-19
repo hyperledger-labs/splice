@@ -139,7 +139,7 @@ spec:
             {{- else if eq .Values.synchronizer.connectionType "bft-custom" }}
         - name: ADDITIONAL_CONFIG_SYNCHRONIZER_TRUSTED
           value: |
-            canton.validator-apps.validator_backend.domains.global.trusted-synchronizer-config.sequencer-names = {{ .Values.synchronizer.sequencerNames | toJson}}
+            canton.validator-apps.validator_backend.domains.global.trusted-synchronizer-config.sv-names = {{ .Values.synchronizer.svNames | toJson}}
             canton.validator-apps.validator_backend.domains.global.trusted-synchronizer-config.threshold = {{ .Values.synchronizer.threshold }}
             {{- end }}
         {{ end }}

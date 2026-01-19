@@ -20,12 +20,12 @@ export const SynchronizerConfigSchema = z.union([
   z
     .object({
       connectionType: z.literal('bft-custom'),
-      sequencerNames: z.array(z.string()).min(1),
+      svNames: z.array(z.string()).min(1),
       threshold: z.number().int().min(1),
     })
     .strict()
-    .refine(data => data.sequencerNames.length >= data.threshold, {
-      message: 'sequencerNames length must be greater than or equal to the threshold',
+    .refine(data => data.svNames.length >= data.threshold, {
+      message: 'svNames length must be greater than or equal to the threshold',
       path: ['threshold'], // Point the error to the threshold field
     }),
   z

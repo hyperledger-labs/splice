@@ -25,7 +25,7 @@
           "type": "string",
           "description": "Trusted sequencer Url."
         },
-        "sequencerNames": {
+        "svNames": {
           "type": "array",
           "items": {
             "type": "string"
@@ -607,7 +607,7 @@
             "then": {
               "properties": {
                 "synchronizer": {
-                  "not": { "required": ["url", "sequencerNames", "threshold"] }
+                  "not": { "required": ["url", "svNames", "threshold"] }
                 }
               }
             }
@@ -622,7 +622,7 @@
                   "required": ["url"],
                   "properties": {
                     "url": { "minLength": 1 },
-                    "sequencerNames": false,
+                    "svNames": false,
                     "threshold": false
                   }
                 }
@@ -636,10 +636,10 @@
             "then": {
               "properties": {
                 "synchronizer": {
-                  "required": ["sequencerNames", "threshold"],
+                  "required": ["svNames", "threshold"],
                   "properties": {
                     "url": false,
-                    "sequencerNames": { "minItems": 1 }
+                    "svNames": { "minItems": 1 }
                   }
                 }
               }

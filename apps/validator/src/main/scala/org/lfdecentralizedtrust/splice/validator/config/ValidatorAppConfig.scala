@@ -110,9 +110,9 @@ case class ValidatorDecentralizedSynchronizerConfig(
 
 case class ValidatorTrustedSynchronizerConfig(
     /** static list of trusted sequencer names to connect to.
-      * sequencerNames is mutually exclusive with `url`.
+      * svNames is mutually exclusive with `url`.
       */
-    sequencerNames: NonEmptyList[String],
+    svNames: NonEmptyList[String],
 
     /** parameter to specify the BFT threshold for the domain connections.
       * If not specified, f +1 will be used.
