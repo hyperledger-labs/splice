@@ -62,6 +62,9 @@ export function buildAmuletRulesConfigFromChanges(
   const futureValues: Tuple2<RelTime, IssuanceConfig>[] = [];
   for (let i = 0; i < futureValuesCount; i++) {
     const time = { microseconds: getValue(`issuanceCurveFutureValues${i}`) };
+    const futureOptDevelopmentFundPercentage = getValue(
+      `issuanceCurveFutureValues${i}OptDevelopmentFundPercentage`
+    );
     const config: IssuanceConfig = {
       amuletToIssuePerYear: getValue(`issuanceCurveFutureValues${i}AmuletToIssuePerYear`),
       validatorRewardPercentage: getValue(`issuanceCurveFutureValues${i}ValidatorRewardPercentage`),
@@ -70,19 +73,22 @@ export function buildAmuletRulesConfigFromChanges(
       featuredAppRewardCap: getValue(`issuanceCurveFutureValues${i}FeaturedAppRewardCap`),
       unfeaturedAppRewardCap: getValue(`issuanceCurveFutureValues${i}UnfeaturedAppRewardCap`),
       optValidatorFaucetCap: getValue(`issuanceCurveFutureValues${i}OptValidatorFaucetCap`),
-      optDevelopmentFundPercentage: getValue(
-        `issuanceCurveFutureValues${i}OptDevelopmentFundPercentage`
-      ),
+      optDevelopmentFundPercentage:
+        futureOptDevelopmentFundPercentage === '' ? null : futureOptDevelopmentFundPercentage,
     };
     futureValues.push({ _1: time, _2: config });
   }
 
   const transferPreapprovalFee = getValue('transferPreapprovalFee');
+  const optDevelopmentFundManager = getValue('optDevelopmentFundManager');
+  const initialOptDevelopmentFundPercentage = getValue(
+    'issuanceCurveInitialValueOptDevelopmentFundPercentage'
+  );
   const amuletConfig: AmuletConfig<'USD'> = {
     tickDuration: { microseconds: getValue('tickDuration') },
     transferPreapprovalFee: transferPreapprovalFee === '' ? null : transferPreapprovalFee,
     featuredAppActivityMarkerAmount: getValue('featuredAppActivityMarkerAmount'),
-    optDevelopmentFundManager: getValue('optDevelopmentFundManager'),
+    optDevelopmentFundManager: optDevelopmentFundManager === '' ? null : optDevelopmentFundManager,
 
     transferConfig: {
       createFee: { fee: getValue('transferConfigCreateFee') },
@@ -107,9 +113,8 @@ export function buildAmuletRulesConfigFromChanges(
         featuredAppRewardCap: getValue('issuanceCurveInitialValueFeaturedAppRewardCap'),
         unfeaturedAppRewardCap: getValue('issuanceCurveInitialValueUnfeaturedAppRewardCap'),
         optValidatorFaucetCap: getValue('issuanceCurveInitialValueOptValidatorFaucetCap'),
-        optDevelopmentFundPercentage: getValue(
-          'issuanceCurveInitialValueOptDevelopmentFundPercentage'
-        ),
+        optDevelopmentFundPercentage:
+          initialOptDevelopmentFundPercentage === '' ? null : initialOptDevelopmentFundPercentage,
       },
       futureValues: futureValues,
     },
