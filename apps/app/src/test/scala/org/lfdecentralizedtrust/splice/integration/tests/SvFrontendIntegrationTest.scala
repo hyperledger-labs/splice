@@ -1423,7 +1423,7 @@ class SvFrontendIntegrationTest
 
     "NEW UI: Set Amulet Rules Configuration" in { implicit env =>
       assertCreateProposal("CRARC_SetConfig", "set-amulet-config-rules") { implicit webDriver =>
-        inside(find(testId("transferConfig.createFee.fee-value"))) { case Some(element) =>
+        inside(find(testId("config-field-transferConfigCreateFee"))) { case Some(element) =>
           element.underlying.clear()
           element.underlying.sendKeys("42.0")
         }
