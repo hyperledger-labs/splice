@@ -46,7 +46,7 @@ import org.lfdecentralizedtrust.splice.scan.store.db.{
   ScanAggregatesReaderContext,
 }
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
-import org.lfdecentralizedtrust.splice.store.{PageLimit, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{ContractFetcher, PageLimit, UpdateHistory}
 import org.lfdecentralizedtrust.splice.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -307,14 +307,21 @@ class ScanApp(
         bftSequencersWithAdminConnections,
         initialRound,
       )
+      contractFetcher = ContractFetcher.createStoreWithLedgerFallback(
+        config.parameters.contractFetchLedgerFallbackEnabled,
+        store,
+        appInitConnection,
+      )
 
       tokenStandardTransferInstructionHandler = new HttpTokenStandardTransferInstructionHandler(
         store,
+        contractFetcher,
         clock,
         loggerFactory,
       )
       tokenStandardAllocationHandler = new HttpTokenStandardAllocationHandler(
         store,
+        contractFetcher,
         clock,
         loggerFactory,
       )

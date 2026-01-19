@@ -9,22 +9,26 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  metadatav1,
+  transferinstructionv1,
+}
 import org.lfdecentralizedtrust.splice.environment.DarResources
-import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1
-import v1.{Resource, definitions}
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.scan.util
+import org.lfdecentralizedtrust.splice.store.ContractFetcher
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.{Resource, definitions}
 
 import java.time.ZoneOffset
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
 import scala.jdk.CollectionConverters.*
+import scala.util.{Failure, Success, Try}
 
 class HttpTokenStandardTransferInstructionHandler(
     store: ScanStore,
+    contractFetcher: ContractFetcher,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -198,8 +202,10 @@ class HttpTokenStandardTransferInstructionHandler(
       tc: TraceContext
   ): Future[definitions.ChoiceContext] = {
     for {
-      amuletInstr <- store.multiDomainAcsStore
-        .lookupContractById(splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION)(
+      amuletInstr <- contractFetcher
+        .lookupContractById(
+          splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION
+        )(
           new splice.amulettransferinstruction.AmuletTransferInstruction.ContractId(
             transferInstructionId
           )
@@ -217,11 +223,12 @@ class HttpTokenStandardTransferInstructionHandler(
         ChoiceContextBuilder,
       ](
         s"AmuletTransferInstruction '$transferInstructionId'",
-        amuletInstr.contract.payload.lockedAmulet,
-        amuletInstr.contract.payload.transfer.executeBefore,
+        amuletInstr.payload.lockedAmulet,
+        amuletInstr.payload.transfer.executeBefore,
         requireLockedAmulet,
         None,
         store,
+        contractFetcher,
         clock,
         new ChoiceContextBuilder(_, excludeDebugFields),
       )
