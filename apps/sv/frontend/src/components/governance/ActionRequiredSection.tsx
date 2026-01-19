@@ -4,7 +4,7 @@ import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules'
 import { ContractId } from '@daml/types';
 import { East } from '@mui/icons-material';
 import { Alert, Box, Grid, Stack, Typography } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import { MemberIdentifier, PageSectionHeader } from '../../components/beta';
 import React from 'react';
 import dayjs from 'dayjs';

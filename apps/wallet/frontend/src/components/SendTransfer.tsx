@@ -9,7 +9,7 @@ import { useMutation } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
 import addHours from 'date-fns/addHours';
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { v4 as uuidv4 } from 'uuid';
 
 import {

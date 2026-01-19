@@ -24,7 +24,7 @@ describe('SV user can', () => {
       </SvConfigProvider>
     );
 
-    expect(await screen.findByText('Log In')).toBeDefined();
+    expect(await screen.findByText('Log In')).toBeInTheDocument();
 
     const input = screen.getByRole('textbox');
     await user.type(input, 'sv1');
@@ -32,7 +32,7 @@ describe('SV user can', () => {
     const button = screen.getByRole('button', { name: 'Log In' });
     user.click(button);
 
-    expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
+    expect(await screen.findAllByDisplayValue(svPartyId)).not.toBe([]);
   });
 });
 
@@ -44,23 +44,23 @@ describe('Set Amulet Config Rules Form', () => {
       </Wrapper>
     );
 
-    expect(screen.getByTestId('set-amulet-config-rules-form')).toBeDefined();
-    expect(screen.getByText('Action')).toBeDefined();
+    expect(screen.getByTestId('set-amulet-config-rules-form')).toBeInTheDocument();
+    expect(screen.getByText('Action')).toBeInTheDocument();
 
     const actionInput = screen.getByTestId('set-amulet-config-rules-action');
-    expect(actionInput).toBeDefined();
+    expect(actionInput).toBeInTheDocument();
     expect(actionInput.getAttribute('value')).toBe('Set Amulet Rules Configuration');
 
     const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
-    expect(summaryInput).toBeDefined();
+    expect(summaryInput).toBeInTheDocument();
     expect(summaryInput.getAttribute('value')).toBeNull();
 
     const summarySubtitle = screen.getByTestId('set-amulet-config-rules-summary-subtitle');
-    expect(summarySubtitle).toBeDefined();
+    expect(summarySubtitle).toBeInTheDocument();
     expect(summarySubtitle.textContent).toBe(PROPOSAL_SUMMARY_SUBTITLE);
 
     const urlInput = screen.getByTestId('set-amulet-config-rules-url');
-    expect(urlInput).toBeDefined();
+    expect(urlInput).toBeInTheDocument();
     expect(urlInput.getAttribute('value')).toBe('');
 
     // Amulet Rules has a lot of fields to process so this can get flakey if not given enough time
@@ -80,7 +80,7 @@ describe('Set Amulet Config Rules Form', () => {
       { timeout: 1000 }
     );
 
-    expect(screen.getByTestId('json-diffs-details')).toBeDefined();
+    expect(screen.getByTestId('json-diffs-details')).toBeInTheDocument();
   });
 
   test(
@@ -96,7 +96,7 @@ describe('Set Amulet Config Rules Form', () => {
 
       const actionInput = screen.getByTestId('set-amulet-config-rules-action');
       const submitButton = screen.getByTestId('submit-button');
-      expect(submitButton).toBeDefined();
+      expect(submitButton).toBeInTheDocument();
 
       await user.click(submitButton);
       expect(submitButton.getAttribute('disabled')).toBeDefined();
@@ -104,16 +104,16 @@ describe('Set Amulet Config Rules Form', () => {
         /Unable to perform pointer interaction/
       );
 
-      expect(screen.getByText('Summary is required')).toBeDefined();
-      expect(screen.getByText('Invalid URL')).toBeDefined();
+      expect(screen.getByText('Summary is required')).toBeInTheDocument();
+      expect(screen.getByText('Invalid URL')).toBeInTheDocument();
 
       // completing the form should reenable the submit button
       const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
-      expect(summaryInput).toBeDefined();
+      expect(summaryInput).toBeInTheDocument();
       await user.type(summaryInput, 'Summary of the proposal');
 
       const urlInput = screen.getByTestId('set-amulet-config-rules-url');
-      expect(urlInput).toBeDefined();
+      expect(urlInput).toBeInTheDocument();
       await user.type(urlInput, 'https://example.com');
 
       await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
@@ -131,7 +131,7 @@ describe('Set Amulet Config Rules Form', () => {
     );
 
     const expiryDateInput = screen.getByTestId('set-amulet-config-rules-expiry-date-field');
-    expect(expiryDateInput).toBeDefined();
+    expect(expiryDateInput).toBeInTheDocument();
 
     const thePast = dayjs().subtract(1, 'day').format(dateTimeFormatISO);
     const theFuture = dayjs().add(1, 'day').format(dateTimeFormatISO);
@@ -198,11 +198,11 @@ describe('Set Amulet Config Rules Form', () => {
     );
 
     const c1Input = screen.getByTestId('config-field-transferPreapprovalFee');
-    expect(c1Input).toBeDefined();
+    expect(c1Input).toBeInTheDocument();
     await user.type(c1Input, '99');
 
     const c2Input = screen.getByTestId('config-field-transferConfigTransferFeeInitialRate');
-    expect(c2Input).toBeDefined();
+    expect(c2Input).toBeInTheDocument();
     await user.type(c2Input, '9.99');
 
     const changes = screen.getAllByTestId('config-current-value', { exact: false });
@@ -232,7 +232,7 @@ describe('Set Amulet Config Rules Form', () => {
     const c2Input = screen.getByTestId('config-field-transferConfigTransferFeeInitialRate');
     await user.type(c2Input, '9.99');
 
-    expect(screen.getByText('Review Proposal')).toBeDefined();
+    expect(screen.getByText('Review Proposal')).toBeInTheDocument();
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
     const submitButton = screen.getByTestId('submit-button');
@@ -242,7 +242,7 @@ describe('Set Amulet Config Rules Form', () => {
 
     await user.click(submitButton);
 
-    expect(screen.getByText(PROPOSAL_SUMMARY_TITLE)).toBeDefined();
+    expect(screen.getByText(PROPOSAL_SUMMARY_TITLE)).toBeInTheDocument();
   });
 
   test('should show error on form if submission fails', { timeout: 10000 }, async () => {
@@ -280,9 +280,9 @@ describe('Set Amulet Config Rules Form', () => {
     await user.click(submitButton); // Review proposal
     await user.click(submitButton); // Submit proposal
 
-    expect(screen.getByTestId('proposal-submission-error')).toBeDefined();
-    expect(screen.getByText(/Submission failed/)).toBeDefined();
-    expect(screen.getByText(/Service Unavailable/)).toBeDefined();
+    expect(screen.getByTestId('proposal-submission-error')).toBeInTheDocument();
+    expect(screen.getByText(/Submission failed/)).toBeInTheDocument();
+    expect(screen.getByText(/Service Unavailable/)).toBeInTheDocument();
   });
 
   test('should redirect to governance page after successful submission', async () => {
@@ -312,19 +312,23 @@ describe('Set Amulet Config Rules Form', () => {
     const c2Input = screen.getByTestId('config-field-transferConfigTransferFeeInitialRate');
     await user.type(c2Input, '9.99');
 
-    const submitButton = screen.getByTestId('submit-button');
+    const reviewButton = screen.getByTestId('submit-button');
     await waitFor(async () => {
-      expect(submitButton.getAttribute('disabled')).toBeNull();
+      expect(reviewButton.getAttribute('disabled')).toBeNull();
+    });
+    await user.click(reviewButton);
+
+    await waitFor(async () => {
+      const submitButton = screen.getByTestId('submit-button');
+      expect(reviewButton).not.toBe(submitButton);
+      await user.click(submitButton);
     });
 
-    await user.click(submitButton); // Review proposal
-    await user.click(submitButton); // Submit proposal
-
     await waitFor(() => {
-      expect(screen.queryByText('Action Required')).toBeDefined();
-      expect(screen.queryByText('Inflight Votes')).toBeDefined();
-      expect(screen.queryByText('Vote History')).toBeDefined();
-      expect(screen.queryByText('Successfully submitted the proposal')).toBeDefined();
+      expect(screen.queryByText('Action Required')).toBeInTheDocument();
+      expect(screen.queryByText('Inflight Votes')).toBeInTheDocument();
+      expect(screen.queryByText('Vote History')).toBeInTheDocument();
+      expect(screen.queryByText('Successfully submitted the proposal')).toBeInTheDocument();
     });
   });
 
@@ -350,18 +354,18 @@ describe('Set Amulet Config Rules Form', () => {
     await user.type(c2Input, '9.99');
 
     const jsonDiffs = screen.getByText('JSON Diffs');
-    expect(jsonDiffs).toBeDefined();
+    expect(jsonDiffs).toBeInTheDocument();
 
     await user.click(jsonDiffs);
-    expect(screen.queryByTestId('config-diffs-display')).toBeDefined();
+    expect(screen.queryByTestId('config-diffs-display')).toBeInTheDocument();
 
     const reviewButton = screen.getByTestId('submit-button');
     await waitFor(async () => {
       expect(reviewButton.getAttribute('disabled')).toBeNull();
     });
 
-    expect(jsonDiffs).toBeDefined();
+    expect(jsonDiffs).toBeInTheDocument();
     await user.click(jsonDiffs);
-    expect(screen.queryByTestId('config-diffs-display')).toBeDefined();
+    expect(screen.queryByTestId('config-diffs-display')).toBeInTheDocument();
   });
 });

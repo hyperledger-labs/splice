@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { PageSectionHeader, VoteStats } from '../../components/beta';
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 import { InfoOutlined } from '@mui/icons-material';

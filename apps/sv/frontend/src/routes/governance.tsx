@@ -25,7 +25,7 @@ import {
   getVoteResultStatus,
 } from '../utils/governance';
 import { SupportedActionTag, ProposalListingData } from '../utils/types';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import { InfoOutlined, WarningAmberOutlined } from '@mui/icons-material';
 
 function getAction(action: ActionRequiringConfirmation): string {

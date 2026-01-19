@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
-import { Link as RouterLink, useRouteError } from 'react-router-dom';
+import { Link as RouterLink, useRouteError } from 'react-router';
 
 import { Box, Link, Typography } from '@mui/material';
 

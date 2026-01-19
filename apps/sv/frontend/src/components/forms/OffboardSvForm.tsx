@@ -117,6 +117,7 @@ export const OffboardSvForm: React.FC = _ => {
                 <field.TextField
                   title="Action"
                   id="offboard-sv-action"
+                  data-testid="offboard-sv-action"
                   muiTextFieldProps={{ disabled: true }}
                 />
               )}
