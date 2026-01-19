@@ -92,7 +92,7 @@
 
     - Add a new trigger, `MergeUnclaimedDevelopmentFundCouponsTrigger`` that automatically monitors ``UnclaimedDevelopmentFundCoupon`` and,
       once their number reaches at least twice the configured threshold, merges the smallest coupons into a single one.
-      This approach keeps larger coupons stable, reducing contention with externally prepared transactions that may reference stale contract IDs.
+      This approach keeps contract-ids of larger coupons stable to minimize contention with externally prepared transactions which reference these ids.
 
     - Add a new config field to ``SvOnboardingConfig`` named ``unclaimedDevelopmentFundCouponsThreshold`` defining the
       threshold above which ``UnclaimedDevelopmentFundCoupon`` s are merged. The default value is set to 10.
