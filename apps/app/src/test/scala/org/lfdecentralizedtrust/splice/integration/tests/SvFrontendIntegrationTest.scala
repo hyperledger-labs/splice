@@ -1422,8 +1422,11 @@ class SvFrontendIntegrationTest
     }
 
     "NEW UI: Set Amulet Rules Configuration" in { implicit env =>
-      assertCreateProposal("CRARC_SetConfig", "set-amulet-config-rules") { _ =>
-        // Config fields default to current values, no extra form operations needed
+      assertCreateProposal("CRARC_SetConfig", "set-amulet-config-rules") { implicit webDriver =>
+        inside(find(testId("transferConfig.createFee.fee-value"))) { case Some(element) =>
+          element.underlying.clear()
+          element.underlying.sendKeys("42.0")
+        }
       }
     }
 
