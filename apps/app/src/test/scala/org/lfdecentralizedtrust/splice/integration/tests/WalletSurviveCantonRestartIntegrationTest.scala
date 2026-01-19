@@ -60,9 +60,7 @@ class WalletSurviveCantonRestartIntegrationTest
           Seq(
             testResourcesPath / "standalone-participant-extra.conf"
           ),
-          Seq(
-            "canton.participants.extraStandaloneParticipant.sequencer-client.use-new-connection-pool=true"
-          ),
+          Seq.empty,
           "wallet-survive-canton-restarts-2",
           "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
           "EXTRA_PARTICIPANT_DB" -> dbName,

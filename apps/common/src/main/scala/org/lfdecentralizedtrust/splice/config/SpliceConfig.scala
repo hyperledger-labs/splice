@@ -70,7 +70,7 @@ final case class CircuitBreakersConfig(
 
 final case class EnabledFeaturesConfig(
     enableNewAcsExport: Boolean = true,
-    newSequencerConnectionPool: Boolean = false,
+    newSequencerConnectionPool: Boolean = true,
 )
 
 /** This class aggregates binary-level configuration options that are shared between each Splice app instance.
