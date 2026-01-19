@@ -68,11 +68,16 @@ class HttpServerMetrics(
           .map { header =>
             val sourceUi = header.value
             logger.debug(
-              s"Request from UI($customSourceUiHeader: $sourceUi): service = $service, operation= $operation"
+              s"HTTP Request from UI($customSourceUiHeader: $sourceUi): service = $service, operation= $operation"
             )
             c.withExtraLabels(SourceUi -> sourceUi)
           }
-          .getOrElse(c)
+          .getOrElse {
+            logger.debug(
+              s"HTTP Request no source UI header: service = $service, operation= $operation"
+            )
+            c
+          }
 
         inFlightRequests.inc()
         val timing = requestTiming.startAsync()
