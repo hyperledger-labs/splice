@@ -51,6 +51,8 @@
           before distributing rewards. When a nonzero allocation is configured, a new
           ``UnclaimedDevelopmentFundCoupon`` is created per round. If ``optDevelopmentFundPercentage`` is ``None``,
           a default value of **0.05** is applied.
+          The accrual of ``UnclaimedDevelopmentFundCoupon`` contracts thus starts
+          as soon as the new Daml models are voted in.
 
         - A new choice ``AmuletRules_MergeUnclaimedDevelopmentFundCoupons``: Adds a batch merge operation to combine
           multiple ``UnclaimedDevelopmentFundCoupon`` contracts into a single one for ACS size control.
