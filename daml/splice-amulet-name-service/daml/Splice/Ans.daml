@@ -4,6 +4,7 @@
 module Splice.Ans where
 
 import DA.Action (void)
+import DA.TextMap qualified as TM
 import DA.Time
 
 import Splice.Amulet
@@ -12,6 +13,9 @@ import Splice.Types
 import Splice.Wallet.Payment
 import Splice.Wallet.Subscriptions
 import Splice.Util
+
+import Splice.Api.Token.MetadataV1 (emptyMetadata)
+import Splice.Api.Credential.RegistryV1 qualified as RegistryV1
 
 data AnsRules_RequestEntryResult = AnsRules_RequestEntryResult
   with
@@ -296,6 +300,54 @@ template AnsEntry
     expiresAt : Time
   where
     signatory user, dso
+
+    -- TODO: factor this instance out into a separate PR for the CIP that builds ANS
+    -- on top of the DSO credential registry.
+    --
+    -- This instance is only provided here to test-drive the credential standard APIs.
+    --
+    interface instance RegistryV1.Credential for AnsEntry where
+      view = RegistryV1.CredentialView with
+        admin = dso
+        issuer = dso
+        holder = user
+        claims = RegistryV1.Claims with
+          values = TM.fromList [
+              -- TODO: use the right CIP number once it is assigned; factor it out into a constant
+
+              ("cip-TBD/cns.name!" <> name, partyToText user),
+              -- This claim translates to (subject="name", property="cip-TBD/cns.name", value=holder).
+              --
+              -- A name lookup matching ANS 1.0 lookup semantics
+              -- can be performed by searching for credentials with
+              -- key = "cip-TBD/cns.name#<name>" and issuer=dso
+              --
+              -- TODO: consider saving space and defining the default rule that an empty value
+              -- means that the value is the holder party. It also obviates the need to deal
+              -- with credentials where the holder is different from the value of this claim.
+              --
+              -- TODO: consider using reverse DNS style for the name, so that the prefix search
+              -- allows listing all names under a domain, e.g., "com.example.myname".
+              --
+              ("cip-TBD/cns.url!" <> name, url),
+              ("cip-TBD/cns.description!" <> name, description)
+              -- Note that name and description are associated with the ans.name and not
+              -- the holder directly; i.e., the holder can have different attributes for different names.
+
+            ]
+          validFrom = None
+          validUntil = Some expiresAt
+          meta = emptyMetadata
+        createdAt = None
+        expiresAt = Some expiresAt
+        meta = emptyMetadata
+
+      credential_publicFetchImpl _self _arg = pure (view (toInterface @RegistryV1.Credential this))
+
+      credential_archiveAsHolderImpl _self _arg = do
+        pure RegistryV1.Credential_ArchiveAsHolderResult with
+          archivedCredential = view (toInterface @RegistryV1.Credential this)
+          meta = emptyMetadata
 
     choice AnsEntry_Expire : AnsEntry_ExpireResult
       with
