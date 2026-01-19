@@ -85,7 +85,7 @@ describe('Create Proposal', () => {
     await checkActionSelection(
       'Feature Application',
       'SRARC_GrantFeaturedAppRight',
-      'grant-featured-app-form'
+      'grant-featured-app-action'
     );
   });
 
@@ -93,7 +93,7 @@ describe('Create Proposal', () => {
     await checkActionSelection(
       'Unfeature Application',
       'SRARC_RevokeFeaturedAppRight',
-      'revoke-featured-app-form'
+      'revoke-featured-app-action'
     );
   });
 
@@ -101,7 +101,7 @@ describe('Create Proposal', () => {
     await checkActionSelection(
       'Set Dso Rules Configuration',
       'SRARC_SetConfig',
-      'set-dso-config-rules-form'
+      'set-dso-config-rules-action'
     );
   });
 
@@ -109,7 +109,7 @@ describe('Create Proposal', () => {
     await checkActionSelection(
       'Set Amulet Rules Configuration',
       'CRARC_SetConfig',
-      'set-amulet-config-rules-form'
+      'set-amulet-config-rules-action'
     );
   });
 
@@ -117,7 +117,7 @@ describe('Create Proposal', () => {
     await checkActionSelection(
       'Update SV Reward Weight',
       'SRARC_UpdateSvRewardWeight',
-      'update-sv-reward-weight-form'
+      'update-sv-reward-weight-action'
     );
   });
 
@@ -125,7 +125,7 @@ describe('Create Proposal', () => {
     await checkActionSelection(
       'Create Unclaimed Activity Record',
       'SRARC_CreateUnallocatedUnclaimedActivityRecord',
-      'update-sv-reward-weight-action'
+      'create-unallocated-unclaimed-activity-record-action'
     );
   });
 
