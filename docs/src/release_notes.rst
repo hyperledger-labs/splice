@@ -9,7 +9,97 @@
 
 .. release-notes:: 0.5.6
 
- - Sequencer
+  .. important::
+
+      **Action recommended from app devs:**
+
+      **App devs whose app's Daml code statically depends on** ``splice-amulet < 0.1.15`` should recompile their Daml code
+      to link against ``splice-amulet >= 0.1.15`` in order to be ready to consume the two new fields introduced in `AmuletConfig`
+      (`optDevelopmentFundManager`) and `IssuanceConfig` (`optDevelopmentFundPercentage`) once either of them is set.
+
+      This is required because once the new fields are set, downgrades of `AmuletRules` will fail.
+      At the moment, this recompilation is not strictly required, as setting these fields is not planned immediately.
+
+      No change is required for apps that build against the :ref:`token_standard`
+      or :ref:`featured_app_activity_markers_api`.
+
+  - Daml
+
+    - Implement Daml changes for `CIP-0082 - Establish a 5% Development Fund (Foundation-Governed) <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0082/cip-0082.md>`__:
+
+      - New templates:
+
+        - **UnclaimedDevelopmentFundCoupon**: Represents unallocated Development Fund entitlements created per issuance round.
+          Coupons are owned by the DSO, have no expiry, and serve as accounting instruments.
+          ACS size is managed through merging rather than expiration.
+
+        - **DevelopmentFundCoupon**: Represents an allocated portion of the Development Fund for a specific beneficiary.
+          Coupons can be withdrawn by the Development Fund Manager or expired by the DSO, in both cases restoring the
+          amount to an unclaimed coupon.
+
+      - Configuration extensions:
+
+        - ``IssuanceConfig`` is extended with an optional ``optDevelopmentFundPercentage``, defining the fraction of each
+          mint allocated to the Development Fund (validated to be within ``[0.0, 1.0]``).
+
+        - ``AmuletConfig`` is extended with an optional ``optDevelopmentFundManager``, designating the party authorized
+          to allocate Development Fund entitlements.
+
+      - AmuletRules updates:
+
+        - Modify ``AmuletRules_MiningRound_StartIssuing``: Issuance logic now deducts the Development Fund share
+          before distributing rewards. When a nonzero allocation is configured, a new
+          ``UnclaimedDevelopmentFundCoupon`` is created per round. If ``optDevelopmentFundPercentage`` is ``None``,
+          a default value of **0.05** is applied.
+          The accrual of ``UnclaimedDevelopmentFundCoupon`` contracts thus starts
+          as soon as the new Daml models are voted in.
+
+        - A new choice ``AmuletRules_MergeUnclaimedDevelopmentFundCoupons``: Adds a batch merge operation to combine
+          multiple ``UnclaimedDevelopmentFundCoupon`` contracts into a single one for ACS size control.
+
+        - A new choice ``AmuletRules_AllocateDevelopmentFundCoupon``: Allows the Development Fund Manager to allocate
+          unclaimed entitlements to beneficiaries, creating ``DevelopmentFundCoupon`` contracts and returning any
+          remaining unclaimed amount.
+
+        - Modify ``AmuletRules_Transfer``: Transfers now accept ``DevelopmentFundCoupon`` as a valid input when
+          the sender matches the beneficiary and report the total Development Fund amount consumed.
+
+      - DsoRules updates:
+
+        - A a new choice ``DsoRules_MergeUnclaimedDevelopmentFundCoupons``: Enables the DSO to trigger unclaimed coupon
+          merges via governance.
+
+        - Add a new ``DsoRules_ExpireDevelopmentFundCoupon``: Allows the DSO to expire an allocated
+          ``DevelopmentFundCoupon``, restoring its amount to an ``UnclaimedDevelopmentFundCoupon``.
+
+      Note that the UI changes in the Wallet app required to allocate funds are not yet implemented and will be delivered in a later release. Please refer to
+      this issue: `Tracking - CIP-0082 - 5% Development Fund <https://github.com/hyperledger-labs/splice/issues/3218>`.
+
+      These Daml changes require an upgrade to the following Daml versions **before**
+      voting to set the transfer fees to zero:
+
+      ================== =======
+      name               version
+      ================== =======
+      amulet             0.1.15
+      amuletNameService  0.1.16
+      dsoGovernance      0.1.21
+      splitwell          0.1.15
+      validatorLifecycle 0.1.6
+      wallet             0.1.15
+      walletPayments     0.1.15
+      ================== =======
+
+  - SV app
+
+    - Add a new trigger, `MergeUnclaimedDevelopmentFundCouponsTrigger`` that automatically monitors ``UnclaimedDevelopmentFundCoupon`` and,
+      once their number reaches at least twice the configured threshold, merges the smallest coupons into a single one.
+      This approach keeps contract-ids of larger coupons stable to minimize contention with externally prepared transactions which reference these ids.
+
+    - Add a new config field to ``SvOnboardingConfig`` named ``unclaimedDevelopmentFundCouponsThreshold`` defining the
+      threshold above which ``UnclaimedDevelopmentFundCoupon`` s are merged. The default value is set to 10.
+
+  - Sequencer
 
     - Includes a number of performance improvements that should improve the stability of the sequencer under higher load.
 
