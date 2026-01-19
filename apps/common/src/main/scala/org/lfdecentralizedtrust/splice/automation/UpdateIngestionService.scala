@@ -19,7 +19,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 
 /** Ingestion for ACS and transfer stores.
   * We ingest them independently but we ensure that the acs store
@@ -97,13 +97,18 @@ class UpdateIngestionService(
   private def process(
       msgs: Seq[GetTreeUpdatesResponse]
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    NonEmptyList.fromFoldable(msgs) match {
-      case Some(batch) =>
-        logger.debug(s"Processing batch of ${batch.size} elements")
-        ingestionSink.ingestUpdateBatch(batch.map(_.updateOrCheckpoint))
-      case None =>
-        logger.error("Received empty batch of updates to ingest. This is never supposed to happen.")
-        Future.unit
+    // if paused, this step will backpressure the source
+    waitForResumePromise.future.flatMap { _ =>
+      NonEmptyList.fromFoldable(msgs) match {
+        case Some(batch) =>
+          logger.debug(s"Processing batch of ${batch.size} elements")
+          ingestionSink.ingestUpdateBatch(batch.map(_.updateOrCheckpoint))
+        case None =>
+          logger.error(
+            "Received empty batch of updates to ingest. This is never supposed to happen."
+          )
+          Future.unit
+      }
     }
   }
 
@@ -124,4 +129,36 @@ class UpdateIngestionService(
 
   // Kick-off the ingestion
   startIngestion()
+
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  @volatile
+  private var waitForResumePromise = Promise.successful(())
+
+  /** Note that any in-flight events being processed when `pause` is called will still be processed.
+    * For test purposes.
+    */
+  def pause(): Future[Unit] = blocking {
+    withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
+      logger.info("Pausing UpdateIngestionService.")
+      blocking {
+        synchronized {
+          if (waitForResumePromise.isCompleted) {
+            waitForResumePromise = Promise()
+          }
+          Future.successful(())
+        }
+      }
+    }
+  }
+
+  def resume(): Unit = blocking {
+    withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
+      logger.info("Resuming UpdateIngestionService.")
+      blocking {
+        synchronized {
+          val _ = waitForResumePromise.trySuccess(())
+        }
+      }
+    }
+  }
 }

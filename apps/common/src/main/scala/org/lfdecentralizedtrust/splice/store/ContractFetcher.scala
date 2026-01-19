@@ -52,7 +52,7 @@ object ContractFetcher {
       OptionT(store.multiDomainAcsStore.lookupContractById(companion)(id))
         .map(_.contract)
         .orElse(
-          OptionT(fallbackLedgerClient.getContract(id, Seq(store.multiDomainAcsStore.storePartyId)))
+          OptionT(fallbackLedgerClient.getContract(id, Seq(store.multiDomainAcsStore.storeParty)))
             .subflatMap { createdEvent =>
               companionClass
                 .fromCreatedEvent(companion)(CreatedEvent.fromProto(toJavaProto(createdEvent)))
