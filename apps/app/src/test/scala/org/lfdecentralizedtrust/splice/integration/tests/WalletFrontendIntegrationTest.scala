@@ -367,6 +367,41 @@ class WalletFrontendIntegrationTest
               },
             )
 
+            // 3. Create two proposals, from beneficiaries that have not completedly onboarding
+            val beneficiary4Incomplete =
+              onboardExternalParty(aliceValidatorBackend, Some("beneficiary4"))
+            val beneficiary5Incomplete =
+              onboardExternalParty(aliceValidatorBackend, Some("beneficiary5"))
+            actAndCheck(
+              "Each beneficiary creates a minting delegation proposal", {
+                createMintingDelegationProposal(beneficiary4Incomplete, validatorParty, expiresAt)
+                createMintingDelegationProposal(beneficiary5Incomplete, validatorParty, expiresAt)
+              },
+            )(
+              "2 new proposals appear, 1 delegation remains",
+              _ => {
+                eventually() {
+                  checkRowCounts(2, 1)
+                }
+              },
+            )
+
+            actAndCheck(
+              "Accepted non-onboarded proposal via api", {
+               val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
+               val cid = proposals.proposals.head.contract.contractId
+               aliceValidatorWalletClient.acceptMintingDelegationProposal(cid)
+               webDriver.navigate().refresh()
+              }
+            )(
+              "1 proposal remain, 2 delegations are visible",
+              _ => {
+                eventually() {
+                  checkRowCounts(1, 2)
+                }
+              },
+            )
+
             // 9. Add another proposal, refresh the UI and confirm that it appears
             actAndCheck(
               "Beneficiary 2 creates new minting proposal and UI refreshes", {
@@ -379,13 +414,13 @@ class WalletFrontendIntegrationTest
                 webDriver.navigate().refresh()
               },
             )(
-              "1 new proposal appears, 1 delegation remains",
+              "1 new proposal appears making 2, 2 delegations remain",
               _ => {
                 eventually() {
                   aliceValidatorWalletClient
                     .listMintingDelegationProposals()
                     .proposals should have size 1
-                  checkRowCounts(1, 1)
+                  checkRowCounts(2, 2)
                 }
               },
             )
@@ -397,10 +432,10 @@ class WalletFrontendIntegrationTest
                 eventuallyClickOn(id("accept-proposal-confirmation-dialog-accept-button"))
               },
             )(
-              "No proposals, and still just 1 delegation",
+              "1 proposal and 2 delegations remain",
               _ => {
                 eventually() {
-                  checkRowCounts(0, 1)
+                  checkRowCounts(1, 2)
                 }
               },
             )
