@@ -5,8 +5,7 @@
     "@pulumi/auth0": "3.21.0",
     "@pulumi/kubernetes-cert-manager": "0.2.0",
     "@pulumiverse/grafana": "0.16.3",
-    "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0",
-    "@pulumi/gcp": "8.32.1"
+    "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0"
   },
   "overrides": {
     "@pulumi/kubernetes-cert-manager": {
