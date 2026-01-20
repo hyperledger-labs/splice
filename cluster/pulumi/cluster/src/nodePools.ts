@@ -11,59 +11,49 @@ export function installNodePools(): void {
     ? `projects/${GCP_PROJECT}/locations/${config.requireEnv('CLOUDSDK_COMPUTE_ZONE')}/clusters/${clusterName}`
     : clusterName;
 
-  new gcp.container.NodePool(
-    'cn-apps-node-pool',
-    {
-      namePrefix: 'cn-apps-pool',
-      cluster,
-      nodeConfig: {
-        machineType: gkeClusterConfig.nodePools.apps.nodeType,
-        taints: [
-          {
-            effect: 'NO_SCHEDULE',
-            key: 'cn_apps',
-            value: 'true',
-          },
-        ],
-        labels: {
-          cn_apps: 'true',
+  new gcp.container.NodePool('cn-apps-node-pool', {
+    cluster,
+    nodeConfig: {
+      machineType: gkeClusterConfig.nodePools.apps.nodeType,
+      taints: [
+        {
+          effect: 'NO_SCHEDULE',
+          key: 'cn_apps',
+          value: 'true',
         },
-      },
-      initialNodeCount: 0,
-      autoscaling: {
-        minNodeCount: gkeClusterConfig.nodePools.apps.minNodes,
-        maxNodeCount: gkeClusterConfig.nodePools.apps.maxNodes,
+      ],
+      labels: {
+        cn_apps: 'true',
       },
     },
-    { aliases: [{ name: 'cn-apps-pool' }] }
-  );
+    initialNodeCount: 0,
+    autoscaling: {
+      minNodeCount: gkeClusterConfig.nodePools.apps.minNodes,
+      maxNodeCount: gkeClusterConfig.nodePools.apps.maxNodes,
+    },
+  });
 
-  new gcp.container.NodePool(
-    'cn-infra-node-pool',
-    {
-      namePrefix: 'cn-infra-pool',
-      cluster,
-      nodeConfig: {
-        machineType: gkeClusterConfig.nodePools.infra.nodeType,
-        taints: [
-          {
-            effect: 'NO_SCHEDULE',
-            key: 'cn_infra',
-            value: 'true',
-          },
-        ],
-        labels: {
-          cn_infra: 'true',
+  new gcp.container.NodePool('cn-infra-node-pool', {
+    cluster,
+    nodeConfig: {
+      machineType: gkeClusterConfig.nodePools.infra.nodeType,
+      taints: [
+        {
+          effect: 'NO_SCHEDULE',
+          key: 'cn_infra',
+          value: 'true',
         },
-      },
-      initialNodeCount: 1,
-      autoscaling: {
-        minNodeCount: gkeClusterConfig.nodePools.infra.minNodes,
-        maxNodeCount: gkeClusterConfig.nodePools.infra.maxNodes,
+      ],
+      labels: {
+        cn_infra: 'true',
       },
     },
-    { aliases: [{ name: 'cn-infra-pool' }] }
-  );
+    initialNodeCount: 1,
+    autoscaling: {
+      minNodeCount: gkeClusterConfig.nodePools.infra.minNodes,
+      maxNodeCount: gkeClusterConfig.nodePools.infra.maxNodes,
+    },
+  });
 
   new gcp.container.NodePool('gke-node-pool', {
     name: 'gke-pool',

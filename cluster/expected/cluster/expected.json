@@ -9,7 +9,6 @@
       },
       "cluster": "cn-mocknet",
       "initialNodeCount": 0,
-      "namePrefix": "cn-apps-pool",
       "nodeConfig": {
         "labels": {
           "cn_apps": "true"
@@ -38,7 +37,6 @@
       },
       "cluster": "cn-mocknet",
       "initialNodeCount": 1,
-      "namePrefix": "cn-infra-pool",
       "nodeConfig": {
         "labels": {
           "cn_infra": "true"
