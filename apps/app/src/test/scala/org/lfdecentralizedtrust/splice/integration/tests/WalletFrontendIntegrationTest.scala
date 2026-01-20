@@ -207,9 +207,9 @@ class WalletFrontendIntegrationTest
 
     }
 
-    "delegations" should {
+    "with delegations and their proposals" should {
 
-      "allow delegate to accept and reject minting delegation proposals and withdraw delegations" in {
+      "allow them to be accepted, rejected or withdrawn as appropriate" in {
         implicit env =>
           def checkRowCounts(proposalCount: Long, activeCount: Long)(implicit
               webDriver: WebDriver
@@ -220,12 +220,14 @@ class WalletFrontendIntegrationTest
             delegationRows should have size activeCount
           }
 
-          // 1. Setup - Validator is the delegate (minting delegations only work for validators)
-          // The RejectInvalidMintingDelegationProposalTrigger requires endUserParty == validatorParty
-          val validatorDamlUser = aliceValidatorWalletClient.config.ledgerApiUser
-          val validatorParty = aliceValidatorBackend.getValidatorPartyId()
+          // 1. Setup
+          val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+          onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+          val aliceParty =
+            PartyId.tryFromProtoPrimitive(aliceWalletClient.userStatus().party)
 
           // Tap to fund the validator wallet for external party setup
+          // (external party operations go through aliceValidatorBackend)
           aliceValidatorWalletClient.tap(100.0)
 
           // Onboard three external parties as beneficiaries
@@ -243,10 +245,10 @@ class WalletFrontendIntegrationTest
 
           // 2. Verify empty initial state via API
           clue("Check that no minting delegation proposals exist initially") {
-            aliceValidatorWalletClient.listMintingDelegationProposals().proposals shouldBe empty
+            aliceWalletClient.listMintingDelegationProposals().proposals shouldBe empty
           }
           clue("Check that no minting delegations exist initially") {
-            aliceValidatorWalletClient.listMintingDelegations().delegations shouldBe empty
+            aliceWalletClient.listMintingDelegations().delegations shouldBe empty
           }
 
           // 3. Create three proposals, one from each beneficiary
@@ -255,24 +257,24 @@ class WalletFrontendIntegrationTest
           val expiresDayAfter = envNow.plus(Duration.ofDays(31)).toInstant
           actAndCheck(
             "Each beneficiary creates a minting delegation proposal", {
-              createMintingDelegationProposal(beneficiary1Onboarding, validatorParty, expiresAt)
-              createMintingDelegationProposal(beneficiary2Onboarding, validatorParty, expiresAt)
-              createMintingDelegationProposal(beneficiary3Onboarding, validatorParty, expiresAt)
+              createMintingDelegationProposal(beneficiary1Onboarding, aliceParty, expiresAt)
+              createMintingDelegationProposal(beneficiary2Onboarding, aliceParty, expiresAt)
+              createMintingDelegationProposal(beneficiary3Onboarding, aliceParty, expiresDayAfter)
             },
           )(
             "and they are successfully created",
             _ => {
-              aliceValidatorWalletClient
+              aliceWalletClient
                 .listMintingDelegationProposals()
                 .proposals should have size 3
             },
           )
 
-          // 4. Test via Selenium UI (using validator's wallet frontend)
+          // 4. Test via Selenium UI (using Alice's wallet frontend)
           withFrontEnd("alice") { implicit webDriver =>
             actAndCheck(
-              "Validator browses to the wallet", {
-                browseToAliceWallet(validatorDamlUser)
+              "Alice browses to the wallet", {
+                browseToAliceWallet(aliceDamlUser)
               },
             )(
               "Alice sees the Delegations tab",
@@ -367,15 +369,16 @@ class WalletFrontendIntegrationTest
               },
             )
 
-            // 3. Create two proposals, from beneficiaries that have not completedly onboarding
+            // 9. Create two proposals, from beneficiaries that have not completedly onboarding
             val beneficiary4Incomplete =
               onboardExternalParty(aliceValidatorBackend, Some("beneficiary4"))
             val beneficiary5Incomplete =
               onboardExternalParty(aliceValidatorBackend, Some("beneficiary5"))
             actAndCheck(
               "Each beneficiary creates a minting delegation proposal", {
-                createMintingDelegationProposal(beneficiary4Incomplete, validatorParty, expiresAt)
-                createMintingDelegationProposal(beneficiary5Incomplete, validatorParty, expiresAt)
+                createMintingDelegationProposal(beneficiary4Incomplete, aliceParty, expiresDayAfter)
+                createMintingDelegationProposal(beneficiary5Incomplete, aliceParty, expiresDayAfter)
+                webDriver.navigate().refresh()
               },
             )(
               "2 new proposals appear, 1 delegation remains",
@@ -387,12 +390,12 @@ class WalletFrontendIntegrationTest
             )
 
             actAndCheck(
-              "Accepted non-onboarded proposal via api", {
-               val proposals = aliceValidatorWalletClient.listMintingDelegationProposals()
-               val cid = proposals.proposals.head.contract.contractId
-               aliceValidatorWalletClient.acceptMintingDelegationProposal(cid)
-               webDriver.navigate().refresh()
-              }
+              "Accept a non-onboarded proposal via api, refresh the UI", {
+                val proposals = aliceWalletClient.listMintingDelegationProposals()
+                val cid = proposals.proposals.head.contract.contractId
+                aliceWalletClient.acceptMintingDelegationProposal(cid)
+                webDriver.navigate().refresh()
+              },
             )(
               "1 proposal remain, 2 delegations are visible",
               _ => {
@@ -402,13 +405,13 @@ class WalletFrontendIntegrationTest
               },
             )
 
-            // 9. Add another proposal, refresh the UI and confirm that it appears
+            // 10. Add another proposal, refresh the UI and confirm that it appears
             actAndCheck(
               "Beneficiary 2 creates new minting proposal and UI refreshes", {
                 createLimitedMintingDelegationProposal(
                   beneficiary2Onboarding,
-                  validatorParty,
-                  expiresDayAfter,
+                  aliceParty,
+                  expiresAt,
                   18,
                 )
                 webDriver.navigate().refresh()
@@ -417,15 +420,15 @@ class WalletFrontendIntegrationTest
               "1 new proposal appears making 2, 2 delegations remain",
               _ => {
                 eventually() {
-                  aliceValidatorWalletClient
+                  aliceWalletClient
                     .listMintingDelegationProposals()
-                    .proposals should have size 1
+                    .proposals should have size 2
                   checkRowCounts(2, 2)
                 }
               },
             )
 
-            // 10. Accept proposal that causes automatic withdraw of existing delegation for beneficary 2
+            // 11. Accept proposal that causes automatic withdraw of existing delegation for beneficary 2
             actAndCheck(
               "Alice clicks Accept on new proposal and confirms", {
                 clickByCssSelector(".proposal-row .proposal-accept")
