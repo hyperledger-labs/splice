@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.wallet.store
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   Amulet,
   AppRewardCoupon,
+  DevelopmentFundCoupon,
   LockedAmulet,
   UnclaimedActivityRecord,
   ValidatorRewardCoupon,
@@ -90,6 +91,18 @@ trait ExternalPartyWalletStore extends TransferInputStore with NamedLogging {
   ]] =
     multiDomainAcsStore
       .listContracts(UnclaimedActivityRecord.COMPANION, limit)
+      .map(_.map(_.contract))
+
+  def listDevelopmentFundCoupons(
+      limit: Limit = Limit.DefaultLimit
+  )(implicit tc: TraceContext): Future[Seq[
+    Contract[
+      DevelopmentFundCoupon.ContractId,
+      DevelopmentFundCoupon,
+    ]
+  ]] =
+    multiDomainAcsStore
+      .listContracts(DevelopmentFundCoupon.COMPANION, limit)
       .map(_.map(_.contract))
 
   def lookupValidatorRight()(implicit
@@ -190,6 +203,10 @@ object ExternalPartyWalletStore {
           ExternalPartyWalletAcsStoreRowData(co, rewardCouponRound = Some(co.payload.round.number))
         ),
         mkFilter(UnclaimedActivityRecord.COMPANION) { co =>
+          co.payload.dso == dso &&
+          co.payload.beneficiary == externalParty
+        }(ExternalPartyWalletAcsStoreRowData(_)),
+        mkFilter(DevelopmentFundCoupon.COMPANION) { co =>
           co.payload.dso == dso &&
           co.payload.beneficiary == externalParty
         }(ExternalPartyWalletAcsStoreRowData(_)),
