@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
 import org.lfdecentralizedtrust.splice.environment.SpliceConsoleEnvironment
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AllocateAmuletResponse,
+  AllocateDevelopmentFundCouponResponse,
   GetBuyTrafficRequestStatusResponse,
   GetTransferOfferStatusResponse,
   TransferInstructionResultResponse,
@@ -600,6 +601,34 @@ abstract class WalletAppReference(
       httpCommand(HttpWalletAppClient.TokenStandard.RejectAllocationRequest(id))
     }
   }
+
+  @Help.Summary("Allocate a DevelopmentFundCoupon")
+  @Help.Description(
+    "Allocates development-fund resources by consuming UnclaimedDevelopmentFundCoupons and creating a new " +
+      "DevelopmentFundCoupon for the specified beneficiary and amount."
+  )
+  def allocateDevelopmentFundCoupon(
+      unclaimedDevelopmentFundCouponContractIds: Seq[
+        amuletCodegen.UnclaimedDevelopmentFundCoupon.ContractId
+      ],
+      beneficiary: PartyId,
+      amount: BigDecimal,
+      expiresAt: CantonTimestamp,
+      reason: String,
+      fundManager: PartyId,
+  ): AllocateDevelopmentFundCouponResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient.AllocateDevelopmentFundCouponRequest(
+          unclaimedDevelopmentFundCouponContractIds,
+          beneficiary,
+          amount,
+          expiresAt,
+          reason,
+          fundManager,
+        )
+      )
+    }
 }
 
 /** Client (aka remote) reference to a wallet app in the style of ParticipantClientReference, i.e.,

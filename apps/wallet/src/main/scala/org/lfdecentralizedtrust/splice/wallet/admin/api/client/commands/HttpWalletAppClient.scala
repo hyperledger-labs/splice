@@ -1351,4 +1351,44 @@ object HttpWalletAppClient {
     }
   }
 
+  final case class AllocateDevelopmentFundCouponRequest(
+      unclaimedDevelopmentFundCouponContractIds: Seq[
+        amuletCodegen.UnclaimedDevelopmentFundCoupon.ContractId
+      ],
+      beneficiary: PartyId,
+      amount: BigDecimal,
+      expiresAt: CantonTimestamp,
+      reason: String,
+      fundManager: PartyId,
+  ) extends InternalBaseCommand[
+        http.AllocateDevelopmentFundCouponResponse,
+        definitions.AllocateDevelopmentFundCouponResponse,
+      ] {
+    override def submitRequest(
+        client: WalletClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.AllocateDevelopmentFundCouponResponse] = client.allocateDevelopmentFundCoupon(
+      body = definitions.AllocateDevelopmentFundCouponRequest(
+        unclaimedDevelopmentFundCouponContractIds.map(_.contractId).toVector,
+        Codec.encode(beneficiary),
+        Codec.encode(amount),
+        Codec.encode(expiresAt),
+        reason,
+        Codec.encode(fundManager),
+      )
+    )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[http.AllocateDevelopmentFundCouponResponse, Either[
+      String,
+      definitions.AllocateDevelopmentFundCouponResponse,
+    ]] = { case http.AllocateDevelopmentFundCouponResponse.OK(value) =>
+      Right(value)
+    }
+  }
+
 }
