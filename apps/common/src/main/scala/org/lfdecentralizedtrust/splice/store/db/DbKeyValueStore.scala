@@ -11,7 +11,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Encoder, Json}
-import org.lfdecentralizedtrust.splice.store.{KeyValueStore, KeyValueStoreDbTableConfig}
+import org.lfdecentralizedtrust.splice.store.KeyValueStore
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import slick.jdbc.JdbcProfile
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -20,7 +20,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class DbKeyValueStore private (
     storage: DbStorage,
-    val dbTableConfig: KeyValueStoreDbTableConfig,
     val storeId: Int,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -32,9 +31,6 @@ class DbKeyValueStore private (
     with NamedLogging {
 
   val profile: JdbcProfile = storage.profile.jdbc
-  val table = dbTableConfig.tableName
-  val keyCol = dbTableConfig.keyColumnName
-  val valCol = dbTableConfig.valueColumnName
 
   override def setValue[T](key: String, value: T)(implicit
       tc: TraceContext,
@@ -43,10 +39,10 @@ class DbKeyValueStore private (
     val jsonValue: Json = value.asJson
 
     val action =
-      sql"""INSERT INTO #$table (#$keyCol, #$valCol, store_id)
+      sql"""INSERT INTO key_value_store (key, value, store_id)
         VALUES ($key, $jsonValue, $storeId)
-        ON CONFLICT (store_id, #$keyCol) DO UPDATE
-        SET #$valCol = excluded.#$valCol""".asUpdate
+        ON CONFLICT (store_id, key) DO UPDATE
+        SET value = excluded.value""".asUpdate
     val updateAction = storage.update(action, "set-validator-internal-config")
 
     logger.debug(
@@ -61,9 +57,9 @@ class DbKeyValueStore private (
 
     logger.debug(s"Retrieving config key $key")
 
-    val queryAction = sql"""SELECT #$valCol
-      FROM #$table
-      WHERE #$keyCol = $key AND store_id = $storeId
+    val queryAction = sql"""SELECT value
+      FROM key_value_store
+      WHERE key = $key AND store_id = $storeId
     """.as[Json].headOption
 
     val jsonOptionT: OptionT[FutureUnlessShutdown, Json] =
@@ -97,7 +93,7 @@ class DbKeyValueStore private (
     )
     storage
       .update(
-        sqlu"delete from #$table WHERE #$keyCol = $key AND store_id = $storeId",
+        sqlu"delete from key_value_store WHERE key = $key AND store_id = $storeId",
         "delete config key",
       )
       .map(_.discard)
@@ -108,7 +104,6 @@ object DbKeyValueStore {
 
   def apply(
       storeDescriptor: StoreDescriptor,
-      dbTableConfig: KeyValueStoreDbTableConfig,
       storage: DbStorage,
       loggerFactory: NamedLoggerFactory,
   )(implicit
@@ -123,7 +118,6 @@ object DbKeyValueStore {
       .map(storeId => {
         new DbKeyValueStore(
           storage,
-          dbTableConfig,
           storeId,
           loggerFactory,
         )

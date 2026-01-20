@@ -8,7 +8,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.store.{KeyValueStore, KeyValueStoreDbTableConfig}
+import org.lfdecentralizedtrust.splice.store.KeyValueStore
 import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -35,7 +35,6 @@ object ValidatorInternalStore {
           "validatorParty" -> validatorParty.toProtoPrimitive
         ),
       ),
-      KeyValueStoreDbTableConfig("validator_internal_config", "config_key", "config_value"),
       storage,
       loggerFactory,
     )

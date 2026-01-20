@@ -25,7 +25,7 @@ abstract class ValidatorConfigProviderTest
 
   protected def mkProvider(name: String): Future[ValidatorConfigProvider]
 
-  "ValidatorConfigProvider should" {
+  "ValidatorConfigProvider" should {
 
     val scanConfig1: Seq[ScanUrlInternalConfig] = Seq(
       ScanUrlInternalConfig("sv1", "url1"),

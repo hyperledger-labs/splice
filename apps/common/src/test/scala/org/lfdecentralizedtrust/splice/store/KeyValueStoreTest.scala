@@ -23,7 +23,6 @@ class KeyValueStoreTest
 
   private def mkStore() = KeyValueStore(
     storeDescriptor,
-    KeyValueStoreDbTableConfig("validator_internal_config", "config_key", "config_value"),
     storage,
     loggerFactory,
   )

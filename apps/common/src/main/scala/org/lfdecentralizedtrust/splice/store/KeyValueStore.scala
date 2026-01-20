@@ -14,12 +14,6 @@ import org.lfdecentralizedtrust.splice.store.db.{DbKeyValueStore, StoreDescripto
 
 import scala.concurrent.{ExecutionContext, Future}
 
-case class KeyValueStoreDbTableConfig(
-    tableName: String,
-    keyColumnName: String,
-    valueColumnName: String,
-)
-
 trait KeyValueStore extends NamedLogging {
 
   def setValue[T](key: String, value: T)(implicit
@@ -56,7 +50,6 @@ object KeyValueStore {
 
   def apply(
       descriptor: StoreDescriptor,
-      tableConfig: KeyValueStoreDbTableConfig,
       storage: DbStorage,
       loggerFactory: NamedLoggerFactory,
   )(implicit
@@ -69,7 +62,6 @@ object KeyValueStore {
       case storage: DbStorage =>
         DbKeyValueStore(
           descriptor,
-          tableConfig,
           storage,
           loggerFactory,
         )
