@@ -71,8 +71,6 @@ object ContractFetcher {
               val createdAt =
                 event.createdAt.flatMap(CantonTimestamp.fromProtoTimestamp(_).toOption)
               val ignoreBefore = clock.now.minus(getContractValidity.asJava)
-              logger
-                .debug(s"For ContractId: $id: CreatedAt: $createdAt, ignoreBefore: $ignoreBefore")
               createdAt.exists(_ > ignoreBefore)
             }
             .subflatMap { createdEvent =>
