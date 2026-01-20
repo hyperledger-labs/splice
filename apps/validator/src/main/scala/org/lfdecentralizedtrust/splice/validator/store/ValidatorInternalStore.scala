@@ -1,59 +1,40 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
-// SPDX-License-Identifier: Apache-2.0
-
 package org.lfdecentralizedtrust.splice.validator.store
 
-import cats.data.OptionT
 import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.tracing.TraceContext
-import io.circe.{Decoder, Encoder}
-import org.lfdecentralizedtrust.splice.validator.store.db.DbValidatorInternalStore
-import scala.concurrent.{ExecutionContext, Future}
-import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.store.{KeyValueStore, KeyValueStoreDbTableConfig}
+import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 
-trait ValidatorInternalStore {
-
-  def setConfig[T](key: String, value: T)(implicit
-      tc: TraceContext,
-      encoder: Encoder[T],
-  ): Future[Unit]
-
-  def getConfig[T](
-      key: String
-  )(implicit tc: TraceContext, decoder: Decoder[T]): OptionT[Future, Decoder.Result[T]]
-
-  def deleteConfig(key: String)(implicit
-      tc: TraceContext
-  ): Future[Unit]
-
-}
+import scala.concurrent.{ExecutionContext, Future}
 
 object ValidatorInternalStore {
-
   def apply(
-      participant: ParticipantId,
-      validatorParty: PartyId,
-      storage: DbStorage,
-      loggerFactory: NamedLoggerFactory,
-  )(implicit
-      ec: ExecutionContext,
-      lc: ErrorLoggingContext,
-      cc: CloseContext,
-      tc: TraceContext,
-  ): Future[ValidatorInternalStore] = {
-    storage match {
-      case storage: DbStorage =>
-        DbValidatorInternalStore(
-          participant,
-          validatorParty,
-          storage,
-          loggerFactory,
-        )
-
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-    }
+    participantId: ParticipantId,
+    validatorParty: PartyId,
+    storage: DbStorage,
+    loggerFactory: NamedLoggerFactory,
+           )(implicit
+             ec: ExecutionContext,
+             lc: ErrorLoggingContext,
+             cc: CloseContext,
+             tc: TraceContext,
+           ): Future[KeyValueStore] = {
+    KeyValueStore(
+      StoreDescriptor(
+        version = 2,
+        name = "DbValidatorInternalConfigStore",
+        party = validatorParty,
+        participant = participantId,
+        key = Map(
+          "validatorParty" -> validatorParty.toProtoPrimitive
+        ),
+      ),
+      KeyValueStoreDbTableConfig("validator_internal_config", "config_key", "config_value"),
+      storage,
+      loggerFactory
+    )
   }
 }

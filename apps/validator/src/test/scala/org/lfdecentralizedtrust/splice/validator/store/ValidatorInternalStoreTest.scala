@@ -9,7 +9,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import org.lfdecentralizedtrust.splice.store.StoreTest
+import org.lfdecentralizedtrust.splice.store.{KeyValueStore, StoreTest}
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorConfigProvider.ScanUrlInternalConfig
 import org.scalatest.matchers.should.Matchers
@@ -18,7 +18,7 @@ import scala.concurrent.Future
 
 abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with HasExecutionContext {
 
-  protected def mkStore(name: String): Future[ValidatorInternalStore]
+  protected def mkStore(name: String): Future[KeyValueStore]
 
   protected def mkProvider(name: String): Future[ValidatorConfigProvider]
 
@@ -32,8 +32,8 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
     "set and get a payload successfully" in {
       for {
         store <- mkStore("alice")
-        _ <- store.setConfig(configKey, configValue)
-        retrievedValue <- store.getConfig[String](configKey).value
+        _ <- store.setValue(configKey, configValue)
+        retrievedValue <- store.getValue[String](configKey).value
       } yield {
         retrievedValue.value.value shouldBe configValue
       }
@@ -42,7 +42,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
     "return None for a non-existent key" in {
       for {
         store <- mkStore("alice")
-        retrievedValue <- store.getConfig[String]("non-existent-key").value
+        retrievedValue <- store.getValue[String]("non-existent-key").value
       } yield {
         retrievedValue shouldBe None
       }
@@ -51,9 +51,9 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
     "update an existing payload" in {
       for {
         store <- mkStore("alice")
-        _ <- store.setConfig(configKey, configValue)
-        _ <- store.setConfig(configKey, otherValue)
-        retrievedValue <- store.getConfig[String](configKey).value
+        _ <- store.setValue(configKey, configValue)
+        _ <- store.setValue(configKey, otherValue)
+        retrievedValue <- store.getValue[String](configKey).value
       } yield {
         retrievedValue.value.value shouldBe otherValue
       }
@@ -62,11 +62,11 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
     "handle multiple different keys independently" in {
       for {
         store <- mkStore("alice")
-        _ <- store.setConfig(configKey, configValue)
-        _ <- store.setConfig(otherKey, otherValue)
+        _ <- store.setValue(configKey, configValue)
+        _ <- store.setValue(otherKey, otherValue)
 
-        configKeyValue <- store.getConfig[String](configKey).value
-        otherKeyValue <- store.getConfig[String](otherKey).value
+        configKeyValue <- store.getValue[String](configKey).value
+        otherKeyValue <- store.getValue[String](otherKey).value
       } yield {
         configKeyValue.value.value shouldBe configValue
         otherKeyValue.value.value shouldBe otherValue
@@ -76,12 +76,12 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
     "delete single key" in {
       for {
         store <- mkStore("alice")
-        _ <- store.setConfig(configKey, configValue)
-        _ <- store.setConfig(otherKey, otherValue)
+        _ <- store.setValue(configKey, configValue)
+        _ <- store.setValue(otherKey, otherValue)
 
-        _ <- store.deleteConfig(configKey)
-        configKeyValue <- store.getConfig[String](configKey).value
-        otherKeyValue <- store.getConfig[String](otherKey).value
+        _ <- store.deleteKey(configKey)
+        configKeyValue <- store.getValue[String](configKey).value
+        otherKeyValue <- store.getValue[String](otherKey).value
       } yield {
         configKeyValue shouldBe None
         otherKeyValue.value.value shouldBe otherValue
@@ -172,7 +172,7 @@ class DbValidatorInternalStoreTest
 
   override protected def timeouts = new ProcessingTimeout
 
-  private def buildDbStore(name: String): Future[ValidatorInternalStore] = {
+  private def buildDbStore(name: String): Future[KeyValueStore] = {
 
     ValidatorInternalStore(
       mkParticipantId("ValidatorInternalStoreTest"),
@@ -182,7 +182,7 @@ class DbValidatorInternalStoreTest
     )
   }
 
-  override protected def mkStore(name: String): Future[ValidatorInternalStore] =
+  override protected def mkStore(name: String): Future[KeyValueStore] =
     buildDbStore(name)
 
   override protected def mkProvider(name: String): Future[ValidatorConfigProvider] = {
