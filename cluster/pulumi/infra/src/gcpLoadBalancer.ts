@@ -157,8 +157,13 @@ function createGCPBackendPolicy(
       },
       spec: {
         default: {
-          // TODO (#2723) compare to format in cni experiment
-          securityPolicy: config.securityPolicy.selfLink,
+          securityPolicy: config.securityPolicy.name.apply(name => {
+            console.assert(
+              !name.includes('/'),
+              `${name} should be just the name, not a full resource path`
+            );
+            return name;
+          }),
         },
         targetRef: backendTargetRef(config),
       },
