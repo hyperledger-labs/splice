@@ -32,7 +32,10 @@ import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
 import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
 import org.lfdecentralizedtrust.splice.admin.http.{AdminRoutes, HttpErrorHandler}
 import org.lfdecentralizedtrust.splice.auth.*
-import org.lfdecentralizedtrust.splice.automation.{DomainParamsAutomationService, DomainTimeAutomationService}
+import org.lfdecentralizedtrust.splice.automation.{
+  DomainParamsAutomationService,
+  DomainTimeAutomationService,
+}
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
@@ -45,10 +48,19 @@ import org.lfdecentralizedtrust.splice.http.v0.validator_admin.ValidatorAdminRes
 import org.lfdecentralizedtrust.splice.http.v0.validator_public.ValidatorPublicResource
 import org.lfdecentralizedtrust.splice.http.v0.wallet.WalletResource as InternalWalletResource
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
-import org.lfdecentralizedtrust.splice.migration.{DomainDataRestorer, DomainMigrationInfo, MigrationTimeInfo, ParticipantUsersDataRestorer}
+import org.lfdecentralizedtrust.splice.migration.{
+  DomainDataRestorer,
+  DomainMigrationInfo,
+  MigrationTimeInfo,
+  ParticipantUsersDataRestorer,
+}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.{BftScanConnection, MinimalScanConnection, SingleScanConnection}
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
+  BftScanConnection,
+  MinimalScanConnection,
+  SingleScanConnection,
+}
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.setup.{NodeInitializer, ParticipantInitializer}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
@@ -58,14 +70,29 @@ import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, HistoryMetr
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.ValidatorApp.OAuthRealms
 import org.lfdecentralizedtrust.splice.validator.admin.http.*
-import org.lfdecentralizedtrust.splice.validator.automation.{ValidatorAutomationService, ValidatorPackageVettingTrigger}
+import org.lfdecentralizedtrust.splice.validator.automation.{
+  ValidatorAutomationService,
+  ValidatorPackageVettingTrigger,
+}
 import org.lfdecentralizedtrust.splice.validator.config.*
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import org.lfdecentralizedtrust.splice.validator.metrics.ValidatorAppMetrics
-import org.lfdecentralizedtrust.splice.validator.migration.{DomainMigrationDump, ParticipantPartyMigrator}
-import org.lfdecentralizedtrust.splice.validator.store.{ValidatorConfigProvider, ValidatorInternalStore, ValidatorStore}
+import org.lfdecentralizedtrust.splice.validator.migration.{
+  DomainMigrationDump,
+  ParticipantPartyMigrator,
+}
+import org.lfdecentralizedtrust.splice.validator.store.{
+  ValidatorConfigProvider,
+  ValidatorInternalStore,
+  ValidatorStore,
+}
 import org.lfdecentralizedtrust.splice.validator.util.{ValidatorScanConnection, ValidatorUtil}
-import org.lfdecentralizedtrust.splice.wallet.admin.http.{HttpExternalWalletHandler, HttpStatusWalletHandler, HttpWalletHandler, UserWalletAuthExtractor}
+import org.lfdecentralizedtrust.splice.wallet.admin.http.{
+  HttpExternalWalletHandler,
+  HttpStatusWalletHandler,
+  HttpWalletHandler,
+  UserWalletAuthExtractor,
+}
 import org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
@@ -173,9 +200,9 @@ class ValidatorApp(
               participantId,
               validatorParty = ParticipantPartyMigrator.toPartyId(
                 config.validatorPartyHint
-                .getOrElse(
-                  BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
-                ),
+                  .getOrElse(
+                    BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
+                  ),
                 participantId,
               ),
               storage,

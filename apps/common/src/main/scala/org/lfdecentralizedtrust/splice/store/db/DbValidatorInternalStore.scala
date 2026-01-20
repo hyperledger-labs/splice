@@ -34,12 +34,13 @@ class DbValidatorInternalStore private (
   val profile: JdbcProfile = storage.profile.jdbc
 
   override def setValue[T](key: String, value: T)(implicit
-                                                  tc: TraceContext,
-                                                  encoder: Encoder[T],
+      tc: TraceContext,
+      encoder: Encoder[T],
   ): Future[Unit] = {
     val jsonValue: Json = value.asJson
 
-    val action = sql"""INSERT INTO ${dbTableConfig.tableName} (${dbTableConfig.keyColumnName}, ${dbTableConfig.valueColumnName}, store_id)
+    val action =
+      sql"""INSERT INTO ${dbTableConfig.tableName} (${dbTableConfig.keyColumnName}, ${dbTableConfig.valueColumnName}, store_id)
         VALUES ($key, $jsonValue, $storeId)
         ON CONFLICT (store_id, ${dbTableConfig.keyColumnName}) DO UPDATE
         SET ${dbTableConfig.keyColumnName} = excluded.${dbTableConfig.keyColumnName}""".asUpdate
@@ -87,7 +88,7 @@ class DbValidatorInternalStore private (
   }
 
   override def deleteKey(key: String)(implicit
-                                      tc: TraceContext
+      tc: TraceContext
   ): Future[Unit] = {
     logger.debug(
       s"Deleting config key $key"

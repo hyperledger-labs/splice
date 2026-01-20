@@ -12,16 +12,16 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object ValidatorInternalStore {
   def apply(
-    participantId: ParticipantId,
-    validatorParty: PartyId,
-    storage: DbStorage,
-    loggerFactory: NamedLoggerFactory,
-           )(implicit
-             ec: ExecutionContext,
-             lc: ErrorLoggingContext,
-             cc: CloseContext,
-             tc: TraceContext,
-           ): Future[KeyValueStore] = {
+      participantId: ParticipantId,
+      validatorParty: PartyId,
+      storage: DbStorage,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      ec: ExecutionContext,
+      lc: ErrorLoggingContext,
+      cc: CloseContext,
+      tc: TraceContext,
+  ): Future[KeyValueStore] = {
     KeyValueStore(
       StoreDescriptor(
         version = 2,
@@ -34,7 +34,7 @@ object ValidatorInternalStore {
       ),
       KeyValueStoreDbTableConfig("validator_internal_config", "config_key", "config_value"),
       storage,
-      loggerFactory
+      loggerFactory,
     )
   }
 }

@@ -46,9 +46,11 @@ class ValidatorConfigProvider(config: KeyValueStore, val loggerFactory: NamedLog
       tc: TraceContext,
       ec: ExecutionContext,
   ): OptionT[Future, Set[PartyId]] = {
-    config.readValueAndLogOnDecodingFailure[PartiesBeingMigrated](migratingPartiesInternalConfigKey).map(
-      _.parties
-    )
+    config
+      .readValueAndLogOnDecodingFailure[PartiesBeingMigrated](migratingPartiesInternalConfigKey)
+      .map(
+        _.parties
+      )
   }
 
   def setPartiesToMigrate(parties: Set[PartyId])(implicit tc: TraceContext): Future[Unit] = {
