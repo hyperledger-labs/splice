@@ -1,0 +1,109 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.UnitTests.Amulet.SvStaking where
+
+import DA.Assert
+import DA.Date
+import DA.Map as Map
+import DA.Optional (fromSome)
+import DA.Set as Set
+import DA.Time
+
+import Daml.Script
+
+import Splice.Amulet.SvStaking
+
+
+-- Staking weight schedule
+--------------------------
+
+defaultStakingWeightSchedule : [(Decimal, Decimal)]
+defaultStakingWeightSchedule =
+  [ (0.2, 0.2)
+  , (0.4, 0.4)
+  , (0.6, 0.6)
+  , (0.8, 1.0)
+  ]
+
+test_stakingWeightSchedule : Script ()
+test_stakingWeightSchedule = do
+    test 0.0 0.0
+    test 0.1 0.0
+    test 0.2 0.2
+    test 0.20001 0.2
+    test 0.3 0.2
+    test 0.4 0.4
+    test 0.5 0.4
+    test 0.6 0.6
+    test 0.7 0.6
+    test 0.8 1.0
+    test 0.9 1.0
+    test 1.0 1.0
+  where
+    test stakedRatio expectedWeightRatio
+      | expectedWeightRatio == actualWeightRatio = pure ()
+      | otherwise = abort $
+          "test_stakingWeightSchedule failed for stakedRatio=" <> show stakedRatio <>
+          ": expected " <> show expectedWeightRatio <>
+          ", got " <> show actualWeightRatio
+      where
+        actualWeightRatio = getEarnedRatio defaultStakingWeightSchedule stakedRatio
+
+-- Default config and context
+-----------------------------
+
+defaultStakingConfig : StakingConfig
+defaultStakingConfig = StakingConfig with
+  stakingDelay = days 30
+  unlockDelay = days 365
+  minStakeAmount = 100_000.0
+  stakingWeightSchedule = defaultStakingWeightSchedule
+
+defaultMintingContext : SvMintingContext
+defaultMintingContext = SvMintingContext with
+  roundClosedAt = time (date 2026 Jan 1) 0 0 0
+  totalSvMintingAllowance = 1e6 -- value chosen for easy calcuations in tests
+  svWeights = Map.fromList []
+  skippedSvs = Set.empty
+
+
+-- Example: 1
+-------------------------
+sv1 : Party
+sv1 = fromSome $ partyFromText "sv1"
+
+sv1StakingState : StakerState
+sv1StakingState = StakerState with
+  config = StakerConfig with relockRatio = 0.8
+  lifetimeRewards = 1e9
+  mintingAllowance = 0.0
+  unconstrainedStake = 800e6
+  stakes = []
+
+example1_mintingContext : SvMintingContext
+example1_mintingContext = defaultMintingContext with
+  svWeights = Map.fromList [(sv1, 10.0)]
+
+example1_stakingState : StakingState
+example1_stakingState = StakingState with
+  config = defaultStakingConfig
+  stakers = Map.fromList [(sv1, sv1StakingState)]
+
+example1_expected_newSv1StakingState : StakerState
+example1_expected_newSv1StakingState = sv1StakingState with
+  lifetimeRewards = 1e9 + 1e6
+  mintingAllowance = 0.2 * 1e6
+  unconstrainedStake = 800e6 + 0.8 * 1e6
+
+example1_expected_newStakingState : StakingState
+example1_expected_newStakingState = StakingState with
+  config = defaultStakingConfig
+  stakers = Map.fromList [(sv1, example1_expected_newSv1StakingState)]
+
+test_example1 : Script ()
+test_example1 = do
+    example1_expected_newStakingState === actual_newStakingState
+  where
+    actual_newStakingState =
+      updateMintingAllowances example1_mintingContext example1_stakingState

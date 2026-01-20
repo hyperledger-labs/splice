@@ -16,7 +16,11 @@ import DA.Set as Set
 data StakingConfig = StakingConfig with
     stakingDelay : RelTime -- ^ Delay before a stake becomes active.
     unlockDelay : RelTime -- ^ Delay until a stake is fully unlocked.
-    minStakeAmount : Decimal -- ^ Minimum amount required to stake, used to avoid dust stakes.
+    minStakeAmount : Decimal
+      -- ^ Minimum amount required to stake.
+      -- Used to avoid lots of small stakes that cause a high tracking overhead.
+      --
+      -- Note: unlocks are only allowed if the remaining stake is 0.0 or >= minStakeAmount.
     stakingWeightSchedule  : [(Decimal, Decimal)] -- ^ List of (percentageLocked, percentageEarned) pairs.
   deriving (Eq, Show)
 
@@ -49,6 +53,17 @@ data StakingState = StakingState with
     --
     -- NOTE: in the actual implementation, we would maintain each of these entries as its own contract
     -- on the ledger to avoid scalability issues.
+    --
+    -- The likely implementation is one where there's DSO only state that keeps track of the
+    -- staking state; and a separate reconciliation process that updates the states visible
+    -- to stakers on a regular basis. Thereby avoiding that a staker which unvets splice-amulet
+    -- can block the reward distribution to other stakers.
+    --
+    -- The computation is likely organized using off-ledger agreement on the totals for the
+    -- third-party staking pool and then each staker's state is updated in its own transaction.
+    -- The total is computed using action-with confirmation. We exploit that the total staked
+    -- as of a particular time does not change due to the explicit time information associated
+    -- with stakes.
   deriving (Eq, Show)
 
 
@@ -161,16 +176,18 @@ addTotalAllowance totalAllowance stakerState =
 
 getEarnedRatio : [(Decimal, Decimal)] -> Decimal -> Decimal
 getEarnedRatio schedule stakedRatio =
-  case dropWhile (\(lockedRatio, _) -> stakedRatio > lockedRatio) schedule of
-    [] -> 1.0
+  case dropWhile (\(minStakedRatio, _) -> stakedRatio < minStakedRatio) (reverse schedule) of
+    [] -> 0.0
     (_, earnedRatio) :: _ -> earnedRatio
 
 
 -- Normalization of stakes
 --------------------------
 
--- NOTE: we'd expect normalization to be done whenever the staking state is updated.
--- It serves to keep the staking state constrained.
+-- NOTE: normalization is not strictly required for correctness of the staking logic.
+-- It is a potential optimization to reduce the number of stakes that need to be tracked.
+-- Care must be taken to synchronize normalization with off-ledger stake total computations for
+-- a specific round.
 
 -- | Normalize stakes as of the given time so that as many stakes as possible are absorbed
 -- into the unconstrained stake or the minting allowance.
