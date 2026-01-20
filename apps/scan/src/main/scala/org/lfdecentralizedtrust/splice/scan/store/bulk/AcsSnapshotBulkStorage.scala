@@ -71,6 +71,8 @@ class AcsSnapshotBulkStorage(
       }
   }
 
+  // TODO(#3429): once we persist the state, i.e. the last dumped snapshot, consider moving from Canton's PekkoUtil.restartSource
+  //  to Pekko's built-in RestartSource (for now, it's convenient to use Canton's ability to track state via lastEmittedElement)
   def getSource = {
     // TODO(#3429): tweak the retry parameters here
     val delay = FiniteDuration(5, "seconds")
@@ -84,7 +86,7 @@ class AcsSnapshotBulkStorage(
           logger.warn(s"Writing ACS snapshot to bulk storage failed with : ${ErrorUtil
               .messageWithStacktrace(t)}, will retry after delay of $delay from last successful timestamp $lastEmittedElement")
           // Always retry (TODO(#3429): consider a max number of retries?)
-          delay -> lastEmittedElement.fold(getStartTimestamp)(identity)
+          delay -> lastEmittedElement.fold(lastState)(identity)
         }
       }
     }
