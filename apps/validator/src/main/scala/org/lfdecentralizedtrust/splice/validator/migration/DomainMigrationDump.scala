@@ -30,7 +30,6 @@ final case class DomainMigrationDump(
     createdAt: Instant,
     // true if we exported for a proper migration, false for DR.
     synchronizerWasPaused: Boolean,
-    acsFormat: http.DomainMigrationDump.AcsFormat,
 ) extends PrettyPrinting {
   override def pretty: Pretty[DomainMigrationDump.this.type] =
     Pretty.prettyNode(
@@ -63,7 +62,7 @@ final case class DomainMigrationDump(
     createdAt = createdAt.toString,
     synchronizerWasPaused = Some(synchronizerWasPaused),
     separatePayloadFiles = Some(outputDirectory.isDefined),
-    acsFormat = Some(acsFormat),
+    acsFormat = Some(http.DomainMigrationDump.AcsFormat.LedgerApi),
   )
 }
 
@@ -94,6 +93,12 @@ object DomainMigrationDump {
       Dar(dar.hash, ByteString.copyFrom(decoded))
     }
     createdAt = Instant.parse(response.createdAt)
+    _ <- response.acsFormat.getOrElse(http.DomainMigrationDump.AcsFormat.AdminApi) match {
+      case http.DomainMigrationDump.AcsFormat.members.AdminApi =>
+        Left("Admin API ACS Format is unsupported since splice 0.5")
+      case http.DomainMigrationDump.AcsFormat.members.LedgerApi =>
+        Right(())
+    }
   } yield DomainMigrationDump(
     domainId = domainId,
     migrationId = migrationId,
@@ -104,6 +109,5 @@ object DomainMigrationDump {
     dars = dars,
     createdAt = createdAt,
     synchronizerWasPaused = response.synchronizerWasPaused.getOrElse(false),
-    acsFormat = response.acsFormat.getOrElse(http.DomainMigrationDump.AcsFormat.AdminApi),
   )
 }
