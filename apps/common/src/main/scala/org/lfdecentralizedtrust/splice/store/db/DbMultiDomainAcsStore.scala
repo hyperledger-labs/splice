@@ -115,7 +115,7 @@ final class DbMultiDomainAcsStore[TXE](
   import profile.api.jdbcActionExtensionMethods
 
   override lazy val storeName = acsStoreDescriptor.name
-  override lazy val storeParty = acsStoreDescriptor.party.toString
+  override lazy val storeParty = acsStoreDescriptor.party
 
   override protected def metricsFactory: LabeledMetricsFactory = retryProvider.metricsFactory
   override lazy val metrics = new StoreMetrics(metricsFactory)(mc)
