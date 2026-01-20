@@ -42,7 +42,7 @@ class ValidatorSequencerConnectionIntegrationTest
                 global = c.domains.global.copy(
                   trustedSynchronizerConfig = Some(
                     ValidatorTrustedSynchronizerConfig(
-                      sequencerNames = NonEmptyList.of(getSvName(1), getSvName(2), getSvName(3)),
+                      svNames = NonEmptyList.of(getSvName(1), getSvName(2), getSvName(3)),
                       threshold = 2,
                     )
                   )
@@ -56,7 +56,7 @@ class ValidatorSequencerConnectionIntegrationTest
       )
       .withManualStart
 
-  "validator with 'sequencerNames' set in config connects to specified sequencers and tracks URL changes of sequencers" in {
+  "validator with 'svNames' set in config connects to specified sequencers and tracks URL changes of sequencers" in {
     implicit env =>
       startAllSync(
         sv1Backend,
