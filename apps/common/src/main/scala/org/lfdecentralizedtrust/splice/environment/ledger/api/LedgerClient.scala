@@ -201,7 +201,7 @@ private[environment] class LedgerClient(
   def getContract(contractId: ContractId[?], queryingParties: Seq[PartyId])(implicit
       tc: TraceContext
   ): Future[Option[CreatedEvent]] = {
-    for {
+    (for {
       stub <- withCredentialsAndTraceContext(contractServiceStub)
       contract <- stub.getContract(
         new lapi.contract_service.GetContractRequest(
@@ -209,7 +209,10 @@ private[environment] class LedgerClient(
           queryingParties.map(_.toProtoPrimitive),
         )
       )
-    } yield contract.createdEvent
+    } yield contract.createdEvent).recover {
+      case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
+        None
+    }
   }
 
   def updates(
