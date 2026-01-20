@@ -1,6 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.daml.ledger.javaapi.data.Identifier
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedDevelopmentFundCoupon
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
@@ -11,6 +13,8 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
 import org.lfdecentralizedtrust.splice.util.{TriggerTestUtil, WalletTestUtil}
 
+import java.time.Duration
+
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_21
 class DevelopmentFundCouponIntegrationTest
     extends SvIntegrationTestBase
@@ -18,6 +22,12 @@ class DevelopmentFundCouponIntegrationTest
     with WalletTestUtil {
 
   private val threshold = 3
+
+  override protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq(
+    UnclaimedDevelopmentFundCoupon.TEMPLATE_ID_WITH_PACKAGE_ID
+  )
+
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   override def environmentDefinition
       : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
@@ -93,6 +103,63 @@ class DevelopmentFundCouponIntegrationTest
           couponAmount.multiply(new java.math.BigDecimal(3)),
           couponAmount.multiply(new java.math.BigDecimal(3)),
         )
+      },
+    )
+  }
+
+  "DevelopmentFundCoupons management flow" in { implicit env =>
+    val sv1UserId = sv1WalletClient.config.ledgerApiUser
+    val unclaimedDevelopmentFundCouponsToMint = Seq(10.0, 10.0, 30.0, 30.0)
+    val unclaimedDevelopmentFundCouponTotal = unclaimedDevelopmentFundCouponsToMint.sum
+    val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+    val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+    val fundManager = aliceParty
+    val beneficiary = bobParty
+    val developmentFundCouponAmount = 40.0
+    val expiresAt = CantonTimestamp.now().plus(Duration.ofDays(1))
+    val reason = "Bob has contributed to the Daml repo"
+
+    val unclaimedDevelopmentFundCouponContractIds =
+      clue("Mint some unclaimed development fund coupons") {
+        unclaimedDevelopmentFundCouponsToMint.foreach { amount =>
+          createUnclaimedDevelopmentFundCoupon(
+            sv1ValidatorBackend.participantClientWithAdminToken,
+            sv1UserId,
+            amount,
+          )
+        }
+        val unclaimedDevelopmentFundCouponContracts =
+          sv1Backend.participantClient.ledger_api_extensions.acs
+            .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
+        unclaimedDevelopmentFundCouponContracts
+          .map(co => BigDecimal(co.data.amount))
+          .sum shouldBe unclaimedDevelopmentFundCouponTotal
+        unclaimedDevelopmentFundCouponContracts.map(_.id)
+      }
+
+    actAndCheck(
+      "allocate one development fund coupon", {
+        aliceWalletClient.allocateDevelopmentFundCoupon(
+          unclaimedDevelopmentFundCouponContractIds,
+          beneficiary,
+          developmentFundCouponAmount,
+          expiresAt,
+          reason,
+          fundManager,
+        )
+      },
+    )(
+      "One development fund coupon is allocated and the total of unclaimed development fund coupons has decreased",
+      _ => {
+        val activeDevelopmentFundCoupons =
+          aliceWalletClient.listActiveDevelopmentFundCoupons().map(_.payload)
+        activeDevelopmentFundCoupons.length shouldBe 1
+        val bobDevelopmentFundCoupon = activeDevelopmentFundCoupons.head
+        bobDevelopmentFundCoupon.amount shouldBe developmentFundCouponAmount
+        sv1Backend.participantClient.ledger_api_extensions.acs
+          .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
+          .map(co => BigDecimal(co.data.amount))
+          .sum shouldBe (unclaimedDevelopmentFundCouponTotal - developmentFundCouponAmount)
       },
     )
   }
