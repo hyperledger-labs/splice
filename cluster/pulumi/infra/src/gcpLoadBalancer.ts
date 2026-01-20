@@ -44,15 +44,6 @@ function createL7Gateway(
   config: L7GatewayConfig,
   opts?: pulumi.CustomResourceOptions
 ): k8s.apiextensions.CustomResource {
-  // name itself yields something like
-  // Error GWCER106: Gateway "cluster-ingress/cn-gke-l7-gateway" is invalid, err: address "cn-scratchdnet-ip" does not exist.
-  const addressesValue = pulumi
-    .all([config.ingressAddress.name, config.ingressAddress.region, config.ingressAddress.project])
-    .apply(([name, region, project]) =>
-      region
-        ? `projects/${project}/regions/${region}/addresses/${name}`
-        : `projects/${project}/global/addresses/${name}`
-    );
   return new k8s.apiextensions.CustomResource(
     config.gatewayName,
     {
@@ -109,7 +100,7 @@ function createL7Gateway(
         ],
         // per gateway Error GWCER106: unsupported address type "IPAddress",
         // only "NamedAddress" is supported
-        addresses: [{ type: 'NamedAddress', value: addressesValue }],
+        addresses: [{ type: 'NamedAddress', value: config.ingressAddress.name }],
       },
     },
     opts
