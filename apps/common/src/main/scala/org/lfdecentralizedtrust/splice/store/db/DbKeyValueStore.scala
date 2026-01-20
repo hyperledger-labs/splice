@@ -38,8 +38,7 @@ class DbKeyValueStore private (
   ): Future[Unit] = {
     val jsonValue: Json = value.asJson
 
-    val action =
-      sql"""INSERT INTO key_value_store (key, value, store_id)
+    val action = sql"""INSERT INTO key_value_store (key, value, store_id)
         VALUES ($key, $jsonValue, $storeId)
         ON CONFLICT (store_id, key) DO UPDATE
         SET value = excluded.value""".asUpdate
