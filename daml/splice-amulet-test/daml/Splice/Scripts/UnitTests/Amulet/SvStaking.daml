@@ -70,6 +70,7 @@ defaultMintingContext = SvMintingContext with
 
 -- Example: 1
 -------------------------
+
 sv1 : Party
 sv1 = fromSome $ partyFromText "sv1"
 
@@ -107,3 +108,132 @@ test_example1 = do
   where
     actual_newStakingState =
       updateMintingAllowances example1_mintingContext example1_stakingState
+
+-- Example: 2
+-------------------------
+
+sv2 : Party
+sv2 = fromSome $ partyFromText "sv2"
+
+sv2StakingState : StakerState
+sv2StakingState = StakerState with
+  config = StakerConfig with relockRatio = 0.4
+  lifetimeRewards = 1e9
+  mintingAllowance = 0.0
+  unconstrainedStake = 400e6
+  stakes = []
+
+example2_mintingContext : SvMintingContext
+example2_mintingContext = defaultMintingContext with
+  svWeights = Map.fromList [(sv2, 10.0)]
+
+example2_stakingState : StakingState
+example2_stakingState = StakingState with
+  config = defaultStakingConfig
+  stakers = Map.fromList [(sv2, sv2StakingState)]
+
+example2_expected_newSv2StakingState : StakerState
+example2_expected_newSv2StakingState = sv2StakingState with
+    lifetimeRewards = 1e9 + sv2Allowance
+    mintingAllowance = 0.6 * sv2Allowance
+    unconstrainedStake = 400e6 + 0.4 * sv2Allowance
+  where
+    sv2Allowance = 1e6 * 0.4
+
+example2_expected_newStakingState : StakingState
+example2_expected_newStakingState = StakingState with
+  config = defaultStakingConfig
+  stakers = Map.fromList [(sv2, example2_expected_newSv2StakingState)]
+
+test_example2 : Script ()
+test_example2 = do
+    example2_expected_newStakingState === actual_newStakingState
+  where
+    actual_newStakingState =
+      updateMintingAllowances example2_mintingContext example2_stakingState
+
+
+-- Example: 3  --  two-third party stakers with a 1:3 split of staked CC
+------------------------------------------------------------------------
+
+staker1 : Party
+staker1 = fromSome $ partyFromText "staker1"
+
+staker2 : Party
+staker2 = fromSome $ partyFromText "staker2"
+
+example3_mintingContext : SvMintingContext
+example3_mintingContext = defaultMintingContext with
+  svWeights = Map.fromList [(sv2, 10.0)]
+
+example3_stakingState : StakingState
+example3_stakingState = StakingState with
+  config = defaultStakingConfig
+  stakers = Map.fromList
+    [ (sv2, sv2StakingState)
+    , (staker1, StakerState with
+        config = StakerConfig with relockRatio = 0.5
+        lifetimeRewards = 500e6
+        mintingAllowance = 0.0
+        unconstrainedStake = 300e6
+        stakes = []
+      )
+    , (staker2, StakerState with
+        config = StakerConfig with relockRatio = 0.2
+        lifetimeRewards = 200e6
+        mintingAllowance = 0.0
+        unconstrainedStake = 100e6
+        stakes = []
+      )
+    ]
+
+example3_expected_newSv2StakingState : StakerState
+example3_expected_newSv2StakingState = sv2StakingState with
+    lifetimeRewards = 1e9 + sv2Allowance
+    mintingAllowance = 0.6 * sv2Allowance
+    unconstrainedStake = 400e6 + 0.4 * sv2Allowance
+  where
+    sv2Allowance = 1e6 * 0.4
+
+example3_expected_newStaker1StakingState : StakerState
+example3_expected_newStaker1StakingState = StakerState with
+    config = StakerConfig with relockRatio = 0.5
+    lifetimeRewards = 500e6 + staker1Allowance
+    mintingAllowance = 0.5 * staker1Allowance
+    unconstrainedStake = 300e6 + 0.5 * staker1Allowance
+    stakes = []
+  where
+    thirdPartyPool = 1e6 * 0.6
+    staker1Allowance = thirdPartyPool * (300e6 / 400e6)
+
+example3_expected_newStaker2StakingState : StakerState
+example3_expected_newStaker2StakingState = StakerState with
+    config = StakerConfig with relockRatio = 0.2
+    lifetimeRewards = 200e6 + staker2Allowance
+    mintingAllowance = 0.8 * staker2Allowance
+    unconstrainedStake = 100e6 + 0.2 * staker2Allowance
+    stakes = []
+  where
+    thirdPartyPool = 1e6 * 0.6
+    staker2Allowance = thirdPartyPool * (100e6 / 400e6)
+
+example3_expected_newStakingState : StakingState
+example3_expected_newStakingState = StakingState with
+  config = defaultStakingConfig
+  stakers = Map.fromList
+    [ (sv2, example3_expected_newSv2StakingState)
+    , (staker1, example3_expected_newStaker1StakingState)
+    , (staker2, example3_expected_newStaker2StakingState)
+    ]
+
+test_example3 : Script ()
+test_example3 = do
+    example3_expected_newStakingState === actual_newStakingState
+  where
+    actual_newStakingState =
+      updateMintingAllowances example3_mintingContext example3_stakingState
+
+
+
+-- TODO: add an example where some stakes are unlocked or freshly locked
+-- TODO: add an example with multiple SVs

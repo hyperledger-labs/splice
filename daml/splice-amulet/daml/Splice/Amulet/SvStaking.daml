@@ -123,9 +123,12 @@ updateMintingAllowances context stakingState =
     -- compute split of minting allowance between staking pool and SV pool
     stakingPoolWeight = sum [ unearnedWeight | (_, unearnedWeight) <- Map.values adjustedSvWeights ]
     svPoolWeight = sum [ earnedWeight | (earnedWeight, _) <- Map.values adjustedSvWeights ]
+    totalWeight = stakingPoolWeight + svPoolWeight
 
     stakingPoolMintingAllowance : Decimal
-    stakingPoolMintingAllowance = context.totalSvMintingAllowance * stakingPoolWeight / (stakingPoolWeight + svPoolWeight)
+    stakingPoolMintingAllowance
+      | totalWeight <= 0.0 = context.totalSvMintingAllowance
+      | otherwise = (context.totalSvMintingAllowance * stakingPoolWeight) / totalWeight
 
     svPoolMintingAllowance : Decimal
     svPoolMintingAllowance = context.totalSvMintingAllowance - stakingPoolMintingAllowance
@@ -134,9 +137,7 @@ updateMintingAllowances context stakingState =
     totalThirdPartyStake = sum $ do
       (staker, stakerState) <- Map.toList stakingState.stakers
       guard (not (Map.member staker adjustedSvWeights))
-      stake <- stakerState.stakes
-      guard (isStaked stake)
-      pure stake.amount
+      pure (getStakedAmount stakerState)
 
     mintingAllowancePerSvWeight : Decimal
     mintingAllowancePerSvWeight
@@ -161,6 +162,7 @@ updateMintingAllowances context stakingState =
               -- Note that an SV staker that is offboarded from the SVs will become a third-party staker.
               let stakedAmount = getStakedAmount stakerState
                   totalAllowance = stakingPoolMintingAllowance * (stakedAmount / totalThirdPartyStake)
+                  -- TODO: double-check that division by zero is not possible here; it should not as the stakedAmount is added to the totalThirdPartyStake
               in
                 addTotalAllowance totalAllowance stakerState
 
