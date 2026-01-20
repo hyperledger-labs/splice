@@ -148,6 +148,8 @@ function createGCPBackendPolicy(
       },
       spec: {
         default: {
+          // TODO (#2723) cloudArmor.ts creates a global security policy but GKE appears to search for a regional one
+          // SetSecurityPolicy: Invalid value for field 'resource': '{  "securityPolicy": "https://www.googleapis.com/compute/beta/projects/da-cn-scratchnet/regions/us-c...'. The given security policy does not exist
           securityPolicy: config.securityPolicy.name.apply(name => {
             console.assert(
               !name.includes('/'),
