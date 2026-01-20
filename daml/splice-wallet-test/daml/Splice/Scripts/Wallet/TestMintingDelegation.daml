@@ -74,6 +74,15 @@ testMintingDelegation = do
     reason = ""
     expiresAt = now `addRelTime` days 60
 
+  let developmentFundCouponAmount = 50.0
+  developmentFundCouponCid <- submit app.dso $ createCmd DevelopmentFundCoupon with
+    dso = app.dso
+    beneficiary = beneficiary
+    fundManager = app.dso
+    amount = developmentFundCouponAmount
+    expiresAt = now `addRelTime` days 60
+    reason = "Test development fund coupon"
+
   -- Wait for rounds to advance so coupons can be minted
   runNextIssuance app
   runNextIssuance app
@@ -96,7 +105,8 @@ testMintingDelegation = do
         InputValidatorLivenessActivityRecord livenessActivityRecordCid,
         InputAppRewardCoupon appRewardCouponCid,
         InputValidatorRewardCoupon validatorRewardCouponCid,
-        InputUnclaimedActivityRecord unclaimedActivityRecordCid
+        InputUnclaimedActivityRecord unclaimedActivityRecordCid,
+        InputDevelopmentFundCoupon developmentFundCouponCid
       ]
     context = PaymentTransferContext with
       context
@@ -111,7 +121,7 @@ testMintingDelegation = do
   let expectedValidatorFaucetAmount = getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingRound
   let expectedAppReward = appRewardCouponAmount * issuingRound.issuancePerUnfeaturedAppRewardCoupon
   let expectedValidatorReward = validatorRewardCouponAmount * issuingRound.issuancePerValidatorRewardCoupon
-  let expectedTotal = expectedValidatorFaucetAmount + expectedAppReward + expectedValidatorReward + unclaimedRewardCouponAmount
+  let expectedTotal = expectedValidatorFaucetAmount + expectedAppReward + expectedValidatorReward + unclaimedRewardCouponAmount + developmentFundCouponAmount
 
   require ("Combined reward should match expected " <> show expectedTotal <> ", got: " <> show reward)
     (reward >= expectedTotal - 1.0 && reward <= expectedTotal + 1.0)
