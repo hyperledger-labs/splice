@@ -629,6 +629,20 @@ abstract class WalletAppReference(
         )
       )
     }
+
+  @Help.Summary("List active development fund coupons")
+  @Help.Description(
+    "List all active development fund coupons for the configured user acting as a beneficiary or development fund manager"
+  )
+  def listActiveDevelopmentFundCoupons(): Seq[
+    Contract[
+      amuletCodegen.DevelopmentFundCoupon.ContractId,
+      amuletCodegen.DevelopmentFundCoupon,
+    ]
+  ] =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.ListActiveDevelopmentFundCoupons)
+    }
 }
 
 /** Client (aka remote) reference to a wallet app in the style of ParticipantClientReference, i.e.,

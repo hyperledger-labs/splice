@@ -1391,4 +1391,32 @@ object HttpWalletAppClient {
     }
   }
 
+  case object ListActiveDevelopmentFundCoupons
+      extends InternalBaseCommand[
+        http.ListActiveDevelopmentFundCouponsResponse,
+        Seq[
+          Contract[
+            amuletCodegen.DevelopmentFundCoupon.ContractId,
+            amuletCodegen.DevelopmentFundCoupon,
+          ]
+        ],
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListActiveDevelopmentFundCouponsResponse] =
+      client.listActiveDevelopmentFundCoupons(headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListActiveDevelopmentFundCouponsResponse.OK(response) =>
+      response.activeDevelopmentFundCoupons
+        .traverse(req => Contract.fromHttp(amuletCodegen.DevelopmentFundCoupon.COMPANION)(req))
+        .leftMap(_.toString)
+    }
+  }
+
 }

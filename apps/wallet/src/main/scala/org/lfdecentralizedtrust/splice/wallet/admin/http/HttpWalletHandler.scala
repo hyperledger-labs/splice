@@ -1362,4 +1362,17 @@ class HttpWalletHandler(
       )
     }
   }
+
+  override def listActiveDevelopmentFundCoupons(
+      respond: v0.WalletResource.ListActiveDevelopmentFundCouponsResponse.type
+  )()(
+      tuser: WalletUserRequest
+  ): Future[v0.WalletResource.ListActiveDevelopmentFundCouponsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+    listContracts(
+      amuletCodegen.DevelopmentFundCoupon.COMPANION,
+      userWallet.store,
+      d0.ListActiveDevelopmentFundCouponsResponse(_),
+    )
+  }
 }
