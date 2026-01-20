@@ -634,7 +634,7 @@ class SvApp(
             val errorHandler = new HttpErrorHandler(loggerFactory)
             def buildOperation(service: String, operation: String) = {
               metrics.httpServerMetrics
-                .withMetrics(service)(operation)
+                .withMetrics(service)(operation)(traceContext)
                 .tflatMap(_ => {
                   httpRateLimiter.withRateLimit(service)(operation).tflatMap { _ =>
                     config.parameters.customTimeouts.get(operation) match {
