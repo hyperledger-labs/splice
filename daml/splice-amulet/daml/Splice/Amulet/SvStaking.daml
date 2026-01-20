@@ -4,99 +4,110 @@
 -- | Staking for the SV rewards tranche Splice Amulet.
 module Splice.Amulet.SvStaking where
 
-import DA.Action.State (State, runState)
 import DA.Map as Map
 import DA.Time
 import DA.Set as Set
 
+
+-- Data types
+-------------
+
+-- | DSO level configuration for SV staking.
 data StakingConfig = StakingConfig with
     stakingDelay : RelTime -- ^ Delay before a stake becomes active.
     unlockDelay : RelTime -- ^ Delay until a stake is fully unlocked.
     minStakeAmount : Decimal -- ^ Minimum amount required to stake, used to avoid dust stakes.
+    stakingWeightSchedule  : [(Decimal, Decimal)] -- ^ List of (percentageLocked, percentageEarned) pairs.
   deriving (Eq, Show)
 
+-- | Configuration determined by each staker for their own stakes.
 data StakerConfig = StakerConfig with
     relockRatio : Decimal -- ^ Ratio of unlocked stake that is automatically relocked. Most be in [0.0, 1.0].
   deriving (Eq, Show)
 
+-- | State of an individual staker.
 data StakerState = StakerState with
-    config :  StakerConfig
+    config :  StakerConfig -- ^ Configuration chosen by the staker.
     lifetimeRewards : Decimal -- ^ Total lifetime rewards earned by the staker.
     mintingAllowance : Decimal -- ^ Unused minting allowance for SV rewards.
     unconstrainedStake : Decimal -- ^ Amount of stake that is not currently locked or constrained.
     stakes : [Stake] -- ^ Stakes with constraints.
   deriving (Eq, Show)
 
+-- | An individual stake with its associated metadata.
 data Stake = Stake with
     amount : Decimal
-    stakedAt : Time
-    requestedUnlockAt : Optional Time
+    stakedAt : Time -- ^ When the stake was created.
+    requestedUnlockAt : Optional Time -- ^ When an unlock was requested, if any.
   deriving (Eq, Show)
 
+-- | State of the SV staking system.
 data StakingState = StakingState with
-    config : StakingConfig
+    config : StakingConfig -- ^ Global staking configuration.
     stakers : Map Party StakerState
+    -- ^ State per staker.
+    --
+    -- NOTE: in the actual implementation, we would maintain each of these entries as its own contract
+    -- on the ledger to avoid scalability issues.
   deriving (Eq, Show)
 
-type SvWeights = Map Party Decimal
-type SvMintingAllowance = Map Party Decimal
-type StakingWeightSchedule = [(Decimal, Decimal)] -- ^ List of (percentageLocked, percentageEarned) pairs.
 
+-- Reward calculation
+---------------------
 
-
+-- | Context information required to compute SV minting allowances.
 data SvMintingContext = SvMintingContext with
     roundClosedAt : Time -- ^ Time when the mining round was closed. Used to determine eligibility of stakes.
-    getEarnedRatio : Decimal -> Decimal -- ^ Function to compute earned percentage from locked percentage.
     totalSvMintingAllowance : Decimal
-    svWeights : SvWeights
-    skipSv : Party -> Bool -- ^ Function to determine whether to ignore a given SV staker; e.g., due to unavailability during the round.
+    svWeights : Map Party Decimal -- ^ Weights of SV parties configured as part of DSO governance.
+    skippedSvs : Set Party -- ^ SVs to skip for this round; e.g.. due to being unavailable.
 
+-- | Update the minting allowances of all stakers based on their stakes to
+-- reflect their new minting allowance for a minting round.
 updateMintingAllowances : SvMintingContext -> StakingState -> StakingState
 updateMintingAllowances context stakingState =
     stakingState with
-      stakers = Map.mapWithKey updateStakerState stakingState.stakers
+      stakers = Map.fromList $ map updateStakerState $ Map.toList stakingState.stakers
   where
+    -- evaluate all time-dependent conditions at the round closing time
     now = context.roundClosedAt
-
-    -- determine locked stake per staker
-    stakerLockedAmounts : Map Party Decimal
-    stakerLockedAmounts = Map.map computeLockedAmount stakingState.stakers
-
-    computeLockedAmount : StakerState -> Decimal
-    computeLockedAmount stakerState = sum $ map amount $ filter isLocked stakerState.stakes
-
-    unlockDelay = stakingState.config.unlockDelay
 
     isStaked : Stake -> Bool
     isStaked stake =
       stake.stakedAt `addRelTime` stakingState.config.stakingDelay <= now &&
       case stake.requestedUnlockAt of
         None -> True
-        Some t -> now < t `addRelTime` unlockDelay
+        Some unlockRequestedAt ->
+          now < unlockRequestedAt `addRelTime` stakingState.config.unlockDelay
 
-    isSvStaker : Party -> Bool
-    isSvStaker sv = Map.member sv context.svWeights
+    getStakedAmount : StakerState -> Decimal
+    getStakedAmount stakerState =
+      stakerState.unconstrainedStake + sum do
+        stake <- stakerState.stakes
+        guard (isStaked stake)
+        pure stake.amount
 
     -- determine forward earned and unearned SV weigths per SV staker
-    svWeights : Map Party (Decimal, Decimal) -- (earnedWeight, unearnedWeight)
-    svWeights = Map.fromList $ do
-      (sv, weight) <- Map.toList svWeights
-      if context.skipSv sv
-        then pure (sv, (0.0, weight))
+    adjustedSvWeights : Map Party (Decimal, Decimal) -- (earnedWeight, unearnedWeight)
+    adjustedSvWeights = Map.fromList $ do
+      (sv, weight) <- Map.toList context.svWeights
+      if Set.member sv context.skippedSvs
+        then pure (sv, (0.0, weight)) -- weight of a skipped SV staker goes entirely to unearned weight
         else case Map.lookup sv stakingState.stakers of
           None -> pure (sv, (0.0, weight))
-          Some stakerState ->
-            let lockedAmount = computeLockedAmount stakerState
-            let lockedRatio
+          Some stakerState -> do
+            let stakedAmount = getStakedAmount stakerState
+            let stakedRatio
                   | stakerState.lifetimeRewards == 0.0 = 1.0
-                  | otherwise = min 1.0 (lockedAmount / stakerState.lifetimeRewards)
-            let earnedRatio = getEarnedRatio lockedRatio
+                  | otherwise = min 1.0 (stakedAmount / stakerState.lifetimeRewards)
+            let earnedRatio = getEarnedRatio stakingState.config.stakingWeightSchedule stakedRatio
             let earnedWeight = weight * earnedRatio
             let unearnedWeight = weight - earnedWeight
             pure (sv, (earnedWeight, unearnedWeight))
 
-    stakingPoolWeight = sum [ unearnedWeight | (_, (_, unearnedWeight)) <- Map.toList svWeights ]
-    svPoolWeight = sum [ earnedWeight | (_, (earnedWeight, _)) <- Map.toList svWeights ]
+    -- compute split of minting allowance between staking pool and SV pool
+    stakingPoolWeight = sum [ unearnedWeight | (_, unearnedWeight) <- Map.values adjustedSvWeights ]
+    svPoolWeight = sum [ earnedWeight | (earnedWeight, _) <- Map.values adjustedSvWeights ]
 
     stakingPoolMintingAllowance : Decimal
     stakingPoolMintingAllowance = context.totalSvMintingAllowance * stakingPoolWeight / (stakingPoolWeight + svPoolWeight)
@@ -104,9 +115,10 @@ updateMintingAllowances context stakingState =
     svPoolMintingAllowance : Decimal
     svPoolMintingAllowance = context.totalSvMintingAllowance - stakingPoolMintingAllowance
 
+    -- compute allowance params
     totalThirdPartyStake = sum $ do
       (staker, stakerState) <- Map.toList stakingState.stakers
-      guard (not (isSvStaker staker))
+      guard (not (Map.member staker adjustedSvWeights))
       stake <- stakerState.stakes
       guard (isStaked stake)
       pure stake.amount
@@ -116,55 +128,81 @@ updateMintingAllowances context stakingState =
       | svPoolWeight > 0.0 = svPoolMintingAllowance / svPoolWeight
       | otherwise = 0.0
 
+    -- update staker state with new minting allowances
+    updateStakerState : (Party, StakerState) -> (Party, StakerState)
+    updateStakerState (staker, stakerState) =
+        (staker, newStakerState)
+      where
+        newStakerState =
+          case Map.lookup staker adjustedSvWeights of
+            -- SV staker: issue for earned weight only
+            Some (earnedWeight, _) ->
+              let totalAllowance = earnedWeight * mintingAllowancePerSvWeight
+              in
+                  addTotalAllowance totalAllowance stakerState
 
-    updateStakerState : Party -> StakerState -> StakerState
-    updateStakerState staker stakerState =
-      case Map.lookup staker svWeights of
-        Some (earnedWeight, _) ->
-          let totalAllowance = earnedWeight * mintingAllowancePerSvWeight
-          let relockAmount = totalAllowance * stakerState.config.relockRatio
-          let mintAmount = totalAllowance - relockAmount
-          in
-            StakerState with
-              config = stakerState.config
-              stakes = stakerState.stakes
-              lifetimeRewards = stakerState.lifetimeRewards + totalAllowance
-              mintingAllowance = stakerState.mintingAllowance + mintAmount
-              unconstrainedStake = stakerState.unconstrainedStake + relockAmount
+            None ->
+              -- Third-party staker: issue from staking pool for their part of the total pool stake
+              -- Note that an SV staker that is offboarded from the SVs will become a third-party staker.
+              let stakedAmount = getStakedAmount stakerState
+                  totalAllowance = stakingPoolMintingAllowance * (stakedAmount / totalThirdPartyStake)
+              in
+                addTotalAllowance totalAllowance stakerState
 
-        None ->
-          let totalStake = stakerState.unconstrainedStake + sum [ stake.amount | stake <- stakerState.stakes, isStaked stake ]
-          let totalAllowance = stakingPoolMintingAllowance * (totalStake / totalThirdPartyStake)
-          let relockAmount = totalAllowance * stakerState.config.relockRatio
-          let mintAmount = totalAllowance - relockAmount
-          in
-            StakerState with
-              config = stakerState.config
-              stakes = stakerState.stakes
-              lifetimeRewards = stakerState.lifetimeRewards + totalAllowance
-              mintingAllowance = stakerState.mintingAllowance + mintAmount
-              unconstrainedStake = stakerState.unconstrainedStake + relockAmount
+addTotalAllowance : Decimal -> StakerState -> StakerState
+addTotalAllowance totalAllowance stakerState =
+    stakerState with
+      lifetimeRewards = stakerState.lifetimeRewards + totalAllowance
+      mintingAllowance = stakerState.mintingAllowance + mintAmount
+      unconstrainedStake = stakerState.unconstrainedStake + relockAmount
+  where
+    relockAmount = totalAllowance * stakerState.config.relockRatio
+    mintAmount = totalAllowance - relockAmount
 
+getEarnedRatio : [(Decimal, Decimal)] -> Decimal -> Decimal
+getEarnedRatio schedule stakedRatio =
+  case dropWhile (\(lockedRatio, _) -> stakedRatio > lockedRatio) schedule of
+    [] -> 1.0
+    (_, earnedRatio) :: _ -> earnedRatio
+
+
+-- Normalization of stakes
+--------------------------
+
+-- NOTE: we'd expect normalization to be done whenever the staking state is updated.
+-- It serves to keep the staking state constrained.
+
+-- | Normalize stakes as of the given time so that as many stakes as possible are absorbed
+-- into the unconstrained stake or the minting allowance.
+normalizeStakingStateAsOf : Time -> StakingState -> StakingState
+normalizeStakingStateAsOf now stakingState =
+    stakingState with
+      stakers = fmap (normalizeStakesAsOf now stakingState.config) stakingState.stakers
 
 -- | Normalize stakes as of the given time so that as many stakes as possible are absorbed
 -- into the unconstrained stake or the minting allowance.
 normalizeStakesAsOf : Time -> StakingConfig -> StakerState -> StakerState
-normalizeStakesAsOf now stakingConfig stakingState =
+normalizeStakesAsOf now stakingConfig stakerState =
     newStakingState with
       stakes = reverse newStakingState.stakes
   where
-    newStakingState = foldl normalize (stakingState with stakes = []) stakingState.stakes
+    newStakingState = foldl normalize (stakerState with stakes = []) stakerState.stakes
 
-    normalize : StakingState -> Stake -> StakingState
-    normalize stakingState stake
+    isUnlocked : Stake -> Bool
+    isUnlocked stake =
+      case stake.requestedUnlockAt of
+        None -> False
+        Some unlockRequestedAt ->
+          unlockRequestedAt `addRelTime` stakingConfig.unlockDelay <= now
+
+    normalize : StakerState -> Stake -> StakerState
+    normalize stakerState stake
       | isUnlocked stake =
-          stakingState with
-            mintingAllowance = stakingState.mintingAllowance + stake.amount
+          stakerState with
+            mintingAllowance = stakerState.mintingAllowance + stake.amount
       | now <= stake.stakedAt `addRelTime` stakingConfig.stakingDelay =
-          stakingState with
-            unconstrainedStake = stakingState.unconstrainedStake + stake.amount
+          stakerState with
+            unconstrainedStake = stakerState.unconstrainedStake + stake.amount
       | otherwise =
-          stakingState with
-            stakes = stake :: stakingState.stakes
-
-
+          stakerState with
+            stakes = stake :: stakerState.stakes
