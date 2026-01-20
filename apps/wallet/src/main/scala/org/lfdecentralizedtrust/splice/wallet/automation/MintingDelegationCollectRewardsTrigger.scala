@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.transferinput.{
   InputAmulet,
   InputAppRewardCoupon,
+  InputDevelopmentFundCoupon,
   InputUnclaimedActivityRecord,
   InputValidatorLivenessActivityRecord,
   InputValidatorRewardCoupon,
@@ -19,6 +20,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.transferi
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   AppRewardCoupon,
   Amulet,
+  DevelopmentFundCoupon,
   UnclaimedActivityRecord,
   ValidatorRewardCoupon,
   ValidatorRight,
@@ -155,7 +157,8 @@ class MintingDelegationCollectRewardsTrigger(
     val hasRewardsToCollect = couponsData.livenessActivityRecords.nonEmpty ||
       validatorRewardCouponsToCollect.nonEmpty ||
       couponsData.appRewardCoupons.nonEmpty ||
-      couponsData.unclaimedActivityRecords.nonEmpty
+      couponsData.unclaimedActivityRecords.nonEmpty ||
+      couponsData.developmentFundCoupons.nonEmpty
     // Merge amulets only if we're above 2x the merge limit to reduce potential waste of traffic
     val shouldMergeAmulets = amulets.size >= 2 * mergeLimit
 
@@ -205,6 +208,7 @@ class MintingDelegationCollectRewardsTrigger(
               s"${filteredCouponsData.validatorRewardCoupons.size} validator reward coupons, " +
               s"${filteredCouponsData.appRewardCoupons.size} app reward coupons, " +
               s"${filteredCouponsData.unclaimedActivityRecords.size} unclaimed activity records, " +
+              s"${filteredCouponsData.developmentFundCoupons.size} development fund coupons, " +
               s"and merged ${amuletsToMerge.size} amulets for delegation ${delegation.contractId}"
           )
           true
@@ -255,8 +259,10 @@ class MintingDelegationCollectRewardsTrigger(
         UnclaimedActivityRecord.ContractId,
         UnclaimedActivityRecord,
       ]],
-      // Handle DevelopmentFundCoupon once it lands on main branch
-      // Issue: https://github.com/hyperledger-labs/splice/issues/3554
+      developmentFundCoupons: Seq[Contract[
+        DevelopmentFundCoupon.ContractId,
+        DevelopmentFundCoupon,
+      ]],
   )
 
   private def fetchCouponsData(
@@ -274,11 +280,13 @@ class MintingDelegationCollectRewardsTrigger(
       )
       appRewardCouponsWithQuantity <- store.listSortedAppRewards(issuingRoundsMap)
       unclaimedActivityRecords <- store.listUnclaimedActivityRecords()
+      developmentFundCoupons <- store.listDevelopmentFundCoupons()
     } yield CouponsData(
       livenessActivityRecordsWithQuantity.map(_._1),
       validatorRewardCoupons,
       appRewardCouponsWithQuantity.map(_._1),
       unclaimedActivityRecords,
+      developmentFundCoupons,
     )
   }
 
@@ -308,12 +316,17 @@ class MintingDelegationCollectRewardsTrigger(
         new InputUnclaimedActivityRecord(record.contractId): TransferInput
       }
 
+    val developmentFundCouponInputs: Seq[TransferInput] =
+      couponsData.developmentFundCoupons.map { coupon =>
+        new InputDevelopmentFundCoupon(coupon.contractId): TransferInput
+      }
+
     val amuletInputs: Seq[TransferInput] = amuletsToMerge.map { amulet =>
       new InputAmulet(amulet.contractId): TransferInput
     }
 
     val allInputs = livenessInputs ++ validatorCouponInputs ++ appCouponInputs ++
-      unclaimedActivityRecordInputs ++ amuletInputs
+      unclaimedActivityRecordInputs ++ developmentFundCouponInputs ++ amuletInputs
     allInputs.take(maxNumInputs)
   }
 
