@@ -4,6 +4,7 @@ import * as k8s from '@pulumi/kubernetes';
 import {
   appsAffinityAndTolerations,
   DOCKER_REPO,
+  ExactNamespace,
   HELM_MAX_HISTORY_SIZE,
   imagePullSecretByNamespaceNameForServiceAccount,
   infraAffinityAndTolerations,
@@ -754,10 +755,11 @@ function installPodMonitor(runnersNamespace: Namespace) {
   );
 }
 
-export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
-  const runnersNamespace = new Namespace('gha-runners', {
+const GHA_NAMESPACE_NAME = 'gha-runners';
+export function installRunnerScaleSets(controller: k8s.helm.v3.Release): ExactNamespace {
+  const runnersNamespace = new Namespace(GHA_NAMESPACE_NAME, {
     metadata: {
-      name: 'gha-runners',
+      name: GHA_NAMESPACE_NAME,
     },
   });
 
@@ -793,4 +795,10 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
   installDockerRunnerScaleSets(controller, runnersNamespace, tokenSecret, cachePvc, saName);
   installK8sRunnerScaleSets(controller, runnersNamespace, tokenSecret, cachePvcName, saName);
   installPodMonitor(runnersNamespace);
+
+  const exactNs: ExactNamespace = {
+    ns: runnersNamespace,
+    logicalName: GHA_NAMESPACE_NAME,
+  };
+  return exactNs;
 }

@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { installController } from './controller';
 import { installDockerRegistryMirror } from './dockerMirror';
+import { installPerformanceTestsServices } from './performanceTests';
 import { installRunnerScaleSets } from './runners';
 
 installDockerRegistryMirror();
 const controller = installController();
-installRunnerScaleSets(controller);
+const ghaNamespace = installRunnerScaleSets(controller);
+installPerformanceTestsServices(ghaNamespace);

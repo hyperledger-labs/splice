@@ -24,6 +24,7 @@ export * from './dockerConfig';
 export * from './serviceAccount';
 export * from './participantKms';
 export * from './config/migrationSchema';
+export * from './postgres';
 export * from './pruning';
 export * from './config/loadTesterConfig';
 export * from './config/networkWideConfig';
