@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
-import {
-  MintingDelegationWithStatus,
-  useWalletClient,
-} from '../contexts/WalletServiceContext';
+import { MintingDelegationWithStatus, useWalletClient } from '../contexts/WalletServiceContext';
 
 export const useMintingDelegations = (): UseQueryResult<MintingDelegationWithStatus[]> => {
   const { listMintingDelegations } = useWalletClient();

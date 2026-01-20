@@ -21,27 +21,24 @@ import {
   mockMintingDelegations,
   mockMintingDelegationsSorted,
   mockMintingDelegationProposals,
-  delegationExpiresAtFormatted,
-  mockDelegationOnboardedStatus,
   mockDelegationOnboardedStatusSorted,
-  mockProposalOnboardedStatus,
   mockProposalOnboardedStatusSorted,
   mockMintingDelegationProposalsSorted,
 } from './mocks/delegation-constants';
 import { requestMocks } from './mocks/handlers/transfers-api';
 import { server } from './setup/setup';
 import {
-    AllocateAmuletRequest,
-    AllocateAmuletResponse,
-    AmuletAllocationWithdrawResult,
-    ChoiceExecutionMetadata,
-    ListAllocationRequestsResponse,
-    ListAllocationsResponse,
+  AllocateAmuletRequest,
+  AllocateAmuletResponse,
+  AmuletAllocationWithdrawResult,
+  ChoiceExecutionMetadata,
+  ListAllocationRequestsResponse,
+  ListAllocationsResponse,
 } from '@lfdecentralizedtrust/wallet-openapi';
 import { AllocationRequest } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
 import { mkContract } from './mocks/contract';
 import { openApiRequestFromTransferLeg } from '../components/ListAllocationRequests';
-import { shortenPartyId } from '../routes/delegations.tsx';
+import { shortenPartyId } from '../routes/delegations';
 import * as damlTypes from '@daml/types';
 import { ContractId } from '@daml/types';
 import { AnyContract } from '@daml.js/splice-api-token-metadata/lib/Splice/Api/Token/MetadataV1/module';
@@ -700,10 +697,13 @@ describe('Wallet user can', () => {
 
     const calledArgs: string[] = [];
     server.use(
-      rest.post(`${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/accept`, (req, res, ctx) => {
-        calledArgs.push(req.params.cid.toString());
-        return res(ctx.status(200));
-      })
+      rest.post(
+        `${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/accept`,
+        (req, res, ctx) => {
+          calledArgs.push(req.params.cid.toString());
+          return res(ctx.status(200));
+        }
+      )
     );
 
     const user = userEvent.setup();
@@ -733,10 +733,13 @@ describe('Wallet user can', () => {
 
     const calledArgs: string[] = [];
     server.use(
-      rest.post(`${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/reject`, (req, res, ctx) => {
-        calledArgs.push(req.params.cid.toString());
-        return res(ctx.status(200));
-      })
+      rest.post(
+        `${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/reject`,
+        (req, res, ctx) => {
+          calledArgs.push(req.params.cid.toString());
+          return res(ctx.status(200));
+        }
+      )
     );
 
     const user = userEvent.setup();
@@ -766,10 +769,13 @@ describe('Wallet user can', () => {
 
     const calledAcceptArgs: string[] = [];
     server.use(
-      rest.post(`${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/accept`, (req, res, ctx) => {
-        calledAcceptArgs.push(req.params.cid.toString());
-        return res(ctx.status(200));
-      })
+      rest.post(
+        `${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/accept`,
+        (req, res, ctx) => {
+          calledAcceptArgs.push(req.params.cid.toString());
+          return res(ctx.status(200));
+        }
+      )
     );
 
     const user = userEvent.setup();

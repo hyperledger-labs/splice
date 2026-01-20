@@ -684,8 +684,8 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     clickOn(query)
   }
 
-  protected def clickByCssSelector(selector :String) (
-    implicit webDriver : WebDriver
+  protected def clickByCssSelector(selector: String)(implicit
+      webDriver: WebDriver
   ): Unit = {
     val query = cssSelector(selector)
     waitForCondition(query) {

@@ -23,6 +23,7 @@ import {
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useMutation } from '@tanstack/react-query';
 
+import { MintingDelegation } from '@daml.js/splice-wallet/lib/Splice/Wallet/MintingDelegation/module';
 import { useMintingDelegations } from '../hooks/useMintingDelegations';
 import { useMintingDelegationProposals } from '../hooks/useMintingDelegationProposals';
 import {
@@ -77,7 +78,13 @@ export const Delegations: React.FC = () => {
   const hasNoProposals = proposals.length === 0;
 
   return (
-    <Stack spacing={4} direction="column" justifyContent="center" id="delegations-page" marginTop={4}>
+    <Stack
+      spacing={4}
+      direction="column"
+      justifyContent="center"
+      id="delegations-page"
+      marginTop={4}
+    >
       <Typography variant="h4" id="proposals-label">
         Proposed
       </Typography>
@@ -100,7 +107,9 @@ export const Delegations: React.FC = () => {
           <TableBody>
             {proposals.map(proposal => {
               const existingDelegation = delegations.find(
-                d => d.contract.payload.beneficiary === proposal.contract.payload.delegation.beneficiary
+                d =>
+                  d.contract.payload.beneficiary ===
+                  proposal.contract.payload.delegation.beneficiary
               )?.contract;
               return (
                 <ProposalRow
@@ -186,9 +195,7 @@ const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
         </Typography>
       </TableCell>
       <TableCell>
-        <Typography className="delegation-onboarded">
-          {beneficiaryOnboarded ? '✓' : '✗'}
-        </Typography>
+        <Typography className="delegation-onboarded">{beneficiaryOnboarded ? '✓' : '✗'}</Typography>
       </TableCell>
       <TableCell>
         <Typography className="delegation-max-amulets">
@@ -299,12 +306,12 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal, existingDelegation 
       className="proposal-row"
     >
       <TableCell>
-        <Typography className="proposal-beneficiary">{shortenPartyId(delegation.beneficiary)}</Typography>
+        <Typography className="proposal-beneficiary">
+          {shortenPartyId(delegation.beneficiary)}
+        </Typography>
       </TableCell>
       <TableCell>
-        <Typography className="proposal-onboarded">
-          {beneficiaryOnboarded ? '✓' : '✗'}
-        </Typography>
+        <Typography className="proposal-onboarded">{beneficiaryOnboarded ? '✓' : '✗'}</Typography>
       </TableCell>
       <TableCell>
         <Typography className="proposal-max-amulets">{delegation.amuletMergeLimit}</Typography>
@@ -340,28 +347,41 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal, existingDelegation 
           showDialog={acceptDialogOpen}
           onAccept={handleAcceptConfirm}
           onClose={handleAcceptClose}
-          title={existingDelegation ? "Replace Minting Delegation" : "Accept Minting Delegation Proposal"}
+          title={
+            existingDelegation ? 'Replace Minting Delegation' : 'Accept Minting Delegation Proposal'
+          }
           attributePrefix="accept-proposal"
         >
           {existingDelegation ? (
             <Stack spacing={2}>
               <Typography variant="body1">
-                A delegation already exists for {shortenPartyId(delegation.beneficiary)}.
-                Accepting this proposal will replace the existing delegation.
+                A delegation already exists for {shortenPartyId(delegation.beneficiary)}. Accepting
+                this proposal will replace the existing delegation.
               </Typography>
               <Box>
                 <Typography variant="caption" color="text.secondary">
                   Max Amulets:
                 </Typography>
-                <Paper variant="outlined" sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Paper
+                  variant="outlined"
+                  sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 2 }}
+                >
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" color="text.secondary">Current</Typography>
-                    <Typography className="existing-max-amulets">{existingDelegation.payload.amuletMergeLimit}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Current
+                    </Typography>
+                    <Typography className="existing-max-amulets">
+                      {existingDelegation.payload.amuletMergeLimit}
+                    </Typography>
                   </Box>
                   <Typography variant="h6">→</Typography>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" color="text.secondary">New</Typography>
-                    <Typography className="new-max-amulets">{delegation.amuletMergeLimit}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      New
+                    </Typography>
+                    <Typography className="new-max-amulets">
+                      {delegation.amuletMergeLimit}
+                    </Typography>
                   </Box>
                 </Paper>
               </Box>
@@ -369,15 +389,26 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal, existingDelegation 
                 <Typography variant="caption" color="text.secondary">
                   Expiration:
                 </Typography>
-                <Paper variant="outlined" sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Paper
+                  variant="outlined"
+                  sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 2 }}
+                >
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" color="text.secondary">Current</Typography>
-                    <Typography className="existing-expiration"><DateDisplay datetime={existingDelegation.payload.expiresAt} /></Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Current
+                    </Typography>
+                    <Typography className="existing-expiration">
+                      <DateDisplay datetime={existingDelegation.payload.expiresAt} />
+                    </Typography>
                   </Box>
                   <Typography variant="h6">→</Typography>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" color="text.secondary">New</Typography>
-                    <Typography className="new-expiration"><DateDisplay datetime={delegation.expiresAt} /></Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      New
+                    </Typography>
+                    <Typography className="new-expiration">
+                      <DateDisplay datetime={delegation.expiresAt} />
+                    </Typography>
                   </Box>
                 </Paper>
               </Box>
