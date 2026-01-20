@@ -33,6 +33,11 @@ data StakerConfig = StakerConfig with
 data StakerState = StakerState with
     config :  StakerConfig -- ^ Configuration chosen by the staker.
     lifetimeRewards : Decimal -- ^ Total lifetime rewards earned by the staker.
+    exemptedLifetimeRewards : Decimal
+      -- ^ Portion of lifetime rewards that are exempted from staking requirements.
+      -- MAY be negative to reflect an exemption for future rewards.
+      --
+      -- Determined using SV voting.
     mintingAllowance : Decimal -- ^ Unused minting allowance for SV rewards.
     unconstrainedStake : Decimal -- ^ Amount of stake that is not currently locked or constrained.
     stakes : [Stake] -- ^ Stakes with constraints.
@@ -112,9 +117,11 @@ updateMintingAllowances context stakingState =
           None -> pure (sv, (0.0, weight))
           Some stakerState -> do
             let stakedAmount = getStakedAmount stakerState
+            let consideredLifetimeRewards =
+                  max 0.0 (stakerState.lifetimeRewards - stakerState.exemptedLifetimeRewards)
             let stakedRatio
-                  | stakerState.lifetimeRewards == 0.0 = 1.0
-                  | otherwise = min 1.0 (stakedAmount / stakerState.lifetimeRewards)
+                  | consideredLifetimeRewards == 0.0 = 1.0
+                  | otherwise = min 1.0 (stakedAmount / consideredLifetimeRewards)
             let earnedRatio = getEarnedRatio stakingState.config.stakingWeightSchedule stakedRatio
             let earnedWeight = weight * earnedRatio
             let unearnedWeight = weight - earnedWeight

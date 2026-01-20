@@ -78,6 +78,7 @@ sv1StakingState : StakerState
 sv1StakingState = StakerState with
   config = StakerConfig with relockRatio = 0.8
   lifetimeRewards = 1e9
+  exemptedLifetimeRewards = 0.0
   mintingAllowance = 0.0
   unconstrainedStake = 800e6
   stakes = []
@@ -119,6 +120,7 @@ sv2StakingState : StakerState
 sv2StakingState = StakerState with
   config = StakerConfig with relockRatio = 0.4
   lifetimeRewards = 1e9
+  exemptedLifetimeRewards = 0.0
   mintingAllowance = 0.0
   unconstrainedStake = 400e6
   stakes = []
@@ -174,6 +176,7 @@ example3_stakingState = StakingState with
     , (staker1, StakerState with
         config = StakerConfig with relockRatio = 0.5
         lifetimeRewards = 500e6
+        exemptedLifetimeRewards = 0.0
         mintingAllowance = 0.0
         unconstrainedStake = 300e6
         stakes = []
@@ -181,6 +184,7 @@ example3_stakingState = StakingState with
     , (staker2, StakerState with
         config = StakerConfig with relockRatio = 0.2
         lifetimeRewards = 200e6
+        exemptedLifetimeRewards = 0.0
         mintingAllowance = 0.0
         unconstrainedStake = 100e6
         stakes = []
@@ -199,6 +203,7 @@ example3_expected_newStaker1StakingState : StakerState
 example3_expected_newStaker1StakingState = StakerState with
     config = StakerConfig with relockRatio = 0.5
     lifetimeRewards = 500e6 + staker1Allowance
+    exemptedLifetimeRewards = 0.0
     mintingAllowance = 0.5 * staker1Allowance
     unconstrainedStake = 300e6 + 0.5 * staker1Allowance
     stakes = []
@@ -210,6 +215,7 @@ example3_expected_newStaker2StakingState : StakerState
 example3_expected_newStaker2StakingState = StakerState with
     config = StakerConfig with relockRatio = 0.2
     lifetimeRewards = 200e6 + staker2Allowance
+    exemptedLifetimeRewards = 0.0
     mintingAllowance = 0.8 * staker2Allowance
     unconstrainedStake = 100e6 + 0.2 * staker2Allowance
     stakes = []
@@ -237,3 +243,4 @@ test_example3 = do
 
 -- TODO: add an example where some stakes are unlocked or freshly locked
 -- TODO: add an example with multiple SVs
+-- TODO: add an example with exempted lifteime rewards
