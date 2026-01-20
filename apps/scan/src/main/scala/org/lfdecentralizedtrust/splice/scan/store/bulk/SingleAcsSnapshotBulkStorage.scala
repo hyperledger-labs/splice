@@ -109,7 +109,8 @@ class SingleAcsSnapshotBulkStorage(
   }
 
   // TODO(#3429): I'm no longer sure the retrying source is actually useful,
-  //  we probably want to move the retry higher up to the larger stream, but keeping it for now until that is fully resolved
+  //  we probably want to just rely on the of the full stream of ACS snapshot dumps (in AcsSnapshotBulkStorage),
+  //  but keeping it for now (and the corresponding unit test) until that is fully resolved
   private def getRetryingSource: Source[WithKillSwitch[String], (KillSwitch, Future[Done])] = {
 
     def mksrc = {
@@ -156,6 +157,11 @@ class SingleAcsSnapshotBulkStorage(
 }
 
 object SingleAcsSnapshotBulkStorage {
+
+  /** A Pekko flow that receives (timestamp, migration) elements, each identifying an ACS snapshot to be dumped,
+    * and dumps each corresponding snapshot to the S3 storage. Every successful dump emits back the (timestamp, migration)
+    * pair, to indicate the last successfully dumped snapshot.
+    */
   def apply(
       config: BulkStorageConfig,
       acsSnapshotStore: AcsSnapshotStore,
@@ -182,6 +188,8 @@ object SingleAcsSnapshotBulkStorage {
           .map(_ => (migrationId, timestamp))
     }
 
+  /** The same flow as a source, currently used only for unit testing.
+    */
   def asSource(
       migrationId: Long,
       timestamp: CantonTimestamp,

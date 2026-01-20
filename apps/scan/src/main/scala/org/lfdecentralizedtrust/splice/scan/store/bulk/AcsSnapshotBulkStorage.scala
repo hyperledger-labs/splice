@@ -29,6 +29,10 @@ class AcsSnapshotBulkStorage(
   // TODO(#3429): persist progress (or conclude it from the S3 storage), and start from latest successfully dumped snapshot upon restart
   private def getStartTimestamp: (Long, CantonTimestamp) = (0, CantonTimestamp.MinValue)
 
+  // When new snapshot is not yet available, how long to wait for a new one.
+  // TODO(#3429): make it longer for prod (so consider making it configurable/overridable for tests)
+  private val snapshotPollingInterval = 5.seconds
+
   private def getAcsSnapshotTimestampAfter(
       startMigrationId: Long,
       startTimestamp: CantonTimestamp,
@@ -38,7 +42,7 @@ class AcsSnapshotBulkStorage(
         case (lastMigrationId: Long, lastTimestamp: CantonTimestamp) =>
           acsSnapshotStore.lookupSnapshotAfter(lastMigrationId, lastTimestamp).flatMap {
             case Some(snapshot) =>
-              logger.debug(
+              logger.info(
                 s"next snapshot available, at migration ${snapshot.migrationId}, record time ${snapshot.snapshotRecordTime}"
               )
               Future.successful(
@@ -50,7 +54,7 @@ class AcsSnapshotBulkStorage(
                 )
               )
             case None =>
-              after(5.seconds, actorSystem.scheduler) {
+              after(snapshotPollingInterval, actorSystem.scheduler) {
                 logger.debug("No new snapshot available, sleeping...")
                 Future.successful(Some(((lastMigrationId, lastTimestamp), None)))
               }
@@ -59,21 +63,31 @@ class AcsSnapshotBulkStorage(
       .collect { case Some((migrationId, timestamp)) => (migrationId, timestamp) }
   }
 
-  private def mksrc(start: (Long, CantonTimestamp)): Source[(Long, CantonTimestamp), (KillSwitch, Future[Done])] = start match {
+  /** *
+    * This is the main implementation of the pipeline. It is a Pekko Source that gets a `start` timestamp, and starts dumping to S3
+    *  all snapshots (strictly) after `start`. It is an infinite source that should never complete.
+    */
+  private def mksrc(
+      start: (Long, CantonTimestamp)
+  ): Source[(Long, CantonTimestamp), (KillSwitch, Future[Done])] = start match {
     case (startMigrationId, startAfterTimestamp) =>
-      logger.debug(s"Starting ACS snapshot dump source, from migration $startMigrationId, timestamp $startAfterTimestamp")
+      logger.debug(
+        s"Starting ACS snapshot dump source, from migration $startMigrationId, timestamp $startAfterTimestamp"
+      )
       val base =
         getAcsSnapshotTimestampAfter(startMigrationId, startAfterTimestamp)
-        .via(SingleAcsSnapshotBulkStorage(config, acsSnapshotStore, s3Connection, loggerFactory))
+          .via(SingleAcsSnapshotBulkStorage(config, acsSnapshotStore, s3Connection, loggerFactory))
 
       val withKs = base.viaMat(KillSwitches.single)(Keep.right)
-      withKs.watchTermination() { case (ks, done) => (ks: KillSwitch, done)
-      }
+      withKs.watchTermination() { case (ks, done) => (ks: KillSwitch, done) }
   }
 
-  // TODO(#3429): once we persist the state, i.e. the last dumped snapshot, consider moving from Canton's PekkoUtil.restartSource
-  //  to Pekko's built-in RestartSource (for now, it's convenient to use Canton's ability to track state via lastEmittedElement)
-  def getSource = {
+  /**  wraps mksrc (where the main pipeline logic is implemented) in a retry loop, to retry upon failures.
+    */
+  def getSource
+      : Source[PekkoUtil.WithKillSwitch[(Long, CantonTimestamp)], (KillSwitch, Future[Done])] = {
+    // TODO(#3429): once we persist the state, i.e. the last dumped snapshot, consider moving from Canton's PekkoUtil.restartSource
+    //  to Pekko's built-in RestartSource (for now, it's convenient to use Canton's ability to track state via lastEmittedElement)
     // TODO(#3429): tweak the retry parameters here
     val delay = FiniteDuration(5, "seconds")
     val policy = new RetrySourcePolicy[(Long, CantonTimestamp), (Long, CantonTimestamp)] {
@@ -83,8 +97,10 @@ class AcsSnapshotBulkStorage(
           lastFailure: Option[Throwable],
       ): Option[(scala.concurrent.duration.FiniteDuration, (Long, CantonTimestamp))] = {
         lastFailure.map { t =>
-          logger.warn(s"Writing ACS snapshot to bulk storage failed with : ${ErrorUtil
-              .messageWithStacktrace(t)}, will retry after delay of $delay from last successful timestamp $lastEmittedElement")
+          logger.warn(
+            s"Writing ACS snapshot to bulk storage failed with : ${ErrorUtil
+                .messageWithStacktrace(t)}, will retry after delay of $delay from last successful timestamp $lastEmittedElement"
+          )
           // Always retry (TODO(#3429): consider a max number of retries?)
           delay -> lastEmittedElement.fold(lastState)(identity)
         }
