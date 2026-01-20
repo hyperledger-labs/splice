@@ -5,7 +5,7 @@
 
 .. _release_notes:
 
-.. release-notes:: 0.5.7
+.. release-notes:: upcoming
 
   .. important::
 
