@@ -68,45 +68,6 @@ class TokenStandardTransferIntegrationTest
 
   "Token Standard Transfers should" should {
 
-    "TransferInstruction context can be fetched from Scan even if it's not yet ingested into the store" in {
-      implicit env =>
-        pauseScanIngestionWithin(sv1ScanBackend) {
-          onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-          val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-          aliceWalletClient.tap(100)
-
-          val response = actAndCheck(
-            "Alice creates transfer offer",
-            aliceWalletClient.createTokenStandardTransfer(
-              bobUserParty,
-              10,
-              s"Transfer",
-              CantonTimestamp.now().plusSeconds(3600L),
-              UUID.randomUUID().toString,
-            ),
-          )(
-            "Alice and Bob see it",
-            _ => {
-              Seq(aliceWalletClient, bobWalletClient).foreach(
-                _.listTokenStandardTransfers() should have size 1
-              )
-            },
-          )._1
-
-          val cid = response.output match {
-            case members.TransferInstructionPending(value) =>
-              new TransferInstruction.ContractId(value.transferInstructionCid)
-            case _ => fail("The transfers were expected to be pending.")
-          }
-
-          clue("SV-1's Scan sees it (stiil, even though ingestion is paused)") {
-            eventuallySucceeds() {
-              sv1ScanBackend.getTransferInstructionAcceptContext(cid)
-            }
-          }
-        }
-    }
-
     "support create, list, accept, reject and withdraw" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
@@ -586,6 +547,45 @@ class TokenStandardTransferIntegrationTest
           })
         }
       }
+    }
+
+    "TransferInstruction context can be fetched from Scan even if it's not yet ingested into the store" in {
+      implicit env =>
+        pauseScanIngestionWithin(sv1ScanBackend) {
+          onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+          val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+          aliceWalletClient.tap(100)
+
+          val response = actAndCheck(
+            "Alice creates transfer offer",
+            aliceWalletClient.createTokenStandardTransfer(
+              bobUserParty,
+              10,
+              s"Transfer",
+              CantonTimestamp.now().plusSeconds(3600L),
+              UUID.randomUUID().toString,
+            ),
+          )(
+            "Alice and Bob see it",
+            _ => {
+              Seq(aliceWalletClient, bobWalletClient).foreach(
+                _.listTokenStandardTransfers() should have size 1
+              )
+            },
+          )._1
+
+          val cid = response.output match {
+            case members.TransferInstructionPending(value) =>
+              new TransferInstruction.ContractId(value.transferInstructionCid)
+            case _ => fail("The transfers were expected to be pending.")
+          }
+
+          clue("SV-1's Scan sees it (stiil, even though ingestion is paused)") {
+            eventuallySucceeds() {
+              sv1ScanBackend.getTransferInstructionAcceptContext(cid)
+            }
+          }
+        }
     }
 
   }
