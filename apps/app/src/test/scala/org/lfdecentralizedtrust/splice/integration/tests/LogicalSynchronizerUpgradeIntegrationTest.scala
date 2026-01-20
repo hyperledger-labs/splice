@@ -34,6 +34,7 @@ import org.scalatest.time.{Minutes, Span}
 
 import java.net.URI
 import java.time.Duration
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 import scala.collection.parallel.CollectionConverters.seqIsParallelizable
 import scala.concurrent.duration.DurationInt
@@ -223,11 +224,13 @@ class LogicalSynchronizerUpgradeIntegrationTest
       participants = false,
       logSuffix = "global-domain-migration",
       extraSequencerConfig = Seq(
-        s"parameters.sequencing-time-lower-bound-exclusive = $upgradeTime"
+        s"""parameters.sequencing-time-lower-bound-exclusive=${upgradeTime.toInstant.truncatedTo(
+            ChronoUnit.SECONDS
+          )}"""
       ),
     )() {
 
-      val announcement = clue(s"Announce migration at $upgradeTime") {
+      val announcement = clue(s"Announce upgrade at $upgradeTime") {
         allBackends.par.map { backend =>
           backend.participantClientWithAdminToken.topology.synchronizer_upgrade.announcement
             .propose(
@@ -279,10 +282,12 @@ class LogicalSynchronizerUpgradeIntegrationTest
               new NodeInitializer(newMediatorAdminConnection, retryProvider, loggerFactory)
 
             clue(s"init ${oldBackend.name} sequencer and mediator from dump") {
+              newBackend.sequencerClient.health.wait_for_ready_for_id()
               sequencerInitializer
                 .initializeFromDump(dump.nodeIdentities.sequencer)
                 .futureValue
 
+              newBackend.mediatorClient.health.wait_for_ready_for_id()
               mediatorInitializer.initializeFromDump(dump.nodeIdentities.mediator).futureValue
             }
             val staticSynchronizerParameters =
@@ -333,6 +338,12 @@ class LogicalSynchronizerUpgradeIntegrationTest
       // stop old backend as the topology trigger will push crazy stuff when the participant connect to the new sync but the topology was not sycned yet
       // https://github.com/DACH-NY/canton/issues/29819
       clue("Stop old backends") {
+        stopAllAsync(
+          sv1ValidatorBackend,
+          sv2ValidatorBackend,
+          sv3ValidatorBackend,
+          sv4ValidatorBackend,
+        ).futureValue
         allBackends.par.map { backend =>
           backend.stop()
         }

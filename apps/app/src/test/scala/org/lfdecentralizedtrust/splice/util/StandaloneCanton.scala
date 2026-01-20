@@ -128,7 +128,7 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
     withCanton(
       configs,
       extraSequencerConfig.flatMap(config =>
-        sequencers.map(id => s"canton.sequencer.standaloneSequencerSv$id.$config")
+        sequencers.map(id => s"canton.sequencers.sv${id}StandaloneSequencer.$config")
       ),
       logSuffix,
       allExtraEnv*
