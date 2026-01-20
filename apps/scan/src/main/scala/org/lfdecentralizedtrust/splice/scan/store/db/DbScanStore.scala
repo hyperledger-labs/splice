@@ -100,6 +100,7 @@ class DbScanStore(
     ingestionConfig: IngestionConfig,
     storeMetrics: DbScanStoreMetrics,
     initialRound: Long,
+    storeDescriptorUserVersion: Option[Long] = None,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -119,6 +120,7 @@ class DbScanStore(
         key = Map(
           "dsoParty" -> key.dsoParty.toProtoPrimitive
         ),
+        userVersion = storeDescriptorUserVersion,
       ),
       txLogStoreDescriptor = StoreDescriptor(
         version = 1,
@@ -128,6 +130,7 @@ class DbScanStore(
         key = Map(
           "dsoParty" -> key.dsoParty.toProtoPrimitive
         ),
+        userVersion = storeDescriptorUserVersion,
       ),
       domainMigrationInfo,
       ingestionConfig,
