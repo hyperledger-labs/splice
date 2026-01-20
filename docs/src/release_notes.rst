@@ -5,9 +5,7 @@
 
 .. _release_notes:
 
-.. release-notes:: upcoming
-
-.. release-notes:: 0.5.6
+.. release-notes:: 0.5.7
 
   .. important::
 
@@ -98,6 +96,8 @@
 
     - Add a new config field to ``SvOnboardingConfig`` named ``unclaimedDevelopmentFundCouponsThreshold`` defining the
       threshold above which ``UnclaimedDevelopmentFundCoupon`` s are merged. The default value is set to 10.
+
+.. release-notes:: 0.5.6
 
   - Sequencer
 
