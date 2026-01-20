@@ -13,7 +13,7 @@ you need to add the CRD; on a cncluster-controlled dev cluster directory you can
  */
 
 // possible values and their meaning: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gatewayclass
-const gcpGatewayClass = 'gke-l7-global-external-managed';
+const gcpGatewayClass = 'gke-l7-regional-external-managed';
 
 interface L7GatewayConfig {
   gatewayName: string;
@@ -44,6 +44,15 @@ function createL7Gateway(
   config: L7GatewayConfig,
   opts?: pulumi.CustomResourceOptions
 ): k8s.apiextensions.CustomResource {
+  // name itself yields something like
+  // Error GWCER106: Gateway "cluster-ingress/cn-gke-l7-gateway" is invalid, err: address "cn-scratchdnet-ip" does not exist.
+  const addressesValue = pulumi
+    .all([config.ingressAddress.name, config.ingressAddress.region, config.ingressAddress.project])
+    .apply(([name, region, project]) =>
+      region
+        ? `projects/${project}/regions/${region}/addresses/${name}`
+        : `projects/${project}/global/addresses/${name}`
+    );
   return new k8s.apiextensions.CustomResource(
     config.gatewayName,
     {
@@ -100,7 +109,7 @@ function createL7Gateway(
         ],
         // per gateway Error GWCER106: unsupported address type "IPAddress",
         // only "NamedAddress" is supported
-        addresses: [{ type: 'NamedAddress', value: config.ingressAddress.name }],
+        addresses: [{ type: 'NamedAddress', value: addressesValue }],
       },
     },
     opts
