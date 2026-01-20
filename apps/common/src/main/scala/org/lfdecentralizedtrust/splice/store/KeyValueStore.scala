@@ -10,7 +10,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.{Decoder, Encoder}
-import org.lfdecentralizedtrust.splice.store.db.{DbValidatorInternalStore, StoreDescriptor}
+import org.lfdecentralizedtrust.splice.store.db.{DbKeyValueStore, StoreDescriptor}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -67,7 +67,7 @@ object KeyValueStore {
   ): Future[KeyValueStore] = {
     storage match {
       case storage: DbStorage =>
-        DbValidatorInternalStore(
+        DbKeyValueStore(
           descriptor,
           tableConfig,
           storage,

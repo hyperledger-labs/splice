@@ -16,77 +16,16 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.Future
 
-abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with HasExecutionContext {
+abstract class ValidatorConfigProviderTest
+    extends StoreTest
+    with Matchers
+    with HasExecutionContext {
 
   protected def mkStore(name: String): Future[KeyValueStore]
 
   protected def mkProvider(name: String): Future[ValidatorConfigProvider]
 
-  "ValidatorInternalStore" should {
-
-    val configKey = "key1"
-    val configValue = "jsonPayload1"
-    val otherKey = "key2"
-    val otherValue = "jsonPayload2"
-
-    "set and get a payload successfully" in {
-      for {
-        store <- mkStore("alice")
-        _ <- store.setValue(configKey, configValue)
-        retrievedValue <- store.getValue[String](configKey).value
-      } yield {
-        retrievedValue.value.value shouldBe configValue
-      }
-    }
-
-    "return None for a non-existent key" in {
-      for {
-        store <- mkStore("alice")
-        retrievedValue <- store.getValue[String]("non-existent-key").value
-      } yield {
-        retrievedValue shouldBe None
-      }
-    }
-
-    "update an existing payload" in {
-      for {
-        store <- mkStore("alice")
-        _ <- store.setValue(configKey, configValue)
-        _ <- store.setValue(configKey, otherValue)
-        retrievedValue <- store.getValue[String](configKey).value
-      } yield {
-        retrievedValue.value.value shouldBe otherValue
-      }
-    }
-
-    "handle multiple different keys independently" in {
-      for {
-        store <- mkStore("alice")
-        _ <- store.setValue(configKey, configValue)
-        _ <- store.setValue(otherKey, otherValue)
-
-        configKeyValue <- store.getValue[String](configKey).value
-        otherKeyValue <- store.getValue[String](otherKey).value
-      } yield {
-        configKeyValue.value.value shouldBe configValue
-        otherKeyValue.value.value shouldBe otherValue
-      }
-    }
-
-    "delete single key" in {
-      for {
-        store <- mkStore("alice")
-        _ <- store.setValue(configKey, configValue)
-        _ <- store.setValue(otherKey, otherValue)
-
-        _ <- store.deleteKey(configKey)
-        configKeyValue <- store.getValue[String](configKey).value
-        otherKeyValue <- store.getValue[String](otherKey).value
-      } yield {
-        configKeyValue shouldBe None
-        otherKeyValue.value.value shouldBe otherValue
-      }
-    }
+  "ValidatorConfigProvider should" {
 
     val scanConfig1: Seq[ScanUrlInternalConfig] = Seq(
       ScanUrlInternalConfig("sv1", "url1"),
@@ -98,7 +37,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
       ScanUrlInternalConfig("svB", "urlB"),
     )
 
-    "CONFIG_PROVIDER set and retrieve a ScanUrlInternalConfig list successfully" in {
+    "set and retrieve a ScanUrlInternalConfig list successfully" in {
       for {
         provider <- mkProvider("alice")
         _ <- provider.setScanUrlInternalConfig(scanConfig1)
@@ -108,7 +47,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
       }
     }
 
-    "CONFIG_PROVIDER update an existing ScanUrlInternalConfig list" in {
+    "update an existing ScanUrlInternalConfig list" in {
       for {
         provider <- mkProvider("alice")
         _ <- provider.setScanUrlInternalConfig(scanConfig1)
@@ -119,7 +58,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
       }
     }
 
-    "CONFIG_PROVIDER return None when no ScanUrlInternalConfig is found" in {
+    "return None when no ScanUrlInternalConfig is found" in {
       for {
         provider <- mkProvider("alice")
         retrievedConfigOption <- provider.getScanUrlInternalConfig().value
@@ -128,7 +67,7 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
       }
     }
 
-    "CONFIG_PROVIDER for two different store descriptors should not collide" in {
+    "for two different store descriptors should not collide" in {
       for {
         provider1 <- mkProvider("alice")
         provider2 <- mkProvider("bob")
@@ -165,8 +104,8 @@ abstract class ValidatorInternalStoreTest extends StoreTest with Matchers with H
   }
 }
 
-class DbValidatorInternalStoreTest
-    extends ValidatorInternalStoreTest
+class DbValidatorConfigProviderTest
+    extends ValidatorConfigProviderTest
     with HasActorSystem
     with SplicePostgresTest {
 

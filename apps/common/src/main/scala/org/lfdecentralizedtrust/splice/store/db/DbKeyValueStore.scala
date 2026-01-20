@@ -18,7 +18,7 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class DbValidatorInternalStore private (
+class DbKeyValueStore private (
     storage: DbStorage,
     val dbTableConfig: KeyValueStoreDbTableConfig,
     val storeId: Int,
@@ -32,6 +32,9 @@ class DbValidatorInternalStore private (
     with NamedLogging {
 
   val profile: JdbcProfile = storage.profile.jdbc
+  val table = dbTableConfig.tableName
+  val keyCol = dbTableConfig.keyColumnName
+  val valCol = dbTableConfig.valueColumnName
 
   override def setValue[T](key: String, value: T)(implicit
       tc: TraceContext,
@@ -40,11 +43,10 @@ class DbValidatorInternalStore private (
     val jsonValue: Json = value.asJson
 
     val action =
-      sql"""INSERT INTO ${dbTableConfig.tableName} (${dbTableConfig.keyColumnName}, ${dbTableConfig.valueColumnName}, store_id)
+      sql"""INSERT INTO #$table (#$keyCol, #$valCol, store_id)
         VALUES ($key, $jsonValue, $storeId)
-        ON CONFLICT (store_id, ${dbTableConfig.keyColumnName}) DO UPDATE
-        SET ${dbTableConfig.keyColumnName} = excluded.${dbTableConfig.keyColumnName}""".asUpdate
-
+        ON CONFLICT (store_id, #$keyCol) DO UPDATE
+        SET #$valCol = excluded.#$valCol""".asUpdate
     val updateAction = storage.update(action, "set-validator-internal-config")
 
     logger.debug(
@@ -59,9 +61,9 @@ class DbValidatorInternalStore private (
 
     logger.debug(s"Retrieving config key $key")
 
-    val queryAction = sql"""SELECT ${dbTableConfig.valueColumnName}
-      FROM ${dbTableConfig.tableName}
-      WHERE ${dbTableConfig.keyColumnName} = $key AND store_id = $storeId
+    val queryAction = sql"""SELECT #$valCol
+      FROM #$table
+      WHERE #$keyCol = $key AND store_id = $storeId
     """.as[Json].headOption
 
     val jsonOptionT: OptionT[FutureUnlessShutdown, Json] =
@@ -95,14 +97,14 @@ class DbValidatorInternalStore private (
     )
     storage
       .update(
-        sqlu"delete from ${dbTableConfig.tableName} WHERE ${dbTableConfig.keyColumnName} = $key AND store_id = $storeId",
+        sqlu"delete from #$table WHERE #$keyCol = $key AND store_id = $storeId",
         "delete config key",
       )
       .map(_.discard)
   }
 }
 
-object DbValidatorInternalStore {
+object DbKeyValueStore {
 
   def apply(
       storeDescriptor: StoreDescriptor,
@@ -114,12 +116,12 @@ object DbValidatorInternalStore {
       lc: ErrorLoggingContext,
       cc: CloseContext,
       tc: TraceContext,
-  ): Future[DbValidatorInternalStore] = {
+  ): Future[DbKeyValueStore] = {
 
     StoreDescriptorStore
       .getStoreIdForDescriptor(storeDescriptor, storage)
       .map(storeId => {
-        new DbValidatorInternalStore(
+        new DbKeyValueStore(
           storage,
           dbTableConfig,
           storeId,
