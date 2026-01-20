@@ -35,8 +35,7 @@ class ConfigurationProvidedBftScanConnectionIntegrationTest
                 Uri("http://127.0.0.1:5012"),
                 Uri("http://127.0.0.1:5112"),
               ),
-              trustedSvs =
-                NonEmptyList.of(s"${getSvName(1)}", s"${getSvName(2)}", s"${getSvName(3)}"),
+              svNames = NonEmptyList.of(s"${getSvName(1)}", s"${getSvName(2)}", s"${getSvName(3)}"),
               threshold = Some(2),
               scansRefreshInterval = NonNegativeFiniteDuration.ofSeconds(5),
             )
