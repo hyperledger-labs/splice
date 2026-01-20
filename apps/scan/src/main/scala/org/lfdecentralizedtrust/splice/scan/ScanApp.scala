@@ -308,9 +308,11 @@ class ScanApp(
         initialRound,
       )
       contractFetcher = ContractFetcher.createStoreWithLedgerFallback(
-        config.parameters.contractFetchLedgerFallbackEnabled,
+        config.parameters.contractFetchLedgerFallbackConfig,
         store,
         appInitConnection,
+        clock,
+        loggerFactory,
       )
 
       tokenStandardTransferInstructionHandler = new HttpTokenStandardTransferInstructionHandler(

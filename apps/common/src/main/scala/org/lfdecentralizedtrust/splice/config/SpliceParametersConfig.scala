@@ -10,12 +10,14 @@ import com.digitalasset.canton.config.{
   NonNegativeFiniteDuration,
   WatchdogConfig,
 }
+import org.lfdecentralizedtrust.splice.store.ContractFetcher
 import org.lfdecentralizedtrust.splice.util.SpliceRateLimitConfig
 
 final case class SpliceParametersConfig(
     batching: BatchingConfig = BatchingConfig(),
     caching: CachingConfigs = CachingConfigs(),
-    contractFetchLedgerFallbackEnabled: Boolean = false,
+    contractFetchLedgerFallbackConfig: ContractFetcher.StoreContractFetcherWithLedgerFallbackConfig =
+      ContractFetcher.StoreContractFetcherWithLedgerFallbackConfig(),
     // Do not define any defaults on the class containing the `SpliceParametersConfig` as they'll be overwritten.
     // Do it instead on the app.conf file in `cluster/images/${the_app}/app.conf`
     customTimeouts: Map[String, NonNegativeFiniteDuration] = Map.empty,
