@@ -8,9 +8,12 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.PekkoUtil.WithKillSwitch
+import com.digitalasset.canton.util.PekkoUtil
+import com.digitalasset.canton.util.PekkoUtil.{RetrySourcePolicy, WithKillSwitch}
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import org.apache.pekko.stream.scaladsl.Sink
+import org.apache.pekko.Done
+import org.apache.pekko.stream.{KillSwitch, KillSwitches}
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
@@ -25,6 +28,7 @@ import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
 import java.nio.ByteBuffer
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
@@ -41,6 +45,60 @@ class AcsSnapshotBulkStorageTest
     1000,
     50000L,
   )
+
+  "restartSource" should {
+    "continue from last successful element" in {
+
+      val failCount = new AtomicInteger(0)
+      val numFailures = 2
+
+      def mksrc(from: Int): Source[Int, (KillSwitch, Future[Done])] = {
+        println(s"in mkSrc, starting from $from")
+        val base = Source(from+1 to 10)
+          .map {
+            n => {
+              if (n == 3 && failCount.get() < numFailures) {
+                val current = failCount.incrementAndGet()
+                println(s"-> Log: Input is 3. Failure count: $current. Throwing...")
+                throw new RuntimeException(s"Failure $failCount")
+              } else {
+                n // Success: emit the element
+              }
+            }
+          }
+        val withKs = base.viaMat(KillSwitches.single)(Keep.right)
+        withKs.watchTermination() { case (ks, done) => (ks: KillSwitch, done) }
+
+      }
+
+      val delay = FiniteDuration(1, "seconds")
+      val policy = new RetrySourcePolicy[Int, Int] {
+        override def shouldRetry(
+            lastState: Int,
+            lastEmittedElement: Option[Int],
+            lastFailure: Option[Throwable],
+        ): Option[(scala.concurrent.duration.FiniteDuration, Int)] = {
+          lastFailure.map { _ =>
+            delay -> lastEmittedElement.fold(0)(identity)
+          }
+        }
+      }
+
+      val probe = PekkoUtil
+        .restartSource(
+          name = "test-restartSource",
+          initial = 0,
+          mkSource = mksrc,
+          policy = policy,
+        ).runWith(TestSink.probe[WithKillSwitch[Int]])
+
+      probe.request(7)
+      probe.expectNextN(7).map(_.value) shouldBe (1 to 7)
+
+      succeed
+    }
+
+  }
 
   "AcsSnapshotBulkStorage" should {
     "successfully dump a single ACS snapshot" in {
@@ -110,13 +168,17 @@ class AcsSnapshotBulkStorageTest
 
         clue("Initially, a single snapshot is dumped") {
           probe.request(2)
-          probe.expectNext(2.minutes).value shouldBe (0, CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(10)))
+          probe.expectNext(2.minutes).value shouldBe (0, CantonTimestamp.tryFromInstant(
+            Instant.ofEpochSecond(10)
+          ))
           probe.expectNoMessage(10.seconds)
         }
 
         clue("Add another snapshot to the store, it is also dumped") {
           store.addSnapshot(CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20)))
-          probe.expectNext(2.minutes).value shouldBe (0, CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20)))
+          probe.expectNext(2.minutes).value shouldBe (0, CantonTimestamp.tryFromInstant(
+            Instant.ofEpochSecond(20)
+          ))
           probe.expectNoMessage(10.seconds)
         }
 
