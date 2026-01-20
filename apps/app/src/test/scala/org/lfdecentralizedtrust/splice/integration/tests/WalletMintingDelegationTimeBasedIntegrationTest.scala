@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
   Amulet,
   AppRewardCoupon,
+  DevelopmentFundCoupon,
   UnclaimedActivityRecord,
   ValidatorRewardCoupon,
   ValidatorRight,
@@ -438,6 +439,7 @@ class WalletMintingDelegationTimeBasedIntegrationTest
       val appRewardAmount = BigDecimal(100.0)
       val unclaimedActivityAmount = BigDecimal(200.0)
       val validatorRewardAmount = BigDecimal(500.0)
+      val developmentFundAmount = BigDecimal(300.0)
 
       // For ValidatorRewardCoupon, we need ValidatorRight for beneficiary
       aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
@@ -523,6 +525,22 @@ class WalletMintingDelegationTimeBasedIntegrationTest
                 issuingRound.round,
               ).create,
             )
+
+          // Create DevelopmentFundCoupon
+          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitWithResult(
+              userId = sv1Backend.config.ledgerApiUser,
+              actAs = Seq(dsoParty),
+              readAs = Seq.empty,
+              update = new DevelopmentFundCoupon(
+                dsoParty.toProtoPrimitive,
+                beneficiaryParty.party.toProtoPrimitive,
+                dsoParty.toProtoPrimitive, // fundManager = dso
+                developmentFundAmount.bigDecimal,
+                env.environment.clock.now.plus(Duration.ofDays(1)).toInstant,
+                "test development fund coupon",
+              ).create,
+            )
         }
 
         // Advance time to collect all rewards
@@ -544,6 +562,9 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             externalPartyWallet.store
               .listSortedLivenessActivityRecords(issuingRoundsMap)
               .futureValue shouldBe empty
+            externalPartyWallet.store
+              .listDevelopmentFundCoupons()
+              .futureValue shouldBe empty
           }
         }
       }
@@ -558,7 +579,8 @@ class WalletMintingDelegationTimeBasedIntegrationTest
             issuingRound.optIssuancePerValidatorFaucetCoupon.orElse(java.math.BigDecimal.ZERO)
           )) +
           (validatorRewardAmount * BigDecimal(issuingRound.issuancePerValidatorRewardCoupon)) +
-          unclaimedActivityAmount
+          unclaimedActivityAmount +
+          developmentFundAmount
 
       actualIncrease shouldBe expectedTotalReward
 
