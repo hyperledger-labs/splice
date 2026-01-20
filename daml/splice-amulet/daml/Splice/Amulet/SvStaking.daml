@@ -1,0 +1,138 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Staking for the SV rewards tranche Splice Amulet.
+module Splice.Amulet.SvStaking where
+
+import DA.Action.State (State, runState)
+import DA.Map as Map
+import DA.Time
+import DA.Set as Set
+
+data StakingConfig = StakingConfig with
+    stakingDelay : RelTime -- ^ Delay before a stake becomes active.
+    unlockDelay : RelTime -- ^ Delay until a stake is fully unlocked.
+    minStakeAmount : Decimal -- ^ Minimum amount required to stake, used to avoid dust stakes.
+  deriving (Eq, Show)
+
+data StakerConfig = StakerConfig with
+    relockPercentage : Decimal -- ^ Percentage of unlocked stake that is automatically relocked.
+    lifetimeRewards : Decimal -- ^ Total lifetime rewards earned by the staker.
+  deriving (Eq, Show)
+
+data StakerState = StakerState with
+    config :  StakerConfig
+    stakes : [Stake]
+    mintingAllowance : Decimal -- ^ Unused minting allowance for SV rewards.
+  deriving (Eq, Show)
+
+data Stake = Stake with
+    amount : Decimal
+    stakedAt : Time
+    requestedUnlockAt : Optional Time
+  deriving (Eq, Show)
+
+data StakingState = StakingState with
+    config : StakingConfig
+    stakers : Map Party StakerState
+  deriving (Eq, Show)
+
+type SvWeights = Map Party Decimal
+type SvMintingAllowance = Map Party Decimal
+type StakingWeightSchedule = [(Decimal, Decimal)] -- ^ List of (percentageLocked, percentageEarned) pairs.
+
+
+removeUnlockedStakes : Time -> RelTime -> StakerState -> StakerState
+removeUnlockedStakes now unlockDelay stakerState =
+  stakerState with
+    stakes = filter isStillStaked stakerState.stakes
+  where
+    isStillStaked : Stake -> Bool
+    isStillStaked stake =
+      case stake.requestedUnlockAt of
+        None -> True
+        Some t -> now <= t `addRelTime` unlockDelay
+
+
+data SvMintingContext = SvMintingContext with
+    roundClosedAt : Time -- ^ Time when the mining round was closed. Used to determine eligibility of stakes.
+    getEarnedPercentage : Decimal -> Decimal -- ^ Function to compute earned percentage from locked percentage.
+    totalSvMintingAllowance : Decimal
+    svWeights : SvWeights
+    skipSv : Party -> Bool -- ^ Function to determine whether to ignore a given SV staker; e.g., due to unavailability during the round.
+
+updateMintingAllowances : SvMintingContext -> StakingState -> StakingState
+updateMintingAllowances context stakingState =
+
+  where
+    now = context.roundClosedAt
+
+    -- determine locked stake per staker
+    stakerLockedAmounts : Map Party Decimal
+    stakerLockedAmounts = Map.map computeLockedAmount stakingState.stakers
+
+    computeLockedAmount : StakerState -> Decimal
+    computeLockedAmount stakerState = sum $ map amount $ filter isLocked stakerState.stakes
+
+    unlockDelay = stakingState.config.unlockDelay
+
+    isStaked : Stake -> Bool
+    isStaked stake =
+      stake.stakedAt `addRelTime` stakingState.config.stakingDelay <= now &&
+      case stake.requestedUnlockAt of
+        None -> True
+        Some t -> now < t `addRelTime` unlockDelay
+
+    isSvStaker : Party -> Bool
+    isSvStaker sv = Map.member sv context.svWeights
+
+    -- determine forward earned and unearned SV weigths per SV staker
+    svWeights : Map Party (Decimal, Decimal) -- (earnedWeight, unearnedWeight)
+    svWeights = Map.fromList $ do
+      (sv, weight) <- Map.toList svWeights
+      if context.skipSv sv
+        then pure (sv, (0.0, weight))
+        else case Map.lookup sv stakingState.stakers of
+          None -> pure (sv, (0.0, weight))
+          Some stakerState ->
+            let lockedAmount = computeLockedAmount stakerState
+            let lockedPercentage
+                  | stakerState.lifetimeRewards == 0.0 = 1.0
+                  | otherwise = min 1.0 (lockedAmount / stakerState.lifetimeRewards)
+            let earnedPercentage = getEarnedPercentage lockedPercentage
+            let earnedWeight = weight * earnedPercentage
+            let unearnedWeight = weight - earnedWeight
+            pure (sv, (earnedWeight, unearnedWeight))
+
+    stakingPoolWeight = sum [ unearnedWeight | (_, (_, unearnedWeight)) <- Map.toList svWeights ]
+    svPoolWeight = sum [ earnedWeight | (_, (earnedWeight, _)) <- Map.toList svWeights ]
+
+    stakingPoolMintingAllowance : Decimal
+    stakingPoolMintingAllowance = context.totalSvMintingAllowance * stakingPoolWeight / (stakingPoolWeight + svPoolWeight)
+
+    svPoolMintingAllowance : Decimal
+    svPoolMintingAllowance = context.totalSvMintingAllowance - stakingPoolMintingAllowance
+
+    totalThirdPartyStake = sum $ do
+      (staker, stakerState) <- Map.toList stakingState.stakers
+      guard (not (isSvStaker staker))
+      stake <- stakerState.stakes
+      guard (isStaked stake)
+      pure stake.amount
+
+    mintingAllowancePerSvWeight : Decimal
+    mintingAllowancePerSvWeight
+      | svPoolWeight > 0.0 = svPoolMintingAllowance / svPoolWeight
+      | otherwise = 0.0
+
+
+
+
+
+      let stakerState = stakingState.stakers[staker]
+      let lockedAmount = stakerLockedAmounts[staker]
+      let (earnedPct, unearnedPct) = computeEarnedUnearnedPct lockedAmount
+      let totalWeight = svWeights[staker]
+      pure (staker, (totalWeight * earnedPct / 100.0, totalWeight * unearnedPct / 100.0))
+
+
