@@ -21,6 +21,13 @@ db:
   maxConnections: 300
   maxWalSize: 2GB
 
+# Extra PostgreSQL command-line arguments (optional)
+# extraArgs:
+#   - "-c"
+#   - "shared_buffers=256MB"
+#   - "-c"
+#   - "wal_buffers=-1"
+
 persistence:
   secretName: "postgres-secrets"
 # k8s affinity for all deployed pods (optional)
