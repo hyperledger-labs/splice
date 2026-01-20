@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.scan.util
-import org.lfdecentralizedtrust.splice.store.ContractFetcher
+import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 import org.lfdecentralizedtrust.splice.util.Contract
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.definitions.GetChoiceContextRequest
@@ -25,7 +25,7 @@ import scala.jdk.CollectionConverters.*
 
 class HttpTokenStandardAllocationHandler(
     store: ScanStore,
-    contractFetcher: ContractFetcher,
+    contractFetcher: ChoiceContextContractFetcher,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit

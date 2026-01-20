@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.AnyContract
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
-import org.lfdecentralizedtrust.splice.store.ContractFetcher
+import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract, ContractWithState}
 
 import java.time.Instant
@@ -140,7 +140,7 @@ object ChoiceContextBuilder {
       requireLockedAmulet: Boolean,
       featuredProvider: Option[PartyId],
       store: ScanStore,
-      fetcher: ContractFetcher,
+      fetcher: ChoiceContextContractFetcher,
       clock: Clock,
       newBuilder: String => Builder,
   )(implicit

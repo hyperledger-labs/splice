@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import com.google.common.annotations.VisibleForTesting
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 
@@ -135,8 +136,8 @@ class UpdateIngestionService(
   private var waitForResumePromise = Promise.successful(())
 
   /** Note that any in-flight events being processed when `pause` is called will still be processed.
-    * For test purposes.
     */
+  @VisibleForTesting
   def pause(): Future[Unit] = blocking {
     withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
       logger.info("Pausing UpdateIngestionService.")
@@ -151,6 +152,7 @@ class UpdateIngestionService(
     }
   }
 
+  @VisibleForTesting
   def resume(): Unit = blocking {
     withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
       logger.info("Resuming UpdateIngestionService.")

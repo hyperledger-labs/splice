@@ -16,7 +16,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.scan.util
-import org.lfdecentralizedtrust.splice.store.ContractFetcher
+import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.{Resource, definitions}
@@ -28,7 +28,7 @@ import scala.util.{Failure, Success, Try}
 
 class HttpTokenStandardTransferInstructionHandler(
     store: ScanStore,
-    contractFetcher: ContractFetcher,
+    contractFetcher: ChoiceContextContractFetcher,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit

@@ -82,7 +82,7 @@ import com.digitalasset.canton.synchronizer.sequencer.config.{
 }
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
-import org.lfdecentralizedtrust.splice.store.ContractFetcher
+import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 
 case class SpliceConfig(
     override val name: Option[String] = None,
@@ -414,8 +414,8 @@ object SpliceConfig {
     implicit val circuitBreakersConfig: ConfigReader[CircuitBreakersConfig] =
       deriveReader[CircuitBreakersConfig]
     implicit val contractFetchLedgerFallbackConfigReader
-        : ConfigReader[ContractFetcher.StoreContractFetcherWithLedgerFallbackConfig] =
-      deriveReader[ContractFetcher.StoreContractFetcherWithLedgerFallbackConfig]
+        : ConfigReader[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig] =
+      deriveReader[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig]
     implicit val spliceParametersConfig: ConfigReader[SpliceParametersConfig] =
       deriveReader[SpliceParametersConfig]
     implicit val rateLimitersConfig: ConfigReader[RateLimitersConfig] =
@@ -843,8 +843,8 @@ object SpliceConfig {
     implicit val circuitBreakersConfig: ConfigWriter[CircuitBreakersConfig] =
       deriveWriter[CircuitBreakersConfig]
     implicit val contractFetchLedgerFallbackConfigWriter
-        : ConfigWriter[ContractFetcher.StoreContractFetcherWithLedgerFallbackConfig] =
-      deriveWriter[ContractFetcher.StoreContractFetcherWithLedgerFallbackConfig]
+        : ConfigWriter[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig] =
+      deriveWriter[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig]
     implicit val spliceParametersConfig: ConfigWriter[SpliceParametersConfig] =
       deriveWriter[SpliceParametersConfig]
 
