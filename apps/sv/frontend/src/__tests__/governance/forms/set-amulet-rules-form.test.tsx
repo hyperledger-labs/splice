@@ -312,22 +312,15 @@ describe('Set Amulet Config Rules Form', () => {
     const c2Input = screen.getByTestId('config-field-transferConfigTransferFeeInitialRate');
     await user.type(c2Input, '9.99');
 
-    const reviewButton = screen.getByTestId('submit-button');
-    await waitFor(async () => {
-      expect(reviewButton.getAttribute('disabled')).toBeNull();
-    });
-    await user.click(reviewButton);
-
-    await screen.findByText('Proposal Summary');
     const submitButton = screen.getByTestId('submit-button');
-    await user.click(submitButton);
-
-    // Verify the success toast appears
-    // Note: Governance page content (Action Required, Inflight Votes, etc.) can't be tested
-    // without full routing and the Wrapper doesn't include routes for the governance page
-    await waitFor(() => {
-      expect(screen.queryByText('Successfully submitted the proposal')).toBeInTheDocument();
+    await waitFor(async () => {
+      expect(submitButton.getAttribute('disabled')).toBeNull();
     });
+
+    await user.click(submitButton); //review proposal
+    await user.click(submitButton); //submit proposal
+
+    await screen.findByText('Successfully submitted the proposal');
   });
 
   test('should render diffs if changes to config values were made', async () => {

@@ -432,11 +432,6 @@ describe('Create Unallocated Unclaimed Activity Record Form', () => {
     await user.click(submitButton); //review proposal
     await user.click(submitButton); //submit proposal
 
-    waitFor(() => {
-      expect(screen.getByText('Action Required')).toBeInTheDocument();
-      expect(screen.getByText('Inflight Votes')).toBeInTheDocument();
-      expect(screen.getByText('Vote History')).toBeInTheDocument();
-      expect(screen.getByText('Successfully submitted the proposal')).toBeInTheDocument();
-    });
+    await screen.findByText('Successfully submitted the proposal');
   });
 });
