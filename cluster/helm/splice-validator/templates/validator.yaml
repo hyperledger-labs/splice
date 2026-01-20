@@ -133,12 +133,14 @@ spec:
         - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
           value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.decentralizedSynchronizerUrl | quote }}
         {{ else if .Values.synchronizer -}}
-            {{- if eq .Values.synchronizer.connectionType "trusted-url" }}
+            {{- if eq .Values.synchronizer.connectionType "trust-single" }}
         - name: ADDITIONAL_CONFIG_SYNCHRONIZER_URL
           value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.synchronizer.url | quote }}
-            {{- else if eq .Values.synchronizer.connectionType "trusted-svs" }}
-        - name: ADDITIONAL_CONFIG_SYNCHRONIZER_NAMES
-          value: canton.validator-apps.validator_backend.domains.global.sequencer-names = {{ .Values.synchronizer.sequencerNames | toJson}}
+            {{- else if eq .Values.synchronizer.connectionType "bft-custom" }}
+        - name: ADDITIONAL_CONFIG_SYNCHRONIZER_TRUSTED
+          value: |
+            canton.validator-apps.validator_backend.domains.global.trusted-synchronizer-config.sv-names = {{ .Values.synchronizer.svNames | toJson}}
+            canton.validator-apps.validator_backend.domains.global.trusted-synchronizer-config.threshold = {{ .Values.synchronizer.threshold }}
             {{- end }}
         {{ end }}
         {{- range $ii, $domain := .Values.extraDomains }}

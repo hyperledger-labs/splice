@@ -83,6 +83,7 @@ export const buildScanMock = (baseScanUrl: string): RestHandler[] => {
                       amuletToIssuePerYear: '40000000000.0',
                       validatorRewardCap: '0.2',
                       optValidatorFaucetCap: '2.85',
+                      optDevelopmentFundPercentage: '0.05',
                     },
                     opensAt: '2025-02-03T13:43:37.895871Z',
                     transferConfigUsd: {
@@ -153,6 +154,7 @@ export const buildScanMock = (baseScanUrl: string): RestHandler[] => {
                       amuletToIssuePerYear: '40000000000.0',
                       validatorRewardCap: '0.2',
                       optValidatorFaucetCap: '2.85',
+                      optDevelopmentFundPercentage: '0.05',
                     },
                     opensAt: '2025-02-03T13:54:09.430298Z',
                     transferConfigUsd: {
@@ -223,6 +225,7 @@ export const buildScanMock = (baseScanUrl: string): RestHandler[] => {
                       amuletToIssuePerYear: '40000000000.0',
                       validatorRewardCap: '0.2',
                       optValidatorFaucetCap: '2.85',
+                      optDevelopmentFundPercentage: '0.05',
                     },
                     opensAt: '2025-02-03T14:04:37.024279Z',
                     transferConfigUsd: {

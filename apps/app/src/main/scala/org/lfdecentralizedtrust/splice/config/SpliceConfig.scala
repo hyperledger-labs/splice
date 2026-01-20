@@ -715,11 +715,11 @@ object SpliceConfig {
           )
           _ <- Either.cond(
             conf.domains.global.trustedSynchronizerConfig.forall(c =>
-              c.sequencerNames.length >= c.threshold
+              c.svNames.length >= c.threshold
             ),
             (),
             ConfigValidationFailed(
-              "Configuration error: Length of sequencerNames should be greater than or equal to threshold."
+              "Configuration error: Length of svNames should be greater than or equal to threshold."
             ),
           )
           _ <- Either.cond(
