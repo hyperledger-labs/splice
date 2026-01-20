@@ -17,7 +17,7 @@ function createCloudSQLInstanceForPerformanceTests(ghaNamespace: ExactNamespace)
       tier: 'db-custom-2-7680', // same as devnet & testnet as of Jan 2026
       enterprisePlus: false,
     },
-    false, // that means that it will start stopped
+    true,
     {
       disableProtection: true,
       disableBackups: true,
