@@ -15,7 +15,6 @@ jest.mock('./config', () => ({
     runnerHookVersion: '1.1',
   },
 }));
-class FakeCloudPostgres extends pulumi.Resource {}
 jest.mock('@lfdecentralizedtrust/splice-pulumi-common', () => ({
   __esModule: true,
   appsAffinityAndTolerations: {},
@@ -23,9 +22,6 @@ jest.mock('@lfdecentralizedtrust/splice-pulumi-common', () => ({
   HELM_MAX_HISTORY_SIZE: 42,
   imagePullSecretByNamespaceNameForServiceAccount: () => [],
   infraAffinityAndTolerations: {},
-  CloudPostgres: function CloudPostgres() {
-    return new FakeCloudPostgres('CloudPostgres', 'cloud-postgres', true);
-  },
 }));
 jest.mock('@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig', () => ({
   __esModule: true,
