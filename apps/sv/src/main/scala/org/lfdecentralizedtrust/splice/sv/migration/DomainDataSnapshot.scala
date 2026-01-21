@@ -24,7 +24,6 @@ final case class DomainDataSnapshot(
     dars: Seq[Dar],
     // true if we exported for a proper migration, false for DR.
     synchronizerWasPaused: Boolean,
-    acsFormat: http.DomainDataSnapshot.AcsFormat,
 ) extends PrettyPrinting {
   // if output directory is specified we use the new format, otherwise the old one.
   // Only the DR endpoint should use the old one.
@@ -43,7 +42,7 @@ final case class DomainDataSnapshot(
       }.toVector,
       synchronizerWasPaused = Some(synchronizerWasPaused),
       separatePayloadFiles = Some(outputDirectory.isDefined),
-      acsFormat = Some(acsFormat),
+      acsFormat = Some(http.DomainDataSnapshot.AcsFormat.LedgerApi),
     )
   }
 
@@ -85,16 +84,20 @@ object DomainDataSnapshot {
         Dar(dar.hash, ByteString.copyFrom(decoded))
       }
     val acsTimestamp = Instant.parse(src.acsTimestamp)
-    Right(
-      DomainDataSnapshot(
-        src.genesisState.map(DomainMigrationEncoding.decode(src.separatePayloadFiles, _)),
-        DomainMigrationEncoding.decode(src.separatePayloadFiles, src.acsSnapshot),
-        acsTimestamp,
-        dars,
-        src.synchronizerWasPaused.getOrElse(false),
-        acsFormat = src.acsFormat.getOrElse(http.DomainDataSnapshot.AcsFormat.AdminApi),
-      )
-    )
+    src.acsFormat.getOrElse(http.DomainDataSnapshot.AcsFormat.AdminApi) match {
+      case http.DomainDataSnapshot.AcsFormat.members.AdminApi =>
+        Left("Admin API ACS Format is unsupported since splice 0.5")
+      case http.DomainDataSnapshot.AcsFormat.members.LedgerApi =>
+        Right(
+          DomainDataSnapshot(
+            src.genesisState.map(DomainMigrationEncoding.decode(src.separatePayloadFiles, _)),
+            DomainMigrationEncoding.decode(src.separatePayloadFiles, src.acsSnapshot),
+            acsTimestamp,
+            dars,
+            src.synchronizerWasPaused.getOrElse(false),
+          )
+        )
+    }
   }
 
 }

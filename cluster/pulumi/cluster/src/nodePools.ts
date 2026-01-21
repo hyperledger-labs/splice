@@ -12,7 +12,6 @@ export function installNodePools(): void {
     : clusterName;
 
   new gcp.container.NodePool('cn-apps-node-pool', {
-    name: 'cn-apps-pool',
     cluster,
     nodeConfig: {
       machineType: gkeClusterConfig.nodePools.apps.nodeType,
@@ -35,7 +34,6 @@ export function installNodePools(): void {
   });
 
   new gcp.container.NodePool('cn-infra-node-pool', {
-    name: 'cn-infra-pool',
     cluster,
     nodeConfig: {
       machineType: gkeClusterConfig.nodePools.infra.nodeType,

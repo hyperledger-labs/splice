@@ -33,6 +33,7 @@ case class SpliceMetricsFactory(
         new ValidatorAppMetrics(
           metricsFactoryProvider.generateMetricsFactory(metricsContext),
           storageHistograms,
+          loggerFactory,
         )
       },
     )
@@ -45,6 +46,7 @@ case class SpliceMetricsFactory(
         new SvAppMetrics(
           metricsFactoryProvider.generateMetricsFactory(metricsContext),
           storageHistograms,
+          loggerFactory,
         )
       },
     )
@@ -71,9 +73,9 @@ case class SpliceMetricsFactory(
         new SplitwellAppMetrics(
           metricsFactoryProvider.generateMetricsFactory(metricsContext),
           storageHistograms,
+          loggerFactory,
         )
       },
     )
   }
-
 }

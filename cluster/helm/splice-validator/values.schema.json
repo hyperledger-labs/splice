@@ -62,7 +62,7 @@
           "minimum": 0,
           "description": "bft-custom threshold. Optional unless scan-type is bft-custom."
         },
-        "trustedSvs": {
+        "svNames": {
           "type": "array",
           "items": {
             "type": "string"
@@ -134,7 +134,7 @@
       "then": {
         "properties": {
           "scanClient": {
-            "required": ["threshold", "trustedSvs"]
+            "required": ["threshold", "svNames"]
           }
         }
       }
