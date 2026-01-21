@@ -108,7 +108,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         )(config)
       )
       .addConfigTransforms((_, config) =>
-        // The test iteslf may hit scan hard, but this test is not about testing rate limiting...
+        // The test itself may hit scan hard, but this test is not about testing rate limiting...
         updateAllScanAppConfigs_(config =>
           config.copy(parameters =
             config.parameters.copy(rateLimiting =
