@@ -45,7 +45,9 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyh
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
+  updateAllScanAppConfigs_,
 }
+import org.lfdecentralizedtrust.splice.config.RateLimitersConfig
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -54,7 +56,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTestWithSharedEnvironment,
   SpliceTestConsoleEnvironment,
 }
-import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{SpliceRateLimitConfig, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
@@ -103,6 +105,16 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        // The test itself may hit scan hard, but this test is not about testing rate limiting...
+        updateAllScanAppConfigs_(config =>
+          config.copy(parameters =
+            config.parameters.copy(rateLimiting =
+              RateLimitersConfig(SpliceRateLimitConfig(enabled = false, 1), Map.empty)
+            )
+          )
         )(config)
       )
   }
@@ -678,7 +690,8 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         )
       def replaceStringsInJson(viewValue: Json) = {
         val current = viewValue.spaces2SortKeys
-        val amuletRulesId = sv1ScanBackend.getAmuletRules().contractId.contractId
+        val amuletRulesId =
+          eventuallySucceeds()(sv1ScanBackend.getAmuletRules().contractId.contractId)
         val allContracts =
           "\"([0-9a-fA-F]{138})\"".r.findAllIn(current).matchData.map(_.group(1)).toSeq
 
