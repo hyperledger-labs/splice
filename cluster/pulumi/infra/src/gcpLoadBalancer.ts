@@ -14,7 +14,25 @@ you need to add the CRD; on a cncluster-controlled dev cluster directory you can
   gcloud container clusters update "cn-${GCP_CLUSTER_BASENAME}net" --gateway-api=standard
  */
 
+/* TODO (#2723)
+
+Highest subnet in 10.x in cn-*net currently is 10.232.0.0/20.
+Range can be expanded but not shrunk; doc recommends starting with /23:
+  https://docs.cloud.google.com/load-balancing/docs/proxy-only-subnets#proxy-subnet-size
+
+1. Create a proxy-only subnet in the GKE cluster's region (us-central1) and VPC:
+   gcloud compute networks subnets create proxy-only-subnet \
+     --purpose=REGIONAL_MANAGED_PROXY \
+     --role=ACTIVE \
+     --region=$CLOUDSDK_COMPUTE_REGION \
+     --network=default \
+     --range=10.233.0.0/23
+ */
+
 // possible values and their meaning: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gatewayclass
+// global vs regional:
+//   - the ingressAddress must match
+//   - the SecurityPolicy must match
 const gcpGatewayClass = 'gke-l7-regional-external-managed';
 
 interface L7GatewayConfig {
