@@ -41,7 +41,6 @@ import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
 import java.time.Duration
-import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 
 class WalletManualRoundsIntegrationTest
