@@ -23,9 +23,17 @@ class KeyValueStoreTest
       participant = mkParticipantId("participant"),
       key = Map(),
     )
+  private val storeDescriptor2 =
+    StoreDescriptor(
+      version = 2,
+      name = "DbMultiDomainAcsStoreTest",
+      party = dsoParty,
+      participant = mkParticipantId("participant"),
+      key = Map(),
+    )
 
-  private def mkStore() = KeyValueStore(
-    storeDescriptor,
+  private def mkStore(descriptor: StoreDescriptor) = KeyValueStore(
+    descriptor,
     storage,
     loggerFactory,
   )
@@ -39,7 +47,7 @@ class KeyValueStoreTest
 
     "set and get a payload successfully" in {
       for {
-        store <- mkStore()
+        store <- mkStore(storeDescriptor)
         _ <- store.setValue(configKey, configValue)
         retrievedValue <- store.getValue[String](configKey).value
       } yield {
@@ -49,7 +57,7 @@ class KeyValueStoreTest
 
     "return None for a non-existent key" in {
       for {
-        store <- mkStore()
+        store <- mkStore(storeDescriptor)
         retrievedValue <- store.getValue[String]("non-existent-key").value
       } yield {
         retrievedValue shouldBe None
@@ -58,7 +66,7 @@ class KeyValueStoreTest
 
     "update an existing payload" in {
       for {
-        store <- mkStore()
+        store <- mkStore(storeDescriptor)
         _ <- store.setValue(configKey, configValue)
         _ <- store.setValue(configKey, otherValue)
         retrievedValue <- store.getValue[String](configKey).value
@@ -69,7 +77,7 @@ class KeyValueStoreTest
 
     "handle multiple different keys independently" in {
       for {
-        store <- mkStore()
+        store <- mkStore(storeDescriptor)
         _ <- store.setValue(configKey, configValue)
         _ <- store.setValue(otherKey, otherValue)
 
@@ -83,7 +91,7 @@ class KeyValueStoreTest
 
     "delete single key" in {
       for {
-        store <- mkStore()
+        store <- mkStore(storeDescriptor)
         _ <- store.setValue(configKey, configValue)
         _ <- store.setValue(otherKey, otherValue)
 
@@ -93,6 +101,27 @@ class KeyValueStoreTest
       } yield {
         configKeyValue shouldBe None
         otherKeyValue.value.value shouldBe otherValue
+      }
+    }
+
+    "different storeDescriptors should not interfere" in {
+      for {
+        store1 <- mkStore(storeDescriptor)
+        store2 <- mkStore(storeDescriptor2)
+        _ <- store1.setValue("key", "value1")
+        _ <- store2.setValue("key", "value2")
+        _ <- store2.setValue("key2", "something")
+
+        k1s1 <- store1.getValue[String]("key").value
+        k2s1 <- store1.getValue[String]("key2").value
+
+        k1s2 <- store2.getValue[String]("key").value
+        k2s2 <- store2.getValue[String]("key2").value
+      } yield {
+        k1s1.value.value shouldBe "value1"
+        k2s1 shouldBe None
+        k1s2.value.value shouldBe "value2"
+        k2s2.value.value shouldBe "something"
       }
     }
   }
