@@ -76,6 +76,7 @@ class DbSvDsoStore(
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     ingestionConfig: IngestionConfig,
+    acsStoreDescriptorUserVersion: Option[Long] = None,
 )(implicit
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,
@@ -95,6 +96,7 @@ class DbSvDsoStore(
           "dsoParty" -> key.dsoParty.toProtoPrimitive,
           "svParty" -> key.svParty.toProtoPrimitive,
         ),
+        userVersion = acsStoreDescriptorUserVersion,
       ),
       domainMigrationInfo,
       ingestionConfig,

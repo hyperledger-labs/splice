@@ -1008,6 +1008,7 @@ object SvDsoStore {
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       ingestionConfig: IngestionConfig,
+      acsStoreDescriptorUserVersion: Option[Long] = None,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -1021,6 +1022,7 @@ object SvDsoStore {
       domainMigrationInfo,
       participantId,
       ingestionConfig,
+      acsStoreDescriptorUserVersion,
     )
   }
 

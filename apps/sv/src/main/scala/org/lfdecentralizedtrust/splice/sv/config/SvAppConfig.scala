@@ -367,6 +367,8 @@ case class SvAppBackendConfig(
     validateTopologyAfterMigration: Boolean = false,
     // The threshold above which unclaimed development fund coupons will be merged.
     unclaimedDevelopmentFundCouponsThreshold: Int = 10,
+    svAcsStoreDescriptorUserVersion: Option[Long] = None,
+    dsoAcsStoreDescriptorUserVersion: Option[Long] = None,
 ) extends SpliceBackendConfig {
 
   def shouldSkipSynchronizerInitialization =

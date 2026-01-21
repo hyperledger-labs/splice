@@ -189,7 +189,8 @@ class ScanApp(
         nodeMetrics.dbScanStore,
         config.automation.ingestion,
         initialRound.toLong,
-        config.storeDescriptorUserVersion,
+        config.acsStoreDescriptorUserVersion,
+        config.txLogStoreDescriptorUserVersion,
       )
       updateHistory = new UpdateHistory(
         storage,
