@@ -104,7 +104,7 @@
 
   - Validator
 
-    - Expose ``/holdings/summary`` endpoint from scan proxy
+    - Expose ``/v0/holdings/summary`` endpoint from scan proxy
 
 .. release-notes:: 0.5.6
 
