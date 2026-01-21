@@ -33,7 +33,6 @@ import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AnsEntry,
   GetDsoInfoResponse,
-  HoldingsSummaryRequest,
   HoldingsSummaryResponse,
   LookupTransferCommandStatusResponse,
   MigrationSchedule,
