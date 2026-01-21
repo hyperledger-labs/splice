@@ -65,12 +65,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     secretName: string,
     cloudSqlConfig: CloudSqlConfig,
     active: boolean = true,
-    opts: {
-      disableProtection?: boolean;
-      migrationId?: string;
-      logicalDecoding?: boolean;
-      disableBackups?: boolean;
-    } = {}
+    opts: { disableProtection?: boolean; migrationId?: string; logicalDecoding?: boolean } = {}
   ) {
     const instanceLogicalName = xns.logicalName + '-' + instanceName;
     const instanceLogicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
@@ -98,8 +93,8 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
             ...(opts.logicalDecoding ? [{ name: 'cloudsql.logical_decoding', value: 'on' }] : []),
           ],
           backupConfiguration: {
-            enabled: !opts.disableBackups,
-            pointInTimeRecoveryEnabled: !opts.disableBackups,
+            enabled: true,
+            pointInTimeRecoveryEnabled: true,
             ...(spliceConfig.pulumiProjectConfig.cloudSql.backupsToRetain
               ? {
                   backupRetentionSettings: {
