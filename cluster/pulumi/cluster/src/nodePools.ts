@@ -15,6 +15,7 @@ export function installNodePools(): void {
     cluster,
     nodeConfig: {
       machineType: gkeClusterConfig.nodePools.apps.nodeType,
+      bootDisk: gkeClusterConfig.nodePools.apps.bootDisk,
       taints: [
         {
           effect: 'NO_SCHEDULE',
@@ -37,6 +38,7 @@ export function installNodePools(): void {
     cluster,
     nodeConfig: {
       machineType: gkeClusterConfig.nodePools.infra.nodeType,
+      bootDisk: gkeClusterConfig.nodePools.infra.bootDisk,
       taints: [
         {
           effect: 'NO_SCHEDULE',

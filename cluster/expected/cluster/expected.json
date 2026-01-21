@@ -10,6 +10,10 @@
       "cluster": "cn-mocknet",
       "initialNodeCount": 0,
       "nodeConfig": {
+        "bootDisk": {
+          "diskType": "pd-balanced",
+          "sizeGb": 100
+        },
         "labels": {
           "cn_apps": "true"
         },
@@ -38,6 +42,10 @@
       "cluster": "cn-mocknet",
       "initialNodeCount": 1,
       "nodeConfig": {
+        "bootDisk": {
+          "diskType": "pd-balanced",
+          "sizeGb": 100
+        },
         "labels": {
           "cn_infra": "true"
         },
