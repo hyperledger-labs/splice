@@ -260,7 +260,7 @@
                 }
               }
             ],
-            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "image": "pulumi/pulumi:0.0.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
