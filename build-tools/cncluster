@@ -1798,7 +1798,7 @@ function subcmd_restore_node() {
 
     node="${1-}"
     migration_id="${2-}"
-    backup_run_id="${4-}"
+    backup_run_id="${3-}"
 
     if [ -z "$node" ] || [ -z "$migration_id" ]; then
         _error "Usage: $SCRIPTNAME restore_node <namespace_name> <migration_id> [<backup_run_id>]"
