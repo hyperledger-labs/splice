@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1155,
+  "id": 19494,
   "links": [],
   "panels": [
     {
@@ -382,15 +382,19 @@
       "id": 11,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
         },
         "tooltip": {
           "hideZeros": false,
           "mode": "single",
-          "sort": "none"
+          "sort": "desc"
         }
       },
       "pluginVersion": "12.1.1",
@@ -398,7 +402,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "(timestamp(daml_participant_sync_commitments_last_locally_checkpointed{namespace=~\"$namespace\",job=~\"$job\"}) - ((daml_participant_sync_commitments_last_locally_checkpointed{namespace=~\"$namespace\",job=~\"$job\"} > 0) / 1e6))",
+          "expr": "min by (namespace, job) ((timestamp(daml_participant_sync_commitments_last_locally_checkpointed{namespace=~\"$namespace\",job=~\"$job\"}) - ((daml_participant_sync_commitments_last_locally_checkpointed{namespace=~\"$namespace\",job=~\"$job\"} > 0) / 1e6)))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "{{namespace}}-{{job}}",
@@ -482,10 +486,14 @@
       "id": 10,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
         },
         "tooltip": {
           "hideZeros": false,
@@ -498,7 +506,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "(timestamp(daml_participant_sync_commitments_last_locally_completed{namespace=~\"$namespace\",job=~\"$job\"}) - ((daml_participant_sync_commitments_last_locally_completed{namespace=~\"$namespace\",job=~\"$job\"} > 0) / 1e6))",
+          "expr": "min by (namespace, job) (timestamp(daml_participant_sync_commitments_last_locally_completed{namespace=~\"$namespace\",job=~\"$job\"}) - ((daml_participant_sync_commitments_last_locally_completed{namespace=~\"$namespace\",job=~\"$job\"} > 0) / 1e6))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "{{namespace}}-{{job}}",
@@ -582,10 +590,14 @@
       "id": 8,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
         },
         "tooltip": {
           "hideZeros": false,
@@ -598,7 +610,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "(timestamp(daml_participant_sync_commitments_last_incoming_received{namespace=~\"$namespace\",job=~\"$job\"}) - ((daml_participant_sync_commitments_last_incoming_received{namespace=~\"$namespace\",job=~\"$job\"} > 0) / 1e6))",
+          "expr": "min by (namespace, job) (timestamp(daml_participant_sync_commitments_last_incoming_received{namespace=~\"$namespace\",job=~\"$job\"}) - ((daml_participant_sync_commitments_last_incoming_received{namespace=~\"$namespace\",job=~\"$job\"} > 0) / 1e6))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "{{namespace}}-{{job}}",
@@ -682,10 +694,14 @@
       "id": 9,
       "options": {
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
         },
         "tooltip": {
           "hideZeros": false,
@@ -797,7 +813,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "(daml_participant_sync_commitments_last_incoming_received{namespace=~\"$namespace\", job=~\"$job\"} != 0)/1e3",
+          "expr": "max by (namespace, job)(daml_participant_sync_commitments_last_incoming_received{namespace=~\"$namespace\", job=~\"$job\"} != 0)/1e3",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "{{namespace}}-{{job}}",
@@ -899,7 +915,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(daml_participant_sync_commitments_last_incoming_processed{namespace=~\"$namespace\", job=~\"$job\"} != 0)/1e3",
+          "expr": "max by (namespace, job)(daml_participant_sync_commitments_last_incoming_processed{namespace=~\"$namespace\", job=~\"$job\"} != 0)/1e3",
           "hide": false,
           "instant": false,
           "legendFormat": "{{namespace}}-{{job}}",
@@ -1000,7 +1016,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(daml_participant_sync_commitments_last_locally_completed{namespace=~\"$namespace\", job=~\"$job\"} != 0)/1e3",
+          "expr": "max by (namespace, job)(daml_participant_sync_commitments_last_locally_completed{namespace=~\"$namespace\", job=~\"$job\"} != 0)/1e3",
           "hide": false,
           "instant": false,
           "legendFormat": "{{namespace}}-{{job}}",
@@ -1101,7 +1117,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(daml_participant_sync_commitments_last_locally_checkpointed{namespace=~\"$namespace\", job=~\"$job\"} != 0)/1e3",
+          "expr": "max by (namespace, job)(daml_participant_sync_commitments_last_locally_checkpointed{namespace=~\"$namespace\", job=~\"$job\"} != 0)/1e3",
           "hide": false,
           "instant": false,
           "legendFormat": "{{namespace}}-{{job}}",
@@ -1114,6 +1130,7 @@
     }
   ],
   "preload": false,
+  "refresh": "30s",
   "schemaVersion": 41,
   "tags": [],
   "templating": {
@@ -1165,12 +1182,12 @@
     ]
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "UTC",
   "title": "ACS Commitment Performance",
   "uid": "eesa90lstfk00b",
-  "version": 2
+  "version": 4
 }
