@@ -380,7 +380,7 @@ object DarResources {
 /** All DARs for a given package
   */
 final case class PackageResource(
-    bootstrap: DarResource, // Used during bootstrapping or testing where we can assume a fixed package id.
+    latest: DarResource, // latest package version
     minimumInitialization: DarResource, // The minimum version that can be used for initialization of a fresh network
     others: Seq[DarResource], // Other DARs for the same package
 ) {
@@ -392,7 +392,7 @@ final case class PackageResource(
     all.find(_.metadata.version.toString() == version)
   }
 
-  def all = bootstrap +: others
+  def all = latest +: others
 }
 
 final case class DarResource(

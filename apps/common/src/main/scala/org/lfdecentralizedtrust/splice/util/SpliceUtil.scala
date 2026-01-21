@@ -57,12 +57,12 @@ object SpliceUtil {
 
   def readPackageConfig(): splice.amuletconfig.PackageConfig = {
     new splice.amuletconfig.PackageConfig(
-      readDarVersion(DarResources.amulet.bootstrap).toString,
-      readDarVersion(DarResources.amuletNameService.bootstrap).toString,
-      readDarVersion(DarResources.dsoGovernance.bootstrap).toString,
-      readDarVersion(DarResources.validatorLifecycle.bootstrap).toString,
-      readDarVersion(DarResources.wallet.bootstrap).toString,
-      readDarVersion(DarResources.walletPayments.bootstrap).toString,
+      readDarVersion(DarResources.amulet.latest).toString,
+      readDarVersion(DarResources.amuletNameService.latest).toString,
+      readDarVersion(DarResources.dsoGovernance.latest).toString,
+      readDarVersion(DarResources.validatorLifecycle.latest).toString,
+      readDarVersion(DarResources.wallet.latest).toString,
+      readDarVersion(DarResources.walletPayments.latest).toString,
     )
   }
 
