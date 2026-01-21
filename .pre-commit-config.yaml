@@ -91,6 +91,6 @@ repos:
        additional_dependencies: ['rstcheck[sphinx]']
        args: [
          --report-level, WARNING,
-         --ignore-directives, "openapi,todo",
+         --ignore-directives, "openapi,todo,release-notes",
          --ignore-substitutions, "version_literal,chart_version_literal"
        ]
