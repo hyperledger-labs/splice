@@ -63,7 +63,7 @@ class AcsSnapshotBulkStorage(
       .collect { case Some((migrationId, timestamp)) => (migrationId, timestamp) }
   }
 
-  /** *
+  /**
     * This is the main implementation of the pipeline. It is a Pekko Source that gets a `start` timestamp, and starts dumping to S3
     *  all snapshots (strictly) after `start`. It is an infinite source that should never complete.
     */

@@ -75,7 +75,7 @@ class SingleAcsSnapshotBulkStorage(
 
   }
 
-  private def getSource: Source[String, NotUsed] = {
+  private def getSource: Source[(Long, CantonTimestamp), NotUsed] = {
     val idx = new AtomicInteger(0)
     Source
       .unfoldAsync(Start: Position) {
@@ -106,12 +106,17 @@ class SingleAcsSnapshotBulkStorage(
           objectKey
         }
       }
+      // emit a Unit upon completion of the write to s3
+      .fold(()) { case ((), _) => () }
+      // emit back the (migration, timestamp) upon completion
+      .map(_ => (migrationId, timestamp))
+
   }
 
   // TODO(#3429): I'm no longer sure the retrying source is actually useful,
   //  we probably want to just rely on the of the full stream of ACS snapshot dumps (in AcsSnapshotBulkStorage),
   //  but keeping it for now (and the corresponding unit test) until that is fully resolved
-  private def getRetryingSource: Source[WithKillSwitch[String], (KillSwitch, Future[Done])] = {
+  private def getRetryingSource: Source[WithKillSwitch[(Long, CantonTimestamp)], (KillSwitch, Future[Done])] = {
 
     def mksrc = {
       val base = getSource
@@ -131,10 +136,10 @@ class SingleAcsSnapshotBulkStorage(
 
     // TODO(#3429): tweak the retry parameters here
     val delay = FiniteDuration(5, "seconds")
-    val policy = new RetrySourcePolicy[Unit, String] {
+    val policy = new RetrySourcePolicy[Unit, (Long, CantonTimestamp)] {
       override def shouldRetry(
           lastState: Unit,
-          lastEmittedElement: Option[String],
+          lastEmittedElement: Option[(Long, CantonTimestamp)],
           lastFailure: Option[Throwable],
       ): Option[(scala.concurrent.duration.FiniteDuration, Unit)] = {
         lastFailure.map { t =>
@@ -182,10 +187,6 @@ object SingleAcsSnapshotBulkStorage {
           s3Connection,
           loggerFactory,
         ).getSource
-          // emit a Unit upon completion
-          .fold(()) { case ((), _) => () }
-          // emit back the (migration, timestamp) upon completion
-          .map(_ => (migrationId, timestamp))
     }
 
   /** The same flow as a source, currently used only for unit testing.
@@ -201,7 +202,7 @@ object SingleAcsSnapshotBulkStorage {
       actorSystem: ActorSystem,
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Source[WithKillSwitch[String], (KillSwitch, Future[Done])] =
+  ): Source[WithKillSwitch[(Long, CantonTimestamp)], (KillSwitch, Future[Done])] =
     new SingleAcsSnapshotBulkStorage(
       migrationId,
       timestamp,
