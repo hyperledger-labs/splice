@@ -5,6 +5,8 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
 
+import { Policy as SecurityPolicy } from './cloudArmor';
+
 /*
 If you see the error
   no matches for kind "Gateway" in version "gateway.networking.k8s.io/v1"
@@ -28,7 +30,7 @@ interface L7GatewayConfig {
     port: number;
   };
   // the Cloud Armor policy to attach
-  securityPolicy: gcp.compute.SecurityPolicy;
+  securityPolicy: SecurityPolicy;
   // if provided, an HTTPS listener will be created on port 443 that
   // terminates TLS using this secret
   tlsSecretName?: pulumi.Input<string>;
