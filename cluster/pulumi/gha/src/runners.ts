@@ -549,8 +549,10 @@ function installK8sRunnerScaleSet(
                   {
                     name: 'PERFORMANCE_TESTS_DB_PASSWORD',
                     valueFrom: {
-                      key: 'postgresPassword',
-                      name: performanceTestsDb.secretName,
+                      secretKeyRef: {
+                        key: 'postgresPassword',
+                        name: performanceTestsDb.secretName,
+                      },
                     },
                   },
                 ],
