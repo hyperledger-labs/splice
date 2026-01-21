@@ -27,7 +27,9 @@ import {
   participantBootstrapDumpSecretName,
   ParticipantPruningConfig,
   PersistenceConfig,
+  pvcSuffix,
   spliceInstanceNames,
+  standardStorageClassName,
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
@@ -237,6 +239,10 @@ export async function installValidatorApp(
       logAsyncFlush: config.logAsync,
       resources: baseConfig.svValidator ? config.resources : {},
       ...spliceInstanceNames,
+      pvc: {
+        volumeStorageClass: standardStorageClassName,
+        volumeName: `domain-migration-validator-${pvcSuffix}`,
+      },
     },
     activeVersion,
     { dependsOn }

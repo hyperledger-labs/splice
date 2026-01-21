@@ -38,6 +38,8 @@ import {
   networkWideConfig,
   getValidatorAppApiAudience,
   getNamespaceConfig,
+  standardStorageClassName,
+  pvcSuffix,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { installParticipant } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
@@ -240,6 +242,10 @@ async function installValidator(
     persistence: {
       ...validatorValuesFromYamlFiles.persistence,
       postgresName: 'postgres',
+    },
+    pvc: {
+      volumeStorageClass: standardStorageClassName,
+      volumeName: `domain-migration-validator-${pvcSuffix}`,
     },
     db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined },
     enablePostgresMetrics: true,

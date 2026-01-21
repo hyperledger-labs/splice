@@ -329,6 +329,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -766,6 +773,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -1203,6 +1217,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -1640,6 +1661,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -2077,6 +2105,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -2540,6 +2575,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -2982,6 +3024,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -3424,6 +3473,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -3866,6 +3922,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -4308,6 +4371,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -4793,6 +4863,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -4805,6 +4882,38 @@
           "volumeSize": "100Gi"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "nonHyperdiskAppsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
+        },
         "persistence": {
           "secretName": "postgres-0-secret"
         },
@@ -4850,6 +4959,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -4862,6 +4978,38 @@
           "volumeSize": "100Gi"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "nonHyperdiskAppsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
+        },
         "persistence": {
           "secretName": "postgres-1-secret"
         },
@@ -4907,6 +5055,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -4919,6 +5074,38 @@
           "volumeSize": "100Gi"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "nonHyperdiskAppsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
+        },
         "persistence": {
           "secretName": "postgres-2-secret"
         },
@@ -4964,6 +5151,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -4976,6 +5170,38 @@
           "volumeSize": "100Gi"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "nonHyperdiskAppsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
+        },
         "persistence": {
           "secretName": "postgres-3-secret"
         },
@@ -5021,6 +5247,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -5033,6 +5266,38 @@
           "volumeSize": "100Gi"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "nonHyperdiskAppsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
+        },
         "persistence": {
           "secretName": "postgres-4-secret"
         },

@@ -9,6 +9,7 @@ import {
   installSpliceRunbookHelmChart,
   installPostgresPasswordSecret,
   InstalledHelmChart,
+  nonHyperdiskAppsAffinityAndTolerations,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { multiValidatorConfig } from './config';
@@ -39,6 +40,7 @@ export function installPostgres(
       persistence: { secretName },
       db: { volumeSize: config.postgresPvcSize, maxConnections: 1000 },
       resources: config.resources?.postgres,
+      nonHyperdiskAppsAffinityAndTolerations,
     },
     activeVersion,
     { dependsOn: [passwordSecret, ...dependsOn] }

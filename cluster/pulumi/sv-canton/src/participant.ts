@@ -20,6 +20,8 @@ import { SingleSvConfiguration } from '@lfdecentralizedtrust/splice-pulumi-commo
 import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
 import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
+import { standardStorageClassName } from '../../common/src/storage/storageClass';
+
 export function installSvParticipant(
   xns: ExactNamespace,
   svConfig: SingleSvConfiguration,
@@ -90,7 +92,7 @@ export function installSvParticipant(
       pvc: spliceConfig.configuration.persistentHeapDumps
         ? {
             size: '10Gi',
-            volumeStorageClass: 'standard-rwo',
+            volumeStorageClass: standardStorageClassName,
           }
         : undefined,
     },

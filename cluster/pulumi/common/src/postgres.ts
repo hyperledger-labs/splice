@@ -10,9 +10,9 @@ import { CnChartVersion } from './artifacts';
 import { clusterSmallDisk, CloudSqlConfig, config } from './config';
 import { spliceConfig } from './config/config';
 import {
-  appsAffinityAndTolerations,
   infraAffinityAndTolerations,
   installSpliceHelmChart,
+  nonHyperdiskAppsAffinityAndTolerations,
 } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
 import { ChartValues, CLUSTER_BASENAME, ExactNamespace, GCP_ZONE } from './utils';
@@ -244,7 +244,9 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
         dependsOn: [passwordSecret],
       },
       true,
-      useInfraAffinityAndTolerations ? infraAffinityAndTolerations : appsAffinityAndTolerations
+      useInfraAffinityAndTolerations
+        ? infraAffinityAndTolerations
+        : nonHyperdiskAppsAffinityAndTolerations
     );
     this.pg = pg;
 

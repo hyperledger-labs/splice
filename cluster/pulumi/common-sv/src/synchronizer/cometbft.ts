@@ -16,6 +16,7 @@ import {
   installSpliceHelmChart,
   isDevNet,
   loadYamlFromFile,
+  nonHyperdiskAppsAffinityAndTolerations,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
   svCometBftKeysFromSecret,
@@ -211,7 +212,9 @@ export function installCometBftNode(
       aliases: [{ name: `global-domain-${migrationId}-cometbft`, parent: undefined }],
       ignoreChanges: ['name'],
       protect: disableProtection ? false : protectCometBft,
-    }
+    },
+    true,
+    nonHyperdiskAppsAffinityAndTolerations
   );
   return { rpcServiceName: `${nodeConfig.identifier}-cometbft-rpc`, release };
 }

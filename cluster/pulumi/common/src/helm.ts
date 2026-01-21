@@ -9,6 +9,7 @@ import path from 'path';
 import { CnChartVersion } from './artifacts';
 import { config, imagePullPolicy } from './config';
 import { spliceConfig } from './config/config';
+import { hyperdiskSupportConfig } from './config/hyperdiskSupportConfig';
 import { activeVersion } from './domainMigration';
 import { SplicePlaceholderResource } from './pulumiUtilResources';
 import {
@@ -73,7 +74,7 @@ function installSpliceHelmChartByNamespaceName(
   version: CnChartVersion = activeVersion,
   opts?: SpliceCustomResourceOptions,
   includeNamespaceInName = true,
-  affinityAndTolerations = appsAffinityAndTolerations,
+  affinityAndTolerations: object = appsAffinityAndTolerations,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): InstalledHelmChart {
   if (spliceConfig.pulumiProjectConfig.installDataOnly) {
@@ -107,7 +108,7 @@ export function installSpliceHelmChart(
   version: CnChartVersion = activeVersion,
   opts?: SpliceCustomResourceOptions,
   includeNamespaceInName = true,
-  affinityAndTolerations = appsAffinityAndTolerations,
+  affinityAndTolerations: object = appsAffinityAndTolerations,
   timeout: number = HELM_CHART_TIMEOUT_SEC
 ): InstalledHelmChart {
   return installSpliceHelmChartByNamespaceName(
@@ -171,9 +172,9 @@ export function installSpliceRunbookHelmChartByNamespaceName(
         chart: chartPath(chartName, version),
         version: versionStringWithPossibleOverride(version, nsLogicalName, chartName),
         values: {
+          ...appsAffinityAndTolerations,
           ...values,
           imageRepo: DOCKER_REPO,
-          ...appsAffinityAndTolerations,
           ...imagePullPolicy,
         },
         timeout,
@@ -224,31 +225,44 @@ function versionStringWithPossibleOverride(
   }
 }
 
-export const appsAffinityAndTolerations = {
-  affinity: {
-    nodeAffinity: {
-      requiredDuringSchedulingIgnoredDuringExecution: {
-        nodeSelectorTerms: [
-          {
-            matchExpressions: [
-              {
-                key: 'cn_apps',
-                operator: 'Exists',
-              },
-            ],
-          },
-        ],
+export const appsAffinityAndTolerations = getAppsAffinityAndTolerations(
+  hyperdiskSupportConfig.hyperdiskSupport.enabled
+);
+
+export const nonHyperdiskAppsAffinityAndTolerations = getAppsAffinityAndTolerations(false);
+
+function getAppsAffinityAndTolerations(hyperdiskSupport: boolean) {
+  return {
+    affinity: {
+      nodeAffinity: {
+        requiredDuringSchedulingIgnoredDuringExecution: {
+          nodeSelectorTerms: [
+            {
+              matchExpressions: [
+                {
+                  key: 'cn_apps',
+                  operator: 'Exists',
+                },
+                {
+                  key: 'cn_apps',
+                  operator: hyperdiskSupport ? 'In' : 'NotIn',
+                  values: ['hyperdisk'],
+                },
+              ],
+            },
+          ],
+        },
       },
     },
-  },
-  tolerations: [
-    {
-      key: 'cn_apps',
-      operator: 'Exists',
-      effect: 'NoSchedule',
-    },
-  ],
-};
+    tolerations: [
+      {
+        key: 'cn_apps',
+        operator: 'Exists',
+        effect: 'NoSchedule',
+      },
+    ],
+  };
+}
 
 export const infraAffinityAndTolerations = {
   affinity: {
