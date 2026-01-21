@@ -891,6 +891,8 @@ paths:
                 "$ref": "#/components/schemas/AllocateDevelopmentFundCouponResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "403":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/403"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
@@ -908,6 +910,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListActiveDevelopmentFundCouponsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/development-fund-coupons/{contract_id}/withdraw:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "withdrawDevelopmentFundCoupon"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/WithdrawDevelopmentFundCouponRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WithdrawDevelopmentFundCouponResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
@@ -1701,3 +1734,20 @@ components:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    WithdrawDevelopmentFundCouponRequest:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+
+    WithdrawDevelopmentFundCouponResponse:
+      type: object
+      required:
+        - unclaimed_development_fund_coupon_contract_id
+      properties:
+        unclaimed_development_fund_coupon_contract_id:
+          type: string
+

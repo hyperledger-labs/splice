@@ -84,9 +84,10 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AllocateDevelopmentFundCouponRequest,
   AllocateDevelopmentFundCouponResponse,
   CreateTokenStandardTransferRequest,
+  WithdrawDevelopmentFundCouponRequest,
+  WithdrawDevelopmentFundCouponResponse,
 }
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.damlDecimal
-
 import org.lfdecentralizedtrust.splice.wallet.admin.http.UserWalletAuthExtractor.WalletUserRequest
 
 import java.math.RoundingMode as JRM
@@ -1366,13 +1367,55 @@ class HttpWalletHandler(
   override def listActiveDevelopmentFundCoupons(
       respond: v0.WalletResource.ListActiveDevelopmentFundCouponsResponse.type
   )()(
-      tuser: WalletUserRequest
+      extracted: WalletUserRequest
   ): Future[v0.WalletResource.ListActiveDevelopmentFundCouponsResponse] = {
-    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
-    listContracts(
-      amuletCodegen.DevelopmentFundCoupon.COMPANION,
-      userWallet.store,
-      d0.ListActiveDevelopmentFundCouponsResponse(_),
-    )
+    implicit val WalletUserRequest(user, userWallet, traceContext) = extracted
+    withSpan(s"$workflowId.listActiveDevelopmentFundCoupons") { _ => _ =>
+      listContracts(
+        amuletCodegen.DevelopmentFundCoupon.COMPANION,
+        userWallet.store,
+        d0.ListActiveDevelopmentFundCouponsResponse(_),
+      )
+    }
+  }
+
+  override def withdrawDevelopmentFundCoupon(
+      respond: WalletResource.WithdrawDevelopmentFundCouponResponse.type
+  )(contractId: String, body: WithdrawDevelopmentFundCouponRequest)(
+      extracted: WalletUserRequest
+  ): Future[WalletResource.WithdrawDevelopmentFundCouponResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = extracted
+    withSpan(s"$workflowId.withdrawDevelopmentFundCoupon") { _ => _ =>
+      val store = userWallet.store
+      val developmentFundCouponContractId =
+        Codec.tryDecodeJavaContractId(UnclaimedDevelopmentFundCoupon.COMPANION)(contractId)
+      for {
+        domain <- scanConnection.getAmuletRulesDomain()(traceContext)
+        developmentFundCoupon <- store.multiDomainAcsStore
+          .getContractById(amuletCodegen.DevelopmentFundCoupon.COMPANION)(
+            developmentFundCouponContractId
+          )
+          .map(
+            _.toAssignedContract.getOrElse(
+              throw Status.Code.FAILED_PRECONDITION.toStatus
+                .withDescription(s"DevelopmentFundCoupon is not assigned to a synchronizer.")
+                .asRuntimeException()
+            )
+          )
+        result <- userWallet.connection
+          .submit(
+            Seq(store.key.validatorParty, store.key.endUserParty),
+            Seq.empty,
+            developmentFundCoupon.exercise(_.exerciseDevelopmentFundCoupon_Withdraw(body.reason)),
+          )
+          .withSynchronizerId(domain)
+          .noDedup
+          .yieldResult()
+      } yield WalletResource.WithdrawDevelopmentFundCouponResponseOK(
+        WithdrawDevelopmentFundCouponResponse(
+          result.exerciseResult.unclaimedDevelopmentFundCouponCid.contractId
+        )
+      )
+    }
   }
 }

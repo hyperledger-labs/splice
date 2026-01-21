@@ -1351,7 +1351,7 @@ object HttpWalletAppClient {
     }
   }
 
-  final case class AllocateDevelopmentFundCouponRequest(
+  final case class AllocateDevelopmentFundCoupon(
       unclaimedDevelopmentFundCouponContractIds: Seq[
         amuletCodegen.UnclaimedDevelopmentFundCoupon.ContractId
       ],
@@ -1416,6 +1416,34 @@ object HttpWalletAppClient {
       response.activeDevelopmentFundCoupons
         .traverse(req => Contract.fromHttp(amuletCodegen.DevelopmentFundCoupon.COMPANION)(req))
         .leftMap(_.toString)
+    }
+  }
+
+  final case class WithdrawDevelopmentFundCoupon(
+      developmentFundCouponContractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+      reason: String,
+  ) extends InternalBaseCommand[
+        http.WithdrawDevelopmentFundCouponResponse,
+        definitions.WithdrawDevelopmentFundCouponResponse,
+      ] {
+    override def submitRequest(
+        client: WalletClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.WithdrawDevelopmentFundCouponResponse] = client.withdrawDevelopmentFundCoupon(
+      developmentFundCouponContractId.contractId,
+      body = definitions.WithdrawDevelopmentFundCouponRequest(reason),
+    )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[http.WithdrawDevelopmentFundCouponResponse, Either[
+      String,
+      definitions.WithdrawDevelopmentFundCouponResponse,
+    ]] = { case http.WithdrawDevelopmentFundCouponResponse.OK(value) =>
+      Right(value)
     }
   }
 
