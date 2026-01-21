@@ -11,7 +11,7 @@ source "${TOOLS_LIB}/libcli.source"
 source "${SPLICE_ROOT}/cluster/scripts/utils.source"
 
 function usage() {
-  _info "Usage: $0 <namespace> <migration_id>"
+  _info "Usage: $0 <namespace> <migration_id> <internal (true|false)>"
 }
 
 function is_full_backup_kube() {
@@ -64,6 +64,7 @@ function latest_full_backup_run_id_gcloud() {
   local migration_id=$2
   local is_sv=$3
   local expected_components=$4
+  local internal=$5
   local num_components
   num_components=$(echo "$expected_components" | wc -w)
   local stack
@@ -71,8 +72,8 @@ function latest_full_backup_run_id_gcloud() {
   declare -A run_ids_dict
 
   for component in $expected_components; do
-    stack=$(get_stack_for_namespace_component "$namespace" "$component")
-    instance="$(create_component_instance "$component" "$migration_id" "$namespace")"
+    stack=$(get_stack_for_namespace_component "$namespace" "$component" "$internal")
+    instance="$(create_component_instance "$component" "$migration_id" "$namespace" "$internal")"
     local full_component_instance="$namespace-$instance-pg"
 
     local cloudsql_id
@@ -109,26 +110,27 @@ function latest_full_backup_run_id_gcloud() {
 }
 
 function main() {
-  if [ "$#" -lt 2 ]; then
+  if [ "$#" -lt 3 ]; then
       usage
       exit 1
   fi
 
   local namespace=$1
   local migration_id=$2
+  local internal=$3
 
   case "$namespace" in
       sv-1|sv-2|sv-3|sv-4|sv-da-1)
           is_sv=true
           full_instance="$namespace-cn-apps-pg"
           expected_components="cn-apps sequencer participant mediator"
-          stack=$(get_stack_for_namespace_component "$namespace" "cn-apps")
+          stack=$(get_stack_for_namespace_component "$namespace" "cn-apps" "$internal")
           ;;
       *)
           is_sv=false
           full_instance="$namespace-validator-pg"
           expected_components="validator participant"
-          stack=$(get_stack_for_namespace_component "$namespace" "participant")
+          stack=$(get_stack_for_namespace_component "$namespace" "participant" "$internal")
           ;;
   esac
 
@@ -138,7 +140,7 @@ function main() {
     backup_run_id=$(latest_full_backup_run_id_kube "$namespace" "$migration_id" "$is_sv" "$expected_components")
     echo "$backup_run_id"
   elif [ "$type" == "canton:cloud:postgres" ]; then
-    backup_run_id=$(latest_full_backup_run_id_gcloud "$namespace" "$migration_id" "$is_sv" "$expected_components")
+    backup_run_id=$(latest_full_backup_run_id_gcloud "$namespace" "$migration_id" "$is_sv" "$expected_components" "$internal")
     echo "$backup_run_id"
   elif [ -z "$type" ]; then
     _error "No postgres instance $full_instance found in stack ${stack}. Is the cluster deployed with split DB instances?"
