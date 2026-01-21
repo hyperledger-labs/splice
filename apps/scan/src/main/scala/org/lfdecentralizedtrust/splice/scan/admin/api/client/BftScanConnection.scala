@@ -33,6 +33,8 @@ import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AnsEntry,
   GetDsoInfoResponse,
+  HoldingsSummaryRequest,
+  HoldingsSummaryResponse,
   LookupTransferCommandStatusResponse,
   MigrationSchedule,
 }
@@ -91,6 +93,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
 }
+import org.lfdecentralizedtrust.splice.http.v0.definitions.HoldingsSummaryRequest.RecordTimeMatch
 import org.lfdecentralizedtrust.tokenstandard.{
   allocation,
   allocationinstruction,
@@ -170,6 +173,16 @@ class BftScanConnection(
     bftCall(
       _.getDsoInfo()
     )
+
+  override def getHoldingsSummaryAt(
+      at: CantonTimestamp,
+      migrationId: Long,
+      ownerPartyIds: Vector[PartyId],
+      recordTimeMatch: Option[RecordTimeMatch],
+      asOfRound: Option[Long],
+  )(implicit tc: TraceContext): Future[Option[HoldingsSummaryResponse]] = {
+    bftCall(_.getHoldingsSummaryAt(at, migrationId, ownerPartyIds, recordTimeMatch, asOfRound))
+  }
 
   override protected def runGetAmuletRulesWithState(
       cachedAmuletRules: Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]
