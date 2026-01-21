@@ -164,11 +164,11 @@ class SingleAcsSnapshotBulkStorage(
 
 object SingleAcsSnapshotBulkStorage {
 
-  /** A Pekko flow that receives (timestamp, migration) elements, each identifying an ACS snapshot to be dumped,
+  /** Returns a Pekko flow that receives (timestamp, migration) elements, each identifying an ACS snapshot to be dumped,
     * and dumps each corresponding snapshot to the S3 storage. Every successful dump emits back the (timestamp, migration)
     * pair, to indicate the last successfully dumped snapshot.
     */
-  def apply(
+  def asFlow(
       config: BulkStorageConfig,
       acsSnapshotStore: AcsSnapshotStore,
       s3Connection: S3BucketConnection,

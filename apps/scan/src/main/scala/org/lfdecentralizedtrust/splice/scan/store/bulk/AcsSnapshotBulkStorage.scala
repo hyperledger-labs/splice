@@ -75,7 +75,14 @@ class AcsSnapshotBulkStorage(
       )
       val base =
         getAcsSnapshotTimestampAfter(startMigrationId, startAfterTimestamp)
-          .via(SingleAcsSnapshotBulkStorage(config, acsSnapshotStore, s3Connection, loggerFactory))
+          .via(
+            SingleAcsSnapshotBulkStorage.asFlow(
+              config,
+              acsSnapshotStore,
+              s3Connection,
+              loggerFactory,
+            )
+          )
 
       val withKs = base.viaMat(KillSwitches.single)(Keep.right)
       withKs.watchTermination() { case (ks, done) => (ks: KillSwitch, done) }
