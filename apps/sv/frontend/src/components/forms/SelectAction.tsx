@@ -12,7 +12,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useForm } from '@tanstack/react-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { createProposalActions } from '../../utils/governance';
 
 export const SelectAction: React.FC = () => {
