@@ -1,11 +1,9 @@
 import { CloudPostgres, ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
 
-export function installPerformanceTestsServices(ghaNamespace: ExactNamespace): void {
-  createCloudSQLInstanceForPerformanceTests(ghaNamespace);
-}
-
-function createCloudSQLInstanceForPerformanceTests(ghaNamespace: ExactNamespace): void {
-  new CloudPostgres(
+export function createCloudSQLInstanceForPerformanceTests(
+  ghaNamespace: ExactNamespace
+): CloudPostgres {
+  return new CloudPostgres(
     ghaNamespace,
     'performance-test-db',
     'performance-test-db',

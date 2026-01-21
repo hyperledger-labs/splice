@@ -3,6 +3,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import {
   appsAffinityAndTolerations,
+  CloudPostgres,
   DOCKER_REPO,
   ExactNamespace,
   HELM_MAX_HISTORY_SIZE,
@@ -19,6 +20,7 @@ import yaml from 'js-yaml';
 
 import { createCachePvc } from './cache';
 import { ghaConfig } from './config';
+import { createCloudSQLInstanceForPerformanceTests } from './performanceTests';
 
 type ResourcesSpec = {
   requests?: {
@@ -404,7 +406,8 @@ function installK8sRunnerScaleSet(
   cachePvcName: string,
   resources: ResourcesSpec,
   serviceAccountName: string,
-  dependsOn: Resource[]
+  dependsOn: Resource[],
+  performanceTestsDb: CloudPostgres
 ): Release {
   const podConfigMapName = `${name}-pod-config`;
   // A configMap that will be mounted to runner pods and provide additional pod spec for the workflow pods
@@ -534,6 +537,21 @@ function installK8sRunnerScaleSet(
                     // Instruct the container-hook to apply the extra spec parameters to the workflow pod
                     name: 'ACTIONS_RUNNER_CONTAINER_HOOK_TEMPLATE',
                     value: '/pod.yaml',
+                  },
+                  {
+                    name: 'PERFORMANCE_TESTS_DB_HOST',
+                    value: performanceTestsDb.address,
+                  },
+                  {
+                    name: 'PERFORMANCE_TESTS_DB_USER',
+                    value: 'cnadmin',
+                  },
+                  {
+                    name: 'PERFORMANCE_TESTS_DB_PASSWORD',
+                    valueFrom: {
+                      key: 'postgresPassword',
+                      name: performanceTestsDb.secretName,
+                    },
                   },
                 ],
                 volumeMounts: [
@@ -702,9 +720,10 @@ function installK8sRunnerScaleSets(
   runnersNamespace: Namespace,
   tokenSecret: Secret,
   cachePvcName: string,
-  serviceAccountName: string
+  serviceAccountName: string,
+  performanceTestsDb: CloudPostgres
 ): void {
-  const dependsOn = [controller, runnersNamespace, tokenSecret];
+  const dependsOn = [controller, runnersNamespace, tokenSecret, performanceTestsDb];
 
   runnerSpecs
     .filter(spec => spec.k8s)
@@ -716,7 +735,8 @@ function installK8sRunnerScaleSets(
         cachePvcName,
         spec.resources,
         serviceAccountName,
-        dependsOn
+        dependsOn,
+        performanceTestsDb
       );
     });
 }
@@ -756,12 +776,16 @@ function installPodMonitor(runnersNamespace: Namespace) {
 }
 
 const GHA_NAMESPACE_NAME = 'gha-runners';
-export function installRunnerScaleSets(controller: k8s.helm.v3.Release): ExactNamespace {
+export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
   const runnersNamespace = new Namespace(GHA_NAMESPACE_NAME, {
     metadata: {
       name: GHA_NAMESPACE_NAME,
     },
   });
+  const exactNs: ExactNamespace = {
+    ns: runnersNamespace,
+    logicalName: GHA_NAMESPACE_NAME,
+  };
 
   const tokenSecret = new k8s.core.v1.Secret(
     'gh-access-token',
@@ -792,13 +816,15 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): ExactNa
   const saName = 'k8s-runners';
   installRunnersServiceAccount(runnersNamespace, saName);
 
+  const performanceTestsDb = createCloudSQLInstanceForPerformanceTests(exactNs);
   installDockerRunnerScaleSets(controller, runnersNamespace, tokenSecret, cachePvc, saName);
-  installK8sRunnerScaleSets(controller, runnersNamespace, tokenSecret, cachePvcName, saName);
+  installK8sRunnerScaleSets(
+    controller,
+    runnersNamespace,
+    tokenSecret,
+    cachePvcName,
+    saName,
+    performanceTestsDb
+  );
   installPodMonitor(runnersNamespace);
-
-  const exactNs: ExactNamespace = {
-    ns: runnersNamespace,
-    logicalName: GHA_NAMESPACE_NAME,
-  };
-  return exactNs;
 }
