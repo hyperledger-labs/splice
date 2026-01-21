@@ -690,7 +690,8 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         )
       def replaceStringsInJson(viewValue: Json) = {
         val current = viewValue.spaces2SortKeys
-        val amuletRulesId = eventuallySucceeds()(sv1ScanBackend.getAmuletRules().contractId.contractId)
+        val amuletRulesId =
+          eventuallySucceeds()(sv1ScanBackend.getAmuletRules().contractId.contractId)
         val allContracts =
           "\"([0-9a-fA-F]{138})\"".r.findAllIn(current).matchData.map(_.group(1)).toSeq
 
