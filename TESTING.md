@@ -177,15 +177,15 @@ Note you can add the flag ``-s`` to skip ``sbt --batch bundle``.
 
 Once this is complete, the front ends will be running on the ports on localhost as follows:
 
-3<frontend><user>, where:
+`3<frontend><user>`, where:
 
-- <frontend> is as follows:
+- `<frontend>` is as follows:
   - 0 for wallet
   - 1 for directory
   - 2 for sv UI
   - 3 for scan
   - 4 for splitwell
-- <user> is as follows:
+- `<user>` is as follows:
   - 00 for alice
   - 01 for bob
   - 02 for charlie

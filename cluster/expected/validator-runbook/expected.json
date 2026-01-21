@@ -730,11 +730,11 @@
             "https://scan.sv-2-eng.test.network.canton.global",
             "https://scan.sv-3-eng.test.network.canton.global"
           ],
-          "threshold": 2,
-          "trustedSvs": [
+          "svNames": [
             "Digital-Asset-Eng-2",
             "Digital-Asset-Eng-3"
-          ]
+          ],
+          "threshold": 2
         },
         "spliceInstanceNames": {
           "amuletName": "Amulet",

@@ -309,7 +309,7 @@ validators:
         scanType: "bft-custom"
         seedUrls: [ "https://scan.sv-2-eng.test.network.canton.global","https://scan.sv-3-eng.test.network.canton.global" ]
         threshold: 2
-        trustedSvs: [ "Digital-Asset-Eng-2","Digital-Asset-Eng-3" ]
+        svNames: [ "Digital-Asset-Eng-2","Digital-Asset-Eng-3" ]
       additionalEnvVars:
         - name: ADDITIONAL_ENV_VAR_VALIDATOR_NAME
           value: ADDITIONAL_ENV_VAR_VALIDATOR_NAME

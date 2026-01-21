@@ -118,7 +118,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
           .futureValue
           .map(dar => dar.name -> PackageVersion.assertFromString(dar.version))
           .filter { case (name, _) =>
-            DarResources.packageResources.map(_.bootstrap.metadata.name).contains(name)
+            DarResources.packageResources.map(_.latest.metadata.name).contains(name)
           }
       val vettedDarNameAndVersions: Seq[(PackageName, PackageVersion)] = {
         vettedPackages
@@ -145,11 +145,11 @@ class BootstrapPackageConfigDarUploadIntegrationTest
       requiredVersion: String,
   ): Unit = {
     withClue(
-      s"dars for package ${packageResource.bootstrap.metadata.name} should be up to $requiredVersion"
+      s"dars for package ${packageResource.latest.metadata.name} should be up to $requiredVersion"
     ) {
       val dars =
         uploadedDars.filter { case (name, _) =>
-          name == packageResource.bootstrap.metadata.name
+          name == packageResource.latest.metadata.name
         }
       dars should not be empty
       dars.map(_._2).max shouldBe PackageVersion.assertFromString(requiredVersion)

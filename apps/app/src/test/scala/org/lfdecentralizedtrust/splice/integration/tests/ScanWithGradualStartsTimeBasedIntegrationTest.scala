@@ -143,7 +143,7 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
       val svRewardPerRound =
         BigDecimal(
           computeSvRewardInRound0(
-            defaultIssuanceCurve.initialValue,
+            defaultIssuanceCurve().initialValue,
             defaultTickDuration,
             dsoSize = 2,
           )
