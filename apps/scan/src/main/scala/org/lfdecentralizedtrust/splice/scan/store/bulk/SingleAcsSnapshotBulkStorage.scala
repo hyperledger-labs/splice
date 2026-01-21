@@ -116,7 +116,8 @@ class SingleAcsSnapshotBulkStorage(
   // TODO(#3429): I'm no longer sure the retrying source is actually useful,
   //  we probably want to just rely on the of the full stream of ACS snapshot dumps (in AcsSnapshotBulkStorage),
   //  but keeping it for now (and the corresponding unit test) until that is fully resolved
-  private def getRetryingSource: Source[WithKillSwitch[(Long, CantonTimestamp)], (KillSwitch, Future[Done])] = {
+  private def getRetryingSource
+      : Source[WithKillSwitch[(Long, CantonTimestamp)], (KillSwitch, Future[Done])] = {
 
     def mksrc = {
       val base = getSource
