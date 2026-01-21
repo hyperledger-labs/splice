@@ -36,9 +36,9 @@ export interface PredefinedWafRule {
 
 // Regional and Global policies and rules use different types/constructors; most
 // of our pulumi code doesn't care about the difference so can use this alias
-export type Policy = gcp.compute.SecurityPolicy;
-const Policy = gcp.compute.SecurityPolicy;
-const PolicyRule = gcp.compute.SecurityPolicyRule;
+export type Policy = gcp.compute.RegionSecurityPolicy;
+const Policy = gcp.compute.RegionSecurityPolicy;
+const PolicyRule = gcp.compute.RegionSecurityPolicyRule;
 
 /**
  * Creates a Cloud Armor security policy
@@ -149,6 +149,7 @@ function addThrottleAndBanRules(
           ruleName,
           {
             securityPolicy: securityPolicy.name,
+            region: securityPolicy.region,
             description: `Throttle rule for all ${confEntryHead} API endpoints`,
             priority,
             preview: preview || singleServiceThrottle.rulePreviewOnly,
@@ -195,6 +196,7 @@ function addDefaultDenyRule(
     'default-deny',
     {
       securityPolicy: securityPolicy.name,
+      region: securityPolicy.region,
       description: 'Default rule to deny all other traffic',
       priority: DEFAULT_DENY_RULE_NUMBER,
       // default rule cannot be in preview mode; google API gives 400 if you try
