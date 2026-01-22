@@ -3,7 +3,7 @@
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { East } from '@mui/icons-material';
-import { Alert, Box, Grid, Stack, Typography } from '@mui/material';
+import { Alert, Box, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router';
 import { CopyableIdentifier, MemberIdentifier, PageSectionHeader } from '../../components/beta';
 import React from 'react';
@@ -55,6 +55,7 @@ export const ActionRequiredSection: React.FC<ActionRequiredProps> = (
               key={index}
               action={ar.actionName}
               description={ar.description}
+              createdAt={ar.createdAt}
               contractId={ar.contractId}
               votingEnds={ar.votingCloses}
               requester={ar.requester}
@@ -70,6 +71,7 @@ export const ActionRequiredSection: React.FC<ActionRequiredProps> = (
 interface ActionCardProps {
   action: string;
   description: string;
+  createdAt: string;
   contractId: ContractId<VoteRequest>;
   votingEnds: string;
   requester: string;
@@ -77,7 +79,7 @@ interface ActionCardProps {
 }
 
 const ActionCard = (props: ActionCardProps) => {
-  const { action, description, contractId, votingEnds, requester, isYou } = props;
+  const { action, description, createdAt, contractId, votingEnds, requester, isYou } = props;
   const remainingTime = dayjs(votingEnds).fromNow(true);
 
   return (
@@ -96,15 +98,15 @@ const ActionCard = (props: ActionCardProps) => {
         className="action-required-card"
         data-testid="action-required-card"
       >
-        <Grid flexGrow={1} container spacing={1}>
-          <Grid size={1.5}>
+        <Stack direction="row" gap={5} alignItems="flex-start">
+          <Box sx={{ flexShrink: 0 }}>
             <ActionCardSegment
               title="ACTION"
               content={action}
               data-testid="action-required-action"
             />
-          </Grid>
-          <Grid size={2}>
+          </Box>
+          <Box sx={{ flexShrink: 1, minWidth: 0, maxWidth: 200 }}>
             <ActionCardSegment
               title="DESCRIPTION"
               content={
@@ -128,15 +130,22 @@ const ActionCard = (props: ActionCardProps) => {
               }
               data-testid="action-required-description"
             />
-          </Grid>
-          <Grid size={1.5}>
+          </Box>
+          <Box sx={{ flexShrink: 0 }}>
+            <ActionCardSegment
+              title="CREATED AT"
+              content={createdAt}
+              data-testid="action-required-created-at"
+            />
+          </Box>
+          <Box sx={{ flexShrink: 0 }}>
             <ActionCardSegment
               title="REMAINING TIME"
               content={remainingTime}
               data-testid="action-required-voting-closes"
             />
-          </Grid>
-          <Grid size={2}>
+          </Box>
+          <Box sx={{ flexShrink: 1, minWidth: 0, maxWidth: 300 }}>
             <ActionCardSegment
               title="REQUESTER"
               content={
@@ -149,8 +158,8 @@ const ActionCard = (props: ActionCardProps) => {
               }
               data-testid="action-required-requester"
             />
-          </Grid>
-          <Grid size={2}>
+          </Box>
+          <Box sx={{ flexShrink: 1, minWidth: 0, maxWidth: 300 }}>
             <ActionCardSegment
               title="CONTRACT ID"
               content={
@@ -162,21 +171,20 @@ const ActionCard = (props: ActionCardProps) => {
               }
               data-testid="action-required-contract-id-segment"
             />
-          </Grid>
-          <Grid size={3} display="flex" justifyContent="flex-end" alignItems="center">
-            <Stack
-              direction="row"
-              alignItems="center"
-              gap={1}
-              data-testid="action-required-view-details"
-            >
-              <Typography fontWeight={500} color="text.light">
-                View Details
-              </Typography>
-              <East fontSize="small" color="secondary" />
-            </Stack>
-          </Grid>
-        </Grid>
+          </Box>
+          <Stack
+            direction="row"
+            alignItems="center"
+            gap={1}
+            sx={{ ml: 'auto', flexShrink: 0, alignSelf: 'center' }}
+            data-testid="action-required-view-details"
+          >
+            <Typography fontWeight={500} color="text.light">
+              View Details
+            </Typography>
+            <East fontSize="small" color="secondary" />
+          </Stack>
+        </Stack>
       </Box>
     </RouterLink>
   );

@@ -96,6 +96,10 @@ describe('Action Required', () => {
     expect(description).toBeInTheDocument();
     expect(description.textContent).toBe(actionRequired.description);
 
+    const createdAt = screen.getByTestId('action-required-created-at-content');
+    expect(createdAt).toBeInTheDocument();
+    expect(createdAt.textContent).toBe(actionRequired.createdAt);
+
     const votingCloses = screen.getByTestId('action-required-voting-closes-content');
     expect(votingCloses).toBeInTheDocument();
     expect(votingCloses.textContent).toBe('10 days');

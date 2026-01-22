@@ -22,14 +22,17 @@ const CopyableIdentifier: React.FC<CopyableIdentifierProps> = ({
   hideCopyButton,
   'data-testid': testId,
 }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.light' }} data-testid={testId}>
+  <Box
+    sx={{ display: 'flex', alignItems: 'center', color: 'text.light', minWidth: 0 }}
+    data-testid={testId}
+  >
     <Typography
       variant="body1"
       fontWeight="medium"
       fontFamily="Source Code Pro"
       fontSize={size === 'small' ? '14px' : '18px'}
       data-testid={`${testId}-value`}
-      sx={{ maxWidth: '100%', textOverflow: 'ellipsis', overflow: 'hidden' }}
+      sx={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}
     >
       {value}
     </Typography>
