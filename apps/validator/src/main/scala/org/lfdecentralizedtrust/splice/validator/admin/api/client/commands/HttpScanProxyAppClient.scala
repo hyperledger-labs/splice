@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.validator.admin.api.client.commands
 
 import cats.data.EitherT
 import cats.syntax.either.*
+import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
@@ -54,6 +55,34 @@ object HttpScanProxyAppClient {
       definitions.GetDsoInfoResponse,
     ]] = { case scanProxy.GetDsoInfoResponse.OK(response) =>
       Right(response)
+    }
+  }
+
+  case class GetHoldingsSummaryAt(
+      at: CantonTimestamp,
+      migrationId: Long,
+      ownerPartyIds: Vector[PartyId],
+      recordTimeMatch: Option[definitions.HoldingsSummaryRequest.RecordTimeMatch],
+      asOfRound: Option[Long],
+  ) extends ScanProxyBaseCommand[scanProxy.GetHoldingsSummaryAtResponse, Option[
+        definitions.HoldingsSummaryResponse
+      ]] {
+
+    override def submitRequest(client: ScanproxyClient, headers: List[HttpHeader]) =
+      client.getHoldingsSummaryAt(
+        definitions.HoldingsSummaryRequest(
+          migrationId,
+          at.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          recordTimeMatch,
+          ownerPartyIds.map(_.toProtoPrimitive),
+          asOfRound,
+        ),
+        headers,
+      )
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case scanProxy.GetHoldingsSummaryAtResponse.OK(response) => Right(Some(response))
+      case scanProxy.GetHoldingsSummaryAtResponse.NotFound(_) => Right(None)
     }
   }
 

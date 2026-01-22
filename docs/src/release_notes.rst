@@ -102,6 +102,10 @@
     - The default logger has been switched to use an asynchronous appender, for all the nodes, for better performance.
       The behavior can be switched back to synchronous logging by setting the environment variable `LOG_IMMEDIATE_FLUSH=true`.
 
+  - Validator
+
+    - Expose ``/v0/holdings/summary`` endpoint from scan proxy.
+
 .. release-notes:: 0.5.6
 
   - Sequencer
