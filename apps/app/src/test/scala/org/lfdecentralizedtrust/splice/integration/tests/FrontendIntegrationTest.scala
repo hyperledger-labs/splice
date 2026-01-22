@@ -254,7 +254,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
 
     biDi.addListener[LogEntry](
       Log.entryAdded(),
-      logEntry => {
+      (logEntry: LogEntry) => {
         logEntry.getConsoleLogEntry.toScala.foreach { consoleLogEntry =>
           val msg = consoleLogEntry.getText
           val ctx = traceContextFromConsoleMessage(msg)
@@ -277,7 +277,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
           NavigationInfo.fromJson(input)
         },
       ),
-      navigationInfo => logger.debug(s"dom content loaded for ${navigationInfo.url}"),
+      (navigationInfo: NavigationInfo) => logger.debug(s"dom content loaded for ${navigationInfo.url}"),
     );
   }
 
