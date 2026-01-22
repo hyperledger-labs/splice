@@ -389,7 +389,7 @@ You can configure how your validator connects to the network's scan services by 
 There are three modes available:
 
 - ``bft``: connects to all scans and validates via $f+1$ agreement.
-- ``bft-custom``: connects to a specific list of trusted SVs and validates against a custom threshold
+- ``bft-custom``: connects to a specific list of trusted SVs and validates against a custom threshold.
 - ``trust-single``: connects to one specific trusted scan.
 
 Detailed configuration examples and instructions for each mode are provided directly within the comments of the ``validator-values.yaml`` file.
@@ -399,10 +399,14 @@ Detailed configuration examples and instructions for each mode are provided dire
     :start-after: SCAN_CLIENT_CONFIGURATION_START
     :end-before: SCAN_CLIENT_CONFIGURATION_END
 
-If you want to connect to the decentralized synchronizer via only a single trusted sequencer,
-you can uncomment the following and set ``useSequencerConnectionsFromScan`` to ``false``. Also replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the publicly accessible URL of the trusted sequencer,
-e.g., |gsf_sequencer_url| for the sequencer operated by the GSF.
-This does mean that you depend on that single SV and if it is broken or malicious you will be unable to use the network so usually you want to default to not enabling this.
+You can configure how your validator's participant connects to the network synchronizer by defining a synchronizer config in your ``validator-values.yaml``.
+This supports three modes:
+
+- ``bft``: connects to all available sequencers and validates responses via $f+1$ agreement.
+- ``bft-custom``: connects only to specific sequencers from your trusted ``svNames`` using a custom ``threshold``.
+- ``trust-single``: connects to one specific url.
+
+Each synchronizer configuration mode is documented with examples in the ``validator-values.yaml``.
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
     :language: yaml
