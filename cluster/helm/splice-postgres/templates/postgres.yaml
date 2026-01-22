@@ -105,6 +105,10 @@ spec:
           storage: {{ $.Values.db.volumeSize }}
       storageClassName: {{ $.Values.db.volumeStorageClass }}
       volumeMode: Filesystem
+      {{- with .Values.db.dataSource }}
+      dataSource:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

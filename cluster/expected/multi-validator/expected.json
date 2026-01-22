@@ -4877,12 +4877,7 @@
             }
           }
         },
-        "db": {
-          "maxConnections": 1000,
-          "volumeSize": "100Gi"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "nonHyperdiskAppsAffinityAndTolerations": {
+        "appsAffinityAndTolerations": {
           "affinity": {
             "nodeAffinity": {
               "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -4914,6 +4909,11 @@
             }
           ]
         },
+        "db": {
+          "maxConnections": 1000,
+          "volumeSize": "100Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
           "secretName": "postgres-0-secret"
         },
@@ -4973,12 +4973,7 @@
             }
           }
         },
-        "db": {
-          "maxConnections": 1000,
-          "volumeSize": "100Gi"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "nonHyperdiskAppsAffinityAndTolerations": {
+        "appsAffinityAndTolerations": {
           "affinity": {
             "nodeAffinity": {
               "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -5010,6 +5005,11 @@
             }
           ]
         },
+        "db": {
+          "maxConnections": 1000,
+          "volumeSize": "100Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
           "secretName": "postgres-1-secret"
         },
@@ -5069,12 +5069,7 @@
             }
           }
         },
-        "db": {
-          "maxConnections": 1000,
-          "volumeSize": "100Gi"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "nonHyperdiskAppsAffinityAndTolerations": {
+        "appsAffinityAndTolerations": {
           "affinity": {
             "nodeAffinity": {
               "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -5106,6 +5101,11 @@
             }
           ]
         },
+        "db": {
+          "maxConnections": 1000,
+          "volumeSize": "100Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
           "secretName": "postgres-2-secret"
         },
@@ -5165,12 +5165,7 @@
             }
           }
         },
-        "db": {
-          "maxConnections": 1000,
-          "volumeSize": "100Gi"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "nonHyperdiskAppsAffinityAndTolerations": {
+        "appsAffinityAndTolerations": {
           "affinity": {
             "nodeAffinity": {
               "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -5202,6 +5197,11 @@
             }
           ]
         },
+        "db": {
+          "maxConnections": 1000,
+          "volumeSize": "100Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
           "secretName": "postgres-3-secret"
         },
@@ -5261,12 +5261,7 @@
             }
           }
         },
-        "db": {
-          "maxConnections": 1000,
-          "volumeSize": "100Gi"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "nonHyperdiskAppsAffinityAndTolerations": {
+        "appsAffinityAndTolerations": {
           "affinity": {
             "nodeAffinity": {
               "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -5298,6 +5293,11 @@
             }
           ]
         },
+        "db": {
+          "maxConnections": 1000,
+          "volumeSize": "100Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
           "secretName": "postgres-4-secret"
         },
