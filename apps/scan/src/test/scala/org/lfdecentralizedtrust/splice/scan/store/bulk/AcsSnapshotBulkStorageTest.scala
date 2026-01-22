@@ -46,13 +46,12 @@ class AcsSnapshotBulkStorageTest
     "successfully dump a single ACS snapshot" in {
       withS3Mock {
         val store = new MockAcsSnapshotStore().store
-        val timestamp = CantonTimestamp.now()
         val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(loggerFactory)
         for {
           _ <- SingleAcsSnapshotBulkStorage
             .asSource(
               0,
-              timestamp,
+              MockAcsSnapshotStore.initialSnapshotTimestamp,
               bulkStorageTestConfig,
               store,
               s3BucketConnection,
@@ -68,7 +67,7 @@ class AcsSnapshotBulkStorageTest
           allContracts <- store
             .queryAcsSnapshot(
               0,
-              timestamp,
+              MockAcsSnapshotStore.initialSnapshotTimestamp,
               None,
               HardLimit.tryCreate(acsSnapshotSize, acsSnapshotSize),
               Seq.empty,
@@ -129,8 +128,12 @@ class AcsSnapshotBulkStorageTest
     }
   }
 
+  object MockAcsSnapshotStore {
+    val initialSnapshotTimestamp: CantonTimestamp =
+      CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(10))
+  }
   class MockAcsSnapshotStore {
-    private var snapshots = Seq(CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(10)))
+    private var snapshots = Seq(MockAcsSnapshotStore.initialSnapshotTimestamp)
     val store = mockAcsSnapshotStore(acsSnapshotSize)
 
     def addSnapshot(timestamp: CantonTimestamp) = { snapshots = snapshots :+ timestamp }
@@ -181,7 +184,11 @@ class AcsSnapshotBulkStorageTest
               result
             }
           } else {
-            Future.failed(new RuntimeException("Unexpected timestamp"))
+            Future.failed(
+              new RuntimeException(
+                s"Unexpected timestamp $timestamp. Known snapshots are: $snapshots"
+              )
+            )
           }
       }
 
