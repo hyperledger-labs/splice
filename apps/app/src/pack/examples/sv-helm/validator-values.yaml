@@ -1,38 +1,41 @@
 # SCAN_CLIENT_CONFIGURATION_START
 scanClient:
   scanType: "bft"
-  seedUrls: ["https://seed-scan-url.com"] # replace with actual scan seed url
+  seedUrls: ["TRUSTED_SCAN_URL"] # replace with actual scan seed url
 
 # scanClient denotes how the validator makes connections to scan service and supports three modes of operation.
 # Mode 1: BFT (Byzantine Fault Tolerance)
 # Connects to all available scans in the network. It validates responses by ensuring
 # at least f+1 matching responses are received.
+
 # scanClient:
 #   scanType: "bft"
-#   seedUrls: ["https://seed-scan-url.com"] # replace with actual seed scan url(s).
+#   seedUrls: ["TRUSTED_SCAN_URL"] # replace with actual seed scan url(s).
 
 # Mode 2: BFT-Custom
 # A specialized version of BFT where you specify a subset of trusted SVs.
 # The validator connects only to the scans of the SVs listed in 'svNames'.
 # 'threshold' defines how many identical responses are required to consider the scan responses valid.
+
 # scanClient:
 #   scanType: "bft-custom"
-#   svNames: ["SV-1", "SV-2"] # replace with actual SV names
-#   seedUrls: ["https://url-1.com", "https://url-2.com"] # replace with actual seed scan urls
+#   svNames: ["TRUSTED_SV_1", "TRUSTED_SV_2"] # replace with actual SV names
+#   seedUrls: ["TRUSTED_SCAN_URL_1", "TRUSTED_SCAN_URL_2"] # replace with actual seed scan urls
 #   threshold: 2
 
 # Mode 3: Trust-Single
 # Connects to a single trusted scan address.
 # This means that you depend on that single SV and if it is broken or
 #  malicious you will be unable to use the network so usually you want to default to not enabling this
+
 # scanClient:
 #   scanType: "trust-single"
 #   scanAddress: "TRUSTED_SCAN_URL" # replace with the actual trusted scan url
 # SCAN_CLIENT_CONFIGURATION_END
 
+# SYNCHRONIZER_CONFIGURATION_START
 synchronizer:
   connectionType: "bft"
-# SYNCHRONIZER_CONFIGURATION_START
 
 # synchronizer configuration Configures how the validator's participant connects to the synchronizer.
 # Choose one of the three modes based on your security and decentralization needs.
@@ -40,21 +43,29 @@ synchronizer:
 # Mode 1: BFT (Byzantine Fault Tolerance)
 # Uses all possible synchronizer connections provided by the scan service.
 # Responses are validated against the network's f+1 fault tolerance logic.
+
 # synchronizer:
 #   connectionType: "bft"
 
 # Mode 2: BFT-Custom
 # Connects only to sequencers operated by the specific SVs listed in 'svNames'.
 # 'threshold' defines the minimum number of matching responses required for validation.
+
 # synchronizer:
 #   connectionType: "bft-custom"
-#   svNames: ["Digital-Asset-Eng-2", "Digital-Asset-Eng-3"]
+#   svNames: ["TRUSTED_SV_1", "TRUSTED_SV_2"]
 #   threshold: 2
 
 # Mode 3: Trust-Single
 # Connects to a single specified synchronizer URL.
 # Trust-Single makes you dependent on a single SV; if it is malicious or down,
 # you will be unable to use the network.
+
+#synchronizer:
+#  connectionType: "trust-single"
+#  url: "TRUSTED_SYNCHRONIZER_URL"
+
+# SYNCHRONIZER_CONFIGURATION_END
 
 # Replace OPERATOR_WALLET_USER_ID with the user id in your IAM that you want to use to log into
 # the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``
