@@ -109,7 +109,6 @@ describe('Inflight Vote Requests', () => {
           noDataMessage="No Inflight Vote Requests available"
           uniqueId={uniqueId}
           showVoteStats
-          showAcceptanceThreshold
           showThresholdDeadline
         />
       </MemoryRouter>
@@ -276,7 +275,6 @@ describe('Vote history', () => {
           uniqueId={uniqueId}
           showStatus
           showVoteStats
-          showAcceptanceThreshold
         />
       </MemoryRouter>
     );

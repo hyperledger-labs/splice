@@ -10,6 +10,7 @@ interface CopyableIdentifierProps {
   copyValue?: string;
   badge?: string;
   size: CopyableIdentifierSize;
+  hideCopyButton?: boolean;
   'data-testid': string;
 }
 
@@ -18,6 +19,7 @@ const CopyableIdentifier: React.FC<CopyableIdentifierProps> = ({
   copyValue,
   badge,
   size,
+  hideCopyButton,
   'data-testid': testId,
 }) => (
   <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.light' }} data-testid={testId}>
@@ -31,13 +33,19 @@ const CopyableIdentifier: React.FC<CopyableIdentifierProps> = ({
     >
       {value}
     </Typography>
-    <IconButton
-      color="secondary"
-      data-testid={`${testId}-copy-button`}
-      onClick={() => navigator.clipboard.writeText(copyValue ?? value)}
-    >
-      <ContentCopy sx={{ fontSize: size === 'small' ? '14px' : '18px' }} />
-    </IconButton>
+    {!hideCopyButton && (
+      <IconButton
+        color="secondary"
+        data-testid={`${testId}-copy-button`}
+        onClick={e => {
+          e.stopPropagation();
+          e.preventDefault();
+          navigator.clipboard.writeText(copyValue ?? value);
+        }}
+      >
+        <ContentCopy sx={{ fontSize: size === 'small' ? '14px' : '18px' }} />
+      </IconButton>
+    )}
     {badge !== undefined && <Chip label={badge} size="small" data-testid={`${testId}-badge`} />}
   </Box>
 );

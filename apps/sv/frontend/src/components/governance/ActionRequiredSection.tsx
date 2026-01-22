@@ -5,7 +5,7 @@ import { ContractId } from '@daml/types';
 import { East } from '@mui/icons-material';
 import { Alert, Box, Grid, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router';
-import { MemberIdentifier, PageSectionHeader } from '../../components/beta';
+import { CopyableIdentifier, MemberIdentifier, PageSectionHeader } from '../../components/beta';
 import React from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -15,6 +15,7 @@ dayjs.extend(relativeTime);
 export interface ActionRequiredData {
   contractId: ContractId<VoteRequest>;
   actionName: string;
+  description: string;
   votingCloses: string;
   createdAt: string;
   requester: string;
@@ -53,7 +54,7 @@ export const ActionRequiredSection: React.FC<ActionRequiredProps> = (
             <ActionCard
               key={index}
               action={ar.actionName}
-              createdAt={ar.createdAt}
+              description={ar.description}
               contractId={ar.contractId}
               votingEnds={ar.votingCloses}
               requester={ar.requester}
@@ -68,15 +69,15 @@ export const ActionRequiredSection: React.FC<ActionRequiredProps> = (
 
 interface ActionCardProps {
   action: string;
+  description: string;
   contractId: ContractId<VoteRequest>;
-  createdAt: string;
   votingEnds: string;
   requester: string;
   isYou?: boolean;
 }
 
 const ActionCard = (props: ActionCardProps) => {
-  const { action, createdAt, contractId, votingEnds, requester, isYou } = props;
+  const { action, description, contractId, votingEnds, requester, isYou } = props;
   const remainingTime = dayjs(votingEnds).fromNow(true);
 
   return (
@@ -96,7 +97,7 @@ const ActionCard = (props: ActionCardProps) => {
         data-testid="action-required-card"
       >
         <Grid flexGrow={1} container spacing={1}>
-          <Grid size={2}>
+          <Grid size={1.5}>
             <ActionCardSegment
               title="ACTION"
               content={action}
@@ -105,35 +106,64 @@ const ActionCard = (props: ActionCardProps) => {
           </Grid>
           <Grid size={2}>
             <ActionCardSegment
-              title="CREATED AT"
-              content={createdAt}
-              data-testid="action-required-created-at"
+              title="DESCRIPTION"
+              content={
+                <Typography
+                  variant="body1"
+                  color="text.light"
+                  fontWeight="medium"
+                  fontSize={14}
+                  lineHeight={1.4}
+                  sx={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                  data-testid="action-required-description-content"
+                >
+                  {description}
+                </Typography>
+              }
+              data-testid="action-required-description"
             />
           </Grid>
-          <Grid size={2}>
+          <Grid size={1.5}>
             <ActionCardSegment
               title="REMAINING TIME"
               content={remainingTime}
               data-testid="action-required-voting-closes"
             />
           </Grid>
-          <Grid size={4}>
-            <Box>
-              <ActionCardSegment
-                title="REQUESTER"
-                content={
-                  <MemberIdentifier
-                    partyId={requester}
-                    isYou={isYou ?? false}
-                    size="small"
-                    data-testid="action-required-requester-identifier"
-                  />
-                }
-                data-testid="action-required-requester"
-              />
-            </Box>
+          <Grid size={2}>
+            <ActionCardSegment
+              title="REQUESTER"
+              content={
+                <MemberIdentifier
+                  partyId={requester}
+                  isYou={isYou ?? false}
+                  size="small"
+                  data-testid="action-required-requester-identifier"
+                />
+              }
+              data-testid="action-required-requester"
+            />
           </Grid>
-          <Grid size={2} display="flex" justifyContent="flex-end" alignItems="center">
+          <Grid size={2}>
+            <ActionCardSegment
+              title="CONTRACT ID"
+              content={
+                <CopyableIdentifier
+                  value={contractId}
+                  size="small"
+                  data-testid="action-required-contract-id"
+                />
+              }
+              data-testid="action-required-contract-id-segment"
+            />
+          </Grid>
+          <Grid size={3} display="flex" justifyContent="flex-end" alignItems="center">
             <Stack
               direction="row"
               alignItems="center"

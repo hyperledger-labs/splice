@@ -16,7 +16,7 @@ import {
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { useNavigate } from 'react-router';
-import { PageSectionHeader, VoteStats } from '../../components/beta';
+import { CopyableIdentifier, PageSectionHeader, VoteStats } from '../../components/beta';
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 import { InfoOutlined } from '@mui/icons-material';
 import dayjs from 'dayjs';
@@ -30,14 +30,9 @@ interface ProposalListingSectionProps {
   uniqueId: string;
   showThresholdDeadline?: boolean;
   showVoteStats?: boolean;
-  showAcceptanceThreshold?: boolean;
   showStatus?: boolean;
   sortOrder?: ProposalSortOrder;
 }
-
-const getColumnsCount = (alwaysShown: number, ...sometimesShown: (boolean | undefined)[]) =>
-  alwaysShown +
-  sometimesShown.reduce((columnsCount, isShown) => columnsCount + (isShown ? 1 : 0), 0);
 
 const getTotalVotes = (item: ProposalListingData): number =>
   item.voteStats['accepted'] + item.voteStats['rejected'];
@@ -64,6 +59,11 @@ const sortProposals = (
     .toSorted((a, b) => getEffectiveDate(a).diff(getEffectiveDate(b)));
 };
 
+const getColumnsCount = (...shown: (boolean | undefined)[]) => 4 + shown.filter(Boolean).length;
+
+const getGridTemplate = (columnsCount: number) =>
+  `1fr minmax(0, 0.7fr) ${'1fr '.repeat(columnsCount - 2).trim()}`;
+
 export const ProposalListingSection: React.FC<ProposalListingSectionProps> = props => {
   const {
     sectionTitle,
@@ -72,20 +72,14 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
     uniqueId,
     showThresholdDeadline,
     showVoteStats,
-    showAcceptanceThreshold,
     showStatus,
     sortOrder,
   } = props;
 
   const sortedData = sortProposals(data, sortOrder);
 
-  const columnsCount = getColumnsCount(
-    3,
-    showThresholdDeadline,
-    showStatus,
-    showVoteStats,
-    showAcceptanceThreshold
-  );
+  const columnsCount = getColumnsCount(showThresholdDeadline, showStatus, showVoteStats);
+  const gridTemplate = getGridTemplate(columnsCount);
 
   return (
     <Box sx={{ mb: 6 }} data-testid={`${uniqueId}-section`}>
@@ -97,16 +91,13 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
         <TableContainer data-testid={`${uniqueId}-section-table`}>
           <Table>
             <TableHead>
-              <TableRow
-                sx={{ display: 'grid', gridTemplateColumns: `repeat(${columnsCount}, 1fr)` }}
-              >
+              <TableRow sx={{ display: 'grid', gridTemplateColumns: gridTemplate }}>
                 <TableCell>ACTION</TableCell>
+                <TableCell>CONTRACT ID</TableCell>
                 {showThresholdDeadline && <TableCell>THRESHOLD DEADLINE</TableCell>}
                 <TableCell>EFFECTIVE AT</TableCell>
                 {showStatus && <TableCell>STATUS</TableCell>}
-
                 {showVoteStats && <TableCell>VOTES</TableCell>}
-                {showAcceptanceThreshold && <TableCell>ACCEPTANCE THRESHOLD</TableCell>}
                 <TableCell>YOUR VOTE</TableCell>
               </TableRow>
             </TableHead>
@@ -115,6 +106,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
                 <VoteRow
                   key={index}
                   actionName={vote.actionName}
+                  description={vote.description}
                   contractId={vote.contractId}
                   uniqueId={uniqueId}
                   votingThresholdDeadline={vote.votingThresholdDeadline}
@@ -122,9 +114,8 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
                   yourVote={vote.yourVote}
                   status={vote.status}
                   voteStats={vote.voteStats}
-                  acceptanceThreshold={vote.acceptanceThreshold}
+                  gridTemplate={gridTemplate}
                   showVoteStats={showVoteStats}
-                  showAcceptanceThreshold={showAcceptanceThreshold}
                   showThresholdDeadline={showThresholdDeadline}
                   showStatus={showStatus}
                 />
@@ -167,8 +158,8 @@ const InfoBox: React.FC<InfoBoxProps> = ({ info, 'data-testid': testId }) => {
 };
 
 interface VoteRowProps {
-  acceptanceThreshold: bigint;
   actionName: string;
+  description?: string;
   contractId: ContractId<VoteRequest>;
   status: ProposalListingStatus;
   uniqueId: string;
@@ -176,16 +167,16 @@ interface VoteRowProps {
   voteTakesEffect: string;
   votingThresholdDeadline: string;
   yourVote: YourVoteStatus;
+  gridTemplate: string;
   showThresholdDeadline?: boolean;
-  showAcceptanceThreshold?: boolean;
   showStatus?: boolean;
   showVoteStats?: boolean;
 }
 
 const VoteRow: React.FC<VoteRowProps> = props => {
   const {
-    acceptanceThreshold,
     actionName,
+    description,
     contractId,
     status,
     uniqueId,
@@ -193,28 +184,20 @@ const VoteRow: React.FC<VoteRowProps> = props => {
     voteTakesEffect,
     votingThresholdDeadline,
     yourVote,
+    gridTemplate,
     showThresholdDeadline,
-    showAcceptanceThreshold,
     showStatus,
     showVoteStats,
   } = props;
 
   const navigate = useNavigate();
 
-  const columnsCount = getColumnsCount(
-    3,
-    showThresholdDeadline,
-    showStatus,
-    showVoteStats,
-    showAcceptanceThreshold
-  );
-
   return (
     <TableRow
       onClick={() => navigate(`/governance-beta/proposals/${contractId}`)}
       sx={{
         display: 'grid',
-        gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
+        gridTemplateColumns: gridTemplate,
         alignItems: 'center',
         borderRadius: '4px',
         border: '1px solid #4F4F4F',
@@ -226,6 +209,31 @@ const VoteRow: React.FC<VoteRowProps> = props => {
     >
       <TableCell data-testid={`${uniqueId}-row-action-name`}>
         <TableBodyTypography>{actionName}</TableBodyTypography>
+        {description && (
+          <Typography
+            data-testid={`${uniqueId}-row-description`}
+            sx={{
+              fontSize: 12,
+              color: 'text.secondary',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              lineHeight: 1.4,
+            }}
+          >
+            {description}
+          </Typography>
+        )}
+      </TableCell>
+      <TableCell data-testid={`${uniqueId}-row-contract-id`}>
+        <CopyableIdentifier
+          value={contractId}
+          size="small"
+          hideCopyButton
+          data-testid={`${uniqueId}-row-contract-id-value`}
+        />
       </TableCell>
       {showThresholdDeadline && (
         <TableCell data-testid={`${uniqueId}-row-voting-threshold-deadline`}>
@@ -250,12 +258,6 @@ const VoteRow: React.FC<VoteRowProps> = props => {
           />
         </TableCell>
       )}
-      {showAcceptanceThreshold && (
-        <TableCell data-testid={`${uniqueId}-row-acceptance-threshold`}>
-          <TableBodyTypography>{acceptanceThreshold.toString()}</TableBodyTypography>
-        </TableCell>
-      )}
-
       <TableCell data-testid={`${uniqueId}-row-your-vote`}>
         <VoteStats
           vote={yourVote}
