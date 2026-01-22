@@ -128,6 +128,10 @@
 
     - Expose ``/v0/holdings/summary`` endpoint from scan proxy.
 
+    - Included support for ``scanClient`` configuration with three operation modes (``bft``, ``bft-custom``, and ``trust-single``) to define how the validator connects to scan.
+
+    - Included support for ``synchronizer`` configuration with three operation modes (``bft``, ``bft-custom``, and ``trust-single``) to define how the validator participant node connects to synchronizer.
+
 .. release-notes:: 0.5.6
 
   - Sequencer
