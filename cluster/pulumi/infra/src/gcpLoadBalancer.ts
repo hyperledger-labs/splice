@@ -17,16 +17,25 @@ you need to add the CRD; on a cncluster-controlled dev cluster directory you can
 /* TODO (#2723)
 
 Highest subnet in 10.x in cn-*net currently is 10.232.0.0/20.
-Range can be expanded but not shrunk; doc recommends starting with /23:
+Doc recommends starting with /23:
   https://docs.cloud.google.com/load-balancing/docs/proxy-only-subnets#proxy-subnet-size
+They can't be expanded, only replaced:
+  https://docs.cloud.google.com/load-balancing/docs/proxy-only-subnets#proxy_only_subnet_change
+You can only have one of these per VPC per region;
+separate GKE clusters cannot have their own
 
 1. Create a proxy-only subnet in the GKE cluster's region (us-central1) and VPC:
-   gcloud compute networks subnets create proxy-only-subnet \
+   gcloud compute networks subnets create proxy-only-subnet-for-gkel7 \
+     --description='proxy-only subnet required for GKE L7 regional ALB' \
      --purpose=REGIONAL_MANAGED_PROXY \
      --role=ACTIVE \
      --region=$CLOUDSDK_COMPUTE_REGION \
      --network=default \
-     --range=10.233.0.0/23
+     --range=10.120.0.0/23
+
+   Check existing subnets for range overlap with:
+   gcloud compute networks subnets list --network=default
+   The full range of 10.128.0.0/9 is reserved and can't be used
  */
 
 // possible values and their meaning: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gatewayclass
