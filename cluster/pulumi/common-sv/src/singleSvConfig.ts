@@ -21,7 +21,6 @@ const SvCometbftConfigSchema = z
     validatorKeyAddress: z.string().optional(),
     // defaults to {svName}-cometbft-keys if not set
     keysGcpSecret: z.string().optional(),
-    snapshotName: z.string().optional(),
     resources: K8sResourceSchema,
   })
   .strict();
