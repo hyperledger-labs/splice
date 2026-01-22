@@ -76,8 +76,12 @@ app does not process any contracts for that party. Most notably, this
 means that there is no reward minting automation running for that
 party including the fact that ``ValidatorRewardCoupon`` activity
 records generated for that party cannot be minted by the validator
-operator as this relies on the ``ValidatorRight`` contract. If this is
-required, you must build your own minting automation.
+operator as this relies on the ``ValidatorRight`` contract. If reward
+minting is required, you have two options:
+
+1. Use a :ref:`minting delegation <validator-delegations>` to delegate reward
+   collection to a validator
+2. Build your own minting automation.
 
 You also cannot use any of the validator endpoints under
 ``/v0/admin/external-party/`` for this party, e.g., to initiate a
