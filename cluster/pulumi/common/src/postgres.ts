@@ -4,17 +4,20 @@ import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
 import * as _ from 'lodash';
+import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import { Resource } from '@pulumi/pulumi';
 
 import { CnChartVersion } from './artifacts';
 import { clusterSmallDisk, CloudSqlConfig, config } from './config';
 import { spliceConfig } from './config/config';
+import { hyperdiskSupportConfig } from './config/hyperdiskSupportConfig';
 import {
+  appsAffinityAndTolerations,
   infraAffinityAndTolerations,
   installSpliceHelmChart,
-  nonHyperdiskAppsAffinityAndTolerations,
 } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
+import { standardStorageClassName } from './storage/storageClass';
 import { ChartValues, CLUSTER_BASENAME, ExactNamespace, GCP_ZONE } from './utils';
 
 const project = gcp.organizations.getProjectOutput({});
@@ -224,6 +227,35 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
 
     // an initial database named cantonnet is created automatically (configured in the Helm chart).
     const smallDiskSize = clusterSmallDisk ? '240Gi' : undefined;
+    const supportsHyperdisk =
+      hyperdiskSupportConfig.hyperdiskSupport.enabled && !useInfraAffinityAndTolerations;
+    let hyperdiskMigrationValues = {};
+    if (supportsHyperdisk && hyperdiskSupportConfig.hyperdiskSupport.migrating) {
+      const pvcSnapshot = new CustomResource(
+        `pg-data-${xns.logicalName}-${instanceName}-snapshot`,
+        {
+          apiVersion: 'snapshot.storage.k8s.io/v1',
+          kind: 'VolumeSnapshot',
+          metadata: {
+            name: `pg-data-${instanceName}-snapshot`,
+            namespace: xns.logicalName,
+          },
+          spec: {
+            volumeSnapshotClassName: 'dev-vsc',
+            source: {
+              persistentVolumeClaimName: `pg-data-${instanceName}-0`,
+            },
+          },
+        }
+      );
+      hyperdiskMigrationValues = {
+        dataSource: {
+          kind: 'VolumeSnapshot',
+          name: pvcSnapshot.metadata.name,
+          apiGroup: 'snapshot.storage.k8s.io',
+        },
+      };
+    }
     const pg = installSpliceHelmChart(
       xns,
       instanceName,
@@ -233,6 +265,13 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
           volumeSize: overrideDbSizeFromValues
             ? values?.db?.volumeSize || smallDiskSize
             : smallDiskSize,
+          ...(supportsHyperdisk
+            ? {
+                volumeStorageClass: standardStorageClassName,
+                pvcTemplateName: 'pg-data-hd',
+                ...hyperdiskMigrationValues,
+              }
+            : {}),
         },
         persistence: {
           secretName: this.secretName,
@@ -242,11 +281,19 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
       {
         aliases: [{ name: logicalNameAlias, type: 'kubernetes:helm.sh/v3:Release' }],
         dependsOn: [passwordSecret],
+        ...((supportsHyperdisk &&
+          // during the migration we first delete the stateful set, which keeps the old pvcs, and the recreate with the new pvcs
+          // the stateful sets are immutable so they need to be recreated to force the change of the pvcs
+          hyperdiskSupportConfig.hyperdiskSupport.migrating) ||
+        spliceConfig.pulumiProjectConfig.replacePostgresStatefulSetOnChanges
+          ? {
+              replaceOnChanges: ['*'],
+              deleteBeforeReplace: true,
+            }
+          : {}),
       },
       true,
-      useInfraAffinityAndTolerations
-        ? infraAffinityAndTolerations
-        : nonHyperdiskAppsAffinityAndTolerations
+      useInfraAffinityAndTolerations ? infraAffinityAndTolerations : appsAffinityAndTolerations
     );
     this.pg = pg;
 
