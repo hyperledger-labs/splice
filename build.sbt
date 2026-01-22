@@ -1948,7 +1948,7 @@ lazy val `apps-app`: Project =
       `apps-common-frontend`,
     )
     .settings(
-      libraryDependencies += "org.scalatestplus" %% "selenium-4-12" % "3.2.17.0" % "test",
+      libraryDependencies += "org.scalatestplus" %% "selenium-4-12" % "3.2.19.0" % "test",
       libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.12.1" % "test",
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
       libraryDependencies += auth0,
