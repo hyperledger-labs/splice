@@ -282,7 +282,7 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
         aliases: [{ name: logicalNameAlias, type: 'kubernetes:helm.sh/v3:Release' }],
         dependsOn: [passwordSecret],
         ...((supportsHyperdisk &&
-          // during the migration we first delete the stateful set, which keeps the old pvcs, and the recreate with the new pvcs
+          // during the migration we first delete the stateful set, which keeps the old pvcs (stateful sets always keep the pvcs), and then recreate with the new pvcs
           // the stateful sets are immutable so they need to be recreated to force the change of the pvcs
           hyperdiskSupportConfig.hyperdiskSupport.migrating) ||
         spliceConfig.pulumiProjectConfig.replacePostgresStatefulSetOnChanges
