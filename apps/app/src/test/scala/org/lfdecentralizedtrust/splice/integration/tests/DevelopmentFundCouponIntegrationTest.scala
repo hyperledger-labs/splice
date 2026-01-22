@@ -27,8 +27,6 @@ class DevelopmentFundCouponIntegrationTest
     UnclaimedDevelopmentFundCoupon.TEMPLATE_ID_WITH_PACKAGE_ID
   )
 
-  override protected def runTokenStandardCliSanityCheck: Boolean = false
-
   override def environmentDefinition
       : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     EnvironmentDefinition
