@@ -29,3 +29,4 @@ export * from './config/loadTesterConfig';
 export * from './config/networkWideConfig';
 export * from './ratelimit';
 export * from './config/config';
+export * from './storage/storageClass';

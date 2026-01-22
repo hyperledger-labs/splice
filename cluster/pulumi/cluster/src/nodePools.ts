@@ -11,6 +11,34 @@ export function installNodePools(): void {
     ? `projects/${GCP_PROJECT}/locations/${config.requireEnv('CLOUDSDK_COMPUTE_ZONE')}/clusters/${clusterName}`
     : clusterName;
 
+  if (gkeClusterConfig.nodePools.hyperdiskApps) {
+    new gcp.container.NodePool('cn-apps-node-pool-hd', {
+      cluster,
+      nodeConfig: {
+        machineType: gkeClusterConfig.nodePools.hyperdiskApps.nodeType,
+        bootDisk: {
+          diskType: 'hyperdisk-balanced',
+          sizeGb: 100,
+        },
+        taints: [
+          {
+            effect: 'NO_SCHEDULE',
+            key: 'cn_apps',
+            value: 'true',
+          },
+        ],
+        labels: {
+          cn_apps: 'hyperdisk',
+        },
+        loggingVariant: 'DEFAULT',
+      },
+      initialNodeCount: 0,
+      autoscaling: {
+        minNodeCount: gkeClusterConfig.nodePools.apps.minNodes,
+        maxNodeCount: gkeClusterConfig.nodePools.apps.maxNodes,
+      },
+    });
+  }
   new gcp.container.NodePool('cn-apps-node-pool', {
     cluster,
     nodeConfig: {
@@ -23,8 +51,9 @@ export function installNodePools(): void {
         },
       ],
       labels: {
-        cn_apps: 'true',
+        cn_apps: 'standard',
       },
+      loggingVariant: 'DEFAULT',
     },
     initialNodeCount: 0,
     autoscaling: {
@@ -47,6 +76,7 @@ export function installNodePools(): void {
       labels: {
         cn_infra: 'true',
       },
+      loggingVariant: 'DEFAULT',
     },
     initialNodeCount: 1,
     autoscaling: {
@@ -67,6 +97,7 @@ export function installNodePools(): void {
           value: 'true',
         },
       ],
+      loggingVariant: 'DEFAULT',
     },
     initialNodeCount: 1,
     autoscaling: {
