@@ -52,7 +52,7 @@ create_component_instance() {
     local namespace="$3"
 
     if [[ ("$component" == "sequencer" || "$component" == "mediator" || "$component" == "participant")
-       && ("$namespace" != "splitwell" && "$namespace" != "validator1" && "$namespace" != "sv"); then
+       && ("$namespace" != "splitwell" && "$namespace" != "validator1" && "$namespace" != "sv") ]]; then
         component_instance="${component}-${migration_id}"
     else
         component_instance="${component}"
