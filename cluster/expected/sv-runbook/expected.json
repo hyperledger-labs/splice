@@ -1328,7 +1328,12 @@
             "memory": "2Gi"
           }
         },
-        "scanAddress": "http://scan-app.sv:5012",
+        "scanClient": {
+          "scanType": "bft",
+          "seedUrls": [
+            "http://scan-app.sv:5012"
+          ]
+        },
         "spliceInstanceNames": {
           "amuletName": "Amulet",
           "amuletNameAcronym": "AMT",
@@ -1338,6 +1343,9 @@
           "networkName": "Splice"
         },
         "svValidator": true,
+        "synchronizer": {
+          "connectionType": "bft"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
