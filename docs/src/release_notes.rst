@@ -130,7 +130,7 @@
 
     - Included support for ``scanClient`` configuration with three operation modes (``bft``, ``bft-custom``, and ``trust-single``) to define how the validator connects to scan.
 
-    - Included support for ``synchronizer`` configuration with three operation modes (``bft``, ``bft-custom``, and ``trust-single``) to define how the validator participant node connects to synchronizer.
+    - Included support for ``synchronizer`` configuration with three operation modes (``bft``, ``bft-custom``, and ``trust-single``) to define how the participant node of the validator connects to synchronizer.
 
 .. release-notes:: 0.5.6
 
