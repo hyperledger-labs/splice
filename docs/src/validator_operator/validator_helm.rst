@@ -379,22 +379,25 @@ Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-p
 
 To configure the validator app, please modify the file ``splice-node/examples/sv-helm/validator-values.yaml`` as follows:
 
-- Replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator. For example, the GSF scan URL, |gsf_scan_url|
-  (This Scan instance will be used for obtaining additional Scan URLs for BFT Scan reads.)
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
 - If you want to configure the audience for the Ledger API, set the ``audience`` field in the `splice-app-validator-ledger-api-auth` k8s secret with the audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
 - Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the validator operator party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. Note that this contact information will be publicly visible. If you do not want to share contact information, you can put an empty string.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
-If you want to only connect to a single trusted scan at ``TRUSTED_SCAN_URL`` but not obtain additional Scan URLs for BFT Scan reads,
-you can uncomment the following and set ``nonSvValidatorTrustSingleScan`` to ``true``.
-This does mean that you depend on that single SV and if it is broken or malicious you will be unable to use the network so usually you want to default to not enabling this.
+You can configure how your validator connects to the network's scan services by defining a ``scanClient`` block in your ``validator-values.yaml``.
+There are three modes available:
+
+- ``bft``: connects to all scans and validates via $f+1$ agreement.
+- ``bft-custom``: connects to a specific list of trusted SVs and validates against a custom threshold
+- ``trust-single``: connects to one specific trusted scan.
+
+Detailed configuration examples and instructions for each mode are provided directly within the comments of the ``validator-values.yaml`` file.
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
     :language: yaml
-    :start-after: TRUSTED_SINGLE_SCAN_START
-    :end-before: TRUSTED_SINGLE_SCAN_END
+    :start-after: SCAN_CLIENT_CONFIGURATION_START
+    :end-before: SCAN_CLIENT_CONFIGURATION_END
 
 If you want to connect to the decentralized synchronizer via only a single trusted sequencer,
 you can uncomment the following and set ``useSequencerConnectionsFromScan`` to ``false``. Also replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the publicly accessible URL of the trusted sequencer,
@@ -403,8 +406,8 @@ This does mean that you depend on that single SV and if it is broken or maliciou
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
     :language: yaml
-    :start-after: TRUSTED_SINGLE_SEQUENCER_START
-    :end-before: TRUSTED_SINGLE_SEQUENCER_END
+    :start-after: SYNCHRONIZER_CONFIGURATION_START
+    :end-before: SYNCHRONIZER_CONFIGURATION_END
 
 Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-validator-values.yaml`` as follows:
 
