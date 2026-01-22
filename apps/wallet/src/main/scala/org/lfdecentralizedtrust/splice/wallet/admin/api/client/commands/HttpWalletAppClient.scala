@@ -1378,7 +1378,8 @@ object HttpWalletAppClient {
         Codec.encode(expiresAt),
         reason,
         Codec.encode(fundManager),
-      )
+      ),
+      headers = headers,
     )
 
     override protected def handleOk()(implicit
@@ -1408,7 +1409,7 @@ object HttpWalletAppClient {
       Throwable,
       HttpResponse,
     ], http.ListActiveDevelopmentFundCouponsResponse] =
-      client.listActiveDevelopmentFundCoupons(headers = headers)
+      client.listActiveDevelopmentFundCoupons(headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
@@ -1435,6 +1436,7 @@ object HttpWalletAppClient {
     ], http.WithdrawDevelopmentFundCouponResponse] = client.withdrawDevelopmentFundCoupon(
       developmentFundCouponContractId.contractId,
       body = definitions.WithdrawDevelopmentFundCouponRequest(reason),
+      headers = headers,
     )
 
     override protected def handleOk()(implicit
