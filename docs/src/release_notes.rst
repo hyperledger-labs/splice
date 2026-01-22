@@ -5,7 +5,7 @@
 
 .. _release_notes:
 
-.. release-notes:: upcoming
+.. release-notes:: 0.5.7
 
   .. important::
 
@@ -20,6 +20,10 @@
 
       No change is required for apps that build against the :ref:`token_standard`
       or :ref:`featured_app_activity_markers_api`.
+
+  - Sequencer connections
+
+    - Fixed an issue in the sequencer connection logic in splice 0.5.6 that resulted in participants randomly crashing and restarting.
 
   - Daml
 
