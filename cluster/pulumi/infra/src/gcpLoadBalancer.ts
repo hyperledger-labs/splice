@@ -16,7 +16,6 @@ you need to add the CRD; on a cncluster-controlled dev cluster directory you can
 
 /* TODO (#2723)
 
-Highest subnet in 10.x in cn-*net currently is 10.232.0.0/20.
 Doc recommends starting with /23:
   https://docs.cloud.google.com/load-balancing/docs/proxy-only-subnets#proxy-subnet-size
 They can't be expanded, only replaced:
