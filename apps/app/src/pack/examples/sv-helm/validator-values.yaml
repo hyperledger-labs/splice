@@ -1,7 +1,8 @@
 # SCAN_CLIENT_CONFIGURATION_START
 scanClient:
-   scanType: "bft"
-   seedUrls: ["https://seed-scan-url.com"] # replace with actual scan seed url
+  scanType: "bft"
+  seedUrls: ["https://seed-scan-url.com"] # replace with actual scan seed url
+
 # scanClient denotes how the validator makes connections to scan service and supports three modes of operation.
 # Mode 1: BFT (Byzantine Fault Tolerance)
 # Connects to all available scans in the network. It validates responses by ensuring
@@ -29,13 +30,31 @@ scanClient:
 #   scanAddress: "TRUSTED_SCAN_URL" # replace with the actual trusted scan url
 # SCAN_CLIENT_CONFIGURATION_END
 
-# TRUSTED_SINGLE_SEQUENCER_START
-# If you want to configure validator to connect to a single trusted sequencer, set ``useSequencerConnectionsFromScan`` to false.
-# and replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the publicly accessible URL of the trusted sequencer.
-# This does mean that you depend on that single SV and if it is broken or malicious you will be unable to use the network so usually you want to default to not enabling this.
-# decentralizedSynchronizerUrl: "TRUSTED_SYNCHRONIZER_SEQUENCER_URL"
-# useSequencerConnectionsFromScan: false
-# TRUSTED_SINGLE_SEQUENCER_END
+synchronizer:
+  connectionType: "bft"
+# SYNCHRONIZER_CONFIGURATION_START
+
+# synchronizer configuration Configures how the validator's participant connects to the synchronizer.
+# Choose one of the three modes based on your security and decentralization needs.
+
+# Mode 1: BFT (Byzantine Fault Tolerance)
+# Uses all possible synchronizer connections provided by the scan service.
+# Responses are validated against the network's f+1 fault tolerance logic.
+# synchronizer:
+#   connectionType: "bft"
+
+# Mode 2: BFT-Custom
+# Connects only to sequencers operated by the specific SVs listed in 'svNames'.
+# 'threshold' defines the minimum number of matching responses required for validation.
+# synchronizer:
+#   connectionType: "bft-custom"
+#   svNames: ["Digital-Asset-Eng-2", "Digital-Asset-Eng-3"]
+#   threshold: 2
+
+# Mode 3: Trust-Single
+# Connects to a single specified synchronizer URL.
+# Trust-Single makes you dependent on a single SV; if it is malicious or down,
+# you will be unable to use the network.
 
 # Replace OPERATOR_WALLET_USER_ID with the user id in your IAM that you want to use to log into
 # the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``
