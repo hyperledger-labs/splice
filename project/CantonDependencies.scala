@@ -48,7 +48,7 @@ object CantonDependencies {
   lazy val scalaz_version = "7.2.33"
   lazy val mockito_scala_version = "1.16.3"
 
-  lazy val netty_version = "4.1.124.Final"
+  lazy val netty_version = "4.2.9.Final"
 
   lazy val reflections = "org.reflections" % "reflections" % "0.10.2"
   lazy val pureconfig = "com.github.pureconfig" %% "pureconfig" % pureconfig_version
