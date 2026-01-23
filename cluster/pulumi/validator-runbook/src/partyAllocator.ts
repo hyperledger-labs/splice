@@ -50,8 +50,8 @@ export function installPartyAllocator(
         preapprovalRetryDelayMs: config.preapprovalRetryDelayMs,
       },
       pvc: {
-        size: config.pvcSize,
-        storageClassName: standardStorageClassName,
+        ...(config.pvcSize ? { size: config.pvcSize } : {}),
+        volumeStorageClass: standardStorageClassName,
         name: hyperdiskSupportConfig.hyperdiskSupport.enabled
           ? 'party-allocator-keys-hd-pvc'
           : 'party-allocator-keys',
