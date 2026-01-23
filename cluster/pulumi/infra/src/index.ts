@@ -52,6 +52,7 @@ if (useGKEL7Gateway) {
     serviceTarget: { port: 443 },
     tlsSecretName: `cn-${clusterBasename}net-tls`,
     securityPolicy: cloudArmorSecurityPolicy,
+    istioResource: istio.istioResource,
   });
 }
 

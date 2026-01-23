@@ -30,6 +30,7 @@ import { clusterBasename, infraConfig, loadIPRanges } from './config';
 interface ConfiguredIstio {
   allResources: pulumi.Resource[];
   httpServiceName: string;
+  istioResource: k8s.helm.v3.Release;
 }
 
 export const istioVersion = {
@@ -761,6 +762,7 @@ export function configureIstio(
       ...sequencerHighPerformanceGrpcRules,
     ],
     httpServiceName: 'istio-ingress',
+    istioResource: gwSvc,
   };
 }
 

@@ -55,6 +55,8 @@ interface L7GatewayConfig {
   serviceTarget: {
     port: number;
   };
+  // the istio gateway service that must be updated before creating this gateway
+  istioResource: pulumi.Resource;
   // the Cloud Armor policy to attach
   securityPolicy: SecurityPolicy;
   // if provided, an HTTPS listener will be created on port 443 that
@@ -68,10 +70,7 @@ const httpsListenerName = 'listen-https';
 /**
  * Creates a GKE L7 Gateway
  */
-function createL7Gateway(
-  config: L7GatewayConfig,
-  opts?: pulumi.CustomResourceOptions
-): k8s.apiextensions.CustomResource {
+function createL7Gateway(config: L7GatewayConfig): k8s.apiextensions.CustomResource {
   return new k8s.apiextensions.CustomResource(
     config.gatewayName,
     {
@@ -131,7 +130,7 @@ function createL7Gateway(
         addresses: [{ type: 'NamedAddress', value: config.ingressAddress.name }],
       },
     },
-    opts
+    { dependsOn: [config.istioResource] }
   );
 }
 
@@ -199,7 +198,7 @@ function createGCPBackendPolicy(
  */
 function createHealthCheckPolicy(
   config: L7GatewayConfig,
-  opts?: pulumi.CustomResourceOptions
+  opts: pulumi.CustomResourceOptions
 ): k8s.apiextensions.CustomResource {
   const policyName = `${config.gatewayName}-healthcheck`;
   return new k8s.apiextensions.CustomResource(
@@ -232,11 +231,7 @@ function createHealthCheckPolicy(
 /**
  * Creates HTTPRoutes for the L7 Gateway
  */
-function createHTTPRoute(
-  config: L7GatewayConfig,
-  gateway: k8s.apiextensions.CustomResource,
-  opts?: pulumi.CustomResourceOptions
-): void {
+function createHTTPRoute(config: L7GatewayConfig, gateway: k8s.apiextensions.CustomResource): void {
   const routeName = `${config.gatewayName}-http-route`;
 
   const parentRef = {
@@ -244,7 +239,7 @@ function createHTTPRoute(
     namespace: config.ingressNs.ns.metadata.name,
   };
 
-  const routeOpts = { ...opts, dependsOn: [gateway] };
+  const routeOpts = { dependsOn: [gateway] };
 
   let sectionExtension: { sectionName: typeof httpsListenerName } | Record<string, never> = {};
 
@@ -333,25 +328,20 @@ function createHTTPRoute(
 /**
  * Configures a complete GKE L7 Gateway with optional Cloud Armor integration
  */
-export function configureGKEL7Gateway(
-  config: L7GatewayConfig,
-  opts?: pulumi.ComponentResourceOptions
-): {
+export function configureGKEL7Gateway(config: L7GatewayConfig): {
   gateway: k8s.apiextensions.CustomResource;
 } {
-  const gateway = createL7Gateway(config, opts);
+  const gateway = createL7Gateway(config);
 
   createGCPBackendPolicy(config, gateway, {
-    ...opts,
     dependsOn: [gateway],
   });
 
   createHealthCheckPolicy(config, {
-    ...opts,
     dependsOn: [gateway],
   });
 
-  createHTTPRoute(config, gateway, opts);
+  createHTTPRoute(config, gateway);
 
   return { gateway };
 }
