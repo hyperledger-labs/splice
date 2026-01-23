@@ -393,8 +393,6 @@ There are three modes of ``scanClient``:
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. Note that this contact information will be publicly visible. If you do not want to share contact information, you can put an empty string.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
-Detailed configuration examples and instructions for each mode are provided directly within the comments of the ``validator-values.yaml`` file.
-
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
     :language: yaml
     :start-after: SCAN_CLIENT_CONFIGURATION_START
@@ -406,8 +404,6 @@ You need to configure how your validator's participant connects to ``sequencers`
 - ``bft``:  (default mode) connects to all available sequencers and validates responses via majority agreement.
 - ``bft-custom``: connects only to specific sequencers from your trusted ``svNames`` using a custom ``threshold``. Replace ``TRUSTED_SV`` with the super validator name(s) you trust. Replace ``TRUST_THRESHOLD`` with an integer representing the number of sequencer responses that need to agree for a response to be considered valid.
 - ``trust-single``: connects to one specific url. Replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the URL of the sequencer you trust.
-
-Each synchronizer configuration mode is documented with examples in the ``validator-values.yaml``.
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
     :language: yaml

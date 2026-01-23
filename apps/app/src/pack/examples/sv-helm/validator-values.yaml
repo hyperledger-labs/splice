@@ -59,7 +59,7 @@ synchronizer:
 #   threshold: <TRUST_THRESHOLD> # replace with the integer number of matching responses required for validation
 
 # Mode 3: trust-Single
-# Connects to a single specified synchronizer URL.
+# Connects to a single specified sequencer URL.
 # trust-single makes you dependent on a single SV; if it is malicious or down, you will be unable to use the network.
 
 #synchronizer:
