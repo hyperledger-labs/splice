@@ -1,8 +1,10 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.javaapi.data.Identifier
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedDevelopmentFundCoupon
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
@@ -39,6 +41,18 @@ class DevelopmentFundCouponIntegrationTest
       .addConfigTransform((_, config) =>
         ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
       )
+      .addConfigTransform((_, config) => {
+        val aliceParticipant =
+          ConfigTransforms
+            .getParticipantIds(config.parameters.clock)("alice_validator_user")
+        val alicePartyHint =
+          config.validatorApps(InstanceName.tryCreate("aliceValidator")).validatorPartyHint.value
+        val alicePartyId = PartyId
+          .tryFromProtoPrimitive(
+            s"${alicePartyHint}::${aliceParticipant.split("::").last}"
+          )
+        ConfigTransforms.withDevelopmentFundManager(alicePartyId)(config)
+      })
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllSvAppConfigs_(
           _.copy(
@@ -107,58 +121,152 @@ class DevelopmentFundCouponIntegrationTest
 
   "DevelopmentFundCoupons management flow" in { implicit env =>
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
-    val unclaimedDevelopmentFundCouponsToMint = Seq(10.0, 10.0, 30.0, 30.0)
+    val unclaimedDevelopmentFundCouponsToMint = Seq(10.0, 10.0, 30.0, 30.0).map(BigDecimal(_))
     val unclaimedDevelopmentFundCouponTotal = unclaimedDevelopmentFundCouponsToMint.sum
-    val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+    val aliceValidatorParty = onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
     val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-    val fundManager = aliceParty
     val beneficiary = bobParty
-    val developmentFundCouponAmount = 40.0
+    val developmentFundCouponAmount = BigDecimal(40.0)
     val expiresAt = CantonTimestamp.now().plus(Duration.ofDays(1))
     val reason = "Bob has contributed to the Daml repo"
 
-    val unclaimedDevelopmentFundCouponContractIds =
-      clue("Mint some unclaimed development fund coupons") {
-        unclaimedDevelopmentFundCouponsToMint.foreach { amount =>
-          createUnclaimedDevelopmentFundCoupon(
-            sv1ValidatorBackend.participantClientWithAdminToken,
-            sv1UserId,
-            amount,
-          )
-        }
-        val unclaimedDevelopmentFundCouponContracts =
-          sv1Backend.participantClient.ledger_api_extensions.acs
-            .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
-        unclaimedDevelopmentFundCouponContracts
-          .map(co => BigDecimal(co.data.amount))
-          .sum shouldBe unclaimedDevelopmentFundCouponTotal
-        unclaimedDevelopmentFundCouponContracts.map(_.id)
+    clue("Mint some unclaimed development fund coupons") {
+      unclaimedDevelopmentFundCouponsToMint.foreach { amount =>
+        createUnclaimedDevelopmentFundCoupon(
+          sv1ValidatorBackend.participantClientWithAdminToken,
+          sv1UserId,
+          amount,
+        )
       }
+      val unclaimedDevelopmentFundCouponContracts =
+        sv1Backend.participantClient.ledger_api_extensions.acs
+          .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
+      unclaimedDevelopmentFundCouponContracts
+        .map(co => BigDecimal(co.data.amount))
+        .sum shouldBe unclaimedDevelopmentFundCouponTotal
+    }
 
-    actAndCheck(
-      "allocate one development fund coupon", {
-        aliceWalletClient.allocateDevelopmentFundCoupon(
-          unclaimedDevelopmentFundCouponContractIds,
+    // Allocation
+    /////////////
+
+    clue("An invalid fund manager cannot allocate a development fund coupon") {
+      assertThrowsAndLogsCommandFailures(
+        bobWalletClient.allocateDevelopmentFundCoupon(
           beneficiary,
           developmentFundCouponAmount,
           expiresAt,
           reason,
-          fundManager,
+        ),
+        logEntry => {
+          logEntry.errorMessage should (include("400 Bad Request") and include(
+            "Invalid fund manager"
+          ))
+          logEntry.errorMessage should not include "DAML_FAILURE"
+        },
+      )
+    }
+
+    clue(
+      "A development fund coupon cannot be allocated when the total of unclaimed development " +
+        "coupon is insufficient"
+    ) {
+      assertThrowsAndLogsCommandFailures(
+        aliceValidatorWalletClient.allocateDevelopmentFundCoupon(
+          beneficiary,
+          unclaimedDevelopmentFundCouponsToMint.sum + BigDecimal(1.0),
+          expiresAt,
+          reason,
+        ),
+        logEntry => {
+          logEntry.errorMessage should (include("400 Bad Request") and include(
+            "The total amount of unclaimed development coupons is insufficient to cover the amount requested"
+          ))
+          logEntry.errorMessage should not include "DAML_FAILURE"
+        },
+      )
+    }
+
+    val (_, developmentFundCouponCid) = actAndCheck(
+      "As the fund manager, Alice allocates one development fund coupon", {
+        aliceValidatorWalletClient.allocateDevelopmentFundCoupon(
+          beneficiary,
+          developmentFundCouponAmount,
+          expiresAt,
+          reason,
         )
       },
     )(
       "One development fund coupon is allocated and the total of unclaimed development fund coupons has decreased",
       _ => {
-        val activeDevelopmentFundCoupons =
-          aliceWalletClient.listActiveDevelopmentFundCoupons().map(_.payload)
-        activeDevelopmentFundCoupons.length shouldBe 1
-        val bobDevelopmentFundCoupon = activeDevelopmentFundCoupons.head
-        bobDevelopmentFundCoupon.amount shouldBe developmentFundCouponAmount
+        // Beneficiary can list their coupons
+        val activeDevelopmentFundCouponContracts =
+          bobWalletClient.listActiveDevelopmentFundCoupons()
+        activeDevelopmentFundCouponContracts.length shouldBe 1
+
+        // Fund manager can list their coupons
+        aliceValidatorWalletClient
+          .listActiveDevelopmentFundCoupons()
+          .length shouldBe 1
+
+        // Verify the coupon
+        val developmentFundCouponContract = activeDevelopmentFundCouponContracts.head
+        val developmentFundCoupon = developmentFundCouponContract.payload
+        BigDecimal(developmentFundCoupon.amount) shouldBe developmentFundCouponAmount
+        developmentFundCoupon.beneficiary shouldBe bobParty.toProtoPrimitive
+        developmentFundCoupon.fundManager shouldBe aliceValidatorParty.toProtoPrimitive
+
+        // Verify that the total of unclaimed development fund coupons has decreased
+        // Note: HttpWalletHandler selects the largest unclaimed development fund coupons for the allocation,
+        // as they are the most stable.
         sv1Backend.participantClient.ledger_api_extensions.acs
           .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
           .map(co => BigDecimal(co.data.amount))
-          .sum shouldBe (unclaimedDevelopmentFundCouponTotal - developmentFundCouponAmount)
+          .sorted shouldBe Seq(10.0, 10.0, 20.0)
+
+        // Fund manager can list their coupons
+        aliceValidatorWalletClient
+          .listActiveDevelopmentFundCoupons()
+          .length shouldBe 1
+
+        developmentFundCouponContract.contractId
       },
     )
+
+    // Withdrawal
+    //////////////
+
+    val withdrawalReason = "Bob's PR in the Daml repo broke CI"
+    clue("The coupon's beneficiary cannot withdraw a development fund coupon") {
+      assertThrowsAndLogsCommandFailures(
+        bobWalletClient
+          .withdrawDevelopmentFundCoupon(developmentFundCouponCid, withdrawalReason),
+        logEntry => {
+          logEntry.errorMessage should (include("400 Bad Request") and include(
+            "Invalid controller"
+          ))
+          logEntry.errorMessage should not include "DAML_AUTHORIZATION_ERROR"
+        },
+      )
+    }
+
+    actAndCheck(
+      "As the fund manager, Alice withdraws a development fund coupon", {
+        aliceValidatorWalletClient
+          .withdrawDevelopmentFundCoupon(developmentFundCouponCid, withdrawalReason)
+      },
+    )(
+      "The coupon is archived and a new unclaimed development fund coupon is created",
+      _ => {
+        // Verify that the coupon is archived
+        aliceValidatorWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
+
+        // Verify that a new unclaimed development fund coupon was created
+        sv1Backend.participantClient.ledger_api_extensions.acs
+          .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
+          .map(co => BigDecimal(co.data.amount))
+          .sorted shouldBe Seq(10.0, 10.0, 20.0, developmentFundCouponAmount.toDouble)
+      },
+    )
+
   }
 }

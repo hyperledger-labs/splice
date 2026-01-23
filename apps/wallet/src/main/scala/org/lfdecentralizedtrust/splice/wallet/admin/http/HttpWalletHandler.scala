@@ -1307,42 +1307,46 @@ class HttpWalletHandler(
             .asRuntimeException()
         )
         beneficiary = Codec.tryDecode(Codec.Party)(body.beneficiary)
-        fundManagerFromRequest = Codec.tryDecode(Codec.Party)(body.fundManager)
         amount = Codec.tryDecode(Codec.BigDecimal)(body.amount)
         expiresAt = Codec.tryDecode(Codec.Timestamp)(body.expiresAt)
-        unclaimedDevelopmentFundCouponContractIds = body.unclaimedDevelopmentFundCouponContractIds
-          .map(
-            Codec.tryDecodeJavaContractId(UnclaimedDevelopmentFundCoupon.COMPANION)(_)
-          )
         optDevelopmentFundManager =
           amuletRulesCt.contract.payload.configSchedule.initialValue.optDevelopmentFundManager
             .map(Codec.tryDecode(Codec.Party)(_))
             .toScala
         // validate development fund manager
-        _ =
+        developmentFundManager =
           optDevelopmentFundManager match {
             case None =>
               throw Status.FAILED_PRECONDITION
                 .withDescription("Development fund manager has not been configured.")
                 .asRuntimeException()
-            case Some(developmentFundManager)
-                if developmentFundManager == fundManagerFromRequest &&
-                  fundManagerFromRequest == store.key.endUserParty =>
-              ()
+            case Some(developmentFundManager) if developmentFundManager == store.key.endUserParty =>
+              developmentFundManager
             case Some(_) =>
-              throw Status.PERMISSION_DENIED
-                .withDescription("Invalid fundManager")
+              throw Status.FAILED_PRECONDITION
+                .withDescription("Invalid fund manager")
                 .asRuntimeException()
           }
+        unclaimedDevelopmentFundCoupons <- scanConnection.listUnclaimedDevelopmentFundCoupons()
+        unclaimedDevelopmentFundCouponsToAllocate = takeUnclaimedDevelopmentFundCouponsUntilAtLeast(
+          unclaimedDevelopmentFundCoupons,
+          amount,
+        ).getOrElse(
+          throw Status.Code.INVALID_ARGUMENT.toStatus
+            .withDescription(
+              s"The total amount of unclaimed development coupons is insufficient to cover the amount requested"
+            )
+            .asRuntimeException
+        )
         cmd = amuletRulesCt
           .exercise(
             _.exerciseAmuletRules_AllocateDevelopmentFundCoupon(
-              unclaimedDevelopmentFundCouponContractIds.asJava,
+              unclaimedDevelopmentFundCouponsToAllocate.map(_.contract.contractId).asJava,
               beneficiary.toProtoPrimitive,
               damlDecimal(amount),
               expiresAt.toInstant,
-              fundManagerFromRequest.toProtoPrimitive,
               body.reason,
+              developmentFundManager.toProtoPrimitive,
             )
           )
         result <- userWallet.connection
@@ -1353,7 +1357,10 @@ class HttpWalletHandler(
           )
           .withSynchronizerId(domain)
           .noDedup
-          .withDisclosedContracts(userWallet.connection.disclosedContracts(amuletRules))
+          .withDisclosedContracts(
+            userWallet.connection
+              .disclosedContracts(amuletRules, unclaimedDevelopmentFundCouponsToAllocate*)
+          )
           .yieldResult()
       } yield WalletResource.AllocateDevelopmentFundCouponResponseOK(
         AllocateDevelopmentFundCouponResponse(
@@ -1362,6 +1369,53 @@ class HttpWalletHandler(
         )
       )
     }
+  }
+
+  // Returns the largest coupons first until their total reaches at least the requested amount;
+  // returns None if the available coupons are insufficient.
+  private def takeUnclaimedDevelopmentFundCouponsUntilAtLeast(
+      coupons: Seq[
+        ContractWithState[
+          UnclaimedDevelopmentFundCoupon.ContractId,
+          UnclaimedDevelopmentFundCoupon,
+        ]
+      ],
+      n: BigDecimal,
+  ): Option[
+    List[
+      ContractWithState[
+        UnclaimedDevelopmentFundCoupon.ContractId,
+        UnclaimedDevelopmentFundCoupon,
+      ]
+    ]
+  ] = {
+    type Cws =
+      ContractWithState[
+        UnclaimedDevelopmentFundCoupon.ContractId,
+        UnclaimedDevelopmentFundCoupon,
+      ]
+
+    def amountOf(c: Cws): BigDecimal =
+      BigDecimal(c.contract.payload.amount)
+
+    val sortedDesc: List[Cws] =
+      coupons
+        .sortBy(amountOf)(Ordering[BigDecimal].reverse)
+        .toList
+
+    @annotation.tailrec
+    def loop(rest: List[Cws], sum: BigDecimal, acc: List[Cws]): Option[List[Cws]] =
+      if (sum >= n) Some(acc)
+      else
+        rest match {
+          case Nil =>
+            None
+          case cur :: tail =>
+            val amt = amountOf(cur)
+            loop(tail, sum + amt, cur :: acc)
+        }
+
+    loop(sortedDesc, BigDecimal(0), Nil)
   }
 
   override def listActiveDevelopmentFundCoupons(
@@ -1402,9 +1456,16 @@ class HttpWalletHandler(
                 .asRuntimeException()
             )
           )
+        _ = if (
+          developmentFundCoupon.contract.payload.fundManager != store.key.endUserParty.toProtoPrimitive
+        )
+          throw Status.Code.FAILED_PRECONDITION.toStatus
+            .withDescription(s"Invalid controller")
+            .asRuntimeException()
+
         result <- userWallet.connection
           .submit(
-            Seq(store.key.validatorParty, store.key.endUserParty),
+            Seq(store.key.endUserParty),
             Seq.empty,
             developmentFundCoupon.exercise(_.exerciseDevelopmentFundCoupon_Withdraw(body.reason)),
           )

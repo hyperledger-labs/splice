@@ -609,24 +609,18 @@ abstract class WalletAppReference(
       "DevelopmentFundCoupon for the specified beneficiary and amount."
   )
   def allocateDevelopmentFundCoupon(
-      unclaimedDevelopmentFundCouponContractIds: Seq[
-        amuletCodegen.UnclaimedDevelopmentFundCoupon.ContractId
-      ],
       beneficiary: PartyId,
       amount: BigDecimal,
       expiresAt: CantonTimestamp,
       reason: String,
-      fundManager: PartyId,
   ): AllocateDevelopmentFundCouponResponse =
     consoleEnvironment.run {
       httpCommand(
         HttpWalletAppClient.AllocateDevelopmentFundCoupon(
-          unclaimedDevelopmentFundCouponContractIds,
           beneficiary,
           amount,
           expiresAt,
           reason,
-          fundManager,
         )
       )
     }

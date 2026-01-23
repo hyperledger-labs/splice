@@ -1664,6 +1664,23 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/unclaimed-development-fund-coupons:
+    get:
+      tags: [ external, scan ]
+      x-jvm-package: scan
+      operationId: "listUnclaimedDevelopmentFundCoupons"
+      description: |
+        Retrieve the list of unclaimed development fund coupons.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListUnclaimedDevelopmentFundCouponsResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
 components:
   schemas:
     GetSpliceInstanceNamesResponse:
@@ -3920,3 +3937,14 @@ components:
         - VERDICT_RESULT_UNSPECIFIED
         - VERDICT_RESULT_ACCEPTED
         - VERDICT_RESULT_REJECTED
+
+    ListUnclaimedDevelopmentFundCouponsResponse:
+      type: object
+      required: [ "unclaimed-development-fund-coupons" ]
+      properties:
+        unclaimed-development-fund-coupons:
+          description: |
+            Contracts of the Daml template `Splice.Amulet:UnclaimedDevelopmentFundCoupon`.
+          type: array
+          items:
+            "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"

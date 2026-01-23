@@ -1352,14 +1352,10 @@ object HttpWalletAppClient {
   }
 
   final case class AllocateDevelopmentFundCoupon(
-      unclaimedDevelopmentFundCouponContractIds: Seq[
-        amuletCodegen.UnclaimedDevelopmentFundCoupon.ContractId
-      ],
       beneficiary: PartyId,
       amount: BigDecimal,
       expiresAt: CantonTimestamp,
       reason: String,
-      fundManager: PartyId,
   ) extends InternalBaseCommand[
         http.AllocateDevelopmentFundCouponResponse,
         definitions.AllocateDevelopmentFundCouponResponse,
@@ -1372,12 +1368,10 @@ object HttpWalletAppClient {
       HttpResponse,
     ], http.AllocateDevelopmentFundCouponResponse] = client.allocateDevelopmentFundCoupon(
       body = definitions.AllocateDevelopmentFundCouponRequest(
-        unclaimedDevelopmentFundCouponContractIds.map(_.contractId).toVector,
         Codec.encode(beneficiary),
         Codec.encode(amount),
         Codec.encode(expiresAt),
         reason,
-        Codec.encode(fundManager),
       ),
       headers = headers,
     )
