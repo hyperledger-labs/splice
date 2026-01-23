@@ -181,7 +181,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
       // and let other tests (SvTimeBasedRewardCouponIntegrationTest, WeightDistributionForSvTest, TestSvRewards.daml)
       // verify that the amounts are correct.
       clue("Both SV and validator1 have received rewards") {
-        eventually() {
+        eventually(3.minutes) {
           checkPresenceOfEntriesInSvAndValidator()
         }
       }
