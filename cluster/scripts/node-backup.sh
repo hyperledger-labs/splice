@@ -56,7 +56,9 @@ function wait_for_pvc_backup() {
       break
     else
       (( i++ )) && (( i > WAIT_FOR_BACKUP_RETRIES )) && {
-        # kubectl delete volumesnapshot -n "$namespace" "$backupName";
+        # remove the finalizers to allow fully deleting them
+        kubectl patch -n "$namespace" volumesnapshot "$pvc_name" -p '{"metadata":{"finalizers": []}}' --type=merge
+        kubectl delete volumesnapshot -n "$namespace" "$backupName";
         _error "Timed out waiting for backup of $description PVC";
       }
       sleep 5
