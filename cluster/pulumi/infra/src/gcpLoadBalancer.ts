@@ -14,6 +14,14 @@ you need to add the CRD; on a cncluster-controlled dev cluster directory you can
   gcloud container clusters update "cn-${GCP_CLUSTER_BASENAME}net" --gateway-api=standard
  */
 
+/*
+If you turn off Cloud Armor and see the error
+    kubernetes:helm.sh/v3:Release  istio-ingress         **updating failed**     [diff: ~values]
+you may need to force the gateway destroy first:
+    cncluster pulumi infra up --target 'urn:pulumi:infra.'$GCP_CLUSTER_BASENAME'::infra::kubernetes:gateway.networking.k8s.io/v1:Gateway::cn-gke-l7-gateway' --target-dependents
+then normal up/apply should work
+ */
+
 /* TODO (#2723)
 
 Doc recommends starting with /23:
