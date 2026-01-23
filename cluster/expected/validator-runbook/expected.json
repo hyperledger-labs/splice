@@ -566,7 +566,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "pvc": {
           "name": "party-allocator-keys",
-          "size": 100,
+          "size": "100Gi",
           "storageClassName": "standard-rwo"
         },
         "tolerations": [
