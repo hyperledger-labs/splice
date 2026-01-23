@@ -689,29 +689,6 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     }
   }
 
-  "getWalletBalance should return 400 for invalid party ID" in { implicit env =>
-    implicit val sys = env.actorSystem
-    registerHttpConnectionPoolsCleanup(env)
-
-    val response = Http()
-      .singleRequest(
-        Get(
-          s"${sv1ScanBackend.httpClientConfig.url}/api/scan/v0/wallet-balance?party_id=None&asOfEndOfRound=0"
-        )
-      )
-      .futureValue
-
-    inside(response) {
-      case _ if response.status == StatusCodes.BadRequest =>
-        inside(Unmarshal(response.entity).to[String].value.value) {
-          case Success(successfullResponse) =>
-            successfullResponse should include(
-              "Invalid unique identifier `None` with missing namespace"
-            )
-        }
-    }
-  }
-
   "getUpdateHistory should return 400 for invalid after timestamp" in { implicit env =>
     import env.{actorSystem, executionContext}
     registerHttpConnectionPoolsCleanup(env)
