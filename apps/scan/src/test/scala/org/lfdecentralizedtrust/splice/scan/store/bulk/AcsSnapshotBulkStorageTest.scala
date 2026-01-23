@@ -117,10 +117,12 @@ class AcsSnapshotBulkStorageTest
 
         clue("Add another snapshot to the store, it is also dumped") {
           store.addSnapshot(CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20)))
-          probe.expectNext(2.minutes).value shouldBe (0, CantonTimestamp.tryFromInstant(
+          val next = probe.expectNext(2.minutes)
+          next.value shouldBe (0, CantonTimestamp.tryFromInstant(
             Instant.ofEpochSecond(20)
           ))
           probe.expectNoMessage(10.seconds)
+          next.killSwitch.shutdown()
         }
 
         succeed
