@@ -32,14 +32,7 @@ import {
   MintingDelegationProposalWithStatus,
   useWalletClient,
 } from '../contexts/WalletServiceContext';
-
-export const shortenPartyId = (partyId: string): string => {
-  const elements = partyId.split('::');
-  if (elements.length == 2) {
-    return `${elements[0]}::${elements[1].slice(0, 10)}…`;
-  }
-  return partyId;
-};
+import { shortenPartyId } from '../utils/partyId';
 
 export const Delegations: React.FC = () => {
   const delegationsQuery = useMintingDelegations();
