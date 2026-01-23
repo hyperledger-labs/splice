@@ -37,7 +37,7 @@ object CantonDependencies {
   lazy val pprint_version = "0.7.1"
   // if you update the slick version, please also update our forked code in common/slick.util.*
   lazy val slick_version = "3.5.2"
-  lazy val bouncy_castle_version = "1.79"
+  lazy val bouncy_castle_version = "1.70"
 
   lazy val pureconfig_version = "0.14.0"
 
@@ -127,9 +127,9 @@ object CantonDependencies {
   lazy val daml_testing_utils = "com.daml" %% "testing-utils" % daml_libraries_version
 
   lazy val bouncycastle_bcprov_jdk15on =
-    "org.bouncycastle" % "bcprov-jdk18on" % bouncy_castle_version
+    "org.bouncycastle" % "bcprov-jdk15on" % bouncy_castle_version
   lazy val bouncycastle_bcpkix_jdk15on =
-    "org.bouncycastle" % "bcpkix-jdk18on" % bouncy_castle_version
+    "org.bouncycastle" % "bcpkix-jdk15on" % bouncy_castle_version
 
   lazy val grpc_api = "io.grpc" % "grpc-api" % grpc_version
   lazy val grpc_protobuf = "io.grpc" % "grpc-protobuf" % grpc_version
