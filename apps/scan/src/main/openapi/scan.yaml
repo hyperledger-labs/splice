@@ -1670,7 +1670,7 @@ paths:
       x-jvm-package: scan
       operationId: "listUnclaimedDevelopmentFundCoupons"
       description: |
-        Retrieve the list of unclaimed development fund coupons.
+        List all unclaimed development fund coupons.
       responses:
         "200":
           description: ok

@@ -73,10 +73,9 @@ class DevelopmentFundCouponIntegrationTest
       "5 UnclaimedDevelopmentFundCoupons are created, and the trigger does not merge the coupons, " +
         "as it only acts when the number of coupons is ≥ 2 × threshold",
       _ => {
-        val coupons = sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
+        val coupons = sv1ScanBackend.listUnclaimedDevelopmentFundCoupons().map(_.contract)
         coupons.size shouldBe 5
-        coupons.head.data.amount
+        BigDecimal(coupons.head.payload.amount)
       },
     )
 
@@ -87,14 +86,13 @@ class DevelopmentFundCouponIntegrationTest
       "The MergeUnclaimedDevelopmentFundCouponsTrigger is triggered and merges the smallest three coupons (threshold), " +
         "while keeping the remaining coupons unchanged.",
       _ => {
-        sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
-          .map(_.data.amount)
-          .sorted shouldBe Seq(
-          couponAmount,
-          couponAmount,
-          couponAmount,
-          couponAmount.multiply(new java.math.BigDecimal(3)),
+        assertUnclaimedDevelopmentCouponAmounts(
+          Seq(
+            couponAmount,
+            couponAmount,
+            couponAmount,
+            couponAmount * 3,
+          )
         )
       },
     )
@@ -106,14 +104,13 @@ class DevelopmentFundCouponIntegrationTest
     )(
       "The MergeUnclaimedDevelopmentFundCouponsTrigger merges the `threshold` smallest coupons",
       _ => {
-        sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
-          .map(_.data.amount)
-          .sorted shouldBe Seq(
-          couponAmount,
-          couponAmount,
-          couponAmount.multiply(new java.math.BigDecimal(3)),
-          couponAmount.multiply(new java.math.BigDecimal(3)),
+        assertUnclaimedDevelopmentCouponAmounts(
+          Seq(
+            couponAmount,
+            couponAmount,
+            couponAmount * 3,
+            couponAmount * 3,
+          )
         )
       },
     )
@@ -138,12 +135,12 @@ class DevelopmentFundCouponIntegrationTest
           amount,
         )
       }
-      val unclaimedDevelopmentFundCouponContracts =
-        sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
-      unclaimedDevelopmentFundCouponContracts
-        .map(co => BigDecimal(co.data.amount))
-        .sum shouldBe unclaimedDevelopmentFundCouponTotal
+      eventually()(
+        sv1ScanBackend
+          .listUnclaimedDevelopmentFundCoupons()
+          .map(coupon => BigDecimal(coupon.contract.payload.amount))
+          .sum shouldBe unclaimedDevelopmentFundCouponTotal
+      )
     }
 
     // Allocation
@@ -218,10 +215,7 @@ class DevelopmentFundCouponIntegrationTest
         // Verify that the total of unclaimed development fund coupons has decreased
         // Note: HttpWalletHandler selects the largest unclaimed development fund coupons for the allocation,
         // as they are the most stable.
-        sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
-          .map(co => BigDecimal(co.data.amount))
-          .sorted shouldBe Seq(10.0, 10.0, 20.0)
+        assertUnclaimedDevelopmentCouponAmounts(Seq(10.0, 10.0, 20.0))
 
         // Fund manager can list their coupons
         aliceValidatorWalletClient
@@ -259,14 +253,20 @@ class DevelopmentFundCouponIntegrationTest
       _ => {
         // Verify that the coupon is archived
         aliceValidatorWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
-
         // Verify that a new unclaimed development fund coupon was created
-        sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(UnclaimedDevelopmentFundCoupon.COMPANION)(dsoParty)
-          .map(co => BigDecimal(co.data.amount))
-          .sorted shouldBe Seq(10.0, 10.0, 20.0, developmentFundCouponAmount.toDouble)
+        assertUnclaimedDevelopmentCouponAmounts(
+          Seq(10.0, 10.0, 20.0, developmentFundCouponAmount.toDouble)
+        )
       },
     )
-
   }
+
+  private def assertUnclaimedDevelopmentCouponAmounts(
+      expectedAmounts: Seq[BigDecimal]
+  )(implicit env: FixtureParam) =
+    sv1ScanBackend
+      .listUnclaimedDevelopmentFundCoupons()
+      .map(co => BigDecimal(co.payload.amount))
+      .sorted shouldBe expectedAmounts
+
 }
