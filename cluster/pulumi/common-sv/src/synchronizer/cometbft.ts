@@ -1,29 +1,30 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as _ from 'lodash';
 import {
   activeVersion,
+  appsAffinityAndTolerations,
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
   clusterSmallDisk,
   config,
+  createVolumeSnapshot,
   DomainMigrationIndex,
   ExactNamespace,
-  GCP_ZONE,
   InstalledHelmChart,
   installSpliceHelmChart,
   isDevNet,
   loadYamlFromFile,
-  nonHyperdiskAppsAffinityAndTolerations,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
+  standardStorageClassName,
   svCometBftKeysFromSecret,
   withAddedDependencies,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
-import { jsonStringify, Output, Resource } from '@pulumi/pulumi';
+import { hyperdiskSupportConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/hyperdiskSupportConfig';
+import { jsonStringify, Output } from '@pulumi/pulumi';
 
 import { svsConfig } from '../config';
 import { SingleSvConfiguration } from '../singleSvConfig';
@@ -104,6 +105,26 @@ export function installCometBftNode(
       ? undefined
       : installCometBftKeysSecret(xns, nodeConfig.validator.keyAddress, migrationId);
 
+  let hyperdiskDbValues = {};
+  if (hyperdiskSupportConfig.hyperdiskSupport.enabled) {
+    hyperdiskDbValues = {
+      pvcName: `cometbft-migration-${migrationId}-hd-pvc`,
+      volumeStorageClass: standardStorageClassName,
+    };
+    if (hyperdiskSupportConfig.hyperdiskSupport.migrating) {
+      const { dataSource } = createVolumeSnapshot({
+        resourceName: `cometbft-${xns.logicalName}-migration-${migrationId}-snapshot`,
+        snapshotName: `cometbft-migration-${migrationId}-pd-snapshot`,
+        namespace: xns.logicalName,
+        pvcName: `global-domain-${migrationId}-cometbft-cometbft-data`,
+      });
+      hyperdiskDbValues = {
+        ...hyperdiskDbValues,
+        dataSource,
+      };
+    }
+  }
+
   const cometbftChartValues = _.mergeWith(cometBftValues, {
     sv1: nodeConfigs.sv1,
     istioVirtualService: {
@@ -138,67 +159,12 @@ export function installCometBftNode(
     },
     db: {
       volumeSize: clusterSmallDisk ? '240Gi' : svsConfig?.cometbft?.volumeSize,
+      ...hyperdiskDbValues,
     },
     extraLogLevelFlags: svConfiguration.logging?.cometbftExtraLogLevelFlags,
     serviceAccountName: imagePullServiceAccountName,
     resources: svConfiguration.cometbft?.resources,
   });
-  const svIdentifier = nodeConfigs.selfSvNodeName;
-  const svIdentifierWithMigration = `${svIdentifier}-m${migrationId}`;
-  let volumeDependecies: Resource[] = [];
-  if (svConfiguration?.cometbft?.snapshotName) {
-    const volumeSize = cometbftChartValues.db.volumeSize;
-    const diskSnapshot = gcp.compute.getSnapshot({
-      name: svConfiguration.cometbft.snapshotName,
-    });
-
-    if (!GCP_ZONE) {
-      throw new Error('Zone is required to create a disk');
-    }
-    const restoredDisk = new gcp.compute.Disk(
-      `${svIdentifierWithMigration}-cometbft-restored-data`,
-      {
-        name: `${svIdentifierWithMigration}-cometbft-restored-disk`,
-        // eslint-disable-next-line promise/prefer-await-to-then
-        size: diskSnapshot.then(snapshot => snapshot.diskSizeGb),
-        // eslint-disable-next-line promise/prefer-await-to-then
-        snapshot: diskSnapshot.then(snapshot => snapshot.selfLink),
-        type: 'pd-ssd',
-        zone: GCP_ZONE,
-      },
-      opts
-    );
-
-    // create the underlying persistent volume that will be used by cometbft from the state of an existing PV
-    volumeDependecies = [
-      new k8s.core.v1.PersistentVolume(
-        `${svIdentifier}-cometbft-data`,
-        {
-          metadata: {
-            name: `${svIdentifier}-cometbft-data-pv`,
-          },
-          spec: {
-            capacity: {
-              storage: volumeSize,
-            },
-            volumeMode: 'Filesystem',
-            accessModes: ['ReadWriteOnce'],
-            persistentVolumeReclaimPolicy: 'Delete',
-            storageClassName: cometbftChartValues.db.volumeStorageClass,
-            claimRef: {
-              name: `global-domain-${migrationId}-cometbft-cometbft-data`,
-              namespace: xns.ns.metadata.name,
-            },
-            csi: {
-              driver: 'pd.csi.storage.gke.io',
-              volumeHandle: restoredDisk.id,
-            },
-          },
-        },
-        opts
-      ),
-    ];
-  }
   const protectCometBft = svsConfig?.cometbft?.protected ?? false;
   const release = installSpliceHelmChart(
     xns,
@@ -208,13 +174,13 @@ export function installCometBftNode(
     version,
     // support old runbook names, can be removed once the runbooks are all reset and latest release is >= 0.2.x
     {
-      ...withAddedDependencies(opts, volumeDependecies.concat(keysSecret ? [keysSecret] : [])),
+      ...withAddedDependencies(opts, keysSecret ? [keysSecret] : []),
       aliases: [{ name: `global-domain-${migrationId}-cometbft`, parent: undefined }],
       ignoreChanges: ['name'],
       protect: disableProtection ? false : protectCometBft,
     },
     true,
-    nonHyperdiskAppsAffinityAndTolerations
+    appsAffinityAndTolerations
   );
   return { rpcServiceName: `${nodeConfig.identifier}-cometbft-rpc`, release };
 }

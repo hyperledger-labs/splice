@@ -4,7 +4,6 @@
 suite: "cometbft deployment"
 templates:
   - deployment.yaml
-  - pvc.yaml
 release:
   # Set for testing labels
   name: global-domain-3
@@ -35,15 +34,18 @@ tests:
       - equal:
           path: spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[0].labelSelector.matchExpressions[0].values[0]
           value: "cometbft"
-  - it: "deploys a PVC"
-    template: pvc.yaml
+      - equal:
+          path: spec.template.spec.volumes[4].persistentVolumeClaim.claimName
+          value: global-domain-3-cometbft-cometbft-data
+  - it: "uses custom pvcName in deployment when set"
+    template: deployment.yaml
+    set:
+      db:
+        pvcName: "custom-pvc-name"
     documentSelector:
       path: kind
-      value: PersistentVolumeClaim
+      value: Deployment
     asserts:
       - equal:
-          path: metadata.name
-          value: global-domain-3-cometbft-cometbft-data
-      - equal:
-          path: metadata.annotations["helm.sh/resource-policy"]
-          value: keep
+          path: spec.template.spec.volumes[4].persistentVolumeClaim.claimName
+          value: custom-pvc-name

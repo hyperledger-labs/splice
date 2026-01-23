@@ -5,6 +5,19 @@
 
 .. _release_notes:
 
+.. release-notes:: upcoming
+
+  - Scan
+
+    - deprecated ``/v0/total-amulet-balance`` and ``/v0/wallet-balance`` endpoints have been removed in favor of using `/registry/metadata/v1/instruments/{instrumentId} <app_dev/token_standard/openapi/token_metadata.html#get--registry-metadata-v1-instruments-instrumentId>`_
+      and `/v0/holdings/summary <app_dev/scan_api/scan_openapi.html#post--v0-holdings-summary>`_, respectively.
+
+  - Deployments
+
+    - The default logger has been switched to use an asynchronous appender, for all the nodes, for better performance.
+      The behavior can be switched back to synchronous logging by setting the environment variable `LOG_IMMEDIATE_FLUSH=true`.
+      This now includes helm deployments as well, in 0.5.7 the default was changed only for docker-compose deployments.
+
 .. release-notes:: 0.5.7
 
   .. important::

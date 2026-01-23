@@ -1213,70 +1213,6 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
-  /v0/total-amulet-balance:
-    get:
-      deprecated: true
-      tags: [deprecated, scan]
-      x-jvm-package: scan
-      operationId: "getTotalAmuletBalance"
-      description: |
-        **Deprecated**, use /registry/metadata/v1/instruments/Amulet token standard metadata API endpoint, see
-        https://docs.sync.global/app_dev/token_standard/openapi/token_metadata.html.
-
-        **This endpoint will be removed in a future release**
-
-        Get the total balance of Amulet in the network.
-      parameters:
-        - in: query
-          name: asOfEndOfRound
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GetTotalAmuletBalanceResponse"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-
-  /v0/wallet-balance:
-    get:
-      deprecated: true
-      tags: [deprecated]
-      x-jvm-package: scan
-      operationId: "getWalletBalance"
-      description: |
-        **Deprecated**, use /v0/holdings/summary with /v0/state/acs/snapshot-timestamp instead.
-
-        **This endpoint will be removed in a future release**
-
-        Get the Amulet balance for a specific party at the end of a closed round.
-      parameters:
-        - in: query
-          name: party_id
-          required: true
-          schema:
-            type: string
-        - in: query
-          name: asOfEndOfRound
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GetWalletBalanceResponse"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-
   /v0/amulet-config-for-round:
     get:
       deprecated: true
@@ -1829,18 +1765,6 @@ components:
       properties:
         featured_app_right:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-    GetWalletBalanceResponse:
-      type: object
-      required: ["wallet_balance"]
-      properties:
-        wallet_balance:
-          type: string
-    GetTotalAmuletBalanceResponse:
-      type: object
-      required: ["total_balance"]
-      properties:
-        total_balance:
-          type: string
     GetAmuletConfigForRoundResponse:
       type: object
       required:
