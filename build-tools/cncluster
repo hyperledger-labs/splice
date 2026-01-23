@@ -1746,10 +1746,12 @@ function subcmd_backup_nodes() {
     fi
     migration_id=$1
 
-    if [ $# -eq 2 ]; then
+    # If only migration is set, backup everything, otherwise backup specified nodes
+    # Notably, prod networks which don't have sv-2 % sv-3
+    if [ $# -eq 1 ]; then
         nodes="sv-1 sv-2 sv-3 sv-da-1 validator1 splitwell"
     else
-        shift 2
+        shift 1
         nodes="$*"
     fi
 
