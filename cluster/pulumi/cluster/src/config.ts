@@ -17,6 +17,7 @@ const GkeClusterConfigSchema = z.object({
 });
 
 export type GkeClusterConfig = z.infer<typeof GkeClusterConfigSchema>;
+export type GkeNodePoolConfig = z.infer<typeof GkeNodePoolConfigSchema>;
 
 export const gkeClusterConfig: GkeClusterConfig = GkeClusterConfigSchema.parse(
   clusterSubConfig('cluster')
