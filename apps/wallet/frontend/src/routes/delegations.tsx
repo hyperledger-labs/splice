@@ -12,6 +12,7 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import {
@@ -86,7 +87,7 @@ export const Delegations: React.FC = () => {
       marginTop={4}
     >
       <Typography variant="h4" id="proposals-label">
-        Proposed
+        Proposed Minting Delegations
       </Typography>
       {hasNoProposals ? (
         <Typography variant="h6" id="no-proposals-message">
@@ -98,7 +99,7 @@ export const Delegations: React.FC = () => {
             <TableRow>
               <TableCell>Beneficiary</TableCell>
               <TableCell>Onboarded</TableCell>
-              <TableCell>Max Amulets</TableCell>
+              <TableCell>Merge Threshold</TableCell>
               <TableCell>Expiration</TableCell>
               <TableCell>Accept</TableCell>
               <TableCell>Reject</TableCell>
@@ -123,9 +124,13 @@ export const Delegations: React.FC = () => {
         </Table>
       )}
 
-      <Typography variant="h4" id="delegations-label">
-        Active
-      </Typography>
+      <Tooltip title="The validator automates minting and merging holdings for the beneficiaries of the delegations below">
+        <span>
+          <Typography variant="h4" id="delegations-label">
+            Active Minting Delegations
+          </Typography>
+        </span>
+      </Tooltip>
       {hasNoDelegations ? (
         <Typography variant="h6" id="no-delegations-message">
           None active
@@ -136,7 +141,7 @@ export const Delegations: React.FC = () => {
             <TableRow>
               <TableCell>Beneficiary</TableCell>
               <TableCell>Onboarded</TableCell>
-              <TableCell>Max Amulets</TableCell>
+              <TableCell>Merge Threshold</TableCell>
               <TableCell>Expiration</TableCell>
               <TableCell>Withdraw</TableCell>
             </TableRow>
@@ -360,7 +365,7 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal, existingDelegation 
               </Typography>
               <Box>
                 <Typography variant="caption" color="text.secondary">
-                  Max Amulets:
+                  Merge Threshold:
                 </Typography>
                 <Paper
                   variant="outlined"

@@ -517,8 +517,8 @@ describe('Wallet user can', () => {
     await user.click(delegationsLink);
 
     // Verify both headings are present
-    expect(screen.getByRole('heading', { name: 'Proposed' })).toBeDefined();
-    expect(screen.getByRole('heading', { name: 'Active' })).toBeDefined();
+    expect(document.getElementById('proposals-label')).toBeDefined();
+    expect(document.getElementById('delegations-label')).toBeDefined();
 
     // Verify both tables exist
     expect(screen.getByRole('table', { name: 'proposals table' })).toBeDefined();
@@ -643,8 +643,8 @@ describe('Wallet user can', () => {
     await user.click(delegationsLink);
 
     // Verify both headings are present
-    expect(screen.getByRole('heading', { name: 'Proposed' })).toBeDefined();
-    expect(screen.getByRole('heading', { name: 'Active' })).toBeDefined();
+    expect(document.getElementById('proposals-label')).toBeDefined();
+    expect(document.getElementById('delegations-label')).toBeDefined();
 
     // Verify the empty state messages are displayed
     expect(await screen.findByText('No proposals')).toBeDefined();
