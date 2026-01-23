@@ -39,32 +39,32 @@ scanClient:
 synchronizer:
   connectionType: "bft"
 
-# synchronizer configuration configures how the validator's participant connects to the synchronizer.
+# synchronizer configuration enables to configure how the validator's participant connects to the synchronizer.
+# synchronizer configuration has three modes of operation.
 
 # Mode 1: bft (Byzantine Fault Tolerance)
-# Uses all possible synchronizer connections provided by the scan service.
+# Uses all available synchronizer connections provided by the scan service.
 # Responses are validated against the network's f+1 fault tolerance logic.
 
 # synchronizer:
 #   connectionType: "bft"
 
-# Mode 2: bft-Custom
+# Mode 2: bft-custom
 # Connects only to sequencers operated by the specific SVs listed in 'svNames'.
 # 'threshold' defines the minimum number of matching responses required for validation.
 
 # synchronizer:
 #   connectionType: "bft-custom"
-#   svNames: ["TRUSTED_SV_1", "TRUSTED_SV_2"]
-#   threshold: 2
+#   svNames: ["TRUSTED_SV"] # replace with trusted SV name(s)
+#   threshold: <TRUST_THRESHOLD> # replace with the integer number of matching responses required for validation
 
 # Mode 3: trust-Single
 # Connects to a single specified synchronizer URL.
-# Trust-Single makes you dependent on a single SV; if it is malicious or down,
-# you will be unable to use the network.
+# trust-single makes you dependent on a single SV; if it is malicious or down, you will be unable to use the network.
 
 #synchronizer:
-#  connectionType: "trust-single"
-#  url: "TRUSTED_SYNCHRONIZER_URL"
+#   connectionType: "trust-single"
+#   url: "TRUSTED_SYNCHRONIZER_SEQUENCER_URL" # replace with the trusted synchronizer sequencer url
 
 # SYNCHRONIZER_CONFIGURATION_END
 

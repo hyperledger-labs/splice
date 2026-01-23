@@ -382,7 +382,7 @@ To configure the validator app, please modify the file ``splice-node/examples/sv
 You need to configure how your validator connects to the network's scan services by defining a ``scanClient`` block in your ``validator-values.yaml``.
 There are three modes of ``scanClient``:
 
-- ``bft``: (default type) connects to all scans and validates via $f+1$ agreement.
+- ``bft``: (default mode) connects to all scans and validates via majority agreement.
 - ``bft-custom``: connects to a specific list of trusted SVs and validates against a custom threshold. Replace ``TRUSTED_SV`` with the super validator name(s) you trust. Replace ``TRUST_THRESHOLD`` with an integer representing the number of scan responses that need to agree for a response to be considered valid.
 - ``trust-single``: connects to one specific trusted scan.
 
@@ -392,6 +392,7 @@ There are three modes of ``scanClient``:
 - Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the validator operator party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. Note that this contact information will be publicly visible. If you do not want to share contact information, you can put an empty string.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
+
 Detailed configuration examples and instructions for each mode are provided directly within the comments of the ``validator-values.yaml`` file.
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
@@ -399,12 +400,12 @@ Detailed configuration examples and instructions for each mode are provided dire
     :start-after: SCAN_CLIENT_CONFIGURATION_START
     :end-before: SCAN_CLIENT_CONFIGURATION_END
 
-You can configure how your validator's participant connects to the network synchronizer by defining a synchronizer config in your ``validator-values.yaml``.
-This supports three modes:
+You need to configure how your validator's participant connects to the network synchronizer by defining a ``synchronizer`` config in your ``validator-values.yaml``.
+``synchronizer`` supports three modes of operation:
 
-- ``bft``: connects to all available sequencers and validates responses via $f+1$ agreement.
-- ``bft-custom``: connects only to specific sequencers from your trusted ``svNames`` using a custom ``threshold``.
-- ``trust-single``: connects to one specific url.
+- ``bft``:  (default mode) connects to all available sequencers and validates responses via majority agreement.
+- ``bft-custom``: connects only to specific sequencers from your trusted ``svNames`` using a custom ``threshold``. Replace ``TRUSTED_SV`` with the super validator name(s) you trust. Replace ``TRUST_THRESHOLD`` with an integer representing the number of sequencer responses that need to agree for a response to be considered valid.
+- ``trust-single``: connects to one specific url. Replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the URL of the sequencer you trust.
 
 Each synchronizer configuration mode is documented with examples in the ``validator-values.yaml``.
 
