@@ -537,8 +537,8 @@ describe('Wallet user can', () => {
       );
     });
 
-    // Verify warning icons are shown for proposals where beneficiary is not onboarded
-    const proposalWarnings = document.querySelectorAll('.proposal-not-onboarded-warning');
+    // Verify warning icons are shown for proposals where beneficiary is not hosted
+    const proposalWarnings = document.querySelectorAll('.proposal-not-hosted-warning');
     const expectedProposalWarnings = mockProposalOnboardedStatusSorted.filter(s => !s).length;
     expect(proposalWarnings.length).toBe(expectedProposalWarnings);
 
@@ -586,8 +586,8 @@ describe('Wallet user can', () => {
       expect(beneficiaries[index].textContent).toBe(shortenPartyId(delegation.beneficiary));
     });
 
-    // Verify warning icons are shown for delegations where beneficiary is not onboarded
-    const delegationWarnings = document.querySelectorAll('.delegation-not-onboarded-warning');
+    // Verify warning icons are shown for delegations where beneficiary is not hosted
+    const delegationWarnings = document.querySelectorAll('.delegation-not-hosted-warning');
     const expectedDelegationWarnings = mockDelegationOnboardedStatusSorted.filter(s => !s).length;
     expect(delegationWarnings.length).toBe(expectedDelegationWarnings);
 

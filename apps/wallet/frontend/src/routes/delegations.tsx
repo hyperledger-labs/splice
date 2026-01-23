@@ -155,7 +155,7 @@ interface DelegationRowProps {
 
 const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
   const { withdrawMintingDelegation } = useWalletClient();
-  const { contract, beneficiaryOnboarded } = delegation;
+  const { contract, beneficiaryOnboarded: beneficiaryHosted } = delegation;
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
   const withdrawMutation = useMutation({
@@ -188,9 +188,9 @@ const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
     >
       <TableCell>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          {!beneficiaryOnboarded && (
+          {!beneficiaryHosted && (
             <Tooltip title="Minting delegations do not work for this party, as it is not hosted on this validator node">
-              <Warning color="warning" fontSize="small" className="delegation-not-onboarded-warning" />
+              <Warning color="warning" fontSize="small" className="delegation-not-hosted-warning" />
             </Tooltip>
           )}
           <Typography className="delegation-beneficiary">
@@ -250,7 +250,7 @@ interface ProposalRowProps {
 
 const ProposalRow: React.FC<ProposalRowProps> = ({ proposal, existingDelegation }) => {
   const { acceptMintingDelegationProposal, rejectMintingDelegationProposal } = useWalletClient();
-  const { contract, beneficiaryOnboarded } = proposal;
+  const { contract, beneficiaryOnboarded: beneficiaryHosted } = proposal;
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
 
@@ -308,9 +308,9 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal, existingDelegation 
     >
       <TableCell>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          {!beneficiaryOnboarded && (
+          {!beneficiaryHosted && (
             <Tooltip title="Minting delegations do not work for this party, as it is not hosted on this validator node">
-              <Warning color="warning" fontSize="small" className="proposal-not-onboarded-warning" />
+              <Warning color="warning" fontSize="small" className="proposal-not-hosted-warning" />
             </Tooltip>
           )}
           <Typography className="proposal-beneficiary">
@@ -330,8 +330,8 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal, existingDelegation 
         <DisableConditionally
           conditions={[
             {
-              disabled: !beneficiaryOnboarded,
-              reason: 'Beneficiary is not onboarded',
+              disabled: !beneficiaryHosted,
+              reason: 'Beneficiary is not hosted on this validator',
             },
             {
               disabled: acceptMutation.isPending,
