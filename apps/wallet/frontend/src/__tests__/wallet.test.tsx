@@ -21,8 +21,8 @@ import {
   mockMintingDelegations,
   mockMintingDelegationsSorted,
   mockMintingDelegationProposals,
-  mockDelegationOnboardedStatusSorted,
-  mockProposalOnboardedStatusSorted,
+  mockDelegationHostedStatusSorted,
+  mockProposalHostedStatusSorted,
   mockMintingDelegationProposalsSorted,
 } from './mocks/delegation-constants';
 import { requestMocks } from './mocks/handlers/transfers-api';
@@ -539,7 +539,7 @@ describe('Wallet user can', () => {
 
     // Verify warning icons are shown for proposals where beneficiary is not hosted
     const proposalWarnings = document.querySelectorAll('.proposal-not-hosted-warning');
-    const expectedProposalWarnings = mockProposalOnboardedStatusSorted.filter(s => !s).length;
+    const expectedProposalWarnings = mockProposalHostedStatusSorted.filter(s => !s).length;
     expect(proposalWarnings.length).toBe(expectedProposalWarnings);
 
     // Verify proposal max amulets values are in sorted order
@@ -558,12 +558,12 @@ describe('Wallet user can', () => {
     });
 
     // Verify Accept buttons are present for each proposal
-    // Accept button should be disabled when beneficiary is not onboarded (in sorted order)
+    // Accept button should be disabled when beneficiary is not hosted (in sorted order)
     const acceptButtons = document.querySelectorAll('.proposal-accept');
     expect(acceptButtons.length).toBe(mockMintingDelegationProposals.length);
-    mockProposalOnboardedStatusSorted.forEach((isOnboarded, index) => {
+    mockProposalHostedStatusSorted.forEach((isHosted, index) => {
       expect(acceptButtons[index].textContent).toBe('Accept');
-      if (isOnboarded) {
+      if (isHosted) {
         expect(acceptButtons[index]).not.toBeDisabled();
       } else {
         expect(acceptButtons[index]).toBeDisabled();
@@ -588,7 +588,7 @@ describe('Wallet user can', () => {
 
     // Verify warning icons are shown for delegations where beneficiary is not hosted
     const delegationWarnings = document.querySelectorAll('.delegation-not-hosted-warning');
-    const expectedDelegationWarnings = mockDelegationOnboardedStatusSorted.filter(s => !s).length;
+    const expectedDelegationWarnings = mockDelegationHostedStatusSorted.filter(s => !s).length;
     expect(delegationWarnings.length).toBe(expectedDelegationWarnings);
 
     // Verify max amulets values are in sorted order

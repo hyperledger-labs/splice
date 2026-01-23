@@ -13,11 +13,11 @@ export const delegationExpiresAt = '2050-01-01T00:00:00.000000Z';
 // Formatted version as displayed by DateDisplay component
 export const delegationExpiresAtFormatted = '2050-01-01 00:00';
 
-// Onboarded status for each delegation (bob is onboarded, charlie is not, eve is onboarded)
-export const mockDelegationOnboardedStatus = [true, false, true];
+// Hosted status for each delegation (bob is hosted, charlie is not, eve is hosted)
+export const mockDelegationHostedStatus = [true, false, true];
 
-// Onboarded status for each proposal (charlie is onboarded, dave is not, eve is onboarded)
-export const mockProposalOnboardedStatus = [true, false, true];
+// Hosted status for each proposal (charlie is hosted, dave is not, eve is hosted)
+export const mockProposalHostedStatus = [true, false, true];
 
 // Three different expiration dates for testing sort order
 export const expiresAtCurrent = '2050-01-01T00:00:00.000000Z';
@@ -69,8 +69,8 @@ export const mockMintingDelegationsSorted: MintingDelegation[] = [
   mockMintingDelegations[1], // charlie - 6 months
 ];
 
-// Onboarded status in sorted order (eve: true, bob: true, charlie: false)
-export const mockDelegationOnboardedStatusSorted = [true, true, false];
+// Hosted status in sorted order (eve: true, bob: true, charlie: false)
+export const mockDelegationHostedStatusSorted = [true, true, false];
 
 // Mock data is intentionally NOT sorted by expiration date.
 // Order: 3 months, 6 months, current - to verify UI sorts them correctly.
@@ -111,5 +111,5 @@ export const mockMintingDelegationProposalsSorted: MintingDelegationProposal[] =
   mockMintingDelegationProposals[1], // dave - 6 months
 ];
 
-// Onboarded status in sorted order (eve: true, charlie: true, dave: false)
-export const mockProposalOnboardedStatusSorted = [true, true, false];
+// Hosted status in sorted order (eve: true, charlie: true, dave: false)
+export const mockProposalHostedStatusSorted = [true, true, false];

@@ -42,12 +42,12 @@ import {
 
 export interface MintingDelegationWithStatus {
   contract: Contract<MintingDelegation>;
-  beneficiaryOnboarded: boolean;
+  beneficiaryHosted: boolean;
 }
 
 export interface MintingDelegationProposalWithStatus {
   contract: Contract<MintingDelegationProposal>;
-  beneficiaryOnboarded: boolean;
+  beneficiaryHosted: boolean;
 }
 
 import {
@@ -360,14 +360,14 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         const res = await walletClient.listMintingDelegations();
         return res.delegations.map(d => ({
           contract: Contract.decodeOpenAPI(d.contract, MintingDelegation),
-          beneficiaryOnboarded: d.beneficiary_onboarded,
+          beneficiaryHosted: d.beneficiary_hosted,
         }));
       },
       listMintingDelegationProposals: async () => {
         const res = await walletClient.listMintingDelegationProposals();
         return res.proposals.map(p => ({
           contract: Contract.decodeOpenAPI(p.contract, MintingDelegationProposal),
-          beneficiaryOnboarded: p.beneficiary_onboarded,
+          beneficiaryHosted: p.beneficiary_hosted,
         }));
       },
       acceptMintingDelegationProposal: async proposalContractId => {

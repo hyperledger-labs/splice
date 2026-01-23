@@ -155,7 +155,7 @@ interface DelegationRowProps {
 
 const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
   const { withdrawMintingDelegation } = useWalletClient();
-  const { contract, beneficiaryOnboarded: beneficiaryHosted } = delegation;
+  const { contract, beneficiaryHosted } = delegation;
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
   const withdrawMutation = useMutation({
@@ -250,7 +250,7 @@ interface ProposalRowProps {
 
 const ProposalRow: React.FC<ProposalRowProps> = ({ proposal, existingDelegation }) => {
   const { acceptMintingDelegationProposal, rejectMintingDelegationProposal } = useWalletClient();
-  const { contract, beneficiaryOnboarded: beneficiaryHosted } = proposal;
+  const { contract, beneficiaryHosted } = proposal;
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
 
