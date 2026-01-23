@@ -26,7 +26,7 @@ scanClient:
 
 # Mode 3: trust-single
 # Connects to a single trusted scan address.
-# This means that you depend on that single SV and if it is broken or #  malicious you will be unable to use the network.
+# This means that you depend on that single SV and if it is broken or malicious you will be unable to use the network.
 # Hence, usually you want to default to not enabling this
 
 # scanClient:
