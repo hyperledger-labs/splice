@@ -81,8 +81,8 @@ There are two types of cluster tests that can be requested on a PR:
 - A Hard Migration test, which tests the full hard migration workflow on a scratch cluster.
 
 To request a cluster test to be run on your PR, comment on your pr `/cluster_test` or `/hdm_test`
-for a basic test or a hard-migration test respectively. After commenting, you’ll need approval to trigger the test.
-If you’re within DA, you can self-approve; otherwise, contact an existing maintainer to approve it.
+for a basic test or a hard-migration test respectively. After commenting, the job needs to be approved to actually run.
+If you're a Digital Asset employee, you can self-approve; otherwise, contact an existing maintainer to approve it.
 
 ### Enabling the new Canton bft ordering layer
 
