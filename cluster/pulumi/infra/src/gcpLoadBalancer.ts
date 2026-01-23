@@ -160,8 +160,7 @@ function backendTargetRef(config: L7GatewayConfig): BackendTargetRef {
  */
 function createGCPBackendPolicy(
   config: L7GatewayConfig,
-  gateway: k8s.apiextensions.CustomResource,
-  opts?: pulumi.CustomResourceOptions
+  gateway: k8s.apiextensions.CustomResource
 ): k8s.apiextensions.CustomResource {
   const policyName = `${config.gatewayName}-cloud-armor-link`;
   return new k8s.apiextensions.CustomResource(
@@ -188,7 +187,7 @@ function createGCPBackendPolicy(
         targetRef: backendTargetRef(config),
       },
     },
-    { ...opts, parent: config.securityPolicy, dependsOn: [gateway, config.securityPolicy] }
+    { parent: gateway, dependsOn: [config.securityPolicy] }
   );
 }
 
@@ -198,7 +197,7 @@ function createGCPBackendPolicy(
  */
 function createHealthCheckPolicy(
   config: L7GatewayConfig,
-  opts: pulumi.CustomResourceOptions
+  gateway: k8s.apiextensions.CustomResource
 ): k8s.apiextensions.CustomResource {
   const policyName = `${config.gatewayName}-healthcheck`;
   return new k8s.apiextensions.CustomResource(
@@ -224,7 +223,7 @@ function createHealthCheckPolicy(
         targetRef: backendTargetRef(config),
       },
     },
-    opts
+    { parent: gateway }
   );
 }
 
@@ -239,7 +238,7 @@ function createHTTPRoute(config: L7GatewayConfig, gateway: k8s.apiextensions.Cus
     namespace: config.ingressNs.ns.metadata.name,
   };
 
-  const routeOpts = { dependsOn: [gateway] };
+  const routeOpts = { parent: gateway };
 
   let sectionExtension: { sectionName: typeof httpsListenerName } | Record<string, never> = {};
 
@@ -333,13 +332,9 @@ export function configureGKEL7Gateway(config: L7GatewayConfig): {
 } {
   const gateway = createL7Gateway(config);
 
-  createGCPBackendPolicy(config, gateway, {
-    dependsOn: [gateway],
-  });
+  createGCPBackendPolicy(config, gateway);
 
-  createHealthCheckPolicy(config, {
-    dependsOn: [gateway],
-  });
+  createHealthCheckPolicy(config, gateway);
 
   createHTTPRoute(config, gateway);
 
