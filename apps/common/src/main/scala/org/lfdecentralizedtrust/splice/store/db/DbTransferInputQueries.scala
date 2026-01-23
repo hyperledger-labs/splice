@@ -22,25 +22,18 @@ import scala.concurrent.{ExecutionContext, Future}
 
 /** TransferInput related DB queries
   *
-  * Implementing stores must provide:
-  * - acsTableName
-  * - acsStoreId
-  * - domainMigrationId
-  * - dbStorage
-  *
-  * The store's ACS table must have the following index columns:
-  * - reward_coupon_round
+  * The store's ACS table must have the index on columns:
+  * (store_id, migration_id, package_name, template_id_qualified_name,
+  * reward_coupon_round) WHERE (reward_coupon_round IS NOT NULL)
   */
 trait DbTransferInputQueries extends AcsQueries with AcsTables with LimitHelpers {
   self: TransferInputStore =>
 
-  // Abstract members that implementing stores must provide
   protected def acsTableName: String
   protected def acsStoreId: AcsStoreId
   protected def domainMigrationId: Long
   protected def dbStorage: DbStorage
 
-  // Implicits that implementing stores must provide (usually from constructor implicit parameters)
   protected implicit def ec: ExecutionContext
   protected implicit def closeContext: CloseContext
   protected implicit def templateJsonDecoder: TemplateJsonDecoder
