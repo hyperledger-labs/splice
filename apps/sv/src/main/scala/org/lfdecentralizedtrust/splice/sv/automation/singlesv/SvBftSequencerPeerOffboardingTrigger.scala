@@ -30,6 +30,7 @@ class SvBftSequencerPeerOffboardingTrigger(
 ) extends SvTopologyStatePollingAndAssignedTrigger[BftPeerDifference](
       baseContext,
       store,
+      None,
     ) {
 
   override val reconciler: SequencerBftPeerRemoveReconciler =

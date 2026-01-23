@@ -30,6 +30,7 @@ class SvBftSequencerPeerOnboardingTrigger(
 ) extends SvTopologyStatePollingAndAssignedTrigger[BftPeerDifference](
       baseContext,
       store,
+      None,
     ) {
 
   // Don't pause when the synchronizer is paused or lagging;

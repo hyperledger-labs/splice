@@ -123,6 +123,7 @@ class SvOnboardingSequencerTrigger(
 ) extends SvTopologyStatePollingAndAssignedTrigger[SequencerToOnboard](
       baseContext,
       store,
+      Some(participantAdminConnection),
     ) {
 
   override val reconciler

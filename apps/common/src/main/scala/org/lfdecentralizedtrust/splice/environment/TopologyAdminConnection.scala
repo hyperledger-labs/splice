@@ -141,8 +141,7 @@ abstract class TopologyAdminConnection(
   )(implicit traceContext: TraceContext): Future[FetchTimeResponse] =
     runCmd(
       SynchronizerTimeCommands.FetchTime(
-        // TODO(#456) Use the proper serial and protocol version
-        Some(PhysicalSynchronizerId(synchronizerId, ProtocolVersion.v34, NonNegativeInt.zero)),
+        Some(synchronizerId),
         freshnessBound =
           com.digitalasset.canton.time.NonNegativeFiniteDuration.fromConfig(maxDomainTimeLag),
         timeout = timeout,

@@ -25,6 +25,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SyncConnectionStalenessCheck
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -37,12 +38,13 @@ import scala.concurrent.{ExecutionContext, Future}
 class SvOnboardingPartyToParticipantProposalTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
-    participantAdminConnection: ParticipantAdminConnection,
+    val participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
     override val tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[SvOnboardingPartyToParticipantProposalTrigger.Task] {
+) extends PollingParallelTaskExecutionTrigger[SvOnboardingPartyToParticipantProposalTrigger.Task]
+    with SyncConnectionStalenessCheck {
 
   import SvOnboardingPartyToParticipantProposalTrigger.Task
 
@@ -141,8 +143,9 @@ class SvOnboardingPartyToParticipantProposalTrigger(
       dsoRules.domain,
       dsoParty,
     )
+    notConnected <- isNotConnectedToSync()
   } yield {
-    partyToParticipant.base.serial != task.serial
+    partyToParticipant.base.serial != task.serial || notConnected
   }
 }
 
