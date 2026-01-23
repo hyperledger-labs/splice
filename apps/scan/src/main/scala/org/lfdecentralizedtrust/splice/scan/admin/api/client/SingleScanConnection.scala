@@ -5,7 +5,10 @@ package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import cats.data.OptionT
 import cats.syntax.either.*
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  FeaturedAppRight,
+  UnclaimedDevelopmentFundCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   TransferPreapproval,
@@ -516,6 +519,19 @@ class SingleScanConnection private[client] (
       limit,
     ),
   )
+
+  override def listUnclaimedDevelopmentFundCoupons()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[
+    Seq[
+      ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
+    ]
+  ] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListUnclaimedDevelopmentFundCoupons(),
+    )
 
   def getTransferInstructionAcceptContext(
       instructionCid: TransferInstruction.ContractId

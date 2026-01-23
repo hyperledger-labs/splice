@@ -891,8 +891,6 @@ paths:
                 "$ref": "#/components/schemas/AllocateDevelopmentFundCouponResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-        "403":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/403"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
@@ -910,8 +908,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListActiveDevelopmentFundCouponsResponse"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
@@ -1691,17 +1687,11 @@ components:
     AllocateDevelopmentFundCouponRequest:
       type: object
       required:
-        - unclaimed_development_fund_coupon_contract_ids
         - beneficiary
         - amount
         - expiresAt
         - reason
-        - fundManager
       properties:
-        unclaimed_development_fund_coupon_contract_ids:
-          type: array
-          items:
-            type: string
         beneficiary:
           type: string
         amount:
@@ -1710,8 +1700,6 @@ components:
           type: integer
           format: int64
         reason:
-          type: string
-        fundManager:
           type: string
 
     AllocateDevelopmentFundCouponResponse:
