@@ -56,7 +56,7 @@ function wait_for_pvc_backup() {
       break
     else
       (( i++ )) && (( i > WAIT_FOR_BACKUP_RETRIES )) && {
-        kubectl delete volumesnapshot -n "$namespace" "$backupName";
+        # kubectl delete volumesnapshot -n "$namespace" "$backupName";
         _error "Timed out waiting for backup of $description PVC";
       }
       sleep 5
@@ -153,7 +153,7 @@ function wait_for_cloudsql_backup() {
       break
     else
       (( i++ ))&& (( i > WAIT_FOR_BACKUP_RETRIES )) && {
-        gcloud sql backups delete "$id" --instance "$db_id" --quiet;
+        # gcloud sql backups delete "$id" --instance "$db_id" --quiet;
         _error "Timed out waiting for backup of $description db";
       }
       sleep 5
