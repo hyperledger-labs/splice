@@ -379,7 +379,7 @@ Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-p
 
 To configure the validator app, please modify the file ``splice-node/examples/sv-helm/validator-values.yaml`` as follows:
 
-You need to configure how your validator connects to the network's scan services by defining a ``scanClient`` block in your ``validator-values.yaml``.
+You need to configure how your validator connects to the network's ``scan`` services by defining a ``scanClient`` block in your ``validator-values.yaml``.
 There are three modes of ``scanClient``:
 
 - ``bft``: (default mode) connects to all scans and validates via majority agreement.
@@ -400,7 +400,7 @@ Detailed configuration examples and instructions for each mode are provided dire
     :start-after: SCAN_CLIENT_CONFIGURATION_START
     :end-before: SCAN_CLIENT_CONFIGURATION_END
 
-You need to configure how your validator's participant connects to the network synchronizer by defining a ``synchronizer`` config in your ``validator-values.yaml``.
+You need to configure how your validator's participant connects to ``sequencers`` by defining a ``synchronizer`` config in your ``validator-values.yaml``.
 ``synchronizer`` supports three modes of operation:
 
 - ``bft``:  (default mode) connects to all available sequencers and validates responses via majority agreement.
