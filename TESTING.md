@@ -82,7 +82,7 @@ There are two types of cluster tests that can be requested on a PR:
 
 To request a cluster test to be run on your PR, comment on your pr `/cluster_test` or `/hdm_test`
 for a basic test or a hard-migration test respectively. After commenting, you’ll need approval to trigger the test.
-If you’re within DA, you can self-approve; otherwise, an existing maintainer will need to approve it.
+If you’re within DA, you can self-approve; otherwise, contact an existing maintainer to approve it.
 
 ### Enabling the new Canton bft ordering layer
 
