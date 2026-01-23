@@ -50,11 +50,6 @@ export interface MintingDelegationProposalWithStatus {
   beneficiaryOnboarded: boolean;
 }
 
-export interface MintingDelegationProposalWithOnboardedStatus {
-  contract: Contract<MintingDelegationProposal>;
-  beneficiaryOnboarded: boolean;
-}
-
 import {
   BalanceChange,
   ListAcceptedTransferOffersResponse,
