@@ -1293,11 +1293,11 @@ class HttpWalletHandler(
       } yield {
         val proposalsWithStatus = page.resultsInPage.map { proposal =>
           val beneficiary = PartyId.tryFromProtoPrimitive(proposal.payload.delegation.beneficiary)
-          val isOnboarded =
+          val isHosted =
             walletManager.externalPartyWalletManager
               .lookupExternalPartyWallet(beneficiary)
               .isDefined
-          d0.MintingDelegationProposalWithStatus(proposal.toHttp, isOnboarded)
+          d0.MintingDelegationProposalWithStatus(proposal.toHttp, isHosted)
         }.toVector
         WalletResource.ListMintingDelegationProposalsResponseOK(
           d0.ListMintingDelegationProposalsResponse(
@@ -1425,11 +1425,11 @@ class HttpWalletHandler(
       } yield {
         val delegationsWithStatus = page.resultsInPage.map { delegation =>
           val beneficiary = PartyId.tryFromProtoPrimitive(delegation.payload.beneficiary)
-          val isOnboarded =
+          val isHosted =
             walletManager.externalPartyWalletManager
               .lookupExternalPartyWallet(beneficiary)
               .isDefined
-          d0.MintingDelegationWithStatus(delegation.toHttp, isOnboarded)
+          d0.MintingDelegationWithStatus(delegation.toHttp, isHosted)
         }.toVector
         WalletResource.ListMintingDelegationsResponseOK(
           d0.ListMintingDelegationsResponse(
