@@ -8,10 +8,12 @@ import { ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { Policy as SecurityPolicy } from './cloudArmor';
 
 /*
-If you see the error
-  no matches for kind "Gateway" in version "gateway.networking.k8s.io/v1"
-you need to add the CRD; on a cncluster-controlled dev cluster directory you can do
-  gcloud container clusters update "cn-${GCP_CLUSTER_BASENAME}net" --gateway-api=standard
+Any cluster that uses this must first run
+
+   cncluster cluster_enable_gke_l7_alb
+
+It's safe to run just to be sure as well; see its comments for errors
+likely if you haven't run it yet.
  */
 
 /*
@@ -22,28 +24,6 @@ you may need to force the gateway destroy first:
 then normal up/apply should work
  */
 
-/* TODO (#2723)
-
-Doc recommends starting with /23:
-  https://docs.cloud.google.com/load-balancing/docs/proxy-only-subnets#proxy-subnet-size
-They can't be expanded, only replaced:
-  https://docs.cloud.google.com/load-balancing/docs/proxy-only-subnets#proxy_only_subnet_change
-You can only have one of these per VPC per region;
-separate GKE clusters cannot have their own
-
-1. Create a proxy-only subnet in the GKE cluster's region (us-central1) and VPC:
-   gcloud compute networks subnets create proxy-only-subnet-for-gkel7 \
-     --description='proxy-only subnet required for GKE L7 regional ALB' \
-     --purpose=REGIONAL_MANAGED_PROXY \
-     --role=ACTIVE \
-     --region=$CLOUDSDK_COMPUTE_REGION \
-     --network=default \
-     --range=10.120.0.0/23
-
-   Check existing subnets for range overlap with:
-   gcloud compute networks subnets list --network=default
-   The full range of 10.128.0.0/9 is reserved and can't be used
- */
 
 // possible values and their meaning: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gatewayclass
 // global vs regional:
