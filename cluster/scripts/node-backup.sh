@@ -55,7 +55,10 @@ function wait_for_pvc_backup() {
       _info "Backup of $description PVC ready!"
       break
     else
-      (( i++ )) && (( i > WAIT_FOR_BACKUP_RETRIES )) && _error "Timed out waiting for backup of $description PVC"
+      (( i++ )) && (( i > WAIT_FOR_BACKUP_RETRIES )) && {
+        kubectl delete volumesnapshot -n "$namespace" "$backupName";
+        _error "Timed out waiting for backup of $description PVC";
+      }
       sleep 5
       _info "still waiting..."
     fi
@@ -149,7 +152,10 @@ function wait_for_cloudsql_backup() {
       _info "Backup of $description ready! Backup ID: $id "
       break
     else
-      (( i++ ))&& (( i > WAIT_FOR_BACKUP_RETRIES )) &&_error "Timed out waiting for backup of $description db"
+      (( i++ ))&& (( i > WAIT_FOR_BACKUP_RETRIES )) && {
+        gcloud sql backups delete "$id" --instance "$db_id" --quiet;
+        _error "Timed out waiting for backup of $description db";
+      }
       sleep 5
       _info "still waiting..."
     fi
