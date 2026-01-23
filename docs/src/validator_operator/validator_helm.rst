@@ -389,16 +389,17 @@ There are three modes of ``scanClient``:
 
 For each scanClient type, replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator. For example, the GSF scan URL, |gsf_scan_url|. For ``bft-custom`` and ``bft`` modes of ``scanClient``, you can specify more than one scan seed URL by separating them with commas.
 
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
+    :language: yaml
+    :start-after: SCAN_CLIENT_CONFIGURATION_START
+    :end-before: SCAN_CLIENT_CONFIGURATION_END
+
+
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
 - If you want to configure the audience for the Ledger API, set the ``audience`` field in the `splice-app-validator-ledger-api-auth` k8s secret with the audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
 - Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the validator operator party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. Note that this contact information will be publicly visible. If you do not want to share contact information, you can put an empty string.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
-
-.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
-    :language: yaml
-    :start-after: SCAN_CLIENT_CONFIGURATION_START
-    :end-before: SCAN_CLIENT_CONFIGURATION_END
 
 You need to configure how your validator's participant connects to ``sequencers`` by defining a ``synchronizer`` config in your ``validator-values.yaml``.
 ``synchronizer`` supports three modes of operation:
