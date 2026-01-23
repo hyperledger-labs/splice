@@ -111,6 +111,7 @@ export const PartyAllocatorConfigSchema = z.object({
   maxParties: z.number().default(1000000),
   preapprovalRetries: z.number().default(120),
   preapprovalRetryDelayMs: z.number().default(1000),
+  pvcSize: z.number().default(100),
 });
 export type PartyAllocatorConfig = z.infer<typeof PartyAllocatorConfigSchema>;
 

@@ -564,6 +564,11 @@
           "validatorApiUrl": "http://validator-app:5003"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "pvc": {
+          "name": "party-allocator-keys",
+          "size": 100,
+          "storageClassName": "standard-rwo"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",

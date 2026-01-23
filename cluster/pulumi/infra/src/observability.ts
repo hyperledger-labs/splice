@@ -11,11 +11,14 @@ import {
   CLUSTER_NAME,
   clusterProdLike,
   commandScriptPath,
+  createVolumeSnapshot,
   ExactNamespace,
   GCP_PROJECT,
   GrafanaKeys,
   HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
+  infraPremiumStorageClassName,
+  infraStandardStorageClassName,
   isMainNet,
   loadTesterConfig,
   ObservabilityReleaseName,
@@ -32,6 +35,7 @@ import { local } from '@pulumi/command';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
 import { Input } from '@pulumi/pulumi';
 
+import { hyperdiskSupportConfig } from '../../common/src/config/hyperdiskSupportConfig';
 import {
   clusterIsResetPeriodically,
   enableAlertEmailToSupportTeam,
@@ -91,9 +95,9 @@ const grafanaExternalUrl = `https://grafana.${CLUSTER_HOSTNAME}`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
 const shouldIgnoreNoDataOrDataSourceError = clusterIsResetPeriodically;
+const namespaceName = 'observability';
 
 export function configureObservability(dependsOn: pulumi.Resource[] = []): pulumi.Resource {
-  const namespaceName = 'observability';
   const namespace = new k8s.core.v1.Namespace(
     namespaceName,
     {
@@ -116,6 +120,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
   const prometheusStackCrdVersion = '0.85.0';
   const postgres = installPostgres({ ns: namespace, logicalName: namespaceName });
   const adminPassword = grafanaKeysFromSecret().adminPassword;
+  const migrationSnapshots = getVolumeSnapshotsForHyperdiskMigration();
   const prometheusStack = new k8s.helm.v3.Release(
     'observability-metrics',
     {
@@ -205,13 +210,14 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             storage: {
               volumeClaimTemplate: {
                 spec: {
-                  storageClassName: 'standard-rwo',
+                  storageClassName: infraStandardStorageClassName,
                   accessModes: ['ReadWriteOnce'],
                   resources: {
                     requests: {
                       storage: '5Gi',
                     },
                   },
+                  ...(migrationSnapshots.alertManager ? migrationSnapshots.alertManager : {}),
                 },
               },
             },
@@ -266,13 +272,14 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             storageSpec: {
               volumeClaimTemplate: {
                 spec: {
-                  storageClassName: 'premium-rwo',
+                  storageClassName: infraPremiumStorageClassName,
                   accessModes: ['ReadWriteOnce'],
                   resources: {
                     requests: {
                       storage: infraConfig.prometheus.storageSize,
                     },
                   },
+                  ...(migrationSnapshots.prometheus ? migrationSnapshots.prometheus : {}),
                 },
               },
             },
@@ -398,7 +405,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             type: 'Recreate',
           },
           persistence: {
-            enabled: true,
+            enabled: !hyperdiskSupportConfig.hyperdiskSupport.migratingInfra,
             type: 'pvc',
             accessModes: ['ReadWriteOnce'],
             size: '5Gi',
@@ -1064,4 +1071,31 @@ function installPostgres(namespace: ExactNamespace): SplicePostgres {
     undefined, // chart version
     true // useInfraAffinityAndTolerations
   );
+}
+
+function getVolumeSnapshotsForHyperdiskMigration() {
+  if (hyperdiskSupportConfig.hyperdiskSupport.migratingInfra) {
+    const { dataSource: prometheusDataSource } = createVolumeSnapshot({
+      resourceName: `prometheus-hd-migration-snapshot`,
+      snapshotName: `prometheus-migration-snapshot`,
+      namespace: namespaceName,
+      pvcName: `prometheus-prometheus-prometheus-db-prometheus-prometheus-prometheus-0`,
+    });
+    const { dataSource: alertManagerDataSource } = createVolumeSnapshot({
+      resourceName: `alertmanager-hd-migration-snapshot`,
+      snapshotName: `alertmanager-migration-snapshot`,
+      namespace: namespaceName,
+      pvcName: `alertmanager-prometheus-alertmanager-db-alertmanager-prometheus-alertmanager-0`,
+    });
+    return {
+      prometheus: {
+        dataSource: prometheusDataSource,
+      },
+      alertManager: {
+        dataSource: alertManagerDataSource,
+      },
+    };
+  } else {
+    return {};
+  }
 }
