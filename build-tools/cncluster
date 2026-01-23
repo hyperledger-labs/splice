@@ -947,7 +947,8 @@ function subcmd_cluster_enable_gke_l7_alb() {
 
     # Check if Gateway API is already enabled
     local gateway_api_enabled
-    gateway_api_enabled=$(gcloud container clusters describe "${GCP_CLUSTER_NAME}" --format='value(networkConfig.gatewayApiConfig.channel)')
+    gateway_api_enabled=$(gcloud container clusters describe "${GCP_CLUSTER_NAME}" \
+        --format='value(networkConfig.gatewayApiConfig.channel)')
 
     # If you see the error in k9s describe of the gateway
     #   no matches for kind "Gateway" in version "gateway.networking.k8s.io/v1"
