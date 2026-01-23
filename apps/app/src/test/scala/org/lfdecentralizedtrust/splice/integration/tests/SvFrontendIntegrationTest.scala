@@ -1084,7 +1084,7 @@ class SvFrontendIntegrationTest
             _ => checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress),
           )
 
-          val (_, reviewButton) = actAndCheck(
+          actAndCheck(
             "sv1 operator creates a new vote request with a long expiration time", {
               submitSetDsoConfigRequestViaFrontend(
                 numMemberTrafficContractsThreshold = "42"
@@ -1097,6 +1097,8 @@ class SvFrontendIntegrationTest
             },
           )
           val requestId = eventually() {
+            // find the review button again because the DOM may have been updated
+            val reviewButton = checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress + 1)
             reviewButton.underlying.click()
             val requestId =
               inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>

@@ -13,19 +13,24 @@ import { z } from 'zod';
 export const SynchronizerConfigSchema = z.union([
   z
     .object({
-      connectionType: z.literal('trusted-url'),
+      connectionType: z.literal('trust-single'),
       url: z.string().min(1),
     })
     .strict(),
   z
     .object({
-      connectionType: z.literal('trusted-svs'),
-      sequencerNames: z.array(z.string()).min(1),
+      connectionType: z.literal('bft-custom'),
+      svNames: z.array(z.string()).min(1),
+      threshold: z.number().int().min(1),
     })
-    .strict(),
+    .strict()
+    .refine(data => data.svNames.length >= data.threshold, {
+      message: 'svNames length must be greater than or equal to the threshold',
+      path: ['threshold'], // Point the error to the threshold field
+    }),
   z
     .object({
-      connectionType: z.literal('from-scan').default('from-scan'),
+      connectionType: z.literal('bft').default('bft'),
     })
     .strict(),
 ]);
@@ -37,23 +42,23 @@ export const ScanClientConfigSchema = z
     scanType: z.enum(['trust-single', 'bft', 'bft-custom']),
     scanAddress: z.string().optional(),
     threshold: z.number().default(0),
-    trustedSvs: z.array(z.string()).default([]),
+    svNames: z.array(z.string()).default([]),
     seedUrls: z.array(z.string()).min(1, 'seedUrls must contain at least one element.').optional(),
   })
   .refine(
     data => {
       if (data.scanType === 'bft-custom') {
         const threshold = data.threshold;
-        const trustedSvsSize = data.trustedSvs.length;
+        const svNamesSize = data.svNames.length;
         const seedUrlsSize = data.seedUrls ? data.seedUrls.length : 0;
-        return trustedSvsSize >= threshold && seedUrlsSize >= threshold;
+        return svNamesSize >= threshold && seedUrlsSize >= threshold;
       } else {
         return true;
       }
     },
     {
       message:
-        "For 'bft-custom' scanType, both 'trustedSvs' and 'seedUrls' must have a length greater than or equal to 'threshold'.",
+        "For 'bft-custom' scanType, both 'svNames' and 'seedUrls' must have a length greater than or equal to 'threshold'.",
       path: ['scanType'],
     }
   );
@@ -106,6 +111,7 @@ export const PartyAllocatorConfigSchema = z.object({
   maxParties: z.number().default(1000000),
   preapprovalRetries: z.number().default(120),
   preapprovalRetryDelayMs: z.number().default(1000),
+  pvcSize: z.string().default('100Gi'),
 });
 export type PartyAllocatorConfig = z.infer<typeof PartyAllocatorConfigSchema>;
 

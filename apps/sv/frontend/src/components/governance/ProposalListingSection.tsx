@@ -15,10 +15,13 @@ import {
 } from '@mui/material';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { PageSectionHeader, VoteStats } from '../../components/beta';
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 import { InfoOutlined } from '@mui/icons-material';
+import dayjs from 'dayjs';
+
+export type ProposalSortOrder = 'effectiveAtAsc' | 'effectiveAtDesc';
 
 interface ProposalListingSectionProps {
   sectionTitle: string;
@@ -29,11 +32,37 @@ interface ProposalListingSectionProps {
   showVoteStats?: boolean;
   showAcceptanceThreshold?: boolean;
   showStatus?: boolean;
+  sortOrder?: ProposalSortOrder;
 }
 
 const getColumnsCount = (alwaysShown: number, ...sometimesShown: (boolean | undefined)[]) =>
   alwaysShown +
   sometimesShown.reduce((columnsCount, isShown) => columnsCount + (isShown ? 1 : 0), 0);
+
+const getTotalVotes = (item: ProposalListingData): number =>
+  item.voteStats['accepted'] + item.voteStats['rejected'];
+
+const getEffectiveDate = (item: ProposalListingData): dayjs.Dayjs =>
+  item.voteTakesEffect === 'Threshold' ? dayjs(0) : dayjs(item.voteTakesEffect);
+
+// Using stable sort: chain sorts from least to most significant criterion
+const sortProposals = (
+  data: ProposalListingData[],
+  sortOrder?: ProposalSortOrder
+): ProposalListingData[] => {
+  if (!sortOrder) return data;
+
+  if (sortOrder === 'effectiveAtDesc') {
+    return data.toSorted((a, b) => dayjs(b.voteTakesEffect).diff(dayjs(a.voteTakesEffect)));
+  }
+
+  // For effectiveAtAsc (Inflight Votes):
+  // Threshold items first (by votes desc, then deadline asc), then dated items (by effective date asc)
+  return data
+    .toSorted((a, b) => dayjs(a.votingThresholdDeadline).diff(dayjs(b.votingThresholdDeadline)))
+    .toSorted((a, b) => getTotalVotes(b) - getTotalVotes(a))
+    .toSorted((a, b) => getEffectiveDate(a).diff(getEffectiveDate(b)));
+};
 
 export const ProposalListingSection: React.FC<ProposalListingSectionProps> = props => {
   const {
@@ -45,7 +74,10 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
     showVoteStats,
     showAcceptanceThreshold,
     showStatus,
+    sortOrder,
   } = props;
+
+  const sortedData = sortProposals(data, sortOrder);
 
   const columnsCount = getColumnsCount(
     3,
@@ -59,7 +91,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
     <Box sx={{ mb: 6 }} data-testid={`${uniqueId}-section`}>
       <PageSectionHeader title={sectionTitle} data-testid={`${uniqueId}-section`} />
 
-      {data.length === 0 ? (
+      {sortedData.length === 0 ? (
         <InfoBox info={noDataMessage} data-testid={`${uniqueId}-section-info`} />
       ) : (
         <TableContainer data-testid={`${uniqueId}-section-table`}>
@@ -79,7 +111,7 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
               </TableRow>
             </TableHead>
             <TableBody sx={{ display: 'contents' }}>
-              {data.map((vote, index) => (
+              {sortedData.map((vote, index) => (
                 <VoteRow
                   key={index}
                   actionName={vote.actionName}

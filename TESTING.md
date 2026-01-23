@@ -81,8 +81,8 @@ There are two types of cluster tests that can be requested on a PR:
 - A Hard Migration test, which tests the full hard migration workflow on a scratch cluster.
 
 To request a cluster test to be run on your PR, comment on your pr `/cluster_test` or `/hdm_test`
-for a basic test or a hard-migration test respectively. After commenting, reach out to the
-[Splice Contributors](CONTRIBUTORS.md) to approve and trigger the actual test on your behalf.
+for a basic test or a hard-migration test respectively. After commenting, the job needs to be approved to actually run.
+If you're a Digital Asset employee, you can self-approve; otherwise, contact an existing maintainer to approve it.
 
 ### Enabling the new Canton bft ordering layer
 
@@ -177,15 +177,15 @@ Note you can add the flag ``-s`` to skip ``sbt --batch bundle``.
 
 Once this is complete, the front ends will be running on the ports on localhost as follows:
 
-3<frontend><user>, where:
+`3<frontend><user>`, where:
 
-- <frontend> is as follows:
+- `<frontend>` is as follows:
   - 0 for wallet
   - 1 for directory
   - 2 for sv UI
   - 3 for scan
   - 4 for splitwell
-- <user> is as follows:
+- `<user>` is as follows:
   - 00 for alice
   - 01 for bob
   - 02 for charlie

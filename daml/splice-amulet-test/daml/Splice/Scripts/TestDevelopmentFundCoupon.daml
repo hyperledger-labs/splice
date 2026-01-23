@@ -1,0 +1,245 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestDevelopmentFundCoupon where
+
+import DA.Action (replicateA_)
+import DA.Assert
+import DA.Time
+import Daml.Script
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Scripts.Util
+
+testAllocateDevelopmentFundCoupon : Script ()
+testAllocateDevelopmentFundCoupon = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  -- Replace the default AmuletConfig with a 0.05% allocation for the development fund.
+  -- No Fund manager configured.
+  -- This configuration applies to the next open round.
+  baseConfig <- getAmuletConfig app
+  replaceDevelopmentFundConfig app baseConfig None (Some 0.05)
+
+  -- Run 3 issuances for the already open rounds without the development fund configuration.
+  -- No development fund coupons are minted.
+  replicateA_ 3 $ runNextIssuance app
+  -- Mint one development fund coupon per issuance (two total).
+  runNextIssuance app
+  runNextIssuance app
+  now <- getTime
+  [(cid1, coupon1), (cid2, coupon2)] <- query @UnclaimedDevelopmentFundCoupon app.dso
+  let
+    totalAmount = coupon1.amount + coupon2.amount
+    unclaimedDevelopmentFundCouponCids = [cid1, cid2]
+    expiresAt = addRelTime now (days 2)
+    reason = "Bob fixed issue XXX"
+    firstAllocationAmount = 10.0
+    secondAllocationAmount = totalAmount - firstAllocationAmount
+
+  -- Unhappy - DevelopmentFundCoupon cannot be allocated without a Development Fund manager configured
+  allocateDevelopmentFundCouponMustFail app alice.primaryParty bob.primaryParty firstAllocationAmount
+    expiresAt reason unclaimedDevelopmentFundCouponCids
+
+  -- Set 5% and Alice as the fund manager
+  replaceDevelopmentFundConfig app baseConfig (Some alice.primaryParty) (Some 0.05)
+
+  -- Unhappy - expiresAt is in the past
+  let invalidExpiresAt = addRelTime now (minutes (-1))
+  allocateDevelopmentFundCouponMustFail app alice.primaryParty bob.primaryParty firstAllocationAmount
+    invalidExpiresAt reason unclaimedDevelopmentFundCouponCids
+
+  -- Unhappy - controller must be the configured Development Fund manager (alice)
+  allocateDevelopmentFundCouponMustFail app bob.primaryParty bob.primaryParty firstAllocationAmount
+    expiresAt reason unclaimedDevelopmentFundCouponCids
+
+  -- Unhappy - insufficient amount to cover the requested allocation
+  allocateDevelopmentFundCouponMustFail app alice.primaryParty bob.primaryParty (totalAmount + 1.0)
+    expiresAt reason unclaimedDevelopmentFundCouponCids
+
+  -- Happy - Development Fund coupon allocated with UnclaimedDevelopmentFundCoupon leftover
+  AmuletRules_AllocateDevelopmentFundCouponResult
+    { developmentFundCouponCid, optUnclaimedDevelopmentFundCouponCid = Some leftOverUnclaimedDevelopmentFundCouponCid } <-
+    allocateDevelopmentFundCoupon app alice.primaryParty bob.primaryParty firstAllocationAmount
+      expiresAt reason unclaimedDevelopmentFundCouponCids
+  Some developmentFundCoupon <- queryContractId bob.primaryParty developmentFundCouponCid
+  Some leftOverUnclaimedDevelopmentFundCoupon <- queryContractId app.dso leftOverUnclaimedDevelopmentFundCouponCid
+  developmentFundCoupon === DevelopmentFundCoupon with
+    dso = app.dso
+    beneficiary = bob.primaryParty
+    fundManager = alice.primaryParty
+    amount = firstAllocationAmount
+    expiresAt
+    reason
+  leftOverUnclaimedDevelopmentFundCoupon === UnclaimedDevelopmentFundCoupon with
+    dso = app.dso
+    amount = secondAllocationAmount
+
+  -- Happy - Development Fund coupon allocated with no UnclaimedDevelopmentFundCoupon leftover
+  AmuletRules_AllocateDevelopmentFundCouponResult { developmentFundCouponCid, optUnclaimedDevelopmentFundCouponCid = None } <-
+    allocateDevelopmentFundCoupon app alice.primaryParty bob.primaryParty secondAllocationAmount
+      expiresAt reason [leftOverUnclaimedDevelopmentFundCouponCid]
+  Some developmentFundCoupon <- queryContractId bob.primaryParty developmentFundCouponCid
+  developmentFundCoupon === DevelopmentFundCoupon with
+    dso = app.dso
+    beneficiary = bob.primaryParty
+    fundManager = alice.primaryParty
+    amount = secondAllocationAmount
+    expiresAt
+    reason
+
+  pure ()
+
+testWithdrawalOfDevelopmentFundCoupon : Script ()
+testWithdrawalOfDevelopmentFundCoupon = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  now <- getTime
+  let
+    amount = 42.0
+    expiresAt = addRelTime now (days 1)
+    fundManager = alice.primaryParty
+    beneficiary = bob.primaryParty
+    reason = "Some reason"
+
+  developmentFundCouponCid <- createDevelopmentFundCoupon app fundManager beneficiary amount expiresAt reason
+
+  -- Unhappy - expiresAt has been reached
+  setTime $ addRelTime expiresAt (minutes 1)
+  withdrawDevelopmentFundCouponMustFail fundManager reason developmentFundCouponCid
+
+  setTime now
+
+  -- Unhappy - invalid controller
+  withdrawDevelopmentFundCouponMustFail app.dso reason developmentFundCouponCid
+  withdrawDevelopmentFundCouponMustFail beneficiary reason developmentFundCouponCid
+
+  -- Happy
+  unclaimedDevelopmentFundCouponCid <- withdrawDevelopmentFundCoupon fundManager reason developmentFundCouponCid
+  Some unclaimedDevelopmentFundCoupon <- queryContractId app.dso unclaimedDevelopmentFundCouponCid
+  unclaimedDevelopmentFundCoupon === UnclaimedDevelopmentFundCoupon with
+    dso = app.dso
+    amount
+
+  pure ()
+
+testRejectionOfDevelopmentFundCoupon : Script ()
+testRejectionOfDevelopmentFundCoupon = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  now <- getTime
+  let
+    amount = 42.0
+    expiresAt = addRelTime now (days 1)
+    fundManager = alice.primaryParty
+    beneficiary = bob.primaryParty
+    reason = "Some reason"
+
+  developmentFundCouponCid <- createDevelopmentFundCoupon app fundManager beneficiary amount expiresAt reason
+
+  -- Unhappy - expiresAt has been reached
+  setTime $ addRelTime expiresAt (minutes 1)
+  rejectDevelopmentFundCouponMustFail fundManager reason developmentFundCouponCid
+
+  setTime now
+
+  -- Unhappy - invalid controller
+  rejectDevelopmentFundCouponMustFail app.dso reason developmentFundCouponCid
+  rejectDevelopmentFundCouponMustFail fundManager reason developmentFundCouponCid
+
+  -- Happy
+  unclaimedDevelopmentFundCouponCid <- rejectDevelopmentFundCoupon beneficiary reason developmentFundCouponCid
+  Some unclaimedDevelopmentFundCoupon <- queryContractId app.dso unclaimedDevelopmentFundCouponCid
+  unclaimedDevelopmentFundCoupon === UnclaimedDevelopmentFundCoupon with
+    dso = app.dso
+    amount
+
+  pure ()
+
+testExpiryOfDevelopmentFundCoupon : Script ()
+testExpiryOfDevelopmentFundCoupon = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  now <- getTime
+  let
+    amount = 42.0
+    expiresAt = addRelTime now (days 1)
+    reason = "Bob fixed issue XXX"
+    fundManager = alice.primaryParty
+    beneficiary = bob.primaryParty
+
+  developmentFundCouponCid <- createDevelopmentFundCoupon app fundManager beneficiary amount expiresAt reason
+
+  -- Unhappy - expiresAt has not been reached
+  expiresDevelopmentFundCouponMustFail app.dso developmentFundCouponCid
+
+  setTime $ addRelTime expiresAt (minutes 1)
+
+  -- -- Unhappy - invalid controller
+  expiresDevelopmentFundCouponMustFail fundManager developmentFundCouponCid
+  expiresDevelopmentFundCouponMustFail beneficiary developmentFundCouponCid
+
+  -- Happy
+  unclaimedDevelopmentFundCouponCid <- expiresDevelopmentFundCoupon app.dso developmentFundCouponCid
+  Some unclaimedDevelopmentFundCoupon <- queryContractId app.dso unclaimedDevelopmentFundCouponCid
+  unclaimedDevelopmentFundCoupon === UnclaimedDevelopmentFundCoupon with
+    dso = app.dso
+    amount
+
+  pure ()
+
+
+-- Helpers
+----------
+
+allocateDevelopmentFundCouponMustFail
+  : AmuletApp -> Party -> Party -> Decimal -> Time -> Text -> [ContractId UnclaimedDevelopmentFundCoupon]
+  -> Script ()
+allocateDevelopmentFundCouponMustFail app fundManager beneficiary amount expiresAt reason unclaimedDevelopmentFundCouponCids = do
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  submitMultiMustFail [fundManager] [app.dso] do
+    exerciseCmd amuletRulesCid AmuletRules_AllocateDevelopmentFundCoupon with
+      unclaimedDevelopmentFundCouponCids
+      beneficiary
+      amount
+      expiresAt
+      reason
+      fundManager
+
+createDevelopmentFundCoupon : AmuletApp -> Party -> Party -> Decimal -> Time -> Text -> Script (ContractId DevelopmentFundCoupon)
+createDevelopmentFundCoupon app fundManager beneficiary amount expiresAt reason =
+  submit app.dso do
+    createCmd DevelopmentFundCoupon with
+      dso = app.dso
+      beneficiary
+      fundManager
+      amount
+      expiresAt
+      reason
+
+rejectDevelopmentFundCoupon : Party -> Text -> ContractId DevelopmentFundCoupon -> Script (ContractId UnclaimedDevelopmentFundCoupon)
+rejectDevelopmentFundCoupon fundManager reason developmentFundCouponCid =
+  (.unclaimedDevelopmentFundCouponCid) <$> submit fundManager do
+    exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_Reject with reason
+
+rejectDevelopmentFundCouponMustFail : Party -> Text -> ContractId DevelopmentFundCoupon -> Script ()
+rejectDevelopmentFundCouponMustFail actor reason developmentFundCouponCid =
+  submitMustFail actor do
+    exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_Reject with reason
+
+withdrawDevelopmentFundCoupon : Party -> Text -> ContractId DevelopmentFundCoupon -> Script (ContractId UnclaimedDevelopmentFundCoupon)
+withdrawDevelopmentFundCoupon fundManager reason developmentFundCouponCid =
+  (.unclaimedDevelopmentFundCouponCid) <$> submit fundManager do
+    exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_Withdraw with reason
+
+withdrawDevelopmentFundCouponMustFail : Party -> Text -> ContractId DevelopmentFundCoupon -> Script ()
+withdrawDevelopmentFundCouponMustFail actor reason developmentFundCouponCid =
+  submitMustFail actor do
+    exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_Withdraw with reason
+
+expiresDevelopmentFundCoupon : Party -> ContractId DevelopmentFundCoupon -> Script (ContractId UnclaimedDevelopmentFundCoupon)
+expiresDevelopmentFundCoupon dso developmentFundCouponCid =
+  (.unclaimedDevelopmentFundCouponCid) <$> submit dso do
+    exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_DsoExpire
+
+expiresDevelopmentFundCouponMustFail : Party -> ContractId DevelopmentFundCoupon -> Script ()
+expiresDevelopmentFundCouponMustFail actor developmentFundCouponCid =
+  submitMustFail actor do
+    exerciseCmd developmentFundCouponCid DevelopmentFundCoupon_DsoExpire

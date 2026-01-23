@@ -220,13 +220,14 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
         amuletConfig.decentralizedSynchronizer,
         amuletConfig.tickDuration,
         new PackageConfig(
-          DarResources.amulet.bootstrap.metadata.version.toString(),
-          DarResources.amuletNameService.bootstrap.metadata.version.toString(),
-          DarResources.dsoGovernance.bootstrap.metadata.version.toString(),
-          DarResources.validatorLifecycle.bootstrap.metadata.version.toString(),
-          DarResources.wallet.bootstrap.metadata.version.toString(),
-          DarResources.walletPayments.bootstrap.metadata.version.toString(),
+          DarResources.amulet.latest.metadata.version.toString(),
+          DarResources.amuletNameService.latest.metadata.version.toString(),
+          DarResources.dsoGovernance.latest.metadata.version.toString(),
+          DarResources.validatorLifecycle.latest.metadata.version.toString(),
+          DarResources.wallet.latest.metadata.version.toString(),
+          DarResources.walletPayments.latest.metadata.version.toString(),
         ),
+        java.util.Optional.empty(),
         java.util.Optional.empty(),
         java.util.Optional.empty(),
       )
@@ -271,7 +272,7 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
         _ => {
           val newAmuletRules = sv1Backend.getDsoInfo().amuletRules
 
-          newAmuletRules.payload.configSchedule.initialValue.packageConfig.amulet shouldBe DarResources.amulet.bootstrap.metadata.version
+          newAmuletRules.payload.configSchedule.initialValue.packageConfig.amulet shouldBe DarResources.amulet.latest.metadata.version
             .toString()
         },
       )
@@ -339,7 +340,7 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
     }
 
     clue("alice taps amulet with new package after all the svs vet the new packages") {
-      alicesTapsWithPackageId(DarResources.amulet.bootstrap.packageId)
+      alicesTapsWithPackageId(DarResources.amulet.latest.packageId)
     }
 
     clue("ExternalPartyAmuletRules gets created") {
@@ -366,6 +367,7 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
         amuletConfig.decentralizedSynchronizer,
         amuletConfig.tickDuration,
         amuletConfig.packageConfig,
+        java.util.Optional.empty(),
         java.util.Optional.empty(),
         java.util.Optional.empty(),
       )
@@ -462,9 +464,9 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
         )
       }
     }
-    packagesAreVetted(DarResources.amulet.bootstrap, PackageIdResolver.Package.SpliceAmulet)
+    packagesAreVetted(DarResources.amulet.latest, PackageIdResolver.Package.SpliceAmulet)
     // also check wallet because for the sv we have 2 vetting triggers, and the wallet is used in the tap call but it's vetted by the validator trigger (amulet rules can be vetted by any of the triggers)
-    packagesAreVetted(DarResources.wallet.bootstrap, PackageIdResolver.Package.SpliceWallet)
+    packagesAreVetted(DarResources.wallet.latest, PackageIdResolver.Package.SpliceWallet)
   }
 
   private def alicesTapsWithPackageId(

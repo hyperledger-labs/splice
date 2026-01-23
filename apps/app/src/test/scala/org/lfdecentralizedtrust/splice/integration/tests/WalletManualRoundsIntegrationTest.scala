@@ -41,7 +41,6 @@ import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
 import java.time.Duration
-import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 
 class WalletManualRoundsIntegrationTest
@@ -315,9 +314,8 @@ class WalletManualRoundsIntegrationTest
 
       aliceWalletClient.tap(20.0)
 
-      eventually(40.seconds) {
-        aliceValidatorWalletClient.listAppRewardCoupons() should be(empty)
-      }
+      // We might have app reward coupons still from previous tests, we'll just ignore those in later stages of this test
+      val initialAppRewardCoupons = aliceValidatorWalletClient.listAppRewardCoupons()
 
       clue("Check that no payment requests exist") {
         aliceWalletClient.listAppPaymentRequests() shouldBe empty
@@ -344,7 +342,11 @@ class WalletManualRoundsIntegrationTest
         "Request no longer exists and validator has one unfeatured app reward",
         _ => {
           aliceWalletClient.listAppPaymentRequests() should have length 0
-          inside(aliceValidatorWalletClient.listAppRewardCoupons()) { case Seq(c) =>
+          inside(
+            aliceValidatorWalletClient
+              .listAppRewardCoupons()
+              .filter(!initialAppRewardCoupons.contains(_))
+          ) { case Seq(c) =>
             // Award for the first (locking) leg goes to the sender's validator
             // The wallet is not a featured app, so no featured app reward even if the validator party is featured!
             c.payload.featured shouldBe false

@@ -83,11 +83,13 @@ abstract class AutomationService(
   }
 
   /** Returns all triggers of the given class */
-  final def triggers[T <: Trigger](implicit tag: ClassTag[T]): Seq[T] = {
+  final def triggers[T <: Trigger](implicit tag: ClassTag[T]): Seq[T] = services[T](tag)
+
+  final def services[T](implicit tag: ClassTag[T]): Seq[T] = {
     backgroundServices
       .get()
-      .collect { case trigger: T =>
-        trigger
+      .collect { case service: T =>
+        service
       }
   }
 

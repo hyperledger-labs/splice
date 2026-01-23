@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.validator.metrics
 
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.DbStorageHistograms
 import org.lfdecentralizedtrust.splice.BaseSpliceMetrics
 
@@ -12,4 +13,5 @@ import org.lfdecentralizedtrust.splice.BaseSpliceMetrics
 class ValidatorAppMetrics(
     metricsFactory: LabeledMetricsFactory,
     storageHistograms: DbStorageHistograms,
-) extends BaseSpliceMetrics("validator", metricsFactory, storageHistograms) {}
+    loggerFactory: NamedLoggerFactory,
+) extends BaseSpliceMetrics("validator", metricsFactory, storageHistograms, loggerFactory) {}

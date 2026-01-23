@@ -214,7 +214,7 @@ class DomainConnector(
         )
       val svFilteredSequencers = config.domains.global.trustedSynchronizerConfig match {
         case Some(config) =>
-          val allowedNamesSet = config.sequencerNames.toList.toSet
+          val allowedNamesSet = config.svNames.toList.toSet
           logger.debug(
             s"Filtering sequencers to only include: ${allowedNamesSet.toList.mkString(", ")}"
           )

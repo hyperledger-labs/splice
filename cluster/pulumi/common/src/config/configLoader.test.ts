@@ -330,7 +330,7 @@ function mockFiles(contentsByPath: Partial<Record<string, string>>) {
   (readFileSync as jest.Mock).mockReset().mockImplementation(path => {
     const contents = typeof path === 'string' ? contentsByPath[path] : undefined;
     if (contents === undefined) {
-      throw new Error(`file [${path}] is not mocekd`);
+      throw new Error(`file [${path}] is not mocked`);
     }
     return contents;
   });

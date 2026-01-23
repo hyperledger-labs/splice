@@ -6,7 +6,7 @@ import { ProposalListingSection } from '../../components/governance/ProposalList
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { ProposalListingData } from '../../utils/types';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 const inflightVoteRequests: ProposalListingData[] = [
   {

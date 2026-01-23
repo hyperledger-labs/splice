@@ -158,12 +158,12 @@ tests:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
           pattern: 'canton.validator-apps.validator_backend.scan-client.seed-urls = \["https://bft-node-1.url:5003","https://bft-node-2.url:5003"\]'
 
-  - it: "configures scan-client for bft-custom mode, including trustedSvs and threshold"
+  - it: "configures scan-client for bft-custom mode, including svNames and threshold"
     set:
       scanClient:
         scanType: "bft-custom"
         seedUrls: [ "https://custom-node-A.com", "https://custom-node-B.com" ]
-        trustedSvs: [ "custom-sv-1", "custom-sv-2", "custom-sv-3" ]
+        svNames: [ "custom-sv-1", "custom-sv-2", "custom-sv-3" ]
         threshold: 2
     documentSelector:
       path: kind
@@ -177,7 +177,7 @@ tests:
           pattern: 'canton.validator-apps.validator_backend.scan-client.seed-urls = \["https://custom-node-A.com","https://custom-node-B.com"\]'
       - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
-          pattern: 'canton.validator-apps.validator_backend.scan-client.trusted-svs = \["custom-sv-1","custom-sv-2","custom-sv-3"\]'
+          pattern: 'canton.validator-apps.validator_backend.scan-client.sv-names = \["custom-sv-1","custom-sv-2","custom-sv-3"\]'
       - matchRegex:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_BFT_SCAN')].value
           pattern: "canton.validator-apps.validator_backend.scan-client.threshold = 2"
@@ -236,7 +236,7 @@ tests:
   - it: "uses synchronizer.url when provided"
     set:
       synchronizer:
-        connectionType: "trusted-url"
+        connectionType: "trust-single"
         url: "https://new-sequencer.mock.com"
     documentSelector:
       path: kind
@@ -246,15 +246,19 @@ tests:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_SYNCHRONIZER_URL')].value
           pattern: 'canton\.validator-apps\.validator_backend\.domains\.global\.url = "https://new-sequencer\.mock\.com"'
 
-  - it: "uses synchronizer.sequencerNames as a JSON array when provided"
+  - it: "uses synchronizer.svNames as a JSON array when provided"
     set:
       synchronizer:
-        connectionType: "trusted-svs"
-        sequencerNames: [ "sequencer-1", "sequencer-2" ]
+        connectionType: "bft-custom"
+        svNames: [ "sequencer-1", "sequencer-2" ]
+        threshold: 2
     documentSelector:
       path: kind
       value: Deployment
     asserts:
       - matchRegex:
-          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_SYNCHRONIZER_NAMES')].value
-          pattern: 'canton\.validator-apps\.validator_backend\.domains\.global\.sequencer-names = \["sequencer-1","sequencer-2"\]'
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_SYNCHRONIZER_TRUSTED')].value
+          pattern: 'canton\.validator-apps\.validator_backend\.domains\.global\.trusted-synchronizer-config\.sv-names = \["sequencer-1","sequencer-2"\]'
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_SYNCHRONIZER_TRUSTED')].value
+          pattern: 'canton\.validator-apps\.validator_backend\.domains\.global\.trusted-synchronizer-config\.threshold = 2'

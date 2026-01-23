@@ -380,32 +380,6 @@ class ParticipantAdminConnection(
       ByteString.copyFrom(chunks.asJava)
     )
 
-  def uploadAcsSnapshotLegacy(acsBytes: Seq[ByteString])(implicit
-      traceContext: TraceContext
-  ): Future[Unit] = {
-    val chunkedAcsBytes: Seq[ByteString] = acsBytes match {
-      case Seq(bytes) =>
-        // Caller has not chunked the bytes, this is possible for SVs that try to onboard or for validator recovery.
-        // The chuning logic here matches what GrpcStreamingUtils.streamToServer does
-        bytes.toByteArray.grouped(1024 * 1024 * 2).map(ByteString.copyFrom(_)).toSeq
-      case _ => acsBytes
-    }
-    retryProvider.retryForClientCalls(
-      "import_acs",
-      "Imports the acs in the participantl",
-      runCmd(
-        ParticipantAdminCommands.ParticipantRepairManagement
-          .ImportAcsOld(
-            chunkedAcsBytes,
-            IMPORT_ACS_WORKFLOW_ID_PREFIX,
-            allowContractIdSuffixRecomputation = false,
-          ),
-        timeoutOverride = Some(GrpcAdminCommand.DefaultUnboundedTimeout),
-      ).map(_ => ()),
-      logger,
-    )
-  }
-
   def uploadAcsSnapshot(acsBytes: Seq[ByteString])(implicit
       traceContext: TraceContext
   ): Future[Unit] = {

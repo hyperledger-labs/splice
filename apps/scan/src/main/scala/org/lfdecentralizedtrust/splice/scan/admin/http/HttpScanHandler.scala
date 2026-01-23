@@ -418,52 +418,6 @@ class HttpScanHandler(
     }
   }
 
-  def getTotalAmuletBalance(
-      response: v0.ScanResource.GetTotalAmuletBalanceResponse.type
-  )(
-      asOfEndOfRound: Long
-  )(extracted: TraceContext): Future[v0.ScanResource.GetTotalAmuletBalanceResponse] = {
-    implicit val tc = extracted
-    withSpan(s"$workflowId.getTotalAmuletBalance") { _ => _ =>
-      for {
-        total <- store
-          .getTotalAmuletBalance(asOfEndOfRound)
-          .transform(
-            HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
-          )
-      } yield {
-        total.fold(
-          v0.ScanResource.GetTotalAmuletBalanceResponse
-            .NotFound(ErrorResponse(s"No total amulet balance found for round $asOfEndOfRound"))
-        )(total =>
-          v0.ScanResource.GetTotalAmuletBalanceResponse.OK(
-            definitions.GetTotalAmuletBalanceResponse(
-              Codec.encode(total)
-            )
-          )
-        )
-      }
-    }
-  }
-
-  override def getWalletBalance(
-      respond: v0.ScanResource.GetWalletBalanceResponse.type
-  )(
-      partyId: String,
-      asOfEndOfRound: Long,
-  )(extracted: TraceContext): Future[v0.ScanResource.GetWalletBalanceResponse] = {
-    implicit val tc = extracted
-    withSpan(s"$workflowId.getWalletBalance") { _ => _ =>
-      for {
-        total <- store
-          .getWalletBalance(PartyId tryFromProtoPrimitive partyId, asOfEndOfRound)
-          .transform(
-            HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
-          )
-      } yield definitions.GetWalletBalanceResponse(Codec.encode(total))
-    }
-  }
-
   def getAmuletConfigForRound(
       response: v0.ScanResource.GetAmuletConfigForRoundResponse.type
   )(
@@ -1423,6 +1377,31 @@ class HttpScanHandler(
           case None =>
             ScanResource.GetDateOfMostRecentSnapshotBeforeResponseNotFound(
               definitions.ErrorResponse(s"No snapshots found before $before")
+            )
+        }
+    }
+  }
+
+  override def getDateOfFirstSnapshotAfter(
+      respond: ScanResource.GetDateOfFirstSnapshotAfterResponse.type
+  )(after: OffsetDateTime, migrationId: Long)(
+      extracted: TraceContext
+  ): Future[ScanResource.GetDateOfFirstSnapshotAfterResponse] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getDateOfFirstSnapshotAfter") { _ => _ =>
+      snapshotStore
+        .lookupSnapshotAfter(migrationId, Codec.tryDecode(Codec.OffsetDateTime)(after))
+        .map {
+          case Some(snapshot) =>
+            ScanResource.GetDateOfFirstSnapshotAfterResponseOK(
+              definitions
+                .AcsSnapshotTimestampResponse(
+                  Codec.encode(snapshot.snapshotRecordTime)
+                )
+            )
+          case None =>
+            ScanResource.GetDateOfFirstSnapshotAfterResponseNotFound(
+              definitions.ErrorResponse(s"No snapshots found after $after")
             )
         }
     }

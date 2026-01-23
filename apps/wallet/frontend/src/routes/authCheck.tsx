@@ -9,7 +9,7 @@ import {
   TestAuthConfig,
   useUserState,
 } from '@lfdecentralizedtrust/splice-common-frontend';
-import { Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router';
 
 import { BasicLayout } from '../components/Layout';
 import Onboarding from '../components/Onboarding';
