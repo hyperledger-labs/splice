@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
@@ -297,10 +297,11 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
             None,
           ), // due to the early splitwell dar upload this is vetted without a timestamp
         ).foreach { case (participantClient, scheduledTimeO) =>
-          clue(s"Vetting state for ${participantClient.id}") {
+          clue(s"Alice sees updated vetting state for ${participantClient.id}") {
             eventually() {
               vettingIsUpdatedForTheNewConfig(
-                participantClient,
+                aliceValidatorBackend.participantClient,
+                participantClient.id,
                 scheduledTimeO,
                 Some(vettingScheduledTime),
                 Some(vettingScheduledTime),
@@ -324,10 +325,11 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
     sv2PackageVettingTrigger.resume()
     sv2ValidatorPackageVettingTrigger.resume()
 
-    clue(s"Vetting state for slow sv is updated after the trigger runs") {
+    clue(s"Vetting state for slow sv is updated after the trigger runs, and alice sees it") {
       eventually() {
         vettingIsUpdatedForTheNewConfig(
-          sv2Backend.participantClient,
+          aliceValidatorBackend.participantClient,
+          sv2Backend.participantClient.id,
           Some(
             vettingScheduledTime
           ),
@@ -428,18 +430,19 @@ class BootstrapPackageConfigIntegrationTest extends IntegrationTest with Splitwe
   }
 
   private def vettingIsUpdatedForTheNewConfig(
-      participantClient: ParticipantClientReference,
+      checkViaParticipant: ParticipantClientReference,
+      vettedByParticipant: ParticipantId,
       scheduledTimeO: Option[CantonTimestamp],
       scheduledTime1: Option[CantonTimestamp],
       scheduledTime2: Option[CantonTimestamp],
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
-    val vettingTopologyState = participantClient.topology.vetted_packages.list(
+    val vettingTopologyState = checkViaParticipant.topology.vetted_packages.list(
       store = Some(
         TopologyStoreId.Synchronizer(
           decentralizedSynchronizerId
         )
       ),
-      filterParticipant = participantClient.id.filterString,
+      filterParticipant = vettedByParticipant.filterString,
     )
     val vettingState = vettingTopologyState.loneElement.item
     def packagesAreVetted(
