@@ -15,6 +15,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { Warning } from '@mui/icons-material';
 import {
   ConfirmationDialog,
   DateDisplay,
@@ -91,7 +92,6 @@ export const Delegations: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>Beneficiary</TableCell>
-              <TableCell>Onboarded</TableCell>
               <TableCell>Merge Threshold</TableCell>
               <TableCell>Expiration</TableCell>
               <TableCell>Accept</TableCell>
@@ -133,7 +133,6 @@ export const Delegations: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>Beneficiary</TableCell>
-              <TableCell>Onboarded</TableCell>
               <TableCell>Merge Threshold</TableCell>
               <TableCell>Expiration</TableCell>
               <TableCell>Withdraw</TableCell>
@@ -188,12 +187,16 @@ const DelegationRow: React.FC<DelegationRowProps> = ({ delegation }) => {
       className="delegation-row"
     >
       <TableCell>
-        <Typography className="delegation-beneficiary">
-          {shortenPartyId(contract.payload.beneficiary)}
-        </Typography>
-      </TableCell>
-      <TableCell>
-        <Typography className="delegation-onboarded">{beneficiaryOnboarded ? '✓' : '✗'}</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {!beneficiaryOnboarded && (
+            <Tooltip title="Minting delegations do not work for this party, as it is not hosted on this validator node">
+              <Warning color="warning" fontSize="small" className="delegation-not-onboarded-warning" />
+            </Tooltip>
+          )}
+          <Typography className="delegation-beneficiary">
+            {shortenPartyId(contract.payload.beneficiary)}
+          </Typography>
+        </Box>
       </TableCell>
       <TableCell>
         <Typography className="delegation-max-amulets">
@@ -304,12 +307,16 @@ const ProposalRow: React.FC<ProposalRowProps> = ({ proposal, existingDelegation 
       className="proposal-row"
     >
       <TableCell>
-        <Typography className="proposal-beneficiary">
-          {shortenPartyId(delegation.beneficiary)}
-        </Typography>
-      </TableCell>
-      <TableCell>
-        <Typography className="proposal-onboarded">{beneficiaryOnboarded ? '✓' : '✗'}</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {!beneficiaryOnboarded && (
+            <Tooltip title="Minting delegations do not work for this party, as it is not hosted on this validator node">
+              <Warning color="warning" fontSize="small" className="proposal-not-onboarded-warning" />
+            </Tooltip>
+          )}
+          <Typography className="proposal-beneficiary">
+            {shortenPartyId(delegation.beneficiary)}
+          </Typography>
+        </Box>
       </TableCell>
       <TableCell>
         <Typography className="proposal-max-amulets">{delegation.amuletMergeLimit}</Typography>

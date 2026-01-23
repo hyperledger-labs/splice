@@ -537,12 +537,10 @@ describe('Wallet user can', () => {
       );
     });
 
-    // Verify proposal onboarded status is displayed (✓ for true, ✗ for false) in sorted order
-    const proposalOnboardedCells = document.querySelectorAll('.proposal-onboarded');
-    expect(proposalOnboardedCells.length).toBe(mockMintingDelegationProposals.length);
-    mockProposalOnboardedStatusSorted.forEach((isOnboarded, index) => {
-      expect(proposalOnboardedCells[index].textContent).toBe(isOnboarded ? '✓' : '✗');
-    });
+    // Verify warning icons are shown for proposals where beneficiary is not onboarded
+    const proposalWarnings = document.querySelectorAll('.proposal-not-onboarded-warning');
+    const expectedProposalWarnings = mockProposalOnboardedStatusSorted.filter(s => !s).length;
+    expect(proposalWarnings.length).toBe(expectedProposalWarnings);
 
     // Verify proposal max amulets values are in sorted order
     const proposalMaxAmulets = document.querySelectorAll('.proposal-max-amulets');
@@ -588,12 +586,10 @@ describe('Wallet user can', () => {
       expect(beneficiaries[index].textContent).toBe(shortenPartyId(delegation.beneficiary));
     });
 
-    // Verify onboarded status is displayed (✓ for true, ✗ for false) in sorted order
-    const onboardedCells = document.querySelectorAll('.delegation-onboarded');
-    expect(onboardedCells.length).toBe(mockMintingDelegations.length);
-    mockDelegationOnboardedStatusSorted.forEach((isOnboarded, index) => {
-      expect(onboardedCells[index].textContent).toBe(isOnboarded ? '✓' : '✗');
-    });
+    // Verify warning icons are shown for delegations where beneficiary is not onboarded
+    const delegationWarnings = document.querySelectorAll('.delegation-not-onboarded-warning');
+    const expectedDelegationWarnings = mockDelegationOnboardedStatusSorted.filter(s => !s).length;
+    expect(delegationWarnings.length).toBe(expectedDelegationWarnings);
 
     // Verify max amulets values are in sorted order
     const maxAmulets = document.querySelectorAll('.delegation-max-amulets');
