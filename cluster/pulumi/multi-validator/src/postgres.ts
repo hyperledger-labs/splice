@@ -12,8 +12,8 @@ import {
   installSpliceRunbookHelmChart,
   spliceConfig,
   standardStorageClassName,
+  createVolumeSnapshot,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 
 import { hyperdiskSupportConfig } from '../../common/src/config/hyperdiskSupportConfig';
 import { multiValidatorConfig } from './config';
@@ -41,27 +41,13 @@ export function installPostgres(
     hyperdiskSupportConfig.hyperdiskSupport.enabled &&
     hyperdiskSupportConfig.hyperdiskSupport.migrating
   ) {
-    const pvcSnapshot = new CustomResource(`pg-data-${xns.logicalName}-${name}-snapshot`, {
-      apiVersion: 'snapshot.storage.k8s.io/v1',
-      kind: 'VolumeSnapshot',
-      metadata: {
-        name: `pg-data-${name}-snapshot`,
-        namespace: xns.logicalName,
-      },
-      spec: {
-        volumeSnapshotClassName: 'dev-vsc',
-        source: {
-          persistentVolumeClaimName: `pg-data-${name}-0`,
-        },
-      },
+    const { dataSource } = createVolumeSnapshot({
+      resourceName: `pg-data-${xns.logicalName}-${name}-snapshot`,
+      snapshotName: `pg-data-${name}-snapshot`,
+      namespace: xns.logicalName,
+      pvcName: `pg-data-${name}-0`,
     });
-    hyperdiskMigrationValues = {
-      dataSource: {
-        kind: 'VolumeSnapshot',
-        name: pvcSnapshot.metadata.name,
-        apiGroup: 'snapshot.storage.k8s.io',
-      },
-    };
+    hyperdiskMigrationValues = { dataSource };
   }
   return installSpliceRunbookHelmChart(
     xns,

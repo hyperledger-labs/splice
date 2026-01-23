@@ -8,7 +8,9 @@ const HyperdiskSupportConfigSchema = z.object({
   hyperdiskSupport: z
     .object({
       enabled: z.boolean().default(false),
+      enabledForInfra: z.boolean().default(false),
       migrating: z.boolean().default(false),
+      migratingInfra: z.boolean().default(false),
     })
     .default({}),
 });
