@@ -9,6 +9,7 @@ import {
   CLUSTER_HOSTNAME,
   clusterSmallDisk,
   config,
+  createVolumeSnapshot,
   DomainMigrationIndex,
   ExactNamespace,
   InstalledHelmChart,
@@ -23,7 +24,6 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
 import { hyperdiskSupportConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/hyperdiskSupportConfig';
-import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import { jsonStringify, Output } from '@pulumi/pulumi';
 
 import { svsConfig } from '../config';
@@ -112,30 +112,15 @@ export function installCometBftNode(
       volumeStorageClass: standardStorageClassName,
     };
     if (hyperdiskSupportConfig.hyperdiskSupport.migrating) {
-      const pvcSnapshot = new CustomResource(
-        `cometbft-${xns.logicalName}-migration-${migrationId}-snapshot`,
-        {
-          apiVersion: 'snapshot.storage.k8s.io/v1',
-          kind: 'VolumeSnapshot',
-          metadata: {
-            name: `cometbft-migration-${migrationId}-pd-snapshot`,
-            namespace: xns.logicalName,
-          },
-          spec: {
-            volumeSnapshotClassName: 'dev-vsc',
-            source: {
-              persistentVolumeClaimName: `global-domain-${migrationId}-cometbft-cometbft-data`,
-            },
-          },
-        }
-      );
+      const { dataSource } = createVolumeSnapshot({
+        resourceName: `cometbft-${xns.logicalName}-migration-${migrationId}-snapshot`,
+        snapshotName: `cometbft-migration-${migrationId}-pd-snapshot`,
+        namespace: xns.logicalName,
+        pvcName: `global-domain-${migrationId}-cometbft-cometbft-data`,
+      });
       hyperdiskDbValues = {
         ...hyperdiskDbValues,
-        dataSource: {
-          kind: 'VolumeSnapshot',
-          name: pvcSnapshot.metadata.name,
-          apiGroup: 'snapshot.storage.k8s.io',
-        },
+        dataSource,
       };
     }
   }
