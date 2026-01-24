@@ -122,7 +122,7 @@ class AcsSnapshotBulkStorageTest
 
           _ = clue("Initially, a single snapshot is dumped") {
             probe.request(2)
-            probe.expectNext(2.minutes).value shouldBe(0, ts1)
+            probe.expectNext(2.minutes).value shouldBe (0, ts1)
             probe.expectNoMessage(10.seconds)
           }
           persistedTs1 <- kvProvider.getLatestAcsSnapshotInBulkStorage().value
@@ -131,7 +131,7 @@ class AcsSnapshotBulkStorageTest
           _ = clue("Add another snapshot to the store, it is also dumped") {
             store.addSnapshot(CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20)))
             val next = probe.expectNext(2.minutes)
-            next.value shouldBe(0, ts2)
+            next.value shouldBe (0, ts2)
             probe.expectNoMessage(10.seconds)
             next.killSwitch.shutdown()
           }
