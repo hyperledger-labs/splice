@@ -3911,6 +3911,12 @@ class State:
                 return HandleTransactionResult.empty()
             case "DsoRules_MergeUnclaimedDevelopmentFundCoupons":
                 return HandleTransactionResult.empty()
+            case "DsoRules_ExpireDevelopmentFundCoupon":
+                return HandleTransactionResult.empty()
+            case "AmuletRules_AllocateDevelopmentFundCoupon":
+                return HandleTransactionResult.empty()
+            case "DevelopmentFundCoupon_Withdraw":
+                return HandleTransactionResult.empty()
             case "ExternalPartyAmuletRules_CreateTransferCommand":
                 return HandleTransactionResult.empty()
             case "FeaturedAppRight_CreateActivityMarker":
