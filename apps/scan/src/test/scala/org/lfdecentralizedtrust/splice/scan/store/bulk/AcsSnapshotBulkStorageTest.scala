@@ -4,8 +4,10 @@
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.LfContractId
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.PekkoUtil.WithKillSwitch
@@ -13,8 +15,13 @@ import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.apache.pekko.stream.scaladsl.Sink
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
-import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
+import org.lfdecentralizedtrust.splice.scan.store.{
+  AcsSnapshotStore,
+  ScanKeyValueProvider,
+  ScanKeyValueStore,
+}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
+import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest}
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
@@ -34,7 +41,8 @@ class AcsSnapshotBulkStorageTest
     extends StoreTest
     with HasExecutionContext
     with HasActorSystem
-    with HasS3Mock {
+    with HasS3Mock
+    with SplicePostgresTest {
 
   val acsSnapshotSize = 48500
   val bulkStorageTestConfig = BulkStorageConfig(
@@ -99,33 +107,38 @@ class AcsSnapshotBulkStorageTest
       withS3Mock {
         val store = new MockAcsSnapshotStore()
         val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(loggerFactory)
-        val probe = new AcsSnapshotBulkStorage(
-          bulkStorageTestConfig,
-          store.store,
-          s3BucketConnection,
-          loggerFactory,
-        ).getSource
-          .runWith(TestSink.probe[WithKillSwitch[(Long, CantonTimestamp)]])
+        val ts1 = CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(10))
+        val ts2 = CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20))
+        for {
+          kvProvider <- mkProvider
+          probe = new AcsSnapshotBulkStorage(
+            bulkStorageTestConfig,
+            store.store,
+            s3BucketConnection,
+            kvProvider,
+            loggerFactory,
+          ).getSource
+            .runWith(TestSink.probe[WithKillSwitch[(Long, CantonTimestamp)]])
 
-        clue("Initially, a single snapshot is dumped") {
-          probe.request(2)
-          probe.expectNext(2.minutes).value shouldBe (0, CantonTimestamp.tryFromInstant(
-            Instant.ofEpochSecond(10)
-          ))
-          probe.expectNoMessage(10.seconds)
+          _ = clue("Initially, a single snapshot is dumped") {
+            probe.request(2)
+            probe.expectNext(2.minutes).value shouldBe(0, ts1)
+            probe.expectNoMessage(10.seconds)
+          }
+          persistedTs1 <- kvProvider.getLatestAcsSnapshotInBulkStorage().value
+          _ = persistedTs1.value shouldBe (0, ts1)
+
+          _ = clue("Add another snapshot to the store, it is also dumped") {
+            store.addSnapshot(CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20)))
+            val next = probe.expectNext(2.minutes)
+            next.value shouldBe(0, ts2)
+            probe.expectNoMessage(10.seconds)
+            next.killSwitch.shutdown()
+          }
+          persistedTs2 <- kvProvider.getLatestAcsSnapshotInBulkStorage().value
+        } yield {
+          persistedTs2.value shouldBe (0, ts2)
         }
-
-        clue("Add another snapshot to the store, it is also dumped") {
-          store.addSnapshot(CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20)))
-          val next = probe.expectNext(2.minutes)
-          next.value shouldBe (0, CantonTimestamp.tryFromInstant(
-            Instant.ofEpochSecond(20)
-          ))
-          probe.expectNoMessage(10.seconds)
-          next.killSwitch.shutdown()
-        }
-
-        succeed
       }
     }
   }
@@ -254,4 +267,16 @@ class AcsSnapshotBulkStorageTest
     s3BucketConnectionWithErrors
   }
 
+  def mkProvider: Future[ScanKeyValueProvider] = {
+    ScanKeyValueStore(
+      dsoParty = dsoParty,
+      participantId = mkParticipantId("participant"),
+      storage,
+      loggerFactory,
+    ).map(new ScanKeyValueProvider(_, loggerFactory))
+  }
+
+  override protected def cleanDb(
+      storage: DbStorage
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] = resetAllAppTables(storage)
 }

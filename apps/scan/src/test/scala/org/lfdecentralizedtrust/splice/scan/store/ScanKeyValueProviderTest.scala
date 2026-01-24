@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 class ScanKeyValueProviderTest
     extends StoreTest
@@ -22,13 +23,15 @@ class ScanKeyValueProviderTest
   "ScanKeyValueProvider" should {
     "set and get acs snapshots timestamps" in {
       val ts = CantonTimestamp.now()
+      val ts2 = ts.add(1.minute)
       val migrationId = 7L
       for {
         provider <- mkProvider
-        _ <- provider.setLatestAcsSnapshotsInBulkStorage(ts, migrationId)
+        _ <- provider.setLatestAcsSnapshotsInBulkStorage(migrationId, ts)
+        _ <- provider.setLatestAcsSnapshotsInBulkStorage(migrationId, ts2)
         readBack <- provider.getLatestAcsSnapshotInBulkStorage().value
       } yield {
-        readBack.value shouldBe (ts, migrationId)
+        readBack.value shouldBe (migrationId, ts2)
       }
     }
   }
