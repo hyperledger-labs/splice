@@ -131,6 +131,19 @@ const ActionCard = (props: ActionCardProps) => {
               data-testid="action-required-description"
             />
           </Box>
+          <Box sx={{ flexShrink: 1, minWidth: 0, maxWidth: 300 }}>
+            <ActionCardSegment
+              title="CONTRACT ID"
+              content={
+                <CopyableIdentifier
+                  value={contractId}
+                  size="small"
+                  data-testid="action-required-contract-id"
+                />
+              }
+              data-testid="action-required-contract-id-segment"
+            />
+          </Box>
           <Box sx={{ flexShrink: 0 }}>
             <ActionCardSegment
               title="CREATED AT"
@@ -157,19 +170,6 @@ const ActionCard = (props: ActionCardProps) => {
                 />
               }
               data-testid="action-required-requester"
-            />
-          </Box>
-          <Box sx={{ flexShrink: 1, minWidth: 0, maxWidth: 300 }}>
-            <ActionCardSegment
-              title="CONTRACT ID"
-              content={
-                <CopyableIdentifier
-                  value={contractId}
-                  size="small"
-                  data-testid="action-required-contract-id"
-                />
-              }
-              data-testid="action-required-contract-id-segment"
             />
           </Box>
           <Stack

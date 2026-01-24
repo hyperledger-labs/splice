@@ -231,7 +231,6 @@ const VoteRow: React.FC<VoteRowProps> = props => {
         <CopyableIdentifier
           value={contractId}
           size="small"
-          hideCopyButton
           data-testid={`${uniqueId}-row-contract-id-value`}
         />
       </TableCell>
