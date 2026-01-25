@@ -73,8 +73,7 @@ class AcsSnapshotBulkStorage(
   private def mksrc(): Source[(Long, CantonTimestamp), (KillSwitch, Future[Done])] = {
     val base =
       Source
-        .single[Unit](())
-        .mapAsync(1) { _ => getStartTimestamp }
+        .future(getStartTimestamp)
         .flatMapConcat {
           case Some((startMigrationId, startAfterTimestamp)) =>
             logger.info(
