@@ -10,9 +10,8 @@ import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.PekkoUtil.WithKillSwitch
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import org.apache.pekko.stream.scaladsl.Sink
+import org.apache.pekko.stream.scaladsl.{Sink, Keep}
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import org.lfdecentralizedtrust.splice.scan.store.{
@@ -111,18 +110,19 @@ class AcsSnapshotBulkStorageTest
         val ts2 = CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20))
         for {
           kvProvider <- mkProvider
-          probe = new AcsSnapshotBulkStorage(
+          (killSwitch, probe) = new AcsSnapshotBulkStorage(
             bulkStorageTestConfig,
             store.store,
             s3BucketConnection,
             kvProvider,
             loggerFactory,
-          ).getSource
-            .runWith(TestSink.probe[WithKillSwitch[(Long, CantonTimestamp)]])
+          ).getSource()
+            .toMat(TestSink.probe[(Long, CantonTimestamp)])(Keep.both)
+            .run()
 
           _ = clue("Initially, a single snapshot is dumped") {
             probe.request(2)
-            probe.expectNext(2.minutes).value shouldBe (0, ts1)
+            probe.expectNext(2.minutes) shouldBe (0, ts1)
             probe.expectNoMessage(10.seconds)
           }
           persistedTs1 <- kvProvider.getLatestAcsSnapshotInBulkStorage().value
@@ -131,13 +131,14 @@ class AcsSnapshotBulkStorageTest
           _ = clue("Add another snapshot to the store, it is also dumped") {
             store.addSnapshot(CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20)))
             val next = probe.expectNext(2.minutes)
-            next.value shouldBe (0, ts2)
+            next shouldBe (0, ts2)
             probe.expectNoMessage(10.seconds)
-            next.killSwitch.shutdown()
           }
           persistedTs2 <- kvProvider.getLatestAcsSnapshotInBulkStorage().value
         } yield {
           persistedTs2.value shouldBe (0, ts2)
+          killSwitch.shutdown()
+          succeed
         }
       }
     }

@@ -42,10 +42,10 @@ class DbKeyValueStore private (
         VALUES ($key, $jsonValue, $storeId)
         ON CONFLICT (store_id, key) DO UPDATE
         SET value = excluded.value""".asUpdate
-    val updateAction = storage.update(action, "set-validator-internal-config")
+    val updateAction = storage.update(action, "set-key-value")
 
     logger.debug(
-      s"saving validator config in database with key '$key' and value '$jsonValue'"
+      s"saving key '$key' and value '$jsonValue'"
     )
     updateAction.map(_ => ())
   }
@@ -54,7 +54,7 @@ class DbKeyValueStore private (
       key: String
   )(implicit tc: TraceContext, decoder: Decoder[T]): OptionT[Future, Decoder.Result[T]] = {
 
-    logger.debug(s"Retrieving config key $key")
+    logger.debug(s"Retrieving key $key")
 
     val queryAction = sql"""SELECT value
       FROM key_value_store
@@ -62,7 +62,7 @@ class DbKeyValueStore private (
     """.as[Json].headOption
 
     val jsonOptionT: OptionT[FutureUnlessShutdown, Json] =
-      storage.querySingle(queryAction, "get-validator-internal-config")
+      storage.querySingle(queryAction, "get-key-value")
 
     val resultOptionT: OptionT[FutureUnlessShutdown, Decoder.Result[T]] =
       jsonOptionT.map { json =>
@@ -71,11 +71,11 @@ class DbKeyValueStore private (
         decodeResult match {
           case Right(_) =>
             logger.debug(
-              s"retrieved validator config from database with key '$key' and value '${json.noSpaces}'"
+              s"retrieved from database key '$key' and value '${json.noSpaces}'"
             )
           case Left(error) =>
             logger.error(
-              s"Failed to decode config key '$key' to expected type T: ${error.getMessage}"
+              s"Failed to decode value for key '$key' to expected type T: ${error.getMessage}"
             )
         }
         decodeResult
@@ -93,7 +93,7 @@ class DbKeyValueStore private (
     storage
       .update(
         sqlu"delete from key_value_store WHERE key = $key AND store_id = $storeId",
-        "delete config key",
+        "delete key-value",
       )
       .map(_.discard)
   }
