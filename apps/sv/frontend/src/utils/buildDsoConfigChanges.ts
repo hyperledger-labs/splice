@@ -25,18 +25,21 @@ function buildSynchronizerMap(
           currentValue: baseSynchronizer[0] || '',
           newValue: currentSynchronizer?.[0] || '',
           isId: true,
+          disabled: idx === 1,
         },
         {
           fieldName: `decentralizedSynchronizerState${idx}`,
           label: `Decentralized Synchronizer (state) ${idx}`,
           currentValue: baseSynchronizer[1].state || '',
           newValue: currentSynchronizer?.[1].state || '',
+          disabled: idx === 1,
         },
         {
           fieldName: `decentralizedSynchronizerCometBftGenesisJson${idx}`,
           label: `Decentralized Synchronizer (cometBftGenesisJson)${idx}`,
           currentValue: baseSynchronizer[1].cometBftGenesisJson || '',
           newValue: currentSynchronizer?.[1].cometBftGenesisJson || '',
+          disabled: idx === 1,
         },
         {
           fieldName: `decentralizedSynchronizerAcsCommitmentReconciliationInterval${idx}`,
@@ -151,6 +154,7 @@ export function buildDsoConfigChanges(
       currentValue: before?.decentralizedSynchronizer.lastSynchronizerId || '',
       newValue: after?.decentralizedSynchronizer.lastSynchronizerId || '',
       isId: true,
+      disabled: true,
     },
     {
       fieldName: 'decentralizedSynchronizerActiveSynchronizerId',
@@ -158,6 +162,7 @@ export function buildDsoConfigChanges(
       currentValue: before?.decentralizedSynchronizer.activeSynchronizerId || '',
       newValue: after?.decentralizedSynchronizer.activeSynchronizerId || '',
       isId: true,
+      disabled: true,
     },
     {
       fieldName: 'nextScheduledSynchronizerUpgradeTime',

@@ -171,12 +171,14 @@ function buildTransferFeeStepsChanges(
             label: `Transfer Fee Step ${idx}`,
             currentValue: b._1,
             newValue: a?._1,
+            disabled: idx <= 3,
           },
           {
             fieldName: `transferFeeSteps${idx}_2`,
             label: `Transfer Fee Step ${idx}`,
             currentValue: b._2,
             newValue: a?._2,
+            disabled: idx <= 3,
           },
         ] as ConfigChange[];
       })
@@ -332,6 +334,7 @@ function buildDecentralizedSynchronizerChanges(
     label: `Decentralized Synchronizer (Required Synchronizer ${idx + 1})`,
     currentValue: beforeRequiredSynchronizers.includes(sync) ? sync : '',
     newValue: afterRequiredSynchronizers.includes(sync) ? sync : '',
+    disabled: idx + 1 === 1,
   }));
 
   return [
@@ -341,6 +344,7 @@ function buildDecentralizedSynchronizerChanges(
       currentValue: before?.activeSynchronizer || '',
       newValue: after?.activeSynchronizer || '',
       isId: true,
+      disabled: true,
     },
     {
       fieldName: 'decentralizedSynchronizerFeesBaseRateTrafficLimitsBurstAmount',
