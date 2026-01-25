@@ -65,7 +65,7 @@ class AcsSnapshotBulkStorage(
 
   /**  This is the main implementation of the pipeline. It is a Pekko Source that reads a `start` timestamp
     *   from the DB, and starts dumping to S3 all snapshots (strictly) after `start`. After every snapshot that
-    *   is successfully dumped, it persists to the DB its timestamp.
+    *   is successfully dumped, it persists to the DB its timestamp, and emits that timestamp as an output.
     *   It is an infinite source that should never complete.
     */
   private def mksrc() = {
