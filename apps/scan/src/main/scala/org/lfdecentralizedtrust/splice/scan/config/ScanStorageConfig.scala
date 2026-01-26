@@ -27,8 +27,9 @@ case class ScanStorageConfig(
 
   private def timesToDoSnapshot = (0 to 23).filter(_ % dbAcsSnapshotPeriodHours == 0)
 
-  // Simplified version of computeSnapshotTimeAfter, which is correct only if `lastSnapshot` is a "legal" snapshot timestamp
-  // Since we get an AcsSnapshot here and not an arbitrary CantonTimestamp, we can assume that this snapshot is valid.
+  /* Simplified version of computeSnapshotTimeAfter, which is correct only if `lastSnapshot` is a "legal" snapshot timestamp
+   * Since we get an AcsSnapshot here and not an arbitrary CantonTimestamp, we can assume that this snapshot is valid.
+   */
   def nextSnapshotTime(lastSnapshot: AcsSnapshot): CantonTimestamp = {
     lastSnapshot.snapshotRecordTime.plus(Duration.ofHours(dbAcsSnapshotPeriodHours.toLong))
   }
