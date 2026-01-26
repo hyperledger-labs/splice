@@ -32,6 +32,7 @@ import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
 import java.nio.ByteBuffer
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
@@ -47,6 +48,7 @@ class AcsSnapshotBulkStorageTest
   val acsSnapshotSize = 48500
   val bulkStorageTestConfig = ScanStorageConfig(
     dbAcsSnapshotPeriodHours = 3,
+    bulkAcsSnapshotPeriodHours = 24, // FIXME: improve the test, to test this
     bulkDbReadChunkSize = 1000,
     bulkMaxFileSize = 50000L,
   )
@@ -54,13 +56,14 @@ class AcsSnapshotBulkStorageTest
   "AcsSnapshotBulkStorage" should {
     "successfully dump a single ACS snapshot" in {
       withS3Mock {
-        val store = new MockAcsSnapshotStore().store
+        val ts = CantonTimestamp.now()
+        val store = new MockAcsSnapshotStore(ts).store
         val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(loggerFactory)
         for {
           _ <- SingleAcsSnapshotBulkStorage
             .asSource(
               0,
-              MockAcsSnapshotStore.initialSnapshotTimestamp,
+              ts,
               bulkStorageTestConfig,
               store,
               s3BucketConnection,
@@ -76,7 +79,7 @@ class AcsSnapshotBulkStorageTest
           allContracts <- store
             .queryAcsSnapshot(
               0,
-              MockAcsSnapshotStore.initialSnapshotTimestamp,
+              ts,
               None,
               HardLimit.tryCreate(acsSnapshotSize, acsSnapshotSize),
               Seq.empty,
@@ -106,10 +109,11 @@ class AcsSnapshotBulkStorageTest
 
     "correctly process multiple ACS snapshots" in {
       withS3Mock {
-        val store = new MockAcsSnapshotStore()
+        val ts1 = CantonTimestamp.tryFromInstant(Instant.now().truncatedTo(ChronoUnit.DAYS))
+        val ts2 = ts1.add(3.hours)
+        val ts3 = ts1.add(24.hours)
+        val store = new MockAcsSnapshotStore(ts1)
         val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(loggerFactory)
-        val ts1 = CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(10))
-        val ts2 = CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20))
         for {
           kvProvider <- mkProvider
           (killSwitch, probe) = new AcsSnapshotBulkStorage(
@@ -130,15 +134,22 @@ class AcsSnapshotBulkStorageTest
           persistedTs1 <- kvProvider.getLatestAcsSnapshotInBulkStorage().value
           _ = persistedTs1.value shouldBe (0, ts1)
 
-          _ = clue("Add another snapshot to the store, it is also dumped") {
-            store.addSnapshot(CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20)))
-            val next = probe.expectNext(2.minutes)
-            next shouldBe (0, ts2)
+          _ = clue(
+            "Add another snapshot to the store, which is not yet dumped because of the longer period on bulk storage"
+          ) {
+            store.addSnapshot(ts2)
             probe.expectNoMessage(10.seconds)
           }
-          persistedTs2 <- kvProvider.getLatestAcsSnapshotInBulkStorage().value
+
+          _ = clue("Add one more snapshot to the store, at the end of the period") {
+            store.addSnapshot(ts3)
+            val next = probe.expectNext(2.minutes)
+            next shouldBe (0, ts3)
+            probe.expectNoMessage(10.seconds)
+          }
+          persistedTs3 <- kvProvider.getLatestAcsSnapshotInBulkStorage().value
         } yield {
-          persistedTs2.value shouldBe (0, ts2)
+          persistedTs3.value shouldBe (0, ts3)
           killSwitch.shutdown()
           succeed
         }
@@ -146,12 +157,8 @@ class AcsSnapshotBulkStorageTest
     }
   }
 
-  object MockAcsSnapshotStore {
-    val initialSnapshotTimestamp: CantonTimestamp =
-      CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(10))
-  }
-  class MockAcsSnapshotStore {
-    private var snapshots = Seq(MockAcsSnapshotStore.initialSnapshotTimestamp)
+  class MockAcsSnapshotStore(val initialSnapshotTimestamp: CantonTimestamp) {
+    private var snapshots = Seq(initialSnapshotTimestamp)
     val store = mockAcsSnapshotStore(acsSnapshotSize)
 
     def addSnapshot(timestamp: CantonTimestamp) = { snapshots = snapshots :+ timestamp }
