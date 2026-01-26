@@ -299,6 +299,8 @@ class DevelopmentFundCouponIntegrationTest
     )(
       "Coupons are listed with the earliest expiration date first",
       _ => {
+        // TODO: Pause CollectRewardsAndMergeAmuletsTrigger around this piece of code, and then enable it and check that they all get collected
+        // in 'PR-6 adding support for expiring DevelopmentFundCoupons' implementation: https://github.com/hyperledger-labs/splice/issues/3218
         aliceValidatorWalletClient
           .listActiveDevelopmentFundCoupons()
           .map(_.payload.expiresAt)
