@@ -84,6 +84,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AllocateDevelopmentFundCouponRequest,
   AllocateDevelopmentFundCouponResponse,
   CreateTokenStandardTransferRequest,
+  ListActiveDevelopmentFundCouponsResponse,
   WithdrawDevelopmentFundCouponRequest,
   WithdrawDevelopmentFundCouponResponse,
 }
@@ -1419,16 +1420,21 @@ class HttpWalletHandler(
   }
 
   override def listActiveDevelopmentFundCoupons(
-      respond: v0.WalletResource.ListActiveDevelopmentFundCouponsResponse.type
+      respond: WalletResource.ListActiveDevelopmentFundCouponsResponse.type
   )()(
       extracted: WalletUserRequest
-  ): Future[v0.WalletResource.ListActiveDevelopmentFundCouponsResponse] = {
+  ): Future[WalletResource.ListActiveDevelopmentFundCouponsResponse] = {
     implicit val WalletUserRequest(user, userWallet, traceContext) = extracted
     withSpan(s"$workflowId.listActiveDevelopmentFundCoupons") { _ => _ =>
-      listContracts(
-        amuletCodegen.DevelopmentFundCoupon.COMPANION,
-        userWallet.store,
-        d0.ListActiveDevelopmentFundCouponsResponse(_),
+      for {
+        coupons <- userWallet.store.multiDomainAcsStore.listContracts(
+          amuletCodegen.DevelopmentFundCoupon.COMPANION
+        )
+        sortedCoupons = coupons.sortBy(_.payload.expiresAt)
+      } yield WalletResource.ListActiveDevelopmentFundCouponsResponseOK(
+        ListActiveDevelopmentFundCouponsResponse(
+          sortedCoupons.map(_.contract.toHttp).toVector
+        )
       )
     }
   }

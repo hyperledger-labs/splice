@@ -1093,6 +1093,39 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     created.contractId
   }
 
+  /** Directly creates a new development fund coupon. */
+  def createDevelopmentFundCoupon(
+      participantClient: ParticipantClientReference,
+      userId: String,
+      beneficiary: PartyId,
+      fundManager: PartyId,
+      amount: BigDecimal = BigDecimal(10),
+      expiresAt: CantonTimestamp,
+      reason: String,
+      synchronizerId: Option[SynchronizerId] = None,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ): amuletCodegen.DevelopmentFundCoupon.ContractId = {
+    val coupon =
+      new amuletCodegen.DevelopmentFundCoupon(
+        dsoParty.toProtoPrimitive,
+        beneficiary.toProtoPrimitive,
+        fundManager.toProtoPrimitive,
+        amount.bigDecimal,
+        expiresAt.toInstant,
+        reason,
+      ).create
+    val created = participantClient.ledger_api_extensions.commands
+      .submitWithResult(
+        userId = userId,
+        actAs = Seq(dsoParty),
+        readAs = Seq.empty,
+        update = coupon,
+        synchronizerId = synchronizerId,
+      )
+    created.contractId
+  }
+
   protected def retryCommandSubmission[T](f: => T) = {
     eventually() {
       try {

@@ -5,7 +5,10 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedDevelopmentFundCoupon
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  DevelopmentFundCoupon,
+  UnclaimedDevelopmentFundCoupon,
+}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
@@ -26,7 +29,8 @@ class DevelopmentFundCouponIntegrationTest
   private val threshold = 3
 
   override protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq(
-    UnclaimedDevelopmentFundCoupon.TEMPLATE_ID_WITH_PACKAGE_ID
+    UnclaimedDevelopmentFundCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+    DevelopmentFundCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
   )
 
   override def environmentDefinition
@@ -64,7 +68,7 @@ class DevelopmentFundCouponIntegrationTest
         ConfigTransforms.withDevelopmentFundPercentage(0.05)(config)
       )
 
-  "UnclaimedDevelopmentFundCoupons are merged" in { implicit env =>
+  "Unclaimed development fund coupons are merged" in { implicit env =>
     val (_, couponAmount) = actAndCheck(
       "Advance 5 rounds", {
         Range(0, 5).foreach(_ => advanceRoundsByOneTickViaAutomation())
@@ -116,11 +120,12 @@ class DevelopmentFundCouponIntegrationTest
     )
   }
 
-  "DevelopmentFundCoupons management flow" in { implicit env =>
+  "Development fund coupons management flow" in { implicit env =>
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
     val unclaimedDevelopmentFundCouponsToMint = Seq(10.0, 10.0, 30.0, 30.0).map(BigDecimal(_))
     val unclaimedDevelopmentFundCouponTotal = unclaimedDevelopmentFundCouponsToMint.sum
     val aliceValidatorParty = onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
+    val fundManger = aliceValidatorParty
     val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
     val beneficiary = bobParty
     val developmentFundCouponAmount = BigDecimal(40.0)
@@ -209,8 +214,8 @@ class DevelopmentFundCouponIntegrationTest
         val developmentFundCouponContract = activeDevelopmentFundCouponContracts.head
         val developmentFundCoupon = developmentFundCouponContract.payload
         BigDecimal(developmentFundCoupon.amount) shouldBe developmentFundCouponAmount
-        developmentFundCoupon.beneficiary shouldBe bobParty.toProtoPrimitive
-        developmentFundCoupon.fundManager shouldBe aliceValidatorParty.toProtoPrimitive
+        developmentFundCoupon.beneficiary shouldBe beneficiary.toProtoPrimitive
+        developmentFundCoupon.fundManager shouldBe fundManger.toProtoPrimitive
 
         // Verify that the total of unclaimed development fund coupons has decreased
         // Note: HttpWalletHandler selects the largest unclaimed development fund coupons for the allocation,
@@ -257,6 +262,48 @@ class DevelopmentFundCouponIntegrationTest
         assertUnclaimedDevelopmentCouponAmounts(
           Seq(10.0, 10.0, 20.0, developmentFundCouponAmount.toDouble)
         )
+      },
+    )
+  }
+
+  "Listing development fund coupons" in { implicit env =>
+    val sv1UserId = sv1WalletClient.config.ledgerApiUser
+    val developmentFundCouponExpirations = Seq(
+      CantonTimestamp.now().plus(Duration.ofDays(3)),
+      CantonTimestamp.now().plus(Duration.ofDays(2)),
+      CantonTimestamp.now().plus(Duration.ofDays(5)),
+      CantonTimestamp.now().plus(Duration.ofDays(1)),
+      CantonTimestamp.now().plus(Duration.ofDays(2)),
+    )
+    val aliceValidatorParty = onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
+    val fundManager = aliceValidatorParty
+    val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+    val beneficiary = bobParty
+    val developmentFundCouponAmount = BigDecimal(40.0)
+    val reason = "Bob has contributed to the Daml repo"
+
+    actAndCheck(
+      "Mint some development fund coupons", {
+        developmentFundCouponExpirations.foreach { expiresAt =>
+          createDevelopmentFundCoupon(
+            sv1ValidatorBackend.participantClientWithAdminToken,
+            sv1UserId,
+            beneficiary,
+            fundManager,
+            developmentFundCouponAmount,
+            expiresAt,
+            reason,
+          )
+        }
+      },
+    )(
+      "Coupons are listed with the earliest expiration date first",
+      _ => {
+        aliceValidatorWalletClient
+          .listActiveDevelopmentFundCoupons()
+          .map(_.payload.expiresAt)
+          .toList shouldBe
+          developmentFundCouponExpirations.map(_.toInstant).sorted
       },
     )
   }
