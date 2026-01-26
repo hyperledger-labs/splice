@@ -313,15 +313,36 @@ function createHTTPRoute(config: L7GatewayConfig, gateway: k8s.apiextensions.Cus
 }
 
 /**
+ * Creates a GCP SSL Policy that enforces TLS 1.2+
+ * https://www.pulumi.com/registry/packages/gcp/api-docs/compute/sslpolicy/
+ */
+function createSSLPolicy(
+  config: L7GatewayConfig
+): gcp.compute.SSLPolicy {
+  const policyName = `${config.gatewayName}-ssl-policy`;
+  return new gcp.compute.SSLPolicy(
+    policyName,
+    {
+      name: policyName,
+      description: `SSL Policy for ${config.gatewayName} enforcing TLS 1.2+`,
+      // https://docs.cloud.google.com/load-balancing/docs/ssl-policies-concepts#defining_an_ssl_policy
+      profile: 'MODERN',
+      minTlsVersion: 'TLS_1_2',
+    }
+  );
+}
+
+/**
  * Create a GCPGatewayPolicy to configure TLS settings
- * Disables TLS 1.0 and 1.1, requiring TLS 1.2 or higher
- * https://docs.cloud.google.com/kubernetes-engine/docs/how-to/configure-gateway-resources#configure_ssl_policies
+ * References a GCP SSL Policy that disables TLS 1.0 and 1.1
+ * https://cloud.google.com/kubernetes-engine/docs/how-to/configure-gateway-resources#configure_ssl_policies
  */
 function attachTLSPolicyToGateway(
   config: L7GatewayConfig,
-  gateway: k8s.apiextensions.CustomResource
+  gateway: k8s.apiextensions.CustomResource,
+  sslPolicy: gcp.compute.SSLPolicy
 ): k8s.apiextensions.CustomResource {
-  const policyName = `${config.gatewayName}-tls-policy`;
+  const policyName = `${config.gatewayName}-ssl-policy-attachment`;
   return new k8s.apiextensions.CustomResource(
     policyName,
     {
@@ -333,11 +354,7 @@ function attachTLSPolicyToGateway(
       },
       spec: {
         default: {
-          sslPolicy: {
-            // https://docs.cloud.google.com/load-balancing/docs/ssl-policies-concepts#defining_an_ssl_policy
-            type: 'MODERN',
-            minTlsVersion: 'TLS_1_2',
-          },
+          sslPolicy: sslPolicy.name,
         },
         targetRef: {
           group: 'gateway.networking.k8s.io',
@@ -347,7 +364,7 @@ function attachTLSPolicyToGateway(
         },
       },
     },
-    { parent: gateway }
+    { parent: gateway, dependsOn: [sslPolicy] }
   );
 }
 
@@ -363,7 +380,8 @@ export function configureGKEL7Gateway(config: L7GatewayConfig): {
 
   createHealthCheckPolicy(config, gateway);
 
-  attachTLSPolicyToGateway(config, gateway);
+  const sslPolicy = createSSLPolicy(config);
+  attachTLSPolicyToGateway(config, gateway, sslPolicy);
 
   createHTTPRoute(config, gateway);
 
