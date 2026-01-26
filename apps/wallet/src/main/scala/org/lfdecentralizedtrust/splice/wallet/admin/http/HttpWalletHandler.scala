@@ -1323,9 +1323,12 @@ class HttpWalletHandler(
                 .asRuntimeException()
             case Some(developmentFundManager) if developmentFundManager == store.key.endUserParty =>
               developmentFundManager
-            case Some(_) =>
+            case Some(developmentFundManager) =>
               throw Status.FAILED_PRECONDITION
-                .withDescription("Invalid fund manager")
+                .withDescription(
+                  s"Invalid fund manager: expected '$developmentFundManager', " +
+                    s"but the submitter was '${store.key.endUserParty.toProtoPrimitive}'."
+                )
                 .asRuntimeException()
           }
         unclaimedDevelopmentFundCoupons <- scanConnection.listUnclaimedDevelopmentFundCoupons()
@@ -1333,7 +1336,7 @@ class HttpWalletHandler(
           unclaimedDevelopmentFundCoupons,
           amount,
         ).getOrElse(
-          throw Status.Code.PRECONDITION_FAILED.toStatus
+          throw Status.FAILED_PRECONDITION
             .withDescription(
               s"The total amount of unclaimed development coupons is insufficient to cover the amount requested"
             )
@@ -1466,7 +1469,11 @@ class HttpWalletHandler(
           developmentFundCoupon.contract.payload.fundManager != store.key.endUserParty.toProtoPrimitive
         )
           throw Status.Code.FAILED_PRECONDITION.toStatus
-            .withDescription(s"Invalid controller")
+            .withDescription(
+              s"Invalid controller: expected fund manager " +
+                s"'${developmentFundCoupon.contract.payload.fundManager}', " +
+                s"but the submitter was '${store.key.endUserParty.toProtoPrimitive}'."
+            )
             .asRuntimeException()
 
         result <- userWallet.connection
