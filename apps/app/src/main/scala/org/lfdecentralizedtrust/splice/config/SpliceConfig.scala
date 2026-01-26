@@ -13,10 +13,10 @@ import org.lfdecentralizedtrust.splice.http.UrlValidator
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.{
   BftSequencerConfig,
+  MediatorVerdictIngestionConfig,
   ScanAppBackendConfig,
   ScanAppClientConfig,
   ScanCacheConfig,
-  MediatorVerdictIngestionConfig,
   ScanSynchronizerConfig,
   CacheConfig as SpliceCacheConfig,
 }
@@ -82,6 +82,7 @@ import com.digitalasset.canton.synchronizer.sequencer.config.{
 }
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 
 case class SpliceConfig(
     override val name: Option[String] = None,
@@ -411,6 +412,9 @@ object SpliceConfig {
       deriveReader[CircuitBreakerConfig]
     implicit val circuitBreakersConfig: ConfigReader[CircuitBreakersConfig] =
       deriveReader[CircuitBreakersConfig]
+    implicit val contractFetchLedgerFallbackConfigReader
+        : ConfigReader[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig] =
+      deriveReader[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig]
     implicit val spliceParametersConfig: ConfigReader[SpliceParametersConfig] =
       deriveReader[SpliceParametersConfig]
     implicit val rateLimitersConfig: ConfigReader[RateLimitersConfig] =
@@ -677,6 +681,9 @@ object SpliceConfig {
       deriveReader[ValidatorExtraSynchronizerConfig]
     implicit val validatorSynchronizerConfigReader: ConfigReader[ValidatorSynchronizerConfig] =
       deriveReader[ValidatorSynchronizerConfig]
+    implicit val validatorTrustedSynchronizerConfigReader
+        : ConfigReader[ValidatorTrustedSynchronizerConfig] =
+      deriveReader[ValidatorTrustedSynchronizerConfig]
     implicit val offsetDateTimeConfigurationReader: ConfigReader[java.time.OffsetDateTime] =
       implicitly[ConfigReader[String]].map(java.time.OffsetDateTime.parse)
     implicit val transferPreapprovalConfigReader: ConfigReader[TransferPreapprovalConfig] =
@@ -699,10 +706,19 @@ object SpliceConfig {
           ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(conf).participant
         for {
           _ <- Either.cond(
-            !(conf.domains.global.url.isDefined && conf.domains.global.sequencerNames.isDefined),
+            !(conf.domains.global.url.isDefined && conf.domains.global.trustedSynchronizerConfig.isDefined),
             (),
             ConfigValidationFailed(
-              "Configuration error: `url` and `sequencerNames` cannot both be specified for the global domain."
+              "Configuration error: `url` and `trustedSynchronizerConfig` are mutually exclusive parameters."
+            ),
+          )
+          _ <- Either.cond(
+            conf.domains.global.trustedSynchronizerConfig.forall(c =>
+              c.svNames.length >= c.threshold
+            ),
+            (),
+            ConfigValidationFailed(
+              "Configuration error: Length of svNames should be greater than or equal to threshold."
             ),
           )
           _ <- Either.cond(
@@ -825,6 +841,9 @@ object SpliceConfig {
       deriveWriter[CircuitBreakerConfig]
     implicit val circuitBreakersConfig: ConfigWriter[CircuitBreakersConfig] =
       deriveWriter[CircuitBreakersConfig]
+    implicit val contractFetchLedgerFallbackConfigWriter
+        : ConfigWriter[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig] =
+      deriveWriter[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig]
     implicit val spliceParametersConfig: ConfigWriter[SpliceParametersConfig] =
       deriveWriter[SpliceParametersConfig]
 
@@ -1027,6 +1046,9 @@ object SpliceConfig {
       deriveWriter[ValidatorExtraSynchronizerConfig]
     implicit val validatorSynchronizerConfigWriter: ConfigWriter[ValidatorSynchronizerConfig] =
       deriveWriter[ValidatorSynchronizerConfig]
+    implicit val validatorTrustedSynchronizerConfigWriter
+        : ConfigWriter[ValidatorTrustedSynchronizerConfig] =
+      deriveWriter[ValidatorTrustedSynchronizerConfig]
     implicit val offsetDateTimeConfigurationWriter: ConfigWriter[java.time.OffsetDateTime] =
       implicitly[ConfigWriter[String]].contramap(_.toString)
     implicit val transferPreapprovalConfigWriter: ConfigWriter[TransferPreapprovalConfig] =

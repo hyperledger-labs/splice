@@ -329,6 +329,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -766,6 +773,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -1203,6 +1217,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -1640,6 +1661,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -2077,6 +2105,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -2540,6 +2575,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -2982,6 +3024,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -3424,6 +3473,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -3866,6 +3922,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -4308,6 +4371,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -4793,12 +4863,51 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
               ]
             }
           }
+        },
+        "appsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
         },
         "db": {
           "maxConnections": 1000,
@@ -4850,12 +4959,51 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
               ]
             }
           }
+        },
+        "appsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
         },
         "db": {
           "maxConnections": 1000,
@@ -4907,12 +5055,51 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
               ]
             }
           }
+        },
+        "appsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
         },
         "db": {
           "maxConnections": 1000,
@@ -4964,12 +5151,51 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
               ]
             }
           }
+        },
+        "appsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
         },
         "db": {
           "maxConnections": 1000,
@@ -5021,12 +5247,51 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
               ]
             }
           }
+        },
+        "appsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
         },
         "db": {
           "maxConnections": 1000,

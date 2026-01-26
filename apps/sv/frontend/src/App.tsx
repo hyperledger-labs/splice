@@ -21,7 +21,7 @@ import {
   createRoutesFromElements,
   useLocation,
   useNavigate,
-} from 'react-router-dom';
+} from 'react-router';
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers';

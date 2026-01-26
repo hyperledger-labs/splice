@@ -6,7 +6,10 @@ package org.lfdecentralizedtrust.splice.sv.store
 import cats.implicits.toTraverseOps
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedReward
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  UnclaimedDevelopmentFundCoupon,
+  UnclaimedReward,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules_MiningRound_Archive,
   AppTransferContext,
@@ -958,6 +961,21 @@ trait SvDsoStore
       .listContracts(splice.amulet.FeaturedAppActivityMarker.COMPANION, PageLimit.tryCreate(limit))
       .map(_.map(_.contract))
 
+  final def listUnclaimedDevelopmentFundCoupons(
+      limit: Limit
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[
+    UnclaimedDevelopmentFundCoupon.ContractId,
+    splice.amulet.UnclaimedDevelopmentFundCoupon,
+  ]]] =
+    for {
+      unclaimedDevelopmentFundCoupon <- multiDomainAcsStore.listContracts(
+        splice.amulet.UnclaimedDevelopmentFundCoupon.COMPANION,
+        limit = limit,
+      )
+    } yield unclaimedDevelopmentFundCoupon map (_.contract)
+
   /** Whether there are more than the given number of featured app activity markers. */
   def featuredAppActivityMarkerCountAboveOrEqualTo(threshold: Int)(implicit
       tc: TraceContext
@@ -1338,6 +1356,13 @@ object SvDsoStore {
           contract,
           conversionRateFeedPublisher =
             Some(PartyId.tryFromProtoPrimitive(contract.payload.publisher)),
+        )
+      },
+      mkFilter(splice.amulet.UnclaimedDevelopmentFundCoupon.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract
         )
       },
     )

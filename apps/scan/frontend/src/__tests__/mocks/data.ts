@@ -73,6 +73,7 @@ export function amuletRules(zeroTransferFees: boolean): any {
             featuredAppRewardCap: '100.0',
             validatorRewardCap: '0.2',
             optValidatorFaucetCap: '2.85',
+            optDevelopmentFundPercentage: '0.05',
           },
           futureValues: [
             {
@@ -87,6 +88,7 @@ export function amuletRules(zeroTransferFees: boolean): any {
                 featuredAppRewardCap: '100.0',
                 validatorRewardCap: '0.2',
                 optValidatorFaucetCap: '2.85',
+                optDevelopmentFundPercentage: '0.05',
               },
             },
             {
@@ -101,6 +103,7 @@ export function amuletRules(zeroTransferFees: boolean): any {
                 featuredAppRewardCap: '100.0',
                 validatorRewardCap: '0.2',
                 optValidatorFaucetCap: '2.85',
+                optDevelopmentFundPercentage: '0.05',
               },
             },
             {
@@ -115,6 +118,7 @@ export function amuletRules(zeroTransferFees: boolean): any {
                 featuredAppRewardCap: '100.0',
                 validatorRewardCap: '0.2',
                 optValidatorFaucetCap: '2.85',
+                optDevelopmentFundPercentage: '0.05',
               },
             },
             {
@@ -129,6 +133,7 @@ export function amuletRules(zeroTransferFees: boolean): any {
                 featuredAppRewardCap: '100.0',
                 validatorRewardCap: '0.2',
                 optValidatorFaucetCap: '2.85',
+                optDevelopmentFundPercentage: '0.05',
               },
             },
           ],
@@ -170,6 +175,7 @@ export function amuletRules(zeroTransferFees: boolean): any {
         },
         transferPreapprovalFee: null,
         featuredAppActivityMarkerAmount: null,
+        optDevelopmentFundManager: null,
       },
       futureValues: [],
     },

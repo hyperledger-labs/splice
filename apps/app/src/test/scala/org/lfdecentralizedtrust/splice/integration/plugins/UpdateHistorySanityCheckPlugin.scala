@@ -205,7 +205,6 @@ class UpdateHistorySanityCheckPlugin(
             "DEBUG",
             "--report-output",
             csvTempFile.toString,
-            "--scan-balance-assertions",
             "--stop-at-record-time",
             snapshotRecordTime.toInstant.toString,
             "--compare-acs-with-snapshot",

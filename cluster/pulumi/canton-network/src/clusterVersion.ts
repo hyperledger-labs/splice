@@ -5,8 +5,8 @@ import {
   activeVersion,
   CLUSTER_HOSTNAME,
   config,
-  exactNamespace,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { exactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common/src/namespace';
 import exec from 'node:child_process';
 
 export function installClusterVersion(): k8s.apiextensions.CustomResource {

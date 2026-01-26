@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { Box, Divider, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import dayjs from 'dayjs';
 import { DetailItem } from './DetailItem';
-import { PartyId } from '@lfdecentralizedtrust/splice-common-frontend';
+import { MemberIdentifier } from '../../beta';
 
 interface CreateUnallocatedUnclaimedActivityRecordSectionProps {
   beneficiary: string;
@@ -20,39 +20,47 @@ export const CreateUnallocatedUnclaimedActivityRecordSection: React.FC<
 
   return (
     <Box
-      sx={{ py: 1 }}
       id="proposal-details-unallocated-unclaimed-activity-record-section"
       data-testid="proposal-details-unallocated-unclaimed-activity-record-section"
+      sx={{ display: 'contents' }}
     >
-      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-        <PartyId partyId={beneficiary} id="proposal-details-beneficiary" />
-        <Divider sx={{ my: 1 }} />
+      <DetailItem
+        label="Beneficiary"
+        value={
+          <MemberIdentifier
+            partyId={beneficiary}
+            isYou={false}
+            size="large"
+            data-testid="proposal-details-beneficiary"
+          />
+        }
+      />
 
-        <DetailItem
-          label="Amount"
-          value={amount}
-          labelId="proposal-details-amount-label"
-          valueId="proposal-details-amount-value"
-        />
+      <DetailItem
+        label="Amount"
+        value={amount}
+        labelId="proposal-details-amount-label"
+        valueId="proposal-details-amount-value"
+      />
 
-        <Box sx={{ py: 1 }}>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            Must Mint Before
-          </Typography>
+      <DetailItem
+        label="Must Mint Before"
+        value={
+          <>
+            <Typography
+              variant="body1"
+              data-testid="proposal-details-must-mint-before-value"
+              gutterBottom
+            >
+              {dayjs(mintBefore).format(dateTimeFormatISO)}
+            </Typography>
 
-          <Typography
-            variant="body1"
-            data-testid="proposal-details-must-mint-before-value"
-            gutterBottom
-          >
-            {dayjs(mintBefore).format(dateTimeFormatISO)}
-          </Typography>
-
-          <Typography variant="body2" color="text.secondary">
-            {dayjs(mintBefore).fromNow()}
-          </Typography>
-        </Box>
-      </Box>
+            <Typography variant="body2" color="text.secondary">
+              {dayjs(mintBefore).fromNow()}
+            </Typography>
+          </>
+        }
+      />
     </Box>
   );
 };

@@ -12,6 +12,7 @@ const GkeClusterConfigSchema = z.object({
   nodePools: z.object({
     infra: GkeNodePoolConfigSchema,
     apps: GkeNodePoolConfigSchema,
+    hyperdiskApps: GkeNodePoolConfigSchema.optional(),
   }),
 });
 

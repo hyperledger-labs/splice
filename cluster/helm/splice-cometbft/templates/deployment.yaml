@@ -125,7 +125,7 @@ spec:
           # It is fine to use a persistent volume claim with a deployment instead of a stateful set,
           # since we are not going to scale this deployment.
           persistentVolumeClaim:
-            claimName: {{ include "prefix" (list $.Values "cometbft-data") }}
+            claimName: {{ $.Values.db.pvcName | default (include "prefix" (list $.Values "cometbft-data")) }}
       {{- with $.Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

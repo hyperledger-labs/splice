@@ -29,7 +29,6 @@ canton.participants.participant_$index = {
       acknowledgement-interval = 10m
       # Use a higher number of in flight batches to increase throughput
       maximum-in-flight-event-batches = 50
-      use-new-connection-pool = false
       enable-amplification-improvements = true
     }
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Loading } from '@lfdecentralizedtrust/splice-common-frontend';
 import React from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router';
 
 import { CloseRounded, DoneRounded } from '@mui/icons-material';
 import { Button, Stack, Typography } from '@mui/material';

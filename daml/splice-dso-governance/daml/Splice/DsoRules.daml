@@ -253,6 +253,12 @@ data DsoRules_ClaimExpiredRewardsResult = DsoRules_ClaimExpiredRewardsResult wit
 data DsoRules_MergeUnclaimedRewardsResult = DsoRules_MergeUnclaimedRewardsResult with
     unclaimedReward: ContractId UnclaimedReward
 
+data DsoRules_MergeUnclaimedDevelopmentFundCouponsResult = DsoRules_MergeUnclaimedDevelopmentFundCouponsResult with
+    result : AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult
+
+data DsoRules_ExpireDevelopmentFundCouponResult = DsoRules_ExpireDevelopmentFundCouponResult with
+    result : DevelopmentFundCoupon_DsoExpireResult
+
 data DsoRules_MiningRound_CloseResult = DsoRules_MiningRound_CloseResult with
     closedRound : ContractId ClosedMiningRound
 
@@ -1317,6 +1323,29 @@ template DsoRules with
         result <- exercise amuletRulesCid AmuletRules_MergeUnclaimedRewards with ..
         return DsoRules_MergeUnclaimedRewardsResult with
           unclaimedReward = result.unclaimedRewardCid
+
+    nonconsuming choice DsoRules_MergeUnclaimedDevelopmentFundCoupons : DsoRules_MergeUnclaimedDevelopmentFundCouponsResult
+      -- ^ Batch merge of of development fund coupons.
+      with
+        amuletRulesCid : ContractId AmuletRules
+        choiceArg : AmuletRules_MergeUnclaimedDevelopmentFundCoupons
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        result <- exercise amuletRulesCid choiceArg
+        return DsoRules_MergeUnclaimedDevelopmentFundCouponsResult with result
+
+    nonconsuming choice DsoRules_ExpireDevelopmentFundCoupon : DsoRules_ExpireDevelopmentFundCouponResult
+      -- ^ Expires a DevelopmentFundCoupon and produces an UnclaimedDevelopmentFundCoupon with the same amount.
+      with
+        developmentFundCouponCid : ContractId DevelopmentFundCoupon
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        result <- exercise developmentFundCouponCid DevelopmentFundCoupon_DsoExpire
+        pure $ DsoRules_ExpireDevelopmentFundCouponResult with result
 
     nonconsuming choice DsoRules_MiningRound_Close : DsoRules_MiningRound_CloseResult
       with

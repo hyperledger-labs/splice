@@ -90,7 +90,7 @@ class RewardExpiryIntegrationTest extends IntegrationTest with TriggerTestUtil {
     actAndCheck(
       "SV1 uploads the latest dso governance",
       sv1Backend.participantClient.dars.upload(
-        s"daml/dars/splice-dso-governance-${DarResources.dsoGovernance.bootstrap.metadata.version}.dar"
+        s"daml/dars/splice-dso-governance-${DarResources.dsoGovernance.latest.metadata.version}.dar"
       ),
     )(
       "SV1 has vetted the latest dso governance",
@@ -103,7 +103,7 @@ class RewardExpiryIntegrationTest extends IntegrationTest with TriggerTestUtil {
           .loneElement
           .item
           .packages
-          .map(_.packageId) should contain(DarResources.dsoGovernance.bootstrap.packageId),
+          .map(_.packageId) should contain(DarResources.dsoGovernance.latest.packageId),
     )
     actAndCheck("Advance by one tick", advanceRoundsByOneTickViaAutomation())(
       "Round 0 is closed",
@@ -121,7 +121,7 @@ class RewardExpiryIntegrationTest extends IntegrationTest with TriggerTestUtil {
           .data
           .round
           .number shouldBe 0
-        closedRound.getTemplateId.packageId shouldBe DarResources.amulet.bootstrap.packageId
+        closedRound.getTemplateId.packageId shouldBe DarResources.amulet.latest.packageId
       },
     )
     // Recreate AmuletRules in new package id.
@@ -140,8 +140,8 @@ class RewardExpiryIntegrationTest extends IntegrationTest with TriggerTestUtil {
       _ => {
         val amuletRules = sv1ScanBackend
           .getAmuletRules()
-        amuletRules.contract.identifier.getPackageId shouldBe DarResources.amulet.bootstrap.packageId
-        DarResources.amulet.bootstrap.packageId should not be initialAmuletPackage.packageId
+        amuletRules.contract.identifier.getPackageId shouldBe DarResources.amulet.latest.packageId
+        DarResources.amulet.latest.packageId should not be initialAmuletPackage.packageId
       },
     )
     aliceValidatorBackend.participantClient.ledger_api_extensions.acs

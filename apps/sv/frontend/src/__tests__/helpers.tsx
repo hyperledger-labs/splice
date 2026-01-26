@@ -11,7 +11,8 @@ import { replaceEqualDeep } from '@lfdecentralizedtrust/splice-common-frontend-u
 import { ThemeProvider } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, useNavigate } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router';
+import { Toaster } from 'sonner';
 import { expect } from 'vitest';
 import { SvAdminClientProvider } from '../contexts/SvAdminServiceContext';
 import { SvAppVotesHooksProvider } from '../contexts/SvAppVotesHooksContext';
@@ -56,6 +57,7 @@ export const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =
     <MemoryRouter>
       <SvConfigProvider>
         <WrapperProviders children={children} />
+        <Toaster richColors />
       </SvConfigProvider>
     </MemoryRouter>
   );

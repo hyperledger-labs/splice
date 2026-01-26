@@ -4,7 +4,7 @@ import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules'
 import { ContractId } from '@daml/types';
 import { East } from '@mui/icons-material';
 import { Alert, Box, Grid, Stack, Typography } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import { MemberIdentifier, PageSectionHeader } from '../../components/beta';
 import React from 'react';
 import dayjs from 'dayjs';
@@ -30,21 +30,26 @@ export const ActionRequiredSection: React.FC<ActionRequiredProps> = (
 ) => {
   const { actionRequiredRequests } = props;
 
+  // Sort by voting closes date ascending (closest deadline first)
+  const sortedRequests = actionRequiredRequests.toSorted((a, b) =>
+    dayjs(a.votingCloses).isBefore(dayjs(b.votingCloses)) ? -1 : 1
+  );
+
   return (
     <Box sx={{ mb: 4 }} data-testid="action-required-section">
       <PageSectionHeader
         title="Action Required"
-        badgeCount={actionRequiredRequests.length}
+        badgeCount={sortedRequests.length}
         data-testid="action-required"
       />
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mb: 3 }}>
-        {actionRequiredRequests.length === 0 ? (
+        {sortedRequests.length === 0 ? (
           <Alert severity="info" data-testid={'action-required-section-no-items'}>
             No Action Required items available
           </Alert>
         ) : (
-          actionRequiredRequests.map((ar, index) => (
+          sortedRequests.map((ar, index) => (
             <ActionCard
               key={index}
               action={ar.actionName}
@@ -75,7 +80,11 @@ const ActionCard = (props: ActionCardProps) => {
   const remainingTime = dayjs(votingEnds).fromNow(true);
 
   return (
-    <RouterLink to={`/governance-beta/proposals/${contractId}`} style={{ textDecoration: 'none' }}>
+    <RouterLink
+      to={`/governance-beta/proposals/${contractId}`}
+      style={{ textDecoration: 'none' }}
+      data-testid="action-required-card-link"
+    >
       <Box
         sx={{
           bgcolor: 'colors.neutral.10',
