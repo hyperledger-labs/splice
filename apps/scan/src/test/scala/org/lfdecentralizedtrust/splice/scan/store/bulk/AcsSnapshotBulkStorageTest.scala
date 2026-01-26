@@ -45,8 +45,9 @@ class AcsSnapshotBulkStorageTest
 
   val acsSnapshotSize = 48500
   val bulkStorageTestConfig = BulkStorageConfig(
-    1000,
-    50000L,
+    acsSnapshotPeriodHours = 3,
+    dbReadChunkSize = 1000,
+    maxFileSize = 50000L,
   )
 
   "AcsSnapshotBulkStorage" should {

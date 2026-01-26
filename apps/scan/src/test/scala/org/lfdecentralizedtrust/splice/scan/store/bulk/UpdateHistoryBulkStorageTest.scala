@@ -27,7 +27,8 @@ class UpdateHistoryBulkStorageTest
     with HasS3Mock {
   val maxFileSize = 30000L
   val bulkStorageTestConfig = BulkStorageConfig(
-    1000,
+    acsSnapshotPeriodHours = 3,
+    dbReadChunkSize = 1000,
     maxFileSize,
   )
 

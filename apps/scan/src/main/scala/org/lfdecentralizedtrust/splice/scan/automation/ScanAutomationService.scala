@@ -26,6 +26,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.scan.store.bulk.BulkStorageConfigs.bulkStorageConfigV1
 
 import scala.concurrent.ExecutionContextExecutor
 
@@ -97,7 +98,7 @@ class ScanAutomationService(
     new AcsSnapshotTrigger(
       snapshotStore,
       updateHistory,
-      config.acsSnapshotPeriodHours,
+      bulkStorageConfigV1.acsSnapshotPeriodHours,
       // The acs snapshot trigger should not attempt to backfill snapshots unless the backfilling
       // UpdateHistory is fully enabled and complete.
       config.updateHistoryBackfillEnabled && config.updateHistoryBackfillImportUpdatesEnabled,

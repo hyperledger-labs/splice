@@ -4,13 +4,15 @@
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 case class BulkStorageConfig(
+    acsSnapshotPeriodHours: Int,
     dbReadChunkSize: Int,
     maxFileSize: Long,
 )
 
 object BulkStorageConfigs {
   val bulkStorageConfigV1 = BulkStorageConfig(
-    1000,
-    64L * 1024 * 1024,
+    acsSnapshotPeriodHours = 3,
+    dbReadChunkSize = 1000,
+    maxFileSize = 64L * 1024 * 1024,
   )
 }
