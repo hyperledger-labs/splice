@@ -205,7 +205,7 @@ function createHealthCheckPolicy(
             httpHealthCheck: {
               // TODO (#2723) confirm Istio's default status port answers readyz
               port: 15021,
-              requestPath: '/readyz',
+              requestPath: '/healthz/ready',
             },
           },
         },
