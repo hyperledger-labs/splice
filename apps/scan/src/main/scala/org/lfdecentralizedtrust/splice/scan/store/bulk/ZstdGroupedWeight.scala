@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.github.luben.zstd.ZstdDirectBufferCompressingStreamNoFinalizer
-import io.netty.buffer.PooledByteBufAllocator
+import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator
 import org.apache.pekko.stream.{Attributes, FlowShape, Inlet, Outlet}
 import org.apache.pekko.stream.stage.{GraphStage, GraphStageLogic, InHandler, OutHandler}
 import org.apache.pekko.util.ByteString
