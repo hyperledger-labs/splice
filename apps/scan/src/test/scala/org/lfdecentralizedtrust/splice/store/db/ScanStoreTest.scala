@@ -1977,10 +1977,10 @@ class DbScanStoreTest
 
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
-      _ <-
-        if (!skipIngestAcs) {
-          store.multiDomainAcsStore.testIngestionSink
-            .ingestAcs(nextOffset(), Seq.empty, Seq.empty, Seq.empty)
+      _ <- initializeResult match {
+          case ResumeAtOffset(_) => Future.unit
+          case InitializeAcsAtLatestOffset => store.multiDomainAcsStore.testIngestionSink.ingestAcs(...)
+          case InitializeAcsAtOffset(_) => store.multiDomainAcsStore.testIngestionSink.ingestAcs(...)
         } else Future.unit
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(SynchronizerAlias.tryCreate(domain) -> dummyDomain)
