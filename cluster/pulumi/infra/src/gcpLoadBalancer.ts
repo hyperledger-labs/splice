@@ -3,7 +3,7 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CLUSTER_BASENAME, ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { Policy as SecurityPolicy } from './cloudArmor';
 
@@ -29,6 +29,7 @@ then normal up/apply should work
 // global vs regional:
 //   - the ingressAddress must match
 //   - the SecurityPolicy must match
+//   - the SSL policy must match
 const gcpGatewayClass = 'gke-l7-regional-external-managed';
 
 interface L7GatewayConfig {
@@ -318,13 +319,14 @@ function createHTTPRoute(config: L7GatewayConfig, gateway: k8s.apiextensions.Cus
  */
 function createSSLPolicy(
   config: L7GatewayConfig
-): gcp.compute.SSLPolicy {
-  const policyName = `${config.gatewayName}-ssl-policy`;
-  return new gcp.compute.SSLPolicy(
+): gcp.compute.RegionSslPolicy {
+  const policyName = `${config.gatewayName}-${CLUSTER_BASENAME}-ssl-policy`;
+  return new gcp.compute.RegionSslPolicy(
     policyName,
     {
       name: policyName,
       description: `SSL Policy for ${config.gatewayName} enforcing TLS 1.2+`,
+      region: config.ingressAddress.region,
       // https://docs.cloud.google.com/load-balancing/docs/ssl-policies-concepts#defining_an_ssl_policy
       profile: 'MODERN',
       minTlsVersion: 'TLS_1_2',
@@ -340,7 +342,7 @@ function createSSLPolicy(
 function attachTLSPolicyToGateway(
   config: L7GatewayConfig,
   gateway: k8s.apiextensions.CustomResource,
-  sslPolicy: gcp.compute.SSLPolicy
+  sslPolicy: gcp.compute.RegionSslPolicy
 ): k8s.apiextensions.CustomResource {
   const policyName = `${config.gatewayName}-ssl-policy-attachment`;
   return new k8s.apiextensions.CustomResource(
