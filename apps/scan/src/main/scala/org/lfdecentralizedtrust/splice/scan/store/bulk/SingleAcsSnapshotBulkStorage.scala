@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.duration.FiniteDuration
 import Position.*
 import org.apache.pekko.{Done, NotUsed}
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 
 object Position {
   sealed trait Position
@@ -38,12 +39,12 @@ object Position {
 }
 
 class SingleAcsSnapshotBulkStorage(
-    val migrationId: Long,
-    val timestamp: CantonTimestamp,
-    val config: BulkStorageConfig,
-    val acsSnapshotStore: AcsSnapshotStore,
-    val s3Connection: S3BucketConnection,
-    override val loggerFactory: NamedLoggerFactory,
+                                    val migrationId: Long,
+                                    val timestamp: CantonTimestamp,
+                                    val config: ScanStorageConfig,
+                                    val acsSnapshotStore: AcsSnapshotStore,
+                                    val s3Connection: S3BucketConnection,
+                                    override val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
@@ -57,7 +58,7 @@ class SingleAcsSnapshotBulkStorage(
         migrationId,
         snapshot = timestamp,
         after,
-        HardLimit.tryCreate(config.dbReadChunkSize),
+        HardLimit.tryCreate(config.bulkDbReadChunkSize),
         Seq.empty,
         Seq.empty,
       )
@@ -83,7 +84,7 @@ class SingleAcsSnapshotBulkStorage(
         case Index(i) => getAcsSnapshotChunk(migrationId, timestamp, Some(i)).map(Some(_))
         case End => Future.successful(None)
       }
-      .via(ZstdGroupedWeight(config.maxFileSize))
+      .via(ZstdGroupedWeight(config.bulkMaxFileSize))
       // Add a buffer so that the next object continues accumulating while we write the previous one
       .buffer(
         1,
@@ -169,10 +170,10 @@ object SingleAcsSnapshotBulkStorage {
     * pair, to indicate the last successfully dumped snapshot.
     */
   def asFlow(
-      config: BulkStorageConfig,
-      acsSnapshotStore: AcsSnapshotStore,
-      s3Connection: S3BucketConnection,
-      loggerFactory: NamedLoggerFactory,
+              config: ScanStorageConfig,
+              acsSnapshotStore: AcsSnapshotStore,
+              s3Connection: S3BucketConnection,
+              loggerFactory: NamedLoggerFactory,
   )(implicit
       actorSystem: ActorSystem,
       tc: TraceContext,
@@ -193,12 +194,12 @@ object SingleAcsSnapshotBulkStorage {
   /** The same flow as a source, currently used only for unit testing.
     */
   def asSource(
-      migrationId: Long,
-      timestamp: CantonTimestamp,
-      config: BulkStorageConfig,
-      acsSnapshotStore: AcsSnapshotStore,
-      s3Connection: S3BucketConnection,
-      loggerFactory: NamedLoggerFactory,
+                migrationId: Long,
+                timestamp: CantonTimestamp,
+                config: ScanStorageConfig,
+                acsSnapshotStore: AcsSnapshotStore,
+                s3Connection: S3BucketConnection,
+                loggerFactory: NamedLoggerFactory,
   )(implicit
       actorSystem: ActorSystem,
       tc: TraceContext,

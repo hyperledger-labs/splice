@@ -9,12 +9,7 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{TransactionTreeUpdate, TreeUpdate}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.AcsSnapshot
-import org.lfdecentralizedtrust.splice.store.{
-  HistoryBackfilling,
-  PageLimit,
-  TreeUpdateWithMigrationId,
-  UpdateHistory,
-}
+import org.lfdecentralizedtrust.splice.store.{HistoryBackfilling, PageLimit, TreeUpdateWithMigrationId, UpdateHistory}
 import UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -24,6 +19,7 @@ import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j.event.Level
 
@@ -567,6 +563,11 @@ class AcsSnapshotTriggerTest
       updateHistoryBackfillEnabled: Boolean,
       val currentMigrationId: Long = 5L,
   ) {
+    final def storageConfig = ScanStorageConfig(
+      dbAcsSnapshotPeriodHours = 1,
+      0, // ignored in this test
+      0L // ignored in this test
+    )
     final def snapshotPeriodHours: Int = 1
 
     val clock = new SimClock(loggerFactory = loggerFactory)
@@ -633,7 +634,7 @@ class AcsSnapshotTriggerTest
     val trigger = new AcsSnapshotTrigger(
       store,
       updateHistory,
-      snapshotPeriodHours,
+      storageConfig,
       updateHistoryBackfillEnabled = updateHistoryBackfillEnabled,
       triggerContext,
     )

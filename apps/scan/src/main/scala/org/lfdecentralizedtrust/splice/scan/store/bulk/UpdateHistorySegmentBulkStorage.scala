@@ -19,18 +19,19 @@ import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.concurrent.{ExecutionContext, Future}
 import io.circe.syntax.*
 import org.apache.pekko.Done
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 
 import java.nio.charset.StandardCharsets
 
 class UpdateHistorySegmentBulkStorage(
-    val config: BulkStorageConfig,
-    val updateHistory: UpdateHistory,
-    val s3Connection: S3BucketConnection,
-    val fromMigrationId: Long,
-    val fromTimestamp: CantonTimestamp,
-    val toMigrationId: Long,
-    val toTimestamp: CantonTimestamp,
-    override val loggerFactory: NamedLoggerFactory,
+                                       val config: ScanStorageConfig,
+                                       val updateHistory: UpdateHistory,
+                                       val s3Connection: S3BucketConnection,
+                                       val fromMigrationId: Long,
+                                       val fromTimestamp: CantonTimestamp,
+                                       val toMigrationId: Long,
+                                       val toTimestamp: CantonTimestamp,
+                                       override val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
@@ -44,7 +45,7 @@ class UpdateHistorySegmentBulkStorage(
 
   val pipeline: Future[Done] = Source
     .fromPublisher(initStream)
-    .via(ZstdGroupedWeight(config.maxFileSize))
+    .via(ZstdGroupedWeight(config.bulkMaxFileSize))
     // Add a buffer so that the next object continues accumulating while we write the previous one
     .buffer(
       1,
@@ -111,12 +112,12 @@ class UpdateHistorySegmentBulkStorage(
         .fold(
           updateHistory.getUpdatesWithoutImportUpdates(
             Some((fromMigrationId, fromTimestamp)),
-            HardLimit.tryCreate(config.dbReadChunkSize),
+            HardLimit.tryCreate(config.bulkDbReadChunkSize),
           )
         )(after =>
           updateHistory.getUpdatesWithoutImportUpdates(
             Some((after._1, after._2)),
-            HardLimit.tryCreate(config.dbReadChunkSize),
+            HardLimit.tryCreate(config.bulkDbReadChunkSize),
           )
         )
 
@@ -125,12 +126,12 @@ class UpdateHistorySegmentBulkStorage(
           update.migrationId == toMigrationId && update.update.update.recordTime <= toTimestamp
       )
       _ <-
-        if (updatesInSegment.length < updates.length || updates.length == config.dbReadChunkSize) {
+        if (updatesInSegment.length < updates.length || updates.length == config.bulkDbReadChunkSize) {
           logger.debug(s"Adding ${updatesInSegment.length} updates to the queue")
           encodeAndOfferToQueue(updatesInSegment)
         } else {
           logger.debug(
-            s"Not enough updates yet (queried for ${config.dbReadChunkSize}, found ${updates.length}), nothing to do"
+            s"Not enough updates yet (queried for ${config.bulkDbReadChunkSize}, found ${updates.length}), nothing to do"
           )
           Future.successful(())
         }
@@ -138,7 +139,7 @@ class UpdateHistorySegmentBulkStorage(
       if (updatesInSegment.length < updates.length) {
         queue.complete()
         Result.Done
-      } else if (updatesInSegment.length < config.dbReadChunkSize) {
+      } else if (updatesInSegment.length < config.bulkDbReadChunkSize) {
         Result.NotReady
       } else {
         val last = updatesInSegment.lastOption.getOrElse(
