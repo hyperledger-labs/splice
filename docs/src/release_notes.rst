@@ -7,6 +7,11 @@
 
 .. release-notes:: upcoming
 
+  - Participant
+
+    - Improve performance of some queries that are used in participant pruning. The fix includes
+      a database migration which can take up to 2min but should be faster on most participants.
+
   - Scan
 
     - deprecated ``/v0/total-amulet-balance`` and ``/v0/wallet-balance`` endpoints have been removed in favor of using `/registry/metadata/v1/instruments/{instrumentId} <app_dev/token_standard/openapi/token_metadata.html#get--registry-metadata-v1-instruments-instrumentId>`_

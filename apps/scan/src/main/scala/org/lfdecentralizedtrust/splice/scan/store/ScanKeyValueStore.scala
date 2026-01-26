@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package org.lfdecentralizedtrust.splice.validator.store
+package org.lfdecentralizedtrust.splice.scan.store
 
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
@@ -13,10 +13,10 @@ import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 
 import scala.concurrent.{ExecutionContext, Future}
 
-object ValidatorInternalStore {
+object ScanKeyValueStore {
   def apply(
+      dsoParty: PartyId,
       participantId: ParticipantId,
-      validatorParty: PartyId,
       storage: DbStorage,
       loggerFactory: NamedLoggerFactory,
   )(implicit
@@ -27,12 +27,12 @@ object ValidatorInternalStore {
   ): Future[KeyValueStore] = {
     KeyValueStore(
       StoreDescriptor(
-        version = 2,
-        name = "DbValidatorInternalConfigStore",
-        party = validatorParty,
+        version = 1,
+        name = "ScanKeyValueStore",
+        party = dsoParty,
         participant = participantId,
         key = Map(
-          "validatorParty" -> validatorParty.toProtoPrimitive
+          "dsoParty" -> dsoParty.toProtoPrimitive
         ),
       ),
       storage,
