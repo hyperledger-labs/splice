@@ -13,7 +13,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.{Keep, Source}
 import org.apache.pekko.pattern.after
 import org.apache.pekko.stream.{KillSwitch, KillSwitches}
-import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
+import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
@@ -22,18 +22,20 @@ class AcsSnapshotBulkStorage(
     val config: BulkStorageConfig,
     val acsSnapshotStore: AcsSnapshotStore,
     val s3Connection: S3BucketConnection,
+    val kvProvider: ScanKeyValueProvider,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
   // TODO(#3429): persist progress (or conclude it from the S3 storage), and start from latest successfully dumped snapshot upon restart
-  private def getStartTimestamp: (Long, CantonTimestamp) = (0, CantonTimestamp.MinValue)
+  private def getStartTimestamp: Future[Option[(Long, CantonTimestamp)]] =
+    kvProvider.getLatestAcsSnapshotInBulkStorage().value
 
   // When new snapshot is not yet available, how long to wait for a new one.
   // TODO(#3429): make it longer for prod (so consider making it configurable/overridable for tests)
   private val snapshotPollingInterval = 5.seconds
 
-  private def getAcsSnapshotTimestampAfter(
+  private def getAcsSnapshotTimestampsAfter(
       startMigrationId: Long,
       startTimestamp: CantonTimestamp,
   ): Source[(Long, CantonTimestamp), NotUsed] = {
@@ -63,29 +65,46 @@ class AcsSnapshotBulkStorage(
       .collect { case Some((migrationId, timestamp)) => (migrationId, timestamp) }
   }
 
-  /** This is the main implementation of the pipeline. It is a Pekko Source that gets a `start` timestamp, and starts dumping to S3
-    *  all snapshots (strictly) after `start`. It is an infinite source that should never complete.
+  /**  This is the main implementation of the pipeline. It is a Pekko Source that reads a `start` timestamp
+    *   from the DB, and starts dumping to S3 all snapshots (strictly) after `start`. After every snapshot that
+    *   is successfully dumped, it persists to the DB its timestamp.
+    *   It is an infinite source that should never complete.
     */
-  private def mksrc(
-      start: (Long, CantonTimestamp)
-  ): Source[(Long, CantonTimestamp), (KillSwitch, Future[Done])] = start match {
-    case (startMigrationId, startAfterTimestamp) =>
-      logger.debug(
-        s"Starting ACS snapshot dump source, from migration $startMigrationId, timestamp $startAfterTimestamp"
-      )
-      val base =
-        getAcsSnapshotTimestampAfter(startMigrationId, startAfterTimestamp)
-          .via(
-            SingleAcsSnapshotBulkStorage.asFlow(
-              config,
-              acsSnapshotStore,
-              s3Connection,
-              loggerFactory,
+  private def mksrc(): Source[(Long, CantonTimestamp), (KillSwitch, Future[Done])] = {
+    val base =
+      Source
+        .future(getStartTimestamp)
+        .flatMapConcat {
+          case Some((startMigrationId, startAfterTimestamp)) =>
+            logger.info(
+              s"Latest dumped snapshot was from migration $startMigrationId, timestamp $startAfterTimestamp"
             )
+            getAcsSnapshotTimestampsAfter(startMigrationId, startAfterTimestamp)
+          case None =>
+            logger.info("Not dumped snapshots yet, starting from genesis")
+            getAcsSnapshotTimestampsAfter(0, CantonTimestamp.MinValue)
+        }
+        .via(
+          SingleAcsSnapshotBulkStorage.asFlow(
+            config,
+            acsSnapshotStore,
+            s3Connection,
+            loggerFactory,
           )
+        )
+        .mapAsync(1) { case (migrationId, timestamp) =>
+          for {
+            _ <- kvProvider.setLatestAcsSnapshotsInBulkStorage(migrationId, timestamp)
+          } yield {
+            logger.info(
+              s"Successfully completed dumping snapshots from migration $migrationId, timestamp $timestamp"
+            )
+            (migrationId, timestamp)
+          }
+        }
 
-      val withKs = base.viaMat(KillSwitches.single)(Keep.right)
-      withKs.watchTermination() { case (ks, done) => (ks: KillSwitch, done) }
+    val withKs = base.viaMat(KillSwitches.single)(Keep.right)
+    withKs.watchTermination() { case (ks, done) => (ks: KillSwitch, done) }
   }
 
   /**  wraps mksrc (where the main pipeline logic is implemented) in a retry loop, to retry upon failures.
@@ -96,19 +115,19 @@ class AcsSnapshotBulkStorage(
     //  to Pekko's built-in RestartSource (for now, it's convenient to use Canton's ability to track state via lastEmittedElement)
     // TODO(#3429): tweak the retry parameters here
     val delay = FiniteDuration(5, "seconds")
-    val policy = new RetrySourcePolicy[(Long, CantonTimestamp), (Long, CantonTimestamp)] {
+    val policy = new RetrySourcePolicy[Unit, (Long, CantonTimestamp)] {
       override def shouldRetry(
-          lastState: (Long, CantonTimestamp),
+          lastState: Unit,
           lastEmittedElement: Option[(Long, CantonTimestamp)],
           lastFailure: Option[Throwable],
-      ): Option[(scala.concurrent.duration.FiniteDuration, (Long, CantonTimestamp))] = {
+      ): Option[(scala.concurrent.duration.FiniteDuration, Unit)] = {
         lastFailure.map { t =>
           logger.warn(
             s"Writing ACS snapshot to bulk storage failed with : ${ErrorUtil
                 .messageWithStacktrace(t)}, will retry after delay of $delay from last successful timestamp $lastEmittedElement"
           )
           // Always retry (TODO(#3429): consider a max number of retries?)
-          delay -> lastEmittedElement.fold(lastState)(identity)
+          delay -> ()
         }
       }
     }
@@ -116,8 +135,8 @@ class AcsSnapshotBulkStorage(
     PekkoUtil
       .restartSource(
         name = "acs-snapshot-dump",
-        initial = getStartTimestamp,
-        mkSource = (start: (Long, CantonTimestamp)) => mksrc(start),
+        initial = (),
+        mkSource = (_: Unit) => mksrc(),
         policy = policy,
       )
 
