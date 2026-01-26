@@ -132,3 +132,14 @@ export interface ListSubscriptionRequestsResponse {
 export interface ListSubscriptionsResponse {
   subscriptionsList: WalletSubscription[];
 }
+
+export interface DevelopmentFundCoupon {
+  id: string;
+  createdAt: Date;
+  beneficiary: string;
+  amount: BigNumber;
+  expiresAt: Date;
+  reason: string;
+  status: 'active' | 'claimed' | 'expired' | 'withdrawn';
+  withdrawalReason?: string;
+}
