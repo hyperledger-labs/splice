@@ -379,7 +379,7 @@ Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-p
 
 To configure the validator app, please modify the file ``splice-node/examples/sv-helm/validator-values.yaml`` as follows:
 
-You need to configure how your validator connects to the network's ``scan`` services by defining a ``scanClient`` block in your ``validator-values.yaml``.
+You need to configure how your validator connects to the network's **scan** services by defining a ``scanClient`` block in your ``validator-values.yaml``.
 There are three modes of ``scanClient``:
 
 - ``bft``: (default mode) connects to all scans and validates via majority agreement.
@@ -401,7 +401,7 @@ For each scanClient type, replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you 
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. Note that this contact information will be publicly visible. If you do not want to share contact information, you can put an empty string.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
-You need to configure how your validator's participant connects to ``sequencers`` by defining a ``synchronizer`` config in your ``validator-values.yaml``.
+You need to configure how your validator's participant connects to **sequencers** by defining a ``synchronizer`` config in your ``validator-values.yaml``.
 ``synchronizer`` supports three modes of operation:
 
 - ``bft``:  (default mode) connects to all available sequencers and validates responses via majority agreement.

@@ -128,13 +128,12 @@
 
     - Expose ``/v0/holdings/summary`` endpoint from scan proxy.
 
-    - Add support for custom fault-tolerance configurations for ``scan`` and ``sequencer`` connections.
-      Please see :ref:`docs <helm-validator-install>` for details.
-      This is supported out of the box, only in the helm charts based deployment scripts.
-      New ``scanClient`` and ``synchronizer`` configs introduce a novel recommended way to configure the ``scan`` and ``sequencer`` connections.
+    - Add support for custom fault-tolerance configurations for **scan** and **sequencer** connections.
+      Please see the updated :ref:`documentation for Helm-based deployments <helm-validator-install>`.
+      This introduces the new configuration keys ``scanClient`` and ``synchronizer`` as the new recommended way to configure **scan** and **sequencer** connections.
       Existing configuration options ``scanAddress``, ``nonSvValidatorTrustSingleScan``, ``decentralizedSynchronizerUrl``, ``useSequencerConnectionsFromScan`` are still supported, but will be deprecated in a future release.
       We recommend to migrate to the new ``scanClient`` and ``synchronizer`` configuration options as soon as possible.
-      Check the updated :ref:`docs <helm-validator-install>` for more details.
+      Docker Compose-based deployments do not currently support the new custom configuration options.
 
 
 .. release-notes:: 0.5.6
