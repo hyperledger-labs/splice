@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.util.*
@@ -367,7 +368,7 @@ class ScanTimeBasedIntegrationTest
 
     advanceTime(
       java.time.Duration
-        .ofHours(sv1ScanBackend.config.acsSnapshotPeriodHours.toLong)
+        .ofHours(scanStorageConfigV1.dbAcsSnapshotPeriodHours.toLong)
         .plusSeconds(1L)
     )
 
@@ -390,7 +391,7 @@ class ScanTimeBasedIntegrationTest
 
     advanceTime(
       java.time.Duration
-        .ofHours(sv1ScanBackend.config.acsSnapshotPeriodHours.toLong)
+        .ofHours(scanStorageConfigV1.dbAcsSnapshotPeriodHours.toLong)
         .plusSeconds(1L)
     )
 

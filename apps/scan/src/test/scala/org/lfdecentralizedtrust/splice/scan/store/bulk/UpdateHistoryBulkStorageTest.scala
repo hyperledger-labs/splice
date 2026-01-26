@@ -9,6 +9,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.store.*
 import org.scalatest.concurrent.PatienceConfiguration
@@ -26,8 +27,9 @@ class UpdateHistoryBulkStorageTest
     with HasActorSystem
     with HasS3Mock {
   val maxFileSize = 30000L
-  val bulkStorageTestConfig = BulkStorageConfig(
-    1000,
+  val bulkStorageTestConfig = ScanStorageConfig(
+    dbAcsSnapshotPeriodHours = 3,
+    bulkDbReadChunkSize = 1000,
     maxFileSize,
   )
 

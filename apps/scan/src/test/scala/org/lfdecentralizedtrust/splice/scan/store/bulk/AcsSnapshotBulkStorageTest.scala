@@ -11,9 +11,10 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import org.apache.pekko.stream.scaladsl.{Sink, Keep}
+import org.apache.pekko.stream.scaladsl.{Keep, Sink}
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import org.lfdecentralizedtrust.splice.scan.store.{
   AcsSnapshotStore,
   ScanKeyValueProvider,
@@ -44,9 +45,10 @@ class AcsSnapshotBulkStorageTest
     with SplicePostgresTest {
 
   val acsSnapshotSize = 48500
-  val bulkStorageTestConfig = BulkStorageConfig(
-    1000,
-    50000L,
+  val bulkStorageTestConfig = ScanStorageConfig(
+    dbAcsSnapshotPeriodHours = 3,
+    bulkDbReadChunkSize = 1000,
+    bulkMaxFileSize = 50000L,
   )
 
   "AcsSnapshotBulkStorage" should {
