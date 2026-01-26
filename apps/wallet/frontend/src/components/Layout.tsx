@@ -7,6 +7,7 @@ import { Box, Divider, Stack } from '@mui/material';
 import Container from '@mui/material/Container';
 
 import { useWalletConfig } from '../utils/config';
+import { useIsDevelopmentFundManager } from '../hooks/useIsDevelopmentFundManager';
 import CurrentUser from './CurrentUser';
 import FeaturedAppRight from './FeaturedAppRight';
 import Hero from './Hero';
@@ -19,18 +20,23 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   const config = useWalletConfig();
+  const isDevelopmentFundManager = useIsDevelopmentFundManager();
+  
+  const navLinks = [
+    { name: 'Transactions', path: 'transactions' },
+    { name: 'Transfer', path: 'transfer' },
+    { name: 'Allocations', path: 'allocations' },
+    ...(isDevelopmentFundManager ? [{ name: 'Development Fund', path: 'development-fund' }] : []),
+    { name: 'Subscriptions', path: 'subscriptions' },
+    { name: 'FAQs', path: 'faqs' },
+  ];
+  
   return (
     <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
       <Container maxWidth="xl">
         <Header
           title={config.spliceInstanceNames.amuletName + ' Wallet'}
-          navLinks={[
-            { name: 'Transactions', path: 'transactions' },
-            { name: 'Transfer', path: 'transfer' },
-            { name: 'Allocations', path: 'allocations' },
-            { name: 'Subscriptions', path: 'subscriptions' },
-            { name: 'FAQs', path: 'faqs' },
-          ]}
+          navLinks={navLinks}
         >
           <Stack direction="row" alignItems="center" spacing={1} paddingLeft={1}>
             <CurrentUser key="current-user" />
