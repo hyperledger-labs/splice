@@ -317,21 +317,17 @@ function createHTTPRoute(config: L7GatewayConfig, gateway: k8s.apiextensions.Cus
  * Creates a GCP SSL Policy that enforces TLS 1.2+
  * https://www.pulumi.com/registry/packages/gcp/api-docs/compute/sslpolicy/
  */
-function createSSLPolicy(
-  config: L7GatewayConfig
-): gcp.compute.RegionSslPolicy {
+function createSSLPolicy(config: L7GatewayConfig): gcp.compute.RegionSslPolicy {
   const policyName = `${config.gatewayName}-${CLUSTER_BASENAME}-ssl-policy`;
-  return new gcp.compute.RegionSslPolicy(
-    policyName,
-    {
-      name: policyName,
-      description: `SSL Policy for ${config.gatewayName} enforcing TLS 1.2+`,
-      region: config.ingressAddress.region,
-      // https://docs.cloud.google.com/load-balancing/docs/ssl-policies-concepts#defining_an_ssl_policy
-      profile: 'MODERN',
-      minTlsVersion: 'TLS_1_2',
-    }
-  );
+  return new gcp.compute.RegionSslPolicy(policyName, {
+    name: policyName,
+    description: `SSL Policy for ${config.gatewayName} enforcing TLS 1.2+`,
+    // use gcp.compute.SSLPolicy for global
+    region: config.ingressAddress.region,
+    // https://docs.cloud.google.com/load-balancing/docs/ssl-policies-concepts#defining_an_ssl_policy
+    profile: 'RESTRICTED',
+    minTlsVersion: 'TLS_1_2',
+  });
 }
 
 /**
@@ -366,7 +362,12 @@ function attachTLSPolicyToGateway(
         },
       },
     },
-    { parent: gateway, dependsOn: [sslPolicy] }
+    {
+      parent: gateway,
+      dependsOn: [sslPolicy],
+      replaceOnChanges: ['spec.default.sslPolicy'],
+      deleteBeforeReplace: true,
+    }
   );
 }
 
