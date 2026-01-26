@@ -146,7 +146,7 @@ function backendTargetRef(config: L7GatewayConfig): BackendTargetRef {
 /**
  * Creates a GCPBackendPolicy for Cloud Armor integration
  */
-function createGCPBackendPolicy(
+function attachCloudArmorToLBBackend(
   config: L7GatewayConfig,
   gateway: k8s.apiextensions.CustomResource
 ): k8s.apiextensions.CustomResource {
@@ -313,6 +313,45 @@ function createHTTPRoute(config: L7GatewayConfig, gateway: k8s.apiextensions.Cus
 }
 
 /**
+ * Create a GCPGatewayPolicy to configure TLS settings
+ * Disables TLS 1.0 and 1.1, requiring TLS 1.2 or higher
+ * https://docs.cloud.google.com/kubernetes-engine/docs/how-to/configure-gateway-resources#configure_ssl_policies
+ */
+function attachTLSPolicyToGateway(
+  config: L7GatewayConfig,
+  gateway: k8s.apiextensions.CustomResource
+): k8s.apiextensions.CustomResource {
+  const policyName = `${config.gatewayName}-tls-policy`;
+  return new k8s.apiextensions.CustomResource(
+    policyName,
+    {
+      apiVersion: 'networking.gke.io/v1',
+      kind: 'GCPGatewayPolicy',
+      metadata: {
+        name: policyName,
+        namespace: config.ingressNs.ns.metadata.name,
+      },
+      spec: {
+        default: {
+          sslPolicy: {
+            // https://docs.cloud.google.com/load-balancing/docs/ssl-policies-concepts#defining_an_ssl_policy
+            type: 'MODERN',
+            minTlsVersion: 'TLS_1_2',
+          },
+        },
+        targetRef: {
+          group: 'gateway.networking.k8s.io',
+          kind: 'Gateway',
+          name: config.gatewayName,
+          namespace: config.ingressNs.ns.metadata.name,
+        },
+      },
+    },
+    { parent: gateway }
+  );
+}
+
+/**
  * Configures a complete GKE L7 Gateway with optional Cloud Armor integration
  */
 export function configureGKEL7Gateway(config: L7GatewayConfig): {
@@ -320,9 +359,11 @@ export function configureGKEL7Gateway(config: L7GatewayConfig): {
 } {
   const gateway = createL7Gateway(config);
 
-  createGCPBackendPolicy(config, gateway);
+  attachCloudArmorToLBBackend(config, gateway);
 
   createHealthCheckPolicy(config, gateway);
+
+  attachTLSPolicyToGateway(config, gateway);
 
   createHTTPRoute(config, gateway);
 
