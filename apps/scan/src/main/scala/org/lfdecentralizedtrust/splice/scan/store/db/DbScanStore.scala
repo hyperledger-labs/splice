@@ -112,7 +112,7 @@ class DbScanStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
-        version = 3,
+        version = 4,
         name = "DbScanStore",
         party = key.dsoParty,
         participant = participantId,
