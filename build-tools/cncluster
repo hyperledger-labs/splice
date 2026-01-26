@@ -1469,7 +1469,7 @@ subcommand_whitelist[debug_shell]='Spin up a debug container on the cluster, and
 function subcmd_debug_shell() {
   _cluster_must_exist
 
-  VERSION_NUMBER=${OVERRIDE_VERSION:-$(yq ".synchronizerMigration.active.version" < config.yaml)}
+  VERSION_NUMBER=${OVERRIDE_VERSION:-$("${SPLICE_ROOT}/cluster/scripts/get-resolved-config.sh" | yq ".synchronizerMigration.active.version")}
   if [ -z "$VERSION_NUMBER" ] || [ "$VERSION_NUMBER" = "null" ]; then
     VERSION_NUMBER=$(get-snapshot-version)
   fi
