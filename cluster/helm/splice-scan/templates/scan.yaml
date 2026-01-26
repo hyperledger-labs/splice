@@ -99,6 +99,16 @@ spec:
               ]
             }
         {{- end }}
+        {{- with .Values.persistence.acsStoreDescriptorUserVersion }}
+        - name: ADDITIONAL_CONFIG_ACS_STORE_DESCRIPTOR_USER_VERSION
+          value: |
+            canton.scan-apps.scan-app.acs-store-descriptor-user-version = {{ . }}
+        {{- end }}
+        {{- with .Values.persistence.txLogStoreDescriptorUserVersion }}
+        - name: ADDITIONAL_CONFIG_TX_LOG_STORE_DESCRIPTOR_USER_VERSION
+          value: |
+            canton.scan-apps.scan-app.tx-log-store-descriptor-user-version = {{ . }}
+        {{- end }}
         {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "scan" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         - name: SPLICE_APP_SCAN_PARTICIPANT_ADDRESS
           value: {{ .Values.participantAddress | quote }}

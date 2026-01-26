@@ -846,4 +846,3 @@ A subsequent re-ingestion can be triggered by incrementing the value, as shown i
       # Example to trigger re-ingestion of the TxLog store for the second time
       persistence:
         txLogStoreDescriptorUserVersion: 2
- 
