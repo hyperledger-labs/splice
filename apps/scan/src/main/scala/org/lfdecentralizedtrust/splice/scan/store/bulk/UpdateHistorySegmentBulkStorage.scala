@@ -24,14 +24,14 @@ import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import java.nio.charset.StandardCharsets
 
 class UpdateHistorySegmentBulkStorage(
-                                       val config: ScanStorageConfig,
-                                       val updateHistory: UpdateHistory,
-                                       val s3Connection: S3BucketConnection,
-                                       val fromMigrationId: Long,
-                                       val fromTimestamp: CantonTimestamp,
-                                       val toMigrationId: Long,
-                                       val toTimestamp: CantonTimestamp,
-                                       override val loggerFactory: NamedLoggerFactory,
+    val config: ScanStorageConfig,
+    val updateHistory: UpdateHistory,
+    val s3Connection: S3BucketConnection,
+    val fromMigrationId: Long,
+    val fromTimestamp: CantonTimestamp,
+    val toMigrationId: Long,
+    val toTimestamp: CantonTimestamp,
+    override val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
@@ -126,7 +126,9 @@ class UpdateHistorySegmentBulkStorage(
           update.migrationId == toMigrationId && update.update.update.recordTime <= toTimestamp
       )
       _ <-
-        if (updatesInSegment.length < updates.length || updates.length == config.bulkDbReadChunkSize) {
+        if (
+          updatesInSegment.length < updates.length || updates.length == config.bulkDbReadChunkSize
+        ) {
           logger.debug(s"Adding ${updatesInSegment.length} updates to the queue")
           encodeAndOfferToQueue(updatesInSegment)
         } else {

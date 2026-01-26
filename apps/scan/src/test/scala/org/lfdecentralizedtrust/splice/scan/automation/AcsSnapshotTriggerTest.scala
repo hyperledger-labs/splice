@@ -9,7 +9,12 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{TransactionTreeUpdate, TreeUpdate}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.AcsSnapshot
-import org.lfdecentralizedtrust.splice.store.{HistoryBackfilling, PageLimit, TreeUpdateWithMigrationId, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HistoryBackfilling,
+  PageLimit,
+  TreeUpdateWithMigrationId,
+  UpdateHistory,
+}
 import UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -566,7 +571,7 @@ class AcsSnapshotTriggerTest
     final def storageConfig = ScanStorageConfig(
       dbAcsSnapshotPeriodHours = 1,
       0, // ignored in this test
-      0L // ignored in this test
+      0L, // ignored in this test
     )
     final def snapshotPeriodHours: Int = 1
 

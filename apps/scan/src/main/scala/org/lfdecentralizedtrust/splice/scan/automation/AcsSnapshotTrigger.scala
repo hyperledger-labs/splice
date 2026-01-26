@@ -201,7 +201,11 @@ class AcsSnapshotTrigger(
           Future.successful(
             Some(
               AcsSnapshotTrigger
-                .Task(storageConfig.nextSnapshotTime(snapshot), migrationIdToBackfill, Some(snapshot))
+                .Task(
+                  storageConfig.nextSnapshotTime(snapshot),
+                  migrationIdToBackfill,
+                  Some(snapshot),
+                )
             )
           )
         case None if !migrationLastedLongEnough =>
@@ -266,7 +270,11 @@ class AcsSnapshotTrigger(
           val firstNonAcsImportRecordTime = firstNonAcsImport.update.update.recordTime
           Some(
             AcsSnapshotTrigger
-              .Task(storageConfig.computeSnapshotTimeAfter(firstNonAcsImportRecordTime), migrationId, None)
+              .Task(
+                storageConfig.computeSnapshotTimeAfter(firstNonAcsImportRecordTime),
+                migrationId,
+                None,
+              )
           )
       }
   }

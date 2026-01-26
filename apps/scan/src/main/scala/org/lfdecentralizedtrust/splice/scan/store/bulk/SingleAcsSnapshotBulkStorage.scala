@@ -39,12 +39,12 @@ object Position {
 }
 
 class SingleAcsSnapshotBulkStorage(
-                                    val migrationId: Long,
-                                    val timestamp: CantonTimestamp,
-                                    val config: ScanStorageConfig,
-                                    val acsSnapshotStore: AcsSnapshotStore,
-                                    val s3Connection: S3BucketConnection,
-                                    override val loggerFactory: NamedLoggerFactory,
+    val migrationId: Long,
+    val timestamp: CantonTimestamp,
+    val config: ScanStorageConfig,
+    val acsSnapshotStore: AcsSnapshotStore,
+    val s3Connection: S3BucketConnection,
+    override val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
@@ -170,10 +170,10 @@ object SingleAcsSnapshotBulkStorage {
     * pair, to indicate the last successfully dumped snapshot.
     */
   def asFlow(
-              config: ScanStorageConfig,
-              acsSnapshotStore: AcsSnapshotStore,
-              s3Connection: S3BucketConnection,
-              loggerFactory: NamedLoggerFactory,
+      config: ScanStorageConfig,
+      acsSnapshotStore: AcsSnapshotStore,
+      s3Connection: S3BucketConnection,
+      loggerFactory: NamedLoggerFactory,
   )(implicit
       actorSystem: ActorSystem,
       tc: TraceContext,
@@ -194,12 +194,12 @@ object SingleAcsSnapshotBulkStorage {
   /** The same flow as a source, currently used only for unit testing.
     */
   def asSource(
-                migrationId: Long,
-                timestamp: CantonTimestamp,
-                config: ScanStorageConfig,
-                acsSnapshotStore: AcsSnapshotStore,
-                s3Connection: S3BucketConnection,
-                loggerFactory: NamedLoggerFactory,
+      migrationId: Long,
+      timestamp: CantonTimestamp,
+      config: ScanStorageConfig,
+      acsSnapshotStore: AcsSnapshotStore,
+      s3Connection: S3BucketConnection,
+      loggerFactory: NamedLoggerFactory,
   )(implicit
       actorSystem: ActorSystem,
       tc: TraceContext,

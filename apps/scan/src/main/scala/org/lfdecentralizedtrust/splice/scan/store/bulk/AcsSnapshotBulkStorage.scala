@@ -18,11 +18,11 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 
 class AcsSnapshotBulkStorage(
-                              val config: ScanStorageConfig,
-                              val acsSnapshotStore: AcsSnapshotStore,
-                              val s3Connection: S3BucketConnection,
-                              val kvProvider: ScanKeyValueProvider,
-                              override val loggerFactory: NamedLoggerFactory,
+    val config: ScanStorageConfig,
+    val acsSnapshotStore: AcsSnapshotStore,
+    val s3Connection: S3BucketConnection,
+    val kvProvider: ScanKeyValueProvider,
+    override val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
