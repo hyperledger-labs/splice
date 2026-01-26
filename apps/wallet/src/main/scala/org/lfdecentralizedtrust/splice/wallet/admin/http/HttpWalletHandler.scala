@@ -1333,7 +1333,7 @@ class HttpWalletHandler(
           unclaimedDevelopmentFundCoupons,
           amount,
         ).getOrElse(
-          throw Status.Code.INVALID_ARGUMENT.toStatus
+          throw Status.Code.PRECONDITION_FAILED.toStatus
             .withDescription(
               s"The total amount of unclaimed development coupons is insufficient to cover the amount requested"
             )
