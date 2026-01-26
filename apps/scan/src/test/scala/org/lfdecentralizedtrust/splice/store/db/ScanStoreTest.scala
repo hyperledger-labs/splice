@@ -6,7 +6,6 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
@@ -23,7 +22,12 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer as decentralizedsynchronizerCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules, Reason, Vote}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  DsoRules,
+  Reason,
+  Vote,
+  VoteRequest,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.FaucetState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
@@ -59,7 +63,11 @@ import scala.jdk.OptionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.reflect.ClassTag
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
-import org.slf4j.event.Level
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart.{
+  InitializeAcsAtLatestOffset,
+  InitializeAcsAtOffset,
+  ResumeAtOffset,
+}
 
 abstract class ScanStoreTest
     extends StoreTest
@@ -815,7 +823,8 @@ abstract class ScanStoreTest
 
         "list all past VoteRequestResult" in {
           val store = mkStore().futureValue
-          assertListOfAllPastVoteRequestResults(store)
+          val voteRequestContracts = mkVoteRequests()
+          assertListOfAllPastVoteRequestResults(voteRequestContracts, store)
         }
       }
 
@@ -1381,8 +1390,7 @@ abstract class ScanStoreTest
       }
     }
   }
-
-  def assertListOfAllPastVoteRequestResults(store: ScanStore) = {
+  def mkVoteRequests(): Vector[Contract[VoteRequest.ContractId, VoteRequest]] = {
     val voteRequestContract1 = voteRequest(
       requester = userParty(1),
       votes = (1 to 4)
@@ -1395,6 +1403,26 @@ abstract class ScanStoreTest
           )
         ),
     )
+    val voteRequestContract2 = voteRequest(
+      requester = userParty(2),
+      votes = (1 to 4)
+        .map(n =>
+          new Vote(
+            userParty(n).toProtoPrimitive,
+            true,
+            new Reason("", ""),
+            Optional.empty(),
+          )
+        ),
+    )
+    Vector(voteRequestContract1, voteRequestContract2)
+  }
+  def assertListOfAllPastVoteRequestResults(
+      voteRequestContracts: Vector[Contract[VoteRequest.ContractId, VoteRequest]],
+      store: ScanStore,
+  ) = {
+    val voteRequestContract1 = voteRequestContracts(0)
+    val voteRequestContract2 = voteRequestContracts(1)
 
     for {
       _ <- dummyDomain.create(voteRequestContract1)(store.multiDomainAcsStore)
@@ -1411,18 +1439,6 @@ abstract class ScanStoreTest
         result1.toValue,
       )(
         store.multiDomainAcsStore
-      )
-      voteRequestContract2 = voteRequest(
-        requester = userParty(2),
-        votes = (1 to 4)
-          .map(n =>
-            new Vote(
-              userParty(n).toProtoPrimitive,
-              true,
-              new Reason("", ""),
-              Optional.empty(),
-            )
-          ),
       )
       _ <- dummyDomain.create(voteRequestContract2)(store.multiDomainAcsStore)
       result2 = mkVoteRequestResult(
@@ -1508,7 +1524,6 @@ abstract class ScanStoreTest
       dsoParty: PartyId = dsoParty,
       acsStoreDescriptorUserVersion: Option[Long] = None,
       txLogStoreDescriptorUserVersion: Option[Long] = None,
-      skipIngestAcs: Boolean = false,
   ): Future[ScanStore]
 
   protected def mkUpdateHistory(
@@ -1936,7 +1951,6 @@ class DbScanStoreTest
       dsoParty: PartyId,
       acsStoreDescriptorUserVersion: Option[Long] = None,
       txLogStoreDescriptorUserVersion: Option[Long] = None,
-      skipIngestAcs: Boolean = false,
   ): Future[ScanStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
@@ -1976,12 +1990,24 @@ class DbScanStoreTest
     )(parallelExecutionContext, implicitly, implicitly)
 
     for {
-      _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
+      initializeResult <- store.multiDomainAcsStore.testIngestionSink.initialize()
       _ <- initializeResult match {
-          case ResumeAtOffset(_) => Future.unit
-          case InitializeAcsAtLatestOffset => store.multiDomainAcsStore.testIngestionSink.ingestAcs(...)
-          case InitializeAcsAtOffset(_) => store.multiDomainAcsStore.testIngestionSink.ingestAcs(...)
-        } else Future.unit
+        case ResumeAtOffset(_) => Future.unit
+        case InitializeAcsAtLatestOffset =>
+          store.multiDomainAcsStore.testIngestionSink.ingestAcs(
+            nextOffset(),
+            Seq.empty,
+            Seq.empty,
+            Seq.empty,
+          )
+        case InitializeAcsAtOffset(_) =>
+          store.multiDomainAcsStore.testIngestionSink.ingestAcs(
+            nextOffset(),
+            Seq.empty,
+            Seq.empty,
+            Seq.empty,
+          )
+      }
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(SynchronizerAlias.tryCreate(domain) -> dummyDomain)
       )
@@ -2119,30 +2145,27 @@ class DbScanStoreTest
 
   "Changing the txLogStoreDescriptorUserVersion" should {
     "force re-ingestion of txLog" in {
+      val activeVoteRequest = voteRequest(
+        requester = userParty(4),
+        votes = (1 to 4)
+          .map(n =>
+            new Vote(
+              userParty(n).toProtoPrimitive,
+              true,
+              new Reason("", ""),
+              Optional.empty(),
+            )
+          ),
+      )
       for {
         store <- mkStore()
-        _ <- assertListOfAllPastVoteRequestResults(store)
-        // create the store with a new txLogStoreDescriptorUserVersion and check that it logs that TxLog backfilling will start restoring previous entries
-        storeReingest <- loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.INFO))(
-          {
-            mkStore(
-              dsoParty = dsoParty,
-              txLogStoreDescriptorUserVersion = Some(1L),
-              // not calling ingestAcs in this test code cause that fails because finishedAcsIngestion completing when it identifies
-              // that StoreHasData(acsStoreId, acsOffset) and StoreHasNoData(txLogStoreId)
-              skipIngestAcs = true,
-            )
-          },
-          lines => {
-            forAll(lines) { line =>
-              line.message should include(
-                s"has not ingested any data, presumably because it was reset."
-              )
-              line.message should include(
-                "TxLog backfilling will start restoring previous entries."
-              )
-            }
-          },
+        voteRequestContracts = mkVoteRequests() :+ activeVoteRequest
+        _ <- assertListOfAllPastVoteRequestResults(voteRequestContracts, store)
+        _ <- dummyDomain.create(activeVoteRequest)(store.multiDomainAcsStore)
+        // create the store with a new txLogStoreDescriptorUserVersion and check that it has acs entries but no txLog entries of the previous store
+        storeReingest <- mkStore(
+          dsoParty = dsoParty,
+          txLogStoreDescriptorUserVersion = Some(1L),
         )
       } yield {
         // new store should not have txLog entry from previous store
@@ -2157,6 +2180,8 @@ class DbScanStoreTest
           )
           .futureValue
           .toList should have size 0
+        // should have the acs entry
+        storeReingest.listVoteRequests().futureValue.toList should contain(activeVoteRequest)
       }
     }
   }
