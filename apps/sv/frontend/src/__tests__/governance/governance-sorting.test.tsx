@@ -18,6 +18,7 @@ describe('Governance Page Sorting', () => {
       const unsortedRequests: ActionRequiredData[] = [
         {
           actionName: 'Action C - Latest',
+          description: 'Test description',
           contractId: 'c' as ContractId<VoteRequest>,
           votingCloses: '2025-01-25 12:00',
           createdAt: '2025-01-10 12:00',
@@ -25,6 +26,7 @@ describe('Governance Page Sorting', () => {
         },
         {
           actionName: 'Action A - Earliest',
+          description: 'Test description',
           contractId: 'a' as ContractId<VoteRequest>,
           votingCloses: '2025-01-15 10:00',
           createdAt: '2025-01-10 12:00',
@@ -32,6 +34,7 @@ describe('Governance Page Sorting', () => {
         },
         {
           actionName: 'Action B - Middle',
+          description: 'Test description',
           contractId: 'b' as ContractId<VoteRequest>,
           votingCloses: '2025-01-15 18:00',
           createdAt: '2025-01-10 12:00',
@@ -120,7 +123,6 @@ describe('Governance Page Sorting', () => {
             noDataMessage="No data"
             uniqueId="inflight-votes"
             showVoteStats
-            showAcceptanceThreshold
             showThresholdDeadline
             sortOrder="effectiveAtAsc"
           />
@@ -194,7 +196,6 @@ describe('Governance Page Sorting', () => {
             uniqueId="vote-history"
             showStatus
             showVoteStats
-            showAcceptanceThreshold
             sortOrder="effectiveAtDesc"
           />
         </MemoryRouter>
