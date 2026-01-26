@@ -48,7 +48,7 @@ class AcsSnapshotBulkStorageTest
   val acsSnapshotSize = 48500
   val bulkStorageTestConfig = ScanStorageConfig(
     dbAcsSnapshotPeriodHours = 3,
-    bulkAcsSnapshotPeriodHours = 24, // FIXME: improve the test, to test this
+    bulkAcsSnapshotPeriodHours = 24,
     bulkDbReadChunkSize = 1000,
     bulkMaxFileSize = 50000L,
   )
