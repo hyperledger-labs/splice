@@ -26,7 +26,6 @@ class AcsSnapshotBulkStorage(
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
-  // TODO(#3429): persist progress (or conclude it from the S3 storage), and start from latest successfully dumped snapshot upon restart
   private def getStartTimestamp: Future[Option[(Long, CantonTimestamp)]] =
     kvProvider.getLatestAcsSnapshotInBulkStorage().value
 
@@ -79,8 +78,19 @@ class AcsSnapshotBulkStorage(
           )
           getAcsSnapshotTimestampsAfter(startMigrationId, startAfterTimestamp)
         case None =>
-          logger.info("Not dumped snapshots yet, starting from genesis")
+          logger.info("No dumped snapshots yet, starting from genesis")
           getAcsSnapshotTimestampsAfter(0, CantonTimestamp.MinValue)
+      }
+      .filter { case (_, ts) =>
+        val ret = config.shouldDumpSnapshotToBulkStorage(ts)
+        if (ret) {
+          logger.debug(s"Dumping snapshot at timestamp $ts to bulk storage")
+        } else {
+          logger.info(
+            s"Skipping snapshot at timestamp $ts for bulk storage, not required per the configured period of ${config.bulkAcsSnapshotPeriodHours}"
+          )
+        }
+        ret
       }
       .via(
         SingleAcsSnapshotBulkStorage.asFlow(
