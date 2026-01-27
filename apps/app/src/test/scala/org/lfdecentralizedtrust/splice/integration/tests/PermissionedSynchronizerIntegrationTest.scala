@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
@@ -46,6 +47,35 @@ class PermissionedSynchronizerIntegrationTest
       "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
       "EXTRA_PARTICIPANT_DB" -> "alice_participant_new",
     ) {
+
+      val participantId = sv1ValidatorBackend.participantClientWithAdminToken.id
+      val topology = sv1ValidatorBackend.participantClient.topology
+
+      val existing = topology.participant_synchronizer_permissions.find(
+        decentralizedSynchronizerId,
+        participantId,
+      )
+
+      existing match {
+        case Some(res) if res.item.permission == ParticipantPermission.Submission => {}
+
+        case Some(res) =>
+          topology.participant_synchronizer_permissions.propose(
+            decentralizedSynchronizerId,
+            participantId,
+            permission = ParticipantPermission.Submission,
+            serial = Some(res.context.serial.increment),
+          )
+
+        case None =>
+          topology.participant_synchronizer_permissions.propose(
+            decentralizedSynchronizerId,
+            participantId,
+            permission = ParticipantPermission.Submission,
+            serial = Some(com.digitalasset.canton.config.RequireTypes.PositiveInt.one),
+          )
+      }
+
       aliceValidatorBackend.startSync()
     }
   }
