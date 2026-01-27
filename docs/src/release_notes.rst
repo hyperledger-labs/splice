@@ -27,6 +27,13 @@
       The behavior can be switched back to synchronous logging by setting the environment variable `LOG_IMMEDIATE_FLUSH=true`.
       This now includes helm deployments as well, in 0.5.7 the default was changed only for docker-compose deployments.
 
+    - This version breaks backwards-compatibility with migration dumps taken on 0.4.x versions.
+      Please make sure that you are deploying with ``migrating: false`` (helm) / without ``-M`` (docker-compose).
+      For helm-based validator deployments:
+      If you are seeing ``unable to parse domain migration json`` errors despite setting ``migrating: false``,
+      you may need to uninstall and reinstall the ``validator`` helm release once to ensure that the desired value is applied correctly.
+
+
 .. release-notes:: 0.5.7
 
   .. important::
