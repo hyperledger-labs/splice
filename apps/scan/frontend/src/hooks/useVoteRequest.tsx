@@ -13,7 +13,9 @@ export const useVoteRequest = (
   const scanClient = useScanClient();
   return useQuery({
     queryKey: ['listDsoRulesVoteRequests', contractId],
-    queryFn: async () =>
-      (await scanClient.lookupDsoRulesVoteRequest(contractId)).dso_rules_vote_request,
+    queryFn: async () => {
+      const request = await scanClient.lookupDsoRulesVoteRequest(contractId);
+      return Contract.decodeOpenAPI(request.dso_rules_vote_request, VoteRequest);
+    },
   });
 };
