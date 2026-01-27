@@ -5,10 +5,14 @@
 
 .. _release_notes:
 
-.. release-notes:: upcoming
+.. release-notes:: 0.5.8
 
-  - Participant
+  Note: 0.5.7 introduced a significant performance regression related to the processing of topology transactions on participants, mediators, and sequencers.
+  Please skip 0.5.7 and upgrade directly to 0.5.8.
 
+  - Canton
+
+    - Fix performance regression related to the processing of topology transactions.
     - Improve performance of some queries that are used in participant pruning. The fix includes
       a database migration which can take up to 2min but should be faster on most participants.
 
@@ -22,6 +26,23 @@
     - The default logger has been switched to use an asynchronous appender, for all the nodes, for better performance.
       The behavior can be switched back to synchronous logging by setting the environment variable `LOG_IMMEDIATE_FLUSH=true`.
       This now includes helm deployments as well, in 0.5.7 the default was changed only for docker-compose deployments.
+
+    - This version breaks backwards compatibility with migration dumps taken on 0.4.x versions.
+      Please make sure that you are deploying with ``migrating: false`` (helm) / without ``-M`` (docker-compose).
+      For helm-based validator deployments:
+
+      In some cases, helm might not properly update the state after you removed the `migrating` flag.
+      You can check before the upgrade if it got properly applied through ``kubectl describe deployment -n validator validator-app`` and look for this env var:
+
+      .. code-block:: yaml
+
+          - name: ADDITIONAL_CONFIG_VALIDATOR_MIGRATION_RESTORE
+            value: |
+              canton.validator-apps.validator_backend.restore-from-migration-dump = "/domain-upgrade-dump/domain_migration_dump.json"
+
+      If you see it, the deployment still has ``migrating: true`` activated.
+      You can clear that flag by, for example, uninstalling and reinstalling the validator helm release (but not participant and postgres).
+      You can either directly reinstall the new version or first do the reinstall on the old version and then upgrade.
 
 .. release-notes:: 0.5.7
 
