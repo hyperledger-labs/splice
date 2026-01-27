@@ -45,6 +45,9 @@ import org.scalatest.{Inside, Inspectors, OptionValues}
 case class EnvironmentDefinition(
     override val baseConfig: SpliceConfig,
     override val testingConfig: TestingConfigInternal = TestingConfigInternal(),
+    // preSetup and setup run *after* the apps have started, but before tests run.
+    // preAppStart runs before the apps are started.
+    preAppStart: SpliceTestConsoleEnvironment => Unit = _ => (),
     val preSetup: SpliceTestConsoleEnvironment => Unit = _ => (),
     val setup: SpliceTestConsoleEnvironment => Unit = _ => (),
     override val teardown: Unit => Unit = _ => (),
@@ -174,8 +177,7 @@ case class EnvironmentDefinition(
       participants: SpliceTestConsoleEnvironment => Seq[ParticipantClientReference]
   ): EnvironmentDefinition = {
     copy(
-      preSetup = implicit env => {
-        this.preSetup(env)
+      preAppStart = implicit env => {
         participants(env).foreach { p =>
           p.synchronizers.list_connected().foreach { connected =>
             val currentVettedPackages = p.topology.vetted_packages.list(
@@ -471,15 +473,17 @@ case class EnvironmentDefinition(
   override def createTestConsole(
       environment: SpliceEnvironment,
       loggerFactory: NamedLoggerFactory,
-  ): TestConsoleEnvironment[SpliceConfig, SpliceEnvironment] =
-    new SpliceConsoleEnvironment(
+  ): TestConsoleEnvironment[SpliceConfig, SpliceEnvironment] = {
+    val env = new SpliceConsoleEnvironment(
       environment,
       new TestConsoleOutput(loggerFactory),
     ) with TestEnvironment[SpliceConfig] {
       override lazy val actorSystem = super[TestEnvironment].actorSystem
       override val actualConfig: SpliceConfig = this.environment.config
-
     }
+    this.preAppStart(env)
+    env
+  }
 }
 
 object EnvironmentDefinition extends CommonAppInstanceReferences {

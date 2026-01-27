@@ -61,6 +61,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -433,6 +440,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -517,6 +531,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -543,6 +564,10 @@
           "validatorApiUrl": "http://validator-app:5003"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "pvc": {
+          "name": "party-allocator-keys",
+          "volumeStorageClass": "standard-rwo"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -597,6 +622,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -675,6 +707,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -714,7 +753,7 @@
             "prefix": "mock/validator"
           }
         },
-        "participantPruningConfig": {
+        "participantPruningSchedule": {
           "cron": "0 /10 * * * ?",
           "maxDuration": "5m",
           "retention": "30d"
@@ -723,6 +762,10 @@
           "host": "postgres",
           "postgresName": "postgres",
           "secretName": "postgres-secrets"
+        },
+        "pvc": {
+          "volumeName": "domain-migration-validator-pvc",
+          "volumeStorageClass": "standard-rwo"
         },
         "scanClient": {
           "scanType": "bft-custom",

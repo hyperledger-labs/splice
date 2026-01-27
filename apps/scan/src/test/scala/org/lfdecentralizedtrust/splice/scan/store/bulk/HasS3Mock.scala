@@ -1,11 +1,10 @@
-package org.lfdecentralizedtrust.splice.scan.store
+package org.lfdecentralizedtrust.splice.scan.store.bulk
 
-import com.digitalasset.canton.{BaseTest, FutureHelpers}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.{BaseTest, FutureHelpers}
 import com.github.luben.zstd.ZstdDirectBufferDecompressingStream
-import io.netty.buffer.PooledByteBufAllocator
+import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
-import org.lfdecentralizedtrust.splice.scan.store.bulk.{S3BucketConnection, S3Config}
 import org.scalatest.EitherValues
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.regions.Region

@@ -20,21 +20,28 @@ const CopyableIdentifier: React.FC<CopyableIdentifierProps> = ({
   size,
   'data-testid': testId,
 }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.light' }} data-testid={testId}>
+  <Box
+    sx={{ display: 'flex', alignItems: 'center', color: 'text.light', minWidth: 0 }}
+    data-testid={testId}
+  >
     <Typography
       variant="body1"
       fontWeight="medium"
       fontFamily="Source Code Pro"
       fontSize={size === 'small' ? '14px' : '18px'}
       data-testid={`${testId}-value`}
-      sx={{ maxWidth: '100%', textOverflow: 'ellipsis', overflow: 'hidden' }}
+      sx={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}
     >
       {value}
     </Typography>
     <IconButton
       color="secondary"
       data-testid={`${testId}-copy-button`}
-      onClick={() => navigator.clipboard.writeText(copyValue ?? value)}
+      onClick={e => {
+        e.stopPropagation();
+        e.preventDefault();
+        navigator.clipboard.writeText(copyValue ?? value);
+      }}
     >
       <ContentCopy sx={{ fontSize: size === 'small' ? '14px' : '18px' }} />
     </IconButton>

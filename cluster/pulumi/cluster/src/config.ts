@@ -12,10 +12,12 @@ const GkeClusterConfigSchema = z.object({
   nodePools: z.object({
     infra: GkeNodePoolConfigSchema,
     apps: GkeNodePoolConfigSchema,
+    hyperdiskApps: GkeNodePoolConfigSchema.optional(),
   }),
 });
 
 export type GkeClusterConfig = z.infer<typeof GkeClusterConfigSchema>;
+export type GkeNodePoolConfig = z.infer<typeof GkeNodePoolConfigSchema>;
 
 export const gkeClusterConfig: GkeClusterConfig = GkeClusterConfigSchema.parse(
   clusterSubConfig('cluster')

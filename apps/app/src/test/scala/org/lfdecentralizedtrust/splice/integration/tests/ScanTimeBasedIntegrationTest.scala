@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.util.*
@@ -290,89 +291,6 @@ class ScanTimeBasedIntegrationTest
     )
   }
 
-  "get total amulet balance" in { implicit env =>
-    val (_, _) = onboardAliceAndBob()
-
-    def roundNum() =
-      sv1ScanBackend.getLatestOpenMiningRound(getLedgerTime).contract.payload.round.number
-    roundNum() shouldBe (firstRound + 1)
-
-    val tapRound1Amount = BigDecimal(500.0)
-    clue(s"Tap in round ${firstRound + 1}") {
-      aliceWalletClient.tap(tapRound1Amount)
-    }
-
-    advanceRoundsToNextRoundOpening
-
-    roundNum() shouldBe (firstRound + 2)
-
-    val tapRound2Amount = BigDecimal(500.0)
-    clue(s"Tap in round ${firstRound + 2}") {
-      bobWalletClient.tap(tapRound2Amount)
-    }
-
-    actAndCheck(
-      s"advance to close round ${firstRound + 2}",
-      (0 to 4).foreach(_ => advanceRoundsToNextRoundOpening),
-    )(
-      s"check round ${firstRound + 2} is closed",
-      _ => {
-        sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
-        sv1ScanBackend.getRoundOfLatestData()._1 shouldBe firstRound + 2
-        sv1ScanBackend.getAggregatedRounds().value shouldBe ScanAggregator.RoundRange(
-          firstRound + 0,
-          firstRound + 2,
-        )
-      },
-    )
-
-    clue(
-      s"Get total balances for round ${firstRound + 0}, ${firstRound + 1} and ${firstRound + 2}"
-    ) {
-      val total0 =
-        sv1ScanBackend
-          .getTotalAmuletBalance(firstRound + 0)
-          .getOrElse(BigDecimal(0))
-      val total1 =
-        sv1ScanBackend
-          .getTotalAmuletBalance(firstRound + 1)
-          .getOrElse(BigDecimal(0))
-      val total2 =
-        sv1ScanBackend
-          .getTotalAmuletBalance(firstRound + 2)
-          .valueOrFail("Amulet balance not yet computed")
-
-      val holdingFeeAfterOneRound = 1 * defaultHoldingFeeAmulet
-      val holdingFeeAfterTwoRounds = 2 * defaultHoldingFeeAmulet
-
-      total0 shouldBe 0.0
-      total1 shouldBe (walletUsdToAmulet(tapRound1Amount) - holdingFeeAfterOneRound)
-      total2 shouldBe (
-        walletUsdToAmulet(tapRound1Amount) - holdingFeeAfterTwoRounds +
-          walletUsdToAmulet(tapRound2Amount) - holdingFeeAfterOneRound
-      )
-      sv1ScanBackend.getAggregatedRounds().value shouldBe ScanAggregator.RoundRange(
-        firstRound + 0,
-        firstRound + 2,
-      )
-      sv1ScanBackend
-        .listRoundTotals(firstRound + 0, firstRound + 2)
-        .map(rt => (rt.closedRound, BigDecimal(rt.totalAmuletBalance))) shouldBe List(
-        firstRound + 0L -> total0,
-        firstRound + 1L -> total1,
-        firstRound + 2L -> total2,
-      )
-      assertThrowsAndLogsCommandFailures(
-        sv1ScanBackend.listRoundTotals(firstRound + 1, firstRound + 3),
-        _.errorMessage should include("is outside of the available rounds range"),
-      )
-      assertThrowsAndLogsCommandFailures(
-        sv1ScanBackend.listRoundPartyTotals(firstRound + 1, firstRound + 3),
-        _.errorMessage should include("is outside of the available rounds range"),
-      )
-    }
-  }
-
   "Not get aggregates for incorrect ranges" in { implicit env =>
     clue("Try to get round totals for negative rounds") {
       val startRounds = List(-1L, 0L, -1L, 1L, -1L)
@@ -450,7 +368,7 @@ class ScanTimeBasedIntegrationTest
 
     advanceTime(
       java.time.Duration
-        .ofHours(sv1ScanBackend.config.acsSnapshotPeriodHours.toLong)
+        .ofHours(scanStorageConfigV1.dbAcsSnapshotPeriodHours.toLong)
         .plusSeconds(1L)
     )
 
@@ -473,7 +391,7 @@ class ScanTimeBasedIntegrationTest
 
     advanceTime(
       java.time.Duration
-        .ofHours(sv1ScanBackend.config.acsSnapshotPeriodHours.toLong)
+        .ofHours(scanStorageConfigV1.dbAcsSnapshotPeriodHours.toLong)
         .plusSeconds(1L)
     )
 

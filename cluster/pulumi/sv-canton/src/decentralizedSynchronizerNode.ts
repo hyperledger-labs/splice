@@ -16,6 +16,7 @@ import {
   sequencerTokenExpirationTime,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
+  standardStorageClassName,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   CometBftNodeConfigs,
@@ -134,7 +135,7 @@ abstract class InStackDecentralizedSynchronizerNode
           pvc: spliceConfig.configuration.persistentHeapDumps
             ? {
                 size: '10Gi',
-                volumeStorageClass: 'standard-rwo',
+                volumeStorageClass: standardStorageClassName,
               }
             : undefined,
           serviceAccountName: imagePullServiceAccountName,

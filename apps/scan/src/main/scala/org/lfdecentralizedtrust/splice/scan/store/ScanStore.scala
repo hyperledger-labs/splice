@@ -156,16 +156,8 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[ContractWithState[splice.ans.AnsRules.ContractId, splice.ans.AnsRules]]]
 
-  def getTotalAmuletBalance(asOfEndOfRound: Long)(implicit
-      tc: TraceContext
-  ): Future[Option[BigDecimal]]
-
   def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal]
   def getRewardsCollectedInRound(round: Long)(implicit tc: TraceContext): Future[BigDecimal]
-
-  def getWalletBalance(partyId: PartyId, asOfEndOfRound: Long)(implicit
-      tc: TraceContext
-  ): Future[BigDecimal]
 
   def getAmuletConfigForRound(round: Long)(implicit
       tc: TraceContext

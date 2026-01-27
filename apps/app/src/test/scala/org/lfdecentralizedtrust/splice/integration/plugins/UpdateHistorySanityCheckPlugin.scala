@@ -19,6 +19,7 @@ import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.logging.SuppressingLogger
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfigs.scanStorageConfigV1
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.scalatest.{Inspectors, LoneElement}
 import org.scalatest.concurrent.Eventually
@@ -205,7 +206,6 @@ class UpdateHistorySanityCheckPlugin(
             "DEBUG",
             "--report-output",
             csvTempFile.toString,
-            "--scan-balance-assertions",
             "--stop-at-record-time",
             snapshotRecordTime.toInstant.toString,
             "--compare-acs-with-snapshot",
@@ -316,7 +316,7 @@ class UpdateHistorySanityCheckPlugin(
       before: CantonTimestamp,
       acc: List[AcsResponse],
   ): List[AcsResponse] = {
-    val acsSnapshotPeriodHours = scan.config.acsSnapshotPeriodHours
+    val acsSnapshotPeriodHours = scanStorageConfigV1.dbAcsSnapshotPeriodHours
     val migrationId = scan.config.domainMigrationId
     scan.getDateOfMostRecentSnapshotBefore(before, migrationId) match {
       case Some(snapshotDate) =>

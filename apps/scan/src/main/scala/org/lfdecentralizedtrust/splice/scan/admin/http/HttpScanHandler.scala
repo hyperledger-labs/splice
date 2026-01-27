@@ -418,52 +418,6 @@ class HttpScanHandler(
     }
   }
 
-  def getTotalAmuletBalance(
-      response: v0.ScanResource.GetTotalAmuletBalanceResponse.type
-  )(
-      asOfEndOfRound: Long
-  )(extracted: TraceContext): Future[v0.ScanResource.GetTotalAmuletBalanceResponse] = {
-    implicit val tc = extracted
-    withSpan(s"$workflowId.getTotalAmuletBalance") { _ => _ =>
-      for {
-        total <- store
-          .getTotalAmuletBalance(asOfEndOfRound)
-          .transform(
-            HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
-          )
-      } yield {
-        total.fold(
-          v0.ScanResource.GetTotalAmuletBalanceResponse
-            .NotFound(ErrorResponse(s"No total amulet balance found for round $asOfEndOfRound"))
-        )(total =>
-          v0.ScanResource.GetTotalAmuletBalanceResponse.OK(
-            definitions.GetTotalAmuletBalanceResponse(
-              Codec.encode(total)
-            )
-          )
-        )
-      }
-    }
-  }
-
-  override def getWalletBalance(
-      respond: v0.ScanResource.GetWalletBalanceResponse.type
-  )(
-      partyId: String,
-      asOfEndOfRound: Long,
-  )(extracted: TraceContext): Future[v0.ScanResource.GetWalletBalanceResponse] = {
-    implicit val tc = extracted
-    withSpan(s"$workflowId.getWalletBalance") { _ => _ =>
-      for {
-        total <- store
-          .getWalletBalance(PartyId tryFromProtoPrimitive partyId, asOfEndOfRound)
-          .transform(
-            HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
-          )
-      } yield definitions.GetWalletBalanceResponse(Codec.encode(total))
-    }
-  }
-
   def getAmuletConfigForRound(
       response: v0.ScanResource.GetAmuletConfigForRoundResponse.type
   )(

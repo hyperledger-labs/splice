@@ -102,6 +102,7 @@ export const Governance: React.FC = () => {
         contractId: vr.payload.trackingCid || vr.contractId,
         actionName:
           actionTagToTitle(amuletName)[getAction(vr.payload.action) as SupportedActionTag],
+        description: vr.payload.reason.body,
         votingCloses: dayjs(vr.payload.voteBefore).format(dateTimeFormatISO),
         createdAt: dayjs(vr.createdAt).format(dateTimeFormatISO),
         requester: vr.payload.requester,
@@ -121,6 +122,7 @@ export const Governance: React.FC = () => {
       return {
         contractId: v.payload.trackingCid || v.contractId,
         actionName: actionTagToTitle(amuletName)[getAction(v.payload.action) as SupportedActionTag],
+        description: v.payload.reason.body,
         votingThresholdDeadline: dayjs(v.payload.voteBefore).format(dateTimeFormatISO),
         voteTakesEffect: effectiveAt,
         yourVote: computeYourVote(votes, svPartyId),
@@ -146,6 +148,7 @@ export const Governance: React.FC = () => {
     return {
       contractId: vr.request.trackingCid,
       actionName: actionTagToTitle(amuletName)[getAction(vr.request.action) as SupportedActionTag],
+      description: vr.request.reason.body,
       votingThresholdDeadline: dayjs(vr.request.voteBefore).format(dateTimeFormatISO),
       voteTakesEffect:
         (vr.outcome.tag === 'VRO_Accepted' &&
@@ -189,7 +192,6 @@ export const Governance: React.FC = () => {
             noDataMessage="No proposals are currently in flight. Proposals you have voted on will appear here while awaiting the voting threshold or deadline."
             uniqueId="inflight-proposals"
             showVoteStats
-            showAcceptanceThreshold
             showThresholdDeadline
             sortOrder="effectiveAtAsc"
           />
@@ -201,7 +203,6 @@ export const Governance: React.FC = () => {
             uniqueId="vote-history"
             showStatus
             showVoteStats
-            showAcceptanceThreshold
             sortOrder="effectiveAtDesc"
           />
         </>

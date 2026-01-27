@@ -562,23 +562,6 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetTotalAmuletBalance(asOfEndOfRound: Long)
-      extends InternalBaseCommand[http.GetTotalAmuletBalanceResponse, Option[BigDecimal]] {
-
-    override def submitRequest(
-        client: ScanClient,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetTotalAmuletBalanceResponse] =
-      client.getTotalAmuletBalance(asOfEndOfRound, headers)
-
-    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.GetTotalAmuletBalanceResponse.OK(response) =>
-        Codec.decode(Codec.BigDecimal)(response.totalBalance).map(Some(_))
-      case http.GetTotalAmuletBalanceResponse.NotFound(_) =>
-        Right(None)
-    }
-  }
-
   final case class RateStep(
       amount: BigDecimal,
       rate: BigDecimal,

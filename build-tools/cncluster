@@ -1469,7 +1469,7 @@ subcommand_whitelist[debug_shell]='Spin up a debug container on the cluster, and
 function subcmd_debug_shell() {
   _cluster_must_exist
 
-  VERSION_NUMBER=${OVERRIDE_VERSION:-$(yq ".synchronizerMigration.active.version" < config.yaml)}
+  VERSION_NUMBER=${OVERRIDE_VERSION:-$("${SPLICE_ROOT}/cluster/scripts/get-resolved-config.sh" | yq ".synchronizerMigration.active.version")}
   if [ -z "$VERSION_NUMBER" ] || [ "$VERSION_NUMBER" = "null" ]; then
     VERSION_NUMBER=$(get-snapshot-version)
   fi
@@ -1746,10 +1746,12 @@ function subcmd_backup_nodes() {
     fi
     migration_id=$1
 
-    if [ $# -eq 2 ]; then
+    # If only migration is set, backup everything, otherwise backup specified nodes
+    # Notably, prod networks which don't have sv-2 % sv-3
+    if [ $# -eq 1 ]; then
         nodes="sv-1 sv-2 sv-3 sv-da-1 validator1 splitwell"
     else
-        shift 2
+        shift 1
         nodes="$*"
     fi
 

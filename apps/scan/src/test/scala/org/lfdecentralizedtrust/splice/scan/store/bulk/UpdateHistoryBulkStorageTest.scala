@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package org.lfdecentralizedtrust.splice.scan.store
+package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.LfContractId
@@ -9,27 +9,17 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
-import org.lfdecentralizedtrust.splice.scan.store.bulk.{
-  BulkStorageConfig,
-  Result,
-  UpdateHistorySegmentBulkStorage,
-}
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
-import org.lfdecentralizedtrust.splice.store.{
-  HardLimit,
-  Limit,
-  StoreTest,
-  TreeUpdateWithMigrationId,
-  UpdateHistory,
-}
+import org.lfdecentralizedtrust.splice.store.*
 import org.scalatest.concurrent.PatienceConfiguration
 import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
 import java.time.Instant
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
-import scala.jdk.FutureConverters.*
 import scala.jdk.CollectionConverters.*
+import scala.jdk.FutureConverters.*
 
 class UpdateHistoryBulkStorageTest
     extends StoreTest
@@ -37,8 +27,9 @@ class UpdateHistoryBulkStorageTest
     with HasActorSystem
     with HasS3Mock {
   val maxFileSize = 30000L
-  val bulkStorageTestConfig = BulkStorageConfig(
-    1000,
+  val bulkStorageTestConfig = ScanStorageConfig(
+    dbAcsSnapshotPeriodHours = 3,
+    bulkDbReadChunkSize = 1000,
     maxFileSize,
   )
 
