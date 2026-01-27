@@ -39,7 +39,7 @@ jobs:
             ./scripts/bump-gha-runner-version.sh
           additional_nix_args: "--keep GH_TOKEN"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_CREATE_PRS_TOKEN }}
 
       - name: Report Failures on Slack & Github
         if: failure() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
