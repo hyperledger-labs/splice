@@ -187,7 +187,7 @@
       In some cases, helm might not properly update the state after you removed the `migrating` flag.
       You can check before the upgrade if it got properly applied through ``kubectl describe deployment -n validator validator-app`` and look for this env var:
 
-      .. code-block:: yaml
+    .. code-block:: yaml
 
           - name: ADDITIONAL_CONFIG_VALIDATOR_MIGRATION_RESTORE
             value: |

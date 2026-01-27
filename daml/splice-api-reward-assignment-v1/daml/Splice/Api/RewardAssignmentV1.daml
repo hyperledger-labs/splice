@@ -1,0 +1,69 @@
+-- | An API for app providers and other service providers to assign reward
+-- coupons for their activity to their beneficiaries.
+module Splice.Api.RewardAssignmentV1 where
+
+import Splice.Api.Token.MetadataV1
+
+-- | View on a coupon representing the right to mint a certain amount of rewards.
+data RewardCouponView = RewardCouponView
+  with
+    dso : Party
+      -- ^ The DSO party.
+    provider : Party
+      -- ^ The party that provided the service for whose activity the minting right was granted.
+    beneficiary : Party
+      -- ^ The beneficiary that can mint the amount specified in the coupon.
+    amount : Decimal
+      -- ^ Amulet amount that can be minted with this coupon.
+    expiresAt : Time
+      -- ^ Expiration time of the coupon. The minting right granted by the coupon can only be exercised before this time.
+    maxNumNewBeneficiaries : Int
+      -- ^ The maximum number of new beneficiaries that can be assigned to the coupon in a single assignment.
+    meta : Metadata
+      -- ^ Metadata associated with this coupon. Provided for extensibility.
+  deriving (Show, Eq)
+
+-- | Specification of a beneficiary of rewards.
+data RewardBeneficiary = RewardBeneficiary
+  with
+    beneficiary : Party
+      -- ^ The party that is granted the right to mint amulet for this activity.
+    amount : Decimal
+      -- ^ The amount of amulet that this beneficiary can mint.
+  deriving (Show, Eq, Ord)
+
+-- | A coupon representing the right to mint a certain amount of rewards.
+interface RewardCoupon where
+  viewtype RewardCouponView
+
+  rewardCoupon_assignBeneficiariesImpl
+    : ContractId RewardCoupon -> RewardCoupon_AssignBeneficiaries -> Update RewardCoupon_AssignBeneficiariesResult
+
+  choice RewardCoupon_AssignBeneficiaries : RewardCoupon_AssignBeneficiariesResult
+    -- ^ Assign (ultimate) beneficiaries to the coupon. Useful for apps
+    -- where the party that earns the minting right (the provider) is just an
+    -- operational party and the actual beneficiaries are different parties.
+    with
+      newBeneficiaries : [RewardBeneficiary]
+        -- ^ The new beneficiaries to whom to assign part of the minting amount of the
+        -- coupon. The remaining amount is assigned to the original beneficiary.
+        --
+        -- There MUST be at most `(view this).maxNumNewBeneficiaries` new beneficiaries in the list.
+        -- The purpose of this limit is to ensure that traffic cost of
+        -- creating coupons guards the overhead of tracking the created coupons
+        -- for the DSO party. The choice returns the coupon representing the
+        -- change for the original beneficiary, which allows chaining to assign
+        -- as many new beneficiaries as needed in a single Daml transaction.
+      extraArgs : ExtraArgs
+        -- ^ Extra arguments for extensibility. Set to empty, unless needed for specific implementations.
+    observer map (.beneficiary) newBeneficiaries
+    controller (view this).beneficiary
+    do rewardCoupon_assignBeneficiariesImpl this self arg
+
+
+data RewardCoupon_AssignBeneficiariesResult = RewardCoupon_AssignBeneficiariesResult with
+    newBeneficiariesCouponCids : [ContractId RewardCoupon]
+      -- ^ The coupons created for the newly assigned beneficiaries.
+    originalBeneficiaryRemainderCid : Optional (ContractId RewardCoupon)
+      -- ^ Coupon for the original beneficiary with the remaining amount not assigned to the new beneficiaries.
+  deriving (Eq, Show)

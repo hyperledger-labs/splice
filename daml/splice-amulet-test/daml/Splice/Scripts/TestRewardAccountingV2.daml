@@ -1,0 +1,535 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestRewardAccountingV2 where
+
+
+import DA.Action (void)
+import DA.Assert
+import DA.Foldable (forA_)
+import DA.List
+import DA.Map qualified as Map
+import DA.Set as Set
+import DA.Time
+
+import Daml.Script
+
+import Splice.Api.RewardAssignmentV1 qualified as Api.RewardAssignmentV1
+
+import Splice.Amulet
+import Splice.Amulet.RewardAccountingV2
+import Splice.Amulet.CryptoHash qualified as CryptoHash
+import Splice.AmuletConfig
+import Splice.AmuletRules
+import Splice.ExternalPartyConfigState
+import Splice.Round
+import Splice.Types
+
+import Splice.Scripts.Util
+
+import Splice.Testing.Registries.AmuletRegistry.Parameters (defaultAmuletConfig)
+import Splice.Testing.TokenStandard.WalletClient as WalletClient
+import Splice.Testing.Utils
+
+
+-- Reward accounting tests
+---------------------------
+
+-- | Shared function to test the creation and processing of reward batches in dry-run or production mode.
+create_and_process_reward_batches : Bool -> Script (Script (), (AmuletApp, Party, Party, Party, Party))
+create_and_process_reward_batches dryRun = do
+  -- enable traffic based app rewards, which are the first use-case for reward accounting v2
+  app <- setupAppWithConfig $ defaultAmuletConfig with
+    rewardConfig = Some $ RewardConfig with
+      mintingVersion = if dryRun then RewardVersion_FeaturedAppMarkers else RewardVersion_TrafficBasedAppRewards
+      dryRunVersion = if dryRun then Some RewardVersion_TrafficBasedAppRewards else None
+      batchSize = 100
+      rewardCouponTimeToLive = hours 36
+
+  -- setup users
+  alice <- allocateParty "Alice"
+  bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
+  dora <- allocateParty "Dora"
+
+  setTime demoTime
+
+  -- move the first round through issuance, which will also trigger the reward calculation for this round
+  runNextIssuance app
+
+  -- setup demo data
+  let mintingAllowances1 = sortOn (.provider)
+        [ MintingAllowance alice 1000.0
+        , MintingAllowance bob 2000.0
+        ]
+  let mintingAllowances2 = sortOn (.provider)
+        [ MintingAllowance charlie 30.0
+        , MintingAllowance dora 5.1
+        ]
+  let b1 = BatchOfMintingAllowances mintingAllowances1
+  let b2 = BatchOfMintingAllowances mintingAllowances2
+  let rootBatch = BatchOfBatches [CryptoHash.hash b1, CryptoHash.hash b2]
+  let rootBatchHash = CryptoHash.hash rootBatch
+  let batchesWithHiding = [(b1, [bob]), (b2, [dora]), (rootBatch, [])]
+
+  -- get the contract representing the pending calculation and confirmation of rewards for round 0
+  [(calculateRewardsCid, _)] <- query @CalculateRewardsV2 app.dso
+
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+
+  -- setup reward coupon creation workflow state
+  submit [app.dso] $ exerciseCmd amuletRulesCid
+      AmuletRules_StartProcessingRewardsV2 with
+        calculateRewardsCid
+        batchHash = rootBatchHash
+
+  let processBatches = do
+        states <- query @ProcessRewardsV2 app.dso
+        forA_ states $ \(processRewardsCid, processRewards) -> do
+          let Some (b, badVettingState) = find (\(b, _) -> CryptoHash.hash b == processRewards.batchHash) batchesWithHiding
+          void $ submit app.dso $ exerciseCmd processRewardsCid
+            ProcessRewardsV2_ProcessBatch with
+              batch = b
+              providersWithWrongVettingState = Set.fromList badVettingState
+
+  pure (processBatches, (app, alice, bob, charlie, dora))
+
+-- | Test the full happy path of reward accounting v2
+test_reward_accounting_v2 : Script ()
+test_reward_accounting_v2 = do
+  (processBatches, (app, alice, bob, charlie, dora)) <- create_and_process_reward_batches False
+
+  -- show that a non-dry run cannot be archived
+  processRewards <- query @ProcessRewardsV2 app.dso
+  calculateRewards <- query @CalculateRewardsV2 app.dso
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+
+  submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_ArchiveDryRunRewardAccountingV2 with
+    processRewardsCids = map fst processRewards
+    calculateRewardsCids = map fst calculateRewards
+
+  -- proceed with processing
+  processBatches -- expand root hash into batch hashes
+  processBatches -- expand follow-up batches into coupons
+
+  -- no left-over processing contracts
+  [] <- query @CalculateRewardsV2 app.dso
+  [] <- query @ProcessRewardsV2 app.dso
+
+  -- check created coupons
+  now <- getTime
+  let couponExpiryTime = now `addRelTime` hours 36
+  let expectedAmounts = [(alice, 1000.0), (bob, 2000.0), (charlie, 30.0), (dora, 5.1)]
+  let expectedCoupons = do
+        (provider, amount) <- expectedAmounts
+        pure RewardCouponV2 with
+          dso = app.dso
+          provider
+          beneficiary = provider
+          amount
+          round = Round 0
+          expiresAt = couponExpiryTime
+          beneficiaryIsObserver = provider `notElem` [bob, dora]
+
+  actualCoupons0 <- query @RewardCouponV2 app.dso
+  let actualCoupons = sortOn (.beneficiary) $ fmap snd actualCoupons0
+  actualCoupons === expectedCoupons
+
+  -- make Bob and Dora observers of their coupons (simulates them changing their vetting state)
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  unobservableCoupons <- queryFilter @RewardCouponV2 app.dso (\c -> not c.beneficiaryIsObserver)
+  void $ submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_UnhideRewardCouponsV2 with
+    rewardCouponCids = map fst unobservableCoupons
+    beneficiaries = map (._2.beneficiary) unobservableCoupons
+
+  couponsAfterUnhiding <- query @RewardCouponV2 app.dso
+  sortOn (.beneficiary) (map snd couponsAfterUnhiding) ===
+    map (\c -> c with beneficiaryIsObserver = True) expectedCoupons
+
+  -- check that reward minting works
+  forA_ expectedAmounts $ \(beneficiary, amount) -> do
+    mintRewardsV2 app beneficiary
+    WalletClient.checkBalance beneficiary app.registry.instrumentId amount
+
+  pure ()
+
+
+test_reward_accounting_v2_dry_run : Script ()
+test_reward_accounting_v2_dry_run = do
+  (processBatches, (app, _, _, _, _)) <- create_and_process_reward_batches True
+
+  processBatches -- expand root hash into batch hashes
+  processBatches -- expand follow-up batches into coupons
+
+  -- no left-over processing contracts
+  [] <- query @CalculateRewardsV2 app.dso
+  [] <- query @ProcessRewardsV2 app.dso
+
+  -- check that no coupons were created
+  [] <- query @RewardCouponV2 app.dso
+  pure ()
+
+test_reward_accounting_v2_skip_stuck_dry_run : Script ()
+test_reward_accounting_v2_skip_stuck_dry_run = do
+  (processBatches, (app, _, _, _, _)) <- create_and_process_reward_batches True
+
+  processBatches -- expand root hash into batch hashes
+  -- pretend that follow up batches fail to process due to hash mismatches
+
+  -- move to next round, so there's also a calculate rewards contract
+  runNextIssuance app
+
+  -- archive the stuck state
+  processRewards <- query @ProcessRewardsV2 app.dso
+  calculateRewards <- query @CalculateRewardsV2 app.dso
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+
+  submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_ArchiveDryRunRewardAccountingV2 with
+    processRewardsCids = map fst processRewards
+    calculateRewardsCids = map fst calculateRewards
+
+  -- no left-over processing contracts
+  [] <- query @CalculateRewardsV2 app.dso
+  [] <- query @ProcessRewardsV2 app.dso
+
+  -- check that no coupons were created
+  [] <- query @RewardCouponV2 app.dso
+  pure ()
+
+-- | When not running in dry-run mode, the contracts tracking the processing cannot be archived
+test_reward_accounting_v2_only_archive_dry_run : Script ()
+test_reward_accounting_v2_only_archive_dry_run = do
+  (processBatches, (app, _, _, _, _)) <- create_and_process_reward_batches False
+
+  processBatches -- expand root hash into batch hashes
+  -- pretend that follow up batches fail to process due to hash mismatches
+
+  -- move to next round, so there's also a calculate rewards contract
+  runNextIssuance app
+
+  -- show that a non-dry run cannot be archived
+  processRewards <- query @ProcessRewardsV2 app.dso
+  calculateRewards <- query @CalculateRewardsV2 app.dso
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+
+  submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_ArchiveDryRunRewardAccountingV2 with
+    processRewardsCids = map fst processRewards
+    calculateRewardsCids = []
+
+  submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_ArchiveDryRunRewardAccountingV2 with
+    processRewardsCids = []
+    calculateRewardsCids = map fst calculateRewards
+
+  pure ()
+
+
+-- Reward minting
+-----------------
+
+data SetupConfig = SetupConfig with
+  hideCoupon : Bool -- ^ Whether to hide alice's coupon
+  useTrafficBasedAppRewards : Bool -- ^ Whether to configure traffic-based rewards for minting
+
+setupAliceWithCoupon : Bool -> Script (AmuletApp, Party, AmuletUser)
+setupAliceWithCoupon hideCoupon = setupAliceWithCoupon' $ SetupConfig with
+  hideCoupon
+  useTrafficBasedAppRewards = False
+
+setupAliceWithCoupon' : SetupConfig -> Script (AmuletApp, Party, AmuletUser)
+setupAliceWithCoupon' config = do
+  app <- setupAppWithConfig $ defaultAmuletConfig with
+    rewardConfig = Some $ RewardConfig with
+      mintingVersion =
+        if config.useTrafficBasedAppRewards
+        then RewardVersion_TrafficBasedAppRewards else RewardVersion_FeaturedAppMarkers
+      dryRunVersion = None
+      batchSize = 100
+      rewardCouponTimeToLive = hours 36
+  setTime demoTime
+  aliceUser <- setupUserWithoutValidatorRight app "Alice"
+  let alice = aliceUser.primaryParty
+
+  -- bare create a coupon
+  let coupon = RewardCouponV2 with
+        dso = app.dso
+        provider = alice
+        beneficiary = alice
+        amount = 1000.0
+        round = Round 0
+        expiresAt = demoTime `addRelTime` hours 36
+        beneficiaryIsObserver = not config.hideCoupon
+  submit app.dso $ createCmd coupon
+  pure (app, alice, aliceUser)
+
+
+test_direct_mint : Script ()
+test_direct_mint = do
+  (app, alice, _) <- setupAliceWithCoupon False
+
+  -- mint and check balance
+  mintRewardsV2 app alice
+  WalletClient.checkBalance alice app.registry.instrumentId 1000.0
+
+
+test_mint_of_hidden_coupon : Script ()
+test_mint_of_hidden_coupon = do
+  (app, alice, _) <- setupAliceWithCoupon True
+
+  -- create transfer context
+  (openMiningRound, _) <- getLatestOpenRound app
+  let context = TransferContext with
+        openMiningRound
+        issuingMiningRounds = Map.empty
+        validatorRights = Map.empty
+        featuredAppRight = None
+  -- mint the coupons
+  coupons <- query @RewardCouponV2 app.dso
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  submitMulti [alice] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_Transfer with
+    transfer = Transfer with
+      sender = alice
+      provider = alice
+      inputs = map (InputRewardCouponV2 . fst) coupons
+      outputs = []
+      beneficiaries = None -- no featured-app-marker beneficiaries
+    context
+    expectedDso = Some app.dso
+
+  -- check balance
+  WalletClient.checkBalance alice app.registry.instrumentId 1000.0
+
+
+-- Coupon assignment
+--------------------
+
+test_coupon_assignment : Script ()
+test_coupon_assignment = do
+  (app, alice, _) <- setupAliceWithCoupon False
+  bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
+  -- assign part of alice's coupon to bob and charly
+  [(aliceCouponCid, _)] <- queryInterface @Api.RewardAssignmentV1.RewardCoupon alice
+  submit alice $ exerciseCmd aliceCouponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+    newBeneficiaries =
+      [ Api.RewardAssignmentV1.RewardBeneficiary bob 300.0
+      , Api.RewardAssignmentV1.RewardBeneficiary charlie 200.0
+      ]
+    extraArgs = emptyExtraArgs
+
+  checkCouponsAfterAssignment app alice [(alice, 500.0), (bob, 300.0), (charlie, 200.0)]
+
+
+test_hidden_coupon_assignment : Script ()
+test_hidden_coupon_assignment = do
+  (app, alice, _) <- setupAliceWithCoupon True
+  bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
+  -- assign part of alice's coupon to bob and charly
+  [(aliceCouponCid, _)] <- queryInterface @Api.RewardAssignmentV1.RewardCoupon app.dso
+  submitMulti [alice] [app.dso] $ exerciseCmd aliceCouponCid Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries with
+    newBeneficiaries =
+      [ Api.RewardAssignmentV1.RewardBeneficiary bob 300.0
+      , Api.RewardAssignmentV1.RewardBeneficiary charlie 200.0
+      ]
+    extraArgs = emptyExtraArgs
+  checkCouponsAfterAssignment app alice [(alice, 500.0), (bob, 300.0), (charlie, 200.0)]
+
+checkCouponsAfterAssignment : AmuletApp -> Party -> [(Party, Decimal)] -> Script ()
+checkCouponsAfterAssignment app alice expectedCouponAmounts =
+  forA_ expectedCouponAmounts $ \(beneficiary, amount) -> do
+    let expectedCoupon = RewardCouponV2 with
+          dso = app.dso
+          provider = alice
+          beneficiary
+          amount
+          round = Round 0
+          expiresAt = demoTime `addRelTime` hours 36
+          beneficiaryIsObserver = True
+
+    coupons <- query @RewardCouponV2 beneficiary
+    map snd coupons === [expectedCoupon]
+
+
+-- Claiming expired reward coupons
+----------------------------------
+
+test_claim_expired_coupons : Script ()
+test_claim_expired_coupons = do
+  (app, alice, _) <- setupAliceWithCoupon False
+  bob <- allocateParty "Bob"
+  charlie <- allocateParty "Charlie"
+
+  -- create an extra coupon
+  let extraCoupon = RewardCouponV2 with
+        dso = app.dso
+        provider = alice
+        beneficiary = bob
+        amount = 500.0
+        round = Round 0
+        expiresAt = demoTime `addRelTime` hours 48
+        beneficiaryIsObserver = False
+  submit app.dso $ createCmd extraCoupon
+
+  -- show that expiry doesn't work before expiry time
+  coupons <- query @RewardCouponV2 app.dso
+  let rewardCouponCids = map fst coupons
+  length coupons === 2
+
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+
+  submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_ClaimExpiredRewardsV2 with
+    rewardCouponCids
+    beneficiaries = [bob, alice]
+
+  -- move time past expiry of the first coupon
+  passTime $ hours 48
+
+  -- beneficiaries are checked
+  submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_ClaimExpiredRewardsV2 with
+    rewardCouponCids
+    beneficiaries = []
+
+  submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_ClaimExpiredRewardsV2 with
+    rewardCouponCids
+    beneficiaries = [alice, bob, charlie]
+
+  -- correct expiry works
+  submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_ClaimExpiredRewardsV2 with
+    rewardCouponCids
+    beneficiaries = [bob, alice]
+
+  -- no coupons left
+  [] <- query @RewardCouponV2 app.dso
+
+  -- unclaimed reward was created
+  [(_, unclaimedReward)] <- query @UnclaimedReward app.dso
+  unclaimedReward === UnclaimedReward with
+    dso = app.dso
+    amount = 1500.0
+
+  pure ()
+
+
+-- test featured marker disablement
+-----------------------------------
+
+test_markers_pre_traffic_based : Script ()
+test_markers_pre_traffic_based = do
+  (app, alice, aliceUser) <- setupAliceWithCoupon' $ SetupConfig with
+    hideCoupon = False
+    useTrafficBasedAppRewards = False
+  featureApp app aliceUser
+  bob <- allocateParty "Bob"
+
+  -- make a transfer and check that the marker is created
+  pay app aliceUser bob 100.0
+  [(_, marker)] <- query @FeaturedAppActivityMarker app.dso
+  marker === FeaturedAppActivityMarker with
+    dso = app.dso
+    provider = alice
+    beneficiary = alice
+    weight = 1.0
+
+  -- switch config and test that markers are properly archived
+  updateAmuletConfig app $ \config -> config with
+    rewardConfig = Some $ RewardConfig with
+      mintingVersion = RewardVersion_TrafficBasedAppRewards
+      dryRunVersion = None
+      batchSize = 100
+      rewardCouponTimeToLive = hours 36
+
+  -- two issuance required to make the first round with the updated config active and open
+  runNextIssuance app
+  runNextIssuance app
+
+  markers <- query @FeaturedAppActivityMarker app.dso
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  (openMiningRoundCid, _) <- getLatestOpenRound app
+
+  submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_ConvertFeaturedAppActivityMarkers with
+    markerCids = map fst markers
+    openMiningRoundCid
+    observers = None
+
+  [] <- query @FeaturedAppActivityMarker app.dso
+  [] <- query @AppRewardCoupon app.dso
+
+  pure ()
+
+
+test_no_markers_post_traffic_based : Script ()
+test_no_markers_post_traffic_based = do
+  (app, _, aliceUser) <- setupAliceWithCoupon' $ SetupConfig with
+    hideCoupon = False
+    useTrafficBasedAppRewards = True
+  featureApp app aliceUser
+  bob <- allocateParty "Bob"
+
+  -- pay and check that there is no marker
+  pay app aliceUser bob 100.0
+  [] <- query @FeaturedAppActivityMarker app.dso
+
+  pure ()
+
+
+-- test switch to traffic-based rewards
+---------------------------------------
+
+test_switch_to_traffic_based_rewards : Script ()
+test_switch_to_traffic_based_rewards = do
+  app <- setupApp
+
+  -- validate starting config
+  let checkAmuletRules expectedRewardConfig = do
+        [(_, amuletRules)] <- query @AmuletRules app.dso
+        amuletRules.configSchedule.initialValue.rewardConfig === expectedRewardConfig
+  let checkOpenRounds expectedRewardConfig = do
+        openRounds <- query @OpenMiningRound app.dso
+        length openRounds === 3
+        forA_ openRounds $ \(_, openRound) ->
+          openRound.rewardConfig === expectedRewardConfig
+  let checkExternalPartyConfigs expectedVersion = do
+        externalPartyConfigs <- query @ExternalPartyConfigState app.dso
+        length externalPartyConfigs === 2
+        forA_ externalPartyConfigs $ \(_, config) ->
+          config.rewardCalculationVersion === expectedVersion
+
+  checkAmuletRules None
+  checkOpenRounds None
+  checkExternalPartyConfigs None
+
+  -- switch config
+  let rewardConfig = Some $ RewardConfig with
+        mintingVersion = RewardVersion_TrafficBasedAppRewards
+        dryRunVersion = None
+        batchSize = 100
+        rewardCouponTimeToLive = hours 36
+  updateAmuletConfig app $ \config -> config with rewardConfig
+
+  -- validate updated config
+  checkAmuletRules rewardConfig
+  checkOpenRounds None
+  checkExternalPartyConfigs None
+
+  -- advance to next round to see that it picks up the config change
+  runNextIssuance app
+  (_, latestRound) <- getLatestActiveOpenRound app
+  latestRound.rewardConfig === rewardConfig
+
+  -- external party updates pick up the new config from the round
+  passTime (hours 24)
+  updateExternalPartyConfigState app
+  -- require two updates as each only processes one of the two states
+  passTime (hours 24)
+  updateExternalPartyConfigState app
+
+  checkExternalPartyConfigs ((.mintingVersion) <$> rewardConfig)
+
+  -- two more issuances and all open rounds use the new config
+  runNextIssuance app
+  runNextIssuance app
+
+  checkOpenRounds rewardConfig
+
+  pure ()
+

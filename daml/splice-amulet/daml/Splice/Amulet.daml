@@ -13,6 +13,7 @@ import DA.Optional (fromOptional)
 
 import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+import Splice.Api.RewardAssignmentV1 qualified as Api.RewardAssignmentV1
 
 import Splice.Amulet.TokenApiUtils
 import Splice.Expiry
@@ -267,38 +268,37 @@ template FeaturedAppRight with
       controller provider
       do return FeaturedAppRight_CancelResult
 
-
     interface instance Splice.Api.FeaturedAppRightV1.FeaturedAppRight for FeaturedAppRight where
       view = Splice.Api.FeaturedAppRightV1.FeaturedAppRightView with dso, provider
 
       featuredAppRight_CreateActivityMarkerImpl _self arg = do
-         validateAppRewardBeneficiaries arg.beneficiaries
-         let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) arg.beneficiaries)
-         cids <- forA (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
-           create FeaturedAppActivityMarker
-             with
-               dso
-               provider
-               beneficiary = beneficiary
-               weight = weight
-         pure (Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarkerResult $ map toInterfaceContractId cids)
+        validateAppRewardBeneficiaries arg.beneficiaries
+        let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) arg.beneficiaries)
+        cids <- forA (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
+          create FeaturedAppActivityMarker
+            with
+              dso
+              provider
+              beneficiary = beneficiary
+              weight = weight
+        pure (Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarkerResult $ map toInterfaceContractId cids)
 
     interface instance Splice.Api.FeaturedAppRightV2.FeaturedAppRight for FeaturedAppRight where
       view = Splice.Api.FeaturedAppRightV2.FeaturedAppRightView with dso, provider
 
       featuredAppRight_CreateActivityMarkerImpl _self arg = do
-         validateAppRewardBeneficiariesV2 arg.beneficiaries
-         require "Weight >= 1.0" (fromOptional 1.0 arg.weight >= 1.0)
-         require "Weight <= 10000.0" (fromOptional 1.0 arg.weight <= 10000.0)
-         let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) arg.beneficiaries)
-         cids <- forA (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
-           create FeaturedAppActivityMarker
-             with
-               dso
-               provider
-               beneficiary = beneficiary
-               weight = weight * fromOptional 1.0 arg.weight
-         pure (Splice.Api.FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarkerResult $ map toInterfaceContractId cids)
+        validateAppRewardBeneficiariesV2 arg.beneficiaries
+        require "Weight >= 1.0" (fromOptional 1.0 arg.weight >= 1.0)
+        require "Weight <= 10000.0" (fromOptional 1.0 arg.weight <= 10000.0)
+        let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) arg.beneficiaries)
+        cids <- forA (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
+          create FeaturedAppActivityMarker
+            with
+              dso
+              provider
+              beneficiary = beneficiary
+              weight = weight * fromOptional 1.0 arg.weight
+        pure (Splice.Api.FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarkerResult $ map toInterfaceContractId cids)
 
 validateAppRewardBeneficiaries : [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary] -> Update ()
 validateAppRewardBeneficiaries beneficiaries = do
@@ -371,6 +371,42 @@ template AppRewardCoupon
          void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
          return AppRewardCoupon_DsoExpireResult with
            ..
+
+-- | A coupon for receiving rewards, which is currently only used for
+-- traffic-based app rewards.
+--
+-- Designed to be flexible so we could extend it to include other kinds of rewards
+-- that are based on on off-ledger calculations.
+-- See Splice.Amulet.RewardAccountingV2 for details.
+template RewardCouponV2
+  with
+    dso : Party
+    provider : Party -- ^ The party that provided the service for whose activity the minting right was granted.
+    round : Round -- ^ The round in which the providers activity was recorded.
+    beneficiary : Party -- ^ The party that can mint the reward for the activity by the provider.
+    amount : Decimal -- ^ The amount of reward that can be minted for this coupon. Denominated in Amulet.
+    expiresAt : Time -- ^ Time-based expiry. Used to determine when the reward can no longer be minted.
+    beneficiaryIsObserver : Bool
+      -- ^ Whether the beneficiary should be an observer, which they are unless
+      -- their vetting state at the time of coupon creation does not allow it.
+      -- DSO automation will then attempt to make the beneficiary an observer when they
+      -- change their vetting state unless the coupon expired in the meantime.
+  where
+    signatory dso
+    observer if beneficiaryIsObserver then [beneficiary] else []
+    ensure amount > 0.0
+
+    interface instance Api.RewardAssignmentV1.RewardCoupon for RewardCouponV2 where
+      view = Api.RewardAssignmentV1.RewardCouponView with
+        dso
+        provider
+        beneficiary
+        amount
+        expiresAt
+        meta = Api.Token.MetadataV1.emptyMetadata
+        maxNumNewBeneficiaries = maxNumNewCouponV2Beneficiaries
+
+      rewardCoupon_assignBeneficiariesImpl _self arg = rewardCouponV2_assignBeneficiariesImpl this arg
 
 
 -- | A coupon for receiving validator rewards proportional to the usage fee paid by a user
@@ -537,6 +573,9 @@ template UnclaimedActivityRecord
         pure UnclaimedActivityRecord_DsoExpireResult with unclaimedRewardCid
 
 
+-- Support code
+---------------
+
 requireAmuletExpiredForAllRounds : ContractId ExternalPartyConfigState -> ContractId ExternalPartyConfigState -> Amulet -> Update ()
 requireAmuletExpiredForAllRounds externalPartyConfigState0Cid externalPartyConfigState1Cid amulet = do
   require "externalPartyConfigState0Cid /= externalPartyConfigState1Cid" (externalPartyConfigState0Cid /= externalPartyConfigState1Cid)
@@ -545,6 +584,45 @@ requireAmuletExpiredForAllRounds externalPartyConfigState0Cid externalPartyConfi
   let round = min config0.holdingFeesOpenRoundNumber config1.holdingFeesOpenRoundNumber
   require "Amulet is expired" (isAmuletExpired round amulet.amount)
 
+-- | Maximum number of new beneficiaries that can be assigned to a RewardCouponV2.
+-- Set to the same limit as the one for featured-app-marker beneficiaries to minmize migration effort
+-- for app providers.
+maxNumNewCouponV2Beneficiaries : Int
+maxNumNewCouponV2Beneficiaries = 20
+
+-- | Implementation of the 'RewardCoupon_AssignBeneficiaries' choice for 'RewardCouponV2'.
+rewardCouponV2_assignBeneficiariesImpl
+  : RewardCouponV2
+  -> Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiaries
+  -> Update Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiariesResult
+rewardCouponV2_assignBeneficiariesImpl coupon arg = do
+  let newBeneficiaries = arg.newBeneficiaries
+  let totalNewBeneficiaryAmount = sum $ map (.amount) arg.newBeneficiaries
+  require ("No more than " <> show maxNumNewCouponV2Beneficiaries <> " beneficiaries assigned")
+    (length arg.newBeneficiaries <= maxNumNewCouponV2Beneficiaries)
+  require "Total amount assigned to new beneficiaries below coupon amount" (totalNewBeneficiaryAmount <= coupon.amount)
+
+  -- return remainder to original beneficiary
+  let remainingAmount = coupon.amount - totalNewBeneficiaryAmount
+  originalBeneficiaryRemainderCid <-
+    if (remainingAmount > 0.0)
+      then do
+        Some <$> create coupon with
+          amount = remainingAmount
+          beneficiaryIsObserver = True
+      else do
+        pure None
+
+  -- create coupons for new beneficiaries
+  newBeneficiaryCouponCids <- forA newBeneficiaries $ \newBeneficiary -> do
+    create coupon with
+      amount = newBeneficiary.amount
+      beneficiary = newBeneficiary.beneficiary
+      beneficiaryIsObserver = True
+
+  return Api.RewardAssignmentV1.RewardCoupon_AssignBeneficiariesResult with
+    newBeneficiariesCouponCids = map toInterfaceContractId newBeneficiaryCouponCids
+    originalBeneficiaryRemainderCid = fmap toInterfaceContractId originalBeneficiaryRemainderCid
 
 
 -- instances
@@ -558,6 +636,12 @@ instance HasCheckedFetch LockedAmulet ForOwner where
 
 instance HasCheckedFetch AppRewardCoupon ForOwner where
   contractGroupId AppRewardCoupon{..} = ForOwner with dso; owner = fromOptional provider beneficiary
+
+instance HasCheckedFetch RewardCouponV2 ForOwner where
+  contractGroupId RewardCouponV2{..} = ForOwner with dso; owner = beneficiary
+
+instance HasCheckedFetch RewardCouponV2 ForDso where
+  contractGroupId RewardCouponV2{..} = ForDso with dso
 
 instance HasCheckedFetch SvRewardCoupon ForOwner where
   contractGroupId SvRewardCoupon{..} = ForOwner with dso; owner = beneficiary

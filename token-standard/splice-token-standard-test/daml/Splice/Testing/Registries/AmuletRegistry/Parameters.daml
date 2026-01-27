@@ -91,6 +91,8 @@ defaultAmuletConfig = AmuletConfig with
 
   optDevelopmentFundManager = None
 
+  rewardConfig = None
+
 -- | Default configuration schedule with single current amulet config
 defaultAmuletConfigSchedule : Schedule Time (AmuletConfig USD)
 defaultAmuletConfigSchedule = Schedule with
@@ -164,5 +166,5 @@ defaultSynchronizerFeesConfig : SynchronizerFeesConfig
 defaultSynchronizerFeesConfig = SynchronizerFeesConfig with
     baseRateTrafficLimits = defaultBaseRateTrafficLimits
     minTopupAmount = 1_000_000 -- 1MB
-    extraTrafficPrice = 1.0
+    extraTrafficPrice = 1.0 -- USD/MB
     readVsWriteScalingFactor = 4 -- charge 4 per 10,000, i.e., 0.04% of write cost for every read

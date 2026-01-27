@@ -127,11 +127,7 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice o
     DsoBootstrap_Bootstrap
 
   dsoUserId <- validateUserId "dso-user"
-  let app = AmuletApp with
-        dso
-        dsoUser = AmuletUser with
-          userId = dsoUserId
-          primaryParty = dso
+  let app = mkAmuletApp dso (AmuletUser dsoUserId dso)
 
   -- add more sv nodes
   forA_ (zip [sv2, sv3, sv4] ["sv2", "sv3", "sv4"]) $ \(svParty, svName) -> do
@@ -297,6 +293,19 @@ confirmAWC_MiningRound_Archive app = do
                 closedRoundCid = round._1
           confirmer = sv
         pure ()
+
+-- | Convenience function to confirm and execute an action requiring confirmation.
+confirmAndExecutionAction : AmuletApp -> ActionRequiringConfirmation -> Script ()
+confirmAndExecutionAction app action = do
+  [(dsoRulesCid, rules)] <- query @DsoRules app.dso
+  forA_ (Map.keys rules.svs) $ \sv -> do
+    -- mallory does not act
+    unless ("mallory" `T.isPrefixOf` partyToText sv) $ do
+      submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+        action
+        confirmer = sv
+      pure ()
+  executeAllConfirmedActions app
 
 executeAllConfirmedActions : AmuletApp -> Script ()
 executeAllConfirmedActions app = do
