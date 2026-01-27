@@ -6,10 +6,10 @@ import sbt.*
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.5.0-snapshot.20251121.14446.0.vb91b8238"
+  val version: String = "3.5.0-snapshot.20260108.14534.0.vc8a0078c"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
-  val transcode_version = "0.1.1-main.20251112.144.829.v5cc568a"
+  val transcode_version = "3.5.0-snapshot.20251205.150.903.vc31b0a4"
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
   // the non-sbt based docker build.
   val daml_compiler_version = sys.env("DAML_COMPILER_VERSION")
