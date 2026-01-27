@@ -3,7 +3,7 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
-.. _validator-delegations:
+.. _minting-delegations:
 
 Minting Delegations
 -------------------

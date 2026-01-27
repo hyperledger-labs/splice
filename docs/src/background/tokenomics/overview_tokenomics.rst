@@ -38,7 +38,7 @@ validator, the validator application runs background automation to mint all acti
 transactions using a key they control. As a consequence, the validator automation is not able to perform minting for external
 parties directly. For external parties, there are two options:
 
-1. Use a :ref:`minting delegation <validator-delegations>` to delegate reward collection to a validator,
+1. Use a :ref:`minting delegation <minting-delegations>` to delegate reward collection to a validator,
    avoiding the need to build custom automation.
 2. Develop custom automation to call :ref:`AmuletRules_Transfer
    <type-splice-amuletrules-amuletrulestransfer-23235>` at least once per round with all activity records as inputs.

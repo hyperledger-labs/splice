@@ -79,7 +79,7 @@ records generated for that party cannot be minted by the validator
 operator as this relies on the ``ValidatorRight`` contract. If reward
 minting is required, you have two options:
 
-1. Use a :ref:`minting delegation <validator-delegations>` to delegate reward
+1. Use a :ref:`minting delegation <minting-delegations>` to delegate reward
    collection to a validator
 2. Build your own minting automation.
 
