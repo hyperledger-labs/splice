@@ -8,19 +8,21 @@
 Minting Delegations
 -------------------
 
-Minting delegations allow a delegate to mint rewards on behalf of another party (the beneficiary).
+Minting delegations allow internal parties to instruct their validator node to automate the minting
+of rewards on behalf of an external party (the beneficiary) hosted on the same validator node.
 This is useful for external parties who want someone else to manage their reward collection
 without running their own wallet automation.
 
 .. note::
-   While this document focuses on validators as delegates, any user with the Delegations tab
-   visible in their wallet can act as a delegate. Validator operators can also use a separate
-   user account as the delegate rather than their operator account.
+   While this document focuses on validator operator parties as delegates, any user with the
+   Delegations tab visible in their wallet can act as a delegate. Validator operators can also
+   use an internal party with its own user account as the delegate rather than their
+   operator account.
 
 Overview
 ++++++++
 
-A **minting delegation** grants a validator (the delegate) the authority to:
+A **minting delegation** grants a delegate party the authority to:
 
 - Mint reward coupons on behalf of a beneficiary party
 - Auto-merge amulets for the beneficiary (up to the configured limit)
@@ -45,9 +47,9 @@ The delegation has the following key properties:
    * - Property
      - Description
    * - Beneficiary
-     - The party on whose behalf minting is performed
+     - The external party on whose behalf minting is performed
    * - Delegate
-     - The validator party authorized to perform minting operations
+     - The internal party authorized to perform minting operations
    * - Expiration
      - The time after which the delegation is no longer valid
    * - Amulet merge limit
