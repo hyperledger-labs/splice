@@ -21,8 +21,6 @@ import Splice.AmuletRules
 import Splice.Types
 import Splice.Util
 
-
-
 import DA.Exception
 
 
