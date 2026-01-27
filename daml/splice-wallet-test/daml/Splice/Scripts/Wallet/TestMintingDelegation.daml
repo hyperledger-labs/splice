@@ -83,6 +83,16 @@ testMintingDelegation = do
     expiresAt = now `addRelTime` days 60
     reason = "Test development fund coupon"
 
+  let rewardCouponV2Amount = 42.0
+  rewardCouponV2Cid <- submit app.dso $ createCmd RewardCouponV2 with
+    dso = app.dso
+    provider = provider2.primaryParty
+    beneficiary = beneficiary
+    amount = rewardCouponV2Amount
+    expiresAt = now `addRelTime` days 60
+    round = openRound.round
+    beneficiaryIsObserver = False
+
   -- Wait for rounds to advance so coupons can be minted
   runNextIssuance app
   runNextIssuance app
@@ -106,7 +116,8 @@ testMintingDelegation = do
         InputAppRewardCoupon appRewardCouponCid,
         InputValidatorRewardCoupon validatorRewardCouponCid,
         InputUnclaimedActivityRecord unclaimedActivityRecordCid,
-        InputDevelopmentFundCoupon developmentFundCouponCid
+        InputDevelopmentFundCoupon developmentFundCouponCid,
+        InputRewardCouponV2 rewardCouponV2Cid
       ]
     context = PaymentTransferContext with
       context
@@ -119,7 +130,7 @@ testMintingDelegation = do
 
   -- expected rewards based on issuance rates
   let expectedValidatorFaucetAmount = getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingRound
-  let expectedAppReward = appRewardCouponAmount * issuingRound.issuancePerUnfeaturedAppRewardCoupon
+  let expectedAppReward = appRewardCouponAmount * issuingRound.issuancePerUnfeaturedAppRewardCoupon + rewardCouponV2Amount
   let expectedValidatorReward = validatorRewardCouponAmount * issuingRound.issuancePerValidatorRewardCoupon
   let expectedTotal = expectedValidatorFaucetAmount + expectedAppReward + expectedValidatorReward + unclaimedRewardCouponAmount + developmentFundCouponAmount
 

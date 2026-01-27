@@ -21,7 +21,6 @@ import Splice.AmuletRules
 import Splice.Types
 import Splice.Util
 
-
 data ExternalPartyAmuletRules_ExpireAmuletAllocationInput = ExternalPartyAmuletRules_ExpireAmuletAllocationInput
   with
     allocationCid : ContractId AmuletAllocation

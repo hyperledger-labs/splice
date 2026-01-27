@@ -34,6 +34,7 @@ scaleAmuletConfig amuletPrice config = AmuletConfig with
   featuredAppActivityMarkerAmount = fmap (/ amuletPrice) config.featuredAppActivityMarkerAmount
   optDevelopmentFundManager = config.optDevelopmentFundManager
   externalPartyConfigStateTickDuration = config.externalPartyConfigStateTickDuration
+  rewardConfig = config.rewardConfig
 
 test : Script ()
 test = script do
