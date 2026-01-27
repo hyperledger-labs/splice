@@ -9,10 +9,12 @@
 -- is a long-standing plan.
 module Splice.Ans.AmuletConversionRateFeed where
 
+import DA.Action (when)
 import DA.Assert
 import DA.Foldable
 import DA.Time
 import Splice.AmuletRules
+import Splice.AmuletConfig
 import Splice.Api.FeaturedAppRightV1 qualified as Api
 import Splice.Schedule
 import Splice.Types
@@ -58,11 +60,12 @@ template AmuletConversionRateFeed
          -- always be slightly slower than the minimum rate limit.
          -- we add one extra microseconds so now + 5 minutes is allowed and the caller does not need to add the microsecond
          assertWithinDeadline "newNextUpdateAfter - 0.5 tickDuration" (newNextUpdateAfter `addRelTime` convertMicrosecondsToRelTime (- (convertRelTimeToMicroseconds currentConfig.tickDuration) / 2 + 1))
-         forA_ markerContextO $ \markerContext -> do
-           _ <- fetchCheckedInterface ForOwner{dso, owner = publisher} markerContext.featuredAppRightCid
-           exercise markerContext.featuredAppRightCid Api.FeaturedAppRight_CreateActivityMarker
-             with
-               beneficiaries = markerContext.beneficiaries
+         when (useFeaturedAppMarkers $ fmap (.mintingVersion) currentConfig.rewardConfig) $
+           forA_ markerContextO $ \markerContext -> do
+             _ <- fetchCheckedInterface ForOwner{dso, owner = publisher} markerContext.featuredAppRightCid
+             exercise markerContext.featuredAppRightCid Api.FeaturedAppRight_CreateActivityMarker
+               with
+                 beneficiaries = markerContext.beneficiaries
          cid <- create this with
            amuletConversionRate
            nextUpdateAfter = Some newNextUpdateAfter

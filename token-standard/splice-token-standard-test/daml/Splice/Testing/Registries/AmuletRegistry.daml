@@ -34,11 +34,11 @@ module Splice.Testing.Registries.AmuletRegistry
 import DA.Action (unless, when)
 import DA.Date
 import DA.Foldable (forA_)
-import qualified DA.TextMap as TextMap
 import DA.Optional (isSome)
 import DA.List.Total
-import DA.Time
+import qualified DA.TextMap as TextMap
 import DA.Text qualified as T
+import DA.Time
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 as Api.Token.HoldingV1
