@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.scan.util
+import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 import org.lfdecentralizedtrust.splice.util.Contract
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.definitions.GetChoiceContextRequest
@@ -24,6 +25,7 @@ import scala.jdk.CollectionConverters.*
 
 class HttpTokenStandardAllocationHandler(
     store: ScanStore,
+    contractFetcher: ChoiceContextContractFetcher,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -102,7 +104,7 @@ class HttpTokenStandardAllocationHandler(
       tc: TraceContext
   ): Future[definitions.ChoiceContext] = {
     for {
-      amuletAlloc <- store.multiDomainAcsStore
+      amuletAlloc <- contractFetcher
         .lookupContractById(amuletallocation.AmuletAllocation.COMPANION)(
           new amuletallocation.AmuletAllocation.ContractId(
             allocationId
@@ -121,13 +123,14 @@ class HttpTokenStandardAllocationHandler(
         ChoiceContextBuilder,
       ](
         s"AmuletAllocation '$allocationId'",
-        amuletAlloc.contract.payload.lockedAmulet,
-        amuletAlloc.contract.payload.allocation.settlement.settleBefore,
+        amuletAlloc.payload.lockedAmulet,
+        amuletAlloc.payload.allocation.settlement.settleBefore,
         requireLockedAmulet,
         Option.when(canBeFeatured)(
           PartyId.tryFromProtoPrimitive(amuletAlloc.payload.allocation.settlement.executor)
         ),
         store,
+        contractFetcher,
         clock,
         new ChoiceContextBuilder(_, excludeDebugFields),
       )

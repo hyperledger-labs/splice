@@ -32,7 +32,7 @@ Once you see the following banner for the console you have successfully gained a
 Participant console
 +++++++++++++++++++
 
-1. Obtain an authentication token as specified in `the Canton authentication docs <https://docs.digitalasset.com/operate/3.3/howtos/secure/apis/jwt.html>`_
+1. Obtain an authentication token as specified in `the Canton authentication docs <https://docs.digitalasset.com/operate/3.4/howtos/secure/apis/jwt.html>`_
 2. Ensure you can access the participant's ports 5001 and 5002
 3. Add the configuration to a local file `console.conf`
     .. code-block::

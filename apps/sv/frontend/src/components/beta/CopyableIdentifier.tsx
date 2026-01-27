@@ -7,6 +7,7 @@ export type CopyableIdentifierSize = 'small' | 'large';
 
 interface CopyableIdentifierProps {
   value: string;
+  copyValue?: string;
   badge?: string;
   size: CopyableIdentifierSize;
   'data-testid': string;
@@ -14,6 +15,7 @@ interface CopyableIdentifierProps {
 
 const CopyableIdentifier: React.FC<CopyableIdentifierProps> = ({
   value,
+  copyValue,
   badge,
   size,
   'data-testid': testId,
@@ -32,7 +34,7 @@ const CopyableIdentifier: React.FC<CopyableIdentifierProps> = ({
     <IconButton
       color="secondary"
       data-testid={`${testId}-copy-button`}
-      onClick={() => navigator.clipboard.writeText(value)}
+      onClick={() => navigator.clipboard.writeText(copyValue ?? value)}
     >
       <ContentCopy sx={{ fontSize: size === 'small' ? '14px' : '18px' }} />
     </IconButton>

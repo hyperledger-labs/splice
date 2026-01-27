@@ -15,7 +15,7 @@ object InitialPackageVersions {
 
   def initialPackageVersion(pkg: PackageResource): String =
     initialPackageVersionMap.getOrElse(
-      pkg.bootstrap.metadata.name,
-      pkg.bootstrap.metadata.version.toString,
+      pkg.latest.metadata.name,
+      pkg.latest.metadata.version.toString,
     )
 }

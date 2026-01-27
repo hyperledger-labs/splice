@@ -1,11 +1,14 @@
-# -*- shell-script -*-
+#!/usr/bin/env bash
+
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 # common functions for use with bash based clis
 # all functions must be prefixed with _
 
 # make a fancy header
 function _header(){
-  local msg="$@"
+  local msg="$*"
   local vbar
   printf -v vbar '─%.0s' $(seq $((${#msg} +2)) )
   local out
@@ -30,6 +33,7 @@ function _prefix(){
   else
     cat
   fi | while read -r; do
+    # shellcheck disable=SC2059
     printf -- "${format}" "${REPLY}"
   done
 }
@@ -60,7 +64,7 @@ function _debug() {
 
 # issue a user friendly red error
 function _error_msg(){
-  echo -e "\e[1;31mERROR: $@\e[0m" >&2
+  echo -e "\e[1;31mERROR: $*\e[0m" >&2
 }
 
 # issue a user friendly green informational message
@@ -84,12 +88,12 @@ function _warning(){
 
 # prints a little green check mark before $@
 function _ok(){
-  echo -e "\e[32;1m✔\e[0m ${@}"
+  echo -e "\e[32;1m✔\e[0m $*"
 }
 
 # prints a little red x mark before $@ and sets check to 1 if you are using it
 function _nope(){
-  echo -e "\e[31;1m✘\e[0m ${@}"
+  echo -e "\e[31;1m✘\e[0m $*"
 }
 
 
@@ -130,7 +134,8 @@ function _join(){
 
 # buffer the output of a long command and output it when it is done
 function _pipe_buffer(){
-  local buff="$(mktemp)"
+  local buff
+  buff="$(mktemp)"
   cat > "${buff}"
   cat "${buff}"
 }
@@ -138,7 +143,7 @@ function _pipe_buffer(){
 
 # just sha returns just the sha without the file names
 function _just_sha(){
-  sha256sum $@ | cut -f1 -d' '
+  sha256sum "$@" | cut -f1 -d' '
 }
 
 # checks if a function exists
@@ -149,8 +154,9 @@ function _has_func(){
 
 # copies a function
 function _cp_func(){
-  _has_func $1 || return
-  local code="$(declare -f "$1" | tail -n+2)"
+  _has_func "$1" || return
+  local code
+  code="$(declare -f "$1" | tail -n+2)"
   eval "function ${2}()${code}"
 }
 
@@ -158,14 +164,14 @@ function _cp_func(){
 # basic confirm action
 function _confirm(){
   echo -e "$@"
-  read -p '[y/n]: '
+  read -r -p '[y/n]: '
   [ "${REPLY}" == 'y' ] || exit 0
 }
 
 # run a command with set -x
 function _set_x(){
   set -x
-  $@ ; RC=$?
+  "$@" ; RC=$?
   { set +x; } 2>/dev/null
   return $RC
 }

@@ -104,14 +104,7 @@ export function installParticipant(
         validatorConfig.participant?.additionalEnvVars ?? []
       ),
       enablePostgresMetrics: true,
-      resources: {
-        requests: {
-          memory: '4Gi',
-        },
-        limits: {
-          memory: '8Gi',
-        },
-      },
+      resources: validatorConfig.participant.resources,
       disableAuth: disableAuth || false,
     },
     version,

@@ -68,6 +68,34 @@ class AcsSnapshotStore(
       .value
   }
 
+  def lookupSnapshotAfter(
+      migrationId: Long,
+      after: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Option[AcsSnapshot]] = {
+
+    val select =
+      sql"select snapshot_record_time, migration_id, history_id, first_row_id, last_row_id, unlocked_amulet_balance, locked_amulet_balance "
+    val orderLimit = sql" order by snapshot_record_time asc limit 1 "
+    val sameMig = select ++ sql""" from acs_snapshot
+            where snapshot_record_time > $after
+              and migration_id = $migrationId
+              and history_id = $historyId """ ++ orderLimit
+    val largerMig = select ++ sql""" from acs_snapshot
+            where migration_id > $migrationId
+              and history_id = $historyId """ ++ orderLimit
+
+    val query =
+      sql"select * from ((" ++ sameMig ++ sql") union all (" ++ largerMig ++ sql")) all_queries order by snapshot_record_time asc limit 1"
+
+    storage
+      .querySingle(
+        query.toActionBuilder.as[AcsSnapshot].headOption,
+        "lookupSnapshotAfter",
+      )
+      .value
+
+  }
+
   def insertNewSnapshot(
       lastSnapshot: Option[AcsSnapshot],
       migrationId: Long,
@@ -81,6 +109,7 @@ class AcsSnapshotStore(
       }
     }.flatMap { _ =>
       val from = lastSnapshot.map(_.snapshotRecordTime).getOrElse(CantonTimestamp.MinValue)
+      val gtFrom = lastSnapshot.fold(">=")(_ => ">")
       val previousSnapshotDataFilter = lastSnapshot match {
         case Some(AcsSnapshot(_, _, _, firstRowId, lastRowId, _, _)) =>
           sql"where snapshot.row_id >= $firstRowId and snapshot.row_id <= $lastRowId"
@@ -91,8 +120,8 @@ class AcsSnapshotStore(
         sql"""
           where #$tableAlias.history_id = $historyId
             and #$tableAlias.migration_id = $migrationId
-            and #$tableAlias.record_time >= $from -- this will be >= MinValue for the first snapshot, which includes ACS imports
-            and #$tableAlias.record_time < $until
+            and #$tableAlias.record_time #$gtFrom $from -- this will be >= MinValue for the first snapshot, which includes ACS imports, otherwise >
+            and #$tableAlias.record_time <= $until
            """
       val statement = (sql"""
             with previous_snapshot_data as (select contract_id

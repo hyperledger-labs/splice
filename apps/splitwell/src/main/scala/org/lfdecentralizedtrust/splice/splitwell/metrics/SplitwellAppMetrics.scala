@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.splitwell.metrics
 
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import org.lfdecentralizedtrust.splice.BaseSpliceMetrics
 import com.digitalasset.canton.metrics.DbStorageHistograms
 
@@ -14,4 +15,5 @@ import com.digitalasset.canton.metrics.DbStorageHistograms
 class SplitwellAppMetrics(
     metricsFactory: LabeledMetricsFactory,
     storageHistograms: DbStorageHistograms,
-) extends BaseSpliceMetrics("splitwell", metricsFactory, storageHistograms) {}
+    loggerFactory: NamedLoggerFactory,
+) extends BaseSpliceMetrics("splitwell", metricsFactory, storageHistograms, loggerFactory) {}

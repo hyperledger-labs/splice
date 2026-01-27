@@ -70,7 +70,7 @@ describe('DSO Pending Fields', () => {
       </SvConfigProvider>
     );
 
-    expect(await screen.findByText('Log In')).toBeDefined();
+    expect(await screen.findByText('Log In')).toBeInTheDocument();
 
     const input = screen.getByRole('textbox');
     await user.type(input, 'sv1');
@@ -78,7 +78,7 @@ describe('DSO Pending Fields', () => {
     const button = screen.getByRole('button', { name: 'Log In' });
     await user.click(button);
 
-    expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
+    expect(await screen.findAllByDisplayValue(svPartyId)).not.toBe([]);
   });
 });
 
@@ -116,7 +116,7 @@ describe('Pending Fields', () => {
     const acsPendingValueDisplay = await screen.findByTestId(
       'config-pending-value-decentralizedSynchronizerAcsCommitmentReconciliationInterval1'
     );
-    expect(acsPendingValueDisplay).toBeDefined();
+    expect(acsPendingValueDisplay).toBeInTheDocument();
     expect(acsPendingValueDisplay).toHaveTextContent('Pending Configuration: 2100');
     expect(acsPendingValueDisplay).toHaveTextContent(
       /This pending configuration will go into effect in 4 days/
@@ -130,7 +130,7 @@ describe('Pending Fields', () => {
     const trafficThresholdPendingValueDisplay = await screen.findByTestId(
       'config-pending-value-numMemberTrafficContractsThreshold'
     );
-    expect(trafficThresholdPendingValueDisplay).toBeDefined();
+    expect(trafficThresholdPendingValueDisplay).toBeInTheDocument();
     expect(trafficThresholdPendingValueDisplay).toHaveTextContent('Pending Configuration: 100');
     expect(trafficThresholdPendingValueDisplay).toHaveTextContent(
       /This pending configuration will go into effect at Threshold/

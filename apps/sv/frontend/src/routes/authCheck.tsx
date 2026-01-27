@@ -9,7 +9,7 @@ import {
   useUserState,
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { useEffect, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 

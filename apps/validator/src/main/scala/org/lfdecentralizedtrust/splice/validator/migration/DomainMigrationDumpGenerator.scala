@@ -14,7 +14,6 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   SpliceLedgerConnection,
 }
-import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
 import org.lfdecentralizedtrust.splice.migration.AcsExporter.AcsExportForParties.AllParticipantParties
 import org.lfdecentralizedtrust.splice.migration.{
@@ -76,7 +75,6 @@ class DomainMigrationDumpGenerator(
         dars = dars,
         createdAt = createdAt,
         synchronizerWasPaused = true,
-        acsFormat = http.DomainMigrationDump.AcsFormat.LedgerApi,
       )
       logger.info(
         show"Finished generating $result"
@@ -116,7 +114,6 @@ class DomainMigrationDumpGenerator(
         dars = dars,
         createdAt = Instant.now(),
         synchronizerWasPaused = false,
-        acsFormat = http.DomainMigrationDump.AcsFormat.LedgerApi,
       )
     }
   }

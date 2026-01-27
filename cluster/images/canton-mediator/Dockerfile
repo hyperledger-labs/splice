@@ -1,13 +1,12 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-ARG base_version
-FROM canton:${base_version}
+ARG canton_version
+ARG image_sha256
 
-ARG base_version
-LABEL org.opencontainers.image.base.name="canton:${base_version}"
+FROM europe-docker.pkg.dev/da-images/public-all/docker/canton-mediator:${canton_version}@${image_sha256}
 
-EXPOSE 5007
-EXPOSE 10013
-
-COPY app.conf /app/
+COPY additional-config.conf /app/
+USER root
+RUN chown -R nonroot:nonroot /app/additional-config.conf
+USER nonroot

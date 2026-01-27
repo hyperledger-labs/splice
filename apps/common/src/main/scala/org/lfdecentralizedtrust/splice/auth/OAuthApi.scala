@@ -10,7 +10,7 @@ import org.apache.pekko.http.scaladsl.model.{FormData, HttpMethods, HttpRequest,
 import org.apache.pekko.http.scaladsl.unmarshalling.{Unmarshal, Unmarshaller}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.{HttpClient, HttpClientMetrics}
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
@@ -65,6 +65,7 @@ trait OAuthApiJson extends SprayJsonSupport with DefaultJsonProtocol {
 
 class OAuthApi(
     requestTimeout: NonNegativeDuration,
+    httpClientMetrics: HttpClientMetrics,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit actorSystem: ActorSystem)
     extends OAuthApiJson
@@ -72,9 +73,12 @@ class OAuthApi(
   implicit val ec: ExecutionContext = actorSystem.dispatcher
   import OAuthApi.*
 
+  private val clientName = "OAuthApi"
+
   private val httpClient = HttpClient(
     ApiLoggingConfig(),
     HttpClient.HttpRequestParameters(requestTimeout),
+    httpClientMetrics,
     logger,
   )
 
@@ -98,7 +102,7 @@ class OAuthApi(
     logger.debug(s"Loading OIDC Well-Known Configuration from $url")
 
     for {
-      res <- httpClient.executeRequest(
+      res <- httpClient.executeRequest(clientName, "getWellKnown")(
         HttpRequest(
           method = HttpMethods.GET,
           uri = url,
@@ -122,13 +126,14 @@ class OAuthApi(
 
     val payload = ClientCredentialRequest(clientId, clientSecret, audience, scope)
 
-    val responseFuture: Future[HttpResponse] = httpClient.executeRequest(
-      HttpRequest(
-        method = HttpMethods.POST,
-        uri = tokenUrl,
-        entity = payload.toFormData.toEntity,
+    val responseFuture: Future[HttpResponse] =
+      httpClient.executeRequest(clientName, "requestToken")(
+        HttpRequest(
+          method = HttpMethods.POST,
+          uri = tokenUrl,
+          entity = payload.toFormData.toEntity,
+        )
       )
-    )
 
     for {
       res <- responseFuture

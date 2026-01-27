@@ -39,6 +39,7 @@ export const TextField: React.FC<TextFieldProps> = props => {
         }
         onChange={e => field.handleChange(e.target.value)}
         inputProps={{ 'data-testid': id }}
+        id={id}
         {...muiTextFieldProps}
       />
       {subtitle && (

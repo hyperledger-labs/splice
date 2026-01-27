@@ -456,6 +456,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -584,6 +591,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -755,6 +769,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -883,6 +904,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -957,6 +985,10 @@
           "schema": "validator1",
           "secretName": "validator-pg-secrets",
           "user": "cnadmin"
+        },
+        "pvc": {
+          "volumeName": "domain-migration-validator-pvc",
+          "volumeStorageClass": "standard-rwo"
         },
         "resources": {},
         "scanAddress": "http://scan-app.sv-1:5012",

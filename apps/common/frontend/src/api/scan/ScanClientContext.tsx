@@ -19,7 +19,16 @@ export const ScanClientProvider: React.FC<React.PropsWithChildren<ScanProps>> = 
   const client: openapi.ScanApi | undefined = useMemo(() => {
     const configuration = openapi.createConfiguration({
       baseServer: new openapi.ServerConfiguration(url, {}),
-      promiseMiddleware: [new OpenAPILoggingMiddleware('scan')],
+      promiseMiddleware: [
+        new OpenAPILoggingMiddleware('scan'),
+        {
+          pre: async context => {
+            context.setHeaderParam('x-source-ui', 'scan');
+            return context;
+          },
+          post: async context => context,
+        },
+      ],
     });
 
     return new openapi.ScanApi(configuration);

@@ -3,6 +3,7 @@
 
 module Splice.Scripts.TestAmuletRulesTransfer where
 
+import DA.Action (replicateA_)
 import DA.Assert
 import DA.Foldable (forA_)
 import DA.List
@@ -110,6 +111,7 @@ testUsageFees = do
     inputUnclaimedActivityRecordAmount = Some 0.0
     inputValidatorFaucetAmount = Some 0.0
     inputSvRewardAmount = 0.0
+    inputDevelopmentFundAmount = Some 0.0
     inputAmuletAmount = 100.0
     balanceChanges = Map.empty
     holdingFees = 0.0 -- no holding fees charged on transfer
@@ -574,5 +576,68 @@ testUnclaimedActivityRecordTransferInput = do
   (_, openRound) <- getLatestActiveOpenRound app
   let createFee = openRound.transferConfigUsd.createFee.fee * openRound.amuletPrice
   transferResult.summary.senderChangeAmount === amountToMint - createFee
+  transferResult.summary.inputUnclaimedActivityRecordAmount === Some amountToMint
+
+  pure ()
+
+testInputDevelopmentFundCoupon : Script ()
+testInputDevelopmentFundCoupon = do
+  defaultAppWithUsers@DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  baseConfig <- getAmuletConfig app
+  -- Replace the default AmuletConfig with a 0.05% allocation for the development fund.
+  -- This configuration applies to the next open round.
+  replaceDevelopmentFundConfig app baseConfig (Some alice.primaryParty) (Some 0.05)
+
+  -- Run 3 issuances for the already open rounds without the development fund configuration.
+  -- No development fund coupons are minted.
+  replicateA_ 3 $ runNextIssuance app
+  -- Mint one development fund coupon per issuance (two total).
+  runNextIssuance app
+  runNextIssuance app
+  context <- getPaymentTransferContext app alice
+  [(cid1, coupon1), (cid2, coupon2)] <- query @UnclaimedDevelopmentFundCoupon app.dso
+  let totalAmount = coupon1.amount + coupon2.amount
+
+  -- Allocate a DevelopmentFundCoupon
+  now <- getTime
+  let
+    expiresAt = addRelTime now (days 2)
+    reason = "Bob fixed issue XXX"
+  AmuletRules_AllocateDevelopmentFundCouponResult
+    { developmentFundCouponCid, optUnclaimedDevelopmentFundCouponCid = None } <-
+      allocateDevelopmentFundCoupon app alice.primaryParty bob.primaryParty totalAmount expiresAt reason [cid1, cid2]
+
+  -- Unhappy - expiresAt has been reached
+  setTime $ addRelTime expiresAt (minutes 1)
+  submitMultiMustFail [bob.primaryParty] [app.dso] $
+    exerciseCmd context.amuletRules AmuletRules_Transfer with
+      transfer = Transfer with
+        sender = bob.primaryParty
+        provider = bob.primaryParty
+        inputs = [InputDevelopmentFundCoupon developmentFundCouponCid]
+        outputs = []
+        beneficiaries = None
+      context = context.context
+      expectedDso = Some app.dso
+  setTime now
+
+  -- Happy
+  transferResult <-
+    checkTransferMetadata app TxKind_MergeSplit bob.primaryParty $
+    checkBalanceChanges defaultAppWithUsers $
+      submitMulti [bob.primaryParty] [app.dso] $
+        exerciseCmd context.amuletRules AmuletRules_Transfer with
+          transfer = Transfer with
+            sender = bob.primaryParty
+            provider = bob.primaryParty
+            inputs = [InputDevelopmentFundCoupon developmentFundCouponCid]
+            outputs = []
+            beneficiaries = None
+          context = context.context
+          expectedDso = Some app.dso
+  (_, openRound) <- getLatestActiveOpenRound app
+  let createFee = openRound.transferConfigUsd.createFee.fee * openRound.amuletPrice
+  transferResult.summary.senderChangeAmount === totalAmount - createFee
+  transferResult.summary.inputDevelopmentFundAmount === Some totalAmount
 
   pure ()

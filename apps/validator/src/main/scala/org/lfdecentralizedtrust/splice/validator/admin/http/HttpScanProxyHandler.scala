@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.validator.admin.http
 
+import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.http.v0.definitions.MaybeCachedContractWithState
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scanproxy as v0}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
@@ -95,6 +96,31 @@ class HttpScanProxyHandler(
             issuingMiningRounds = issuing.map(_.toHttp).toVector,
           )
         )
+      }
+    }
+  }
+
+  override def getHoldingsSummaryAt(
+      respond: v0.ScanproxyResource.GetHoldingsSummaryAtResponse.type
+  )(
+      body: definitions.HoldingsSummaryRequest
+  )(tUser: AuthenticatedRequest): Future[v0.ScanproxyResource.GetHoldingsSummaryAtResponse] = {
+    implicit val AuthenticatedRequest(_, traceContext) = tUser
+    withSpan(s"$workflowId.getHoldingsSummaryAt") { implicit traceContext => _ =>
+      for {
+        summaryOpt <- scanConnection.getHoldingsSummaryAt(
+          CantonTimestamp.assertFromInstant(body.recordTime.toInstant),
+          body.migrationId,
+          body.ownerPartyIds.map(PartyId.tryFromProtoPrimitive),
+          body.recordTimeMatch,
+          body.asOfRound,
+        )
+      } yield {
+        summaryOpt match {
+          case Some(summary) => respond.OK(summary)
+          case None =>
+            respond.NotFound(definitions.ErrorResponse("Summary not found for given parameters"))
+        }
       }
     }
   }

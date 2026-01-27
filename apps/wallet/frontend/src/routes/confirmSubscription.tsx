@@ -11,7 +11,7 @@ import {
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import BigNumber from 'bignumber.js';
 import { useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router';
 
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
 

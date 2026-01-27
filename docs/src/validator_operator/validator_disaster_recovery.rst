@@ -340,7 +340,7 @@ it on multiple nodes, you will need to adjust this.
 We'll need the topology transaction and the definitions defined here later again. Either keep your Canton console open or save them.
 
 The topology transaction hash needs to be signed externally following the
-`documentation for external signing <https://docs.digitalasset.com/build/3.3/tutorials/app-dev/external_signing_onboarding.html#external-party-onboarding-transactions>`_.
+`documentation for external signing <https://docs.digitalasset.com/build/3.4/tutorials/app-dev/external_signing_onboarding.html#external-party-onboarding-transactions>`_.
 
 After you signed it externally, you need to construct the signed
 topology transaction, sign it additionally through the participant and

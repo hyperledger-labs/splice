@@ -1,6 +1,7 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
+{-# LANGUAGE MultiWayIf #-}
 module Splice.AmuletRules where
 
 import Prelude hiding (forA)
@@ -64,6 +65,7 @@ data AmuletRules_AdvanceOpenMiningRoundsResult = AmuletRules_AdvanceOpenMiningRo
 
 data AmuletRules_MiningRound_StartIssuingResult = AmuletRules_MiningRound_StartIssuingResult with
     issuingRoundCid : ContractId IssuingMiningRound
+    unclaimedDevelopmentFundCouponCid : Optional (ContractId UnclaimedDevelopmentFundCoupon)
 
 data AmuletRules_MiningRound_CloseResult = AmuletRules_MiningRound_CloseResult with
     closedRoundCid : ContractId ClosedMiningRound
@@ -75,6 +77,13 @@ data AmuletRules_ClaimExpiredRewardsResult = AmuletRules_ClaimExpiredRewardsResu
 
 data AmuletRules_MergeUnclaimedRewardsResult = AmuletRules_MergeUnclaimedRewardsResult with
     unclaimedRewardCid : ContractId UnclaimedReward
+
+data AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult = AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult with
+    unclaimedDevelopmentFundCouponCid : ContractId UnclaimedDevelopmentFundCoupon
+
+data AmuletRules_AllocateDevelopmentFundCouponResult = AmuletRules_AllocateDevelopmentFundCouponResult with
+    developmentFundCouponCid : ContractId DevelopmentFundCoupon
+    optUnclaimedDevelopmentFundCouponCid : Optional (ContractId UnclaimedDevelopmentFundCoupon)
 
 data AmuletRules_SetConfigResult = AmuletRules_SetConfigResult with
     newAmuletRules : ContractId AmuletRules
@@ -450,6 +459,12 @@ template AmuletRules
             dso
             amount = totalUnclaimedRewards
 
+        -- record unclaimed development fund coupon contract
+        unclaimedDevelopmentFundCouponCid <-
+          case params.optAmuletsToIssueToDevelopmentFund of
+            Some amount | amount > 0.0 -> Some <$> create UnclaimedDevelopmentFundCoupon with dso; amount
+            _ -> pure None
+
         -- create issuing round
         now <- getTime
         let tickDuration = miningRound.tickDuration
@@ -578,6 +593,68 @@ template AmuletRules
           amount = sum archivedAmounts
 
         return AmuletRules_MergeUnclaimedRewardsResult with ..
+
+    nonconsuming choice AmuletRules_MergeUnclaimedDevelopmentFundCoupons : AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult
+      -- ^ Batch merge of unclaimed development fund coupons
+      with
+        unclaimedDevelopmentFundCouponCids : [ContractId UnclaimedDevelopmentFundCoupon]
+      controller dso
+      do
+        require "More than one unclaimed development fund coupon contract" (length unclaimedDevelopmentFundCouponCids > 1)
+
+        -- archive all given coupons
+        archivedAmounts <- forA unclaimedDevelopmentFundCouponCids $ \unclaimedDevelopmentFundCouponCid -> do
+          unclaimedDevelopmentFundCoupon <- fetchAndArchive (ForDso with dso) unclaimedDevelopmentFundCouponCid
+          pure unclaimedDevelopmentFundCoupon.amount
+
+        -- create a new unclaimed development fund coupon over the total
+        unclaimedDevelopmentFundCouponCid <- create UnclaimedDevelopmentFundCoupon with
+          dso
+          amount = sum archivedAmounts
+
+        return AmuletRules_MergeUnclaimedDevelopmentFundCouponsResult with ..
+
+    nonconsuming choice AmuletRules_AllocateDevelopmentFundCoupon : AmuletRules_AllocateDevelopmentFundCouponResult
+      -- ^ Allows the Development Fund manager to allocate a specified amount from a
+      -- collection of UnclaimedDevelopmentFundCoupons to a beneficiary, generating a
+      -- DevelopmentFundCoupon and producing a leftover unclaimed coupon if applicable.
+      with
+        unclaimedDevelopmentFundCouponCids : [ContractId UnclaimedDevelopmentFundCoupon]
+        beneficiary : Party
+        amount : Decimal
+        expiresAt : Time
+        reason : Text
+        fundManager : Party
+      controller fundManager
+      do
+        -- Verify expiry
+        assertWithinDeadline "DevelopmentFundCoupon.expiresAt" expiresAt
+
+        -- Verify fundManager
+        configUsd <- getValueAsOfLedgerTime configSchedule
+        case configUsd.optDevelopmentFundManager of
+          None -> abort "DevelopmentFundCoupon cannot be allocated without a Development Fund manager configured"
+          Some developmentFundManager ->
+            require ("controller is the configured Development Fund manager: " <> show developmentFundManager) $
+              developmentFundManager == fundManager
+
+        -- Verify the amount and create a leftover UnclaimedDevelopmentFundCoupon if needed
+        totalUnclaimedDevelopmentFundCoupons <- sum <$> forA unclaimedDevelopmentFundCouponCids \cid -> do
+          coupon <- fetchAndArchive (ForDso with dso) cid
+          pure coupon.amount
+        let leftover = totalUnclaimedDevelopmentFundCoupons - amount
+        optUnclaimedDevelopmentFundCouponCid <-
+          if | leftover < 0.0 -> abort $ "insufficient amount to cover the requested allocation: " <> show (negate leftover)
+             | leftover == 0.0 -> pure None
+             | otherwise -> Some <$> create UnclaimedDevelopmentFundCoupon with dso; amount = leftover
+
+        -- record development fund coupon contract
+        developmentFundCouponCid <- create DevelopmentFundCoupon with
+          dso; beneficiary; fundManager; amount; expiresAt; reason
+
+        return AmuletRules_AllocateDevelopmentFundCouponResult with
+          developmentFundCouponCid
+          optUnclaimedDevelopmentFundCouponCid
 
     -- This allows fetchByKey-style fetches if you have readAs
     -- but not actAs claims.
@@ -749,6 +826,7 @@ executeTransfer config context dso t = do
           nonZeroMetadata appRewardAmountMetaKey summary.inputAppRewardAmount $
           nonZeroMetadata validatorRewardAmountMetaKey summary.inputValidatorRewardAmount $
           optionalNonZeroMetadata unclaimedActivityRecordAmountMetaKey summary.inputUnclaimedActivityRecordAmount $
+          optionalNonZeroMetadata developmentFundAmountMetaKey summary.inputDevelopmentFundAmount $
           TextMap.empty
 
   return TransferResult with
@@ -778,6 +856,9 @@ data TransferInputsSummary = TransferInputsSummary with
     totalUnclaimedActivityRecordAmount : Optional Decimal
       -- ^ Note: Made optional as the addition of this field is checked by the upgrade checker
       -- on package upload because `TransferInputsSummary` is serializable.
+    totalDevelopmentFundAmount : Optional Decimal
+      -- ^ Note: Same rationale as above — made optional to ensure compatibility with
+      -- the upgrade checker on package upload because `TransferInputsSummary` is serializable.
   deriving (Eq, Show)
 
 type TransferOutputsSummary = [PreprocessedTransferOutput]
@@ -836,6 +917,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
     foldlA (summarizeAndConsumeInput csum.openRound.round) initialSummary inps
   where
     forOwner = ForOwner with dso; owner = sender
+    forDso = ForDso with dso
 
     initialSummary = TransferInputsSummary with
       totalAmuletAmount = 0.0
@@ -847,6 +929,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
       amountArchivedAsOfRoundZero = 0.0
       changeToHoldingFeesRate = 0.0
       totalUnclaimedActivityRecordAmount = Some 0.0
+      totalDevelopmentFundAmount = Some 0.0
 
     summarizeAndConsumeInput _round s (InputAmulet amuletCid) = do
       amulet <- fetchAndArchive forOwner amuletCid
@@ -863,6 +946,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero + getValueAsOfRound0 amulet.amount
         changeToHoldingFeesRate = s.changeToHoldingFeesRate - amulet.amount.ratePerRound.rate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
     summarizeAndConsumeInput _round s (InputAppRewardCoupon couponCid) = do
       coupon <- fetchAndArchive forOwner couponCid
@@ -881,10 +965,11 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
     summarizeAndConsumeInput _round s (InputValidatorRewardCoupon couponCid) = do
       -- we must and do use the validator right to archive the coupon of the user
-      coupon <- fetchButArchiveLater (ForDso with dso) couponCid
+      coupon <- fetchButArchiveLater forDso couponCid
       do
         rightCid <- getValidatorRight csum coupon.user
         exercise couponCid ValidatorRewardCoupon_ArchiveAsValidator with
@@ -902,6 +987,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
     summarizeAndConsumeInput _round s (InputSvRewardCoupon couponCid) = do
       -- we use the SvRewardCoupon_ArchiveAsBeneficiary choice to signal the archival of the coupon
@@ -920,6 +1006,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
     summarizeAndConsumeInput _round s (InputValidatorLivenessActivityRecord recordCid) = do
       record <- fetchAndArchive forOwner recordCid
@@ -936,6 +1023,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
     summarizeAndConsumeInput _round s (ExtTransferInput _dummyUnitField optInputValidatorFaucetCoupon) = do
       optional (pure s) (summarizeAndConsumeValidatorFaucetInput s) optInputValidatorFaucetCoupon
@@ -954,6 +1042,22 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
+
+    summarizeAndConsumeInput _round s (InputDevelopmentFundCoupon couponCid) = do
+      coupon <- fetchAndArchive forOwner couponCid
+      assertWithinDeadline "DevelopmentFundCoupon.expiresAt" coupon.expiresAt
+      return TransferInputsSummary with
+        totalAmuletAmount = s.totalAmuletAmount
+        totalAppRewardAmount = s.totalAppRewardAmount
+        totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalUnclaimedActivityRecordAmount = s.totalUnclaimedActivityRecordAmount
+        totalValidatorFaucetAmount = s.totalValidatorFaucetAmount
+        totalSvRewardAmount = s.totalSvRewardAmount
+        totalHoldingFees = s.totalHoldingFees
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
+        changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = (+ coupon.amount) <$> s.totalDevelopmentFundAmount
 
     summarizeAndConsumeValidatorFaucetInput s couponCid = do
       coupon <- fetchAndArchive forOwner couponCid
@@ -970,6 +1074,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
+        totalDevelopmentFundAmount = s.totalDevelopmentFundAmount
 
 -- | Deduplicate lock-holders to store them and charge for them at most once
 dedupOutputLockHolders : TransferOutput -> TransferOutput
@@ -1029,6 +1134,7 @@ summarizeTransfer sender openRound transferConfigAmulet inp preprocessedOutputs 
       + fromOptional 0.0 inp.totalUnclaimedActivityRecordAmount
       + inp.totalValidatorFaucetAmount
       + inp.totalSvRewardAmount
+      + fromOptional 0.0 inp.totalDevelopmentFundAmount
       - totalOutputAmount - sum outputFees
     senderChangeFee = min transferConfigAmulet.createFee.fee leftOverAmount
     senderChangeAmount = leftOverAmount - senderChangeFee
@@ -1054,6 +1160,7 @@ summarizeTransfer sender openRound transferConfigAmulet inp preprocessedOutputs 
       inputUnclaimedActivityRecordAmount = inp.totalUnclaimedActivityRecordAmount
       inputValidatorFaucetAmount = Some inp.totalValidatorFaucetAmount
       inputSvRewardAmount = inp.totalSvRewardAmount
+      inputDevelopmentFundAmount = inp.totalDevelopmentFundAmount
       holdingFees = inp.totalHoldingFees
       outputFees
       senderChangeFee
@@ -1245,6 +1352,7 @@ data TransferInput
         -- ^ Added in CIP-3. Optional validator faucet coupon input into this transfer.
   | InputValidatorLivenessActivityRecord (ContractId ValidatorLivenessActivityRecord)
   | InputUnclaimedActivityRecord (ContractId UnclaimedActivityRecord)
+  | InputDevelopmentFundCoupon (ContractId DevelopmentFundCoupon)
   deriving (Eq, Ord, Show)
 
 -- | Smart constructor for inputing validator faucet coupons into a transfer.
@@ -1347,6 +1455,9 @@ data TransferSummary = TransferSummary with
       -- ^ Added in CIP-3. Total amount of validator faucet coupon issuance input into this transfer.
     inputUnclaimedActivityRecordAmount : Optional Decimal
       -- ^ Total amount of unclaimed activity record issuance input into this transfer.
+      -- Note: Made optional as the addition of this field is checked by the upgrade checker.
+    inputDevelopmentFundAmount : Optional Decimal
+      -- ^ Total amount of development fund coupon issuance input into this transfer.
       -- Note: Made optional as the addition of this field is checked by the upgrade checker.
   deriving (Show, Eq)
 

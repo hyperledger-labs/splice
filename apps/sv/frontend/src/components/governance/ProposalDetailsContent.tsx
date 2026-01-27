@@ -7,8 +7,8 @@ import {
   VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
-import { ChevronLeft } from '@mui/icons-material';
-import { Box, Button, Divider, Link, Stack, Tab, Tabs, Typography } from '@mui/material';
+import { ChevronLeft, Edit } from '@mui/icons-material';
+import { Box, Button, Divider, Stack, Tab, Tabs, Typography } from '@mui/material';
 import React, { PropsWithChildren, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -18,8 +18,7 @@ import {
   PrettyJsonDiff,
   useVotesHooks,
 } from '@lfdecentralizedtrust/splice-common-frontend';
-import { sanitizeUrl } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import {
   ProposalDetails,
   ProposalVote,
@@ -32,7 +31,7 @@ import { JsonDiffAccordion } from './JsonDiffAccordion';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { DetailItem } from './proposal-details/DetailItem';
 import { CreateUnallocatedUnclaimedActivityRecordSection } from './proposal-details/CreateUnallocatedUnclaimedActivityRecordSection';
-import { CopyableIdentifier, MemberIdentifier, VoteStats } from '../beta';
+import { CopyableIdentifier, CopyableUrl, MemberIdentifier, VoteStats } from '../beta';
 
 dayjs.extend(relativeTime);
 
@@ -112,10 +111,18 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
   ]);
 
   const [voteTabValue, setVoteTabValue] = useState<VoteTab>('all');
+  const [editFormKey, setEditFormKey] = useState(0);
+  const [voteSubmitted, setVoteSubmitted] = useState(false);
 
   const handleVoteTabChange = (_event: React.SyntheticEvent, newValue: VoteTab) => {
     setVoteTabValue(newValue);
   };
+
+  const yourVote = votes.find(vote => vote.sv === currentSvPartyId);
+  const hasVoted = yourVote?.vote === 'accepted' || yourVote?.vote === 'rejected';
+  const isEditingVote = editFormKey > 0;
+  const showVoteForm =
+    proposalDetails.isVoteRequest && !isClosed && (!hasVoted || isEditingVote || voteSubmitted);
 
   const { acceptedVotes, rejectedVotes, awaitingVotes } = votes.reduce(
     (acc, vote) => {
@@ -228,7 +235,10 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
 
             {proposalDetails.action === 'CRARC_SetConfig' && (
               <>
-                <ConfigValuesChanges changes={proposalDetails.proposal.configChanges} />
+                <DetailItem
+                  label="Proposed Changes"
+                  value={<ConfigValuesChanges changes={proposalDetails.proposal.configChanges} />}
+                />
                 <JsonDiffAccordion>
                   {amuletConfigToCompareWith ? (
                     <PrettyJsonDiff
@@ -246,7 +256,10 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
 
             {proposalDetails.action === 'SRARC_SetConfig' && (
               <>
-                <ConfigValuesChanges changes={proposalDetails.proposal.configChanges} />
+                <DetailItem
+                  label="Proposed Changes"
+                  value={<ConfigValuesChanges changes={proposalDetails.proposal.configChanges} />}
+                />
                 <JsonDiffAccordion>
                   {dsoConfigToCompareWith?.[1] ? (
                     <PrettyJsonDiff
@@ -272,14 +285,11 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             <DetailItem
               label="URL"
               value={
-                <Link
-                  href={sanitizeUrl(proposalDetails.url)}
-                  target="_blank"
-                  color="primary"
-                  data-testid="proposal-details-url-value"
-                >
-                  {sanitizeUrl(proposalDetails.url)}
-                </Link>
+                <CopyableUrl
+                  url={proposalDetails.url}
+                  size="large"
+                  data-testid="proposal-details-url"
+                />
               }
               labelId="proposal-details-url-label"
             />
@@ -392,6 +402,11 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
                   status={vote.vote}
                   isYou={vote.isYou}
                   isClosed={isClosed}
+                  onEdit={
+                    vote.isYou && hasVoted && !isClosed
+                      ? () => setEditFormKey(k => k + 1)
+                      : undefined
+                  }
                 />
               ))}
               {getFilteredVotes().length === 0 && (
@@ -404,15 +419,22 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             </Box>
           </VoteSection>
 
-          <VoteSection title="Your vote" data-testid="proposal-details-your-vote">
-            {proposalDetails.isVoteRequest && !isClosed && (
+          {showVoteForm && (
+            <VoteSection
+              title="Your Vote"
+              data-testid="proposal-details-your-vote"
+              bordered
+              centered
+            >
               <ProposalVoteForm
+                key={editFormKey}
                 voteRequestContractId={contractId}
                 currentSvPartyId={currentSvPartyId}
+                onSubmissionComplete={() => setVoteSubmitted(true)}
                 votes={votes}
               />
-            )}
-          </VoteSection>
+            </VoteSection>
+          )}
         </Stack>
       </Box>
     </Box>
@@ -422,14 +444,36 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
 interface VoteSectionProps extends PropsWithChildren {
   title: string;
   'data-testid': string;
+  bordered?: boolean;
+  centered?: boolean;
 }
 
-const VoteSection: React.FC<VoteSectionProps> = ({ title, children, 'data-testid': testId }) => (
+const VoteSection: React.FC<VoteSectionProps> = ({
+  title,
+  children,
+  'data-testid': testId,
+  bordered = false,
+  centered = false,
+}) => (
   <Box sx={{ width: '100%', maxWidth: '800px' }} data-testid={testId}>
     <Typography component="h2" fontSize={18} fontWeight={700} fontFamily="lato" mb={3}>
       {title}
     </Typography>
-    <Stack gap={3}>{children}</Stack>
+    <Box
+      sx={{
+        ...(bordered && {
+          border: '2px solid',
+          borderColor: 'divider',
+          borderRadius: 2,
+          py: 5,
+          px: 12,
+        }),
+      }}
+    >
+      <Stack gap={3} alignItems={centered ? 'center' : undefined}>
+        {children}
+      </Stack>
+    </Box>
   </Box>
 );
 
@@ -440,6 +484,7 @@ interface VoteItemProps {
   status: VoteStatus;
   isClosed?: boolean;
   isYou?: boolean;
+  onEdit?: () => void;
 }
 
 const VoteItem: React.FC<VoteItemProps> = ({
@@ -449,6 +494,7 @@ const VoteItem: React.FC<VoteItemProps> = ({
   status,
   isClosed,
   isYou = false,
+  onEdit,
 }) => (
   <>
     <Box
@@ -473,19 +519,28 @@ const VoteItem: React.FC<VoteItemProps> = ({
             {comment}
           </Typography>
         )}
-        {url && (
-          <Typography variant="body2" color="text.secondary">
-            <Link href={sanitizeUrl(url)} target="_blank" color="primary">
-              {sanitizeUrl(url)}
-            </Link>
-          </Typography>
+        {url && <CopyableUrl url={url} size="small" data-testid="proposal-details-vote-url" />}
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <VoteStats
+          vote={status}
+          noVoteMessage={isClosed ? 'No Vote' : 'Awaiting Response'}
+          data-testid="proposal-details-vote-status"
+        />
+        {onEdit && (
+          <Button
+            color="secondary"
+            startIcon={<Edit fontSize="small" />}
+            onClick={onEdit}
+            data-testid="your-vote-edit-button"
+            sx={{
+              fontSize: 16,
+            }}
+          >
+            Edit
+          </Button>
         )}
       </Box>
-      <VoteStats
-        vote={status}
-        noVoteMessage={isClosed ? 'No Vote' : 'Awaiting Response'}
-        data-testid="proposal-details-vote-status"
-      />
     </Box>
     <Divider sx={{ borderBottomWidth: 2 }} />
   </>
@@ -500,6 +555,7 @@ const OffboardMemberSection = ({ memberPartyId }: OffboardMemberSectionProps) =>
     <Box
       id="proposal-details-offboard-member-section"
       data-testid="proposal-details-offboard-member-section"
+      sx={{ display: 'contents' }}
     >
       <DetailItem
         label="Member"
@@ -525,6 +581,7 @@ const FeatureAppSection = ({ provider }: FeatureAppSectionProps) => {
     <Box
       id="proposal-details-feature-app-section"
       data-testid="proposal-details-feature-app-section"
+      sx={{ display: 'contents' }}
     >
       <DetailItem
         label="Provider ID"
@@ -545,12 +602,18 @@ const UnfeatureAppSection = ({ rightContractId }: UnfeatureAppSectionProps) => {
     <Box
       id="proposal-details-unfeature-app-section"
       data-testid="proposal-details-unfeature-app-section"
+      sx={{ display: 'contents' }}
     >
       <DetailItem
-        label="Contract ID"
-        value={rightContractId}
+        label="Proposal ID"
+        value={
+          <CopyableIdentifier
+            value={rightContractId}
+            size="large"
+            data-testid="proposal-details-unfeature-app-value"
+          />
+        }
         labelId="proposal-details-unfeature-app-label"
-        valueId="proposal-details-unfeature-app-value"
       />
     </Box>
   );
@@ -586,15 +649,20 @@ const UpdateSvRewardWeightSection = ({
         />
       </Box>
 
-      <ConfigValuesChanges
-        changes={[
-          {
-            label: 'Weight',
-            fieldName: 'svRewardWeight',
-            currentValue: currentWeight,
-            newValue: weightChange,
-          },
-        ]}
+      <DetailItem
+        label="Proposed Changes"
+        value={
+          <ConfigValuesChanges
+            changes={[
+              {
+                label: 'Weight',
+                fieldName: 'svRewardWeight',
+                currentValue: currentWeight,
+                newValue: weightChange,
+              },
+            ]}
+          />
+        }
       />
     </>
   );

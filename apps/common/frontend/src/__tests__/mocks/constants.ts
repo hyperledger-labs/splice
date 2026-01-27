@@ -90,6 +90,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                     featuredAppRewardCap: '100.0',
                     unfeaturedAppRewardCap: '0.6',
                     optValidatorFaucetCap: '2.85',
+                    optDevelopmentFundPercentage: '0.05',
                   },
                   futureValues: [
                     {
@@ -104,6 +105,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                         featuredAppRewardCap: '100.0',
                         unfeaturedAppRewardCap: '0.6',
                         optValidatorFaucetCap: '2.85',
+                        optDevelopmentFundPercentage: '0.05',
                       },
                     },
                     {
@@ -118,6 +120,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                         featuredAppRewardCap: '100.0',
                         unfeaturedAppRewardCap: '0.6',
                         optValidatorFaucetCap: '2.85',
+                        optDevelopmentFundPercentage: '0.05',
                       },
                     },
                     {
@@ -132,6 +135,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                         featuredAppRewardCap: '100.0',
                         unfeaturedAppRewardCap: '0.6',
                         optValidatorFaucetCap: '2.85',
+                        optDevelopmentFundPercentage: '0.05',
                       },
                     },
                     {
@@ -146,6 +150,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                         featuredAppRewardCap: '100.0',
                         unfeaturedAppRewardCap: '0.6',
                         optValidatorFaucetCap: '2.85',
+                        optDevelopmentFundPercentage: '0.05',
                       },
                     },
                   ],
@@ -186,6 +191,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                 },
                 transferPreapprovalFee: null,
                 featuredAppActivityMarkerAmount: null,
+                optDevelopmentFundManager: null,
               },
             },
           },

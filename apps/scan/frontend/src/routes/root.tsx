@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useGetRoundOfLatestData } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 import React, { useMemo } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router';
 
 import { Tab, Tabs, Typography, Box, Grid } from '@mui/material';
 
@@ -19,7 +19,7 @@ const Root: React.FC = () => {
     { name: 'Synchronizer Fees Leaderboard', path: 'synchronizer-fees-leaderboard' },
     { name: 'Validator Liveness Leaderboard', path: 'validator-faucets-leaderboard' },
   ];
-  // Unfortunately, NavLink from react-router-dom doesn't realize that 'recent-activity' is the index at '/',
+  // Unfortunately, NavLink from react-router doesn't realize that 'recent-activity' is the index at '/',
   // so we need to set it as active manually.
   const currentPath = useLocation().pathname;
   const selected = navLinks.find(({ path }) => currentPath.includes(path)) || navLinks[0];

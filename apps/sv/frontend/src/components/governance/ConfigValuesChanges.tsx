@@ -16,21 +16,10 @@ export const ConfigValuesChanges: React.FC<ConfigValuesChangesProps> = props => 
 
   return (
     <Box
-      sx={{ py: 1 }}
       id="proposal-details-config-changes-section"
       data-testid="proposal-details-config-changes-section"
     >
-      <Typography
-        variant={isSummaryView ? 'h5' : 'subtitle2'}
-        color={isSummaryView ? 'text.primary' : 'text.secondary'}
-        gutterBottom
-        sx={{ mb: isSummaryView ? 2 : 4 }}
-        data-testid="proposal-details-config-changes-section-title"
-      >
-        Proposed Changes
-      </Typography>
-
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {changes.length === 0 && (
           <Box sx={{ py: 1 }}>
             <Typography variant="body2" color={textColor}>

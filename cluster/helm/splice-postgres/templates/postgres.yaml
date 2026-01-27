@@ -38,7 +38,14 @@ spec:
       - name: {{ .Release.Name }}
         image: postgres:14
         imagePullPolicy: IfNotPresent
-        args: ["-c", "max_connections={{ .Values.db.maxConnections }}", "-c", "max_wal_size={{ .Values.db.maxWalSize }}"]
+        args:
+          - "-c"
+          - "max_connections={{ .Values.db.maxConnections }}"
+          - "-c"
+          - "max_wal_size={{ .Values.db.maxWalSize }}"
+          {{- with .Values.extraArgs }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
         env:
         - name: POSTGRES_PASSWORD
           valueFrom:
@@ -98,6 +105,10 @@ spec:
           storage: {{ $.Values.db.volumeSize }}
       storageClassName: {{ $.Values.db.volumeStorageClass }}
       volumeMode: Filesystem
+      {{- with .Values.db.dataSource }}
+      dataSource:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

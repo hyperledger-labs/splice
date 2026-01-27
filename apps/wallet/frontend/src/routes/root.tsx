@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Copyright } from '@lfdecentralizedtrust/splice-common-frontend';
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router';
 
 import { Layout } from '../components/Layout';
 

@@ -7,12 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import React from 'react';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
-import {
-  createBrowserRouter,
-  createRoutesFromElements,
-  Route,
-  RouterProvider,
-} from 'react-router-dom';
+import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } from 'react-router';
 
 import { CssBaseline } from '@mui/material';
 import { ThemeProvider } from '@mui/material';

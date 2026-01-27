@@ -24,7 +24,6 @@ import useLookupFeaturedAppRight, {
 } from './useLookupFeaturedAppRight';
 import useOpenRounds from './useOpenRounds';
 import useTopAppProviders from './useTopAppProviders';
-import useTotalAmuletBalance from './useTotalAmuletBalance';
 import useTotalRewards from './useTotalRewards';
 
 export {
@@ -45,7 +44,6 @@ export {
   useLookupFeaturedAppRightBuilder,
   useActivity,
   useTopAppProviders,
-  useTotalAmuletBalance,
   useTotalRewards,
   useListAnsEntries,
   useListAnsEntriesFromResponse,

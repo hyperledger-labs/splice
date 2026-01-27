@@ -149,10 +149,10 @@ ________
 
     Then you can add an extra limit on query `(?limit=xyz)` to the request but the result will never exceed server limit.
 
-    One alternative is the use the `websockets APIs <https://docs.digitalasset.com/build/3.3/reference/json-api/asyncapi.html>`__  which don't have a hard limit.
+    One alternative is the use the `websockets APIs <https://docs.digitalasset.com/build/3.4/reference/json-api/asyncapi.html>`__  which don't have a hard limit.
 
-    Another alternative is to use the `PQS <https://docs.digitalasset.com/build/3.3/sdlc-howtos/applications/develop/pqs/index.html>`__
-    which can simplify debugging via `Daml Shell <https://docs.digitalasset.com/build/3.3/sdlc-howtos/applications/develop/debug/daml-shell/index.html#contract-summaries>`__.
+    Another alternative is to use the `PQS <https://docs.digitalasset.com/build/3.4/sdlc-howtos/applications/develop/pqs/index.html>`__
+    which can simplify debugging via `Daml Shell <https://docs.digitalasset.com/build/3.4/sdlc-howtos/applications/develop/debug/daml-shell/index.html#contract-summaries>`__.
 
   How can I create a transaction with more than one root node?
 
@@ -192,7 +192,7 @@ ________
           ``/canton/tree/main/community/ledger/ledger-json-api/src/test/resources/json-api-docs`` to the ``openapi.yaml`` and ``asyncapi.yaml`` files.
 
       - Another source for the JSON API's specifications is to retrieve them from a running Canton participant node.  A
-        description of this is in the `Verification - download OpenAPI <https://docs.digitalasset.com/build/3.3/tutorials/json-api/canton_and_the_json_ledger_api.html#verification-download-openapi>`__
+        description of this is in the `Verification - download OpenAPI <https://docs.digitalasset.com/build/3.4/tutorials/json-api/canton_and_the_json_ledger_api.html#verification-download-openapi>`__
         section.  The specifications are available as:
 
         * For OpenAPI: ``http://<host>:<port>/docs/openapi``

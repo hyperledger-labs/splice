@@ -55,7 +55,7 @@ describe.skip('Governance Page', () => {
     const actionRequired = screen.getByTestId('action-required-section');
     expect(actionRequired).toBeInTheDocument();
 
-    const inflightVoteRequests = screen.getByTestId('inflight-vote-requests-section');
+    const inflightVoteRequests = screen.getByTestId('inflight-proposals-section');
     expect(inflightVoteRequests).toBeInTheDocument();
 
     const voteHistory = screen.getByTestId('vote-history-section');
@@ -80,7 +80,7 @@ describe.skip('Governance Page', () => {
 
     await navigateToGovernancePage(user);
 
-    expect(() => screen.getAllByTestId('inflight-vote-requests-row')).toThrowError(
+    expect(() => screen.getAllByTestId('inflight-proposals-row')).toThrowError(
       /Unable to find an element/
     );
   });

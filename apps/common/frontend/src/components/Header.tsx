@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router';
 
 import { Warning } from '@mui/icons-material';
 import { Badge, Box, Stack, Toolbar } from '@mui/material';

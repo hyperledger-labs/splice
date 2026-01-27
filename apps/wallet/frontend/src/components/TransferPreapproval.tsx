@@ -6,7 +6,7 @@ import {
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { useMutation } from '@tanstack/react-query';
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 import { Button, Tooltip, Typography } from '@mui/material';
 

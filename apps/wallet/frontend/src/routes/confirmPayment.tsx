@@ -8,7 +8,7 @@ import {
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import BigNumber from 'bignumber.js';
 import React from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router';
 
 import { ArrowOutward } from '@mui/icons-material';
 import {

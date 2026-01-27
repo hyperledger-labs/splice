@@ -208,7 +208,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       ProtobufJsonScanHttpEncodings.lapiToHttpUpdate(tree, EventId.prefixedFromUpdateIdAndNodeId)
     check(encodedLossless)
     val encodedLossy =
-      CompactJsonScanHttpEncodings.lapiToHttpUpdate(tree, EventId.prefixedFromUpdateIdAndNodeId)
+      CompactJsonScanHttpEncodings().lapiToHttpUpdate(tree, EventId.prefixedFromUpdateIdAndNodeId)
     check(encodedLossy)
   }
 

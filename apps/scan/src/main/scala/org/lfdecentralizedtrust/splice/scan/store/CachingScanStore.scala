@@ -69,17 +69,6 @@ class CachingScanStore(
 
   override protected[store] def domainMigrationId: Long = store.domainMigrationId
 
-  // TODO(#800) remove when amulet expiry works again
-  override def getTotalAmuletBalance(
-      asOfEndOfRound: Long
-  )(implicit tc: TraceContext): Future[Option[BigDecimal]] = {
-    getCache(
-      "totalAmuletBalance",
-      cacheConfig.totalAmuletBalance,
-      store.getTotalAmuletBalance _,
-    ).get(asOfEndOfRound)
-  }
-
   override def listSvNodeStates()(implicit tc: TraceContext): Future[Seq[SvNodeState]] = {
     getCache(
       "svNodeStateCache",
@@ -136,16 +125,6 @@ class CachingScanStore(
       cacheConfig.rewardsCollectedInRound,
       store.getRewardsCollectedInRound,
     ).get(round)
-  }
-
-  override def getWalletBalance(partyId: PartyId, asOfEndOfRound: Long)(implicit
-      tc: TraceContext
-  ): Future[BigDecimal] = {
-    getCache(
-      "walletBalance",
-      cacheConfig.walletBalance,
-      (store.getWalletBalance _) tupled,
-    ).get((partyId -> asOfEndOfRound))
   }
 
   override def getAmuletConfigForRound(round: Long)(implicit

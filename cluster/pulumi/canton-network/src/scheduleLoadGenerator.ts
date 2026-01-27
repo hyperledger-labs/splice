@@ -84,6 +84,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
           test: {
             duration: `365d`,
             iterationsPerMinute: loadTesterConfig.iterationsPerMinute,
+            maxVUs: loadTesterConfig.maxVUs,
           },
           adaptiveScenario: loadTesterConfig.adaptiveScenario,
         }),

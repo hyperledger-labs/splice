@@ -4,16 +4,13 @@
 package org.lfdecentralizedtrust.splice.validator.admin.api.client.commands
 
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
-import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.http.v0.validator_public as http
 import org.lfdecentralizedtrust.splice.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 final case class UserInfo(
     primaryParty: PartyId,
@@ -22,20 +19,9 @@ final case class UserInfo(
 )
 
 object HttpValidatorPublicAppClient {
-
-  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = http.ValidatorPublicClient
-
-    def createClient(host: String)(implicit
-        httpClient: HttpClient,
-        tc: TraceContext,
-        ec: ExecutionContext,
-        mat: Materializer,
-    ): Client =
-      http.ValidatorPublicClient.httpClient(
-        HttpClientBuilder().buildClient(),
-        host,
-      )
+  import http.ValidatorPublicClient as Client
+  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result, Client] {
+    val createGenClientFn = (fn, host, ec, mat) => Client.httpClient(fn, host)(ec, mat)
   }
 
   case object GetValidatorUserInfo

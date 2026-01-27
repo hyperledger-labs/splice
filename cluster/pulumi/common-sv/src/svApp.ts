@@ -1,7 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
-import { DecentralizedSynchronizerMigrationConfig } from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  DecentralizedSynchronizerMigrationConfig,
+  pvcSuffix,
+  standardStorageClassName,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { EnvVarConfig, SingleSvConfiguration } from './singleSvConfig';
 import {
@@ -17,6 +21,7 @@ export function valuesForSvApp(
   domain: object;
   additionalEnvVars: EnvVarConfig[];
   cometBFT?: object;
+  pvc: object;
 } {
   const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
   const bftSequencerConnectionEnvVars =
@@ -66,6 +71,10 @@ export function valuesForSvApp(
             enableBftSequencer: true,
           }
         : {}),
+    },
+    pvc: {
+      volumeStorageClass: standardStorageClassName,
+      volumeName: `sv-app-global-domain-migration-${pvcSuffix}`,
     },
     additionalEnvVars,
   };

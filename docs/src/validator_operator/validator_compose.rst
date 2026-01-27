@@ -174,13 +174,13 @@ via the wallet, in order to purchase a CNS entry for that user.
 Accessing the Canton Participant APIs
 -------------------------------------
 
-The `JSON Ledger API <https://docs.digitalasset.com/build/3.3/tutorials/json-api/canton_and_the_json_ledger_api.html>`_
+The `JSON Ledger API <https://docs.digitalasset.com/build/3.4/tutorials/json-api/canton_and_the_json_ledger_api.html>`_
 is exposed under ``json-ledger-api.localhost:80``. Note that for some
 clients you may explicitly need to set the ``Host:
 json-ledger-api.localhost`` header for this to get resolved correctly.
 
 The `gRPC Ledger API
-<https://docs.digitalasset.com/build/3.3/explanations/ledger-api-services.html>`_
+<https://docs.digitalasset.com/build/3.4/explanations/ledger-api-services.html>`_
 is exposed under ``grpc-ledger-api.localhost:80``. Note that for some
 clients you may explicitly need to set the ``:authority:
 json-ledger-api.localhost`` pseudo-header for this to get resolved correctly.

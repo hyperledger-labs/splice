@@ -68,7 +68,7 @@ class DisabledWalletTimeBasedIntegrationTest
       val expectedMinAmount =
         BigDecimal(
           computeSvRewardInRound0(
-            defaultIssuanceCurve.initialValue,
+            defaultIssuanceCurve().initialValue,
             defaultTickDuration,
             dsoSize = 1,
           )

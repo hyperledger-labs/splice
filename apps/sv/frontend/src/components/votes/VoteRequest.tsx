@@ -198,12 +198,8 @@ export const CreateVoteRequest: React.FC = () => {
   const conflicts = hasConflictingFields(action, voteRequestQuery.data);
 
   useEffect(() => {
-    if (conflicts.hasConflict) {
-      setDisableProceed(true);
-    } else {
-      setDisableProceed(false);
-    }
-  }, [conflicts]);
+    setDisableProceed(conflicts.hasConflict);
+  }, [conflicts.hasConflict]);
 
   const submissionConditions: { disabled: boolean; reason: string; severity?: AlertColor }[] = [
     { disabled: createVoteRequestMutation.isPending, reason: 'Loading...' },

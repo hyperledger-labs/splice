@@ -8,7 +8,11 @@ import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2Bearer
 import com.digitalasset.daml.lf.archive.DarParser
 import org.lfdecentralizedtrust.splice.admin.api.client.HttpAdminAppClient
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
-import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SpliceBackendConfig}
+import org.lfdecentralizedtrust.splice.config.{
+  BaseParticipantClientConfig,
+  NetworkAppClientConfig,
+  SpliceBackendConfig,
+}
 import org.lfdecentralizedtrust.splice.environment.{
   NodeBase,
   SpliceConsoleEnvironment,
@@ -45,7 +49,7 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.VettedPackage
 
 import java.io.File
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration.*
 import scala.reflect.ClassTag
 import scala.util.Try
@@ -123,8 +127,8 @@ trait HttpAppReference extends AppReference with HttpCommandRunner {
 
   def httpClientConfig: NetworkAppClientConfig
 
-  override protected[splice] def httpCommand[Result](
-      httpCommand: HttpCommand[?, Result],
+  override protected[splice] def httpCommand[Res, Result, Client](
+      httpCommand: HttpCommand[Res, Result, Client],
       basePath: Option[String] = None,
   ): ConsoleCommandResult[Result] =
     spliceConsoleEnvironment.httpCommandRunner.runCommand(
@@ -237,6 +241,39 @@ trait AppBackendReference extends AppReference with LocalInstanceReference {
       x => x,
     )
   }
+
+  protected def getParticipantClient()(implicit
+      ec: ExecutionContext
+  ): ParticipantClientReference = {
+    val remoteParticipantClientConfig = getRemoteParticipantConfigWithToken(
+      config.participantClient
+    )
+    new ParticipantClientReference(
+      spliceConsoleEnvironment,
+      s"remote participant for `$name``",
+      remoteParticipantClientConfig,
+    )
+  }
+
+  private def getRemoteParticipantConfigWithToken(
+      participantClientConfig: BaseParticipantClientConfig
+  )(implicit ec: ExecutionContext): RemoteParticipantConfig = {
+    val tokenStrO = Await.result(
+      spliceConsoleEnvironment.httpClient
+        .getToken(participantClientConfig.ledgerApi.authConfig)
+        .map(_.map(_.accessToken)),
+      30.seconds,
+    )
+    RemoteParticipantConfig(
+      participantClientConfig.adminApi,
+      participantClientConfig.ledgerApi.clientConfig,
+      tokenStrO,
+    )
+  }
+  implicit val ec: ExecutionContext = executionContext
+
+  /** Remote participant this splitwell app is configured to interact with. */
+  lazy val participantClient = getParticipantClient()
 }
 
 /** Subclass of participantClient that takes the config as an argument

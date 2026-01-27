@@ -3,6 +3,7 @@
 
 module Splice.Scripts.TestDecentralizedAutomation where
 
+import DA.Action (replicateA_)
 import DA.Assert
 import DA.Foldable (forA_)
 import DA.List()
@@ -26,6 +27,7 @@ import Splice.Scripts.DsoTestUtils
 import Splice.Ans
 import Splice.Scripts.AnsRulesParameters
 import Splice.Scripts.TestTransferPreapproval
+import Splice.Testing.Registries.AmuletRegistry.Parameters
 import Splice.Wallet.Subscriptions
 
 
@@ -52,6 +54,96 @@ testUnclaimedRewardsMerging = do
 
   pure ()
 
+
+-- Development Fund
+--------------------
+
+testUnclaimedDevelopmentFundCouponsMerging : Script ()
+testUnclaimedDevelopmentFundCouponsMerging = do
+  let
+    -- 5% Development Fund
+    amuletConfig =
+      defaultAmuletConfig with
+        issuanceCurve = defaultAmuletConfig.issuanceCurve with
+          initialValue = defaultAmuletConfig.issuanceCurve.initialValue with
+            optDevelopmentFundPercentage = Some 0.05
+  (app, _, (sv1, _, _, _)) <- initDevNetWithAmuletConfig amuletConfig
+
+  -- Mint 5 unclaimed development fund coupons
+  replicateA_ 5 $ runNextIssuanceD app 1.0
+
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  unclaimedDevelopmentFundCouponCids@(cid1 :: _) <- fmap fst <$> query @UnclaimedDevelopmentFundCoupon app.dso
+  length unclaimedDevelopmentFundCouponCids === 5
+
+  -- Unhappy path - requires more than one development fund coupon contract.
+  dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    DsoRules_MergeUnclaimedDevelopmentFundCoupons with
+      amuletRulesCid
+      choiceArg = AmuletRules_MergeUnclaimedDevelopmentFundCoupons with
+        unclaimedDevelopmentFundCouponCids = [cid1]
+      sv = sv1
+
+  -- Happy path
+  dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
+    DsoRules_MergeUnclaimedDevelopmentFundCoupons with
+      amuletRulesCid
+      choiceArg = AmuletRules_MergeUnclaimedDevelopmentFundCoupons with
+        unclaimedDevelopmentFundCouponCids
+      sv = sv1
+
+  unclaimedDevelopmentFundCoupons <- query @UnclaimedDevelopmentFundCoupon app.dso
+  length unclaimedDevelopmentFundCoupons === 1
+
+  pure ()
+
+testDevelopmentFundCouponExpiry : Script ()
+testDevelopmentFundCouponExpiry = do
+  fundManager <- allocateParty "FundManager"
+  let
+    -- 5% Development Fund
+    amuletConfig =
+      defaultAmuletConfig with
+        optDevelopmentFundManager = Some fundManager
+        issuanceCurve = defaultAmuletConfig.issuanceCurve with
+          initialValue = defaultAmuletConfig.issuanceCurve.initialValue with
+            optDevelopmentFundPercentage = Some 0.05
+  (app, _, (sv1, _, _, _)) <- initDevNetWithAmuletConfig amuletConfig
+  [(dsoRulesCid, _)] <- query @DsoRules app.dso
+
+  -- Mint 1 unclaimed development fund coupon
+  runNextIssuanceD app 1.0
+  [(unclaimedDevelopmentFundCouponCid, unclaimedDevelopmentFundCoupon)] <- query @UnclaimedDevelopmentFundCoupon app.dso
+
+  -- Allocate a development fund coupon
+  now <- getTime
+  let
+    expiresAt = addRelTime now (hours 1)
+    amount = unclaimedDevelopmentFundCoupon.amount
+    reason = "Alice fixed issue XXX"
+  alice <- setupUser app "alice" app.dso
+  developmentFundCouponCid <- (.developmentFundCouponCid) <$>
+    allocateDevelopmentFundCoupon app fundManager alice.primaryParty amount expiresAt reason [unclaimedDevelopmentFundCouponCid]
+
+  -- Unhappy - expiresAt has not been reached
+  submitMultiMustFail [sv1] [app.dso] do
+    exerciseCmd dsoRulesCid DsoRules_ExpireDevelopmentFundCoupon with
+      developmentFundCouponCid
+      sv = sv1
+
+  -- Happy
+  setTime $ addRelTime expiresAt (minutes 1)
+  unclaimedDevelopmentFundCouponCid <- (.unclaimedDevelopmentFundCouponCid) . (.result) <$>
+    submitMulti [sv1] [app.dso] do
+      exerciseCmd dsoRulesCid DsoRules_ExpireDevelopmentFundCoupon with
+        developmentFundCouponCid
+        sv = sv1
+  Some unclaimedDevelopmentFundCoupon <- queryContractId app.dso unclaimedDevelopmentFundCouponCid
+  unclaimedDevelopmentFundCoupon === UnclaimedDevelopmentFundCoupon with
+    dso = app.dso
+    amount
+
+  pure ()
 
 
 -- Testing confirmations

@@ -445,6 +445,45 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/state/acs/snapshot-timestamp-after:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getDateOfFirstSnapshotAfter"
+      description: |
+        Returns the timestamp of the first snapshot after the given date, for the given migration_id or larger.
+      parameters:
+        - name: "after"
+          in: "query"
+          required: true
+          schema:
+            type: string
+            format: date-time
+            description: |
+              The endpoint will return the record time of the first snapshot after this parameter.
+        - name: "migration_id"
+          in: "query"
+          required: true
+          schema:
+            type: integer
+            format: int64
+            description: |
+              The endpoint will return the record time of the first snapshot for this migration id or larger.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcsSnapshotTimestampResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+
   /v0/state/acs:
     post:
       tags: [external, scan]
@@ -1174,70 +1213,6 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
-  /v0/total-amulet-balance:
-    get:
-      deprecated: true
-      tags: [deprecated, scan]
-      x-jvm-package: scan
-      operationId: "getTotalAmuletBalance"
-      description: | 
-        **Deprecated**, use /registry/metadata/v1/instruments/Amulet token standard metadata API endpoint, see 
-        https://docs.sync.global/app_dev/token_standard/openapi/token_metadata.html.
-        
-        **This endpoint will be removed in a future release**        
-        
-        Get the total balance of Amulet in the network.
-      parameters:
-        - in: query
-          name: asOfEndOfRound
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GetTotalAmuletBalanceResponse"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-
-  /v0/wallet-balance:
-    get:
-      deprecated: true
-      tags: [deprecated]
-      x-jvm-package: scan
-      operationId: "getWalletBalance"
-      description: |
-        **Deprecated**, use /v0/holdings/summary with /v0/state/acs/snapshot-timestamp instead. 
-        
-        **This endpoint will be removed in a future release**
-        
-        Get the Amulet balance for a specific party at the end of a closed round.
-      parameters:
-        - in: query
-          name: party_id
-          required: true
-          schema:
-            type: string
-        - in: query
-          name: asOfEndOfRound
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GetWalletBalanceResponse"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-
   /v0/amulet-config-for-round:
     get:
       deprecated: true
@@ -1790,18 +1765,6 @@ components:
       properties:
         featured_app_right:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-    GetWalletBalanceResponse:
-      type: object
-      required: ["wallet_balance"]
-      properties:
-        wallet_balance:
-          type: string
-    GetTotalAmuletBalanceResponse:
-      type: object
-      required: ["total_balance"]
-      properties:
-        total_balance:
-          type: string
     GetAmuletConfigForRoundResponse:
       type: object
       required:
@@ -2629,7 +2592,7 @@ components:
           type: string
           format: date-time
           description: |
-            The timestamp at which the contract set was active. 
+            The timestamp at which the contract set was active.
             This needs to be an exact timestamp, i.e.,
             needs to correspond to a timestamp reported by `/v0/state/acs/snapshot-timestamp` if `record_time_match` is set to `exact` (which is the default).
             If `record_time_match` is set to `at_or_before`, this can be any timestamp, and the most recent snapshot at or before the given `record_time` will be returned.
@@ -2684,7 +2647,7 @@ components:
           type: string
           format: date-time
           description: |
-            The timestamp at which the contract set was active. 
+            The timestamp at which the contract set was active.
             This needs to be an exact timestamp, i.e.,
             needs to correspond to a timestamp reported by `/v0/state/acs/snapshot-timestamp` if `record_time_match` is set to `exact` (which is the default).
             If `record_time_match` is set to `at_or_before`, this can be any timestamp, and the most recent snapshot at or before the given `record_time` will be returned.
@@ -2731,7 +2694,7 @@ components:
           type: string
           format: date-time
           description: |
-            The timestamp at which the contract set was active. 
+            The timestamp at which the contract set was active.
             This needs to be an exact timestamp, i.e.,
             needs to correspond to a timestamp reported by `/v0/state/acs/snapshot-timestamp` if `record_time_match` is set to `exact` (which is the default).
             If `record_time_match` is set to `at_or_before`, this can be any timestamp, and the most recent snapshot at or before the given `record_time` will be returned.

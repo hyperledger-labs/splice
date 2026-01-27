@@ -4,18 +4,34 @@ import * as pulumi from '@pulumi/pulumi';
 import {
   activeVersion,
   CnInput,
+  createVolumeSnapshot,
   DecentralizedSynchronizerUpgradeConfig,
   ExactNamespace,
   InstalledHelmChart,
   installSpliceHelmChart,
+  standardStorageClassName,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { PartyAllocatorConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+
+import { hyperdiskSupportConfig } from '../../common/src/config/hyperdiskSupportConfig';
 
 export function installPartyAllocator(
   xns: ExactNamespace,
   config: PartyAllocatorConfig,
   dependsOn: CnInput<pulumi.Resource>[]
 ): InstalledHelmChart {
+  const dataSource =
+    hyperdiskSupportConfig.hyperdiskSupport.enabled &&
+    hyperdiskSupportConfig.hyperdiskSupport.migrating
+      ? {
+          dataSource: createVolumeSnapshot({
+            resourceName: `party-allocator-keys-migration-snapshot`,
+            snapshotName: `party-allocator-keys-snapshot`,
+            namespace: xns.logicalName,
+            pvcName: `party-allocator-keys`,
+          }).dataSource,
+        }
+      : {};
   return installSpliceHelmChart(
     xns,
     'party-allocator',
@@ -32,6 +48,14 @@ export function installPartyAllocator(
         parallelism: config.parallelism,
         preapprovalRetries: config.preapprovalRetries,
         preapprovalRetryDelayMs: config.preapprovalRetryDelayMs,
+      },
+      pvc: {
+        ...(config.pvcSize ? { size: config.pvcSize } : {}),
+        volumeStorageClass: standardStorageClassName,
+        name: hyperdiskSupportConfig.hyperdiskSupport.enabled
+          ? 'party-allocator-keys-hd-pvc'
+          : 'party-allocator-keys',
+        ...dataSource,
       },
     },
     activeVersion,

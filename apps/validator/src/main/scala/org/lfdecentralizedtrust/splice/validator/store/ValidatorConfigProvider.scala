@@ -4,17 +4,19 @@
 package org.lfdecentralizedtrust.splice.validator.store
 
 import cats.data.OptionT
-import cats.implicits.{catsSyntaxOptionId, toBifunctorOps}
+import cats.implicits.toBifunctorOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Codec
+
 import scala.concurrent.Future
 import io.circe.generic.semiauto.deriveCodec
-import io.circe.Decoder
+import org.lfdecentralizedtrust.splice.store.KeyValueStore
+
 import scala.concurrent.ExecutionContext
 
-class ValidatorConfigProvider(config: ValidatorInternalStore, val loggerFactory: NamedLoggerFactory)
+class ValidatorConfigProvider(config: KeyValueStore, val loggerFactory: NamedLoggerFactory)
     extends NamedLogging {
 
   private val scanInternalConfigKey = "validator_scan_internal_config_key"
@@ -24,7 +26,7 @@ class ValidatorConfigProvider(config: ValidatorInternalStore, val loggerFactory:
   final def setScanUrlInternalConfig(
       value: Seq[ScanUrlInternalConfig]
   )(implicit tc: TraceContext): Future[Unit] = {
-    config.setConfig(scanInternalConfigKey, value)
+    config.setValue(scanInternalConfigKey, value)
   }
 
   final def getScanUrlInternalConfig(
@@ -32,42 +34,28 @@ class ValidatorConfigProvider(config: ValidatorInternalStore, val loggerFactory:
       tc: TraceContext,
       ec: ExecutionContext,
   ): OptionT[Future, Seq[ScanUrlInternalConfig]] = {
-    readConfigAndLogOnDecodingFailure(scanInternalConfigKey)
+    config.readValueAndLogOnDecodingFailure(scanInternalConfigKey)
   }
 
   def clearPartiesToMigrate()(implicit tc: TraceContext): Future[Unit] = {
     logger.info("Clearing parties that were migrated")
-    config.deleteConfig(migratingPartiesInternalConfigKey)
+    config.deleteKey(migratingPartiesInternalConfigKey)
   }
 
   def getPartiesToMigrate()(implicit
       tc: TraceContext,
       ec: ExecutionContext,
   ): OptionT[Future, Set[PartyId]] = {
-    readConfigAndLogOnDecodingFailure[PartiesBeingMigrated](migratingPartiesInternalConfigKey).map(
-      _.parties
-    )
-  }
-
-  private def readConfigAndLogOnDecodingFailure[T: Decoder](
-      key: String
-  )(implicit tc: TraceContext, ec: ExecutionContext) = {
     config
-      .getConfig[T](key)
-      .subflatMap(
-        _.fold(
-          { failure =>
-            logger.warn(s"Failed to decode $key from the db $failure")
-            None
-          },
-          _.some,
-        )
+      .readValueAndLogOnDecodingFailure[PartiesBeingMigrated](migratingPartiesInternalConfigKey)
+      .map(
+        _.parties
       )
   }
 
   def setPartiesToMigrate(parties: Set[PartyId])(implicit tc: TraceContext): Future[Unit] = {
     logger.info(s"Storing parties that will be migrated $parties")
-    config.setConfig(migratingPartiesInternalConfigKey, PartiesBeingMigrated(parties))
+    config.setValue(migratingPartiesInternalConfigKey, PartiesBeingMigrated(parties))
   }
 }
 

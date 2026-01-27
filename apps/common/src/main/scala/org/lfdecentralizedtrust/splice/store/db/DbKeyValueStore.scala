@@ -1,26 +1,24 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package org.lfdecentralizedtrust.splice.validator.store.db
+package org.lfdecentralizedtrust.splice.store.db
 
 import cats.data.OptionT
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
-import org.lfdecentralizedtrust.splice.validator.store.ValidatorInternalStore
 import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Encoder, Json}
-import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
+import org.lfdecentralizedtrust.splice.store.KeyValueStore
+import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 import slick.jdbc.JdbcProfile
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import scala.concurrent.{ExecutionContext, Future}
-import org.lfdecentralizedtrust.splice.store.db.{StoreDescriptor, StoreDescriptorStore}
 
-class DbValidatorInternalStore private (
+import scala.concurrent.{ExecutionContext, Future}
+
+class DbKeyValueStore private (
     storage: DbStorage,
     val storeId: Int,
     val loggerFactory: NamedLoggerFactory,
@@ -28,23 +26,22 @@ class DbValidatorInternalStore private (
     val ec: ExecutionContext,
     val loggingContext: ErrorLoggingContext,
     val closeContext: CloseContext,
-) extends ValidatorInternalStore
+) extends KeyValueStore
     with AcsJdbcTypes
     with NamedLogging {
 
   val profile: JdbcProfile = storage.profile.jdbc
 
-  override def setConfig[T](key: String, value: T)(implicit
+  override def setValue[T](key: String, value: T)(implicit
       tc: TraceContext,
       encoder: Encoder[T],
   ): Future[Unit] = {
     val jsonValue: Json = value.asJson
 
-    val action = sql"""INSERT INTO validator_internal_config (config_key, config_value, store_id)
+    val action = sql"""INSERT INTO key_value_store (key, value, store_id)
         VALUES ($key, $jsonValue, $storeId)
-        ON CONFLICT (store_id, config_key) DO UPDATE
-        SET config_value = excluded.config_value""".asUpdate
-
+        ON CONFLICT (store_id, key) DO UPDATE
+        SET value = excluded.value""".asUpdate
     val updateAction = storage.update(action, "set-validator-internal-config")
 
     logger.debug(
@@ -53,15 +50,15 @@ class DbValidatorInternalStore private (
     updateAction.map(_ => ())
   }
 
-  override def getConfig[T](
+  override def getValue[T](
       key: String
   )(implicit tc: TraceContext, decoder: Decoder[T]): OptionT[Future, Decoder.Result[T]] = {
 
     logger.debug(s"Retrieving config key $key")
 
-    val queryAction = sql"""SELECT config_value
-      FROM validator_internal_config
-      WHERE config_key = $key AND store_id = $storeId
+    val queryAction = sql"""SELECT value
+      FROM key_value_store
+      WHERE key = $key AND store_id = $storeId
     """.as[Json].headOption
 
     val jsonOptionT: OptionT[FutureUnlessShutdown, Json] =
@@ -87,7 +84,7 @@ class DbValidatorInternalStore private (
     OptionT(futureUnlessShutdownToFuture(resultOptionT.value))
   }
 
-  override def deleteConfig(key: String)(implicit
+  override def deleteKey(key: String)(implicit
       tc: TraceContext
   ): Future[Unit] = {
     logger.debug(
@@ -95,18 +92,17 @@ class DbValidatorInternalStore private (
     )
     storage
       .update(
-        sqlu"delete from validator_internal_config WHERE config_key = $key AND store_id = $storeId",
+        sqlu"delete from key_value_store WHERE key = $key AND store_id = $storeId",
         "delete config key",
       )
       .map(_.discard)
   }
 }
 
-object DbValidatorInternalStore {
+object DbKeyValueStore {
 
   def apply(
-      participant: ParticipantId,
-      validatorParty: PartyId,
+      storeDescriptor: StoreDescriptor,
       storage: DbStorage,
       loggerFactory: NamedLoggerFactory,
   )(implicit
@@ -114,23 +110,12 @@ object DbValidatorInternalStore {
       lc: ErrorLoggingContext,
       cc: CloseContext,
       tc: TraceContext,
-  ): Future[DbValidatorInternalStore] = {
+  ): Future[DbKeyValueStore] = {
 
     StoreDescriptorStore
-      .getStoreIdForDescriptor(
-        StoreDescriptor(
-          version = 2,
-          name = "DbValidatorInternalConfigStore",
-          party = validatorParty,
-          participant = participant,
-          key = Map(
-            "validatorParty" -> validatorParty.toProtoPrimitive
-          ),
-        ),
-        storage,
-      )
+      .getStoreIdForDescriptor(storeDescriptor, storage)
       .map(storeId => {
-        new DbValidatorInternalStore(
+        new DbKeyValueStore(
           storage,
           storeId,
           loggerFactory,

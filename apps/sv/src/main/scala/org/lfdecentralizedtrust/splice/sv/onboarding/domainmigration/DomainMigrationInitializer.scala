@@ -312,8 +312,6 @@ class DomainMigrationInitializer(
         SequencerConnections.single(localSynchronizerNode.sequencerConnection),
         domainMigrationDump.domainDataSnapshot.dars,
         domainMigrationDump.domainDataSnapshot.acsSnapshot,
-        legacyAcsImport =
-          domainMigrationDump.domainDataSnapshot.acsFormat == http.DomainDataSnapshot.AcsFormat.AdminApi,
       )
       _ = logger.info("resumed domain")
     } yield {}

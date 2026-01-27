@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import { useDsoInfos } from '../../contexts/SvContext';
 import dayjs from 'dayjs';
 import { createProposalActions, getInitialExpiration } from '../../utils/governance';

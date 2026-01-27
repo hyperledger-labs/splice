@@ -1,8 +1,11 @@
 package org.lfdecentralizedtrust.splice.unit.http
 
 import com.auth0.jwk.{JwkProvider, JwkProviderBuilder}
+import com.daml.metrics.api.MetricsContext
+import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.digitalasset.canton.config.{ApiLoggingConfig, NonNegativeDuration}
 import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.metrics.ScopedInMemoryMetricsFactory
 import com.digitalasset.canton.{BaseTest, FutureHelpers, HasActorSystem, HasExecutionContext}
 import com.typesafe.config.ConfigFactory
 import org.apache.pekko.Done
@@ -14,7 +17,7 @@ import org.apache.pekko.http.scaladsl.server.Directives.{complete, *}
 import org.apache.pekko.http.scaladsl.server.Route
 import org.lfdecentralizedtrust.splice.auth.OAuthApi.WellKnownResponse
 import org.lfdecentralizedtrust.splice.auth.{OAuthApi, RSAVerifier}
-import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.http.{HttpClient, HttpClientMetrics}
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.net.URI
@@ -168,6 +171,7 @@ class HttpClientProxyTest
             val api =
               new OAuthApi(
                 NonNegativeDuration.ofSeconds(20),
+                HttpClientMetrics(metricsFactory),
                 loggerFactory,
               )
             api.getWellKnown(wellKnownUrlString).futureValue shouldBe an[WellKnownResponse]
@@ -251,6 +255,9 @@ class HttpClientProxyTest
       }
     }
   }
+  private val metricsFactoryProvider = new ScopedInMemoryMetricsFactory()
+  private val metricsFactory: InMemoryMetricsFactory =
+    metricsFactoryProvider.generateMetricsFactory(MetricsContext.Empty)
 
   private def executeRequest(
       serverBinding: ServerBinding
@@ -259,12 +266,13 @@ class HttpClientProxyTest
     val httpClient = HttpClient(
       ApiLoggingConfig(),
       HttpClient.HttpRequestParameters(NonNegativeDuration(30.seconds)),
+      HttpClientMetrics(metricsFactory),
       logger,
     )(ac, ec)
     val uriString = s"http://localhost:$serverPort"
 
     httpClient
-      .executeRequest(
+      .executeRequest("http-client-proxy-test", "test-request")(
         HttpRequest(uri = Uri(uriString))
       )
   }

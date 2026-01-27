@@ -31,11 +31,12 @@ const deleteBadPodsCommand = [
         BAD_PODS=$(
           kubectl get pods -n "$NAMESPACE" -o json | \\
           jq -r '.items[] |
-              (select(.status.phase == "Unknown" and .status.reason == "ContainerStatusUnknown") |
-                  .metadata.name) //
-              (select(.status.containerStatuses[]?.state.terminated? |
-                  .reason == "Error" and .exitCode == 137) |
-                  .metadata.name)'
+              select(
+              (.status.phase == "Unknown" and .status.reason == "ContainerStatusUnknown") or
+              (.status.reason == "Evicted") or
+              (.status.containerStatuses[]?.state.terminated? | .reason == "Error" and .exitCode == 137) or
+              (.status.initContainerStatuses[]?.state.waiting?.reason == "ContainerStatusUnknown")
+            ) | .metadata.name' | sort -u
         );
         if [ -z "$BAD_PODS" ]; then
             echo "No bad pods found in $NAMESPACE. Skipping.";
@@ -85,7 +86,7 @@ export function deployGCPodReaper(
           {
             apiGroups: [''], // Core API group for Pods
             resources: ['pods'],
-            verbs: ['list', 'create', 'delete', 'update'],
+            verbs: ['list', 'create', 'delete', 'update', 'get'],
           },
         ],
       },

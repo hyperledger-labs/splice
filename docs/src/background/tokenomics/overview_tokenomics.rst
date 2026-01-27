@@ -32,7 +32,7 @@ every 10 minutes, which is a configuration parameter that the Super Validators m
 whitepaper for the details.
 
 There is no difference in activity record creation for an `external party
-<https://docs.digitalasset.com/build/3.3/tutorials/app-dev/external_signing_onboarding.html#tutorial-onboard-external-party>`__ or a
+<https://docs.digitalasset.com/build/3.4/tutorials/app-dev/external_signing_onboarding.html#tutorial-onboard-external-party>`__ or a
 local party, but there is a difference in the automation support used in the minting phase. For local parties onboarded to a
 validator, the validator application runs background automation to mint all activity records automatically. An external party signs
 transactions using a key they control. As a consequence, the validator automation is not able to perform minting for external

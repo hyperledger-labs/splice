@@ -5,7 +5,7 @@ import {
   useUserState,
   usePrimaryParty,
 } from '@lfdecentralizedtrust/splice-common-frontend';
-import { Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router';
 
 import { AppBar, Box, Button, CssBaseline, Toolbar, Typography } from '@mui/material';
 

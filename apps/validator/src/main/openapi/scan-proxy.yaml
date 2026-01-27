@@ -223,7 +223,33 @@ paths:
         "404":
           description: No TransferCommand exists with this contract id within the last 24h
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-
+  /v0/scan-proxy/holdings/summary:
+    post:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "getHoldingsSummaryAt"
+      description: |
+        Returns the summary of active amulet contracts for a given migration id and record time, for the given parties.
+        This is an aggregate of `/v0/holdings/state` by owner party ID with better performance than client-side computation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/HoldingsSummaryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../scan/src/main/openapi/scan.yaml#/components/schemas/HoldingsSummaryResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 components:
   schemas:
     # does not include the TTL, and the contracts are not-MaybeCached

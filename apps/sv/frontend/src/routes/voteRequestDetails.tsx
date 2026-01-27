@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import React from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { ContractId } from '@daml/types';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import {

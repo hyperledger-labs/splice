@@ -6,8 +6,9 @@ package org.lfdecentralizedtrust.splice.environment
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfig
 import com.daml.ledger.api.v2.admin.{ObjectMetaOuterClass, UserManagementServiceOuterClass}
+import com.daml.ledger.api.v2.event
 import com.daml.ledger.api.v2.package_reference.PackageReference
-import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
+import com.daml.ledger.javaapi.data.codegen.{ContractId, Created, Exercised, HasCommands, Update}
 import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, Transaction, User}
 import com.digitalasset.base.error.ErrorResource
 import com.digitalasset.base.error.utils.ErrorDetails
@@ -148,6 +149,13 @@ class BaseLedgerConnection(
         Seq[IncompleteReassignmentEvent.Assign],
     )
   ] = activeContracts(filter.toEventFormat, offset)
+
+  def getContract(
+      contractId: ContractId[?],
+      queryingParties: Seq[PartyId],
+  )(implicit tc: TraceContext): Future[Option[event.CreatedEvent]] = {
+    client.getContract(contractId, queryingParties)
+  }
 
   def getConnectedDomains(party: PartyId)(implicit
       tc: TraceContext

@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import { Box, Divider, TextField as MuiTextField, Typography } from '@mui/material';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';

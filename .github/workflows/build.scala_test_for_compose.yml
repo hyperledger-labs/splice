@@ -73,9 +73,10 @@ jobs:
 
     services:
       postgres:
-        image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-postgres:0.3.12
+        image: postgres:17
         env:
           POSTGRES_PASSWORD: postgres
+          POSTGRES_INITDB_ARGS: "-c max_connections=16000"
         ports:
           - 5432:5432
 

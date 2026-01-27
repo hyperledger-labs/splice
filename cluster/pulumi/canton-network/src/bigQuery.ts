@@ -400,7 +400,9 @@ function installDatastreamToNatVmFirewallRule(
         ports: [dbPort.toString()],
       },
     ],
-    sourceRanges: [source.vpcPeeringConfig.subnet],
+    sourceRanges: source.vpcPeeringConfig.apply(peeringConfig =>
+      peeringConfig ? [peeringConfig.subnet] : []
+    ),
     destinationRanges: [natVm.networkInterfaces[0].networkIp],
   });
 }

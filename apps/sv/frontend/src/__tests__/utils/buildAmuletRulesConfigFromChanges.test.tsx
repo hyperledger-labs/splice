@@ -129,6 +129,12 @@ describe('buildAmuletRulesConfigFromChanges', () => {
         newValue: '100',
       },
       {
+        fieldName: 'issuanceCurveInitialValueOptDevelopmentFundPercentage',
+        label: 'Opt Development Fund Percentage',
+        currentValue: '0.05',
+        newValue: '0.06',
+      },
+      {
         fieldName: 'decentralizedSynchronizerActiveSynchronizer',
         label: 'Active Synchronizer',
         currentValue: 'sync1',
@@ -237,6 +243,7 @@ describe('buildAmuletRulesConfigFromChanges', () => {
     expect(result.issuanceCurve.initialValue.featuredAppRewardCap).toBe('1000');
     expect(result.issuanceCurve.initialValue.unfeaturedAppRewardCap).toBe('200');
     expect(result.issuanceCurve.initialValue.optValidatorFaucetCap).toBe('100');
+    expect(result.issuanceCurve.initialValue.optDevelopmentFundPercentage).toBe('0.06');
 
     expect(result.decentralizedSynchronizer.activeSynchronizer).toBe('sync2');
     const expectedRequiredSynchronizers = Array.from(
@@ -351,6 +358,12 @@ describe('buildAmuletRulesConfigFromChanges', () => {
         currentValue: '50',
         newValue: '100',
       },
+      {
+        fieldName: 'issuanceCurveFutureValues0OptDevelopmentFundPercentage',
+        label: 'Future Value 0 Opt Development Fund Percentage',
+        currentValue: '0.05',
+        newValue: '0.06',
+      },
     ];
 
     const result = buildAmuletRulesConfigFromChanges(changes);
@@ -366,6 +379,7 @@ describe('buildAmuletRulesConfigFromChanges', () => {
         featuredAppRewardCap: '1000',
         unfeaturedAppRewardCap: '200',
         optValidatorFaucetCap: '100',
+        optDevelopmentFundPercentage: '0.06',
       },
     });
   });

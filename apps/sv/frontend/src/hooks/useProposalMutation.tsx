@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useMutation, UseMutationResult } from '@tanstack/react-query';
 import { ProposalMutationArgs } from '../utils/types';
 import dayjs from 'dayjs';

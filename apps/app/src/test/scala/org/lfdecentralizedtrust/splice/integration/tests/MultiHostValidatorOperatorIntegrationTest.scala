@@ -77,7 +77,7 @@ class MultiHostValidatorOperatorIntegrationTest
     )(
       "Topology has changed",
       _ => {
-        multiHostedParties.foreach(party =>
+        forEvery(multiHostedParties)(party =>
           aliceParticipant.topology.party_to_participant_mappings
             .list(
               synchronizerId,
@@ -125,7 +125,7 @@ class MultiHostValidatorOperatorIntegrationTest
     )(
       "Alice sees the transaction",
       _ =>
-        multiHostedParties.foreach { party =>
+        forEvery(multiHostedParties) { party =>
           val mappings = aliceParticipant.topology.party_to_participant_mappings
             .list(
               synchronizerId,
@@ -152,7 +152,7 @@ class MultiHostValidatorOperatorIntegrationTest
     )(
       "Wait for confirmation rights",
       _ =>
-        multiHostedParties.foreach(party => {
+        forEvery(multiHostedParties) { party =>
           val mapping =
             aliceValidatorBackend.participantClient.topology.party_to_participant_mappings
               .list(
@@ -162,7 +162,7 @@ class MultiHostValidatorOperatorIntegrationTest
               )
           mapping should not be empty
           mapping.last.item.participants.last.permission shouldBe ParticipantPermission.Confirmation
-        }),
+        },
     )
 
     clue("Setup transfer preapproval") {

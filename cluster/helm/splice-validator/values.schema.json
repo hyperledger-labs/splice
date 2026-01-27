@@ -9,6 +9,37 @@
       "type": "object",
       "description": "The authentication configuration for the application"
     },
+    "synchronizer": {
+      "type": "object",
+      "description": "Configuration parameters for the sequencer connections.",
+      "properties": {
+        "connectionType": {
+          "type": "string",
+          "enum": [
+            "trust-single",
+            "bft",
+            "bft-custom"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "description": "Trusted sequencer Url."
+        },
+        "svNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "list of trusted sequencer / SV names. Optional unless connectionType is bft-custom."
+        },
+        "threshold": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "bft-custom threshold. Optional unless connectionType is bft-custom."
+        }
+      }
+    },
     "scanClient": {
       "type": "object",
       "description": "Configuration parameters for the scan client.",
@@ -28,10 +59,10 @@
         },
         "threshold": {
           "type": "integer",
-          "default": 0,
+          "minimum": 0,
           "description": "bft-custom threshold. Optional unless scan-type is bft-custom."
         },
-        "trustedSvs": {
+        "svNames": {
           "type": "array",
           "items": {
             "type": "string"
@@ -103,7 +134,7 @@
       "then": {
         "properties": {
           "scanClient": {
-            "required": ["threshold", "trustedSvs"]
+            "required": ["threshold", "svNames"]
           }
         }
       }
@@ -558,6 +589,63 @@
           ]
         },
         "errorMessage": "If 'scanClient' is set, 'scanAddress' and 'nonSvValidatorTrustSingleScan' must not be set. All the scan specific configuration must be done inside the 'scanClient' object."
+      }
+    },
+    {
+      "if": {
+        "required": ["synchronizer"],
+        "properties": {
+          "synchronizer": { "required": ["connectionType"] }
+        }
+      },
+      "then": {
+        "allOf": [
+          {
+            "if": {
+              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "bft" } } } }
+            },
+            "then": {
+              "properties": {
+                "synchronizer": {
+                  "not": { "required": ["url", "svNames", "threshold"] }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "trust-single" } } } }
+            },
+            "then": {
+              "properties": {
+                "synchronizer": {
+                  "required": ["url"],
+                  "properties": {
+                    "url": { "minLength": 1 },
+                    "svNames": false,
+                    "threshold": false
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "bft-custom" } } } }
+            },
+            "then": {
+              "properties": {
+                "synchronizer": {
+                  "required": ["svNames", "threshold"],
+                  "properties": {
+                    "url": false,
+                    "svNames": { "minItems": 1 }
+                  }
+                }
+              }
+            }
+          }
+        ]
       }
     }
   ]

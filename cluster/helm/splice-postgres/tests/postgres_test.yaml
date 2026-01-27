@@ -1,0 +1,343 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+suite: "Postgres deployment"
+templates:
+  - postgres.yaml
+release:
+  # Set for testing labels
+  name: test-postgres
+  namespace: test-namespace
+chart:
+  # Override for testing labels
+  version: 0.1.1
+  appVersion: 0.1.0
+set:
+  persistence:
+    secretName: postgres-secrets
+  db:
+    volumeSize: 100Gi
+    volumeStorageClass: standard-rwo
+    pvcTemplateName: pg-data
+    maxConnections: 300
+    maxWalSize: 2GB
+tests:
+  - it: "deploys a ConfigMap with correct environment variables"
+    documentIndex: 0
+    documentSelector:
+      path: kind
+      value: ConfigMap
+    asserts:
+      - equal:
+          path: metadata.name
+          value: test-postgres-configuration
+      - equal:
+          path: metadata.namespace
+          value: test-namespace
+      - equal:
+          path: data.PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
+      - equal:
+          path: data.POSTGRES_DB
+          value: "cantonnet"
+      - equal:
+          path: data.POSTGRES_USER
+          value: "cnadmin"
+
+  - it: "deploys a StatefulSet with correct configuration"
+    documentIndex: 1
+    documentSelector:
+      path: kind
+      value: StatefulSet
+    asserts:
+      - equal:
+          path: metadata.name
+          value: test-postgres
+      - equal:
+          path: metadata.namespace
+          value: test-namespace
+      - equal:
+          path: spec.serviceName
+          value: test-postgres
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.selector.matchLabels.app
+          value: test-postgres
+
+  - it: "sets labels as expected"
+    set:
+      pod:
+        labels:
+          custom: label
+        annotations:
+          custom: annotation
+    documentIndex: 1
+    documentSelector:
+      path: kind
+      value: StatefulSet
+    asserts:
+      - isSubset:
+          path: metadata.labels
+          content:
+            app: test-postgres
+            app.kubernetes.io/instance: test-postgres
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: test-postgres
+            app.kubernetes.io/version: "0.1.0"
+            helm.sh/chart: splice-postgres-0.1.1
+      - isSubset:
+          path: spec.template.metadata.labels
+          content:
+            app: test-postgres
+            namespace: test-namespace
+            custom: label
+      - equal:
+          path: spec.template.metadata.annotations.custom
+          value: annotation
+
+  - it: "configures container with default args"
+    documentIndex: 1
+    documentSelector:
+      path: kind
+      value: StatefulSet
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: test-postgres
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: postgres:14
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: IfNotPresent
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-c"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "max_connections=300"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "max_wal_size=2GB"
+
+  - it: "configures container with extraArgs"
+    set:
+      extraArgs:
+        - "-c"
+        - "shared_buffers=256MB"
+        - "-c"
+        - "work_mem=16MB"
+    documentIndex: 1
+    documentSelector:
+      path: kind
+      value: StatefulSet
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "-c"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "max_connections=300"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "shared_buffers=256MB"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "work_mem=16MB"
+
+  - it: "configures environment variables correctly"
+    documentIndex: 1
+    documentSelector:
+      path: kind
+      value: StatefulSet
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].name
+          value: POSTGRES_PASSWORD
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.name
+          value: postgres-secrets
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.key
+          value: postgresPassword
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
+          value: test-postgres-configuration
+
+  - it: "configures liveness probe"
+    documentIndex: 1
+    documentSelector:
+      path: kind
+      value: StatefulSet
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.exec.command
+          value:
+            - psql
+            - -U
+            - cnadmin
+            - -d
+            - template1
+            - -c
+            - SELECT 1
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.failureThreshold
+          value: 3
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.periodSeconds
+          value: 10
+
+  - it: "configures port correctly"
+    documentIndex: 1
+    documentSelector:
+      path: kind
+      value: StatefulSet
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 5432
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].name
+          value: postgresdb
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].protocol
+          value: TCP
+
+  - it: "configures resources when provided"
+    set:
+      resources:
+        limits:
+          memory: 12Gi
+        requests:
+          cpu: "0.5"
+          memory: 1Gi
+    documentIndex: 1
+    documentSelector:
+      path: kind
+      value: StatefulSet
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 12Gi
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: "0.5"
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: 1Gi
+
+  - it: "configures volume mounts"
+    documentIndex: 1
+    documentSelector:
+      path: kind
+      value: StatefulSet
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /var/lib/postgresql/data
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].name
+          value: pg-data
+
+  - it: "configures nodeSelector when provided"
+    set:
+      nodeSelector:
+        disktype: ssd
+    documentIndex: 1
+    documentSelector:
+      path: kind
+      value: StatefulSet
+    asserts:
+      - equal:
+          path: spec.template.spec.nodeSelector.disktype
+          value: ssd
+
+  - it: "configures affinity when provided"
+    set:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values:
+                      - us-west-2a
+    documentIndex: 1
+    documentSelector:
+      path: kind
+      value: StatefulSet
+    asserts:
+      - isNotNull:
+          path: spec.template.spec.affinity
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: topology.kubernetes.io/zone
+
+  - it: "configures tolerations when provided"
+    set:
+      tolerations:
+        - key: "dedicated"
+          operator: "Equal"
+          value: "postgres"
+          effect: "NoSchedule"
+    documentIndex: 1
+    documentSelector:
+      path: kind
+      value: StatefulSet
+    asserts:
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: dedicated
+      - equal:
+          path: spec.template.spec.tolerations[0].value
+          value: postgres
+
+  - it: "configures volumeClaimTemplates correctly"
+    documentIndex: 1
+    documentSelector:
+      path: kind
+      value: StatefulSet
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].metadata.name
+          value: pg-data
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.accessModes[0]
+          value: ReadWriteOnce
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.resources.requests.storage
+          value: 100Gi
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+          value: standard-rwo
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.volumeMode
+          value: Filesystem
+
+  - it: "deploys a Service with correct configuration"
+    documentIndex: 2
+    documentSelector:
+      path: kind
+      value: Service
+    asserts:
+      - equal:
+          path: metadata.name
+          value: test-postgres
+      - equal:
+          path: metadata.namespace
+          value: test-namespace
+      - equal:
+          path: spec.ports[0].name
+          value: postgresdb
+      - equal:
+          path: spec.ports[0].port
+          value: 5432
+      - equal:
+          path: spec.ports[0].protocol
+          value: TCP
+      - equal:
+          path: spec.selector.app
+          value: test-postgres

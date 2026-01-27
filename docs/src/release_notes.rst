@@ -7,8 +7,129 @@
 
 .. release-notes:: upcoming
 
+  - Scan
+
+    - deprecated ``/v0/total-amulet-balance`` and ``/v0/wallet-balance`` endpoints have been removed in favor of using `/registry/metadata/v1/instruments/{instrumentId} <app_dev/token_standard/openapi/token_metadata.html#get--registry-metadata-v1-instruments-instrumentId>`_
+      and `/v0/holdings/summary <app_dev/scan_api/scan_openapi.html#post--v0-holdings-summary>`_, respectively.
+
+  - Deployments
+
+    - The default logger has been switched to use an asynchronous appender, for all the nodes, for better performance.
+      The behavior can be switched back to synchronous logging by setting the environment variable `LOG_IMMEDIATE_FLUSH=true`.
+      This now includes helm deployments as well, in 0.5.7 the default was changed only for docker-compose deployments.
+
+.. release-notes:: 0.5.7
+
+  .. important::
+
+      **Action recommended from app devs:**
+
+      **App devs whose app's Daml code statically depends on** ``splice-amulet < 0.1.15`` should recompile their Daml code
+      to link against ``splice-amulet >= 0.1.15`` in order to be ready to consume the two new fields introduced in `AmuletConfig`
+      (`optDevelopmentFundManager`) and `IssuanceConfig` (`optDevelopmentFundPercentage`) once either of them is set.
+
+      This is required because once the new fields are set, downgrades of `AmuletRules` will fail.
+      At the moment, this recompilation is not strictly required, as setting these fields is not planned immediately.
+
+      No change is required for apps that build against the :ref:`token_standard`
+      or :ref:`featured_app_activity_markers_api`.
+
+  - Sequencer connections
+
+    - Fixed an issue in the sequencer connection logic in splice 0.5.6 that resulted in participants randomly crashing and restarting.
+
+  - Daml
+
+    - Implement Daml changes for `CIP-0082 - Establish a 5% Development Fund (Foundation-Governed) <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0082/cip-0082.md>`__:
+
+      - New templates:
+
+        - **UnclaimedDevelopmentFundCoupon**: Represents unallocated Development Fund entitlements created per issuance round.
+          Coupons are owned by the DSO, have no expiry, and serve as accounting instruments.
+          ACS size is managed through merging rather than expiration.
+
+        - **DevelopmentFundCoupon**: Represents an allocated portion of the Development Fund for a specific beneficiary.
+          Coupons can be withdrawn by the Development Fund Manager or expired by the DSO, in both cases restoring the
+          amount to an unclaimed coupon.
+
+      - Configuration extensions:
+
+        - ``IssuanceConfig`` is extended with an optional ``optDevelopmentFundPercentage``, defining the fraction of each
+          mint allocated to the Development Fund (validated to be within ``[0.0, 1.0]``).
+
+        - ``AmuletConfig`` is extended with an optional ``optDevelopmentFundManager``, designating the party authorized
+          to allocate Development Fund entitlements.
+
+      - AmuletRules updates:
+
+        - Modify ``AmuletRules_MiningRound_StartIssuing``: Issuance logic now deducts the Development Fund share
+          before distributing rewards. When a nonzero allocation is configured, a new
+          ``UnclaimedDevelopmentFundCoupon`` is created per round. If ``optDevelopmentFundPercentage`` is ``None``,
+          a default value of **0.05** is applied.
+          The accrual of ``UnclaimedDevelopmentFundCoupon`` contracts thus starts
+          as soon as the new Daml models are voted in.
+
+        - A new choice ``AmuletRules_MergeUnclaimedDevelopmentFundCoupons``: Adds a batch merge operation to combine
+          multiple ``UnclaimedDevelopmentFundCoupon`` contracts into a single one for ACS size control.
+
+        - A new choice ``AmuletRules_AllocateDevelopmentFundCoupon``: Allows the Development Fund Manager to allocate
+          unclaimed entitlements to beneficiaries, creating ``DevelopmentFundCoupon`` contracts and returning any
+          remaining unclaimed amount.
+
+        - Modify ``AmuletRules_Transfer``: Transfers now accept ``DevelopmentFundCoupon`` as a valid input when
+          the sender matches the beneficiary and report the total Development Fund amount consumed.
+
+      - DsoRules updates:
+
+        - A a new choice ``DsoRules_MergeUnclaimedDevelopmentFundCoupons``: Enables the DSO to trigger unclaimed coupon
+          merges via governance.
+
+        - Add a new ``DsoRules_ExpireDevelopmentFundCoupon``: Allows the DSO to expire an allocated
+          ``DevelopmentFundCoupon``, restoring its amount to an ``UnclaimedDevelopmentFundCoupon``.
+
+      Note that the UI changes in the Wallet app required to allocate funds are not yet implemented and will be delivered in a later release. Please refer to
+      this issue: `Tracking - CIP-0082 - 5% Development Fund <https://github.com/hyperledger-labs/splice/issues/3218>`.
+
+      These Daml changes require an upgrade to the following Daml versions **before**
+      voting to set the transfer fees to zero:
+
+      ================== =======
+      name               version
+      ================== =======
+      amulet             0.1.15
+      amuletNameService  0.1.16
+      dsoGovernance      0.1.21
+      splitwell          0.1.15
+      validatorLifecycle 0.1.6
+      wallet             0.1.15
+      walletPayments     0.1.15
+      ================== =======
+
+  - SV app
+
+    - Add a new trigger, `MergeUnclaimedDevelopmentFundCouponsTrigger`` that automatically monitors ``UnclaimedDevelopmentFundCoupon`` and,
+      once their number reaches at least twice the configured threshold, merges the smallest coupons into a single one.
+      This approach keeps contract-ids of larger coupons stable to minimize contention with externally prepared transactions which reference these ids.
+
+    - Add a new config field to ``SvOnboardingConfig`` named ``unclaimedDevelopmentFundCouponsThreshold`` defining the
+      threshold above which ``UnclaimedDevelopmentFundCoupon`` s are merged. The default value is set to 10.
+
+  - Deployments
+
+    - The default logger has been switched to use an asynchronous appender, for all the nodes, for better performance.
+      The behavior can be switched back to synchronous logging by setting the environment variable `LOG_IMMEDIATE_FLUSH=true`.
+
   - Validator
-    - Added support for picking a custom name for new parties created when onboarding users via the `/v0/admin/users` API. See :ref:`docs <validator-users>`.
+
+    - Expose ``/v0/holdings/summary`` endpoint from scan proxy.
+
+.. release-notes:: 0.5.6
+
+  - Sequencer
+
+    - Includes a number of performance improvements that should improve the stability of the sequencer under higher load.
+
+.. release-notes:: 0.5.5
 
   - API security
 
@@ -19,7 +140,7 @@
       Revoking user rights on the participant will revoke access to the corresponding API endpoints.
 
       In general, endpoints that required authentication before will now check that the authenticated user
-      is not deactivated on the participant has ``actAs`` rights for the relevant party
+      is not deactivated on the participant and has ``actAs`` rights for the relevant party
       (wallet party for the wallet app API, SV operator party for the SV app API, etc).
 
     - Administrative SV app endpoints now require participant admin rights.
@@ -29,7 +150,6 @@
 
         - ``/v0/admin/domain/pause``
         - ``/v0/admin/domain/unpause``
-        - ``/v0/admin/domain/migration-dump``
         - ``/v0/admin/domain/migration-dump``
         - ``/v0/admin/domain/identities-dump``
         - ``/v0/admin/domain/data-snapshot``
@@ -48,10 +168,13 @@
           similar to most other SV app endpoints.
           Use the public ``/v0/dso`` endpoint in the scan app if you need to fetch DSO info.
 
-    - Added an optional ``excludeDebugFields``` boolean to the request body of allocation and transfer endpoints for the Token Standard component.
-      (``splice-api-token-allocation-v1`` and ``splice-api-token-transfer-instruction-v1``
+  - Validator
 
-      Clients can now set this to true to omit debug information from the response.
+    - Added support for picking a custom name for new parties created when onboarding users via the `/v0/admin/users` API. See :ref:`docs <validator-users>`.
+
+    - Added an optional ``excludeDebugFields``` boolean to the request body of allocation and transfer endpoints for the Token Standard component
+      (``splice-api-token-allocation-v1`` and ``splice-api-token-transfer-instruction-v1``).
+      Clients can now set this to true to omit debug information from the response in order to save on bandwidth.
 
 .. release-notes:: 0.5.4
 
@@ -989,7 +1112,7 @@ which can happen in certain cases when the sequencer is down.
 
   - Improve the :ref:`application development documentation <app_dev_overview>` to better explain the available APIs and how to use them.
   - Add relevant links to the new application developer documentation pages published by Digital Asset at
-    https://docs.digitalasset.com/build/3.3/.
+    https://docs.digitalasset.com/build/3.4/.
   - Fixed docker-compose docs around migrating from a non-authenticated validator to
     an authenticated validator. A complete wipe of the validator database is not required, as
     opposed to what the docs previously stated. See the relevant section on :ref:`authenticated

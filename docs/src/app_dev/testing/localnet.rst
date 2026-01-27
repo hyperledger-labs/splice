@@ -219,8 +219,8 @@ Access the Canton Admin Console
 Use the Canton Admin Console to inspect and modify the run configuration
 of the Canton sequencer, mediator, and participant nodes in your LocalNet deployment.
 
-* `Canton Console How-To <https://docs.digitalasset.com/operate/3.3/howtos/operate/console/console.html?>`__
-* `Canton Console commands <https://docs.digitalasset.com/operate/3.3/reference/console.html>`__
+* `Canton Console How-To <https://docs.digitalasset.com/operate/3.4/howtos/operate/console/console.html?>`__
+* `Canton Console commands <https://docs.digitalasset.com/operate/3.4/reference/console.html>`__
 
 
 .. code-block:: bash

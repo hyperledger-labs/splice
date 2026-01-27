@@ -58,8 +58,15 @@ class AcsSnapshotStoreTest
         for {
           updateHistory <- mkUpdateHistory()
           store = mkStore(updateHistory)
-          result <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, CantonTimestamp.MaxValue)
-        } yield result should be(None)
+          resultBefore <- store.lookupSnapshotAtOrBefore(
+            DefaultMigrationId,
+            CantonTimestamp.MaxValue,
+          )
+          resultAfter <- store.lookupSnapshotAfter(DefaultMigrationId, CantonTimestamp.MinValue)
+        } yield {
+          resultBefore should be(None)
+          resultAfter should be(None)
+        }
       }
 
       "only return the last snapshot of the passed migration id" in {
@@ -95,7 +102,7 @@ class AcsSnapshotStoreTest
         } yield result should be(None)
       }
 
-      "return the latest snapshot before the given timestamp" in {
+      "return correct snapshots before and after given timestamps" in {
         for {
           updateHistory <- mkUpdateHistory()
           store = mkStore(updateHistory)
@@ -109,8 +116,17 @@ class AcsSnapshotStoreTest
               snapshot <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp)
             } yield snapshot
           }
-          result <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, timestamp4)
-        } yield result.map(_.snapshotRecordTime) should be(Some(timestamp3))
+          resultBefore4 <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, timestamp4)
+          firstResult <- store.lookupSnapshotAfter(DefaultMigrationId, CantonTimestamp.MinValue)
+          secondResult <- store.lookupSnapshotAfter(
+            DefaultMigrationId,
+            firstResult.value.snapshotRecordTime,
+          )
+        } yield {
+          resultBefore4.map(_.snapshotRecordTime) should be(Some(timestamp3))
+          firstResult.map(_.snapshotRecordTime) should be(Some(timestamp1))
+          secondResult.map(_.snapshotRecordTime) should be(Some(timestamp2))
+        }
       }
 
     }
@@ -204,14 +220,14 @@ class AcsSnapshotStoreTest
           _ <- ingestCreate(
             updateHistory,
             omr1,
-            timestamp1.minusSeconds(2L),
+            timestamp1,
           )
           _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
           // t2
           _ <- ingestCreate(
             updateHistory,
             omr2,
-            timestamp2.minusSeconds(1L),
+            timestamp2,
           )
           lastSnapshot <- store.lookupSnapshotAtOrBefore(DefaultMigrationId, timestamp2)
           _ <- store.insertNewSnapshot(lastSnapshot, DefaultMigrationId, timestamp2)

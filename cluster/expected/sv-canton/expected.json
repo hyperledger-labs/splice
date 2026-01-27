@@ -1389,6 +1389,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -1488,6 +1495,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -1716,6 +1730,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -1835,6 +1856,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -2421,6 +2449,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -2581,6 +2616,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -3351,6 +3393,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -3447,6 +3496,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -3543,6 +3599,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -3642,6 +3705,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -3870,6 +3940,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -3989,6 +4066,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -4579,6 +4663,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -4764,6 +4855,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -5528,6 +5626,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -5647,6 +5752,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -6233,6 +6345,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -6393,6 +6512,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }

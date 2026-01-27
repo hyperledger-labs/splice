@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Divider, Stack, Typography } from '@mui/material';
-import { PropsWithChildren } from 'react';
 
-interface DetailItemProps extends PropsWithChildren {
+interface DetailItemProps {
   label: string;
   value: React.ReactNode;
   labelId?: string;

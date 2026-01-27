@@ -1,0 +1,66 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+suite: "cometbft pvc"
+templates:
+  - pvc.yaml
+release:
+  # Set for testing labels
+  name: global-domain-3
+set:
+  node:
+    identifier: "global-domain-3-cometbft"
+tests:
+  - it: "deploys a PVC"
+    template: pvc.yaml
+    documentSelector:
+      path: kind
+      value: PersistentVolumeClaim
+    asserts:
+      - equal:
+          path: metadata.name
+          value: global-domain-3-cometbft-cometbft-data
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
+  - it: "uses custom pvcName in PVC when set"
+    template: pvc.yaml
+    set:
+      db:
+        pvcName: "custom-pvc-name"
+    documentSelector:
+      path: kind
+      value: PersistentVolumeClaim
+    asserts:
+      - equal:
+          path: metadata.name
+          value: custom-pvc-name
+  - it: "does not include dataSource in PVC when not set"
+    template: pvc.yaml
+    documentSelector:
+      path: kind
+      value: PersistentVolumeClaim
+    asserts:
+      - isNull:
+          path: spec.dataSource
+  - it: "includes dataSource in PVC when set"
+    template: pvc.yaml
+    set:
+      db:
+        dataSource:
+          kind: VolumeSnapshot
+          name: my-snapshot
+          apiGroup: snapshot.storage.k8s.io
+    documentSelector:
+      path: kind
+      value: PersistentVolumeClaim
+    asserts:
+      - equal:
+          path: spec.dataSource.kind
+          value: VolumeSnapshot
+      - equal:
+          path: spec.dataSource.name
+          value: my-snapshot
+      - equal:
+          path: spec.dataSource.apiGroup
+          value: snapshot.storage.k8s.io

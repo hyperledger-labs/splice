@@ -56,7 +56,7 @@ const runnerSpecs = [
         memory: '10Gi',
       },
       limits: {
-        cpu: '4',
+        cpu: '6',
         memory: '10Gi',
       },
     },
@@ -71,7 +71,7 @@ const runnerSpecs = [
         memory: '18Gi',
       },
       limits: {
-        cpu: '4',
+        cpu: '6',
         memory: '18Gi',
       },
     },
@@ -86,7 +86,7 @@ const runnerSpecs = [
         memory: '24Gi',
       },
       limits: {
-        cpu: '5',
+        cpu: '7',
         memory: '24Gi',
       },
     },
@@ -101,7 +101,7 @@ const runnerSpecs = [
         memory: '32Gi',
       },
       limits: {
-        cpu: '6',
+        cpu: '8',
         memory: '32Gi',
       },
     },
@@ -116,7 +116,7 @@ const runnerSpecs = [
         memory: '52Gi',
       },
       limits: {
-        cpu: '8',
+        cpu: '10',
         memory: '52Gi',
       },
     },
@@ -769,8 +769,9 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
         namespace: runnersNamespace.metadata.name,
       },
       stringData: {
-        // This is the 'Actions Runner' token for canton-network-da GH user.
-        // Note that the user needs admin rights on the repo for this to work, since the controller and
+        // This is the 'Self-hosted runner token' token for canton-network-da GH user.
+        // Note that the user needs "read/write rights access to administration" and "read access to metadata"
+        // (fine-grained) permissions for this to work, since the controller and
         // listeners use the actions/runners/registration-token endpoint to create a temporary token
         // for registration, and this endpoint seems to require admin rights.
         // TODO(DACH-NY/canton-network-node#17842): The recommended thing to do is use a GitHub App. See here for a guide

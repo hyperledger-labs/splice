@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 553,
+  "id": 782,
   "links": [],
   "panels": [
     {
@@ -305,16 +305,10 @@
         "allValue": ".*",
         "current": {
           "text": [
-            "0.5.4",
-            "0.5.1",
-            "0.4.23",
-            "0.4.25"
+            "All"
           ],
           "value": [
-            "0.5.4",
-            "0.5.1",
-            "0.4.23",
-            "0.4.25"
+            "$__all"
           ]
         },
         "datasource": {
@@ -394,5 +388,5 @@
   "timezone": "",
   "title": "Validator Licenses",
   "uid": "cdpcj4gxackcga",
-  "version": 2
+  "version": 1
 }

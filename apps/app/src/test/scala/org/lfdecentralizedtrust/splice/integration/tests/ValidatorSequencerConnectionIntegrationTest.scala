@@ -21,6 +21,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import org.apache.pekko.http.scaladsl.model.Uri
+import org.lfdecentralizedtrust.splice.validator.config.ValidatorTrustedSynchronizerConfig
 
 class ValidatorSequencerConnectionIntegrationTest
     extends IntegrationTest
@@ -39,7 +40,12 @@ class ValidatorSequencerConnectionIntegrationTest
             c.copy(
               domains = c.domains.copy(
                 global = c.domains.global.copy(
-                  sequencerNames = Some(NonEmptyList.of(getSvName(1), getSvName(2)))
+                  trustedSynchronizerConfig = Some(
+                    ValidatorTrustedSynchronizerConfig(
+                      svNames = NonEmptyList.of(getSvName(1), getSvName(2), getSvName(3)),
+                      threshold = 2,
+                    )
+                  )
                 )
               ),
               automation =
@@ -50,7 +56,7 @@ class ValidatorSequencerConnectionIntegrationTest
       )
       .withManualStart
 
-  "validator with 'sequencerNames' set in config connects to specified sequencers and tracks URL changes of sequencers" in {
+  "validator with 'svNames' set in config connects to specified sequencers and tracks URL changes of sequencers" in {
     implicit env =>
       startAllSync(
         sv1Backend,
@@ -63,19 +69,45 @@ class ValidatorSequencerConnectionIntegrationTest
         sv4ScanBackend,
       )
 
+      // We must wait for the sequencers to "mature" in Scan before starting the validator.
+      // WITHOUT THIS: Alice queries Scan and finds that although 4 sequencers are listed,
+      // some (like SV3) have an 'availableAfter' timestamp in the future.
+      // Alice's DomainConnector correctly ignores these "not yet available" sequencers.
+      // If Alice only finds 1 valid sequencer but is configured with a trust threshold of 2,
+      // her validator app will crash on startup to prevent operating with insufficient trust.
+      withClue("Wait for all 4 SV sequencers to be available and valid in Scan") {
+        eventually(60.seconds, 1.second) {
+          val allDomains = sv1ScanBackend.listDsoSequencers()
+          val now = env.environment.clock.now
+          val availableSequencers = for {
+            domain <- allDomains
+            sequencer <- domain.sequencers
+            if sequencer.url.nonEmpty && !now.toInstant.isBefore(sequencer.availableAfter)
+          } yield sequencer
+          availableSequencers.size shouldBe 4
+        }
+      }
+
       aliceValidatorBackend.startSync()
 
       val sv1Url = getPublicSequencerUrl(sv1Backend)
       val sv2InitialUrl = getPublicSequencerUrl(sv2Backend)
-      val initialExpectedUrls = Set(sv1Url, sv2InitialUrl)
+      val sv3Url = getPublicSequencerUrl(sv3Backend)
+      val initialExpectedUrls = Set(sv1Url, sv2InitialUrl, sv3Url)
 
       withClue("Validator should connect to the filtered list of sequencers from the config") {
-        eventually(60.seconds, 1.second) {
+        eventually(120.seconds, 1.second) {
           val connectedUrls = getSequencerPublicUrls(
             aliceValidatorBackend.participantClientWithAdminToken,
             globalSyncAlias,
           )
           connectedUrls shouldBe initialExpectedUrls
+
+          val currentThreshold = getSequencerTrustThreshold(
+            aliceValidatorBackend.participantClientWithAdminToken,
+            globalSyncAlias,
+          )
+          currentThreshold shouldBe 2
         }
       }
       val newSv2Address = "localhost:19108"
@@ -83,10 +115,10 @@ class ValidatorSequencerConnectionIntegrationTest
 
       setSequencerUrl(sv2Backend, newSv2Url).futureValue
 
-      val updatedExpectedUrls = Set(sv1Url, newSv2Address)
+      val updatedExpectedUrls = Set(sv1Url, newSv2Address, sv3Url)
 
       withClue("Validator should eventually see the updated sequencer URL from the ledger") {
-        eventually(60.seconds, 1.second) {
+        eventually(120.seconds, 1.second) {
           val connectedUrls = getSequencerPublicUrls(
             aliceValidatorBackend.participantClientWithAdminToken,
             globalSyncAlias,
@@ -106,6 +138,18 @@ class ValidatorSequencerConnectionIntegrationTest
   private def getPublicSequencerUrl(sv: SvAppBackendReference): String = {
     val fullUrl = sv.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
     Uri(fullUrl).authority.toString()
+  }
+
+  private def getSequencerTrustThreshold(
+      participantConnection: ParticipantClientReference,
+      synchronizerAlias: SynchronizerAlias,
+  ): Int = {
+    participantConnection.synchronizers
+      .config(synchronizerAlias)
+      .value
+      .sequencerConnections
+      .sequencerTrustThreshold
+      .unwrap
   }
 
   private def getSequencerPublicUrls(

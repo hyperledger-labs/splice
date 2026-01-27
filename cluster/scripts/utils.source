@@ -1,3 +1,9 @@
+#!/usr/bin/env bash
+
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+
 function get_postgres_type() {
   local instance=$1
   local stack=$2
@@ -27,15 +33,14 @@ function get_cloudsql_id() {
 function get_stack_for_namespace_component() {
   local namespace=$1
   local component=$2
-  local internal=$3
 
   local stack=""
   if [[ "${namespace}" =~ sv.* ]]; then
-    if [[ "${component}" == "participant" && "${internal}" != "true" ]]; then
+    if [[ "${component}" == "participant" ]]; then
       stack="sv-canton"
-    elif [[ "${component}" == "sequencer" && "${internal}" != "true" ]]; then
+    elif [[ "${component}" == "sequencer" ]]; then
       stack="sv-canton"
-    elif [[ "${component}" == "mediator" && "${internal}" != "true" ]]; then
+    elif [[ "${component}" == "mediator" ]]; then
       stack="sv-canton"
     else
       stack="canton-network"
@@ -44,18 +49,16 @@ function get_stack_for_namespace_component() {
     stack="$namespace"
   fi
 
-  echo $stack
+  echo "$stack"
 }
 
 create_component_instance() {
     local component="$1"
     local migration_id="$2"
     local namespace="$3"
-    local internal="$4"
 
     if [[ ("$component" == "sequencer" || "$component" == "mediator" || "$component" == "participant")
-       && ("$namespace" != "splitwell" && "$namespace" != "validator1" && "$namespace" != "sv")
-       && ("$internal" != "true") ]]; then
+       && ("$namespace" != "splitwell" && "$namespace" != "validator1" && "$namespace" != "sv") ]]; then
         component_instance="${component}-${migration_id}"
     else
         component_instance="${component}"

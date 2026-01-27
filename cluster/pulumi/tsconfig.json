@@ -13,12 +13,8 @@
     "noImplicitReturns": true,
     "forceConsistentCasingInFileNames": true,
     "allowSyntheticDefaultImports": true,
-    "lib": [
-      "es2021.string",
-      "es2015.iterable",
-      "es2019.array",
-      "dom"
-    ],
-    "resolveJsonModule": true
+    "lib": ["es2021.string", "es2015.iterable", "es2019.array", "dom"],
+    "resolveJsonModule": true,
+    "skipLibCheck": true
   }
 }
