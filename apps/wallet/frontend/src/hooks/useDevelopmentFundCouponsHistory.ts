@@ -6,15 +6,15 @@ import { useWalletClient } from '../contexts/WalletServiceContext';
 
 const PAGE_SIZE = 10;
 
-export const useDevelopmentFundCouponsHistory = () => {
-  const { listDevelopmentFundCouponsHistory } = useWalletClient();
+export const useActiveDevelopmentFundCoupons = () => {
+  const { listActiveDevelopmentFundCoupons } = useWalletClient();
   const queryClient = useQueryClient();
 
   const [offset, setOffset] = React.useState<number>(0);
 
   const couponsQuery = useQuery({
-    queryKey: ['developmentFundCoupons', offset, PAGE_SIZE],
-    queryFn: () => listDevelopmentFundCouponsHistory(PAGE_SIZE, offset),
+    queryKey: ['activeDevelopmentFundCoupons', offset, PAGE_SIZE],
+    queryFn: () => listActiveDevelopmentFundCoupons(PAGE_SIZE, offset),
   });
 
   const total = couponsQuery.data?.total || 0;
@@ -37,15 +37,65 @@ export const useDevelopmentFundCouponsHistory = () => {
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
 
   const invalidate = React.useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['developmentFundCoupons'] });
+    queryClient.invalidateQueries({ queryKey: ['activeDevelopmentFundCoupons'] });
     queryClient.invalidateQueries({ queryKey: ['developmentFundTotal'] });
   }, [queryClient]);
 
   return {
     coupons,
+    total,
     isLoading: couponsQuery.isLoading,
     isError: couponsQuery.isError,
     error: couponsQuery.error,
+    hasNextPage,
+    hasPreviousPage,
+    currentPage,
+    goToNextPage,
+    goToPreviousPage,
+    invalidate,
+  };
+};
+
+export const useCouponHistoryEvents = () => {
+  const { listCouponHistoryEvents } = useWalletClient();
+  const queryClient = useQueryClient();
+
+  const [offset, setOffset] = React.useState<number>(0);
+
+  const historyQuery = useQuery({
+    queryKey: ['couponHistoryEvents', offset, PAGE_SIZE],
+    queryFn: () => listCouponHistoryEvents(PAGE_SIZE, offset),
+  });
+
+  const total = historyQuery.data?.total || 0;
+  const events = historyQuery.data?.events || [];
+
+  const goToNextPage = React.useCallback(() => {
+    if (offset + PAGE_SIZE < total) {
+      setOffset(prev => prev + PAGE_SIZE);
+    }
+  }, [offset, total]);
+
+  const goToPreviousPage = React.useCallback(() => {
+    if (offset > 0) {
+      setOffset(prev => Math.max(0, prev - PAGE_SIZE));
+    }
+  }, [offset]);
+
+  const hasNextPage = offset + PAGE_SIZE < total;
+  const hasPreviousPage = offset > 0;
+  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+
+  const invalidate = React.useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['couponHistoryEvents'] });
+  }, [queryClient]);
+
+  return {
+    events,
+    total,
+    isLoading: historyQuery.isLoading,
+    isError: historyQuery.isError,
+    error: historyQuery.error,
     hasNextPage,
     hasPreviousPage,
     currentPage,

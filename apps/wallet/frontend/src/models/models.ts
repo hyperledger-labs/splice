@@ -143,3 +143,16 @@ export interface DevelopmentFundCoupon {
   status: 'active' | 'claimed' | 'expired' | 'withdrawn';
   withdrawalReason?: string;
 }
+
+export type CouponHistoryEventType = 'activation' | 'withdrawal' | 'expiration' | 'claim';
+
+export interface CouponHistoryEvent {
+  id: string;
+  couponId: string;
+  eventType: CouponHistoryEventType;
+  timestamp: Date;
+  beneficiary: string;
+  amount: BigNumber;
+  allocationReason: string;
+  withdrawalReason?: string;
+}

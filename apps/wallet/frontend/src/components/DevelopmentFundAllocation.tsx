@@ -3,17 +3,29 @@
 import React, { useState } from 'react';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Alert, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material';
+import {
+  Alert,
+  Button,
+  Card,
+  CardContent,
+  FormControl,
+  InputAdornment,
+  OutlinedInput,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
 import { DisableConditionally } from '@lfdecentralizedtrust/splice-common-frontend';
 import BftAnsField from './BftAnsField';
-import AmountInput from './AmountInput';
 import BigNumber from 'bignumber.js';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import dayjs, { Dayjs } from 'dayjs';
+import { useWalletConfig } from '../utils/config';
 
 const DevelopmentFundAllocation: React.FC = () => {
   const { allocateDevelopmentFundCoupon } = useWalletClient();
   const queryClient = useQueryClient();
+  const config = useWalletConfig();
   const [error, setError] = useState<object | null>(null);
   const [beneficiary, setBeneficiary] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
@@ -75,25 +87,44 @@ const DevelopmentFundAllocation: React.FC = () => {
               onPartyChanged={setBeneficiary}
             />
 
-            <AmountInput
-              idPrefix="development-fund-allocation"
-              ccAmountText={amount}
-              setCcAmountText={setAmount}
-            />
+            <Stack direction="row" spacing={3}>
+              <Stack spacing={1} sx={{ flex: 1 }}>
+                <Typography variant="h6">Amount</Typography>
+                <FormControl fullWidth>
+                  <OutlinedInput
+                    id="development-fund-allocation-amount"
+                    type="text"
+                    value={amount}
+                    onChange={event => setAmount(event.target.value)}
+                    endAdornment={
+                      <InputAdornment position="end">
+                        {config.spliceInstanceNames.amuletNameAcronym}
+                      </InputAdornment>
+                    }
+                    error={amount !== '' && BigNumber(amount).lte(0)}
+                    inputProps={{
+                      'aria-label': 'amount',
+                    }}
+                  />
+                </FormControl>
+              </Stack>
 
-            <Typography variant="h6">Expires At</Typography>
-            <DateTimePicker
-              label="Expires At"
-              value={expiresAt}
-              onChange={newValue => setExpiresAt(newValue)}
-              minDateTime={dayjs()}
-              slotProps={{
-                textField: {
-                  id: 'development-fund-allocation-expires-at',
-                  fullWidth: true,
-                },
-              }}
-            />
+              <Stack spacing={1} sx={{ flex: 1 }}>
+                <Typography variant="h6">Expires At</Typography>
+                <DateTimePicker
+                  label="Expires At"
+                  value={expiresAt}
+                  onChange={newValue => setExpiresAt(newValue)}
+                  minDateTime={dayjs()}
+                  slotProps={{
+                    textField: {
+                      id: 'development-fund-allocation-expires-at',
+                      fullWidth: true,
+                    },
+                  }}
+                />
+              </Stack>
+            </Stack>
 
             <Typography variant="h6">Reason</Typography>
             <TextField

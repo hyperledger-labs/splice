@@ -52,6 +52,7 @@ export interface MintingDelegationProposalWithStatus {
 
 import {
   BalanceChange,
+  CouponHistoryEvent,
   DevelopmentFundCoupon,
   ListAcceptedTransferOffersResponse,
   ListResponse,
@@ -69,7 +70,7 @@ import {
   mockAllocateDevelopmentFundCoupon,
   mockGetDevelopmentFundTotal,
   mockListActiveDevelopmentFundCoupons,
-  mockListDevelopmentFundCouponsHistory,
+  mockListCouponHistoryEvents,
   mockWithdrawDevelopmentFundCoupon,
 } from './WalletServiceContextMocks';
 import { AllocationRequest } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
@@ -160,12 +161,12 @@ export interface WalletClient {
     expiresAt: Date,
     reason: string
   ) => Promise<void>;
-  listActiveDevelopmentFundCoupons: (pageSize?: number, beginAfterId?: string) => Promise<{
+  listActiveDevelopmentFundCoupons: (pageSize: number, offset: number) => Promise<{
     coupons: DevelopmentFundCoupon[];
-    nextPageToken?: string;
+    total: number;
   }>;
-  listDevelopmentFundCouponsHistory: (pageSize: number, offset: number) => Promise<{
-    coupons: DevelopmentFundCoupon[];
+  listCouponHistoryEvents: (pageSize: number, offset: number) => Promise<{
+    events: CouponHistoryEvent[];
     total: number;
   }>;
   withdrawDevelopmentFundCoupon: (couponId: string, reason: string) => Promise<void>;
@@ -481,7 +482,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       getDevelopmentFundTotal: mockGetDevelopmentFundTotal,
       allocateDevelopmentFundCoupon: mockAllocateDevelopmentFundCoupon,
       listActiveDevelopmentFundCoupons: mockListActiveDevelopmentFundCoupons,
-      listDevelopmentFundCouponsHistory: mockListDevelopmentFundCouponsHistory,
+      listCouponHistoryEvents: mockListCouponHistoryEvents,
       withdrawDevelopmentFundCoupon: mockWithdrawDevelopmentFundCoupon,
     };
   }, [url, userAccessToken]);
