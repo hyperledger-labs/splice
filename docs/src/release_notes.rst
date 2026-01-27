@@ -17,6 +17,19 @@
     - deprecated ``/v0/total-amulet-balance`` and ``/v0/wallet-balance`` endpoints have been removed in favor of using `/registry/metadata/v1/instruments/{instrumentId} <app_dev/token_standard/openapi/token_metadata.html#get--registry-metadata-v1-instruments-instrumentId>`_
       and `/v0/holdings/summary <app_dev/scan_api/scan_openapi.html#post--v0-holdings-summary>`_, respectively.
 
+    - Added a new external endpoint ``GET /v0/unclaimed-development-fund-coupons`` to retrieve all active unclaimed development fund coupon contracts.
+
+  - Wallet
+
+    - Added a new internal endpoint ``POST /v0/wallet/development-fund-coupons/allocate`` to allocate a development fund coupon for a given beneficiary,
+      amount, expiration time, and reason.
+
+    - Added a new internal endpoint ``GET /v0/wallet/development-fund-coupons`` to retrieve all active DevelopmentFundCoupon contracts,
+      sorted by expiration date, where the wallet user party is either the development fund manager or the beneficiary.
+
+    - Added a new internal endpoint ``POST /v0/wallet/development-fund-coupons/{contract_id}/withdraw`` to withdraw a development fund coupon
+      when the wallet user party is the development fund manager.
+
   - Deployments
 
     - The default logger has been switched to use an asynchronous appender, for all the nodes, for better performance.
