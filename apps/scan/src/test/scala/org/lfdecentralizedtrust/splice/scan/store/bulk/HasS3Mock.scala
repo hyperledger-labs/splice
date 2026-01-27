@@ -22,10 +22,9 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
   // TODO(#3429): consider running s3Mock container as a service in GHA instead of starting it here.
   def withS3Mock[A](test: => Future[A])(implicit ec: ExecutionContext): Future[A] = {
 
-    val container = new S3MockContainer("4.11.0")
+    val container = new S3MockContainer("4.11.0").withInitialBuckets("bucket")
       .withEnv(
         Map(
-          "COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS" -> "bucket",
           "debug" -> "true",
         ).asJava
       )
