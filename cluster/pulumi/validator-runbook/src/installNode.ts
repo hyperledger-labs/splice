@@ -221,9 +221,8 @@ async function installValidator(
         ? true
         : validatorValuesFromYamlFiles.migration.migrating,
     },
-    scanClient: validatorConfig.validatorApp?.scanClient ?? validatorValuesFromYamlFiles.scanClient,
-    synchronizer:
-      validatorConfig.validatorApp?.synchronizer ?? validatorValuesFromYamlFiles.synchronizer,
+    scanClient: validatorConfig.validatorApp?.scanClient,
+    synchronizer: validatorConfig.validatorApp?.synchronizer,
     metrics: {
       enable: true,
     },

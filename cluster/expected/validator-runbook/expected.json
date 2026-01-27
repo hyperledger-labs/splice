@@ -788,9 +788,6 @@
           "networkName": "Splice"
         },
         "svSponsorAddress": "https://sv.sv-2.mock.global.canton.network.digitalasset.com",
-        "synchronizer": {
-          "connectionType": "bft"
-        },
         "tolerations": [
           {
             "effect": "NoSchedule",
