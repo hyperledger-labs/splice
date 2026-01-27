@@ -2123,6 +2123,7 @@ class DbScanStoreTest
 
     "force re-ingestion of acs" in {
       for {
+        // ingestion in these store tests is simulated by directly interacting with the ingestion sink (dummyDomain.create)
         // create store, ingest an update with aliceValidatorLicense
         store <- mkStore()
         _ <- dummyDomain.create(aliceValidatorLicense)(store.multiDomainAcsStore)
@@ -2131,7 +2132,9 @@ class DbScanStoreTest
         )
         // create store again but now with new storeDescriptor userVersion, ingest an update with aliceValidatorLicense again
         storeReingest <- mkStore(dsoParty = dsoParty, acsStoreDescriptorUserVersion = Some(1L))
-        // ingestUpdate would fail on the same storeId for aliceValidatorLicense without a new user version.
+        // Below 'dummyDomain.create' would fail on the same storeId for aliceValidatorLicense without a new user version.
+        // there is a unique constraint on (store_id, migration_id, contract_id) in the acs table (acs_store_template_sid_mid_cid) that would be violated.
+        // Successfully creating the license again here proves that the store has switched to a new store descriptor.
         _ <- dummyDomain.create(aliceValidatorLicense)(storeReingest.multiDomainAcsStore)
         resultAfter <- storeReingest.getValidatorLicenseByValidator(
           Vector(alice)
@@ -2162,13 +2165,16 @@ class DbScanStoreTest
         voteRequestContracts = mkVoteRequests() :+ activeVoteRequest
         _ <- assertListOfAllPastVoteRequestResults(voteRequestContracts, store)
         _ <- dummyDomain.create(activeVoteRequest)(store.multiDomainAcsStore)
-        // create the store with a new txLogStoreDescriptorUserVersion and check that it has acs entries but no txLog entries of the previous store
+        // create the store with a new txLogStoreDescriptorUserVersion and
+        // check that it has acs entries but no txLog entries of the previous store
+        // this proves that the store descriptor has changed and a new storeId is used.
         storeReingest <- mkStore(
           dsoParty = dsoParty,
           txLogStoreDescriptorUserVersion = Some(1L),
         )
       } yield {
         // new store should not have txLog entry from previous store
+        // because ingestion in these store tests is simulated by directly interacting with the ingestion sink
         storeReingest
           .listVoteRequestResults(
             Some("AddSv"),
@@ -2180,7 +2186,7 @@ class DbScanStoreTest
           )
           .futureValue
           .toList should have size 0
-        // should have the acs entry
+        // should have the active acs entry
         storeReingest.listVoteRequests().futureValue.toList should contain(activeVoteRequest)
       }
     }
