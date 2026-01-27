@@ -1360,7 +1360,15 @@ class HttpWalletHandler(
             cmd,
           )
           .withSynchronizerId(domain)
-          .noDedup
+          .withDedup(
+            commandId = SpliceLedgerConnection
+              .CommandId(
+                "org.lfdecentralizedtrust.splice.wallet.allocateDevelopmentFundCoupon",
+                Seq(store.key.validatorParty, store.key.endUserParty),
+                Seq(s"${body.beneficiary}:${body.amount}:${body.expiresAt}:${body.reason}"),
+              ),
+            deduplicationConfig = dedupDuration,
+          )
           .withDisclosedContracts(
             userWallet.connection
               .disclosedContracts(amuletRules, unclaimedDevelopmentFundCouponsToAllocate*)
