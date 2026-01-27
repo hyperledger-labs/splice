@@ -7,6 +7,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
+import org.apache.pekko.stream.scaladsl.Sink
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
@@ -34,6 +35,37 @@ class UpdateHistoryBulkStorageTest
   )
 
   "UpdateHistoryBulkStorage" should {
+
+    // FIXME: name
+    "new implementation should work" in {
+      withS3Mock {
+        val initialStoreSize = 2500
+        val segmentSize = 2200L
+        val segmentFromTimestamp = 100L
+        val mockStore = new MockUpdateHistoryStore(initialStoreSize)
+        val bucketConnection = getS3BucketConnection(loggerFactory)
+        val fromTimestamp =
+          CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp))
+        val toTimestamp =
+          CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp + segmentSize))
+
+        for {
+          _ <- UpdateHistorySegmentBulkStorageNew.asSource(
+            bulkStorageTestConfig,
+            mockStore.store,
+            bucketConnection,
+            0,
+            fromTimestamp,
+            0,
+            toTimestamp,
+            loggerFactory,
+          ).runWith(Sink.ignore)
+        } yield {
+          succeed
+        }
+      }
+    }
+
     "work" in {
       withS3Mock {
         val initialStoreSize = 1500
