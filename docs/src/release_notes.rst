@@ -27,12 +27,22 @@
       The behavior can be switched back to synchronous logging by setting the environment variable `LOG_IMMEDIATE_FLUSH=true`.
       This now includes helm deployments as well, in 0.5.7 the default was changed only for docker-compose deployments.
 
-    - This version breaks backwards-compatibility with migration dumps taken on 0.4.x versions.
+    - This version breaks backwards compatibility with migration dumps taken on 0.4.x versions.
       Please make sure that you are deploying with ``migrating: false`` (helm) / without ``-M`` (docker-compose).
       For helm-based validator deployments:
-      If you are seeing ``unable to parse domain migration json`` errors despite setting ``migrating: false``,
-      you may need to uninstall and reinstall the ``validator`` helm release once to ensure that the desired value is applied correctly.
 
+      In some cases, helm might not properly update the state after you removed the `migrating` flag.
+      You can check before the upgrade if it got properly applied through ``kubectl describe deployment -n validator validator-app`` and look for this env var:
+
+      .. code-block:: yaml
+
+          - name: ADDITIONAL_CONFIG_VALIDATOR_MIGRATION_RESTORE
+            value: |
+              canton.validator-apps.validator_backend.restore-from-migration-dump = "/domain-upgrade-dump/domain_migration_dump.json"
+
+      If you see it, the deployment still has ``migrating: true`` activated.
+      You can clear that flag by, for example, uninstalling and reinstalling the validator helm release (but not participant and postgres).
+      You can either directly reinstall the new version or first do the reinstall on the old version and then upgrade.
 
 .. release-notes:: 0.5.7
 
