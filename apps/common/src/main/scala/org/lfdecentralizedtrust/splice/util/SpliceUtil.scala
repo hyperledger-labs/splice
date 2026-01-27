@@ -378,6 +378,7 @@ object SpliceUtil {
       featuredAppActivityMarkerAmount: Option[BigDecimal] = None,
       nextSynchronizerId: Option[SynchronizerId] = None,
       developmentFundPercentage: Option[BigDecimal] = None,
+      developmentFundManager: Option[PartyId] = None,
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.AmuletConfig(
       // transferConfig
@@ -402,7 +403,7 @@ object SpliceUtil {
       initialPackageConfig,
       transferPreapprovalFee.map(_.bigDecimal).toJava,
       featuredAppActivityMarkerAmount.map(_.bigDecimal).toJava,
-      Optional.empty(),
+      developmentFundManager.map(_.toProtoPrimitive).toJava,
     )
 
   def defaultAnsConfig(

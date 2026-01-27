@@ -16,9 +16,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
 import org.lfdecentralizedtrust.splice.environment.SpliceConsoleEnvironment
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AllocateAmuletResponse,
+  AllocateDevelopmentFundCouponResponse,
   GetBuyTrafficRequestStatusResponse,
   GetTransferOfferStatusResponse,
   TransferInstructionResultResponse,
+  WithdrawDevelopmentFundCouponResponse,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState}
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
@@ -600,6 +602,56 @@ abstract class WalletAppReference(
       httpCommand(HttpWalletAppClient.TokenStandard.RejectAllocationRequest(id))
     }
   }
+
+  @Help.Summary("Allocate a DevelopmentFundCoupon")
+  @Help.Description(
+    "Allocate development-fund resources by consuming UnclaimedDevelopmentFundCoupons and creating a new " +
+      "DevelopmentFundCoupon for the specified beneficiary and amount."
+  )
+  def allocateDevelopmentFundCoupon(
+      beneficiary: PartyId,
+      amount: BigDecimal,
+      expiresAt: CantonTimestamp,
+      reason: String,
+  ): AllocateDevelopmentFundCouponResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient.AllocateDevelopmentFundCoupon(
+          beneficiary,
+          amount,
+          expiresAt,
+          reason,
+        )
+      )
+    }
+
+  @Help.Summary("List active development fund coupons")
+  @Help.Description(
+    "List all active development fund coupons for the configured user acting as a beneficiary or development fund manager."
+  )
+  def listActiveDevelopmentFundCoupons(): Seq[
+    Contract[
+      amuletCodegen.DevelopmentFundCoupon.ContractId,
+      amuletCodegen.DevelopmentFundCoupon,
+    ]
+  ] =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.ListActiveDevelopmentFundCoupons)
+    }
+
+  @Help.Summary("Withdraw a DevelopmentFundCoupon")
+  @Help.Description(
+    "Withdraw a DevelopmentFundCoupon where the configured user acts as the development fund manager."
+  )
+  def withdrawDevelopmentFundCoupon(
+      developmentFundCouponContractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+      reason: String,
+  ): WithdrawDevelopmentFundCouponResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient.WithdrawDevelopmentFundCoupon(developmentFundCouponContractId, reason)
+      )
+    }
 }
 
 /** Client (aka remote) reference to a wallet app in the style of ParticipantClientReference, i.e.,

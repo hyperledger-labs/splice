@@ -103,6 +103,7 @@ object SvOnboardingConfig {
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
       initialRound: Long = 0L,
       developmentFundPercentage: Option[BigDecimal] = None,
+      developmentFundManager: Option[PartyId] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(

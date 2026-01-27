@@ -708,6 +708,10 @@ object UserWalletStore {
         } { contract =>
           UserWalletAcsStoreRowData(contract)
         },
+        // Development fund coupons
+        mkFilter(amuletCodegen.DevelopmentFundCoupon.COMPANION)(co =>
+          co.payload.dso == dso && (co.payload.fundManager == endUser || co.payload.beneficiary == endUser)
+        )(UserWalletAcsStoreRowData(_)),
       ),
       Map(
         mkFilterInterface(allocationrequestv1.AllocationRequest.INTERFACE)(co =>

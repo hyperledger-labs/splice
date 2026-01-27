@@ -692,6 +692,7 @@ class SV1Initializer(
                     sv1Config.initialFeaturedAppActivityMarkerAmount,
                     developmentFundPercentage =
                       if (developmentFund.supported) sv1Config.developmentFundPercentage else None,
+                    developmentFundManager = sv1Config.developmentFundManager,
                   )
                   sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(
                     cometBftNode,

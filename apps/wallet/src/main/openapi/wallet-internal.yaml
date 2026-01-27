@@ -871,6 +871,77 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/wallet/development-fund-coupons/allocate:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "allocateDevelopmentFundCoupon"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AllocateDevelopmentFundCouponRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AllocateDevelopmentFundCouponResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/development-fund-coupons:
+    get:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "listActiveDevelopmentFundCoupons"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListActiveDevelopmentFundCouponsResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/development-fund-coupons/{contract_id}/withdraw:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "withdrawDevelopmentFundCoupon"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/WithdrawDevelopmentFundCouponRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WithdrawDevelopmentFundCouponResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
 
 components:
   schemas:
@@ -1612,3 +1683,59 @@ components:
           type: object
           additionalProperties:
             type: string
+
+    AllocateDevelopmentFundCouponRequest:
+      type: object
+      required:
+        - beneficiary
+        - amount
+        - expiresAt
+        - reason
+      properties:
+        beneficiary:
+          type: string
+        amount:
+          type: string
+        expiresAt:
+          type: integer
+          format: int64
+        reason:
+          type: string
+
+    AllocateDevelopmentFundCouponResponse:
+      type: object
+      required:
+        - development_fund_coupon_contract_id
+      properties:
+        development_fund_coupon_contract_id:
+          type: string
+        unclaimed_development_fund_coupon_contract_id:
+          type: string
+
+    ListActiveDevelopmentFundCouponsResponse:
+      type: object
+      description: Includes only up to 1000 elements.
+      required:
+        - active_development_fund_coupons
+      properties:
+        active_development_fund_coupons:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    WithdrawDevelopmentFundCouponRequest:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+
+    WithdrawDevelopmentFundCouponResponse:
+      type: object
+      required:
+        - unclaimed_development_fund_coupon_contract_id
+      properties:
+        unclaimed_development_fund_coupon_contract_id:
+          type: string
+

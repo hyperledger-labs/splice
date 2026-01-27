@@ -5,7 +5,10 @@ package org.lfdecentralizedtrust.splice.console
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  FeaturedAppRight,
+  UnclaimedDevelopmentFundCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   AppTransferContext,
@@ -344,6 +347,14 @@ abstract class ScanAppReference(
       httpCommand(
         HttpScanAppClient.ListDsoSequencers()
       )
+    }
+
+  @Help.Summary("List all unclaimed development fund coupons")
+  def listUnclaimedDevelopmentFundCoupons(): Seq[
+    ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
+  ] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.ListUnclaimedDevelopmentFundCoupons())
     }
 
   import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem
