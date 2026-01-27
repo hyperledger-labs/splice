@@ -28,6 +28,7 @@ template OpenMiningRound
     transferConfigUsd : TransferConfig USD -- ^ Configuration determining the fees and limits in USD for Amulet transfers
     issuanceConfig : IssuanceConfig -- ^ Configuration for issuance of this round.
     tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
+    useTrafficBasedAppRewards : Optional Bool -- ^ Whether to use traffic-based app rewards for this round. If None, the default is false.
   where
     signatory dso
     ensure isDefinedRound round

@@ -261,6 +261,9 @@ data DsoRules_ReceiveSvRewardCouponResult = DsoRules_ReceiveSvRewardCouponResult
 data DsoRules_ClaimExpiredRewardsResult = DsoRules_ClaimExpiredRewardsResult with
     unclaimedReward: Optional (ContractId UnclaimedReward)
 
+data DsoRules_ClaimExpiredRewardsV2Result = DsoRules_ClaimExpiredRewardsV2Result with
+    unclaimedReward: Optional (ContractId UnclaimedReward)
+
 data DsoRules_MergeUnclaimedRewardsResult = DsoRules_MergeUnclaimedRewardsResult with
     unclaimedReward: ContractId UnclaimedReward
 
@@ -1304,6 +1307,8 @@ template DsoRules with
         sv : Optional Party
       controller sv
       do
+        _ <- getAndValidateSvParty this sv
+
         -- TODO(#2025) Deprecate AmuletRules_ClaimExpiredRewards. We did not do that in the same change
         -- as inlining the definition here so don't need to bump splice-amulet which also requires validators to upgrade.
         let AmuletRules_ClaimExpiredRewards{..} = choiceArg
@@ -1355,6 +1360,25 @@ template DsoRules with
               then pure None
               else Some <$> create UnclaimedReward with dso; amount
         return DsoRules_ClaimExpiredRewardsResult with
+          unclaimedReward = unclaimedRewardCid
+
+    -- batch claim of expired rewards that use time-based expiry
+    nonconsuming choice DsoRules_ClaimExpiredRewardsV2 : DsoRules_ClaimExpiredRewardsV2Result
+      with
+        appRewardCouponCids : [ContractId AppRewardCouponV2]
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        expiredAmounts <- forA appRewardCouponCids $ \cid -> do
+          _ <- fetchChecked (ForDso with dso) cid
+          expireResult <- exercise cid AppRewardCouponV2_DsoExpire
+          return expireResult.amount
+        let amount = sum expiredAmounts
+        unclaimedRewardCid <- if (amount <= 0.0)
+              then pure None
+              else Some <$> create UnclaimedReward with dso; amount
+        return DsoRules_ClaimExpiredRewardsV2Result with
           unclaimedReward = unclaimedRewardCid
 
     -- Batch merge of unclaimed rewards

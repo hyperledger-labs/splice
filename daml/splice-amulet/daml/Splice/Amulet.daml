@@ -87,6 +87,9 @@ data AppRewardCoupon_DsoExpireResult = AppRewardCoupon_DsoExpireResult with
   featured : Bool
   amount : Decimal
 
+data AppRewardCouponV2_DsoExpireResult = AppRewardCouponV2_DsoExpireResult with
+  amount : Decimal
+
 data ValidatorRewardCoupon_DsoExpireResult = ValidatorRewardCoupon_DsoExpireResult with
   amount : Decimal
 
@@ -373,6 +376,27 @@ template AppRewardCoupon
          return AppRewardCoupon_DsoExpireResult with
            ..
 
+-- | A coupon for receiving traffic-based app rewards.
+--
+-- Designed so that minting can be batched in longer time intervals than a single round.
+template AppRewardCouponV2
+  with
+    dso : Party
+    provider : Party -- ^ Application provider
+    amount : Decimal -- ^ The amount of reward to be claimed. Denominated in Amulet.
+    round : Round -- ^ The round for which this reward can be claimed.
+    expiresAt : Time -- ^ Time-based expiry.
+  where
+    signatory dso
+    observer provider
+    ensure amount > 0.0
+
+    choice AppRewardCouponV2_DsoExpire : AppRewardCouponV2_DsoExpireResult
+      controller dso
+      do
+        assertDeadlineExceeded "expiresAt" expiresAt
+        return AppRewardCouponV2_DsoExpireResult with
+          amount
 
 -- | A coupon for receiving validator rewards proportional to the usage fee paid by a user
 -- hosted by a validator operator.
@@ -559,6 +583,12 @@ instance HasCheckedFetch LockedAmulet ForOwner where
 
 instance HasCheckedFetch AppRewardCoupon ForOwner where
   contractGroupId AppRewardCoupon{..} = ForOwner with dso; owner = fromOptional provider beneficiary
+
+instance HasCheckedFetch AppRewardCouponV2 ForOwner where
+  contractGroupId AppRewardCouponV2{..} = ForOwner with dso; owner = provider
+
+instance HasCheckedFetch AppRewardCouponV2 ForDso where
+  contractGroupId AppRewardCouponV2{..} = ForDso with dso
 
 instance HasCheckedFetch SvRewardCoupon ForOwner where
   contractGroupId SvRewardCoupon{..} = ForOwner with dso; owner = beneficiary

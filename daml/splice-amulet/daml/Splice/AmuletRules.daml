@@ -753,21 +753,24 @@ template AmuletRules
          round <- fetchReferenceData (ForDso dso) openMiningRoundCid
          require ("mining round is open: " <> show round) (round.opensAt <= now)
          let configUsd = getValueAsOf now configSchedule
-         -- If the amount is not set or is <= 0 we just archive the marker contracts.
-         markerCids <- forA (optionalToList configUsd.featuredAppActivityMarkerAmount) $ \amountUsd -> do
-           let amountAmulet = amountUsd / round.amuletPrice
-           if amountAmulet > 0.0
-             then
-               forA (Map.toList groupedMarkers) $ \((provider, beneficiary), weight) ->
-                 create AppRewardCoupon with
-                   dso
-                   provider
-                   beneficiary = Some beneficiary
-                   featured = True
-                   round = round.round
-                   amount = amountAmulet * weight
-             else pure []
-         pure AmuletRules_ConvertFeaturedAppActivityMarkersResult with appRewardCouponCids = concat markerCids
+         if fromOptional False round.useTrafficBasedAppRewards
+           then pure AmuletRules_ConvertFeaturedAppActivityMarkersResult with appRewardCouponCids = []
+           else do
+            -- If the amount is not set or is <= 0 we just archive the marker contracts.
+            markerCids <- forA (optionalToList configUsd.featuredAppActivityMarkerAmount) $ \amountUsd -> do
+              let amountAmulet = amountUsd / round.amuletPrice
+              if amountAmulet > 0.0
+                then
+                  forA (Map.toList groupedMarkers) $ \((provider, beneficiary), weight) ->
+                    create AppRewardCoupon with
+                      dso
+                      provider
+                      beneficiary = Some beneficiary
+                      featured = True
+                      round = round.round
+                      amount = amountAmulet * weight
+                else pure []
+            pure AmuletRules_ConvertFeaturedAppActivityMarkersResult with appRewardCouponCids = concat markerCids
 
     nonconsuming choice AmuletRules_UpdateExternalPartyConfigStates : AmuletRules_UpdateExternalPartyConfigStatesResult
       with

@@ -1,0 +1,132 @@
+-- Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Templates and support code for app activity and rewards accounting.
+module Splice.Amulet.AppRewards where
+
+import DA.Action (unless)
+import DA.Foldable (forA_)
+
+import Splice.Amulet.CryptoHash qualified as CryptoHash
+import Splice.Amulet
+import Splice.Types
+import Splice.Util
+
+{- TODO
+
+overall:
+- remove AmuletRules_ClaimExpiredRewards; and add missing getAndValidateSvParty calls to DsoRules_ClaimExpiredRewards
+  - add checked fetches for all coupons in ClaimExpiredRewards
+- check naming to prepare for a change where more reward issuance works through this mechanism (e.g. SV and validator rewards)
+  - e.g., name `GenericRewardCoupon` and pull that through
+
+splice-amulet:
+
+- decide whether we even need AppRewardV2
+  - main motivation: batched minting
+  - adjust amulet rules transfer to support AppRewardsV2
+- introduce ExternalAmuletRules_MintWithBeneficiaries
+  - add API package for it
+
+
+splice-dso:
+- switch to iterated committments to enable bounded-size batches
+
+Notes for apps:
+
+- wallet:
+  - collect AppRewardCouponV2
+
+
+
+
+
+
+
+
+
+-}
+
+
+
+-- | Reminder for DSO to confirm the app reward amounts for the given round.
+template ConfirmAppRewards with
+    dso : Party
+    round : Round
+    dryRun : Bool -- ^ Whether to only simulate the confirmation without creating any ProcessAppRewards contracts.
+    rewardsExpireAt : Time
+  where
+    signatory dso
+
+-- | A minting allowance for a beneficiary to mint Amulet.
+data MintingAllowance = MintingAllowance with
+    beneficiary : Party
+    amount : Decimal
+  deriving (Eq, Show)
+
+type MintingAllowances = [MintingAllowance]
+
+data Batch
+  = BatchOfBatches [CryptoHash.Hash]
+  | BatchOfMintingAllowances MintingAllowances
+  deriving (Eq, Show)
+
+data ProcessAppRewards_ProcessBatchResult = ProcessAppRewards_ProcessBatchResult {}
+  deriving (Eq, Show)
+
+template ProcessAppRewards with
+    dso : Party
+    round : Round
+    dryRun : Bool -- ^ Whether to only simulate the processing without creating any app reward contracts.
+    rewardsExpireAt : Time
+    batchHash : CryptoHash.Hash
+  where
+    signatory dso
+
+    choice ProcessAppRewards_ProcessBatch : ProcessAppRewards_ProcessBatchResult
+      with
+        batch : Batch
+      observer batchBeneficiaries batch -- FIXME: remove parties that do not vet splice-amulet
+      controller dso
+      do
+        let actualHash = CryptoHash.hash batch
+        require "batch hash matches" (actualHash == batchHash)
+        case batch of
+          BatchOfBatches batchHashes -> do
+            forA_ batchHashes $ \newBatchHash ->
+              create ProcessAppRewards with
+                dso
+                round
+                rewardsExpireAt
+                dryRun
+                batchHash = newBatchHash
+          BatchOfMintingAllowances mintingAllowances -> do
+            unless dryRun $ do
+              forA_ mintingAllowances $ \MintingAllowance{..} -> do
+                create AppRewardCouponV2 with
+                  dso
+                  provider = beneficiary
+                  amount
+                  round
+                  expiresAt = rewardsExpireAt
+        -- intentationally not returning any information here to save computational overhead
+        return ProcessAppRewards_ProcessBatchResult {}
+
+batchBeneficiaries : Batch -> [Party]
+batchBeneficiaries batch = case batch of
+  BatchOfBatches _ -> []
+  BatchOfMintingAllowances mintingAllowances -> map (.beneficiary) mintingAllowances
+
+instance CryptoHash.Hashable MintingAllowance where
+  hash MintingAllowance{..} =
+    CryptoHash.hashRecord
+      [ CryptoHash.hash beneficiary
+      , CryptoHash.hash amount
+      ]
+
+instance CryptoHash.Hashable Batch where
+  hash batch = case batch of
+    BatchOfBatches batchHashes ->
+      CryptoHash.hashVariant "BatchOfBatches" [CryptoHash.hash batchHashes]
+    BatchOfMintingAllowances mintingAllowances ->
+      CryptoHash.hashVariant "BatchOfMintingAllowances" [CryptoHash.hash mintingAllowances]
