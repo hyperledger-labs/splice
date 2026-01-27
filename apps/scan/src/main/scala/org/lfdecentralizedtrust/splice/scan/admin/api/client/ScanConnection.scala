@@ -4,7 +4,10 @@
 package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import cats.data.OptionT
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  FeaturedAppRight,
+  UnclaimedDevelopmentFundCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
@@ -267,6 +270,15 @@ trait ScanConnection
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Seq[DsoRules_CloseVoteRequestResult]]
+
+  def listUnclaimedDevelopmentFundCoupons()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[
+    Seq[
+      ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
+    ]
+  ]
 
 }
 
