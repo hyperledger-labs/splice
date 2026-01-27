@@ -36,13 +36,7 @@ if git diff --exit-code --quiet "${docker_runner_file}" "${runner_hook_file}"; t
   exit 0
 fi
 
-echo "GHA runner version is not up to date. Testing image build..."
-
-make --directory "${SPLICE_ROOT}" --jobs \
-  cluster/images/splice-test-docker-runner/docker-build \
-  cluster/images/splice-test-runner-hook/docker-build
-
-echo "Creating a PR..."
+echo "GHA runner version is not up to date. Creating a PR..."
 
 git add --all
 updated_branch="gha-runner-version-bump-$(date +%Y-%m-%d)"

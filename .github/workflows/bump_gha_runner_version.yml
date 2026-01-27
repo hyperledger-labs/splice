@@ -42,7 +42,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Report Failures on Slack & Github
-        if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+        if: failure() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
         uses: ./.github/actions/tests/failure_notifications
         with:
           workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'
