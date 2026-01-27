@@ -5,10 +5,14 @@
 
 .. _release_notes:
 
-.. release-notes:: upcoming
+.. release-notes:: 0.5.8
 
-  - Participant
+  Note: 0.5.7 introduced a significant performance regression related to the processing of topology transactions on participants, mediators, and sequencers.
+  Please skip 0.5.7 and upgrade directly to 0.5.8.
 
+  - Canton
+
+    - Fix performance regression related to the processing of topology transactions.
     - Improve performance of some queries that are used in participant pruning. The fix includes
       a database migration which can take up to 2min but should be faster on most participants.
 
