@@ -19,6 +19,7 @@ data-dependencies:
   - ../splice-util/.daml/dist/splice-util-current.dar
   - ../dars/splice-api-featured-app-v1-1.0.0.dar
   - ../dars/splice-api-featured-app-v2-1.0.0.dar
+  - ../dars/splice-api-reward-assignment-v1-1.0.0.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches

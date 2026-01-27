@@ -15,6 +15,7 @@ data-dependencies:
   - ../splice-util/.daml/dist/splice-util-current.dar
   - ../splice-amulet/.daml/dist/splice-amulet-current.dar
   - ../dars/splice-api-featured-app-v1-1.0.0.dar
+  - ../dars/splice-api-reward-assignment-v1-1.0.0.dar
   - ../dars/splice-api-token-metadata-v1-1.0.0.dar
   - ../dars/splice-api-token-holding-v1-1.0.0.dar
   - ../dars/splice-api-token-transfer-instruction-v1-1.0.0.dar
