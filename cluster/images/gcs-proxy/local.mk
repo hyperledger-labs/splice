@@ -3,10 +3,7 @@
 
 dir := $(call current_dir)
 
-$(dir)/$(docker-build): $(dir)/target/LICENSE $(target-dir)
+$(dir)/$(docker-build): $(dir)/target/LICENSE
 
-$(dir)/target/LICENSE: ${SPLICE_ROOT}/cluster/images/LICENSE $(target-dir)
+$(dir)/target/LICENSE: ${SPLICE_ROOT}/cluster/images/LICENSE | $(dir)/target
 	cp $< $@
-
-$(target-dir):
-	mkdir -p $(@D)
