@@ -10,7 +10,7 @@
    to avoid merges accidentally merging new changes into an existing release.
 
     - add your upcoming release notes into `release_notes_upcoming.rst`
-    - upon release and the content of `release_notes_upcoming.rst` into a
+    - upon release add the content of `release_notes_upcoming.rst` into a
       new `..  release-notes:: x.y.z` section with the actual version number;
       and comment out the `Upcoming` section in `release_notes_upcoming.rst`.
 
