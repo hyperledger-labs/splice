@@ -55,6 +55,26 @@ The delegation has the following key properties:
    * - Amulet merge limit
      - The number of amulets to keep after auto-merging
 
+
+Automation
+++++++++++
+
+When a minting delegation is active, the validator node runs automation
+(``MintingDelegationCollectRewardsTrigger``) for the beneficiary party that periodically:
+
+1. Checks for reward coupons owned by the beneficiary that are eligible for minting
+2. Collects and mints these rewards on behalf of the beneficiary
+3. Merges the beneficiary's amulets when the count exceeds twice the configured merge limit
+
+For the automation to run successfully, the following conditions must be met:
+
+- The delegate party must be a local party on the validator node
+- The delegation must not be expired
+- The beneficiary must have reward coupons or amulets that need processing
+
+The automation submits transactions as the delegate party. Transaction costs are paid from the
+validator node's traffic balance.
+
 .. note::
    The amulet merge limit controls automatic consolidation of the beneficiary's amulets: when
    the number of amulets exceeds twice the limit, the smallest amulets are merged to maintain
