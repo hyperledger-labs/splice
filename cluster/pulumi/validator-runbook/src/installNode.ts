@@ -237,7 +237,7 @@ async function installValidator(
           newParticipantIdentifier,
         }
       : undefined,
-    participantPruningConfig: participantPruningConfig,
+    participantPruningSchedule: participantPruningConfig,
     ...(participantBootstrapDumpSecret ? { nodeIdentifier: newParticipantIdentifier } : {}),
     persistence: {
       ...validatorValuesFromYamlFiles.persistence,
