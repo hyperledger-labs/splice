@@ -26,7 +26,7 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
       .withInitialBuckets("bucket")
       .withEnv(
         Map(
-          "debug" -> "true",
+          "debug" -> "true"
         ).asJava
       )
 
