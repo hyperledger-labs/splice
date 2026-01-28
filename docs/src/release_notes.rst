@@ -14,9 +14,9 @@
       new `..  release-notes:: x.y.z` section with the actual version number;
       and comment out the `Upcoming` section in `release_notes_upcoming.rst`.
 
-.. _release_notes:
-
 .. include:: release_notes_upcoming.rst
+
+.. _release_notes:
 
 .. release-notes:: 0.5.8
 
