@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.scan.automation
 
-import cats.data.OptionT
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
@@ -21,37 +20,30 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.Done
 import org.apache.pekko.stream.Materializer
 
-import java.time.temporal.ChronoField
-import java.time.{Duration, ZoneOffset}
-import cats.implicits.*
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 
-class AcsSnapshotTrigger2(
+abstract class AcsSnapshotTriggerBase(
     store: AcsSnapshotStore,
     updateHistory: UpdateHistory,
     storageConfig: ScanStorageConfig,
-    currentMigrationId: Long,
     protected val context: TriggerContext,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
     mat: Materializer,
     // we always return 1 task, so PollingParallelTaskExecutionTrigger in effect does nothing in parallel
-) extends PollingParallelTaskExecutionTrigger[AcsSnapshotTrigger2.Task] {
+) extends PollingParallelTaskExecutionTrigger[AcsSnapshotTriggerBase.Task] {
 
-  protected val snapshotTable: IncrementalAcsSnapshotTable =
-    AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+  protected val snapshotTable: IncrementalAcsSnapshotTable
 
-  override final def completeTask(task: AcsSnapshotTrigger2.Task)(implicit
+  override final def completeTask(task: AcsSnapshotTriggerBase.Task)(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = task match {
-    case AcsSnapshotTrigger2.InitializeIncrementalSnapshotTask(from, nextAt) =>
+    case AcsSnapshotTriggerBase.InitializeIncrementalSnapshotTask(from, nextAt) =>
       store
         .initializeIncrementalSnapshot(
           table = snapshotTable,
@@ -59,7 +51,7 @@ class AcsSnapshotTrigger2(
           targetRecordTime = nextAt,
         )
         .map(_ => TaskSuccess(s"Initialized incremental snapshot from $from"))
-    case AcsSnapshotTrigger2.InitializeEmptyIncrementalSnapshotTask(
+    case AcsSnapshotTriggerBase.InitializeEmptyIncrementalSnapshotTask(
           recordTime,
           migration,
           nextAt,
@@ -76,7 +68,7 @@ class AcsSnapshotTrigger2(
             s"Initialized empty incremental snapshot at $recordTime in migration $migration"
           )
         )
-    case AcsSnapshotTrigger2.UpdateIncrementalSnapshotTask(snapshot, _, updateUntil) =>
+    case AcsSnapshotTriggerBase.UpdateIncrementalSnapshotTask(snapshot, _, updateUntil) =>
       store
         .updateIncrementalSnapshot(
           table = snapshotTable,
@@ -84,7 +76,7 @@ class AcsSnapshotTrigger2(
           targetRecordTime = updateUntil,
         )
         .map(_ => TaskSuccess(s"Updated incremental snapshot to $updateUntil"))
-    case AcsSnapshotTrigger2.SaveIncrementalSnapshotTask(snapshot, nextAt) =>
+    case AcsSnapshotTriggerBase.SaveIncrementalSnapshotTask(snapshot, nextAt) =>
       store
         .saveIncrementalSnapshot(
           table = snapshotTable,
@@ -92,51 +84,67 @@ class AcsSnapshotTrigger2(
           nextSnapshotTargetRecordTime = nextAt,
         )
         .map(_ => TaskSuccess(s"Saved incremental snapshot at ${snapshot.recordTime}"))
+    case AcsSnapshotTriggerBase.DeleteIncrementalSnapshotTask(snapshot) =>
+      store
+        .deleteIncrementalSnapshot(
+          table = snapshotTable,
+          snapshot = snapshot,
+        )
+        .map(_ => TaskSuccess(s"Deleted incremental snapshot"))
   }
 
-  override final def isStaleTask(task: AcsSnapshotTrigger2.Task)(implicit
+  override final def isStaleTask(task: AcsSnapshotTriggerBase.Task)(implicit
       tc: TraceContext
   ): Future[Boolean] = for {
     currentSnapshot <- store.getIncrementalSnapshot(snapshotTable)
   } yield task match {
-    case AcsSnapshotTrigger2.UpdateIncrementalSnapshotTask(snapshot, _, _) =>
-      currentSnapshot.forall(_.recordTime != snapshot.recordTime)
-    case AcsSnapshotTrigger2.SaveIncrementalSnapshotTask(snapshot, _) =>
-      currentSnapshot.forall(_.targetRecordTime != snapshot.targetRecordTime)
-    case AcsSnapshotTrigger2.InitializeEmptyIncrementalSnapshotTask(_, _, _) =>
+    case AcsSnapshotTriggerBase.UpdateIncrementalSnapshotTask(snapshot, _, _) =>
+      !currentSnapshot.contains(snapshot)
+    case AcsSnapshotTriggerBase.SaveIncrementalSnapshotTask(snapshot, _) =>
+      !currentSnapshot.contains(snapshot)
+    case AcsSnapshotTriggerBase.InitializeEmptyIncrementalSnapshotTask(_, _, _) =>
       currentSnapshot.isDefined
-    case AcsSnapshotTrigger2.InitializeIncrementalSnapshotTask(_, _) =>
+    case AcsSnapshotTriggerBase.InitializeIncrementalSnapshotTask(_, _) =>
       currentSnapshot.isDefined
+    case AcsSnapshotTriggerBase.DeleteIncrementalSnapshotTask(_) =>
+      currentSnapshot.isEmpty
   }
 
-  override def retrieveTasks()(implicit
+  protected def retrieveTaskForMigration(
+      migrationId: Long,
+      historyIngestedUntil: Option[CantonTimestamp],
+  )(implicit
       tc: TraceContext
-  ): Future[Seq[AcsSnapshotTrigger2.Task]] = {
+  ): Future[Option[AcsSnapshotTriggerBase.Task]] =
     if (!updateHistory.isReady) {
-      Future.successful(Seq.empty)
+      Future.successful(None)
     } else {
-      isHistoryBackfilled(currentMigrationId).flatMap { backfilled =>
-        if (backfilled) {
-          retrieveTask().map(_.toList)
+      updateHistory.isHistoryBackfilled(migrationId).flatMap { historyBackfilled =>
+        if (historyBackfilled) {
+          retrieveTaskForCompleteMigration(migrationId, historyIngestedUntil)
         } else {
-          Future.successful(Seq.empty)
+          // UpdateHistoryBackfillingTrigger is still running for this migration,
+          // wait until it's done.
+          Future.successful(None)
         }
       }
     }
-  }
 
-  private def retrieveTask()(implicit
+  private def retrieveTaskForCompleteMigration(
+      migrationId: Long,
+      historyIngestedUntil: Option[CantonTimestamp],
+  )(implicit
       tc: TraceContext
-  ): Future[Option[AcsSnapshotTrigger2.Task]] = {
+  ): Future[Option[AcsSnapshotTriggerBase.Task]] =
     store.getIncrementalSnapshot(snapshotTable).flatMap {
       case None =>
-        store.lookupSnapshotAtOrBefore(currentMigrationId, CantonTimestamp.MaxValue).flatMap {
+        store.lookupSnapshotAtOrBefore(migrationId, CantonTimestamp.MaxValue).flatMap {
           // No incremental snapshot exists, start by copying from the latest full snapshot
           case Some(latestSnapshot) =>
             val nextSnapshotTime = storageConfig.nextSnapshotTime(latestSnapshot)
             Future.successful(
               Some(
-                AcsSnapshotTrigger2.InitializeIncrementalSnapshotTask(
+                AcsSnapshotTriggerBase.InitializeIncrementalSnapshotTask(
                   from = latestSnapshot,
                   nextAt = nextSnapshotTime,
                 )
@@ -145,14 +153,17 @@ class AcsSnapshotTrigger2(
           case None =>
             // No full snapshot exists either, start an empty incremental snapshot right before the
             // first real (non-import) update of the current migration.
-            firstUpdateRecordTimeForMigration(currentMigrationId).map {
+            firstUpdateRecordTimeForMigration(migrationId).map {
               case Some(firstUpdateRecordTime) =>
                 val emptySnapshotRecordTime = firstUpdateRecordTime.minusSeconds(1L)
-                val nextSnapshotTime = storageConfig.computeSnapshotTimeAfter(firstUpdateRecordTime)
+                val nextSnapshotTime = storageConfig.computeSnapshotTimeAfter(
+                  firstUpdateRecordTime,
+                  storageConfig.dbAcsSnapshotPeriodHours,
+                )
                 Some(
-                  AcsSnapshotTrigger2.InitializeEmptyIncrementalSnapshotTask(
+                  AcsSnapshotTriggerBase.InitializeEmptyIncrementalSnapshotTask(
                     recordTime = emptySnapshotRecordTime,
-                    migration = currentMigrationId,
+                    migration = migrationId,
                     nextAt = nextSnapshotTime,
                   )
                 )
@@ -165,51 +176,52 @@ class AcsSnapshotTrigger2(
             }
         }
       case Some(snapshot) =>
-        assert(!snapshot.recordTime.isAfter(snapshot.targetRecordTime))
-        if (snapshot.recordTime == snapshot.targetRecordTime) {
-          // Incremental snapshot is complete, copy it to historical storage
-          val nextSnapshotTime = storageConfig.nextSnapshotTime(snapshot)
+        if (snapshot.migrationId != migrationId) {
+          // Incremental snapshot contains data from a wrong migration, delete it and start over.
           Future.successful(
-            Some(AcsSnapshotTrigger2.SaveIncrementalSnapshotTask(snapshot, nextSnapshotTime))
+            Some(AcsSnapshotTriggerBase.DeleteIncrementalSnapshotTask(snapshot))
           )
         } else {
-          // Incremental snapshot is not yet complete.
-          // The intent is that we process around 30sec (the polling interval) of updates per iteration.
-
-          // First, make sure we don't process too much. The target time for the update is computed
-          // from the state of the incremental snapshot (and not from the current time).
-          val updateUntil = snapshot.recordTime
-            .plus(context.config.pollingInterval.asJava)
-            .min(snapshot.targetRecordTime)
-
-          // Next, make sure we don't process too little. We don't want this trigger to busy loop
-          // doing tiny updates, so only run the update if there is a full chunk of data to process.
-          val now = context.clock.now
-          if (now.isAfter(updateUntil)) {
+          assert(!snapshot.recordTime.isAfter(snapshot.targetRecordTime))
+          if (snapshot.recordTime == snapshot.targetRecordTime) {
+            // Incremental snapshot is complete, copy it to historical storage
+            val nextSnapshotTime = storageConfig.nextSnapshotTime(snapshot)
             Future.successful(
-              Some(AcsSnapshotTrigger2.UpdateIncrementalSnapshotTask(snapshot, now, updateUntil))
+              Some(AcsSnapshotTriggerBase.SaveIncrementalSnapshotTask(snapshot, nextSnapshotTime))
             )
           } else {
-            Future.successful(None)
+            // Incremental snapshot is not yet complete.
+            // The intent is that we process around 30sec (the polling interval) of updates per iteration.
+
+            // First, make sure we don't process too much. The target time for the update is computed
+            // from the state of the incremental snapshot (and not from the current time).
+            val updateUntil = snapshot.recordTime
+              .plus(context.config.pollingInterval.asJava)
+              .min(snapshot.targetRecordTime)
+
+            val now = context.clock.now
+
+            // Next, make sure we don't process too little.
+            if (now.isBefore(updateUntil)) {
+              // The target time for the update is still in the future, wait until next time.
+              // Otherwise, we'll end up busy looping doing tiny updates.
+              Future.successful(None)
+            } else if (historyIngestedUntil.forall(_.isBefore(updateUntil))) {
+              // UpdateHistory has not caught up yet, wait until next time.
+              // Otherwise, we'll miss updates between lastIngestedRecordTime and updateUntil.
+              Future.successful(None)
+            } else {
+              Future.successful(
+                Some(
+                  AcsSnapshotTriggerBase.UpdateIncrementalSnapshotTask(snapshot, now, updateUntil)
+                )
+              )
+            }
           }
         }
     }
-  }
 
-  /** @return True if the passed migration id was fully backfilled.
-    *         This applies to the current migration id, where it either didn't need to backfill,
-    *         or backfilled because it joined late.
-    *         And also for past migrations, whether the SV was present in them or not.
-    */
-  protected def isHistoryBackfilled(
-      migrationId: Long
-  )(implicit tc: TraceContext): Future[Boolean] = {
-    updateHistory.sourceHistory
-      .migrationInfo(migrationId)
-      .map(_.exists(i => i.complete && i.importUpdatesComplete))
-  }
-
-  protected def firstUpdateRecordTimeForMigration(migrationId: Long)(implicit
+  private def firstUpdateRecordTimeForMigration(migrationId: Long)(implicit
       tc: TraceContext
   ): Future[Option[CantonTimestamp]] = {
     updateHistory
@@ -225,9 +237,25 @@ class AcsSnapshotTrigger2(
       .map(_.headOption)
       .map(_.map(_.update.update.recordTime))
   }
+
+  protected def lastUpdateRecordTimeForMigration(migrationId: Long)(implicit
+      tc: TraceContext
+  ): Future[CantonTimestamp] = {
+    // Note: this could be optimized with a dedicated query in UpdateHistory
+    updateHistory.getRecordTimeRange(migrationId).map { ranges =>
+      ranges
+        .map(_._2.max)
+        .maxOption
+        .getOrElse(
+          throw new IllegalStateException(
+            s"No updates found for migration id $migrationId"
+          )
+        )
+    }
+  }
 }
 
-object AcsSnapshotTrigger2 {
+object AcsSnapshotTriggerBase {
   sealed trait Task extends PrettyPrinting
   case class InitializeIncrementalSnapshotTask(from: AcsSnapshot, nextAt: CantonTimestamp)
       extends Task {
@@ -270,5 +298,10 @@ object AcsSnapshotTrigger2 {
         param("snapshot", _.snapshot),
         param("nextAt", _.nextAt),
       )
+  }
+  case class DeleteIncrementalSnapshotTask(snapshot: IncrementalAcsSnapshot) extends Task {
+    override def pretty: Pretty[this.type] = prettyOfClass(
+      param("snapshot", _.snapshot)
+    )
   }
 }

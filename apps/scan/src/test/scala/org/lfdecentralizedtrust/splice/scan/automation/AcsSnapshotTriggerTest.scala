@@ -9,7 +9,11 @@ import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{TransactionTreeUpdate, TreeUpdate}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
-import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.AcsSnapshot
+import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
+  AcsSnapshot,
+  IncrementalAcsSnapshot,
+  IncrementalAcsSnapshotTable,
+}
 import org.lfdecentralizedtrust.splice.store.{
   HistoryBackfilling,
   PageLimit,
@@ -20,14 +24,16 @@ import UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
+import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerBase.{
+  InitializeEmptyIncrementalSnapshotTask,
+  InitializeIncrementalSnapshotTask,
+}
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import org.scalatest.wordspec.AnyWordSpec
-import org.slf4j.event.Level
 
 import scala.concurrent.Future
 
@@ -38,536 +44,399 @@ class AcsSnapshotTriggerTest
     with HasActorSystem {
 
   "AcsSnapshotTrigger" should {
+    "initialization" should {
 
-    "when there's a previous snapshot" should {
-
-      "do nothing if the next task is not yet due" in new AcsSnapshotTriggerTestScope(false) {
-        previousSnapshot(now.minusSeconds(60L))
-
-        trigger.retrieveTasks().futureValue should be(Seq.empty)
-      }
-
-      "do nothing if there might still be updates pending" in new AcsSnapshotTriggerTestScope(
-        false
-      ) {
-        // The snapshot was taken more than an hour ago, so the next snapshot is due
-        val lastSnapshotTime = now.minusSeconds(3700L)
-        previousSnapshot(lastSnapshotTime)
-
-        // but there's still updates pending
-        when(
-          updateHistory.getUpdatesWithoutImportUpdates(
-            eqTo(Some((currentMigrationId, lastSnapshotTime.plusSeconds(3600L)))),
-            eqTo(PageLimit.tryCreate(1)),
-          )(any[TraceContext])
-        ).thenReturn(Future.successful(Seq.empty))
-
-        trigger.retrieveTasks().futureValue should be(Seq.empty)
-      }
-
-      "return the new task when due and no updates pending" in new AcsSnapshotTriggerTestScope(
-        false
-      ) {
-        // The snapshot was taken more than an hour ago, so the next snapshot is due
-        val lastSnapshotTime = now.minusSeconds(3700L)
-        val lastSnapshot = previousSnapshot(lastSnapshotTime)
-
-        // there are no pending updates
-        firstUpdateAt(
-          currentMigrationId,
-          queryRecordTime = lastSnapshotTime.plusSeconds(3600L),
-          updateRecordTime = lastSnapshotTime.plusSeconds(3700L),
-        )
+      "initialize from an existing snapshot" in new AcsSnapshotTriggerTestScope() {
+        noPreviousIncrementalSnapshot()
+        val snapshot = previousSnapshot(now.minusSeconds(60L))
 
         trigger.retrieveTasks().futureValue should be(
           Seq(
-            AcsSnapshotTrigger.Task(
-              lastSnapshotTime.plusSeconds(3600L),
-              currentMigrationId,
-              Some(lastSnapshot),
+            InitializeIncrementalSnapshotTask(
+              from = snapshot,
+              nextAt = snapshot.snapshotRecordTime.plusSeconds(3600L),
             )
           )
         )
       }
 
-    }
-
-    "when there's no previous snapshot" should {
-      "do nothing if only an ACS import is present" in new AcsSnapshotTriggerTestScope(false) {
+      "don't do anything if there are no updates" in new AcsSnapshotTriggerTestScope() {
+        noPreviousIncrementalSnapshot()
         noPreviousSnapshot()
+        noUpdates(currentMigrationId)
 
-        when(
-          updateHistory.getUpdatesWithoutImportUpdates(
-            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
-            eqTo(PageLimit.tryCreate(1)),
-          )(any[TraceContext])
-        ).thenReturn(Future.successful(Seq.empty))
-
-        trigger.retrieveTasks().futureValue should be(Seq.empty)
+        trigger.retrieveTasks().futureValue shouldBe empty
       }
 
-      "do nothing if there might still be updates pending" in new AcsSnapshotTriggerTestScope(
-        false
-      ) {
+      "initialize empty if there is no existing snapshot" in new AcsSnapshotTriggerTestScope() {
+        noPreviousIncrementalSnapshot()
         noPreviousSnapshot()
+        updatesBetween(currentMigrationId, now.minusSeconds(60L), now.minusSeconds(1L))
 
-        // data after ACS
-        when(
-          updateHistory.getUpdatesWithoutImportUpdates(
-            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
-            eqTo(PageLimit.tryCreate(1)),
-          )(any[TraceContext])
-        ).thenReturn(
-          Future.successful(
-            Seq(
-              TreeUpdateWithMigrationId(
-                UpdateHistoryResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain),
-                1L,
-              )
-            )
-          )
-        )
-        val firstSnapshotTime =
-          CantonTimestamp.assertFromInstant(java.time.Instant.parse("2007-12-03T10:00:00.00Z"))
-
-        // but there's still updates pending
-        when(
-          updateHistory.getUpdatesWithoutImportUpdates(
-            eqTo(Some((currentMigrationId, firstSnapshotTime))),
-            eqTo(PageLimit.tryCreate(1)),
-          )(any[TraceContext])
-        ).thenReturn(Future.successful(Seq.empty))
-
-        trigger.retrieveTasks().futureValue should be(Seq.empty)
-      }
-
-      "when not backfilling: return the first task when due and no updates pending" in new AcsSnapshotTriggerTestScope(
-        false
-      ) {
-        noPreviousSnapshot()
-
-        // data after ACS
-        when(
-          updateHistory.getUpdatesWithoutImportUpdates(
-            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
-            eqTo(PageLimit.tryCreate(1)),
-          )(any[TraceContext])
-        ).thenReturn(
-          Future.successful(
-            Seq(
-              TreeUpdateWithMigrationId(
-                UpdateHistoryResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain),
-                1L,
-              )
-            )
-          )
-        )
-
-        val firstSnapshotTime =
-          CantonTimestamp.assertFromInstant(java.time.Instant.parse("2007-12-03T10:00:00.00Z"))
-
-        // no updates pending
-        when(
-          updateHistory.getUpdatesWithoutImportUpdates(
-            eqTo(Some((currentMigrationId, firstSnapshotTime))),
-            eqTo(PageLimit.tryCreate(1)),
-          )(any[TraceContext])
-        ).thenReturn(
-          Future.successful(
-            Seq(
-              TreeUpdateWithMigrationId(
-                UpdateHistoryResponse(treeUpdate(now.plusSeconds(1800L)), dummyDomain),
-                1L,
-              )
-            )
-          )
-        )
-
+        // First incremental snapshot starting from just before the first update,
+        // with a targetRecordTime of the next full hour.
         trigger.retrieveTasks().futureValue should be(
-          Seq(AcsSnapshotTrigger.Task(firstSnapshotTime, currentMigrationId, None))
+          Seq(
+            InitializeEmptyIncrementalSnapshotTask(
+              recordTime = now.minusSeconds(61L),
+              migration = currentMigrationId,
+              nextAt = cantonTimestamp("2007-12-03T11:00:00.00Z"),
+            )
+          )
         )
       }
 
-      "when historyBackfilling=true" should {
-
-        "when update history backfilling has not finished: return no task" in new AcsSnapshotTriggerTestScope(
-          true
-        ) {
-          noPreviousSnapshot()
-
-          // data after ACS
-          when(
-            updateHistory.getUpdatesWithoutImportUpdates(
-              eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
-              eqTo(PageLimit.tryCreate(1)),
-            )(any[TraceContext])
-          ).thenReturn(
-            Future.successful(
-              Seq(
-                TreeUpdateWithMigrationId(
-                  UpdateHistoryResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain),
-                  1L,
-                )
-              )
-            )
-          )
-
-          historyBackfilled(currentMigrationId, complete = false)
-
-          trigger.retrieveTasks().futureValue should be(empty)
-        }
-
-        "when update history backfilling has not finished import updates: return no task" in new AcsSnapshotTriggerTestScope(
-          true
-        ) {
-          noPreviousSnapshot()
-
-          // data after ACS
-          when(
-            updateHistory.getUpdatesWithoutImportUpdates(
-              eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
-              eqTo(PageLimit.tryCreate(1)),
-            )(any[TraceContext])
-          ).thenReturn(
-            Future.successful(
-              Seq(
-                TreeUpdateWithMigrationId(
-                  UpdateHistoryResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain),
-                  1L,
-                )
-              )
-            )
-          )
-
-          historyPartiallyBackfilled(
-            currentMigrationId,
-            complete = true,
-            importUpdatesComplete = false,
-          )
-
-          trigger.retrieveTasks().futureValue should be(empty)
-        }
-
-        // Currently, import updates are always backfilled after regular updates, but we do not want to depend on that in the trigger
-        "when update history backfilling has not finished regular updates: return no task" in new AcsSnapshotTriggerTestScope(
-          true
-        ) {
-          noPreviousSnapshot()
-
-          // data after ACS
-          when(
-            updateHistory.getUpdatesWithoutImportUpdates(
-              eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
-              eqTo(PageLimit.tryCreate(1)),
-            )(any[TraceContext])
-          ).thenReturn(
-            Future.successful(
-              Seq(
-                TreeUpdateWithMigrationId(
-                  UpdateHistoryResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain),
-                  1L,
-                )
-              )
-            )
-          )
-
-          historyPartiallyBackfilled(
-            currentMigrationId,
-            complete = false,
-            importUpdatesComplete = true,
-          )
-
-          trigger.retrieveTasks().futureValue should be(empty)
-        }
-
-        // this is the case of when an SV joins late (and the history is backfilled),
-        // or was present at the beginning of a migration (no backfilling required).
-        "when update history backfilling has finished: return the first task when due and no updates pending" in new AcsSnapshotTriggerTestScope(
-          true
-        ) {
-          noPreviousSnapshot()
-
-          // data after ACS
-          when(
-            updateHistory.getUpdatesWithoutImportUpdates(
-              eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
-              eqTo(PageLimit.tryCreate(1)),
-            )(any[TraceContext])
-          ).thenReturn(
-            Future.successful(
-              Seq(
-                TreeUpdateWithMigrationId(
-                  UpdateHistoryResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain),
-                  1L,
-                )
-              )
-            )
-          )
-
-          historyBackfilled(currentMigrationId, complete = true)
-
-          val firstSnapshotTime =
-            CantonTimestamp.assertFromInstant(java.time.Instant.parse("2007-12-03T10:00:00.00Z"))
-
-          // no updates pending
-          when(
-            updateHistory.getUpdatesWithoutImportUpdates(
-              eqTo(Some((currentMigrationId, firstSnapshotTime))),
-              eqTo(PageLimit.tryCreate(1)),
-            )(any[TraceContext])
-          ).thenReturn(
-            Future.successful(
-              Seq(
-                TreeUpdateWithMigrationId(
-                  UpdateHistoryResponse(treeUpdate(now.plusSeconds(1800L)), dummyDomain),
-                  1L,
-                )
-              )
-            )
-          )
-
-          trigger.retrieveTasks().futureValue should be(
-            Seq(AcsSnapshotTrigger.Task(firstSnapshotTime, currentMigrationId, None))
-          )
-        }
-
-        "when the current migration id is complete" should {
-
-          "return no task if the previous migration id is not backfilled" in new AcsSnapshotTriggerTestScope(
-            true
-          ) {
-            // no snapshot needed for the current migration id
-            historyBackfilled(currentMigrationId, complete = true)
-            previousSnapshot(now.minusSeconds(60L), currentMigrationId)
-
-            // therefore we attempt to backfill the previous migration id,
-            // but that one is not yet backfilled
-            historyBackfilled(currentMigrationId - 1, complete = false)
-
-            trigger.retrieveTasks().futureValue should be(Seq.empty)
-            trigger.isDoneBackfillingAcsSnapshots should be(false)
-          }
-
-          "return no task if the previous migration id is backfilled but didn't last long enough" in new AcsSnapshotTriggerTestScope(
-            true,
-            currentMigrationId = 1L,
-          ) {
-            // no snapshot needed for the current migration id
-            historyBackfilled(currentMigrationId, complete = true)
-            previousSnapshot(now.minusSeconds(60L), currentMigrationId)
-
-            // therefore we attempt to backfill the previous migration id,
-            // which is backfilled
-            val previousMigrationId = currentMigrationId - 1
-            historyBackfilled(previousMigrationId, complete = true)
-            // last update happened shortly after the end
-            recordTimeRange(
-              previousMigrationId,
-              // didn't last enough
-              min = CantonTimestamp.MinValue.plusSeconds(3600L - 1),
-              max = CantonTimestamp.MinValue.plusSeconds(3600L + 600),
-            )
-            noPreviousSnapshot(previousMigrationId)
-
-            trigger.retrieveTasks().futureValue should be(Seq.empty)
-            trigger.isDoneBackfillingAcsSnapshots should be(true)
-          }
-
-          "return the first task to backfill the previous migration id" in new AcsSnapshotTriggerTestScope(
-            true
-          ) {
-            // no snapshot needed for the current migration id
-            historyBackfilled(currentMigrationId, complete = true)
-            previousSnapshot(now.minusSeconds(60L), currentMigrationId)
-
-            // therefore we attempt to backfill the previous migration id,
-            // which is backfilled
-            val previousMigrationId = currentMigrationId - 1
-            historyBackfilled(previousMigrationId, complete = true)
-            // last update happened on 2007-11-03T10:15:30.00Z
-            recordTimeRange(previousMigrationId, cantonTimestamp("2007-11-03T10:15:30.00Z"))
-            noPreviousSnapshot(previousMigrationId)
-            firstUpdateAt(
-              previousMigrationId,
-              queryRecordTime = CantonTimestamp.MinValue,
-              // first update happened 10d ~3h before the last update
-              updateRecordTime = cantonTimestamp("2007-01-03T07:55:30.00Z"),
-            )
-
-            trigger.retrieveTasks().futureValue should be(
-              Seq(
-                AcsSnapshotTrigger.Task(
-                  // the next hour after 07:55:30.00Z, on the same day
-                  cantonTimestamp("2007-01-03T08:00:00.00Z"),
-                  currentMigrationId - 1,
-                  None,
-                )
-              )
-            )
-            trigger.isDoneBackfillingAcsSnapshots should be(false)
-          }
-
-          "continue backfilling a previous migration id where it left off" in new AcsSnapshotTriggerTestScope(
-            true
-          ) {
-            // no snapshot needed for the current migration id
-            historyBackfilled(currentMigrationId, complete = true)
-            previousSnapshot(now.minusSeconds(60L), currentMigrationId)
-
-            // therefore we attempt to backfill the previous migration id,
-            // which is backfilled
-            val previousMigrationId = currentMigrationId - 1
-            historyBackfilled(previousMigrationId, complete = true)
-            // last update happened on 2007-11-03T10:15:30.00Z
-            recordTimeRange(previousMigrationId, cantonTimestamp("2007-11-03T10:15:30.00Z"))
-            // there was already a snapshot at 8
-            val lastSnapshot =
-              previousSnapshot(cantonTimestamp("2007-01-03T08:00:00.00Z"), previousMigrationId)
-
-            trigger.retrieveTasks().futureValue should be(
-              Seq(
-                AcsSnapshotTrigger.Task(
-                  // so the next one needs to happen at 9
-                  cantonTimestamp("2007-01-03T09:00:00.00Z"),
-                  currentMigrationId - 1,
-                  Some(lastSnapshot),
-                )
-              )
-            )
-            trigger.isDoneBackfillingAcsSnapshots should be(false)
-          }
-
-          "once done with a migration id, it moves on to the next (previous) one" in new AcsSnapshotTriggerTestScope(
-            true
-          ) {
-            // no snapshot needed for the current migration id
-            historyBackfilled(currentMigrationId, complete = true)
-            previousSnapshot(now.minusSeconds(60L), currentMigrationId)
-
-            // the previous migration id history & snapshots are backfilled
-            val previousMigrationId = currentMigrationId - 1
-            historyBackfilled(previousMigrationId, complete = true)
-            // last update happened on 2007-11-03T10:15:30.00Z
-            recordTimeRange(previousMigrationId, cantonTimestamp("2007-11-03T10:15:30.00Z"))
-            // the last possible snapshot for the migration id already exists,
-            // note that the snapshot at T11 will not be done to avoid issues with recovery of a past migration id.
-            previousSnapshot(cantonTimestamp("2007-11-03T10:00:00.00Z"), previousMigrationId)
-
-            // so we move on to the previous-previous migration id
-            historyBackfilled(previousMigrationId - 1, complete = true)
-            // last update happened on 2007-11-24T19:25:30.00Z
-            recordTimeRange(previousMigrationId - 1, cantonTimestamp("2007-11-24T19:25:30.00Z"))
-            noPreviousSnapshot(previousMigrationId - 1)
-            // first update at 2007-11-20T10:15:30.00Z
-            firstUpdateAt(
-              previousMigrationId - 1,
-              queryRecordTime = CantonTimestamp.MinValue,
-              updateRecordTime = cantonTimestamp("2007-11-20T10:15:30.00Z"),
-            )
-
-            trigger.retrieveTasks().futureValue should be(
-              Seq(
-                AcsSnapshotTrigger.Task(
-                  cantonTimestamp("2007-11-20T11:00:00.00Z"),
-                  // previous to previous
-                  previousMigrationId - 1,
-                  None,
-                )
-              )
-            )
-            trigger.isDoneBackfillingAcsSnapshots should be(false)
-          }
-
-          "stop backfilling once all previous migration ids have been backfilled" in new AcsSnapshotTriggerTestScope(
-            true
-          ) {
-            // no snapshot needed for the current migration id
-            historyBackfilled(currentMigrationId, complete = true)
-            previousSnapshot(now.minusSeconds(60L), currentMigrationId)
-
-            def migrationIdIsBackfilled(migrationId: Long) = {
-              // the previous migration id history & snapshots are backfilled
-              historyBackfilled(migrationId, complete = true)
-              // last update happened on 2007-11-03T10:15:30.00Z
-              recordTimeRange(migrationId, cantonTimestamp(s"200${migrationId}-11-03T10:15:30.00Z"))
-              // the last possible snapshot for the migration id already exists
-              previousSnapshot(
-                cantonTimestamp(s"200${migrationId}-11-03T11:00:00.00Z"),
-                migrationId,
-              )
-            }
-            ((currentMigrationId - 1) to 0 by -1).foreach(migrationIdIsBackfilled)
-
-            trigger.retrieveTasks().futureValue should be(Seq.empty)
-            trigger.isDoneBackfillingAcsSnapshots should be(true)
-          }
-
-        }
-
-      }
-
-      "return the first task when due and no updates pending between 23:00 and 00:00" in new AcsSnapshotTriggerTestScope(
-        false
-      ) {
-        override def now =
-          CantonTimestamp.assertFromInstant(java.time.Instant.parse("2007-12-03T23:15:30.00Z"))
+      "don't do anything if history is still backfilling" in new AcsSnapshotTriggerTestScope() {
+        noPreviousIncrementalSnapshot()
         noPreviousSnapshot()
+        updatesBetween(currentMigrationId, now.minusSeconds(60L), now.minusSeconds(1L))
+        historyBackfilled(currentMigrationId, complete = false)
 
-        // data after ACS
-        when(
-          updateHistory.getUpdatesWithoutImportUpdates(
-            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
-            eqTo(PageLimit.tryCreate(1)),
-          )(any[TraceContext])
-        ).thenReturn(
-          Future.successful(
-            Seq(
-              TreeUpdateWithMigrationId(
-                UpdateHistoryResponse(treeUpdate(now.minusSeconds(1L)), dummyDomain),
-                1L,
-              )
-            )
-          )
+        trigger.retrieveTasks().futureValue shouldBe empty
+      }
+
+      "don't do anything if history is still backfilling regular updates" in new AcsSnapshotTriggerTestScope() {
+        noPreviousIncrementalSnapshot()
+        noPreviousSnapshot()
+        updatesBetween(currentMigrationId, now.minusSeconds(60L), now.minusSeconds(1L))
+        // Note: this won't happen in practice as import updates are always backfilled after regular updates,
+        // but we don't want to depend on that in the trigger.
+        historyPartiallyBackfilled(
+          currentMigrationId,
+          complete = false,
+          importUpdatesComplete = true,
         )
 
-        val firstSnapshotTime =
-          CantonTimestamp.assertFromInstant(java.time.Instant.parse("2007-12-04T00:00:00.00Z"))
+        trigger.retrieveTasks().futureValue shouldBe empty
+      }
 
-        // no updates pending
-        when(
-          updateHistory.getUpdatesWithoutImportUpdates(
-            eqTo(Some((currentMigrationId, firstSnapshotTime))),
-            eqTo(PageLimit.tryCreate(1)),
-          )(any[TraceContext])
-        ).thenReturn(
-          Future.successful(
-            Seq(
-              TreeUpdateWithMigrationId(
-                UpdateHistoryResponse(treeUpdate(now.plusSeconds(1800L)), dummyDomain),
-                1L,
-              )
-            )
-          )
+      "don't do anything if history is still backfilling import updates" in new AcsSnapshotTriggerTestScope() {
+        noPreviousIncrementalSnapshot()
+        noPreviousSnapshot()
+        updatesBetween(currentMigrationId, now.minusSeconds(60L), now.minusSeconds(1L))
+        historyPartiallyBackfilled(
+          currentMigrationId,
+          complete = true,
+          importUpdatesComplete = false,
         )
 
-        loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.INFO))(
-          trigger.retrieveTasks().futureValue should be(Seq.empty),
-          lines => {
-            forExactly(1, lines) { line =>
-              line.message should be(
-                s"Still not time to take a snapshot. Now: $now. Next snapshot time: $firstSnapshotTime."
-              )
-            }
-          },
-        )
+        trigger.retrieveTasks().futureValue shouldBe empty
       }
     }
 
+    "updating" should {
+      "update an incremental snapshot that is old" in new AcsSnapshotTriggerTestScope() {
+        val snapshot = IncrementalAcsSnapshot(
+          snapshotId = 1L,
+          historyId = 1L,
+          tableName = AcsSnapshotStore.IncrementalAcsSnapshotTable.Next.tableName,
+          recordTime = now.minusSeconds(2800L),
+          migrationId = currentMigrationId,
+          targetRecordTime = now.minusSeconds(1800L),
+        )
+        previousIncrementalSnapshot(snapshot)
+        updatesBetween(currentMigrationId, now.minusSeconds(6000L), now.minusSeconds(1L))
+
+        // Update the incremental snapshot with 30sec worth of data.
+        // It should NOT update until the targetRecordTime, even if that is long overdue.
+        trigger.retrieveTasks().futureValue should be(
+          Seq(
+            AcsSnapshotTriggerBase.UpdateIncrementalSnapshotTask(
+              snapshot = snapshot,
+              now = now,
+              updateUntil = now.minusSeconds(2770L),
+            )
+          )
+        )
+      }
+      "update an incremental snapshot that is almost finished" in new AcsSnapshotTriggerTestScope() {
+        val snapshot = IncrementalAcsSnapshot(
+          snapshotId = 1L,
+          historyId = 1L,
+          tableName = AcsSnapshotStore.IncrementalAcsSnapshotTable.Next.tableName,
+          recordTime = now.minusSeconds(1801L),
+          migrationId = currentMigrationId,
+          targetRecordTime = now.minusSeconds(1800L),
+        )
+        previousIncrementalSnapshot(snapshot)
+        updatesBetween(currentMigrationId, now.minusSeconds(6000L), now.minusSeconds(1L))
+
+        // Update the incremental snapshot with 1sec worth of data, until exactly the targetRecordTime.
+        trigger.retrieveTasks().futureValue should be(
+          Seq(
+            AcsSnapshotTriggerBase.UpdateIncrementalSnapshotTask(
+              snapshot = snapshot,
+              now = now,
+              updateUntil = now.minusSeconds(1800L),
+            )
+          )
+        )
+      }
+
+      "don't do anything if not enough time has passed since last update" in new AcsSnapshotTriggerTestScope() {
+        val snapshot = IncrementalAcsSnapshot(
+          snapshotId = 1L,
+          historyId = 1L,
+          tableName = AcsSnapshotStore.IncrementalAcsSnapshotTable.Next.tableName,
+          recordTime = now.minusSeconds(1L),
+          migrationId = currentMigrationId,
+          targetRecordTime = now.plusSeconds(1800L),
+        )
+        previousIncrementalSnapshot(snapshot)
+        updatesBetween(currentMigrationId, now.minusSeconds(6000L), now.minusSeconds(1L))
+
+        // The incremental snapshot is just 1sec old, don't try to update it yet
+        trigger.retrieveTasks().futureValue shouldBe empty
+      }
+
+      "don't do anything if updateHistory has not caught up" in new AcsSnapshotTriggerTestScope() {
+        val snapshot = IncrementalAcsSnapshot(
+          snapshotId = 1L,
+          historyId = 1L,
+          tableName = AcsSnapshotStore.IncrementalAcsSnapshotTable.Next.tableName,
+          recordTime = now.minusSeconds(600L),
+          migrationId = currentMigrationId,
+          targetRecordTime = now.plusSeconds(1800L),
+        )
+        previousIncrementalSnapshot(snapshot)
+        updatesBetween(currentMigrationId, now.minusSeconds(6000L), now.minusSeconds(600L))
+
+        // The incremental snapshot is 600sec old, but update history has no data after that,
+        // so we can't update it further.
+        trigger.retrieveTasks().futureValue shouldBe empty
+      }
+    }
+
+    "finalization" should {
+      "save incremental snapshot" in new AcsSnapshotTriggerTestScope() {
+        val snapshot = IncrementalAcsSnapshot(
+          snapshotId = 1L,
+          historyId = 1L,
+          tableName = AcsSnapshotStore.IncrementalAcsSnapshotTable.Next.tableName,
+          recordTime = now.minusSeconds(1800L),
+          migrationId = currentMigrationId,
+          targetRecordTime = now.minusSeconds(1800L),
+        )
+        previousIncrementalSnapshot(snapshot)
+
+        // Incremental snapshot has reached its targetRecordTime, so it should be finalized
+        trigger.retrieveTasks().futureValue should be(
+          Seq(
+            AcsSnapshotTriggerBase.SaveIncrementalSnapshotTask(
+              snapshot = snapshot,
+              nextAt = now.plusSeconds(1800L),
+            )
+          )
+        )
+      }
+    }
+  }
+
+  "AcsSnapshotBackfillingTrigger" should {
+    "initialize" should {
+      "start backfilling from an empty incremental snapshot" in new AcsSnapshotTriggerTestScope() {
+        noPreviousIncrementalSnapshot()
+        noPreviousSnapshot(currentMigrationId - 1L)
+        updatesBetween(currentMigrationId - 1L, now.minusSeconds(4600L), now.minusSeconds(10L))
+
+        // There is no backfilled data at all, start from an empty snapshot in the previous migration.
+        backfillingTrigger.retrieveTasks().futureValue should be(
+          Seq(
+            InitializeEmptyIncrementalSnapshotTask(
+              recordTime = now.minusSeconds(4601L),
+              migration = currentMigrationId - 1L,
+              nextAt = cantonTimestamp("2007-12-03T09:00:00.00Z"),
+            )
+          )
+        )
+        backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 1L)
+      }
+      "continue backfilling from an existing snapshot" in new AcsSnapshotTriggerTestScope() {
+        noPreviousIncrementalSnapshot()
+        val snapshot = previousSnapshot(now.minusSeconds(7200L), currentMigrationId - 1L)
+        updatesBetween(currentMigrationId - 1L, now.minusSeconds(8000L), now.minusSeconds(10L))
+
+        // Backfilling was halfway done when we switched to incremental snapshots,
+        // continue where we left off.
+        backfillingTrigger.retrieveTasks().futureValue should be(
+          Seq(
+            InitializeIncrementalSnapshotTask(
+              from = snapshot,
+              nextAt = snapshot.snapshotRecordTime.plusSeconds(3600L),
+            )
+          )
+        )
+        backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 1L)
+      }
+      "skip migrations that are too short" in new AcsSnapshotTriggerTestScope() {
+        noPreviousIncrementalSnapshot()
+        noPreviousSnapshot(currentMigrationId - 1L)
+        noPreviousSnapshot(currentMigrationId - 2L)
+
+        // The previous migration was very short-lived
+        updatesBetween(currentMigrationId - 1L, now.minusSeconds(1000L), now.minusSeconds(1001L))
+        updatesBetween(currentMigrationId - 2L, now.minusSeconds(6000L), now.minusSeconds(1000L))
+
+        // So we skip it and start backfilling from the migration before that.
+        backfillingTrigger.retrieveTasks().futureValue shouldBe empty
+        backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 2L)
+        backfillingTrigger.retrieveTasks().futureValue should be(
+          Seq(
+            InitializeEmptyIncrementalSnapshotTask(
+              recordTime = now.minusSeconds(6001L),
+              migration = currentMigrationId - 2L,
+              nextAt = cantonTimestamp("2007-12-03T09:00:00.00Z"),
+            )
+          )
+        )
+      }
+      "skip migrations that are finished" in new AcsSnapshotTriggerTestScope() {
+        noPreviousIncrementalSnapshot()
+
+        // The previous migration is already fully backfilled
+        previousSnapshot(now.minusSeconds(1800L), currentMigrationId - 1L)
+        updatesBetween(currentMigrationId - 1L, now.minusSeconds(2000L), now.minusSeconds(1000L))
+
+        // The migration before that has no data yet
+        noPreviousSnapshot(currentMigrationId - 2L)
+        updatesBetween(currentMigrationId - 2L, now.minusSeconds(6000L), now.minusSeconds(2000L))
+
+        // Skip the completed migration and start backfilling from the migration before that.
+        backfillingTrigger.retrieveTasks().futureValue shouldBe empty
+        backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 2L)
+        backfillingTrigger.retrieveTasks().futureValue should be(
+          Seq(
+            InitializeEmptyIncrementalSnapshotTask(
+              recordTime = now.minusSeconds(6001L),
+              migration = currentMigrationId - 2L,
+              nextAt = cantonTimestamp("2007-12-03T09:00:00.00Z"),
+            )
+          )
+        )
+      }
+      "don't do anything if update history backfilling has not completed" in new AcsSnapshotTriggerTestScope() {
+        noPreviousIncrementalSnapshot()
+        noPreviousSnapshot(currentMigrationId - 1L)
+
+        updatesBetween(currentMigrationId - 1L, now.minusSeconds(4600L), now.minusSeconds(10L))
+        historyBackfilled(currentMigrationId - 1L, complete = false)
+
+        backfillingTrigger.retrieveTasks().futureValue shouldBe empty
+      }
+      "don't do anything when all migrations are complete" in new AcsSnapshotTriggerTestScope() {
+        noPreviousIncrementalSnapshot()
+
+        // All previous migrations are complete
+        (0L to currentMigrationId - 1L).foreach { migrationId =>
+          previousSnapshot(now.minusSeconds(1800L), migrationId)
+          updatesBetween(migrationId, now.minusSeconds(2000L), now.minusSeconds(1000L))
+        }
+
+        // All migrations are complete, nothing to backfill.
+        eventually() {
+          backfillingTrigger.retrieveTasks().futureValue shouldBe empty
+          backfillingTrigger.isDoneBackfillingAcsSnapshots shouldBe true
+        }
+      }
+    }
+
+    "update" should {
+      "continue backfilling from an existing incremental snapshot" in new AcsSnapshotTriggerTestScope() {
+        val snapshot = IncrementalAcsSnapshot(
+          snapshotId = 1L,
+          historyId = 1L,
+          tableName = AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill.tableName,
+          recordTime = now.minusSeconds(2800L),
+          migrationId = currentMigrationId - 2L,
+          targetRecordTime = now.minusSeconds(1800L),
+        )
+        previousIncrementalSnapshot(snapshot)
+        updatesBetween(currentMigrationId - 2L, now.minusSeconds(6000L), now.minusSeconds(1L))
+
+        // Update the incremental snapshot with 30sec worth of data.
+        backfillingTrigger.retrieveTasks().futureValue should be(
+          Seq(
+            AcsSnapshotTriggerBase.UpdateIncrementalSnapshotTask(
+              snapshot = snapshot,
+              now = now,
+              updateUntil = now.minusSeconds(2770L),
+            )
+          )
+        )
+        backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 2L)
+      }
+      "save snapshot at its target record time" in new AcsSnapshotTriggerTestScope() {
+        val snapshot = IncrementalAcsSnapshot(
+          snapshotId = 1L,
+          historyId = 1L,
+          tableName = AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill.tableName,
+          recordTime = now.minusSeconds(1800L),
+          migrationId = currentMigrationId - 2L,
+          targetRecordTime = now.minusSeconds(1800L),
+        )
+        previousIncrementalSnapshot(snapshot)
+        updatesBetween(currentMigrationId - 2L, now.minusSeconds(6000L), now.minusSeconds(1700L))
+
+        // Incremental snapshot has reached its targetRecordTime, so it should be saved
+        backfillingTrigger.retrieveTasks().futureValue should be(
+          Seq(
+            AcsSnapshotTriggerBase.SaveIncrementalSnapshotTask(
+              snapshot = snapshot,
+              nextAt = now.plusSeconds(1800L),
+            )
+          )
+        )
+        backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 2L)
+      }
+      "move to the next migration when done with one" in new AcsSnapshotTriggerTestScope() {
+        val snapshot = IncrementalAcsSnapshot(
+          snapshotId = 1L,
+          historyId = 1L,
+          tableName = AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill.tableName,
+          recordTime = now.minusSeconds(1800L),
+          migrationId = currentMigrationId - 2L,
+          targetRecordTime = now.plusSeconds(1800L),
+        )
+        previousIncrementalSnapshot(snapshot)
+        previousSnapshot(now.minusSeconds(1800L), currentMigrationId - 2L)
+        updatesBetween(currentMigrationId - 2L, now.minusSeconds(6000L), now.minusSeconds(1700L))
+        updatesBetween(currentMigrationId - 3L, now.minusSeconds(9900L), now.minusSeconds(6000L))
+
+        // Incremental snapshot has a targetRecordTime beyond the end of the migration,
+        // move on to the next migration
+        backfillingTrigger.retrieveTasks().futureValue shouldBe empty
+        backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 3L)
+        backfillingTrigger.retrieveTasks().futureValue should be(
+          Seq(
+            AcsSnapshotTriggerBase.DeleteIncrementalSnapshotTask(
+              snapshot = snapshot
+            )
+          )
+        )
+      }
+    }
+    "stop when all migrations are complete" in new AcsSnapshotTriggerTestScope() {
+      // The incremental snapshot is at the end of the oldest migration
+      val snapshot = IncrementalAcsSnapshot(
+        snapshotId = 1L,
+        historyId = 1L,
+        tableName = AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill.tableName,
+        recordTime = now.minusSeconds(1800L),
+        migrationId = 0L,
+        targetRecordTime = now.plusSeconds(1800L),
+      )
+      previousIncrementalSnapshot(snapshot)
+      previousSnapshot(now.minusSeconds(1800L), 0L)
+      updatesBetween(0L, now.minusSeconds(2000L), now.minusSeconds(1000L))
+
+      // All migrations are complete, nothing to backfill.
+      backfillingTrigger.retrieveTasks().futureValue shouldBe empty
+      backfillingTrigger.isDoneBackfillingAcsSnapshots shouldBe true
+    }
   }
 
   abstract class AcsSnapshotTriggerTestScope(
-      updateHistoryBackfillEnabled: Boolean,
-      val currentMigrationId: Long = 5L,
+      val currentMigrationId: Long = 5L
   ) {
     final def storageConfig = ScanStorageConfig(
       dbAcsSnapshotPeriodHours = 1,
@@ -650,7 +519,12 @@ class AcsSnapshotTriggerTest
       store,
       updateHistory,
       storageConfig,
-      updateHistoryBackfillEnabled = updateHistoryBackfillEnabled,
+      triggerContext,
+    )
+    val backfillingTrigger = new AcsSnapshotBackfillingTrigger(
+      store,
+      updateHistory,
+      storageConfig,
       triggerContext,
     )
 
@@ -681,14 +555,39 @@ class AcsSnapshotTriggerTest
       lastSnapshot
     }
 
-    def firstUpdateAt(
+    def previousIncrementalSnapshot(
+        snapshot: IncrementalAcsSnapshot
+    ): Unit = {
+      when(
+        store.getIncrementalSnapshot(any[IncrementalAcsSnapshotTable])(
+          any[TraceContext]
+        )
+      )
+        .thenReturn(
+          Future.successful(Some(snapshot))
+        )
+    }
+
+    def noPreviousIncrementalSnapshot(
+    ): Unit = {
+      when(
+        store.getIncrementalSnapshot(any[IncrementalAcsSnapshotTable])(
+          any[TraceContext]
+        )
+      )
+        .thenReturn(
+          Future.successful(None)
+        )
+    }
+
+    def updatesBetween(
         migrationId: Long,
-        queryRecordTime: CantonTimestamp,
-        updateRecordTime: CantonTimestamp,
+        minRecordTime: CantonTimestamp,
+        maxRecordTime: CantonTimestamp,
     ) = {
       when(
         updateHistory.getUpdatesWithoutImportUpdates(
-          eqTo(Some((migrationId, queryRecordTime))),
+          eqTo(Some((migrationId, CantonTimestamp.MinValue))),
           eqTo(PageLimit.tryCreate(1)),
         )(any[TraceContext])
       ).thenReturn(
@@ -696,13 +595,50 @@ class AcsSnapshotTriggerTest
           Seq(
             TreeUpdateWithMigrationId(
               UpdateHistoryResponse(
-                treeUpdate(updateRecordTime),
+                treeUpdate(minRecordTime),
                 dummyDomain,
               ),
               migrationId,
             )
           )
         )
+      )
+      when(
+        updateHistory.getRecordTimeRange(eqTo(migrationId))(any[TraceContext])
+      ).thenReturn(
+        Future.successful(
+          Map(dummyDomain -> DomainRecordTimeRange(minRecordTime, maxRecordTime))
+        )
+      )
+      when(
+        updateHistory.lastIngestedRecordTime
+      ).thenReturn(
+        Some(maxRecordTime)
+      )
+    }
+
+    def noUpdates(migrationId: Long) = {
+      when(
+        updateHistory.getUpdatesWithoutImportUpdates(
+          eqTo(Some((migrationId, CantonTimestamp.MinValue))),
+          eqTo(PageLimit.tryCreate(1)),
+        )(any[TraceContext])
+      ).thenReturn(
+        Future.successful(
+          Seq.empty
+        )
+      )
+      when(
+        updateHistory.getRecordTimeRange(eqTo(migrationId))(any[TraceContext])
+      ).thenReturn(
+        Future.successful(
+          Map.empty
+        )
+      )
+      when(
+        updateHistory.lastIngestedRecordTime
+      ).thenReturn(
+        None
       )
     }
 
