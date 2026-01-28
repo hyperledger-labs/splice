@@ -1439,13 +1439,11 @@ class HttpWalletHandler(
     implicit val WalletUserRequest(user, userWallet, traceContext) = extracted
     withSpan(s"$workflowId.listActiveDevelopmentFundCoupons") { _ => _ =>
       for {
-        coupons <- userWallet.store.multiDomainAcsStore.listContracts(
-          amuletCodegen.DevelopmentFundCoupon.COMPANION
-        )
+        coupons <- userWallet.store.listDevelopmentFundCoupons()
         sortedCoupons = coupons.sortBy(_.payload.expiresAt)
       } yield WalletResource.ListActiveDevelopmentFundCouponsResponseOK(
         ListActiveDevelopmentFundCouponsResponse(
-          sortedCoupons.map(_.contract.toHttp).toVector
+          sortedCoupons.map(_.toHttp).toVector
         )
       )
     }

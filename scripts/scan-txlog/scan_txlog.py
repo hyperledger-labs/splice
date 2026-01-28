@@ -2245,6 +2245,9 @@ class State:
                 case "InputUnclaimedActivityRecord":
                     cid = value.get_contract_id()
                     del self.active_contracts[cid]
+                case "InputDevelopmentFundCoupon":
+                    cid = value.get_contract_id()
+                    del self.active_contracts[cid]
                 case _:
                     self._fail(transaction, f"Unexpected transfer input: {tag}")
         return TransferInputs(
