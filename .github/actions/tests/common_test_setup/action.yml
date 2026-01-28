@@ -22,15 +22,10 @@ inputs:
   artifactory_password:
     description: "The Artifactory password"
     required: false
-  target:
-    description: "Choose nix target: oss - restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts), static_tests - for static tests, default - for enterprise dependencies"
-    default: 'default'
-    type: choice
-    options:
-      - oss
-      - default
-      - static_tests
+  oss_only:
+    description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)"
     required: false
+    default: "false"
   upload_workload_identity_provider:
     description: "The workload identity provider to use for uploading the cache"
     required: false
@@ -49,7 +44,7 @@ runs:
   using: "composite"
   steps:
     - name: Validate input
-      if: inputs.target == 'default' && (inputs.artifactory_password == '' || inputs.artifactory_user == '')
+      if: inputs.oss_only != 'true' && (inputs.artifactory_password == '' || inputs.artifactory_user == '')
       shell: bash
       run: |
         echo "artifactory_user and artifactory_password must be provided if not using OSS only dependencies."
@@ -72,7 +67,7 @@ runs:
         cache_version: 7
         should_save: ${{ inputs.save_nix_cache }}
         should_save_gcp: ${{ inputs.save_nix_cache_to_gcp }}
-        target: ${{ inputs.target }}
+        oss_only: ${{ inputs.oss_only }}
         upload_workload_identity_provider: ${{ inputs.upload_workload_identity_provider }}
         upload_service_account: ${{ inputs.upload_service_account }}
 

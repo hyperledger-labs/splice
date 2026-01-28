@@ -31,7 +31,7 @@ jobs:
         uses: ./.github/actions/tests/common_test_setup
         with:
           test_name: daml_test
-          target: 'oss'
+          oss_only: true
 
       - name: Run Daml tests
         if: steps.skip.outputs.skip != 'true'

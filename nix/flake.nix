@@ -32,19 +32,13 @@
             inherit npmPkgs;
             x86Pkgs = enterprise_x86Pkgs;
             pkgs = enterprise_pkgs;
-            variant = "enterprise";
+            use_enterprise = true;
           };
           devShells.oss = import ./shell.nix {
             inherit npmPkgs;
             x86Pkgs = oss_x86Pkgs;
             pkgs = oss_pkgs;
-            variant = "oss";
-          };
-          devShells.static_tests = import ./shell.nix {
-            inherit npmPkgs;
-            x86Pkgs = oss_x86Pkgs;
-            pkgs = oss_pkgs;
-            variant = "static_tests";
+            use_enterprise = false;
           };
         }
       );

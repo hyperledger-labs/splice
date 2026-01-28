@@ -38,7 +38,7 @@ jobs:
         uses: ./.github/actions/tests/common_test_setup
         with:
           test_name: ts_cli
-          target: 'oss'
+          oss_only: true
 
       - name: Run Token Standard CLI tests
         if: steps.skip.outputs.skip != 'true'

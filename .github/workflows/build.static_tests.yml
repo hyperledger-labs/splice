@@ -33,7 +33,7 @@ jobs:
         uses: ./.github/actions/tests/common_test_setup
         with:
           test_name: static_tests
-          target: 'static_tests'
+          oss_only: true
 
       - name: Check trailing whitespace
         uses: ./.github/actions/nix/run_bash_command_in_nix
