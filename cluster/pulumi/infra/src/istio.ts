@@ -360,11 +360,11 @@ function configureGatewayService(
           type: gatewayVariant.type,
           // TODO (#2723) works without?
           // (prior to IP fixes) without this ALB returns 5xx, with it returns 403
-          annotations: {
+          /*annotations: {
             // Use numeric port keys (as strings) to avoid
             // error parsing value of NEG annotation "cloud.google.com/neg" on service "cluster-ingress"/"istio-ingress": NEG annotation is invalid
             'cloud.google.com/neg': JSON.stringify({ exposed_ports: { '80': {} } }),
-          },
+          },*/
         };
 
   const gateway = new k8s.helm.v3.Release(
