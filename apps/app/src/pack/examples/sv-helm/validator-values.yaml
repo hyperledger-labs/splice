@@ -1,17 +1,72 @@
-scanAddress: "TRUSTED_SCAN_URL"
-# TRUSTED_SINGLE_SCAN_START
-# If you want to configure validator to use a single trusted scan, set ``nonSvValidatorTrustSingleScan`` to true.
-# It will only connect to the scan specified in ``scanAddress``. This does mean that you depend on that single SV and if it is broken or malicious you will be unable to use the network so usually you want to default to not enabling this.
-# nonSvValidatorTrustSingleScan: true
-# TRUSTED_SINGLE_SCAN_END
+# SCAN_CLIENT_CONFIGURATION_START
+scanClient:
+  scanType: "bft"
+  seedUrls: ["TRUSTED_SCAN_URL"] # replace with scan seed url. Supports multiple urls, separated by comma.
 
-# TRUSTED_SINGLE_SEQUENCER_START
-# If you want to configure validator to connect to a single trusted sequencer, set ``useSequencerConnectionsFromScan`` to false.
-# and replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the publicly accessible URL of the trusted sequencer.
-# This does mean that you depend on that single SV and if it is broken or malicious you will be unable to use the network so usually you want to default to not enabling this.
-# decentralizedSynchronizerUrl: "TRUSTED_SYNCHRONIZER_SEQUENCER_URL"
-# useSequencerConnectionsFromScan: false
-# TRUSTED_SINGLE_SEQUENCER_END
+# scanClient denotes how the validator makes connections to scan service and supports three modes of operation.
+
+# Mode 1: bft (Byzantine Fault Tolerance)
+# Connects to all available scans in the network. It validates responses by ensuring
+# at least f+1 matching responses are received.
+
+# scanClient:
+#   scanType: "bft"
+#   seedUrls: ["TRUSTED_SCAN_URL"] # replace with scan seed url(s).  Supports multiple urls, separated by comma.
+
+# Mode 2: bft-custom
+# A specialized version of bft where you specify a subset of trusted SVs.
+# The validator connects only to the scans of the SVs listed in 'svNames'.
+# 'threshold' defines how many identical responses are required to consider the scan responses valid.
+
+# scanClient:
+#   scanType: "bft-custom"
+#   svNames: ["TRUSTED_SV"] # replace with trusted SV names(s)
+#   seedUrls: ["TRUSTED_SCAN_URL"] # replace with actual scan seed urls(s)
+#   threshold: <TRUST_THRESHOLD> # replace with the integer number of matching responses required for validation
+
+# Mode 3: trust-single
+# Connects to a single trusted scan address.
+# This means that you depend on that single SV and if it is broken or malicious you will be unable to use the network.
+# Hence, usually you want to default to not enabling this
+
+# scanClient:
+#   scanType: "trust-single"
+#   scanAddress: "TRUSTED_SCAN_URL" # replace with the trusted scan url
+
+# SCAN_CLIENT_CONFIGURATION_END
+
+# SYNCHRONIZER_CONFIGURATION_START
+synchronizer:
+  connectionType: "bft"
+
+# synchronizer configuration enables to configure how the validator's participant connects to the synchronizer.
+# synchronizer configuration has three modes of operation.
+
+# Mode 1: bft (Byzantine Fault Tolerance)
+# Uses all available synchronizer connections provided by the scan service.
+# Responses are validated against the network's f+1 fault tolerance logic.
+
+# synchronizer:
+#   connectionType: "bft"
+
+# Mode 2: bft-custom
+# Connects only to sequencers operated by the specific SVs listed in 'svNames'.
+# 'threshold' defines the minimum number of matching responses required for validation.
+
+# synchronizer:
+#   connectionType: "bft-custom"
+#   svNames: ["TRUSTED_SV"] # replace with trusted SV name(s)
+#   threshold: <TRUST_THRESHOLD> # replace with the integer number of matching responses required for validation
+
+# Mode 3: trust-Single
+# Connects to a single specified sequencer URL.
+# trust-single makes you dependent on a single SV; if it is malicious or down, you will be unable to use the network.
+
+#synchronizer:
+#   connectionType: "trust-single"
+#   url: "TRUSTED_SYNCHRONIZER_SEQUENCER_URL" # replace with the trusted synchronizer sequencer url
+
+# SYNCHRONIZER_CONFIGURATION_END
 
 # Replace OPERATOR_WALLET_USER_ID with the user id in your IAM that you want to use to log into
 # the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``
