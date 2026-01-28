@@ -466,7 +466,6 @@ async function installSvAndValidator(
       ...validatorValuesWithMaybeTopups,
       additionalJvmOptions: getAdditionalJvmOptions(svConfig.validatorApp?.additionalJvmOptions),
       scanClient: svConfig.validatorApp?.scanClient ?? validatorValues.scanClient,
-      synchronizer: svConfig.validatorApp?.synchronizer ?? validatorValues.synchronizer,
     },
     activeVersion,
     {
