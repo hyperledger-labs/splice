@@ -10,7 +10,7 @@ async function getFileFromGit(deps, path, ref) {
 }
 
 async function getBranchesForCluster(deps, cluster) {
-  const configYaml = await getFileFromGit(deps, `cluster/deployment/${cluster}/config.yaml`, 'main');
+  const configYaml = await getFileFromGit(deps, `cluster/deployment/${cluster}/config.resolved.yaml`, 'main');
   const config = deps.jsyaml.load(configYaml);
   const active = config.synchronizerMigration.active.releaseReference.gitReference;
   const upgrade = config.synchronizerMigration.upgrade?.releaseReference.gitReference;
