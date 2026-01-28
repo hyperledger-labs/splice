@@ -24,7 +24,7 @@ abstract class TransferInputStoreTest extends StoreTest {
         _ <- dummyDomain.ingest(mintTransaction(user, 10.0, 4L, 1.0))(store.multiDomainAcsStore)
       } yield {
         // We don't deduct holding fees here (anymore)
-        // TODO(#2257): we also shouldn't need to pas a round here anymore...
+        // TODO(#2257): we also shouldn't need to pass a round here anymore...
         store
           .listSortedAmuletsAndQuantity(5L, PageLimit.tryCreate(5))
           .futureValue
