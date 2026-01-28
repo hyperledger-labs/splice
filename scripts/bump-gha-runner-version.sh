@@ -41,7 +41,7 @@ echo "GHA runner version is not up to date. Creating a PR..."
 git add "${docker_runner_file}" "${runner_hook_file}"
 updated_branch="gha-runner-version-bump-$(date +%Y-%m-%d)"
 git switch -c "${updated_branch}"
-git commit -m "[static] bump GHA runner version to the latest (auto-generated)" -s
+git commit -m "[ci] bump GHA runner version to the latest (auto-generated)" -s
 git push origin "${updated_branch}"
 
 gh pr create \
