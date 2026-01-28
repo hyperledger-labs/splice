@@ -3,6 +3,19 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
+
+
+.. NOTE:
+   We keep notes for upcoming releases in `release_notes_upcoming.rst`
+   to avoid merges accidentally merging new changes into an existing release.
+
+    - add your upcoming release notes into `release_notes_upcoming.rst`
+    - upon release add the content of `release_notes_upcoming.rst` into a
+      new `..  release-notes:: x.y.z` section with the actual version number;
+      and comment out the `Upcoming` section in `release_notes_upcoming.rst`.
+
+.. include:: release_notes_upcoming.rst
+
 .. _release_notes:
 
 .. release-notes:: 0.5.8
@@ -20,25 +33,6 @@
 
     - deprecated ``/v0/total-amulet-balance`` and ``/v0/wallet-balance`` endpoints have been removed in favor of using `/registry/metadata/v1/instruments/{instrumentId} <app_dev/token_standard/openapi/token_metadata.html#get--registry-metadata-v1-instruments-instrumentId>`_
       and `/v0/holdings/summary <app_dev/scan_api/scan_openapi.html#post--v0-holdings-summary>`_, respectively.
-
-    - `canton.scan-apps.scan-app.acs-store-descriptor-user-version` and `canton.scan-apps.scan-app.tx-log-store-descriptor-user-version`
-      configuration settings
-      have been added to set a `user-version`, respectively for the ACS and TxLog store.
-      Modifying the `user-version` wipes the respective store and triggers re-ingestion.
-      See the :ref:`SV Operations docs <sv-reingest-scan-stores>` for more details.
-
-    - Added a new external endpoint ``GET /v0/unclaimed-development-fund-coupons`` to retrieve all active unclaimed development fund coupon contracts.
-
-  - Wallet
-
-    - Added a new internal endpoint ``POST /v0/wallet/development-fund-coupons/allocate`` to allocate a development fund coupon for a given beneficiary,
-      amount, expiration time, and reason.
-
-    - Added a new internal endpoint ``GET /v0/wallet/development-fund-coupons`` to retrieve all active DevelopmentFundCoupon contracts,
-      sorted by expiration date, where the wallet user party is either the development fund manager or the beneficiary.
-
-    - Added a new internal endpoint ``POST /v0/wallet/development-fund-coupons/{contract_id}/withdraw`` to withdraw a development fund coupon
-      when the wallet user party is the development fund manager.
 
   - Deployments
 
