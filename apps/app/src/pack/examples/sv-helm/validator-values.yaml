@@ -1,3 +1,10 @@
+# Only for SV validators:
+# if you want to configure validator to connect to a single trusted sequencer, set ``useSequencerConnectionsFromScan`` to false.
+# and replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the publicly accessible URL of the trusted sequencer.
+# This does mean that you depend on that single SV and if it is broken or malicious you will be unable to use the network so usually you want to default to not enabling this.
+# decentralizedSynchronizerUrl: "TRUSTED_SYNCHRONIZER_SEQUENCER_URL"
+# useSequencerConnectionsFromScan: false
+
 # Replace OPERATOR_WALLET_USER_ID with the user id in your IAM that you want to use to log into
 # the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``
 # not only the suffix ``43b68e1e4978b000cefba352``:
