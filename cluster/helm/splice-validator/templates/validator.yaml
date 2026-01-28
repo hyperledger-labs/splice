@@ -98,11 +98,13 @@ spec:
         {{- include "splice-util-lib.auth0-user-env-var" (dict "appName" "sv" "keyName" "sv") | indent 8}}
         - name: ADDITIONAL_CONFIG_TRUST_SINGLE_SCAN
           value: |
+            canton.validator-apps.validator_backend.scan-client.type = "trust-single"
             {{- if .Values.scanClient }}
               {{- if eq .Values.scanClient.scanType "trust-single" } }
-            canton.validator-apps.validator_backend.scan-client.type = "trust-single"
             canton.validator-apps.validator_backend.scan-client.url = {{ .Values.scanClient.scanAddress | quote }}
               {{- end }}
+            {{- else }}
+            canton.validator-apps.validator_backend.scan-client.url = ${_scan.admin-api.address}
             {{- end }}
         {{ else if .Values.nonSvValidatorTrustSingleScan | default false -}}
         - name: ADDITIONAL_CONFIG_NON_VALIDATOR_TRUST_SINGLE_SCAN
@@ -133,10 +135,7 @@ spec:
             canton.validator-apps.validator_backend.scan-client.seed-urls = [ ${_scan.admin-api.address} ]
             {{- end }}
         {{ end }}
-        {{ if not .Values.useSequencerConnectionsFromScan -}}
-        - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
-          value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.decentralizedSynchronizerUrl | quote }}
-        {{ else if .Values.synchronizer -}}
+        {{ if .Values.synchronizer -}}
             {{- if eq .Values.synchronizer.connectionType "trust-single" }}
         - name: ADDITIONAL_CONFIG_SYNCHRONIZER_URL
           value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.synchronizer.url | quote }}
@@ -146,6 +145,9 @@ spec:
             canton.validator-apps.validator_backend.domains.global.trusted-synchronizer-config.sv-names = {{ .Values.synchronizer.svNames | toJson}}
             canton.validator-apps.validator_backend.domains.global.trusted-synchronizer-config.threshold = {{ .Values.synchronizer.threshold }}
             {{- end }}
+        {{-else if not .Values.useSequencerConnectionsFromScan - }}
+        - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
+          value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.decentralizedSynchronizerUrl | quote }}
         {{ end }}
         {{- range $ii, $domain := .Values.extraDomains }}
         - name: ADDITIONAL_CONFIG_EXTRA_DOMAIN_{{ $ii }}

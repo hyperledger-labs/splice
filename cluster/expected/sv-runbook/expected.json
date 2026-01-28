@@ -1329,7 +1329,7 @@
           }
         },
         "scanClient": {
-          "scanAddress": "TRUSTED_SCAN_URL",
+          "scanAddress": "http://scan-app.sv:5012",
           "scanType": "trust-single"
         },
         "spliceInstanceNames": {
