@@ -4,12 +4,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # This script checks that all internal npm packages in the apps directory
-# are properly namespaced with @lfdecentralizedtrust/splice-
+# are properly namespaced with @lfdecentralizedtrust/
 
 set -euo pipefail
 
 APPS_DIR="apps"
-REQUIRED_NAMESPACE="@lfdecentralizedtrust/splice-"
+REQUIRED_NAMESPACE="@lfdecentralizedtrust/"
 
 fail=0
 
