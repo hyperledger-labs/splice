@@ -216,8 +216,8 @@ final case class MetricsRegistry(
               .registered()
               .map(_.name.toString())
               .toSet,
-            onlyLogMissingHistograms =
-              if (testingSupportAdhocMetrics) Some(logger.underlying) else None,
+            // TODO(#13956) - port this in a smarter way to canton
+            onlyLogMissingHistograms = Some(NOPLogger.NOP_LOGGER),
             globalMetricsContext = extraContext,
           ),
           baseFilter,

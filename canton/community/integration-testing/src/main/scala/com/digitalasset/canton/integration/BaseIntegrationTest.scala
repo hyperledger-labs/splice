@@ -98,7 +98,7 @@ private[integration] trait BaseIntegrationTest
         assertion(entry)
         entry.commandFailureMessage
         succeed
-      } *,
+      }*
     )
 
   /** Version of [[com.digitalasset.canton.logging.SuppressingLogger.assertThrowsAndLogs]] that is
@@ -116,7 +116,7 @@ private[integration] trait BaseIntegrationTest
         assertion(entry)
         entry.commandFailureMessage
         succeed
-      } *,
+      }*
     )
 
   def suppressPackageIdWarning[A](within: => A): A =
@@ -156,10 +156,23 @@ private[integration] trait BaseIntegrationTest
     override val pos: Option[Position] = test.pos
 
     override def apply(): Outcome = {
-      val environment = provideEnvironment
-      val testOutcome =
-        try test.toNoArgTest(environment)()
-        finally testFinished(environment)
+      val metrics = testInfrastructureTestMetrics(test.name)
+      val environment = Timed.value(
+        metrics.testProvideEnvironment,
+        provideEnvironment(test.name),
+      )
+      val testOutcome = {
+        try
+          Timed.value(
+            metrics.testExecution,
+            test.toNoArgTest(environment)(),
+          )
+        finally
+          Timed.value(
+            metrics.testFinished,
+            testFinished(test.name, environment),
+          )
+      }
       testOutcome
     }
   }

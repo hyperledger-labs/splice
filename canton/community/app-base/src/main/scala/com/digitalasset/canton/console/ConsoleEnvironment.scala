@@ -24,7 +24,7 @@ import com.digitalasset.canton.console.commands.GlobalSecretKeyAdministration
 import com.digitalasset.canton.crypto.{Crypto, Fingerprint}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.environment.Environment
+import com.digitalasset.canton.environment.{CantonEnvironment, Environment}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
@@ -62,15 +62,12 @@ object NodeReferences {
     NodeReferences[ParticipantReference, RemoteParticipantReference, LocalParticipantReference]
 }
 
-/** The environment in which console commands are evaluated.
-  */
-@SuppressWarnings(Array("org.wartremover.warts.Any")) // required for `Binding[_]` usage
-class ConsoleEnvironment(
-    val environment: Environment,
-    val consoleOutput: ConsoleOutput = StandardConsoleOutput,
-) extends NamedLogging
-    with FlagCloseable
-    with NoTracing {
+trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing {
+  type Config <: SharedCantonConfig[Config]
+
+  val environment: Environment[Config]
+
+  val consoleOutput: ConsoleOutput
 
   override protected val loggerFactory: NamedLoggerFactory = environment.loggerFactory
 
@@ -104,7 +101,7 @@ class ConsoleEnvironment(
   private[console] def predefCode(interactive: Boolean, noTty: Boolean = false): String =
     ConsoleEnvironmentBinding.predefCode(interactive, noTty)
 
-  private[console] val tracer: Tracer = environment.tracerProvider.tracer
+  val tracer: Tracer = environment.tracerProvider.tracer
 
   /** Definition of the startup order of local instances. Nodes support starting up in any order
     * however to avoid delays/warnings we opt to start in the most desirable order for simple
@@ -112,7 +109,7 @@ class ConsoleEnvironment(
     * return a int for the instance (typically just a static value based on type), and then the
     * console will start these instances for lower to higher values.
     */
-  private def startupOrderPrecedence(instance: LocalInstanceReference): Int =
+  def startupOrderPrecedence(instance: LocalInstanceReference): Int =
     instance match {
       case _: LocalSequencerReference =>
         1 // everything depends on a sequencer so start that first
@@ -241,7 +238,8 @@ class ConsoleEnvironment(
         result
       } catch {
         case err: Throwable =>
-          CommandInternalError.ErrorWithException(err).logWithContext()
+          val internalError = CommandInternalError.ErrorWithException(err)
+          internalError.logWithContext()
           err match {
             case NonFatal(_) =>
               // No need to rethrow err, as it has been logged and output
@@ -263,7 +261,8 @@ class ConsoleEnvironment(
 
     resultValue match {
       case null =>
-        CommandInternalError.NullError().logWithContext(invocationContext())
+        val internalError = CommandInternalError.NullError()
+        internalError.logWithContext(invocationContext())
         errorHandler.handleInternalError()
       case CommandSuccessful(value) =>
         value
@@ -519,6 +518,20 @@ class ConsoleEnvironment(
   def startAll(): Unit = runE(environment.startAll())
 
   def stopAll(): Unit = runE(environment.stopAll())
+}
+
+/** The environment in which console commands are evaluated.
+  */
+@SuppressWarnings(Array("org.wartremover.warts.Any")) // required for `Binding[_]` usage
+class CantonConsoleEnvironment(
+    override val environment: CantonEnvironment,
+    val consoleOutput: ConsoleOutput = StandardConsoleOutput,
+) extends ConsoleEnvironment
+    with NamedLogging
+    with FlagCloseable
+    with NoTracing {
+
+  override type Config = CantonConfig
 
 }
 

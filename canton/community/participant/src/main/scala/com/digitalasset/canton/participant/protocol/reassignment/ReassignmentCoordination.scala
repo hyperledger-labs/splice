@@ -254,8 +254,9 @@ class ReassignmentCoordination(
         _.traverseSingleton((_, syncCrypto) => syncCrypto.snapshot(timestamp.unwrap))
       )
 
-  private def awaitTimestampAndGetTaggedCryptoSnapshot[T[X] <: ReassignmentTag[X]
-    : SameReassignmentType: SingletonTraverse](
+  private def awaitTimestampAndGetTaggedCryptoSnapshot[T[X] <: ReassignmentTag[
+    X
+  ]: SameReassignmentType: SingletonTraverse](
       targetSynchronizerId: T[PhysicalSynchronizerId],
       staticSynchronizerParameters: T[StaticSynchronizerParameters],
       timestamp: T[CantonTimestamp],
@@ -331,8 +332,9 @@ class ReassignmentCoordination(
       }
   } yield topology
 
-  private def getTopologyClient[T[X] <: ReassignmentTag[X]
-    : SameReassignmentType: SingletonTraverse](
+  private def getTopologyClient[
+      T[X] <: ReassignmentTag[X]: SameReassignmentType: SingletonTraverse
+  ](
       psid: T[PhysicalSynchronizerId],
       staticSynchronizerParameters: T[StaticSynchronizerParameters],
   ): Either[UnknownPhysicalSynchronizer, T[SynchronizerCryptoClient]] =

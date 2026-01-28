@@ -28,8 +28,7 @@ trait DbTest
     with FlagCloseable
     with HasCloseContext // not used here, but required by most tests. So extending it for convenience.
     with HasExecutionContext
-    with NamedLogging
-    with DbStorage.Implicits {
+    with NamedLogging {
   this: Suite =>
 
   /** Flag to define the migration mode for the schemas */
@@ -101,9 +100,12 @@ trait DbTest
     }
   }
 
-  private def cleanup()(implicit tc: TraceContext): Unit =
+  private def cleanup()(implicit tc: TraceContext): Unit = {
     // Use the underlying storage for clean-up operations, so we don't run clean-ups twice
-    Await.result(cleanDb(storage.underlying), 10.seconds)
+    // cleanDB is usually implemented by a TRUNCATE statement, which can be very slow,
+    // we therefore use a long timeout.
+    Await.result(cleanDb(storage.underlying), 120.seconds)
+  }
 }
 
 /** Run db test against h2 */
