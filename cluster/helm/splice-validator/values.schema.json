@@ -571,6 +571,25 @@
     {
       "if": {
         "properties": {
+          "svValidator": { "const": true }
+        },
+        "required": ["svValidator"]
+      },
+      "then": {
+        "properties": {
+          "scanClient": {
+            "type": "object",
+            "required": ["scanType", "scanAddress"],
+            "properties": {
+              "scanType": { "const": "trust-single" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
           "scanClient": {
             "type": "object"
           }
