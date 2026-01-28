@@ -18,7 +18,6 @@
 
 .. include:: release_notes_upcoming.rst
 
-
 .. release-notes:: 0.5.8
 
   Note: 0.5.7 introduced a significant performance regression related to the processing of topology transactions on participants, mediators, and sequencers.

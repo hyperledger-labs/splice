@@ -100,6 +100,7 @@ object SvSvStore {
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       ingestionConfig: IngestionConfig,
+      acsStoreDescriptorUserVersion: Option[Long] = None,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -113,6 +114,7 @@ object SvSvStore {
       domainMigrationInfo,
       participantId,
       ingestionConfig,
+      acsStoreDescriptorUserVersion,
     )
 
   /** Contract filter of an sv acs store for a specific acs party. */

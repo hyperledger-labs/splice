@@ -8,9 +8,8 @@ load-tester := ${SPLICE_ROOT}/load-tester/dist
 
 $(dir)/$(docker-build): $(target-load-tester)  $(dir)/target/LICENSE
 
-$(target-load-tester): $(load-tester)
-	mkdir -p $(@D)
+$(target-load-tester): $(load-tester) | $(dir)/target
 	cp -r $< $@
 
-$(dir)/target/LICENSE: ${SPLICE_ROOT}/cluster/images/LICENSE
+$(dir)/target/LICENSE: ${SPLICE_ROOT}/cluster/images/LICENSE | $(dir)/target
 	cp $< $@

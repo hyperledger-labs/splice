@@ -28,6 +28,13 @@ persistence:
   port: 5432
   user: cnadmin
   secretName: "postgres-secrets"
+  # The user version of the ACS store (optional), a positive integer,
+  # set to 1 if previously unset to re-ingest, increment by 1 to subsequently re-ingest, the ACS store
+  # acsStoreDescriptorUserVersion:
+
+  # The user version of the TxLog store (optional), a positive integer,
+  # set to 1 if previously unset to re-ingest, increment by 1 to subsequently re-ingest, the TxLog store
+  # txLogStoreDescriptorUserVersion:
 
 migration:
   id: 0

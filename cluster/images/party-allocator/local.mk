@@ -8,9 +8,8 @@ party-allocator := ${SPLICE_ROOT}/party-allocator/build/bundle.js
 
 $(dir)/$(docker-build): $(target-party-allocator)  $(dir)/target/LICENSE  $(dir)/entrypoint.sh
 
-$(target-party-allocator): $(party-allocator)
-	mkdir -p $(@D)
+$(target-party-allocator): $(party-allocator) | $(dir)/target
 	cp -r $< $@
 
-$(dir)/target/LICENSE: ${SPLICE_ROOT}/cluster/images/LICENSE
+$(dir)/target/LICENSE: ${SPLICE_ROOT}/cluster/images/LICENSE | $(dir)/target
 	cp $< $@

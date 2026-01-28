@@ -309,6 +309,8 @@ object ScanStore {
       metrics: DbScanStoreMetrics,
       ingestionConfig: IngestionConfig,
       initialRound: Long,
+      acsStoreDescriptorUserVersion: Option[Long] = None,
+      txLogStoreDescriptorUserVersion: Option[Long] = None,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -329,6 +331,8 @@ object ScanStore {
         ingestionConfig,
         metrics,
         initialRound,
+        acsStoreDescriptorUserVersion,
+        txLogStoreDescriptorUserVersion,
       ),
       cacheConfigs,
       metrics,

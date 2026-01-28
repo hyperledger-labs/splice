@@ -161,6 +161,7 @@ object ValidatorStore {
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       ingestionConfig: IngestionConfig,
+      acsStoreDescriptorUserVersion: Option[Long] = None,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -174,6 +175,7 @@ object ValidatorStore {
       domainMigrationInfo,
       participantId,
       ingestionConfig,
+      acsStoreDescriptorUserVersion,
     )
 
   case class Key(

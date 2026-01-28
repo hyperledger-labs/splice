@@ -65,6 +65,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       key: SvStore.Key,
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
+      acsStoreDescriptorUserVersion: Option[Long],
   )(implicit
       ec: ExecutionContext,
       templateDecoder: TemplateJsonDecoder,
@@ -77,6 +78,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
     domainMigrationInfo,
     participantId,
     config.automation.ingestion,
+    acsStoreDescriptorUserVersion,
   )
 
   protected def newSvSvAutomationService(
@@ -112,6 +114,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       key: SvStore.Key,
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
+      acsStoreDescriptorUserVersion: Option[Long],
   )(implicit
       ec: ExecutionContext,
       templateDecoder: TemplateJsonDecoder,
@@ -125,6 +128,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       domainMigrationInfo,
       participantId,
       config.automation.ingestion,
+      acsStoreDescriptorUserVersion,
     )
   }
 

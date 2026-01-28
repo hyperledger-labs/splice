@@ -11,6 +11,12 @@
 
   - Scan
 
+    - `canton.scan-apps.scan-app.acs-store-descriptor-user-version` and `canton.scan-apps.scan-app.tx-log-store-descriptor-user-version`
+      configuration settings
+      have been added to set a `user-version`, respectively for the ACS and TxLog store.
+      Modifying the `user-version` wipes the respective store and triggers re-ingestion.
+      See the :ref:`SV Operations docs <sv-reingest-scan-stores>` for more details.
+
     - Added a new external endpoint ``GET /v0/unclaimed-development-fund-coupons`` to retrieve all active unclaimed development fund coupon contracts.
 
   - Wallet
@@ -23,4 +29,3 @@
 
     - Added a new internal endpoint ``POST /v0/wallet/development-fund-coupons/{contract_id}/withdraw`` to withdraw a development fund coupon
       when the wallet user party is the development fund manager.
-

@@ -800,6 +800,7 @@ class ValidatorApp(
         domainMigrationInfo,
         participantId,
         config.automation.ingestion,
+        config.acsStoreDescriptorUserVersion,
       )
       validatorUpdateHistory = new UpdateHistory(
         storage,
