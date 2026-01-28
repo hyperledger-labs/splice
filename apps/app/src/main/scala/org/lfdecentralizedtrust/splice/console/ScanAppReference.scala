@@ -5,7 +5,10 @@ package org.lfdecentralizedtrust.splice.console
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  FeaturedAppRight,
+  UnclaimedDevelopmentFundCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   AppTransferContext,
@@ -249,12 +252,6 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
     }
 
-  @Help.Summary("Get the total balance of Amulet in the network")
-  def getTotalAmuletBalance(asOfEndOfRound: Long): Option[BigDecimal] =
-    consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetTotalAmuletBalance(asOfEndOfRound))
-    }
-
   @Help.Summary("Get the Amulet config parameters for a given round")
   def getAmuletConfigForRound(
       round: Long
@@ -346,6 +343,14 @@ abstract class ScanAppReference(
       )
     }
 
+  @Help.Summary("List all unclaimed development fund coupons")
+  def listUnclaimedDevelopmentFundCoupons(): Seq[
+    ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
+  ] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.ListUnclaimedDevelopmentFundCoupons())
+    }
+
   import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem
   import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest.SortOrder
 
@@ -389,6 +394,16 @@ abstract class ScanAppReference(
       httpCommand(
         HttpScanAppClient.GetDateOfMostRecentSnapshotBefore(
           before.toInstant.atOffset(java.time.ZoneOffset.UTC),
+          migrationId,
+        )
+      )
+    }
+
+  def getDateOfFirstSnapshotAfter(after: CantonTimestamp, migrationId: Long) =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetDateOfFirstSnapshotAfter(
+          after.toInstant.atOffset(java.time.ZoneOffset.UTC),
           migrationId,
         )
       )
@@ -606,6 +621,21 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.LookupInstrument(instrumentId))
     }
+  @Help.Summary(
+    "Get the total amulet balance (total supply), automatically forces a new acs snapshot to get an up2date response"
+  )
+  def getTotalAmuletBalance(
+      amuletName: String = getSpliceInstanceNames().amuletName
+  ): BigDecimal = {
+    val _ = forceAcsSnapshotNow()
+    lookupInstrument(amuletName)
+      .flatMap(_.totalSupply.map(s => BigDecimal(s)))
+      .getOrElse(
+        throw new RuntimeException(
+          s"'$amuletName' instrument not found or total supply not defined"
+        )
+      )
+  }
 
   def listInstruments() =
     consoleEnvironment.run {

@@ -31,21 +31,21 @@ object PackageIdResolver {
       case SpliceWallet => packageConfig.wallet
       case SpliceWalletPayments => packageConfig.walletPayments
       case TokenStandard.SpliceApiTokenMetadataV1 =>
-        DarResources.TokenStandard.tokenMetadata.bootstrap.metadata.version.toString()
+        DarResources.TokenStandard.tokenMetadata.latest.metadata.version.toString()
       case TokenStandard.SpliceApiTokenHoldingV1 =>
-        DarResources.TokenStandard.tokenHolding.bootstrap.metadata.version.toString()
+        DarResources.TokenStandard.tokenHolding.latest.metadata.version.toString()
       case TokenStandard.SpliceApiTokenTransferInstructionV1 =>
-        DarResources.TokenStandard.tokenTransferInstruction.bootstrap.metadata.version.toString()
+        DarResources.TokenStandard.tokenTransferInstruction.latest.metadata.version.toString()
       case TokenStandard.SpliceApiTokenAllocationV1 =>
-        DarResources.TokenStandard.tokenAllocation.bootstrap.metadata.version.toString()
+        DarResources.TokenStandard.tokenAllocation.latest.metadata.version.toString()
       case TokenStandard.SpliceApiTokenAllocationRequestV1 =>
-        DarResources.TokenStandard.tokenAllocationRequest.bootstrap.metadata.version.toString()
+        DarResources.TokenStandard.tokenAllocationRequest.latest.metadata.version.toString()
       case TokenStandard.SpliceApiTokenAllocationInstructionV1 =>
-        DarResources.TokenStandard.tokenAllocationInstruction.bootstrap.metadata.version.toString()
+        DarResources.TokenStandard.tokenAllocationInstruction.latest.metadata.version.toString()
       case TokenStandard.SpliceTokenTestTradingApp =>
-        DarResources.TokenStandard.tokenTestTradingApp.bootstrap.metadata.version.toString()
+        DarResources.TokenStandard.tokenTestTradingApp.latest.metadata.version.toString()
       case FeaturedApp =>
-        DarResources.featuredApp.bootstrap.metadata.version.toString()
+        DarResources.featuredApp.latest.metadata.version.toString()
     }
     PackageVersion.assertFromString(version)
   }

@@ -5,7 +5,7 @@
 
 set -eou pipefail
 
-DOCKER_POSTGRES_IMAGE_NAME="postgres:14"
+DOCKER_POSTGRES_IMAGE_NAME="postgres:17"
 
 # Postgres settings
 DOCKER_POSTGRES_CONTAINER_NAME="postgres-for-splice-node"

@@ -338,6 +338,27 @@ abstract class ValidatorAppReference(
         )
       }
     }
+
+    def getHoldingsSummaryAt(
+        at: CantonTimestamp,
+        migrationId: Long,
+        ownerPartyIds: Vector[PartyId],
+        recordTimeMatch: Option[definitions.HoldingsSummaryRequest.RecordTimeMatch] = None,
+        asOfRound: Option[Long] = None,
+    ): Option[definitions.HoldingsSummaryResponse] = {
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanProxyAppClient.GetHoldingsSummaryAt(
+            at,
+            migrationId,
+            ownerPartyIds,
+            recordTimeMatch,
+            asOfRound,
+          )
+        )
+      }
+    }
+
     def getDsoInfo(): definitions.GetDsoInfoResponse = {
       consoleEnvironment.run {
         httpCommand(

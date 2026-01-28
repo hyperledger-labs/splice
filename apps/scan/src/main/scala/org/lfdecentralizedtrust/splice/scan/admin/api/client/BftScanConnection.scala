@@ -6,7 +6,10 @@ package org.lfdecentralizedtrust.splice.scan.admin.api.client
 import cats.data.{NonEmptyList, OptionT}
 import cats.implicits.*
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  FeaturedAppRight,
+  UnclaimedDevelopmentFundCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   TransferPreapproval,
@@ -33,6 +36,7 @@ import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AnsEntry,
   GetDsoInfoResponse,
+  HoldingsSummaryResponse,
   LookupTransferCommandStatusResponse,
   MigrationSchedule,
 }
@@ -91,6 +95,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
 }
+import org.lfdecentralizedtrust.splice.http.v0.definitions.HoldingsSummaryRequest.RecordTimeMatch
 import org.lfdecentralizedtrust.tokenstandard.{
   allocation,
   allocationinstruction,
@@ -170,6 +175,16 @@ class BftScanConnection(
     bftCall(
       _.getDsoInfo()
     )
+
+  override def getHoldingsSummaryAt(
+      at: CantonTimestamp,
+      migrationId: Long,
+      ownerPartyIds: Vector[PartyId],
+      recordTimeMatch: Option[RecordTimeMatch],
+      asOfRound: Option[Long],
+  )(implicit tc: TraceContext): Future[Option[HoldingsSummaryResponse]] = {
+    bftCall(_.getHoldingsSummaryAt(at, migrationId, ownerPartyIds, recordTimeMatch, asOfRound))
+  }
 
   override protected def runGetAmuletRulesWithState(
       cachedAmuletRules: Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]
@@ -664,6 +679,13 @@ class BftScanConnection(
         SyncCloseable("scan_list", scanList.close())
       )
   }
+
+  override def listUnclaimedDevelopmentFundCoupons()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[
+    ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
+  ]] = bftCall(_.listUnclaimedDevelopmentFundCoupons())
 }
 trait HasUrl {
   def url: Uri
@@ -1092,7 +1114,7 @@ object BftScanConnection {
   }
 
   class ConfigurationProvidedScansBft(
-      trustedSvs: NonEmptyList[String],
+      svNames: NonEmptyList[String],
       threshold: Option[Int],
       override val initialScanConnections: Seq[SingleScanConnection],
       override val initialFailedConnections: Map[Uri, Throwable],
@@ -1105,12 +1127,12 @@ object BftScanConnection {
   )(implicit override val ec: ExecutionContext, tc: TraceContext)
       extends Bft {
 
-    private val trustedSvsSet = trustedSvs.toList.toSet
+    private val svNamesSet = svNames.toList.toSet
 
     override protected def filterScans(allScans: Seq[DsoScan]): Seq[DsoScan] = {
-      val targetScans = allScans.filter(scan => trustedSvsSet.contains(scan.svName))
+      val targetScans = allScans.filter(scan => svNamesSet.contains(scan.svName))
       val foundSvs = targetScans.map(_.svName).toSet
-      val missingSvs = trustedSvsSet -- foundSvs
+      val missingSvs = svNamesSet -- foundSvs
 
       logger.trace(s"Discovered the following trusted scans from the network: ${targetScans
           .map(s => s"Name=${s.svName}, URL=${s.publicUrl}")
@@ -1126,13 +1148,13 @@ object BftScanConnection {
     }
 
     override protected def getRequiredConnections(state: BftState): Int = {
-      threshold.getOrElse(Thresholds.requiredNumScanThreshold(trustedSvs.size).value)
+      threshold.getOrElse(Thresholds.requiredNumScanThreshold(svNames.size).value)
     }
 
     override def scanConnections: ScanConnections = {
       val connections = currentConnectionsState
       connections.copy(
-        targetTotalNumber = Some(trustedSvs.size),
+        targetTotalNumber = Some(svNames.size),
         threshold = threshold,
       )
     }
@@ -1316,7 +1338,7 @@ object BftScanConnection {
           // Use the temporary connection to get a consensus on the full list of scans
           allScans <- Bft.getScansInDsoRules(tempBftConnection)
 
-          trustedScans = allScans.filter(scan => ts.trustedSvs.toList.contains(scan.svName))
+          trustedScans = allScans.filter(scan => ts.svNames.toList.contains(scan.svName))
 
           trustedScanDetails = trustedScans
             .map(s => s"  - Name: ${s.svName}, URL: ${s.publicUrl}")
@@ -1346,7 +1368,7 @@ object BftScanConnection {
           )
 
           scanList = new ConfigurationProvidedScansBft(
-            ts.trustedSvs,
+            ts.svNames,
             ts.threshold,
             connections,
             failed.toMap,
@@ -1554,7 +1576,7 @@ object BftScanConnection {
     case class BftCustom(
         seedUrls: NonEmptyList[Uri], // by default only one seed_url is provided
         threshold: Option[Int] = None, // default to len(seedUrls)/3+1
-        trustedSvs: NonEmptyList[String], // should be at least 1
+        svNames: NonEmptyList[String], // should be at least 1
         amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
           ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
         scansRefreshInterval: NonNegativeFiniteDuration =

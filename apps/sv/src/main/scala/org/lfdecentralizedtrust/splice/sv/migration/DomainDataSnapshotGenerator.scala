@@ -10,7 +10,6 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   SequencerAdminConnection,
 }
-import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.migration.{
   AcsExporter,
   DarExporter,
@@ -74,7 +73,6 @@ class DomainDataSnapshotGenerator(
     acsTimestamp = timestamp,
     dars,
     synchronizerWasPaused = false,
-    acsFormat = http.DomainDataSnapshot.AcsFormat.LedgerApi,
   )
 
   private def exportGenesisState(
@@ -165,7 +163,6 @@ class DomainDataSnapshotGenerator(
       acsTimestamp,
       dars,
       synchronizerWasPaused = true,
-      acsFormat = http.DomainDataSnapshot.AcsFormat.LedgerApi,
     )
     logger.info(show"Finished generating $result")
     result

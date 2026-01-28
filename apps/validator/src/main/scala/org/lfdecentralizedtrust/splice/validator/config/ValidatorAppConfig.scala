@@ -110,9 +110,9 @@ case class ValidatorDecentralizedSynchronizerConfig(
 
 case class ValidatorTrustedSynchronizerConfig(
     /** static list of trusted sequencer names to connect to.
-      * sequencerNames is mutually exclusive with `url`.
+      * svNames is mutually exclusive with `url`.
       */
-    sequencerNames: NonEmptyList[String],
+    svNames: NonEmptyList[String],
 
     /** parameter to specify the BFT threshold for the domain connections.
       * If not specified, f +1 will be used.
@@ -214,6 +214,7 @@ case class ValidatorAppBackendConfig(
     maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(24),
     // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
     latestPackagesOnly: Boolean = false,
+    acsStoreDescriptorUserVersion: Option[Long] = None,
 ) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

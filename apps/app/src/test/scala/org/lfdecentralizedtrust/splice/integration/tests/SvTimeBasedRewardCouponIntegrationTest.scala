@@ -170,7 +170,7 @@ class SvTimeBasedRewardCouponIntegrationTest
       }
 
       val eachSvGetInRound0 =
-        computeSvRewardInRound0(defaultIssuanceCurve.initialValue, defaultTickDuration, svs.size)
+        computeSvRewardInRound0(defaultIssuanceCurve().initialValue, defaultTickDuration, svs.size)
       val sv1Party = sv1Backend.getDsoInfo().svParty
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
       val expectedAliceAmount = eachSvGetInRound0.multiply(new java.math.BigDecimal("0.3333"))

@@ -48,8 +48,6 @@ object CantonDependencies {
   lazy val scalaz_version = "7.2.33"
   lazy val mockito_scala_version = "1.16.3"
 
-  lazy val netty_version = "4.1.124.Final"
-
   lazy val reflections = "org.reflections" % "reflections" % "0.10.2"
   lazy val pureconfig = "com.github.pureconfig" %% "pureconfig" % pureconfig_version
   lazy val pureconfig_cats = "com.github.pureconfig" %% "pureconfig-cats" % pureconfig_version
@@ -70,7 +68,7 @@ object CantonDependencies {
   lazy val hikaricp = "com.zaxxer" % "HikariCP" % "3.2.0"
   lazy val h2 = "com.h2database" % "h2" % "2.1.210"
   lazy val postgres = "org.postgresql" % "postgresql" % "42.7.3"
-  private val flyway_version = "10.12.0"
+  private val flyway_version = "10.22.0"
   lazy val flyway = "org.flywaydb" % "flyway-core" % flyway_version
   lazy val flyway_postgresql = "org.flywaydb" % "flyway-database-postgresql" % flyway_version
   lazy val oracle = "com.oracle.database.jdbc" % "ojdbc8" % "19.13.0.0.1"
@@ -135,10 +133,6 @@ object CantonDependencies {
   lazy val grpc_protobuf = "io.grpc" % "grpc-protobuf" % grpc_version
   lazy val grpc_netty_shaded = "io.grpc" % "grpc-netty-shaded" % grpc_version
   lazy val grpc_stub = "io.grpc" % "grpc-stub" % grpc_version
-  // pick the version of boring ssl from this table: https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty
-  // required for ALPN (which is required for TLS+HTTP/2) when running on Java 8. JSSE will be used on Java 9+.
-  lazy val netty_boring_ssl = "io.netty" % "netty-tcnative-boringssl-static" % "2.0.72.Final"
-  lazy val netty_handler = "io.netty" % "netty-handler" % netty_version
   lazy val grpc_services = "io.grpc" % "grpc-services" % grpc_version
   lazy val google_common_protos = "com.google.api.grpc" % "proto-google-common-protos" % "2.41.0"
 

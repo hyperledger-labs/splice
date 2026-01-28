@@ -7,7 +7,11 @@ import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletAllocationCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as validatorLicenseCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  Amulet,
+  LockedAmulet,
+  UnclaimedDevelopmentFundCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_AcceptedAppPayment
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{
   AmuletOperationOutcome,
@@ -77,8 +81,14 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferins
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AllocateAmuletRequest,
+  AllocateDevelopmentFundCouponRequest,
+  AllocateDevelopmentFundCouponResponse,
   CreateTokenStandardTransferRequest,
+  ListActiveDevelopmentFundCouponsResponse,
+  WithdrawDevelopmentFundCouponRequest,
+  WithdrawDevelopmentFundCouponResponse,
 }
+import org.lfdecentralizedtrust.splice.util.SpliceUtil.damlDecimal
 import org.lfdecentralizedtrust.splice.wallet.admin.http.UserWalletAuthExtractor.WalletUserRequest
 
 import java.math.RoundingMode as JRM
@@ -1275,6 +1285,218 @@ class HttpWalletHandler(
           .yieldResult()
       } yield WalletResource.RejectAllocationRequestResponseOK(
         d0.ChoiceExecutionMetadata(result.exerciseResult.meta.values.asScala.toMap)
+      )
+    }
+  }
+
+  override def allocateDevelopmentFundCoupon(
+      respond: WalletResource.AllocateDevelopmentFundCouponResponse.type
+  )(body: AllocateDevelopmentFundCouponRequest)(
+      extracted: WalletUserRequest
+  ): Future[WalletResource.AllocateDevelopmentFundCouponResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = extracted
+    withSpan(s"$workflowId.rejectAllocationRequest") { implicit traceContext => _ =>
+      val store = userWallet.store
+      for {
+        domain <- scanConnection.getAmuletRulesDomain()(traceContext)
+        amuletRules <- scanConnection.getAmuletRulesWithState()
+        amuletRulesCt = amuletRules.toAssignedContract.getOrElse(
+          throw Status.Code.FAILED_PRECONDITION.toStatus
+            .withDescription(
+              s"AmuletRules contract is not assigned to a domain."
+            )
+            .asRuntimeException()
+        )
+        beneficiary = Codec.tryDecode(Codec.Party)(body.beneficiary)
+        amount = Codec.tryDecode(Codec.BigDecimal)(body.amount)
+        expiresAt = Codec.tryDecode(Codec.Timestamp)(body.expiresAt)
+        optDevelopmentFundManager =
+          amuletRulesCt.contract.payload.configSchedule.initialValue.optDevelopmentFundManager
+            .map(Codec.tryDecode(Codec.Party)(_))
+            .toScala
+        // validate development fund manager
+        developmentFundManager =
+          optDevelopmentFundManager match {
+            case None =>
+              throw Status.FAILED_PRECONDITION
+                .withDescription("Development fund manager has not been configured.")
+                .asRuntimeException()
+            case Some(developmentFundManager) if developmentFundManager == store.key.endUserParty =>
+              developmentFundManager
+            case Some(developmentFundManager) =>
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"Invalid fund manager: expected '$developmentFundManager', " +
+                    s"but the submitter was '${store.key.endUserParty.toProtoPrimitive}'."
+                )
+                .asRuntimeException()
+          }
+        unclaimedDevelopmentFundCoupons <- scanConnection.listUnclaimedDevelopmentFundCoupons()
+        unclaimedDevelopmentFundCouponsToAllocate = takeUnclaimedDevelopmentFundCouponsUntilAtLeast(
+          unclaimedDevelopmentFundCoupons,
+          amount,
+        ).getOrElse(
+          throw Status.FAILED_PRECONDITION
+            .withDescription(
+              s"The total amount of unclaimed development coupons is insufficient to cover the amount requested"
+            )
+            .asRuntimeException
+        )
+        cmd = amuletRulesCt
+          .exercise(
+            _.exerciseAmuletRules_AllocateDevelopmentFundCoupon(
+              unclaimedDevelopmentFundCouponsToAllocate.map(_.contract.contractId).asJava,
+              beneficiary.toProtoPrimitive,
+              damlDecimal(amount),
+              expiresAt.toInstant,
+              body.reason,
+              developmentFundManager.toProtoPrimitive,
+            )
+          )
+        result <- userWallet.connection
+          .submit(
+            Seq(store.key.validatorParty, store.key.endUserParty),
+            Seq.empty,
+            cmd,
+          )
+          .withSynchronizerId(domain)
+          .withDedup(
+            commandId = SpliceLedgerConnection
+              .CommandId(
+                "org.lfdecentralizedtrust.splice.wallet.allocateDevelopmentFundCoupon",
+                Seq(store.key.validatorParty, store.key.endUserParty),
+                Seq(s"${body.beneficiary}:${body.amount}:${body.expiresAt}:${body.reason}"),
+              ),
+            deduplicationConfig = dedupDuration,
+          )
+          .withDisclosedContracts(
+            userWallet.connection
+              .disclosedContracts(amuletRules, unclaimedDevelopmentFundCouponsToAllocate*)
+          )
+          .yieldResult()
+      } yield WalletResource.AllocateDevelopmentFundCouponResponseOK(
+        AllocateDevelopmentFundCouponResponse(
+          result.exerciseResult.developmentFundCouponCid.contractId,
+          result.exerciseResult.optUnclaimedDevelopmentFundCouponCid.toScala.map(_.contractId),
+        )
+      )
+    }
+  }
+
+  // Returns the largest coupons first until their total reaches at least the requested amount;
+  // returns None if the available coupons are insufficient.
+  private def takeUnclaimedDevelopmentFundCouponsUntilAtLeast(
+      coupons: Seq[
+        ContractWithState[
+          UnclaimedDevelopmentFundCoupon.ContractId,
+          UnclaimedDevelopmentFundCoupon,
+        ]
+      ],
+      n: BigDecimal,
+  ): Option[
+    List[
+      ContractWithState[
+        UnclaimedDevelopmentFundCoupon.ContractId,
+        UnclaimedDevelopmentFundCoupon,
+      ]
+    ]
+  ] = {
+    type Cws =
+      ContractWithState[
+        UnclaimedDevelopmentFundCoupon.ContractId,
+        UnclaimedDevelopmentFundCoupon,
+      ]
+
+    def amountOf(c: Cws): BigDecimal =
+      BigDecimal(c.contract.payload.amount)
+
+    val sortedDesc: List[Cws] =
+      coupons
+        .sortBy(amountOf)(Ordering[BigDecimal].reverse)
+        .toList
+
+    @annotation.tailrec
+    def loop(rest: List[Cws], sum: BigDecimal, acc: List[Cws]): Option[List[Cws]] =
+      if (sum >= n) Some(acc)
+      else
+        rest match {
+          case Nil =>
+            None
+          case cur :: tail =>
+            val amt = amountOf(cur)
+            loop(tail, sum + amt, cur :: acc)
+        }
+
+    loop(sortedDesc, BigDecimal(0), Nil)
+  }
+
+  override def listActiveDevelopmentFundCoupons(
+      respond: WalletResource.ListActiveDevelopmentFundCouponsResponse.type
+  )()(
+      extracted: WalletUserRequest
+  ): Future[WalletResource.ListActiveDevelopmentFundCouponsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = extracted
+    withSpan(s"$workflowId.listActiveDevelopmentFundCoupons") { _ => _ =>
+      for {
+        coupons <- userWallet.store.multiDomainAcsStore.listContracts(
+          amuletCodegen.DevelopmentFundCoupon.COMPANION
+        )
+        sortedCoupons = coupons.sortBy(_.payload.expiresAt)
+      } yield WalletResource.ListActiveDevelopmentFundCouponsResponseOK(
+        ListActiveDevelopmentFundCouponsResponse(
+          sortedCoupons.map(_.contract.toHttp).toVector
+        )
+      )
+    }
+  }
+
+  override def withdrawDevelopmentFundCoupon(
+      respond: WalletResource.WithdrawDevelopmentFundCouponResponse.type
+  )(contractId: String, body: WithdrawDevelopmentFundCouponRequest)(
+      extracted: WalletUserRequest
+  ): Future[WalletResource.WithdrawDevelopmentFundCouponResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = extracted
+    withSpan(s"$workflowId.withdrawDevelopmentFundCoupon") { _ => _ =>
+      val store = userWallet.store
+      val developmentFundCouponContractId =
+        Codec.tryDecodeJavaContractId(UnclaimedDevelopmentFundCoupon.COMPANION)(contractId)
+      for {
+        domain <- scanConnection.getAmuletRulesDomain()(traceContext)
+        developmentFundCoupon <- store.multiDomainAcsStore
+          .getContractById(amuletCodegen.DevelopmentFundCoupon.COMPANION)(
+            developmentFundCouponContractId
+          )
+          .map(
+            _.toAssignedContract.getOrElse(
+              throw Status.Code.FAILED_PRECONDITION.toStatus
+                .withDescription(s"DevelopmentFundCoupon is not assigned to a synchronizer.")
+                .asRuntimeException()
+            )
+          )
+        _ = if (
+          developmentFundCoupon.contract.payload.fundManager != store.key.endUserParty.toProtoPrimitive
+        )
+          throw Status.Code.FAILED_PRECONDITION.toStatus
+            .withDescription(
+              s"Invalid controller: expected fund manager " +
+                s"'${developmentFundCoupon.contract.payload.fundManager}', " +
+                s"but the submitter was '${store.key.endUserParty.toProtoPrimitive}'."
+            )
+            .asRuntimeException()
+
+        result <- userWallet.connection
+          .submit(
+            Seq(store.key.endUserParty),
+            Seq.empty,
+            developmentFundCoupon.exercise(_.exerciseDevelopmentFundCoupon_Withdraw(body.reason)),
+          )
+          .withSynchronizerId(domain)
+          .noDedup
+          .yieldResult()
+      } yield WalletResource.WithdrawDevelopmentFundCouponResponseOK(
+        WithdrawDevelopmentFundCouponResponse(
+          result.exerciseResult.unclaimedDevelopmentFundCouponCid.contractId
+        )
       )
     }
   }

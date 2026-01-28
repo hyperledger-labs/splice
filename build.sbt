@@ -1966,8 +1966,7 @@ lazy val `apps-app`: Project =
         CantonDependencies.opentelemetry_zipkin,
         CantonDependencies.opentelemetry_instrumentation_grpc,
         CantonDependencies.opentelemetry_instrumentation_runtime_metrics,
-      ) ++ Seq("netty-handler-proxy", "netty-codec-socks")
-        .map("io.netty" % _ % CantonDependencies.netty_version % "test"),
+      ),
       BuildCommon.sharedAppSettings,
       BuildCommon.cantonWarts,
       bundleTask,

@@ -18,7 +18,16 @@ export const TokenMetadataClientProvider: React.FC<React.PropsWithChildren<ScanC
   const client: openapi.DefaultApi | undefined = useMemo(() => {
     const configuration = openapi.createConfiguration({
       baseServer: new openapi.ServerConfiguration(scanUrl, {}),
-      promiseMiddleware: [new OpenAPILoggingMiddleware('TokenMetadata')],
+      promiseMiddleware: [
+        new OpenAPILoggingMiddleware('TokenMetadata'),
+        {
+          pre: async context => {
+            context.setHeaderParam('x-source-ui', 'scan');
+            return context;
+          },
+          post: async context => context,
+        },
+      ],
     });
 
     return new openapi.DefaultApi(configuration);

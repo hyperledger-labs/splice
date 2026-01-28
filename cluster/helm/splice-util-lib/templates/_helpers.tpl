@@ -109,7 +109,7 @@ spec:
                 path: postgresPassword
       containers:
       - name: postgres-exporter
-        image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
+        image: quay.io/prometheuscommunity/postgres-exporter:v0.18.1
         env:
           - name: DATA_SOURCE_PASS_FILE
             value: /tmp/pwd
@@ -204,7 +204,7 @@ spec:
 - name: LOG_LEVEL_STDOUT
   value: {{ .logLevelStdout | default "DEBUG" }}
 - name: LOG_IMMEDIATE_FLUSH
-  value: {{ .logAsyncFlush | default false | not | quote }}
+  value: {{ .logAsyncFlush | default true | not | quote }}
 {{- end }}
 {{- define "splice-util-lib.service-account" -}}
 {{- if .serviceAccountName -}}

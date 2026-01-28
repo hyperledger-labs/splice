@@ -52,5 +52,6 @@ export const SynchronizerMigrationSchema = z
     upgrade: MigrationInfoSchema.optional(),
     archived: z.array(MigrationInfoSchema).optional(),
     activeDatabaseId: z.number().optional(),
+    attachPvc: z.boolean().default(true),
   })
   .strict();
