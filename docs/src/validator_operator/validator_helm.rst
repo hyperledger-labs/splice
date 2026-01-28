@@ -379,7 +379,7 @@ Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-p
 
 To configure the validator app, please modify the file ``splice-node/examples/sv-helm/validator-values.yaml`` as follows:
 
-You need to configure how your validator connects to the network's **scan** services by defining a ``scanClient`` block in your ``validator-values.yaml``.
+You need to configure how your validator connects to the network's **scan** services by defining a ``scanClient`` block in your ``standalone-validator-values.yaml``.
 There are three modes of ``scanClient``:
 
 - ``bft``: (default mode) connects to all scans and validates via majority agreement.
@@ -389,7 +389,7 @@ There are three modes of ``scanClient``:
 
 For each scanClient type, replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator. For example, the GSF scan URL, |gsf_scan_url|. For ``bft-custom`` and ``bft`` modes of ``scanClient``, you can specify more than one scan seed URL by separating them with commas.
 
-.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
     :language: yaml
     :start-after: SCAN_CLIENT_CONFIGURATION_START
     :end-before: SCAN_CLIENT_CONFIGURATION_END
@@ -408,7 +408,7 @@ You need to configure how your validator's participant connects to **sequencers*
 - ``bft-custom``: connects only to specific sequencers from your trusted ``svNames`` using a custom ``threshold``. Replace ``TRUSTED_SV`` with the super validator name(s) you trust. Replace ``TRUST_THRESHOLD`` with an integer representing the number of sequencer responses that need to agree for a response to be considered valid.
 - ``trust-single``: connects to one specific url. Replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the URL of the sequencer you trust.
 
-.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/validator-values.yaml
+.. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
     :language: yaml
     :start-after: SYNCHRONIZER_CONFIGURATION_START
     :end-before: SYNCHRONIZER_CONFIGURATION_END
