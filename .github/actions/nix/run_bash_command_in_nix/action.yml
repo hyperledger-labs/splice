@@ -29,9 +29,13 @@ runs:
         echo "sourcing nix profile"
         export USER=$(whoami)
         . ~/.nix-profile/etc/profile.d/nix.sh
-        target="$(cat /tmp/nix_target)"
+        if [ -f /tmp/oss-only ]; then
+          target="oss"
+        else
+          target="default"
+        fi
 
-        echo "Running command with nix version $(nix --version) and nix target $target"
+        echo "Running command with nix version $(nix --version)"
 
         # Attempt to build the nix env with retries to work around transient download failures
         echo "building nix env"
