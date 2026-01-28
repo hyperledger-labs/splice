@@ -10,7 +10,7 @@ import {
 
 import { useScanClient } from './ScanClientContext';
 
-const useLookupAnsEntryByParty = (party?: string): UseQueryResult<AnsEntry> => {
+const useLookupAnsEntryByParty = (party?: string): UseQueryResult<AnsEntry | null> => {
   const scanClient = useScanClient();
 
   return useLookupAnsEntryByPartyFromResponse(p => scanClient.lookupAnsEntryByParty(p), party);
@@ -19,7 +19,7 @@ const useLookupAnsEntryByParty = (party?: string): UseQueryResult<AnsEntry> => {
 export function useLookupAnsEntryByPartyFromResponse(
   getResponse: (party: string) => Promise<LookupEntryByPartyResponse>,
   party?: string
-): UseQueryResult<AnsEntry> {
+): UseQueryResult<AnsEntry | null> {
   return useQuery({
     refetchInterval: PollingStrategy.NONE,
     queryKey: ['scan-api', 'lookupAnsEntryByParty', AnsEntry, party],
