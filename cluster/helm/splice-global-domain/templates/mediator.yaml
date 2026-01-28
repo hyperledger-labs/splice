@@ -68,7 +68,7 @@ spec:
           name: cm-metrics
           protocol: TCP
       {{- if .Values.mediator.resources }}
-        resources: {{- toYaml .Values.mediator.resources | nindent 12 }}
+        resources: {{- toYaml (merge .Values.mediator.resources .Values.resources) | nindent 12 }}
         {{- else }}
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 12 }}
