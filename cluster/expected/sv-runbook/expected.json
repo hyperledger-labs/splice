@@ -1329,10 +1329,8 @@
           }
         },
         "scanClient": {
-          "scanType": "bft",
-          "seedUrls": [
-            "http://scan-app.sv:5012"
-          ]
+          "scanAddress": "TRUSTED_SCAN_URL",
+          "scanType": "trust-single"
         },
         "spliceInstanceNames": {
           "amuletName": "Amulet",
