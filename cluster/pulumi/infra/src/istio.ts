@@ -356,11 +356,14 @@ function configureGatewayService(
       : // Create a ClusterIP Service for the istio ingress so the GKE L7 Gateway can
         // target it (the GKE controller will create NEGs for the service ports).
         {
+          // without LoadBalancer, the istio Gateway will not create a public IP
           type: gatewayVariant.type,
+          // TODO (#2723) works without?
+          // (prior to IP fixes) without this ALB returns 5xx, with it returns 403
           annotations: {
             // Use numeric port keys (as strings) to avoid
             // error parsing value of NEG annotation "cloud.google.com/neg" on service "cluster-ingress"/"istio-ingress": NEG annotation is invalid
-            'cloud.google.com/neg': JSON.stringify({ exposed_ports: { '80': {}, '443': {} } }),
+            'cloud.google.com/neg': JSON.stringify({ exposed_ports: { '80': {} } }),
           },
         };
 
@@ -451,7 +454,8 @@ function configureGatewayService(
 function configureGateway(
   ingressNs: ExactNamespace,
   gwSvc: k8s.helm.v3.Release,
-  cometBftSvc: k8s.helm.v3.Release
+  cometBftSvc: k8s.helm.v3.Release,
+  withSeparateGcpGateway: boolean
 ): k8s.apiextensions.CustomResource[] {
   const hosts = [
     getDnsNames().cantonDnsName,
@@ -459,7 +463,6 @@ function configureGateway(
     getDnsNames().daDnsName,
     `*.${getDnsNames().daDnsName}`,
   ];
-  const withSeparateGcpGateway = false;
   const httpGw = new k8s.apiextensions.CustomResource(
     'cn-http-gateway',
     {
@@ -748,7 +751,7 @@ export function configureIstio(
     istiod
   );
   const cometBftSvc = configureCometBFTGatewayService(ingressNs.ns, cometBftIngressIp, istiod);
-  const gateways = configureGateway(ingressNs, gwSvc, cometBftSvc);
+  const gateways = configureGateway(ingressNs, gwSvc, cometBftSvc, expectGKEL7Gateway);
   const docsAndReleases = configureDocsAndReleases(true, gateways);
   const publicInfo = configurePublicInfo(ingressNs.ns);
   const sequencerHighPerformanceGrpcRules = configureSequencerHighPerformanceGrpcDestinationRules(

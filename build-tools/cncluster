@@ -956,7 +956,7 @@ function subcmd_cluster_enable_gke_l7_alb() {
     if [[ $gateway_api_enabled == CHANNEL_STANDARD ]]; then
         _info "Gateway API is already enabled for cluster ${GCP_CLUSTER_NAME}."
     else
-        _info "Enabling Gateway API for cluster ${GCP_CLUSTER_NAME}..."
+        _info "Enabling Gateway API for cluster ${GCP_CLUSTER_NAME} (may take 15-20min)..."
         $dry_run gcloud container clusters update "${GCP_CLUSTER_NAME}" --gateway-api=standard
     fi
 
