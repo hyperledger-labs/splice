@@ -20,7 +20,9 @@ import scala.jdk.CollectionConverters.*
 trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with BaseTest {
 
   // TODO(#3429): consider running s3Mock container as a service in GHA instead of starting it here.
-  def withS3Mock[A](test: => Future[A])(implicit ec: ExecutionContext): Future[A] = {
+  def withS3Mock[A](
+      loggerFactory: NamedLoggerFactory
+  )(test: S3BucketConnection => Future[A])(implicit ec: ExecutionContext): Future[A] = {
 
     val container = new S3MockContainer("4.11.0")
       .withInitialBuckets("bucket")
@@ -36,14 +38,17 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
       logger.debug(s"[s3Mock] ${frame.getUtf8String}")
     }
 
-    test.andThen({ case _ =>
+    test(getS3BucketConnection(loggerFactory, container)).andThen({ case _ =>
       container.stop()
     })
   }
 
-  def getS3BucketConnection(loggerFactory: NamedLoggerFactory): S3BucketConnection = {
+  private def getS3BucketConnection(
+      loggerFactory: NamedLoggerFactory,
+      container: S3MockContainer,
+  ): S3BucketConnection = {
     val s3Config = S3Config(
-      URI.create("http://localhost:9090"),
+      URI.create(container.getHttpEndpoint),
       "bucket",
       Region.US_EAST_1,
       AwsBasicCredentials.create("mock_id", "mock_key"),
