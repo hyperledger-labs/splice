@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block
@@ -10,10 +10,10 @@ import cats.syntax.foldable.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.RichGeneratedMessage
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.{Signature, SynchronizerCryptoClient}
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound}
 import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.pretty.CantonPrettyPrinter
@@ -79,7 +79,7 @@ class BlockSequencer(
     store: SequencerBlockStore,
     dbSequencerStore: SequencerStore,
     blockSequencerConfig: BlockSequencerConfig,
-    useTimeProofsToObserveEffectiveTime: Boolean,
+    producePostOrderingTopologyTicks: Boolean,
     trafficPurchasedStore: TrafficPurchasedStore,
     storage: Storage,
     futureSupervisor: FutureSupervisor,
@@ -87,11 +87,12 @@ class BlockSequencer(
     clock: Clock,
     blockRateLimitManager: SequencerRateLimitManager,
     orderingTimeFixMode: OrderingTimeFixMode,
-    sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
+    sequencingTimeLowerBoundExclusive: SequencingTimeBound,
     processingTimeouts: ProcessingTimeout,
     logEventDetails: Boolean,
     prettyPrinter: CantonPrettyPrinter,
     metrics: SequencerMetrics,
+    batchingConfig: BatchingConfig,
     loggerFactory: NamedLoggerFactory,
     exitOnFatalFailures: Boolean,
     runtimeReady: FutureUnlessShutdown[Unit],
@@ -144,7 +145,7 @@ class BlockSequencer(
     new TrafficPurchasedSubmissionHandler(clock, loggerFactory)
 
   override protected def resetWatermarkTo: SequencerWriter.ResetWatermark =
-    sequencingTimeLowerBoundExclusive match {
+    sequencingTimeLowerBoundExclusive.get match {
       case Some(boundExclusive) =>
         SequencerWriter.ResetWatermarkToTimestamp(
           stateManager.getHeadState.block.lastTs.max(boundExclusive)
@@ -183,8 +184,9 @@ class BlockSequencer(
       blockRateLimitManager,
       orderingTimeFixMode,
       sequencingTimeLowerBoundExclusive = sequencingTimeLowerBoundExclusive,
-      useTimeProofsToObserveEffectiveTime,
+      producePostOrderingTopologyTicks,
       metrics,
+      batchingConfig,
       loggerFactory,
       memberValidator = memberValidator,
     )(CloseContext(cryptoApi), tracer)
@@ -347,7 +349,7 @@ class BlockSequencer(
       : EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] = {
     val currentTime = clock.now
 
-    sequencingTimeLowerBoundExclusive match {
+    sequencingTimeLowerBoundExclusive.get match {
       case Some(boundExclusive) =>
         EitherTUtil.condUnitET[FutureUnlessShutdown](
           currentTime > boundExclusive,
@@ -404,12 +406,15 @@ class BlockSequencer(
       //  aggregated submissions with signed envelopes define a topology snapshot
       _ <- validateMaxSequencingTime(submission)
       // TODO(#19476): Why we don't check group recipients here?
+      approximateSnapshot <- EitherT.liftF(
+        cryptoApi.currentSnapshotApproximation
+      )
       _ <- SubmissionRequestValidations
         .checkSenderAndRecipientsAreRegistered(
           submission,
           // Using currentSnapshotApproximation due to members registration date
           // expected to be before submission sequencing time
-          cryptoApi.currentSnapshotApproximation.ipsSnapshot,
+          approximateSnapshot.ipsSnapshot,
         )
         .leftMap(_.toSequencerDeliverError)
       _ = if (logEventDetails)
@@ -767,12 +772,13 @@ class BlockSequencer(
       traceContext: TraceContext
   ): FutureUnlessShutdown[SequencerTrafficStatus] =
     for {
+      topologySnapshot <- cryptoApi.currentSnapshotApproximation
       members <-
         if (requestedMembers.isEmpty) {
           // If requestedMembers is not set get the traffic states of all known members
-          cryptoApi.currentSnapshotApproximation.ipsSnapshot.allMembers()
+          topologySnapshot.ipsSnapshot.allMembers()
         } else {
-          cryptoApi.currentSnapshotApproximation.ipsSnapshot
+          topologySnapshot.ipsSnapshot
             .allMembers()
             .map { registered =>
               requestedMembers.toSet.intersect(registered)

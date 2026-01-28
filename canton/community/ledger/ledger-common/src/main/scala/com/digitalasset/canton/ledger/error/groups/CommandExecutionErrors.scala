@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.error.groups
@@ -913,11 +913,13 @@ object CommandExecutionErrors extends CommandExecutionErrorGroup {
               (ErrorResource.TemplateId, err.dstTemplateId.toString),
               (ErrorResource.PackageName, err.srcPackageName),
               (ErrorResource.PackageName, err.dstPackageName),
-            ) ++ encodeParties(err.originalSignatories) ++ encodeParties(
-              err.originalObservers
-            ) ++ optKeyResources(err.originalKeyOpt) ++ encodeParties(
-              err.recomputedSignatories
-            ) ++ encodeParties(err.recomputedObservers) ++ optKeyResources(err.recomputedKeyOpt)
+            )
+              ++ encodeParties(err.originalSignatories)
+              ++ encodeParties(err.originalObservers)
+              ++ optKeyResources(err.originalKeyOpt)
+              ++ encodeParties(err.recomputedSignatories)
+              ++ encodeParties(err.recomputedObservers)
+              ++ optKeyResources(err.recomputedKeyOpt)
           }
         }
       }

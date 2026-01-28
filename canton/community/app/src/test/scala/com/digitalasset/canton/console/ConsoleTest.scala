@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
@@ -71,7 +71,7 @@ final class ConsoleTest extends AnyWordSpec with BaseTest {
   )
 
   private abstract class TestEnvironment(val config: CantonConfig = DefaultConfig) {
-    val environment: CantonEnvironment = mock[CantonEnvironment]
+    val environment: Environment = mock[Environment]
     val participants: ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode] =
       mock[ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode]]
     val sequencers: SequencerNodes = mock[SequencerNodes]
@@ -126,7 +126,7 @@ final class ConsoleTest extends AnyWordSpec with BaseTest {
       .thenReturn(GenericCommandError("Mocked error"))
 
     private val consoleEnvironment =
-      new CantonConsoleEnvironment(
+      new ConsoleEnvironment(
         environment,
         consoleOutput = testConsoleOutput,
       ) {

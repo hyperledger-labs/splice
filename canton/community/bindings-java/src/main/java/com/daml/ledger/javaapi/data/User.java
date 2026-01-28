@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.daml.ledger.javaapi.data;
@@ -12,24 +12,15 @@ public final class User {
 
   private final String id;
   private final Optional<String> primaryParty;
-  private final boolean isDeactivated;
 
   public User(@NonNull String id) {
     this.id = id;
     this.primaryParty = Optional.empty();
-    this.isDeactivated = false;
   }
 
   public User(@NonNull String id, @NonNull String primaryParty) {
     this.id = id;
     this.primaryParty = Optional.of(primaryParty);
-    this.isDeactivated = false;
-  }
-
-  public User(@NonNull String id, @NonNull Optional<String> primaryParty, boolean isDeactivated) {
-    this.id = id;
-    this.primaryParty = primaryParty;
-    this.isDeactivated = isDeactivated;
   }
 
   public UserManagementServiceOuterClass.User toProto() {
@@ -46,10 +37,11 @@ public final class User {
   public static User fromProto(UserManagementServiceOuterClass.User proto) {
     String id = proto.getId();
     String primaryParty = proto.getPrimaryParty();
-    Optional<String> primaryPartyOpt =
-            (primaryParty == null || primaryParty.isEmpty()) ? Optional.empty() : Optional.of(primaryParty);
-    boolean isDeactivated = proto.getIsDeactivated();
-    return new User(id, primaryPartyOpt, isDeactivated);
+    if (primaryParty == null || primaryParty.isEmpty()) {
+      return new User(id);
+    } else {
+      return new User(id, primaryParty);
+    }
   }
 
   @NonNull
@@ -60,8 +52,6 @@ public final class User {
   public Optional<String> getPrimaryParty() {
     return primaryParty;
   }
-
-  public boolean isDeactivated() { return isDeactivated; }
 
   @Override
   public String toString() {
@@ -78,14 +68,12 @@ public final class User {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
     User user = (User) o;
-    return Objects.equals(id, user.id) &&
-            Objects.equals(primaryParty, user.primaryParty) &&
-            Objects.equals(isDeactivated, user.isDeactivated);
+    return Objects.equals(id, user.id) && Objects.equals(primaryParty, user.primaryParty);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, primaryParty, isDeactivated);
+    return Objects.hash(id, primaryParty);
   }
 
   public abstract static class Right {
@@ -102,9 +90,6 @@ public final class User {
         case CAN_READ_AS:
           right = new CanReadAs(proto.getCanReadAs().getParty());
           break;
-        case CAN_EXECUTE_AS:
-          right = new CanExecuteAs(proto.getCanExecuteAs().getParty());
-          break;
         case PARTICIPANT_ADMIN:
           // since this is a singleton so far we simply ignore the actual object
           right = ParticipantAdmin.INSTANCE;
@@ -116,10 +101,6 @@ public final class User {
         case CAN_READ_AS_ANY_PARTY:
           // since this is a singleton so far we simply ignore the actual object
           right = CanReadAsAnyParty.INSTANCE;
-          break;
-        case CAN_EXECUTE_AS_ANY_PARTY:
-          // since this is a singleton so far we simply ignore the actual object
-          right = CanExecuteAsAnyParty.INSTANCE;
           break;
         default:
           throw new IllegalArgumentException("Unrecognized user right case: " + kindCase.name());
@@ -189,22 +170,6 @@ public final class User {
       }
     }
 
-    public static final class CanExecuteAs extends Right {
-      public final String party;
-
-      public CanExecuteAs(String party) {
-        this.party = party;
-      }
-
-      @Override
-      UserManagementServiceOuterClass.Right toProto() {
-        return UserManagementServiceOuterClass.Right.newBuilder()
-            .setCanExecuteAs(
-                UserManagementServiceOuterClass.Right.CanExecuteAs.newBuilder().setParty(this.party))
-            .build();
-      }
-    }
-
     public static final class CanReadAsAnyParty extends Right {
       // empty private constructor, singleton object
       private CanReadAsAnyParty() {}
@@ -216,21 +181,6 @@ public final class User {
         return UserManagementServiceOuterClass.Right.newBuilder()
             .setCanReadAsAnyParty(
                 UserManagementServiceOuterClass.Right.CanReadAsAnyParty.getDefaultInstance())
-            .build();
-      }
-    }
-
-    public static final class CanExecuteAsAnyParty extends Right {
-      // empty private constructor, singleton object
-      private CanExecuteAsAnyParty() {}
-      // not built lazily on purpose, close to no overhead here
-      public static final CanExecuteAsAnyParty INSTANCE = new CanExecuteAsAnyParty();
-
-      @Override
-      UserManagementServiceOuterClass.Right toProto() {
-        return UserManagementServiceOuterClass.Right.newBuilder()
-            .setCanExecuteAsAnyParty(
-                UserManagementServiceOuterClass.Right.CanExecuteAsAnyParty.getDefaultInstance())
             .build();
       }
     }

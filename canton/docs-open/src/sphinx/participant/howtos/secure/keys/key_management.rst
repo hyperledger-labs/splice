@@ -1,5 +1,5 @@
 ..
-   Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+   Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 ..
    SPDX-License-Identifier: Apache-2.0
 
@@ -69,7 +69,7 @@ The following command rotates a single key of ``myNode``:
 
 .. todo:: <https://github.com/DACH-NY/canton/issues/27699>
    Update the commands and docs so that one can actually pause in between and take a backup.
-                 
+
 .. _deleting-canton-keys:
 
 Generate and activate keys
@@ -156,7 +156,7 @@ you can do so by setting the following configurations.
 
 To disable **session encryption keys**:
 
-.. literalinclude:: CANTON/enterprise/app/src/test/resources/session-key-cache.conf
+.. literalinclude:: CANTON/community/app/src/test/resources/session-key-cache.conf
    :language: scala
    :start-after: user-manual-entry-begin: SessionEncryptionKeyConfigDisable
    :end-before: user-manual-entry-end: SessionEncryptionKeyConfigDisable
@@ -164,7 +164,7 @@ To disable **session encryption keys**:
 
 To disable **session signing keys**:
 
-.. literalinclude:: CANTON/enterprise/app/src/test/resources/session-key-cache.conf
+.. literalinclude:: CANTON/community/app/src/test/resources/session-key-cache.conf
    :language: scala
    :start-after: user-manual-entry-begin: SessionSigningKeyConfigDisable
    :end-before: user-manual-entry-end: SessionSigningKeyConfigDisable

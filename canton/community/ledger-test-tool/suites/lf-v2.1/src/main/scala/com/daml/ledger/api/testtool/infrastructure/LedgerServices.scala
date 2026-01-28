@@ -1,5 +1,5 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.daml.ledger.api.testtool.infrastructure
 
@@ -101,6 +101,12 @@ import com.daml.ledger.api.v2.command_submission_service.{
   SubmitRequest,
   SubmitResponse,
 }
+import com.daml.ledger.api.v2.contract_service.ContractServiceGrpc.ContractService
+import com.daml.ledger.api.v2.contract_service.{
+  ContractServiceGrpc,
+  GetContractRequest,
+  GetContractResponse,
+}
 import com.daml.ledger.api.v2.event_query_service.EventQueryServiceGrpc.EventQueryService
 import com.daml.ledger.api.v2.event_query_service.{
   EventQueryServiceGrpc,
@@ -169,10 +175,12 @@ import com.digitalasset.base.error.{
   ErrorResource,
   Grouping,
 }
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, Jwt}
 import com.digitalasset.canton.http.json.v2.JsSchema.JsCantonError
 import com.digitalasset.canton.http.json.v2.{
   JsCommandService,
+  JsContractService,
   JsEventService,
   JsExecuteSubmissionAndWaitForTransactionRequest,
   JsExecuteSubmissionAndWaitForTransactionResponse,
@@ -237,13 +245,13 @@ object LedgerServices {
       commandInterceptors: Seq[ClientInterceptor],
       dars: List[String],
   )(implicit executionContext: ExecutionContext): LedgerServices = participantEndpoint
-    .map(LedgerServicesGrpc(_, commandInterceptors))
+    .map(new LedgerServicesGrpc(_, commandInterceptors))
     .left
     .map { case (hostname, port) =>
       implicit val actorSystem: ActorSystem = ActorSystem("LedgerServicesJson")
       implicit val materializer: Materializer = Materializer(actorSystem)
 
-      LedgerServicesJson(
+      new LedgerServicesJson(
         hostname,
         port,
         dars,
@@ -253,7 +261,7 @@ object LedgerServices {
     .merge
 }
 
-private final case class LedgerServicesJson(
+private final class LedgerServicesJson(
     hostname: String,
     port: Int,
     dars: List[String],
@@ -261,7 +269,9 @@ private final case class LedgerServicesJson(
 )(implicit executionContext: ExecutionContext, mat: Materializer)
     extends LedgerServices
     with NamedLogging {
+
   import com.digitalasset.canton.http.util.GrpcHttpErrorCodes.`gRPC status  as sttp`
+
   protected def loggerFactory: NamedLoggerFactory =
     NamedLoggerFactory("client-ledger-services", "json")
 
@@ -272,8 +282,12 @@ private final case class LedgerServicesJson(
   implicit val token: Option[String] = tokenParam
 
   private val backend = PekkoHttpBackend(
-    customConnectionPoolSettings =
-      Some(ConnectionPoolSettings.apply(mat.system).withMaxOpenRequests(256)),
+    customConnectionPoolSettings = Some(
+      ConnectionPoolSettings
+        .apply(mat.system)
+        .withMaxConnections(16)
+        .withMaxOpenRequests(256)
+    ),
     customizeRequest = { request =>
       logger.debug(s"JSON Request ${request.method} ${request.uri}")
       request
@@ -384,52 +398,48 @@ private final case class LedgerServicesJson(
       ], PekkoStreams & capabilities.WebSockets],
       input: REQ,
       responseObserver: StreamObserver[RESP],
-      converter: JSRESP => Future[RESP] = { (elem: JSRESP) =>
-        Future.successful(elem.asInstanceOf[RESP])
-      },
-  ): Future[Unit] = {
-    for {
+      converter: JSRESP => Future[RESP],
+  ): Unit = {
+    val unusedF = for {
       wsFlow <- clientCall(endpoint = endpoint, input = (), ws = true)
-      _ <- Future {
 
-        val sink = Sink.fromSubscriber(new Subscriber[Either[JsCantonError, RESP]]() {
-          override def onSubscribe(subscription: Subscription): Unit =
-            subscription.request(Long.MaxValue)
+      sink = Sink.fromSubscriber(new Subscriber[Either[JsCantonError, RESP]]() {
+        override def onSubscribe(subscription: Subscription): Unit =
+          subscription.request(Long.MaxValue)
 
-          override def onNext(t: Either[JsCantonError, RESP]): Unit =
-            t match {
-              case Left(cantonError) =>
-                val decoded = toDecodedCantonError(cantonError)
-                val err = io.grpc.protobuf.StatusProto.toStatusRuntimeException(
-                  com.google.rpc.status.Status
-                    .toJavaProto(decoded.toRpcStatusWithForwardedRequestId)
-                )
-                responseObserver.onError(err)
-              case Right(v) => responseObserver.onNext(v)
-            }
-
-          override def onError(t: Throwable): Unit =
-            responseObserver.onError(t)
-
-          override def onComplete(): Unit =
-            responseObserver.onCompleted()
-        })
-        Source
-          .single(
-            input
-          )
-          .via(wsFlow)
-          .mapAsync(1) {
-            case Left(e) => Future.successful(Left(e))
-            case Right(js) => converter(js).map(Right(_))
+        override def onNext(t: Either[JsCantonError, RESP]): Unit =
+          t match {
+            case Left(cantonError) =>
+              val decoded = toDecodedCantonError(cantonError)
+              val err = io.grpc.protobuf.StatusProto.toStatusRuntimeException(
+                com.google.rpc.status.Status
+                  .toJavaProto(decoded.toRpcStatusWithForwardedRequestId)
+              )
+              responseObserver.onError(err)
+            case Right(v) => responseObserver.onNext(v)
           }
-          .to(sink)
-          .run()
-      }
-    } yield {
-      ()
-    }
-    Future.unit
+
+        override def onError(t: Throwable): Unit =
+          responseObserver.onError(t)
+
+        override def onComplete(): Unit =
+          responseObserver.onCompleted()
+      })
+
+      notUsed_ = Source
+        .single(input)
+        .via(wsFlow)
+        .mapAsync(1) {
+          case Left(e) => Future.successful(Left(e))
+          case Right(js) => converter(js).map(Right(_))
+        }
+        .to(sink)
+        .run()
+    } yield ()
+
+    // It is fine to discard the future here since the client implicitly
+    // awaits for it to complete via the responseObserver
+    unusedF.discard
   }
 
   private val packageMetadataView: AtomicReference[PackageMetadata] =
@@ -483,7 +493,13 @@ private final case class LedgerServicesJson(
   def commandCompletion: CommandCompletionService = (
       request: CompletionStreamRequest,
       responseObserver: StreamObserver[CompletionStreamResponse],
-  ) => wsCall(JsCommandService.completionStreamEndpoint, request, responseObserver)
+  ) =>
+    wsCall(
+      JsCommandService.completionStreamEndpoint,
+      request,
+      responseObserver,
+      Future.successful(_: CompletionStreamResponse),
+    )
 
   def commandSubmission: CommandSubmissionService = new CommandSubmissionService {
 
@@ -556,7 +572,15 @@ private final case class LedgerServicesJson(
     override def getParties(request: GetPartiesRequest): Future[GetPartiesResponse] =
       clientCall(
         JsPartyManagementService.getPartyEndpoint,
-        (request.parties.head, Some(request.identityProviderId), request.parties.drop(1).toList),
+        (
+          request.parties.headOption.getOrElse(
+            sys.error(
+              s"Expected at least a party in the ${classOf[GetPartiesRequest].getSimpleName}"
+            )
+          ),
+          Some(request.identityProviderId),
+          request.parties.drop(1).toList,
+        ),
       )
 
     override def listKnownParties(
@@ -564,14 +588,15 @@ private final case class LedgerServicesJson(
     ): Future[ListKnownPartiesResponse] =
       clientCall(
         JsPartyManagementService.listKnownPartiesEndpoint,
-        PagedList((), Some(request.pageSize), Some(request.pageToken)),
+        PagedList(
+          (None, None): (Option[String], Option[String]),
+          Some(request.pageSize),
+          Some(request.pageToken),
+        ),
       )
 
     override def allocateParty(request: AllocatePartyRequest): Future[AllocatePartyResponse] =
-      for {
-        jsRequest <- protocolConverters.AllocatePartyRequest.toJson(request)
-        resp <- clientCall(JsPartyManagementService.allocatePartyEndpoint, jsRequest)
-      } yield resp
+      clientCall(JsPartyManagementService.allocatePartyEndpoint, request)
 
     override def updatePartyDetails(
         request: UpdatePartyDetailsRequest
@@ -593,12 +618,14 @@ private final case class LedgerServicesJson(
       JsPartyManagementService.allocateExternalPartyEndpoint,
       request,
     )
+
     override def generateExternalPartyTopology(
         request: GenerateExternalPartyTopologyRequest
     ): Future[GenerateExternalPartyTopologyResponse] =
       clientCall(JsPartyManagementService.externalPartyGenerateTopologyEndpoint, request)
 
   }
+
   def packageManagement: PackageManagementService = new PackageManagementService {
     override def listKnownPackages(
         request: ListKnownPackagesRequest
@@ -670,11 +697,11 @@ private final case class LedgerServicesJson(
     Using(new ZipInputStream(inputStream)) { zip =>
       (for {
         archive <- DarParser.readArchive("Uploaded DAR", zip)
-        pkgs <- archive.all.traverse(Decode.decodeArchive(_))
+        pkgs <- archive.all.traverse(Decode.decodeArchive)
       } yield {
         pkgs.map { case (pkgId, pkg) => PackageMetadata.from(pkgId, pkg) }.foreach {
           newPackageMetadata =>
-            packageMetadataView.updateAndGet(_ |+| newPackageMetadata)
+            packageMetadataView.updateAndGet(_ |+| newPackageMetadata).discard
         }
       }).fold(
         err => {
@@ -721,12 +748,13 @@ private final case class LedgerServicesJson(
     override def getUpdates(
         request: GetUpdatesRequest,
         responseObserver: StreamObserver[GetUpdatesResponse],
-    ): Unit = wsCall(
-      JsUpdateService.getUpdatesEndpoint,
-      toGetUpdatesRequestLegacy(request),
-      responseObserver,
-      protocolConverters.GetUpdatesResponse.fromJson,
-    )
+    ): Unit =
+      wsCall(
+        JsUpdateService.getUpdatesEndpoint,
+        toGetUpdatesRequestLegacy(request),
+        responseObserver,
+        protocolConverters.GetUpdatesResponse.fromJson,
+      )
 
     private def toGetUpdatesRequestLegacy(
         req: GetUpdatesRequest
@@ -762,6 +790,7 @@ private final case class LedgerServicesJson(
       request,
     )
       .flatMap(protocolConverters.GetEventsByContractIdResponse.fromJson)
+
   def time: TimeService = throw new UnsupportedOperationException(
     "TimeService is not available in JSON API"
   )
@@ -820,6 +849,7 @@ private final case class LedgerServicesJson(
       )
 
   }
+
   def identityProviderConfig: IdentityProviderConfigService = new IdentityProviderConfigService {
 
     override def createIdentityProviderConfig(
@@ -936,6 +966,12 @@ private final case class LedgerServicesJson(
             .fromJson(response)
         } yield grpcResponse
     }
+
+  def contract: ContractService = new ContractService {
+    override def getContract(request: GetContractRequest): Future[GetContractResponse] =
+      clientCall(JsContractService.getContractEndpoint, request)
+        .flatMap(protocolConverters.GetContractResponse.fromJson)
+  }
 }
 
 sealed trait LedgerServices {
@@ -955,9 +991,10 @@ sealed trait LedgerServices {
   def version: VersionService
   def userManagement: UserManagementService
   def identityProviderConfig: IdentityProviderConfigService
+  def contract: ContractService
 }
 
-private final case class LedgerServicesGrpc(
+private final class LedgerServicesGrpc(
     channel: Channel,
     commandInterceptors: Seq[ClientInterceptor],
 ) extends LedgerServices {
@@ -1009,6 +1046,9 @@ private final case class LedgerServicesGrpc(
 
   val interactiveSubmission: InteractiveSubmissionService =
     InteractiveSubmissionServiceGrpc.stub(channel)
+
+  val contract: ContractService =
+    ContractServiceGrpc.stub(channel)
 }
 
 object JsonErrors {

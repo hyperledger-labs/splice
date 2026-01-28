@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.util
@@ -10,8 +10,9 @@ import com.daml.ledger.api.v2.state_service.IncompleteUnassigned
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.WrappedContractEntry
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{LocalParticipantReference, ParticipantReference}
+import com.digitalasset.canton.examples.java as M
 import com.digitalasset.canton.protocol.{ContractInstance, LfContractId}
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{Party, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, SynchronizerAlias}
 import com.digitalasset.daml.lf.data.Ref.PackageId
@@ -276,6 +277,25 @@ trait AcsInspection {
     }
     PackageId.assertFromString(resultAsString)
   }
+
+  def findIOU(
+      participant: LocalParticipantReference,
+      obligor: Party,
+      owner: Party,
+  ): M.iou.Iou.Contract =
+    participant.ledger_api.javaapi.state.acs
+      .await(M.iou.Iou.COMPANION)(
+        obligor,
+        contract =>
+          contract.data.owner == owner.toProtoPrimitive && contract.data.payer == obligor.toProtoPrimitive,
+      )
+
+  def findIOU(
+      participant: LocalParticipantReference,
+      submitter: Party,
+      predicate: M.iou.Iou.Contract => Boolean,
+  ): M.iou.Iou.Contract =
+    participant.ledger_api.javaapi.state.acs.await(M.iou.Iou.COMPANION)(submitter, predicate)
 
   private def comparableCreatedEvent(createdEvent: Option[CreatedEvent]): Option[CreatedEvent] =
     createdEvent.map(_.copy(offset = 0L, nodeId = 0))

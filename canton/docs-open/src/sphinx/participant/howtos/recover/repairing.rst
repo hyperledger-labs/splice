@@ -1,5 +1,5 @@
 ..
-   Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+   Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 ..
    SPDX-License-Identifier: Apache-2.0
 
@@ -59,7 +59,7 @@ replication is turned on if the Participant Node has been configured for high av
 the Participant Nodes are configured to not perform auto-initialization to prevent creating a new identity
 by setting disabling the auto-init configuration option:
 
-.. literalinclude:: CANTON/enterprise/app/src/test/resources/participant1-manual-init.conf
+.. literalinclude:: CANTON/community/app/src/test/resources/participant1-manual-init.conf
    :start-after: user-manual-entry-begin: ManualParticipantNodeIdentityConfig
    :end-before: user-manual-entry-end: ManualParticipantNodeIdentityConfig
 

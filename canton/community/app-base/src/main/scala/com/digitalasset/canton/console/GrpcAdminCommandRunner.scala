@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
@@ -19,7 +19,6 @@ import com.digitalasset.canton.config.{
   ClientConfig,
   ConsoleCommandTimeout,
   NonNegativeDuration,
-  SharedCantonConfig,
 }
 import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.lifecycle.OnShutdownRunner
@@ -27,16 +26,15 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.{
   CantonGrpcUtil,
   ClientChannelBuilder,
-  GrpcError,
   GrpcManagedChannel,
 }
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.util.Mutex
 import io.opentelemetry.api.trace.Tracer
 
-import java.util.concurrent.atomic.AtomicReference
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.{Duration, FiniteDuration}
-import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Attempt to run a grpc admin-api command against whatever is pointed at in the config
   * @param commandTimeouts
@@ -55,20 +53,13 @@ class GrpcAdminCommandRunner(
     with OnShutdownRunner
     with Spanning {
 
-  private val retryPolicyV =
-    new AtomicReference[GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean](_ => _ => false)
-
-  def retryPolicy: GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean = retryPolicyV.get()
-
-  def setRetryPolicy(policy: GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean): Unit =
-    retryPolicyV.set(policy)
-
   private val grpcRunner = new GrpcCtlRunner(
     apiLoggingConfig.maxMessageLines,
     apiLoggingConfig.maxStringLength,
     loggerFactory,
   )
   private val channels = TrieMap[(String, String, Port), GrpcManagedChannel]()
+  private val lock = new Mutex()
 
   def runCommandAsync[Result](
       instanceName: String,
@@ -122,7 +113,6 @@ class GrpcAdminCommandRunner(
         channel,
         token,
         callTimeout.duration,
-        retryPolicy(command),
       )
     } yield result
     (
@@ -163,7 +153,7 @@ class GrpcAdminCommandRunner(
       instanceName: String,
       clientConfig: ClientConfig,
   ): GrpcManagedChannel =
-    blocking(synchronized {
+    (lock.exclusive {
       val addr = (instanceName, clientConfig.address, clientConfig.port)
       channels.getOrElseUpdate(
         addr,
@@ -180,7 +170,7 @@ class GrpcAdminCommandRunner(
   override def onFirstClose(): Unit =
     closeChannels()
 
-  def closeChannels(): Unit = blocking(synchronized {
+  def closeChannels(): Unit = (lock.exclusive {
     channels.values.foreach(_.close())
     channels.clear()
   })
@@ -188,7 +178,7 @@ class GrpcAdminCommandRunner(
 
 object GrpcAdminCommandRunner {
   def apply(
-      environment: Environment[? <: SharedCantonConfig[?]],
+      environment: Environment,
       apiName: String,
   ): GrpcAdminCommandRunner =
     new GrpcAdminCommandRunner(

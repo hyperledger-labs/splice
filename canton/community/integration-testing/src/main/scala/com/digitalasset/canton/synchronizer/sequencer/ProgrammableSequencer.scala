@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -7,11 +7,10 @@ import cats.data.{EitherT, OptionT}
 import cats.syntax.functorFilter.*
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.config.{CantonConfig, DefaultProcessingTimeouts, ProcessingTimeout}
+import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.{HashPurpose, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.integration.{
   ConfigTransform,
@@ -476,13 +475,15 @@ trait HasProgrammableSequencer {
   def signModifiedSubmissionRequest(
       request: SubmissionRequest,
       syncCrypto: SynchronizerCryptoClient,
+      approximateTimestampOverride: Option[CantonTimestamp],
   )(implicit executionContext: ExecutionContext): SignedContent[SubmissionRequest] =
     SignedContent
       .create(
         syncCrypto.pureCrypto,
-        syncCrypto.currentSnapshotApproximation,
+        syncCrypto.currentSnapshotApproximation.futureValueUS,
         request,
         None,
+        approximateTimestampOverride,
         HashPurpose.SubmissionRequestSignature,
         testedProtocolVersion,
       )
@@ -510,7 +511,7 @@ object ProgrammableSequencer {
   /** Extract the list of confirmation responses.
     */
   def confirmationResponsesKind(messages: Map[Member, Seq[SubmissionRequest]])(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      env: TestConsoleEnvironment
   ): Map[Member, Seq[String]] =
     messages.view
       .mapValues(_.mapFilter { submissionRequest =>

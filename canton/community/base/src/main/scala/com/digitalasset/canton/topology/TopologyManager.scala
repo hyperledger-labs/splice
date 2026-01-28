@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
@@ -10,12 +10,17 @@ import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.{BatchAggregatorConfig, ProcessingTimeout, TopologyConfig}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
+import com.digitalasset.canton.lifecycle.{
+  FlagCloseable,
+  FutureUnlessShutdown,
+  HasCloseContext,
+  LifeCycle,
+}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.{
   DynamicSynchronizerParameters,
@@ -32,6 +37,7 @@ import com.digitalasset.canton.topology.TopologyManagerError.{
   TooManyPendingTopologyTransactions,
   ValueOutOfBounds,
 }
+import com.digitalasset.canton.topology.cache.TopologyStateLookup
 import com.digitalasset.canton.topology.processing.{
   EffectiveTime,
   SequencedTime,
@@ -86,6 +92,8 @@ class SynchronizerTopologyManager(
     clock: Clock,
     crypto: SynchronizerCrypto,
     staticSynchronizerParameters: StaticSynchronizerParameters,
+    topologyCacheAggregatorConfig: BatchAggregatorConfig,
+    topologyConfig: TopologyConfig,
     override val store: TopologyStore[SynchronizerStore],
     val outboxQueue: SynchronizerOutboxQueue,
     dispatchQueueBackpressureLimit: NonNegativeInt,
@@ -113,20 +121,25 @@ class SynchronizerTopologyManager(
 
   override protected val processor: TopologyStateProcessor = {
 
-    val required =
-      RequiredTopologyMappingChecks(store, Some(staticSynchronizerParameters), loggerFactory)
-    val checks =
+    def makeChecks(lookup: TopologyStateLookup): TopologyMappingChecks = {
+      val required =
+        RequiredTopologyMappingChecks(Some(staticSynchronizerParameters), lookup, loggerFactory)
+
       if (!disableOptionalTopologyChecks)
         new TopologyMappingChecks.All(
           required,
           new OptionalTopologyMappingChecks(store, loggerFactory),
         )
       else required
+    }
     TopologyStateProcessor.forTopologyManager(
       store,
+      topologyCacheAggregatorConfig,
+      topologyConfig,
       Some(outboxQueue),
-      checks,
+      makeChecks,
       crypto.pureCrypto,
+      timeouts,
       loggerFactory,
     )
   }
@@ -176,6 +189,8 @@ class TemporaryTopologyManager(
     nodeId: UniqueIdentifier,
     clock: Clock,
     crypto: Crypto,
+    topologyCacheAggregatorConfig: BatchAggregatorConfig,
+    topologyConfig: TopologyConfig,
     store: TopologyStore[TemporaryStore],
     timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,
@@ -185,6 +200,8 @@ class TemporaryTopologyManager(
       nodeId,
       clock,
       crypto,
+      topologyCacheAggregatorConfig,
+      topologyConfig,
       store,
       exitOnFatalFailures = false,
       timeouts,
@@ -199,6 +216,8 @@ class AuthorizedTopologyManager(
     nodeId: UniqueIdentifier,
     clock: Clock,
     crypto: Crypto,
+    topologyCacheAggregatorConfig: BatchAggregatorConfig,
+    topologyConfig: TopologyConfig,
     store: TopologyStore[AuthorizedStore],
     exitOnFatalFailures: Boolean,
     timeouts: ProcessingTimeout,
@@ -209,6 +228,8 @@ class AuthorizedTopologyManager(
       nodeId,
       clock,
       crypto,
+      topologyCacheAggregatorConfig,
+      topologyConfig,
       store,
       exitOnFatalFailures = exitOnFatalFailures,
       timeouts,
@@ -225,6 +246,8 @@ abstract class LocalTopologyManager[StoreId <: TopologyStoreId](
     nodeId: UniqueIdentifier,
     clock: Clock,
     crypto: Crypto,
+    topologyCacheAggregatorConfig: BatchAggregatorConfig,
+    topologyConfig: TopologyConfig,
     store: TopologyStore[StoreId],
     exitOnFatalFailures: Boolean,
     timeouts: ProcessingTimeout,
@@ -245,9 +268,12 @@ abstract class LocalTopologyManager[StoreId <: TopologyStoreId](
   override protected val processor: TopologyStateProcessor =
     TopologyStateProcessor.forTopologyManager(
       store,
+      topologyCacheAggregatorConfig,
+      topologyConfig,
       None,
-      NoopTopologyMappingChecks,
+      _ => NoopTopologyMappingChecks,
       crypto.pureCrypto,
+      timeouts,
       loggerFactory,
     )
 
@@ -313,7 +339,8 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
 )(implicit ec: ExecutionContext)
     extends TopologyManagerStatus
     with NamedLogging
-    with FlagCloseable {
+    with FlagCloseable
+    with HasCloseContext {
 
   /** The timestamp that will be used for validating the topology transactions before submitting
     * them for sequencing to a synchronizer or storing it in the local store.
@@ -447,7 +474,7 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
       if (signingKeys.nonEmpty)
         s"signed by ${signingKeys.mkString(", ")}"
       else ""
-    logger.debug(
+    logger.info(
       show"Attempting to build, sign, and $op $mapping with serial $serial $signingKeyString"
     )
     for {
@@ -562,7 +589,8 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
           EitherT.cond[FutureUnlessShutdown][TopologyManagerError, PositiveInt](
             proposed == PositiveInt.one,
             PositiveInt.one,
-            TopologyManagerError.SerialMismatch.Failure(Some(PositiveInt.one), Some(proposed)),
+            TopologyManagerError.SerialMismatch
+              .Failure(actual = Some(proposed), expected = Some(PositiveInt.one)),
           )
         // The stored mapping and the proposed mapping are the same. This likely only adds an additional signature.
         // If not, then duplicates will be filtered out down the line.
@@ -586,7 +614,8 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
           EitherT.cond[FutureUnlessShutdown](
             next == proposed,
             next,
-            TopologyManagerError.SerialMismatch.Failure(Some(next), Some(proposed)),
+            TopologyManagerError.SerialMismatch
+              .Failure(actual = Some(proposed), expected = Some(next)),
           )
       }): EitherT[FutureUnlessShutdown, TopologyManagerError, PositiveInt]
     } yield TopologyTransaction(op, theSerial, mapping, protocolVersion)

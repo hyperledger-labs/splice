@@ -1,8 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block
 
+import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -20,13 +21,14 @@ import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerThroug
 }
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.Member
+import com.digitalasset.canton.util.Mutex
 import com.google.common.annotations.VisibleForTesting
 import org.apache.pekko.actor.{Cancellable, Scheduler}
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContext, blocking}
+import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
 
 /** Throughput cap that functions to protect the overall availability of the sequencer network. This
@@ -62,6 +64,7 @@ class BlockSequencerThroughputCap(
     extends NamedLogging
     with AutoCloseable {
 
+  private val lock = new Mutex()
   private val perMessageTypeCaps =
     Map[SubmissionRequestType, IndividualBlockSequencerThroughputCap](
       SubmissionRequestType.ConfirmationRequest -> makeIndividualCap(
@@ -128,7 +131,7 @@ class BlockSequencerThroughputCap(
   @VisibleForTesting
   private[block] def addBlockUpdateInternal(
       submissions: Seq[SubmissionRequestEntry]
-  ): Unit = if (enabled.get()) blocking(synchronized {
+  ): Unit = if (enabled.get())(lock.exclusive {
     cancellable.foreach(_.cancel().discard)
 
     submissions.foreach { submission =>
@@ -146,7 +149,7 @@ class BlockSequencerThroughputCap(
     advanceWindow()
   })
 
-  private def advanceWindow(): Unit = blocking(synchronized {
+  private def advanceWindow(): Unit = (lock.exclusive {
     perMessageTypeCaps.values.foreach(_.advanceWindow())
     scheduleClockTick()
   })
@@ -237,7 +240,7 @@ object BlockSequencerThroughputCap {
       lazy val overKbps = usageByMember.bytes > allowedBytesForMember
       lazy val overThresholdLevel = requestLevel > currentThresholdLevel
 
-      for {
+      val result = for {
         _ <- Either.cond(
           !overTps,
           (),
@@ -254,6 +257,17 @@ object BlockSequencerThroughputCap {
           s"Request at level $requestLevel is higher than the current threshold $currentThresholdLevel",
         )
       } yield ()
+
+      result.left.foreach { _ =>
+        metrics.rejections.mark()(
+          MetricsContext(
+            "member" -> key.member.toProtoPrimitive,
+            "rejection_type" -> "per_member",
+          )
+        )
+      }
+
+      result
     }
 
     // R_t = (R_max - R_A) / (1 + V_active) + B_i
@@ -269,7 +283,7 @@ object BlockSequencerThroughputCap {
         lazy val overThrottledTps = usageByMember.count > throttledCountForMember
         lazy val overThrottledKbps = usageByMember.bytes > throttledBytesForMember
 
-        for {
+        val result = for {
           _ <- Either.cond(
             !overThrottledTps,
             (),
@@ -281,6 +295,17 @@ object BlockSequencerThroughputCap {
             s"${usageByMember.bytes} bytes over the past $observationPeriodSeconds seconds is more than the allowed $throttledBytesForMember throttled amount for the period",
           )
         } yield ()
+
+        result.left.foreach { _ =>
+          metrics.rejections.mark()(
+            MetricsContext(
+              "member" -> key.member.toProtoPrimitive,
+              "rejection_type" -> "global",
+            )
+          )
+        }
+
+        result
       }
 
     // assumes that transactions are added in order of CantonTimestamp

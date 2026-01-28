@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.commands
@@ -38,13 +38,13 @@ import com.daml.ledger.api.v2.admin.user_management_service.{
   ListUsersResponse,
   RevokeUserRightsRequest,
   RevokeUserRightsResponse,
+  Right as UserRight,
   UpdateUserIdentityProviderIdRequest,
   UpdateUserIdentityProviderIdResponse,
   UpdateUserRequest,
   UpdateUserResponse,
   User,
   UserManagementServiceGrpc,
-  Right as UserRight,
 }
 import com.daml.ledger.api.v2.command_completion_service.CommandCompletionServiceGrpc.CommandCompletionServiceStub
 import com.daml.ledger.api.v2.command_completion_service.{
@@ -156,6 +156,7 @@ import com.daml.ledger.api.v2.update_service.{
 }
 import com.digitalasset.canton.admin.api.client
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
+  CustomClientTimeout,
   DefaultUnboundedTimeout,
   ServerEnforcedTimeout,
   TimeoutType,
@@ -170,6 +171,7 @@ import com.digitalasset.canton.admin.api.client.data.{
   TemplateId,
   UserRights,
 }
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.{Signature, SigningPublicKey}
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
@@ -369,7 +371,7 @@ object LedgerApiCommands {
 
     }
 
-    final case class ListKnownParties(identityProviderId: String)
+    final case class ListKnownParties(identityProviderId: String, filterParty: String)
         extends BaseCommand[ListKnownPartiesRequest, ListKnownPartiesResponse, Seq[
           PartyDetails
         ]] {
@@ -379,6 +381,7 @@ object LedgerApiCommands {
             pageToken = "",
             pageSize = 0,
             identityProviderId = identityProviderId,
+            filterParty = filterParty,
           )
         )
       override protected def submitRequest(
@@ -1908,6 +1911,7 @@ object LedgerApiCommands {
         override val packageIdSelectionPreference: Seq[LfPackageId],
         transactionShape: TransactionShape,
         includeCreatedEventBlob: Boolean,
+        optTimeout: Option[NonNegativeDuration],
     ) extends SubmitCommand
         with BaseCommand[
           SubmitAndWaitForTransactionRequest,
@@ -1962,7 +1966,8 @@ object LedgerApiCommands {
       ): Either[String, Transaction] =
         response.transaction.toRight("Received response without any transaction")
 
-      override def timeoutType: TimeoutType = DefaultUnboundedTimeout
+      override def timeoutType: TimeoutType =
+        optTimeout.map(CustomClientTimeout(_)).getOrElse(DefaultUnboundedTimeout)
 
     }
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer.parallel
@@ -6,7 +6,6 @@ package com.digitalasset.canton.platform.indexer.parallel
 import com.digitalasset.canton.RepairCounter
 import com.digitalasset.canton.data.{CantonTimestamp, LedgerTimeBoundaries, Offset}
 import com.digitalasset.canton.ledger.participant.state.Update.CommandRejected.FinalReason
-import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccepted.RepresentativePackageIds
 import com.digitalasset.canton.ledger.participant.state.Update.{
   RepairTransactionAccepted,
   SequencedCommandRejected,
@@ -77,11 +76,10 @@ class PostPublishDataSpec extends AnyFlatSpec with Matchers with NamedLogging {
         transactionMeta = transactionMeta,
         transaction = CommittedTransaction(TransactionBuilder.Empty),
         updateId = updateId,
-        contractAuthenticationData = Map.empty,
         synchronizerId = synchronizerId,
         recordTime = cantonTime2,
         acsChangeFactory = TestAcsChangeFactory(),
-        internalContractIds = Map.empty,
+        contractInfos = Map.empty,
       )(TraceContext.empty),
       offset = offset,
       publicationTime = cantonTime1,
@@ -110,11 +108,10 @@ class PostPublishDataSpec extends AnyFlatSpec with Matchers with NamedLogging {
         transactionMeta = transactionMeta,
         transaction = CommittedTransaction(TransactionBuilder.Empty),
         updateId = updateId,
-        contractAuthenticationData = Map.empty,
         synchronizerId = synchronizerId,
         recordTime = cantonTime2,
         acsChangeFactory = TestAcsChangeFactory(),
-        internalContractIds = Map.empty,
+        contractInfos = Map.empty,
       )(TraceContext.empty),
       offset = offset,
       publicationTime = cantonTime1,
@@ -127,12 +124,10 @@ class PostPublishDataSpec extends AnyFlatSpec with Matchers with NamedLogging {
         transactionMeta = transactionMeta,
         transaction = CommittedTransaction(TransactionBuilder.Empty),
         updateId = updateId,
-        contractAuthenticationData = Map.empty,
-        representativePackageIds = RepresentativePackageIds.Empty,
         synchronizerId = synchronizerId,
         repairCounter = RepairCounter(65),
         recordTime = cantonTime2,
-        internalContractIds = Map.empty,
+        contractInfos = Map.empty,
       )(TraceContext.empty),
       offset = offset,
       publicationTime = cantonTime1,

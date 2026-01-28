@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.participant.state.metrics
@@ -36,6 +36,7 @@ import com.digitalasset.canton.store.packagemeta.PackageMetadata
 import com.digitalasset.canton.topology.{
   ExternalPartyOnboardingDetails,
   ParticipantId,
+  PartyId,
   PhysicalSynchronizerId,
   SynchronizerId,
 }
@@ -119,7 +120,7 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
     )
 
   override def allocateParty(
-      hint: Ref.Party,
+      partyId: PartyId,
       submissionId: Ref.SubmissionId,
       synchronizerIdO: Option[SynchronizerId],
       externalPartyOnboardingDetails: Option[ExternalPartyOnboardingDetails],
@@ -128,7 +129,7 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
   ): FutureUnlessShutdown[SubmissionResult] =
     Timed.future(
       metrics.services.write.allocateParty,
-      delegate.allocateParty(hint, submissionId, synchronizerIdO, externalPartyOnboardingDetails),
+      delegate.allocateParty(partyId, submissionId, synchronizerIdO, externalPartyOnboardingDetails),
     )
 
   override def prune(
@@ -297,7 +298,7 @@ final class TimedSyncService(delegate: SyncService, metrics: LedgerApiServerMetr
 
   override def getRoutingSynchronizerState(implicit
       traceContext: TraceContext
-  ): RoutingSynchronizerState =
+  ): FutureUnlessShutdown[RoutingSynchronizerState] =
     delegate.getRoutingSynchronizerState
 
   override def estimateTrafficCost(

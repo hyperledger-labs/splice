@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.benchtool.services
@@ -13,6 +13,7 @@ import io.grpc.Channel
 
 import scala.concurrent.Future
 
+@SuppressWarnings(Array("com.digitalasset.canton.DirectGrpcServiceInvocation"))
 class PruningService(channel: Channel, authorizationToken: Option[String]) {
   private val service: ParticipantPruningServiceGrpc.ParticipantPruningServiceStub =
     AuthorizationHelper.maybeAuthedService(authorizationToken)(

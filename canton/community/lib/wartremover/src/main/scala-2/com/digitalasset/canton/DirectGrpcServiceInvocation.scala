@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates.
 // Proprietary code. All rights reserved.
 
 package com.digitalasset.canton
@@ -66,8 +66,8 @@ object DirectGrpcServiceInvocation extends WartTraverser {
         tree.symbol.annotations.exists(isGrpcServiceInvocationMethodAnnotation)
 
       def isMethodDefWithGrpcServiceInvocationMethodAnnotation(symbol: Symbol): Boolean =
-        symbol.annotations.exists(isGrpcServiceInvocationMethodAnnotation) || symbol.overrides
-          .exists(isMethodDefWithGrpcServiceInvocationMethodAnnotation)
+        symbol.annotations.exists(isGrpcServiceInvocationMethodAnnotation)
+          || symbol.overrides.exists(isMethodDefWithGrpcServiceInvocationMethodAnnotation)
 
       def isArtifactValDef(x: Tree): Boolean =
         x match {

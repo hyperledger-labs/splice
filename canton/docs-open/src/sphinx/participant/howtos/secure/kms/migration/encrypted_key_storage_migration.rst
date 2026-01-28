@@ -1,5 +1,5 @@
 ..
-   Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+   Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 ..
    SPDX-License-Identifier: Apache-2.0
 
@@ -21,7 +21,7 @@ Encrypted private key storage can be reverted back to unencrypted storage.
 To prevent accidental reverts, simply deleting the `private-key-store` configuration does **not** revert
 to unencrypted storage. Instead, the following configuration must be added, and the node restarted:
 
-.. literalinclude:: CANTON/enterprise/app/src/test/resources/encrypted-store-reverted.conf
+.. literalinclude:: CANTON/community/app/src/test/resources/encrypted-store-reverted.conf
    :language: none
    :start-after: user-manual-entry-begin: EncryptedStoreReverted
    :end-before: user-manual-entry-end: EncryptedStoreReverted

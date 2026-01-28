@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.hash
@@ -629,8 +629,6 @@ class NodeHashV1Test extends BaseTest with AnyWordSpecLike with Matchers with Ha
                                     |'00000001' # 1 (int)
                                     |'00000007' # 7 (int)
                                     |'636861726c6965' # charlie (string)
-                                    |# Interface Id
-                                    |'00' # None
                                     |# Acting Parties
                                     |'00000002' # 2 (int)
                                     |'00000005' # 5 (int)

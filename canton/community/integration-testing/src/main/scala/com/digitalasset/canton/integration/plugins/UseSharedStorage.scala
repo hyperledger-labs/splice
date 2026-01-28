@@ -1,10 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
 
 import com.digitalasset.canton.config.{CantonConfig, LocalNodeConfig, StorageConfig}
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{
   ConfigTransform,
   ConfigTransforms,
@@ -25,7 +24,7 @@ class UseSharedStorage[C <: LocalNodeConfig](
     updateStorageConfig: C => StorageConfig => C,
     updateAllNodes: ((String, C) => C) => ConfigTransform,
     override protected val loggerFactory: NamedLoggerFactory,
-) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment] {
+) extends EnvironmentSetupPlugin {
 
   override def beforeEnvironmentCreated(config: CantonConfig): CantonConfig = {
     val activeStorageConfig = getNodeConfig(config)(sourceNodeNames).storage

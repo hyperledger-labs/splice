@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
@@ -6,8 +6,9 @@ package com.digitalasset.canton.http.json.v2
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.auth.AuthInterceptor
 import com.digitalasset.canton.config.ApiLoggingConfig
-import com.digitalasset.canton.http.WebsocketConfig
+import com.digitalasset.canton.http.json.JsHealthService
 import com.digitalasset.canton.http.json.v2.damldefinitionsservice.DamlDefinitionsView
+import com.digitalasset.canton.http.{HealthService, WebsocketConfig}
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.ledger.client.services.version.VersionClient
 import com.digitalasset.canton.ledger.participant.state.PackageSyncService
@@ -37,12 +38,14 @@ class V2Routes(
     partyManagementService: JsPartyManagementService,
     stateService: JsStateService,
     updateService: JsUpdateService,
+    contractService: JsContractService,
     userManagementService: JsUserManagementService,
     versionService: JsVersionService,
     metadataServiceIfEnabled: Option[JsDamlDefinitionsService],
     versionClient: VersionClient,
     requestLogger: ApiRequestLogger,
     val loggerFactory: NamedLoggerFactory,
+    jsHealthService: JsHealthService,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
   @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
@@ -52,7 +55,8 @@ class V2Routes(
       .endpoints() ++ stateService.endpoints() ++ updateService.endpoints() ++ userManagementService
       .endpoints() ++ identityProviderService
       .endpoints() ++ interactiveSubmissionService
-      .endpoints() ++ metadataServiceIfEnabled.toList.flatMap(_.endpoints())
+      .endpoints() ++ metadataServiceIfEnabled.toList.flatMap(_.endpoints()) ++ jsHealthService
+      .endpoints() ++ contractService.endpoints()
 
   private val docs =
     new JsApiDocsService(
@@ -82,6 +86,7 @@ object V2Routes {
       executionContext: ExecutionContext,
       apiLoggingConfig: ApiLoggingConfig,
       loggerFactory: NamedLoggerFactory,
+      healthService: HealthService,
   )(implicit
       ws: WebsocketConfig,
       esf: ExecutionSequencerFactory,
@@ -114,7 +119,6 @@ object V2Routes {
     val partyManagementService =
       new JsPartyManagementService(
         ledgerClient.partyManagementClient,
-        protocolConverters,
         requestLogger,
         loggerFactory,
       )
@@ -129,6 +133,9 @@ object V2Routes {
 
     val updateService =
       new JsUpdateService(ledgerClient, protocolConverters, requestLogger, loggerFactory)
+
+    val contractService =
+      new JsContractService(ledgerClient, protocolConverters, requestLogger, loggerFactory)
 
     val userManagementService =
       new JsUserManagementService(ledgerClient.userManagementClient, requestLogger, loggerFactory)
@@ -149,6 +156,11 @@ object V2Routes {
         new DamlDefinitionsView(packageSyncService.getPackageMetadataSnapshot(_))
       new JsDamlDefinitionsService(damlDefinitionsService, requestLogger, loggerFactory)
     }
+    val jsHealthService = new JsHealthService(
+      healthService = healthService,
+      requestLogger = requestLogger,
+      loggerFactory = loggerFactory,
+    )
 
     new V2Routes(
       commandService,
@@ -159,12 +171,14 @@ object V2Routes {
       partyManagementService,
       stateService,
       updateService,
+      contractService,
       userManagementService,
       versionService,
       damlDefinitionsServiceIfEnabled,
       ledgerClient.versionClient,
       requestLogger,
       loggerFactory,
+      jsHealthService,
     )(executionContext)
   }
 }

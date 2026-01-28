@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.pruning
@@ -49,6 +49,7 @@ import com.digitalasset.canton.participant.store.{
   AcsCounterParticipantConfigStore,
 }
 import com.digitalasset.canton.participant.util.TimeOfChange
+import com.digitalasset.canton.platform.store.interning.MockStringInterning
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.{
   AcsCommitment,
@@ -91,7 +92,6 @@ import org.scalatest.Inspectors
 import org.scalatest.matchers.should.Matchers
 
 import java.util.concurrent.TimeUnit
-import scala.collection.immutable.Set
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
 
@@ -477,6 +477,9 @@ class AcsCommitmentBenchmark
       Some(CommitmentSendDelay(Some(NonNegativeProportion.zero), Some(NonNegativeProportion.zero))),
       doNotAwaitOnCheckingIncomingCommitments = false,
       commitmentCheckpointInterval = PositiveDurationSeconds.ofSeconds(reconciliationInterval),
+      commitmentMismatchDebugging = false,
+      commitmentProcessorNrAcsChangesBehindToTriggerCatchUp = None,
+      stringInterning = new MockStringInterning,
     )
   }
 
@@ -645,7 +648,7 @@ class AcsCommitmentBenchmark
             .create(synchronizerId, participant, localId, period, cmt, testedProtocolVersion)
         snapshotF.flatMap { snapshot =>
           SignedProtocolMessage
-            .trySignAndCreate(payload, snapshot)
+            .trySignAndCreate(payload, snapshot, None)
         }
       }
     )

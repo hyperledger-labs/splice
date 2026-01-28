@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
@@ -16,7 +16,6 @@ import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.DefaultProcessingTimeouts.shutdownProcessing
 import com.digitalasset.canton.crypto.kms.{Kms, KmsError, KmsFactory, KmsKeyId}
 import com.digitalasset.canton.crypto.store.{CryptoPrivateStore, EncryptedCryptoPrivateStore}
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{
   ConfigTransforms,
   EnvironmentSetupPlugin,
@@ -32,10 +31,7 @@ import monocle.macros.syntax.lens.*
 
 import scala.concurrent.{ExecutionContext, Future}
 
-abstract class UseKms
-    extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
-    with AutoCloseable
-    with NoTracing {
+abstract class UseKms extends EnvironmentSetupPlugin with AutoCloseable with NoTracing {
 
   protected def keyId: Option[KmsKeyId]
   protected def nodes: Set[String]
@@ -96,27 +92,17 @@ abstract class UseKms
         enableEncryptedPrivateStore(addKmsConfig(conf, disableSessionKeys = true))
       case EncryptedPrivateStoreStatus.Revert =>
         revertEncryptedPrivateStore(addKmsConfig(conf, disableSessionKeys = true))
-      // session signing keys can only be used if we are directly storing all our private keys in an external KMS
+      // if the encrypted private store is disabled, the private crypto API must be backed by an external KMS
       case EncryptedPrivateStoreStatus.Disable =>
-        disableEncryptedPrivateStore(addKmsConfig(conf, disableSessionKeys))
-    }
-
-  private def setSessionKeysInKmsConfig(kmsConfig: KmsConfig, enabled: Boolean): KmsConfig =
-    kmsConfig match {
-      case driverConfig: KmsConfig.Driver =>
-        driverConfig.focus(_.sessionSigningKeys.enabled).replace(enabled)
-      case awsConfig: KmsConfig.Aws =>
-        awsConfig.focus(_.sessionSigningKeys.enabled).replace(enabled)
-      case gcpConfig: KmsConfig.Gcp =>
-        gcpConfig.focus(_.sessionSigningKeys.enabled).replace(enabled)
+        enableExternalKms(disableEncryptedPrivateStore(addKmsConfig(conf, disableSessionKeys)))
     }
 
   private def addKmsConfig(conf: CryptoConfig, disableSessionKeys: Boolean): CryptoConfig =
     conf
+      .focus(_.sessionSigningKeys.enabled)
+      .replace(!disableSessionKeys)
       .focus(_.kms)
-      .replace(
-        Some(setSessionKeysInKmsConfig(kmsConfig, enabled = !disableSessionKeys))
-      )
+      .replace(Some(kmsConfig))
 
   private def enableEncryptedPrivateStore(conf: CryptoConfig): CryptoConfig =
     conf
@@ -135,6 +121,11 @@ abstract class UseKms
 
   private def disableSessionSigningKeysForNode(name: String): Boolean =
     nodesWithSessionSigningKeysDisabled.contains(name)
+
+  private def enableExternalKms(conf: CryptoConfig): CryptoConfig =
+    conf
+      .focus(_.provider)
+      .replace(CryptoProvider.Kms)
 
   private def transformConfig(config: CantonConfig): CantonConfig = {
     // change the overall configs
@@ -176,8 +167,7 @@ abstract class UseKms
   }
 
   override def beforeEnvironmentDestroyed(
-      config: CantonConfig,
-      environment: TestConsoleEnvironment[CantonConfig, CantonEnvironment],
+      environment: TestConsoleEnvironment
   ): Unit = {
     implicit val ec: ExecutionContext = kmsKeyDeletionExecutionContext
 

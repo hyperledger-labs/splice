@@ -1,5 +1,5 @@
 ..
-   Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+   Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 ..
    SPDX-License-Identifier: Apache-2.0
 
@@ -142,6 +142,7 @@ Canton documentation
   participant/howtos/operate/parties/parties
   participant/howtos/operate/parties/party_replication
   participant/howtos/operate/parties/decentralized_parties
+  participant/howtos/operate/parties/multi-sig-in-canton
   participant/howtos/operate/parties/external_parties
   participant/howtos/operate/users/users
   participant/howtos/operate/traffic/node_traffic

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.store.memory
@@ -28,6 +28,12 @@ class InMemoryKmsMetadataStore(override val loggerFactory: NamedLoggerFactory)
       tc: TraceContext
   ): FutureUnlessShutdown[Option[KmsMetadataStore.KmsMetadata]] = FutureUnlessShutdown.pure {
     metadataStore.get(fingerprint)
+  }
+
+  override def getAll(fingerprints: Seq[Fingerprint])(implicit
+      tc: TraceContext
+  ): FutureUnlessShutdown[Map[Fingerprint, Option[KmsMetadata]]] = FutureUnlessShutdown.pure {
+    fingerprints.map(key => key -> metadataStore.get(key)).toMap
   }
 
   private def storeDuplicateError(

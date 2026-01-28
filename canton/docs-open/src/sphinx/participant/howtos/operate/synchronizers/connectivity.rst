@@ -1,5 +1,5 @@
 ..
-   Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+   Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 ..
    SPDX-License-Identifier: Apache-2.0
 
@@ -47,7 +47,7 @@ are validated before being persisted.
 .. TODO(#25904): Add link to the reference doc of ``SequencerConnectionValidation``
 
 .. snippet:: participant_connectivity
-    .. success:: val sequencerConnectionValidation = com.digitalasset.canton.sequencing.SequencerConnectionValidation.Active
+    .. success:: val sequencerConnectionValidation = SequencerConnectionValidation.Active
 
 3. Execute the ``connect_local`` command:
 
@@ -279,7 +279,7 @@ To update a custom TLS trust certificate, particularly when using self-signed ce
 2. Create a new connection instance and pass the certificate into this new connection.
 
 .. snippet:: participant_connectivity
-    .. success:: val connection = com.digitalasset.canton.sequencing.GrpcSequencerConnection.tryCreate(sequencerUrl, customTrustCertificates = Some(certificate))
+    .. success:: val connection = GrpcSequencerConnection.tryCreate(sequencerUrl, customTrustCertificates = Some(certificate))
 
 3. Update the Sequencer connection settings on the Participant Node:
 

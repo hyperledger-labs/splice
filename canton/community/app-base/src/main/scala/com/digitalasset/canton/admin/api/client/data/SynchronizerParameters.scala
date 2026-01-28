@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.data
@@ -287,7 +287,7 @@ final case class DynamicSynchronizerParameters(
   // https://docs.google.com/document/d/1tpPbzv2s6bjbekVGBn6X5VZuw0oOTHek5c30CBo4UkI/edit#bookmark=id.1dzc6dxxlpca
   // Originally the validation was done on ledgerTimeRecordTimeTolerance, but was moved to preparationTimeRecordTimeTolerance
   // instead when the parameter was introduced
-  def compatibleWithNewPreparationTimeRecordTimeTolerance(
+  private[canton] def compatibleWithNewPreparationTimeRecordTimeTolerance(
       newPreparationTimeRecordTimeTolerance: config.NonNegativeFiniteDuration
   ): Boolean =
     // If false, a new request may receive the same submission time as a previous request and the previous

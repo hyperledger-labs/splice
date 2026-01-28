@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.benchtool.metrics
@@ -50,8 +50,8 @@ final case class ConsumptionSpeedMetric[T](
     Value(None)
 
   override def violatedPeriodicObjectives: List[(MinConsumptionSpeed, Value)] =
-    objective.collect {
-      case (obj, value) if value.isDefined => obj -> value.get
+    objective.collect { case (obj, Some(value)) =>
+      obj -> value
     }.toList
 
   override def violatedFinalObjectives(

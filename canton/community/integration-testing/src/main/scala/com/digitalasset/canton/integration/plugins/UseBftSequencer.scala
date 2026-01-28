@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
@@ -10,7 +10,6 @@ import com.digitalasset.canton.config.StorageConfig.Memory
 import com.digitalasset.canton.config.{CantonConfig, QueryCostMonitoringConfig, TlsClientConfig}
 import com.digitalasset.canton.crypto.provider.jce.JcePrivateCrypto
 import com.digitalasset.canton.crypto.{Fingerprint, SigningKeySpec, SigningKeyUsage}
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.{
   MultiSynchronizer,
@@ -22,6 +21,7 @@ import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig.BftSequenc
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.{
   BftBlockOrderingStandalonePeerConfig,
+  DefaultConsensusBlockCompletionTimeout,
   DefaultDedicatedExecutionContextDivisor,
   DefaultEpochLength,
   DefaultMaxBatchCreationInterval,
@@ -72,12 +72,13 @@ final class UseBftSequencer(
     // Use a shorter empty block creation timeout by default to speed up tests that stop sequencing
     //  and use `GetTime` to await an effective time to be reached on the synchronizer.
     consensusEmptyBlockCreationTimeout: FiniteDuration = 250.millis,
+    consensusBlockCompletionTimeout: FiniteDuration = DefaultConsensusBlockCompletionTimeout,
     maxRequestsInBatch: Short = DefaultMaxRequestsInBatch,
     minRequestsInBatch: Short = DefaultMinRequestsInBatch,
     maxBatchCreationInterval: FiniteDuration = DefaultMaxBatchCreationInterval,
     maxBatchesPerBlockProposal: Short = DefaultMaxBatchesPerProposal,
     dedicatedExecutionContextDivisor: Option[Int] = DefaultDedicatedExecutionContextDivisor,
-) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment] {
+) extends EnvironmentSetupPlugin {
 
   private val tmpDir = better.files.File(System.getProperty("java.io.tmpdir"))
 
@@ -103,6 +104,7 @@ final class UseBftSequencer(
                   .copy(
                     epochLength = epochLength,
                     consensusEmptyBlockCreationTimeout = consensusEmptyBlockCreationTimeout,
+                    consensusBlockCompletionTimeout = consensusBlockCompletionTimeout,
                     maxRequestsInBatch = maxRequestsInBatch,
                     minRequestsInBatch = minRequestsInBatch,
                     maxBatchCreationInterval = maxBatchCreationInterval,
@@ -230,6 +232,7 @@ final class UseBftSequencer(
             config = BftBlockOrdererConfig(
               epochLength = epochLength,
               consensusEmptyBlockCreationTimeout = consensusEmptyBlockCreationTimeout,
+              consensusBlockCompletionTimeout = consensusBlockCompletionTimeout,
               maxRequestsInBatch = maxRequestsInBatch,
               minRequestsInBatch = minRequestsInBatch,
               maxBatchCreationInterval = maxBatchCreationInterval,

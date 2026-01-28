@@ -1,17 +1,18 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
 
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.admin.api.client.data.{
+  SequencerConnectionValidation,
+  SynchronizerConnectionConfig,
+}
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.commands.ParticipantCommands
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
-import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
-import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
-import com.google.protobuf.ByteString
 
 class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(implicit
     override val consoleEnvironment: ConsoleEnvironment
@@ -27,8 +28,11 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
   object dars extends Helpful {
     @Help.Summary("Upload DARs to participants")
     @Help.Description(
-      """If synchronizerId is set, the participants will vet the packages on the specified synchronizer.
-        If synchronizeVetting is true, the command will block until the package vetting transaction has been registered with all connected synchronizers."""
+      """If synchronizerId is set, the participants will vet the packages on the specified
+        |synchronizer.
+        |If synchronizeVetting is true, the command will block until the package vetting
+        |transaction has been registered with all connected synchronizers.
+        """
     )
     def upload(
         darPath: String,
@@ -38,7 +42,6 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
         synchronizeVetting: Boolean = true,
         expectedMainPackageId: String = "",
         requestHeaders: Map[String, String] = Map(),
-        darDataO: Option[ByteString] = None,
     ): Map[ParticipantReference, String] = {
       val res = ConsoleCommandResult.runAll(participants)(
         ParticipantCommands.dars
@@ -52,7 +55,6 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
             expectedMainPackageId = expectedMainPackageId,
             requestHeaders = requestHeaders,
             logger,
-            darDataO,
           )
       )
       if (synchronizeVetting && vetAllPackages) {
@@ -63,8 +65,11 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
 
     @Help.Summary("Upload DARs to participants")
     @Help.Description(
-      """If synchronizerId is set, the participants will vet the packages on the specified synchronizer.
-        If synchronizeVetting is true, the command will block until the package vetting transaction has been registered with all connected synchronizers."""
+      """If synchronizerId is set, the participants will vet the packages on the specified
+        |synchronizer.
+        |If synchronizeVetting is true, the command will block until the package vetting
+        |transaction has been registered with all connected synchronizers.
+        """
     )
     def upload_many(
         paths: Seq[String],
@@ -94,7 +99,8 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
     @Help.Summary("Validate DARs against the current participants' state")
     @Help.Description(
       """Performs the same DAR and Daml package validation checks that the upload call performs,
-         but with no effects on the target participants: the DAR is not persisted or vetted."""
+        |but with no effects on the target participants: the DAR is not persisted or vetted.
+        """
     )
     def validate(darPath: String): Map[ParticipantReference, String] =
       ConsoleCommandResult.runAll(participants)(
@@ -129,7 +135,9 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
 
     @Help.Summary("Reconnect to synchronizer")
     @Help.Description(
-      "If retry is set to true (default), the command will return after the first attempt, but keep on trying in the background."
+      """If retry is set to true (default), the command will return after the first attempt,
+        |but keep on trying in the background.
+        """
     )
     def reconnect(alias: SynchronizerAlias, retry: Boolean = true): Unit =
       ConsoleCommandResult
@@ -140,8 +148,11 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
 
     @Help.Summary("Reconnect to all synchronizers for which `manualStart` = false")
     @Help.Description(
-      """If ignoreFailures is set to true (default), the reconnect all will succeed even if some synchronizers are offline.
-          | The participants will continue attempting to establish a synchronizer connection."""
+      """If ignoreFailures is set to true (default), the reconnect all will succeed even if some
+        |synchronizers are offline.
+        |
+        |The participants will continue attempting to establish a synchronizer connection.
+        """
     )
     def reconnect_all(ignoreFailures: Boolean = true): Unit =
       ConsoleCommandResult
@@ -175,14 +186,18 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(i
         .discard
 
     @Help.Summary("Register and potentially connect to new local synchronizer")
-    @Help.Description("""
-        The arguments are:
-          sequencer - A local sequencer reference
-          alias - A synchronizer alias to register this connection for.
-          manualConnect - Whether this connection should be handled manually and also excluded from automatic re-connect.
-          physicalSynchronizerId - An optional Synchronizer Id to ensure the connection is made to the correct synchronizer.
-          synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.
-        """)
+    @Help.Description(
+      """Parameters:
+        |- sequencer: A local sequencer reference.
+        |- alias: A synchronizer alias to register this connection for.
+        |- manualConnect: Whether this connection should be handled manually and also excluded
+        |  from automatic re-connect.
+        |- physicalSynchronizerId: An optional Synchronizer Id to ensure the connection is made to
+        |  the correct synchronizer.
+        |- synchronize: A timeout duration indicating how long to wait for all topology changes to
+        |  have been effected on all local nodes.
+        """
+    )
     def connect_local(
         sequencer: SequencerReference,
         alias: SynchronizerAlias,

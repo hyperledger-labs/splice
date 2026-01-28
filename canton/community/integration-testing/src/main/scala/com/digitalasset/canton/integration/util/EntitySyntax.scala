@@ -1,13 +1,11 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.util
 
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.config.CantonConfig
 import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.console.{LocalParticipantReference, ParticipantReference}
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.TestConsoleEnvironment
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.*
@@ -21,7 +19,7 @@ trait EntitySyntax {
   val defaultParticipant: String = "participant1"
 
   implicit class ParticipantReferenceSyntax(participantReference: ParticipantReference)(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      env: TestConsoleEnvironment
   ) {
 
     def ownParties(filterSynchronizerId: Option[SynchronizerId] = None): Set[PartyId] =
@@ -60,9 +58,7 @@ trait EntitySyntax {
     }
   }
 
-  implicit class PartyIdSyntax(partyId: PartyId)(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
-  ) {
+  implicit class PartyIdSyntax(partyId: PartyId)(implicit env: TestConsoleEnvironment) {
     def participants(
         requestingParticipant: LocalParticipantReference,
         synchronizerId: Option[SynchronizerId] = None,
@@ -73,9 +69,7 @@ trait EntitySyntax {
         .toSet
   }
 
-  implicit class StringConversions(name: String)(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
-  ) {
+  implicit class StringConversions(name: String)(implicit env: TestConsoleEnvironment) {
     import env.*
 
     def toPartyId(

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client
@@ -27,7 +27,6 @@ class GrpcCtlRunnerTest extends AsyncWordSpec with BaseTest {
           channel,
           None,
           1000.milliseconds,
-          _ => false,
         ) map { result =>
           result shouldBe "result"
         }

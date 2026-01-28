@@ -1,10 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.concurrent
 
 import cats.syntax.either.*
-import com.daml.metrics.ExecutorServiceMetrics
 import com.digitalasset.canton.checked
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.lifecycle.ClosingException
@@ -15,7 +14,6 @@ import com.typesafe.scalalogging.Logger
 
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicReference
-import java.util.function.Predicate
 import scala.concurrent.{ExecutionContextExecutor, blocking}
 import scala.util.chaining.*
 
@@ -129,24 +127,9 @@ object Threading {
       name: String,
       logger: Logger,
   ): ExecutionContextIdlenessExecutorService =
-    newExecutionContext(name, logger, None)
-
-  def newExecutionContext(
-      name: String,
-      logger: Logger,
-      metrics: ExecutorServiceMetrics,
-  ): ExecutionContextIdlenessExecutorService =
-    newExecutionContext(name, logger, Some(metrics))
-
-  def newExecutionContext(
-      name: String,
-      logger: Logger,
-      maybeMetrics: Option[ExecutorServiceMetrics],
-  ): ExecutionContextIdlenessExecutorService =
     newExecutionContext(
       name,
       logger,
-      maybeMetrics,
       detectNumberOfThreads(logger),
     )
 
@@ -161,7 +144,6 @@ object Threading {
   def newExecutionContext(
       name: String,
       logger: Logger,
-      maybeMetrics: Option[ExecutorServiceMetrics],
       parallelism: PositiveInt,
       maxExtraThreads: PositiveInt = PositiveInt.tryCreate(256),
       exitOnFatal: Boolean = true,
@@ -183,12 +165,8 @@ object Threading {
       .asInstanceOf[ForkJoinPool.ForkJoinWorkerThreadFactory]
 
     val forkJoinPool = createForkJoinPool(parallelism, threadFactory, handler, logger)
-    val executorService =
-      maybeMetrics.fold(forkJoinPool: ExecutorService)(
-        _.monitorExecutorService(name, forkJoinPool)
-      )
 
-    new ForkJoinIdlenessExecutorService(forkJoinPool, executorService, reporter, name)
+    new ForkJoinIdlenessExecutorService(forkJoinPool, forkJoinPool, reporter, name)
   }
 
   /** Minimum parallelism of ForkJoinPool. Currently greater than one to work around a bug that
@@ -215,44 +193,21 @@ object Threading {
         minParallelismForForkJoinPool
       }
 
-    try {
-      val java11ForkJoinPoolConstructor = classOf[ForkJoinPool].getConstructor(
-        classOf[Int],
-        classOf[ForkJoinPool.ForkJoinWorkerThreadFactory],
-        classOf[Thread.UncaughtExceptionHandler],
-        classOf[Boolean],
-        classOf[Int],
-        classOf[Int],
-        classOf[Int],
-        classOf[Predicate[?]],
-        classOf[Long],
-        classOf[TimeUnit],
-      )
-
-      java11ForkJoinPoolConstructor.newInstance(
-        Int.box(tunedParallelism.unwrap),
-        threadFactory,
-        handler,
-        Boolean.box(true),
-        Int.box(tunedParallelism.unwrap),
-        Int.box(Int.MaxValue),
-        //
-        // Choosing tunedParallelism here instead of the default of 1.
-        // With the default, we would get only 1 running thread in the presence of blocking calls.
-        Int.box(tunedParallelism.unwrap),
-        null,
-        Long.box(60),
-        TimeUnit.SECONDS,
-      )
-    } catch {
-      case _: NoSuchMethodException =>
-        logger.warn(
-          "Unable to create ForkJoinPool of Java 11. " +
-            "Using fallback instead, which has been tested less than the default one. " +
-            "Do not use this setting in production."
-        )
-        new ForkJoinPool(tunedParallelism.unwrap, threadFactory, handler, true)
-    }
+    new ForkJoinPool(
+      tunedParallelism.unwrap,
+      threadFactory,
+      handler,
+      true,
+      tunedParallelism.unwrap,
+      Int.MaxValue,
+      //
+      // Choosing tunedParallelism here instead of the default of 1.
+      // With the default, we would get only 1 running thread in the presence of blocking calls.
+      tunedParallelism.unwrap,
+      null,
+      60L,
+      TimeUnit.SECONDS,
+    )
   }
 
   def directExecutionContext(logger: Logger): ExecutionContextExecutor = DirectExecutionContext(

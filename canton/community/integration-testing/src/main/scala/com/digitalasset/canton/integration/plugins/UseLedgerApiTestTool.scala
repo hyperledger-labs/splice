@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
@@ -13,7 +13,6 @@ import com.digitalasset.canton.config.{
   NonNegativeFiniteDuration as NonNegativeFiniteDurationConfig,
 }
 import com.digitalasset.canton.console.BufferedProcessLogger
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.plugins.UseLedgerApiTestTool.{
   EnvVarTestOverrides,
   LAPITTVersion,
@@ -30,9 +29,10 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, Traced
 import com.digitalasset.canton.platform.apiserver.SeedService.Seeding
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.OptionUtil
+import io.circe.*
+import io.circe.generic.semiauto.*
+import io.circe.parser.*
 import monocle.macros.syntax.lens.*
-import spray.json.*
-import spray.json.DefaultJsonProtocol.*
 
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import java.net.{Authenticator, PasswordAuthentication, URI}
@@ -57,7 +57,7 @@ class UseLedgerApiTestTool(
     version: LAPITTVersion = LAPITTVersion.Latest,
     javaOpts: String = "-Xmx500m",
     defaultExtraArguments: Map[String, String] = Map("--timeout-scale-factor" -> "4"),
-) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
+) extends EnvironmentSetupPlugin
     with NoTracing
     with EnvVarTestOverrides {
 
@@ -130,7 +130,7 @@ class UseLedgerApiTestTool(
       exclude: Seq[String],
       concurrency: Int,
       kv: (String, String)*
-  )(implicit env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]): String = {
+  )(implicit env: TestConsoleEnvironment): String = {
     val excludeParameter = NonEmpty.from(exclude) match {
       case Some(suitesNE) => Seq("--exclude", suitesNE.mkString(","))
       case None => Nil
@@ -151,7 +151,7 @@ class UseLedgerApiTestTool(
       suites: String, // comma-separated list of suites
       exclude: Seq[String],
       kv: (String, String)*
-  )(implicit env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]): String =
+  )(implicit env: TestConsoleEnvironment): String =
     runSuites(suites = suites, exclude = exclude, concurrency = 1, kv*)
 
   def runShardedSuites(
@@ -160,7 +160,7 @@ class UseLedgerApiTestTool(
       exclude: Seq[String],
       concurrentTestRuns: Int = 4,
   )(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      env: TestConsoleEnvironment
   ): String = {
     val allTests = execTestTool("--list-all").split("\n")
     val listing = allTests
@@ -225,9 +225,7 @@ class UseLedgerApiTestTool(
 
   private def endpointAsString(config: ClientConfig) = s"${config.address}:${config.port.toString}"
 
-  private def testParticipants(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
-  ): Seq[String] =
+  private def testParticipants(implicit env: TestConsoleEnvironment): Seq[String] =
     env.participants.all
       .map { p =>
         val ledgerApiEndpoint = endpointAsString(p.config.clientLedgerApi)
@@ -350,6 +348,7 @@ object UseLedgerApiTestTool {
   // Ideally we'd rely on sbt and coursier to manage the dependency to avoid having to deal with  caching ourselves,
   // but these does not seem to be a straightforward way to keep the test tool off from the classpath so that the
   // fat jar contents don't interfere with canton dependencies (e.g. fastparse).
+  @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
   def download(
       url: String,
       destination: File,
@@ -430,9 +429,7 @@ object UseLedgerApiTestTool {
 
   final case class ArtifactoryItem(uri: String, folder: Boolean)
 
-  implicit val artifactoryItemFormat: RootJsonFormat[ArtifactoryItem] = jsonFormat2(
-    ArtifactoryItem.apply
-  )
+  implicit val artifactoryItemDecoder: Decoder[ArtifactoryItem] = deriveDecoder[ArtifactoryItem]
 
   private def credentialsFromNetrcFile: (Option[String], Option[String]) = {
     val netrcPath = System.getProperty("user.home") + "/.netrc"
@@ -467,8 +464,15 @@ object UseLedgerApiTestTool {
       )
 
     // from jfrog api a json object is returned which contains the folders in children field
-    val obj = response.body.parseJson.asJsObject
-    val files = obj.fields("children").convertTo[Seq[ArtifactoryItem]]
+    val json = parse(response.body) match {
+      case Left(err) => sys.error(s"Failed to parse artifactory response body: ${err.getMessage}")
+      case Right(j) => j
+    }
+
+    val files = json.hcursor.downField("children").as[Seq[ArtifactoryItem]] match {
+      case Left(err) => sys.error(s"Failed to decode artifactory children: ${err.getMessage}")
+      case Right(seq) => seq
+    }
 
     files
       .map(_.uri)

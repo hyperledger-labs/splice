@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging
@@ -101,8 +101,6 @@ final case class LogEntry(
     Seq(
       "com.digitalasset.canton.integration.EnvironmentDefinition",
       "com.digitalasset.canton.integration.EnvironmentDefinition",
-      // TODO(M1-90): add as parameter for Canton library-isation
-      "org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition",
     )
 
   def shouldBeCommandFailure(code: ErrorCode, message: String = "")(implicit

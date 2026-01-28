@@ -1,5 +1,5 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.daml.ledger.api.testtool.suites
 
@@ -41,7 +41,7 @@ class NamesSpec(val allTestSuites: Vector[LedgerTestSuite])
     }
 
     "not be a prefix of or equal to any other name, so that each test can be included independently (per each test suite)" in {
-      allTestIdentifiersPerTestSuite.map { case (testSuiteName, testIdentifiers) =>
+      allTestIdentifiersPerTestSuite.foreach { case (testSuiteName, testIdentifiers) =>
         testIdentifiers.zipWithIndex.foreach { case (testIdentifier, i) =>
           all(
             testIdentifiers.drop(i + 1)

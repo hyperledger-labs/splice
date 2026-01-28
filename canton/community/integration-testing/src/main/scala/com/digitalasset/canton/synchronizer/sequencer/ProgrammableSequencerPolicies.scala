@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -26,7 +26,7 @@ object ProgrammableSequencerPolicies {
   /*
     Delay the specified messages by some duration.
    */
-  def delay(environment: Environment[?])(
+  def delay(environment: Environment)(
       confirmationResponses: Map[ParticipantId, NonNegativeFiniteDuration] = Map.empty,
       mediatorMessages: Option[NonNegativeFiniteDuration] = None,
   ): SendPolicy = {

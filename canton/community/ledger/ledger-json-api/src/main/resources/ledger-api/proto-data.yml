@@ -42,9 +42,15 @@ fileComments:
         message:
           comments: null
           fieldComments:
-            command_id_prefix: optional filter by command id
-            state: optional filter by state
-            limit: optional limit of returned statuses, defaults to 100
+            command_id_prefix: |-
+              filter by command id
+              Optional
+            state: |-
+              filter by state
+              Optional
+            limit: |-
+              limit of returned statuses, defaults to 100
+              Optional
       GetCommandStatusResponse:
         message:
           comments: null
@@ -631,6 +637,11 @@ fileComments:
             identity_provider_id: |-
               The id of the ``Identity Provider`` whose parties should be retrieved.
               Optional, if not set, assume the party is managed by the default identity provider or party is not hosted by the participant.
+            filter_party: |-
+              An optional filter for the party name, searching for all party names known to this node
+              starting with the given prefix. This can either be just a string or extend up to the full
+              identifier.
+              Optional
       ListKnownPartiesResponse:
         message:
           comments: null
@@ -1103,6 +1114,7 @@ fileComments:
               If not set the ledger uses the ledger begin offset instead.
               If specified, it must be a valid absolute offset (positive integer) or zero (ledger begin offset).
               If the ledger has been pruned, this parameter must be specified and greater than the pruning offset.
+              Optional
       CompletionStreamResponse:
         message:
           comments: null
@@ -1561,6 +1573,51 @@ fileComments:
 
                 Must be non-negative.
     services: {}
+  contract_service.proto:
+    messages:
+      GetContractRequest:
+        message:
+          comments: null
+          fieldComments:
+            contract_id: |-
+              The ID of the contract.
+              Must be a valid LedgerString (as described in ``value.proto``).
+              Required
+            querying_parties: |-
+              The list of querying parties
+              The stakeholders of the referenced contract must have an intersection with any of these parties
+              to return the result.
+              Optional, if no querying_parties specified, all possible contracts could be returned.
+      GetContractResponse:
+        message:
+          comments: null
+          fieldComments:
+            created_event: |-
+              The representative_package_id will be always set to the contract package ID, therefore this endpoint should
+              not be used to lookup contract which entered the participant via party replication or repair service.
+              The witnesses field will contain only the querying_parties which are also stakeholders of the contract as well.
+              The following fields of the created event cannot be populated, so those should not be used / parsed:
+
+              - offset
+              - node_id
+              - created_event_blob
+              - interface_views
+              - acs_delta
+
+              Required
+    oneOfs:
+      GetContractRequest: {}
+      GetContractResponse: {}
+    services:
+      ContractService:
+      - name: GetContract
+        comments: |-
+          Looking up contract data by contract ID.
+          This endpoint is experimental / alpha, therefore no backwards compatibility is guaranteed.
+          This endpoint must not be used to look up contracts which entered the participant via party replication
+          or repair service.
+          If there is no contract exist with the contract ID, or there is no intersection with the querying_parties,
+          an CONTRACT_PAYLOAD_NOT_FOUND error will be raised.
   crypto.proto:
     messages:
       Signature:
@@ -1857,6 +1914,13 @@ fileComments:
               The value of the interface's view method on this event.
               Set if it was requested in the ``InterfaceFilter`` and it could be
               successfully computed.
+              Optional
+            implementation_package_id: |-
+              The package defining the interface implementation used to compute the view.
+              Can be different from the package that was used to create the contract itself,
+              as the contract arguments can be upgraded or downgraded using smart-contract upgrading
+              as part of computing the interface view.
+              Populated if the view computation is successful, otherwise empty.
               Optional
     oneOfs:
       ArchivedEvent: {}
@@ -2940,7 +3004,9 @@ fileComments:
             offset: |-
               The participant's offset. The details of this field are described in ``community/ledger-api/README.md``.
               Required, must be a valid absolute offset (positive integer).
-            events: The collection of reassignment events. Required.
+            events: |-
+              The collection of reassignment events.
+              Required.
             workflow_id: |-
               The workflow ID used in reassignment command submission. Only set if the ``workflow_id`` for the command was set.
               Must be a valid LedgerString (as described in ``value.proto``).
@@ -3150,11 +3216,7 @@ fileComments:
             event_format: |-
               Format of the contract_entries in the result. In case of CreatedEvent the presentation will be of
               TRANSACTION_SHAPE_ACS_DELTA.
-              Optional for backwards compatibility, defaults to an EventFormat where:
-
-              - filters_by_party is the filter.filters_by_party from this request
-              - filters_for_any_party is the filter.filters_for_any_party from this request
-              - verbose is the verbose field from this request
+              Required
       GetActiveContractsResponse:
         message:
           comments: null
@@ -3703,17 +3765,7 @@ fileComments:
               The response will only contain transactions whose offset is less than or equal to this.
               Optional, if empty, the stream will not terminate.
               If specified, the stream will terminate after this absolute offset (positive integer) is reached.
-            update_format: |-
-              Must be unset for GetUpdateTrees request.
-              Optional for backwards compatibility for GetUpdates request: defaults to an UpdateFormat where:
-
-              - include_transactions.event_format.filters_by_party = the filter.filters_by_party on this request
-              - include_transactions.event_format.filters_for_any_party = the filter.filters_for_any_party on this request
-              - include_transactions.event_format.verbose = the same flag specified on this request
-              - include_transactions.transaction_shape = TRANSACTION_SHAPE_ACS_DELTA
-              - include_reassignments.filter = the same filter specified on this request
-              - include_reassignments.verbose = the same flag specified on this request
-              - include_topology_events.include_participant_authorization_events.parties = all the parties specified in filter
+            update_format: Required
       GetUpdatesResponse:
         message:
           comments: null
@@ -3752,7 +3804,7 @@ fileComments:
           for individual events depends on the transaction shape chosen.
 
           - ACS delta: a requesting party must be a stakeholder of an event for it to be included.
-          - ledger effects: a requesting party must be a witness of an en event for it to be included.
+          - ledger effects: a requesting party must be a witness of an event for it to be included.
       - name: GetUpdateByOffset
         comments: |-
           Lookup an update by its offset.

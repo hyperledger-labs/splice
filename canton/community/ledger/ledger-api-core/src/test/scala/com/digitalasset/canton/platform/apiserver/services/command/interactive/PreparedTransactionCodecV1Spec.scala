@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command.interactive
@@ -91,40 +91,6 @@ class PreparedTransactionCodecV1Spec
       forAll { (node: Node.Fetch) =>
         val encoded =
           encoder.v1.fetchTransformer(LfSerializationVersion.V1).transform(node).asEither.value
-        decoder.v1.fetchTransformer.transform(encoded).asEither.value shouldEqual node
-      }
-    }
-
-    "support interfaceId on exercise node" in {
-      implicit val nodeGen: Arbitrary[Node.Exercise] = Arbitrary(
-        for {
-          exerciseNode <- ValueGenerators.danglingRefExerciseNodeGen
-          normalized = normalizeNodeForV1(exerciseNode).copy(
-            interfaceId = Some(ValueGenerators.idGen.sample.value)
-          )
-        } yield normalized
-      )
-
-      forAll { (node: Node.Exercise) =>
-        val encoded =
-          encoder.v1.exerciseTransformer(LanguageVersion.v2_1).transform(node).asEither.value
-        decoder.v1.exerciseTransformer.transform(encoded).asEither.value shouldEqual node
-      }
-    }
-
-    "support interfaceId on fetch node" in {
-      implicit val nodeGen: Arbitrary[Node.Fetch] = Arbitrary(
-        for {
-          fetchNode <- ValueGenerators.fetchNodeGen
-          normalized = normalizeNodeForV1(fetchNode).copy(
-            interfaceId = Some(ValueGenerators.idGen.sample.value)
-          )
-        } yield normalized
-      )
-
-      forAll { (node: Node.Fetch) =>
-        val encoded =
-          encoder.v1.fetchTransformer(LanguageVersion.v2_1).transform(node).asEither.value
         decoder.v1.fetchTransformer.transform(encoded).asEither.value shouldEqual node
       }
     }

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.block.update
@@ -6,12 +6,12 @@ package com.digitalasset.canton.synchronizer.block.update
 import cats.syntax.alternative.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
-import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.base.error.BaseAlarm
 import com.digitalasset.canton.SequencerCounter
+import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.crypto.{HashPurpose, SyncCryptoClient, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.{CantonTimestamp, LogicalUpgradeTime}
 import com.digitalasset.canton.discard.Implicits.*
@@ -51,6 +51,7 @@ final class BlockChunkProcessor(
     sequencerId: SequencerId,
     rateLimitManager: SequencerRateLimitManager,
     orderingTimeFixMode: OrderingTimeFixMode,
+    batchingConfig: BatchingConfig,
     override val loggerFactory: NamedLoggerFactory,
     metrics: SequencerMetrics,
     memberValidator: SequencerMemberValidator,
@@ -63,6 +64,7 @@ final class BlockChunkProcessor(
       synchronizerSyncCryptoApi,
       sequencerId,
       rateLimitManager,
+      batchingConfig,
       loggerFactory,
       metrics,
       memberValidator = memberValidator,
@@ -111,12 +113,10 @@ final class BlockChunkProcessor(
 
     for {
       validatedSequencedSubmissions <- validatedSequencedSubmissionsF
-      pendingTopologyTimestamps =
-        state.pendingTopologyTimestamps ++ validatedSequencedSubmissions.collect {
-          case submission
-              if submission.submissionRequest.content.requestType == TopologyTransaction =>
-            submission.sequencingTimestamp
-        }
+      latestTopologyTimestamp = validatedSequencedSubmissions
+        .findLast(_.submissionRequest.content.requestType == TopologyTransaction)
+        .map(_.sequencingTimestamp)
+        .orElse(state.latestPendingTopologyTransactionTimestamp)
 
       acksValidationResult <- acksValidationResultF
       (acksByMember, invalidAcks) = acksValidationResult
@@ -163,8 +163,8 @@ final class BlockChunkProcessor(
           state.lastBlockTs,
           lastChunkTsOfSuccessfulEvents,
           lastSequencerEventTimestamp.orElse(state.latestSequencerEventTimestamp),
+          latestTopologyTimestamp,
           finalInFlightAggregationsWithAggregationExpiry,
-          pendingTopologyTimestamps,
         )
     } yield (newState, chunkUpdate)
   }
@@ -334,7 +334,7 @@ final class BlockChunkProcessor(
       // assigned a sequencing time that corresponds to an actual (i.e. `Send`) event and that is also surely
       // at or after the acknowledged timestamp. This has no effect whatsoever on transaction processing.
       chunk.forgetNE.foldLeft[
-        (CantonTimestamp, Seq[(CantonTimestamp, Traced[LedgerBlockEvent])])
+        (CantonTimestamp, Seq[(CantonTimestamp, Traced[LedgerBlockEvent])]),
       ]((state.lastChunkTs, Seq.empty)) { case ((lastTs, events), event) =>
         event.value match {
           case send: Send =>
@@ -383,7 +383,7 @@ final class BlockChunkProcessor(
   )(implicit
       executionContext: ExecutionContext
   ): FutureUnlessShutdown[Seq[SequencedValidatedSubmission]] =
-    submissionRequests.zipWithIndex.parTraverse {
+    MonadUtil.parTraverseWithLimit(batchingConfig.parallelism)(submissionRequests.zipWithIndex) {
       case ((sequencingTimestamp, tracedSubmissionRequest, orderingSequencerId), requestIndex) =>
         tracedSubmissionRequest.withTraceContext {
           implicit traceContext => signedSubmissionRequest =>
@@ -521,7 +521,8 @@ final class BlockChunkProcessor(
 
         // Intentionally use the previous block's last timestamp
         // such that the criterion does not depend on how the block events are chunked up.
-        tracedSignedAck.value.content.timestamp <= state.lastBlockTs || allowFutureAcksAfterSynchronizerUpgrade
+        tracedSignedAck.value.content.timestamp <= state.lastBlockTs
+        || allowFutureAcksAfterSynchronizerUpgrade
       }
       invalidTsAcks = futureAcks.map(_.withTraceContext { implicit traceContext => signedAck =>
         val ack = signedAck.content

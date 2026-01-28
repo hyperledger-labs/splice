@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.performance.elements
@@ -38,7 +38,6 @@ object DriverStatus {
       maxRate: Double,
       latencyMs: Double,
       pending: Int,
-      backpressured: Int,
       failed: Int,
       proposals: StepStatus,
       accepts: StepStatus,
@@ -56,7 +55,6 @@ object DriverStatus {
          | pending=$pending,
          | proposals=$proposals,
          | accepts=$accepts,
-         | backpressured=$backpressured,
          | failed=$failed)
          |""".stripMargin.replaceAll("\n", "")
   }

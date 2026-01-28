@@ -1,9 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
 
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.{BatchAggregatorConfig, TopologyConfig}
 import com.digitalasset.canton.crypto.BaseCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.processing.TopologyTransactionTestFactory
@@ -137,6 +138,8 @@ class TopologyManagerTest extends AnyWordSpec with BaseTest with HasExecutionCon
       Factory.sequencer1.uid,
       wallClock,
       Factory.crypto,
+      BatchAggregatorConfig.defaultsForTesting,
+      TopologyConfig.forTesting,
       new InMemoryTopologyStore(
         TopologyStoreId.AuthorizedStore,
         testedProtocolVersion,
@@ -154,6 +157,8 @@ class TopologyManagerTest extends AnyWordSpec with BaseTest with HasExecutionCon
       Factory.sequencer1.uid,
       wallClock,
       Factory.crypto,
+      BatchAggregatorConfig.defaultsForTesting,
+      TopologyConfig.forTesting,
       new InMemoryTopologyStore(
         TopologyStoreId.TemporaryStore.tryCreate("test"),
         testedProtocolVersion,
@@ -174,6 +179,8 @@ class TopologyManagerTest extends AnyWordSpec with BaseTest with HasExecutionCon
       wallClock,
       Factory.syncCryptoClient.crypto,
       defaultStaticSynchronizerParameters,
+      BatchAggregatorConfig.defaultsForTesting,
+      TopologyConfig.forTesting,
       new InMemoryTopologyStore(
         TopologyStoreId.SynchronizerStore(Factory.physicalSynchronizerId1),
         testedProtocolVersion,

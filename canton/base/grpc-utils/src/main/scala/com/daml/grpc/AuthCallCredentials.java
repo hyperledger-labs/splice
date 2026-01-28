@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.daml.grpc;
@@ -31,10 +31,5 @@ public final class AuthCallCredentials extends CallCredentials {
     metadata.put(
         AuthCallCredentials.header, token.startsWith("Bearer ") ? token : "Bearer " + token);
     applier.apply(metadata);
-  }
-
-  @Override
-  public void thisUsesUnstableApi() {
-    // No need to implement this, it's used as a warning from upstream
   }
 }

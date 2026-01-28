@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.admin.grpc
@@ -110,7 +110,7 @@ object TopologyStoreId {
         physical => Right(store.TopologyStoreId.SynchronizerStore(physical)),
       )
 
-    def logicalSynchronizerId: SynchronizerId = id.fold(identity, _.logical)
+    private[canton] def logicalSynchronizerId: SynchronizerId = id.fold(identity, _.logical)
   }
 
   object Synchronizer {

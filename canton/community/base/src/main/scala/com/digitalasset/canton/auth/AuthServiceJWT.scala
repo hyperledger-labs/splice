@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.auth
@@ -11,21 +11,16 @@ import com.daml.jwt.{
   JwtVerifierBase,
   StandardJWTPayload,
 }
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
-import com.digitalasset.canton.config.{CantonConfigValidator, UniformCantonConfigValidation}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import spray.json.JsonParser
+import io.circe.parser
 
 import scala.concurrent.Future
 import scala.util.Try
 
-sealed trait AccessLevel extends Product with Serializable with UniformCantonConfigValidation
+sealed trait AccessLevel extends Product with Serializable
 
 object AccessLevel {
-  implicit val accessLevelCantonConfigValidator: CantonConfigValidator[AccessLevel] =
-    CantonConfigValidatorDerivation[AccessLevel]
-
   case object Admin extends AccessLevel
   case object Wildcard extends AccessLevel
 }
@@ -33,12 +28,7 @@ object AccessLevel {
 final case class AuthorizedUser(
     userId: String,
     allowedServices: Seq[String],
-) extends UniformCantonConfigValidation
-
-object AuthorizedUser {
-  implicit val accessLevelCantonConfigValidator: CantonConfigValidator[AuthorizedUser] =
-    CantonConfigValidatorDerivation[AuthorizedUser]
-}
+)
 
 /** An AuthService that reads a JWT token from a `Authorization: Bearer` HTTP header. The token is
   * expected to use the format as defined in [[com.daml.jwt.AuthServiceJWTPayload]]:
@@ -106,21 +96,21 @@ abstract class AuthServiceJWTBase(
 
   private[this] def parseAuthServicePayload(jwtPayload: String): AuthServiceJWTPayload = {
     import AuthServiceJWTCodec.JsonImplicits.*
-    JsonParser(jwtPayload).convertTo[AuthServiceJWTPayload]
+    parser.decode(jwtPayload).fold(throw _, identity)
   }
 
   private[this] def parseAudienceBasedPayload(
       jwtPayload: String
   ): AuthServiceJWTPayload = {
     import AuthServiceJWTCodec.AudienceBasedTokenJsonImplicits.*
-    JsonParser(jwtPayload).convertTo[AuthServiceJWTPayload]
+    parser.decode(jwtPayload).fold(throw _, identity)
   }
 
   private[this] def parseScopeBasedPayload(
       jwtPayload: String
   ): AuthServiceJWTPayload = {
     import AuthServiceJWTCodec.ScopeBasedTokenJsonImplicits.*
-    JsonParser(jwtPayload).convertTo[AuthServiceJWTPayload]
+    parser.decode(jwtPayload).fold(throw _, identity)
   }
 
   private[this] def parseJWTPayload(header: String): Either[Error, AuthServiceJWTPayload] =

@@ -1,10 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
 
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
-import com.digitalasset.canton.config.SharedCantonConfig
 import com.digitalasset.canton.console.{HeadlessConsole, InteractiveConsole}
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.environment.Environment
@@ -18,20 +17,20 @@ import scala.util.control.NonFatal
 /** Result for exposing the process exit code. All logging is expected to take place inside the
   * runner.
   */
-trait Runner[C <: SharedCantonConfig[C]] extends NamedLogging {
+trait Runner extends NamedLogging {
 
-  def run(environment: Environment[C]): Unit
+  def run(environment: Environment): Unit
 }
 
-class ServerRunner[C <: SharedCantonConfig[C]](
+class ServerRunner(
     bootstrapScript: Option[CantonScript] = None,
     override val loggerFactory: NamedLoggerFactory,
     exitAfterBootstrap: Boolean = false,
     dars: Seq[String] = Seq.empty,
-) extends Runner[C]
+) extends Runner
     with NoTracing {
 
-  def run(environment: Environment[C]): Unit =
+  def run(environment: Environment): Unit =
     try {
       // TODO(#24954): Convert to using declarative api, when it becomes available
       def uploadDar(darPath: String): Unit = {
@@ -80,34 +79,32 @@ class ServerRunner[C <: SharedCantonConfig[C]](
     }
 }
 
-class ConsoleInteractiveRunner[C <: SharedCantonConfig[C]](
+class ConsoleInteractiveRunner(
     noTty: Boolean = false,
     bootstrapScript: Option[CantonScript],
     postScriptCallback: => Unit,
     override val loggerFactory: NamedLoggerFactory,
-) extends Runner[C] {
-  def run(environment: Environment[C]): Unit = {
+) extends Runner {
+  def run(environment: Environment): Unit = {
     val success =
       try {
         val consoleEnvironment = environment.createConsole()
         InteractiveConsole(consoleEnvironment, noTty, bootstrapScript, logger, postScriptCallback)
       } catch {
-        case NonFatal(e) =>
-          logger.error(e.getMessage)(TraceContext.empty)
-          false
+        case NonFatal(_) => false
       }
     sys.exit(if (success) 0 else 1)
   }
 }
 
-class ConsoleScriptRunner[C <: SharedCantonConfig[C]](
+class ConsoleScriptRunner(
     scriptPath: CantonScript,
     override val loggerFactory: NamedLoggerFactory,
-) extends Runner[C] {
+) extends Runner {
   private val Ok = 0
   private val Error = 1
 
-  override def run(environment: Environment[C]): Unit = {
+  override def run(environment: Environment): Unit = {
     val exitCode =
       ConsoleScriptRunner.run(environment, scriptPath, logger) match {
         case Right(_unit) =>
@@ -174,21 +171,21 @@ final case class CantonScriptFromFile(scriptPath: File) extends CantonScript {
 }
 
 object ConsoleScriptRunner extends NoTracing {
-  def apply[C <: SharedCantonConfig[C]](
+  def apply(
       scriptPath: File,
       loggerFactory: NamedLoggerFactory,
-  ): ConsoleScriptRunner[C] =
+  ): ConsoleScriptRunner =
     new ConsoleScriptRunner(CantonScriptFromFile(scriptPath), loggerFactory)
 
-  def run[C <: SharedCantonConfig[C]](
-      environment: Environment[C],
+  def run(
+      environment: Environment,
       scriptPath: File,
       logger: TracedLogger,
   ): Either[HeadlessConsole.HeadlessConsoleError, Unit] =
     run(environment, CantonScriptFromFile(scriptPath), logger)
 
-  def run[C <: SharedCantonConfig[C]](
-      environment: Environment[C],
+  def run(
+      environment: Environment,
       cantonScript: CantonScript,
       logger: TracedLogger,
   ): Either[HeadlessConsole.HeadlessConsoleError, Unit] = {
@@ -219,7 +216,7 @@ object ConsoleScriptRunner extends NoTracing {
     val normalized = script.replaceAll("\\r\\n|\\r|\\n", "\n")
     Hash
       .build(HashPurpose.CantonScript, HashAlgorithm.Sha256)
-      .add(normalized)
+      .addString(normalized)
       .finish()
   }
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
@@ -8,7 +8,6 @@ import cats.implicits.catsSyntaxParallelTraverse_
 import com.digitalasset.canton.config.CantonConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.console.InstanceReference
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.TestConsoleEnvironment
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.{TempDirectory, TempFile}
@@ -36,7 +35,7 @@ trait DbDumpRestore {
     }
 
   def saveDump(node: InstanceReference, tempFile: TempFile)(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      env: TestConsoleEnvironment
   ): Future[Unit]
 
   def saveDump(nodeName: String, tempFile: TempFile): Future[Unit]
@@ -56,7 +55,7 @@ trait DbDumpRestore {
     }
 
   def restoreDump(node: InstanceReference, dumpFileName: Path)(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      env: TestConsoleEnvironment
   ): Future[Unit]
 
   def restoreDump(nodeName: String, dumpFileName: Path): Future[Unit]

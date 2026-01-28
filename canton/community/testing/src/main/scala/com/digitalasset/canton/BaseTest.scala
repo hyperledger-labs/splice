@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -14,7 +14,7 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCryptoProvider
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
-import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger, SuppressionRule}
+import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.metrics.OpenTelemetryOnDemandMetricsReader
 import com.digitalasset.canton.protocol.{
   DynamicSynchronizerParameters,
@@ -48,7 +48,6 @@ import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatestplus.scalacheck.CheckerAsserting
 import org.slf4j.bridge.SLF4JBridgeHandler
-import org.slf4j.event.Level
 import org.typelevel.discipline.Laws
 
 import scala.concurrent.duration.*
@@ -152,11 +151,6 @@ trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
       optionTAssertion: OptionT[Future, Assertion]
   )(implicit ec: ExecutionContext, pos: source.Position): Future[Assertion] =
     optionTAssertion.getOrElse(fail(s"Unexpected None value"))
-
-  implicit def futureUnlessShutdownAssertionOfOptionTAssertion(
-      optionTAssertion: OptionT[FutureUnlessShutdown, Assertion]
-  )(implicit ec: ExecutionContext, pos: source.Position): Future[Assertion] =
-    optionTAssertion.getOrElse(fail(s"Unexpected None value")).failOnShutdown("shutdown")
 
   /** Converts an EitherT into a Future, failing in case of a [[scala.Left$]]. */
   def valueOrFail[F[_], A, B](e: EitherT[F, A, B])(
@@ -287,7 +281,7 @@ trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
     def failOnShutdown(clue: String)(implicit ec: ExecutionContext, pos: Position): Future[A] =
       fut.onShutdown(fail(s"Shutdown during $clue"))
     def failOnShutdown(implicit ec: ExecutionContext, pos: Position): Future[A] =
-      fut.onShutdown(fail(s"Unexpected shutdown"))
+      fut.onShutdown(fail("Unexpected shutdown"))
     def futureValueUS(implicit pos: Position): A =
       futureValueUS(PatienceConfiguration.Timeout(defaultPatience.timeout))(pos)
     def futureValueUS(timeout: PatienceConfiguration.Timeout)(implicit pos: Position): A =
@@ -381,15 +375,6 @@ trait BaseTest
         throw ex
     }
   }
-
-  /** Suppressed failed clue messages to make our log-checker happy when using clues within an eventually. */
-  def suppressFailedClues[T](loggerFactory: SuppressingLogger)(expr: => T): T =
-    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.ERROR))(
-      expr,
-      logEntries =>
-        forAll(logEntries)(logEntry => logEntry.message should startWith("Failed: clue")),
-    )
-
   def clueFUS[T](
       message: String
   )(expr: => FutureUnlessShutdown[T])(implicit ec: ExecutionContext): FutureUnlessShutdown[T] = {
@@ -430,23 +415,6 @@ trait BaseTest
       maxPollInterval,
       retryOnTestFailuresOnly = retryOnTestFailuresOnly,
     )(testCode)
-
-  /** Keeps evaluating `testCode` until it succeeds or a timeout occurs.
-    */
-  def eventuallySucceeds[T](
-      timeUntilSuccess: FiniteDuration = 20.seconds,
-      maxPollInterval: FiniteDuration = 5.seconds,
-      suppressErrors: Boolean = true,
-  )(testCode: => T): T = {
-    eventually(timeUntilSuccess, maxPollInterval) {
-      try {
-        if (suppressErrors) loggerFactory.suppressErrors(testCode) else testCode
-      } catch {
-        case e: TestFailedException => throw e
-        case NonFatal(e) => fail(e)
-      }
-    }
-  }
 
   /** Keeps evaluating `testCode` until it fails or a timeout occurs.
     * @return
@@ -499,10 +467,15 @@ trait BaseTest
   lazy val VettingMainCompatPath: String = BaseTest.VettingMainCompatPath
   lazy val VettingMainIncompatPath: String = BaseTest.VettingMainIncompatPath
   lazy val VettingMainSubstitutionPath: String = BaseTest.VettingMainSubstitutionPath
+  lazy val ModelTestsPath: String = BaseTest.ModelTestsPath
+  lazy val SubViewsIfaceV1Path: String = BaseTest.SubViewsIfaceV1Path
+  lazy val SubViewsAssetV1Path: String = BaseTest.SubViewsAssetV1Path
+  lazy val SubViewsAssetV2Path: String = BaseTest.SubViewsAssetV2Path
+  lazy val SubViewsMainV1Path: String = BaseTest.SubViewsMainV1Path
 
   implicit class RichSynchronizerId(val id: SynchronizerId) {
     def toPhysical: PhysicalSynchronizerId =
-      PhysicalSynchronizerId(id, testedProtocolVersion, NonNegativeInt.zero)
+      PhysicalSynchronizerId(id, NonNegativeInt.zero, testedProtocolVersion)
   }
 
   implicit def toSynchronizerId(id: PhysicalSynchronizerId): SynchronizerId = id.logical
@@ -511,11 +484,9 @@ trait BaseTest
 }
 
 object BaseTest {
-  val DefaultEventuallyTimeUntilSuccess: FiniteDuration = 20.seconds
-
   implicit class RichSynchronizerIdO(val id: SynchronizerId) {
     def toPhysical: PhysicalSynchronizerId =
-      PhysicalSynchronizerId(id, testedProtocolVersion, NonNegativeInt.zero)
+      PhysicalSynchronizerId(id, NonNegativeInt.zero, testedProtocolVersion)
   }
 
   /** Keeps evaluating `testCode` until it fails or a timeout occurs.
@@ -568,8 +539,8 @@ object BaseTest {
     )
   )
   def eventually[T](
-      timeUntilSuccess: FiniteDuration = DefaultEventuallyTimeUntilSuccess,
-      maxPollInterval: FiniteDuration = 100.millis,
+      timeUntilSuccess: FiniteDuration = 20.seconds,
+      maxPollInterval: FiniteDuration = 5.seconds,
       retryOnTestFailuresOnly: Boolean = true,
   )(testCode: => T): T = {
     require(
@@ -577,7 +548,7 @@ object BaseTest {
       s"The timeout must not be negative, but is $timeUntilSuccess",
     )
     val deadline = timeUntilSuccess.fromNow
-    var sleepMs = 10L min (maxPollInterval.toMillis / 10L)
+    var sleepMs = 1L
     def sleep(): Unit = {
       val timeLeft = deadline.timeLeft.toMillis max 0
       Threading.sleep(sleepMs min timeLeft)
@@ -627,6 +598,10 @@ object BaseTest {
   object UnsupportedExternalPartyTest {
     // TODO(i27461): Support multi party submissions for external parties
     case object MultiPartySubmission extends UnsupportedExternalPartyTest
+    // TODO(i29530): Support multi root node submissions for external parties
+    case object MultiRootNodeSubmission extends UnsupportedExternalPartyTest
+    // TODO(i30256): Synchronizer routing for external parties
+    case object MultiSynchronizerParties extends UnsupportedExternalPartyTest
   }
 
   lazy val testedProtocolVersion: ProtocolVersion = ProtocolVersion.forSynchronizer
@@ -667,6 +642,11 @@ object BaseTest {
   lazy val VettingMainCompatPath: String = getResourcePath("VettingMain-2.0.0.dar")
   lazy val VettingMainIncompatPath: String = getResourcePath("VettingMain-3.0.0.dar")
   lazy val VettingMainSubstitutionPath: String = getResourcePath("VettingMain-4.0.0.dar")
+  lazy val ModelTestsPath: String = getResourcePath("model-tests-1.0.0.dar")
+  lazy val SubViewsIfaceV1Path: String = getResourcePath("sub-views-iface-1.0.0.dar")
+  lazy val SubViewsAssetV1Path: String = getResourcePath("sub-views-asset-1.0.0.dar")
+  lazy val SubViewsAssetV2Path: String = getResourcePath("sub-views-asset-2.0.0.dar")
+  lazy val SubViewsMainV1Path: String = getResourcePath("sub-views-main-1.0.0.dar")
 
   def getResourcePath(name: String): String =
     Option(getClass.getClassLoader.getResource(name))

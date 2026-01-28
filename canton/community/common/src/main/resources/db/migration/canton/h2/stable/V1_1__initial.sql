@@ -388,7 +388,8 @@ create table seq_block_height (
     -- there is no further event addressed to the sequencer between this timestamp
     -- and the last event in the block.
     -- NULL if no such timestamp is known, e.g., because this block was added before this column was added.
-    latest_sequencer_event_ts bigint
+    latest_sequencer_event_ts bigint,
+    latest_pending_topology_ts bigint
 );
 
 create table mediator_deduplication_store (
@@ -759,6 +760,7 @@ create index idx_common_topology_transactions_effective_changes
 create index idx_common_topology_transactions_for_valid_until_update
   on common_topology_transactions (store_id, mapping_key_hash, serial_counter, valid_from);
 
+-- TODO(#282923) validate whether this index is still necessary
 create index idx_common_topology_transactions_for_old_unique_idx
     on common_topology_transactions (store_id, mapping_key_hash, serial_counter, valid_from, operation, representative_protocol_version, tx_hash);
 

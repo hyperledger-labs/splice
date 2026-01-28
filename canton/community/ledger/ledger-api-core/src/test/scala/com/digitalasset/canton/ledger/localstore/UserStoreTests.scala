@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.localstore
@@ -148,19 +148,6 @@ trait UserStoreTests extends UserStoreSpecBase { self: AsyncFreeSpec =>
         } yield {
           res1 shouldBe Right(createdUser("user1"))
           res2 shouldBe Left(UserExists(user.id))
-        }
-      }
-    }
-
-    "disallow re-creating an existing user concurrently" in {
-      testIt { tested =>
-        val user = newUser("user1")
-        for {
-          res <- Future.sequence(
-            Seq(tested.createUser(user, Set.empty), tested.createUser(user, Set.empty))
-          )
-        } yield {
-          res should contain(Left(UserExists(user.id)))
         }
       }
     }

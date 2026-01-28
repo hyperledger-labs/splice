@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
@@ -19,7 +19,7 @@ class JsApiDocsService(
     override protected val requestLogger: ApiRequestLogger,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
-    executionContext: ExecutionContext
+    val executionContext: ExecutionContext
 ) extends Endpoints {
   private val apidocsGenerator = new ApiDocsGenerator(loggerFactory)
   private lazy val docs: Endpoint[CallerContext, Unit, Unit, Unit, Any] =

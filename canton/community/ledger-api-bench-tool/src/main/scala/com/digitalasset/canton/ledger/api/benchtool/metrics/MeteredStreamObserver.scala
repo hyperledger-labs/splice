@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.benchtool.metrics
@@ -8,6 +8,7 @@ import org.slf4j.Logger
 
 import scala.concurrent.Future
 
+@SuppressWarnings(Array("org.wartremover.warts.Var"))
 class MeteredStreamObserver[T](
     val streamName: String,
     logger: Logger,
@@ -21,8 +22,9 @@ class MeteredStreamObserver[T](
     itemsCount += itemCountingFunction(value)
     manager.sendNewValue(value)
     super.onNext(value)
-    if (maxItemCount.isDefined && itemsCount >= maxItemCount.get)
+    maxItemCount.filter(_ <= itemsCount).foreach { _ =>
       cancel()
+    }
   }
 
   override def completeWith(): Future[BenchmarkResult] =

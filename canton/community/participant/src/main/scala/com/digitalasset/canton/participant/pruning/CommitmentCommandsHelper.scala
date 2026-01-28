@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.pruning
@@ -103,7 +103,7 @@ final case class CommitmentContractMetadata(
 
 object CommitmentContractMetadata
     extends HasVersionedMessageCompanion[
-      CommitmentContractMetadata
+      CommitmentContractMetadata,
     ] {
   import JsonCodecs.*
   @SuppressWarnings(Array("org.wartremover.warts.Null", "org.wartremover.warts.Var"))

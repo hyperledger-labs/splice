@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.commands
@@ -660,16 +660,15 @@ object TopologyAdminCommands {
     }
 
     final case class LogicalUpgradeState(
-        observer: StreamObserver[LogicalUpgradeStateResponse]
+        store: Option[TopologyStoreId],
+        observer: StreamObserver[LogicalUpgradeStateResponse],
     ) extends BaseCommand[
           v30.LogicalUpgradeStateRequest,
           CancellableContext,
           CancellableContext,
         ] {
       override protected def createRequest(): Either[String, v30.LogicalUpgradeStateRequest] =
-        Right(
-          v30.LogicalUpgradeStateRequest()
-        )
+        Right(v30.LogicalUpgradeStateRequest(store.map(_.toProtoV30)))
 
       override protected def submitRequest(
           service: TopologyManagerReadServiceStub,
@@ -1213,7 +1212,7 @@ object TopologyAdminCommands {
     }
 
     final case class GetId()
-        extends BaseInitializationService[v30.GetIdRequest, v30.GetIdResponse, GetIdResult] {
+        extends BaseInitializationService[v30.GetIdRequest, v30.GetIdResponse, UniqueIdentifier] {
       override protected def createRequest(): Either[String, v30.GetIdRequest] =
         Right(v30.GetIdRequest())
 
@@ -1225,19 +1224,13 @@ object TopologyAdminCommands {
 
       override protected def handleResponse(
           response: v30.GetIdResponse
-      ): Either[String, GetIdResult] =
+      ): Either[String, UniqueIdentifier] =
         if (response.uniqueIdentifier.nonEmpty)
-          UniqueIdentifier
-            .fromProtoPrimitive_(response.uniqueIdentifier)
-            .leftMap(_.message)
-            .map(id => GetIdResult(response.initialized, Some(id)))
+          UniqueIdentifier.fromProtoPrimitive_(response.uniqueIdentifier).leftMap(_.message)
         else
-          Right(GetIdResult(response.initialized, None))
+          Left(
+            s"Node is not initialized and therefore does not have an Id assigned yet."
+          )
     }
-
-    final case class GetIdResult(
-        initialized: Boolean,
-        uniqueIdentifier: Option[UniqueIdentifier],
-    )
   }
 }

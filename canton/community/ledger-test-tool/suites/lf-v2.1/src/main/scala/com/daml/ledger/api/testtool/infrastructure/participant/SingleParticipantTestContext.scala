@@ -1,5 +1,5 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.daml.ledger.api.testtool.infrastructure.participant
 
@@ -47,6 +47,7 @@ import com.daml.ledger.api.v2.command_service.{
 import com.daml.ledger.api.v2.command_submission_service.SubmitRequest
 import com.daml.ledger.api.v2.commands.{Command as ApiCommand, Commands}
 import com.daml.ledger.api.v2.completion.Completion
+import com.daml.ledger.api.v2.contract_service.GetContractRequest
 import com.daml.ledger.api.v2.event.Event.Event.Created
 import com.daml.ledger.api.v2.event.{CreatedEvent, Event}
 import com.daml.ledger.api.v2.event_query_service.{
@@ -82,14 +83,7 @@ import com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilt
 import com.daml.ledger.api.v2.update_service.*
 import com.daml.ledger.api.v2.{crypto as lapicrypto, value as v1}
 import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId, Exercised, Update}
-import com.daml.ledger.javaapi.data.{
-  Command,
-  ExerciseByKeyCommand,
-  Identifier,
-  Template,
-  Unit as UnitData,
-  Value,
-}
+import com.daml.ledger.javaapi.data.{Command, ExerciseByKeyCommand, Identifier, Template, Value}
 import com.daml.logging.{ContextualizedLogger, LoggingContext}
 import com.daml.timer.Delayed
 import com.digitalasset.base.error.ErrorCode
@@ -99,6 +93,7 @@ import com.digitalasset.canton.ledger.api.TransactionShape.{AcsDelta, LedgerEffe
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
 import com.digitalasset.canton.util.FutureInstances.*
+import com.digitalasset.canton.util.Thereafter.syntax.ThereafterAsyncOps
 import com.digitalasset.canton.util.{MonadUtil, OptionUtil}
 import com.google.protobuf.ByteString
 import io.grpc.StatusRuntimeException
@@ -404,13 +399,16 @@ final class SingleParticipantTestContext private[participant] (
         ).flatMap(services.partyManagement.allocateExternalParty)
           .map(Some(_))
       }
-    } yield Party.external(
-      result.head.partyId,
-      UniqueIdentifier.tryFromProtoPrimitive(result.head.partyId).fingerprint,
-      keyPair,
-      signingThreshold = PositiveInt.one,
-      connectedSynchronizerIds.toList,
-    )
+    } yield {
+      val partyId = result.getOrElse(sys.error("Party missing in response")).partyId
+      Party.external(
+        partyId,
+        UniqueIdentifier.tryFromProtoPrimitive(partyId).fingerprint,
+        keyPair,
+        signingThreshold = PositiveInt.one,
+        connectedSynchronizerIds.toList,
+      )
+    }
   }
 
   override def allocateParty(
@@ -431,7 +429,10 @@ final class SingleParticipantTestContext private[participant] (
         ),
         minSynchronizers.getOrElse(1),
       )
-    } yield Party(result.partyDetails.get.party, synchronizerIds.toList)
+    } yield Party(
+      result.partyDetails.getOrElse(sys.error("Party details not populated")).party,
+      synchronizerIds.toList,
+    )
 
   override def allocateParty(
       req: AllocatePartyRequest,
@@ -464,12 +465,15 @@ final class SingleParticipantTestContext private[participant] (
           )
           .map(Some(_))
       }
+      allocatePartyResponse = result.getOrElse(sys.error("Allocate party response is empty"))
       synchronizerIdsForParty <- RetryingGetConnectedSynchronizersForParty(
         services,
-        result.head.partyDetails.get.party,
+        allocatePartyResponse.partyDetails
+          .getOrElse(sys.error("Party details not populated"))
+          .party,
         minSynchronizers,
       )
-    } yield (result.head, synchronizerIdsForParty)
+    } yield (allocatePartyResponse, synchronizerIdsForParty)
 
   override def connectedSynchronizers(): Future[Seq[String]] = for {
     participantId <- services.partyManagement.getParticipantId(GetParticipantIdRequest())
@@ -526,7 +530,7 @@ final class SingleParticipantTestContext private[participant] (
 
   override def listKnownPartiesExpanded(): Future[Set[Party]] =
     services.partyManagement
-      .listKnownParties(ListKnownPartiesRequest("", 0, ""))
+      .listKnownParties(ListKnownPartiesRequest("", 0, "", filterParty = ""))
       .map(_.partyDetails.map(partyDetails => Party(partyDetails.party)).toSet)
 
   override def listKnownParties(req: ListKnownPartiesRequest): Future[ListKnownPartiesResponse] =
@@ -535,7 +539,7 @@ final class SingleParticipantTestContext private[participant] (
 
   override def listKnownParties(): Future[ListKnownPartiesResponse] =
     services.partyManagement
-      .listKnownParties(new ListKnownPartiesRequest("", 0, ""))
+      .listKnownParties(new ListKnownPartiesRequest("", 0, "", filterParty = ""))
 
   override def waitForPartiesOnOtherParticipants(
       otherParticipants: Iterable[ParticipantTestContext],
@@ -630,6 +634,19 @@ final class SingleParticipantTestContext private[participant] (
         )
       )
     } yield acs
+
+  override def contract(
+      queryingParties: Option[Seq[Party]],
+      contractId: String,
+  ): Future[Option[CreatedEvent]] =
+    services.contract
+      .getContract(
+        GetContractRequest(
+          contractId = contractId,
+          queryingParties = queryingParties.getOrElse(Set.empty).toList.map(_.underlying.getValue),
+        )
+      )
+      .map(_.createdEvent)
 
   def eventFormat(
       verbose: Boolean,
@@ -1010,7 +1027,10 @@ final class SingleParticipantTestContext private[participant] (
     submitAndWaitForTransaction(
       submitAndWaitForTransactionRequest(party, template.create.commands, AcsDelta)
     )
-      .map(response => extractContracts(response.getTransaction).head)
+      .map(response =>
+        extractContracts(response.getTransaction).headOption
+          .getOrElse(sys.error("Expected at least one contract"))
+      )
 
   override def create[TCid <: ContractId[T], T <: Template](
       actAs: List[Party],
@@ -1019,7 +1039,10 @@ final class SingleParticipantTestContext private[participant] (
   )(implicit companion: ContractCompanion[?, TCid, T]): Future[TCid] =
     submitAndWaitForTransaction(
       submitAndWaitForTransactionRequest(actAs, readAs, template.create.commands, AcsDelta)
-    ).map(response => extractContracts(response.getTransaction).head)
+    ).map(response =>
+      extractContracts(response.getTransaction).headOption
+        .getOrElse(sys.error("Expected at least one contract"))
+    )
 
   override def createAndGetUpdateId[
       TCid <: ContractId[T],
@@ -1033,9 +1056,11 @@ final class SingleParticipantTestContext private[participant] (
     )
       .map(_.getTransaction)
       .map(tx =>
-        tx.updateId -> tx.events.collect { case Event(Created(e)) =>
-          companion.toContractId(new ContractId(e.contractId))
-        }.head
+        tx.updateId -> tx.events
+          .collectFirst { case Event(Created(e)) =>
+            companion.toContractId(new ContractId(e.contractId))
+          }
+          .getOrElse(sys.error("Expected at least one contract"))
       )
 
   override def exercise[T](
@@ -1075,19 +1100,10 @@ final class SingleParticipantTestContext private[participant] (
       submitAndWaitForTransactionRequest(party, exercise.commands)
     )
       .map(_.getTransaction)
-      .map(t => extractContracts(t)(companion))
-      .map(_.head)
-
-  override def exerciseAndGetContractNoDisclose[TCid <: ContractId[?]](
-      party: Party,
-      exercise: Update[Exercised[UnitData]],
-  )(implicit companion: ContractCompanion[?, TCid, ?]): Future[TCid] =
-    submitAndWaitForTransaction(
-      submitAndWaitForTransactionRequest(party, exercise.commands)
-    )
-      .map(_.getTransaction)
-      .map(t => extractContracts(t)(companion))
-      .map(_.head)
+      .map(t =>
+        extractContracts(t)(companion).headOption
+          .getOrElse(sys.error("Expected at least one contract"))
+      )
 
   override def exerciseByKey(
       party: Party,
@@ -1367,6 +1383,14 @@ final class SingleParticipantTestContext private[participant] (
       .within(within.toScala)
       .map(_.map(_.completionResponse))
 
+  override def completions(
+      take: Int,
+      request: CompletionStreamRequest,
+  ): Future[Vector[CompletionStreamResponse.CompletionResponse]] =
+    new StreamConsumer[CompletionStreamResponse](
+      services.commandCompletion.completionStream(request, _)
+    ).take(take).map(_.map(_.completionResponse))
+
   override def completionStreamRequest(from: Long = referenceOffset)(
       parties: Party*
   ): CompletionStreamRequest =
@@ -1380,7 +1404,7 @@ final class SingleParticipantTestContext private[participant] (
     new StreamConsumer[CompletionStreamResponse](
       services.commandCompletion.completionStream(request, _)
     ).find(_.completionResponse.completion.nonEmpty)
-      .map(_.completionResponse.completion.toVector)
+      .map(_.completionResponse.completion.toList.toVector)
 
   override def firstCompletions(parties: Party*): Future[Vector[Completion]] =
     firstCompletions(completionStreamRequest()(parties*))
@@ -1403,7 +1427,7 @@ final class SingleParticipantTestContext private[participant] (
     new StreamConsumer[CompletionStreamResponse](
       services.commandCompletion.completionStream(request, _)
     ).find(_.completionResponse.completion.exists(p))
-      .map(response => response.completionResponse.completion.find(p))
+      .map(_.completionResponse.completion.filter(p))
 
   override def findCompletion(parties: Party*)(
       p: Completion => Boolean
@@ -1433,7 +1457,7 @@ final class SingleParticipantTestContext private[participant] (
         .prune(
           PruneRequest(pruneUpTo, nextSubmissionId(), pruneAllDivulgedContracts = true)
         )
-        .andThen { case Failure(exception) =>
+        .thereafterP { case Failure(exception) =>
           logger.warn("Failed to prune", exception)(LoggingContext.ForTesting)
         }
     }

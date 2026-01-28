@@ -1,5 +1,5 @@
 ..
-   Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+   Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 ..
    SPDX-License-Identifier: Apache-2.0
 
@@ -20,7 +20,7 @@ To enable external key storage and usage, apply the configuration below before t
 Participant node. **If you're updating an existing Participant, you must instead follow the migration guide:**
 :ref:`Migrate to external key storage with a KMS <external_key_storage_migration>`.
 
-.. literalinclude:: CANTON/enterprise/app/src/test/resources/aws-kms-provider-tagged.conf
+.. literalinclude:: CANTON/community/app/src/test/resources/aws-kms-provider-tagged.conf
    :language: none
    :start-after: user-manual-entry-begin: KmsProviderConfig
    :end-before: user-manual-entry-end: KmsProviderConfig
@@ -28,7 +28,7 @@ Participant node. **If you're updating an existing Participant, you must instead
 A complete example configuration that puts together both AWS KMS configuration and external
 key storage configuration is shown below:
 
-.. literalinclude:: CANTON/enterprise/app/src/test/resources/aws-kms-provider-tagged.conf
+.. literalinclude:: CANTON/community/app/src/test/resources/aws-kms-provider-tagged.conf
    :language: none
    :start-after: user-manual-entry-begin: AwsKmsProviderFullConfig
    :end-before: user-manual-entry-end: AwsKmsProviderFullConfig

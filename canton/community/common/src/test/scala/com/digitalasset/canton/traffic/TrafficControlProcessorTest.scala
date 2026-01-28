@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.traffic
@@ -59,7 +59,7 @@ class TrafficControlProcessorTest extends AnyWordSpec with BaseTest with HasExec
   private def mkSetTrafficPurchased(
       signatureO: Option[Signature] = None
   ): SignedProtocolMessage[SetTrafficPurchasedMessage] = {
-    val setTrafficPurchased: SetTrafficPurchasedMessage = SetTrafficPurchasedMessage(
+    val setTrafficPurchased = SetTrafficPurchasedMessage(
       participantId,
       PositiveInt.one,
       NonNegativeLong.tryCreate(100),
@@ -77,7 +77,8 @@ class TrafficControlProcessorTest extends AnyWordSpec with BaseTest with HasExec
         SignedProtocolMessage
           .trySignAndCreate(
             setTrafficPurchased,
-            synchronizerCrypto.currentSnapshotApproximation,
+            synchronizerCrypto.currentSnapshotApproximation.futureValueUS,
+            None,
           )
           .failOnShutdown
           .futureValue

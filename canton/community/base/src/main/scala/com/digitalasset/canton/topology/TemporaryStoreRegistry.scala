@@ -1,10 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
 
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{BatchAggregatorConfig, ProcessingTimeout, TopologyConfig}
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -22,6 +22,8 @@ class TemporaryStoreRegistry(
     nodeId: UniqueIdentifier,
     clock: Clock,
     crypto: Crypto,
+    topologyCacheAggregatorConfig: BatchAggregatorConfig,
+    topologyConfig: TopologyConfig,
     futureSupervisor: FutureSupervisor,
     override val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
@@ -50,6 +52,8 @@ class TemporaryStoreRegistry(
       nodeId,
       clock,
       crypto,
+      topologyCacheAggregatorConfig,
+      topologyConfig,
       store,
       timeouts,
       futureSupervisor,

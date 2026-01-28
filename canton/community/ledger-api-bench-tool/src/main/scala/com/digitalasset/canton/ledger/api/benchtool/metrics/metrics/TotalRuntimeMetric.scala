@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.benchtool.metrics.metrics
@@ -39,6 +39,7 @@ object TotalRuntimeMetric {
 /** Measures the total runtime since the set start time to the time of receiving the most recent
   * item.
   */
+@SuppressWarnings(Array("org.wartremover.warts.Var")) //Metric interface is imperative in nature.
 final case class TotalRuntimeMetric[T](
     clock: Clock,
     startTime: Instant,

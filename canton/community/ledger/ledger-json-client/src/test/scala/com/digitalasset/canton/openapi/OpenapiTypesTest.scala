@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.openapi
@@ -158,6 +158,7 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
     import com.digitalasset.canton.http.json.v2.JsIdentityProviderCodecs.*
     import com.digitalasset.canton.http.json.v2.JsVersionServiceCodecs.*
     import com.digitalasset.canton.http.json.v2.JsSchema.Crypto.*
+    import com.digitalasset.canton.http.json.v2.JsContractServiceCodecs.*
 
     import magnolify.scalacheck.auto.*
 
@@ -947,6 +948,12 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
         ](
           openapi.GenerateExternalPartyTopologyResponse.fromJson
         ),
+        Mapping[
+          v2.contract_service.GetContractRequest,
+          openapi.GetContractRequest,
+        ](
+          openapi.GetContractRequest.fromJson
+        ),
       )
     }
 
@@ -960,7 +967,7 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
             openapi.JsGetActiveContractsResponse.fromJson
           ),
           Mapping[
-            json.js.AllocatePartyRequest,
+            v2.admin.party_management_service.AllocatePartyRequest,
             openapi.AllocatePartyRequest,
           ](
             openapi.AllocatePartyRequest.fromJson
@@ -1011,6 +1018,9 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
           ),
           Mapping[json.JsGetUpdatesResponse, openapi.JsGetUpdatesResponse](
             openapi.JsGetUpdatesResponse.fromJson
+          ),
+          Mapping[json.JsContractService.GetContractResponse, openapi.GetContractResponse](
+            openapi.GetContractResponse.fromJson
           ),
         )
     }

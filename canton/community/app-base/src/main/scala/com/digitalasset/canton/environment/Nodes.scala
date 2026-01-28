@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -31,10 +31,11 @@ import com.digitalasset.canton.synchronizer.sequencer.config.{
 }
 import com.digitalasset.canton.synchronizer.sequencer.{SequencerNode, SequencerNodeBootstrap}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.Mutex
 import com.digitalasset.canton.util.Thereafter.syntax.*
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 /** Group of CantonNodes of the same type (mediators, participants, sequencers). */
 trait Nodes[+Node <: CantonNode, +NodeBootstrap <: CantonNodeBootstrap[Node]]
@@ -128,6 +129,7 @@ class ManagedNodes[
     with HasCloseContext
     with FlagCloseableAsync {
 
+  private val lock = new Mutex()
   private val nodes = TrieMap[InstanceName, ManagedNodeStage[NodeBootstrap]]()
   override def names(): Seq[InstanceName] = configs.keys.toSeq
 
@@ -214,15 +216,13 @@ class ManagedNodes[
         promise: Promise[Either[StartupError, NodeBootstrap]]
     ): EitherT[Future, StartupError, NodeBootstrap] = {
       val params = parametersFor(name)
-
-      val instanceCreated = create(name, config)
-
       val startup = for {
         // start migration
         _ <- EitherT(Future(checkMigration(name, config.storage, params)))
         instance = {
-          nodes.put(name, StartingUp(promise, instanceCreated)).discard
-          instanceCreated
+          val instance = create(name, config)
+          nodes.put(name, StartingUp(promise, instance)).discard
+          instance
         }
         declarativeHandler <-
           instance
@@ -261,8 +261,8 @@ class ManagedNodes[
       params = parametersFor(name)
     } yield (config, params)
 
-  override def migrateDatabase(name: InstanceName): Either[StartupError, Unit] = blocking(
-    synchronized {
+  override def migrateDatabase(name: InstanceName): Either[StartupError, Unit] = (
+    lock.exclusive {
       for {
         cAndP <- configAndParams(name)
         (config, params) = cAndP
@@ -271,8 +271,8 @@ class ManagedNodes[
     }
   )
 
-  override def repairDatabaseMigration(name: InstanceName): Either[StartupError, Unit] = blocking(
-    synchronized {
+  override def repairDatabaseMigration(name: InstanceName): Either[StartupError, Unit] = (
+    lock.exclusive {
       for {
         cAndP <- configAndParams(name)
         (config, params) = cAndP

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
@@ -16,7 +16,6 @@ import com.digitalasset.canton.config.{
   CantonConfig,
   TlsServerConfig,
 }
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{EnvironmentSetupPlugin, TestConsoleEnvironment}
 import com.digitalasset.canton.lifecycle.LifeCycle.{CloseableServer, toCloseableServer}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -24,6 +23,7 @@ import com.digitalasset.canton.metrics.ActiveRequestsMetrics
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.tracing.TracingConfig.{BatchSpanProcessor, Exporter}
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
+import com.digitalasset.canton.util.Mutex
 import com.google.common.io.BaseEncoding
 import io.grpc.stub.StreamObserver
 import io.grpc.{Context, Contexts, Metadata, ServerCall, ServerCallHandler, ServerInterceptor}
@@ -36,8 +36,8 @@ import io.opentelemetry.proto.trace.v1.Span
 import monocle.macros.syntax.lens.*
 
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{ExecutionContext, blocking}
 import scala.jdk.CollectionConverters.ListHasAsScala
 
 final case class OtlpSpan(traceId: String, spanId: String, parentSpanId: String, name: String)
@@ -48,25 +48,28 @@ class OtlpGrpcServer(protected val loggerFactory: NamedLoggerFactory)
 
   logger.info("Created Otlp Server")(TraceContext.empty)
   private val traceSpans: ListBuffer[Span] = ListBuffer[Span]()
+  private val lock = new Mutex()
 
-  def getSpans: Seq[OtlpSpan] = blocking(synchronized(traceSpans.toSeq)).map(span =>
-    OtlpSpan(
-      traceId = BaseEncoding.base16().lowerCase().encode(span.getTraceId.toByteArray),
-      spanId = BaseEncoding.base16().lowerCase().encode(span.getSpanId.toByteArray),
-      parentSpanId = BaseEncoding.base16().lowerCase().encode(span.getParentSpanId.toByteArray),
-      name = span.getName,
+  def getSpans: Seq[OtlpSpan] = (lock
+    .exclusive(traceSpans.toSeq))
+    .map(span =>
+      OtlpSpan(
+        traceId = BaseEncoding.base16().lowerCase().encode(span.getTraceId.toByteArray),
+        spanId = BaseEncoding.base16().lowerCase().encode(span.getSpanId.toByteArray),
+        parentSpanId = BaseEncoding.base16().lowerCase().encode(span.getParentSpanId.toByteArray),
+        name = span.getName,
+      )
     )
-  )
 
   override def `export`(
       request: ExportTraceServiceRequest,
       responseObserver: StreamObserver[ExportTraceServiceResponse],
   ): Unit = {
-    blocking(
-      synchronized(
+    (
+      lock.exclusive(
         traceSpans.addAll(
           request.getResourceSpansList.asScala
-            .flatMap(_.getInstrumentationLibrarySpansList.asScala)
+            .flatMap(_.getScopeSpansList.asScala)
             .flatMap(_.getSpansList.asScala)
         )
       )
@@ -113,7 +116,7 @@ class UseOtlp(
     protected val trustCollectionPath: Option[String] = None,
     protected val tls: Option[TlsServerConfig] = None,
     protected val otlpHeaders: Map[String, String] = Map.empty,
-) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
+) extends EnvironmentSetupPlugin
     with AutoCloseable {
 
   private var otlpServer: OtlpGrpcServer = _
@@ -133,7 +136,7 @@ class UseOtlp(
       .replace(BatchSpanProcessor(batchSize = Some(64), scheduleDelay = Some(50.millis)))
 
   private def startServer(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      env: TestConsoleEnvironment
   ): CloseableServer = {
     import env.*
 
@@ -170,13 +173,12 @@ class UseOtlp(
 
   override def afterEnvironmentCreated(
       config: CantonConfig,
-      environment: TestConsoleEnvironment[CantonConfig, CantonEnvironment],
+      environment: TestConsoleEnvironment,
   ): Unit =
     grpcServer = startServer(environment)
 
   override def beforeEnvironmentDestroyed(
-      config: CantonConfig,
-      environment: TestConsoleEnvironment[CantonConfig, CantonEnvironment],
+      environment: TestConsoleEnvironment
   ): Unit = {}
 
   override def afterEnvironmentDestroyed(config: CantonConfig): Unit =

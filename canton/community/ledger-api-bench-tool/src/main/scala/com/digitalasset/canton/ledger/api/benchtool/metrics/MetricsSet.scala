@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.benchtool.metrics
@@ -151,10 +151,10 @@ object MetricsSet {
     response.contractEntry.activeContract.knownSize
 
   def countCompletions(response: CompletionStreamResponse): Int =
-    response.completionResponse.completion.size
+    response.completionResponse.completion.toList.size
 
   def countTransactionsEvents(response: GetUpdatesResponse): Long =
-    response.update.transaction.foldLeft(0L)((acc, tx) => acc + tx.events.size)
+    response.update.transaction.toList.foldLeft(0L)((acc, tx) => acc + tx.events.size)
 
   private def optionalMaxDurationMetrics[T](
       configO: Option[CommonObjectivesConfig]

@@ -1,5 +1,5 @@
 ..
-   Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+   Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 ..
    SPDX-License-Identifier: Apache-2.0
 
@@ -95,7 +95,7 @@ The following configuration enables an internal watchdog service that checks the
 every ``check-interval`` seconds and kills the process after ``kill-delay`` seconds after
 the ``liveness`` reports the Node unhealthy.
 
-.. literalinclude:: CANTON/enterprise/app/src/test/resources/sequencer-mediator-health-documentation.conf
+.. literalinclude:: CANTON/community/app/src/test/resources/sequencer-mediator-health-documentation.conf
    :language: none
    :start-after: sequencer_health-watchdog-example-begin
    :end-before: sequencer_health-watchdog-example-end

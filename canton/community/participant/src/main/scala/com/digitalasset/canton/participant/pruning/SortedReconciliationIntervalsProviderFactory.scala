@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.pruning
@@ -35,7 +35,7 @@ class SortedReconciliationIntervalsProviderFactory(
       .toRight(s"Can not obtain topology factory for $synchronizerId")
       .toEitherT[FutureUnlessShutdown]
     topologyClient <- EitherT.right(
-      topologyFactory.createCachingTopologyClient(NoPackageDependencies, synchronizerPredecessor)
+      topologyFactory.createTopologyClient(NoPackageDependencies, synchronizerPredecessor)
     )
   } yield {
     topologyClient.updateHead(

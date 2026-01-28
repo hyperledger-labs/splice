@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util.retry
@@ -1106,7 +1106,6 @@ class PolicyTest extends AsyncFunSpec with BaseTest with HasExecutorService {
       val closeableEc = Threading.newExecutionContext(
         executionContextName,
         noTracingLogger,
-        None,
         Threading.detectNumberOfThreads(noTracingLogger),
         exitOnFatal = exitOnFatal,
       )

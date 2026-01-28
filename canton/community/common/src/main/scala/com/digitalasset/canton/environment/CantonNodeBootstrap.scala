@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -181,7 +181,7 @@ trait BaseMetrics {
 
   def healthMetrics: HealthMetrics
   def storageMetrics: DbStorageMetrics
-  def declarativeApiMetrics: DeclarativeApiMetrics
+  val declarativeApiMetrics: DeclarativeApiMetrics
 
 }
 
@@ -243,6 +243,8 @@ abstract class CantonNodeBootstrapImpl[
       nodeId,
       clock,
       crypto,
+      parameters.batchingConfig.topologyCacheAggregator,
+      config.topology,
       authorizedStore,
       exitOnFatalFailures = parameters.exitOnFatalFailures,
       bootstrapStageCallback.timeouts,
@@ -480,6 +482,7 @@ abstract class CantonNodeBootstrapImpl[
             arguments.clock,
             executionContext,
             bootstrapStageCallback.timeouts,
+            arguments.config.parameters.batching,
             bootstrapStageCallback.loggerFactory,
             tracerProvider,
           )
@@ -739,10 +742,12 @@ abstract class CantonNodeBootstrapImpl[
       val snapshotValidator = new InitialTopologySnapshotValidator(
         crypto.pureCrypto,
         temporaryTopologyStore,
+        parameters.batchingConfig.topologyCacheAggregator,
+        config.topology,
         // there are no synchronizer parameters here, so we cannot pass them.
         // as we are only expecting namespace delegations that end up in the authorized store, this is fine
         staticSynchronizerParameters = None,
-        validateInitialSnapshot = config.topology.validateInitialTopologySnapshot,
+        timeouts = this.timeouts,
         loggerFactory = this.loggerFactory,
       )
 
@@ -939,6 +944,8 @@ abstract class CantonNodeBootstrapImpl[
         nodeId,
         clock,
         crypto,
+        parameters.batchingConfig.topologyCacheAggregator,
+        config.topology,
         futureSupervisor,
         parameters.processingTimeouts,
         bootstrapStageCallback.loggerFactory,

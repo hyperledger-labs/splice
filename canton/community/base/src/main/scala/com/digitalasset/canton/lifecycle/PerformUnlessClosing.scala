@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.lifecycle
@@ -50,11 +50,6 @@ trait PerformUnlessClosing extends OnShutdownRunner with HasSynchronizeWithReade
       f: => Future[A]
   )(implicit ec: ExecutionContext, traceContext: TraceContext): FutureUnlessShutdown[A] =
     synchronizeWithClosing(name)(FutureUnlessShutdown.outcomeF(f))
-
-// def performUnlessClosingEitherT[E, R](name: String, onClosing: => E)(
-//       etf: => EitherT[Future, E, R]
-//   )(implicit ec: ExecutionContext, traceContext: TraceContext): EitherT[Future, E, R] =
-//     EitherT(performUnlessClosingF(name)(etf.value).unwrap.map(_.onShutdown(Left(onClosing))))
 
   protected def onClosed(): Unit = ()
 

@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 if [ $# -eq 0 ];then
     echo "Usage: $0 <docker compose command>"
     echo "Use '$0 up --force-recreate --renew-anon-volumes' to re-create network"

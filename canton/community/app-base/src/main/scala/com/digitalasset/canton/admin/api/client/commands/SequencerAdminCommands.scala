@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.commands
@@ -297,10 +297,10 @@ object SequencerAdminCommands {
   }
 
   final case class InitializeFromGenesisStateV2(
-      topologySnapshot: Seq[ByteString],
+      topologySnapshot: ByteString,
       synchronizerParameters: com.digitalasset.canton.protocol.StaticSynchronizerParameters,
   ) extends GrpcAdminCommand[
-        Seq[proto.InitializeSequencerFromGenesisStateV2Request],
+        proto.InitializeSequencerFromGenesisStateV2Request,
         proto.InitializeSequencerFromGenesisStateV2Response,
         InitializeSequencerResponse,
       ] {
@@ -314,21 +314,24 @@ object SequencerAdminCommands {
 
     override protected def submitRequest(
         service: proto.SequencerInitializationServiceGrpc.SequencerInitializationServiceStub,
-        request: Seq[proto.InitializeSequencerFromGenesisStateV2Request],
+        request: proto.InitializeSequencerFromGenesisStateV2Request,
     ): Future[proto.InitializeSequencerFromGenesisStateV2Response] =
-      GrpcStreamingUtils.streamToServerChunked(
+      GrpcStreamingUtils.streamToServer(
         service.initializeSequencerFromGenesisStateV2,
-        request,
+        (topologySnapshot: Array[Byte]) =>
+          proto.InitializeSequencerFromGenesisStateV2Request(
+            topologySnapshot = ByteString.copyFrom(topologySnapshot),
+            Some(synchronizerParameters.toProtoV30),
+          ),
+        request.topologySnapshot,
       )
 
     override protected def createRequest()
-        : Either[String, Seq[proto.InitializeSequencerFromGenesisStateV2Request]] =
+        : Either[String, proto.InitializeSequencerFromGenesisStateV2Request] =
       Right(
-        topologySnapshot.map(bytes =>
-          proto.InitializeSequencerFromGenesisStateV2Request(
-            topologySnapshot = bytes,
-            Some(synchronizerParameters.toProtoV30),
-          )
+        proto.InitializeSequencerFromGenesisStateV2Request(
+          topologySnapshot = topologySnapshot,
+          Some(synchronizerParameters.toProtoV30),
         )
       )
 

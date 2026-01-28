@@ -1,9 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.performance.elements
 
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.performance.RateSettings.SubmissionRateSettings
 import com.digitalasset.canton.performance.elements.dvp.TraderDriver
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -23,6 +24,9 @@ class TraderDriverTest extends AnyWordSpec with BaseTest {
       maxRate: Double = 11,
       maxProposalsAheadSeconds: Double = 5,
   ) = {
+    val submissionRateSettings =
+      SubmissionRateSettings.TargetLatency(targetLatencyMs = targetLatencyMs)
+
     val available = Math.max(0, Math.round(maxRate - currentRate))
     TraderDriver.computeSubmissions(
       freeAssets,
@@ -30,7 +34,7 @@ class TraderDriverTest extends AnyWordSpec with BaseTest {
       proposalsSubmitted,
       acceptanceSubmitted,
       totalCycles,
-      targetLatencyMs,
+      submissionRateSettings,
       maxSubmissionPerIterationFactor,
       batchSize,
       pending,

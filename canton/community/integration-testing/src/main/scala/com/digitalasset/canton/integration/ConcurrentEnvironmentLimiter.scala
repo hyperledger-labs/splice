@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration
@@ -48,7 +48,7 @@ object ConcurrentEnvironmentLimiter extends LazyLogging {
 
   val IntegrationTestConcurrencyLimit = "canton-test.integration.concurrency"
 
-  private val concurrencyLimit: Int = System.getProperty(IntegrationTestConcurrencyLimit, "1").toInt
+  private val concurrencyLimit: Int = System.getProperty(IntegrationTestConcurrencyLimit, "3").toInt
 
   /** Configured to be fair so earlier started tests will be first to get environments */
   private val semaphore = new Semaphore(concurrencyLimit, true)

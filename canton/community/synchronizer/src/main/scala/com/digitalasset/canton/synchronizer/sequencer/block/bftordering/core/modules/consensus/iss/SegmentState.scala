@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
@@ -190,10 +190,10 @@ class SegmentState(
   def commitVotes: Map[BftNodeId, Long] = sumOverInProgressBlocks(_.commitVoters)
 
   def discardedMessageCount: Int =
-    discardedViewMessagesCount +
-      discardedRetransmittedCommitCertsCount +
-      segmentBlocks.forgetNE.map(_.discardedMessages).sum +
-      viewChangeState.values.map(_.discardedMessages).sum
+    discardedViewMessagesCount
+      + discardedRetransmittedCommitCertsCount
+      + segmentBlocks.forgetNE.map(_.discardedMessages).sum
+      + viewChangeState.values.map(_.discardedMessages).sum
 
   private[iss] def retransmittedMessages = retransmittedMessagesCount
   private[iss] def retransmittedCommitCertificates = retransmittedCommitCertificatesCount

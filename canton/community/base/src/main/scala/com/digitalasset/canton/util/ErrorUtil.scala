@@ -1,11 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
 
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import io.grpc.{Status, StatusRuntimeException}
 
 import java.io.{PrintWriter, StringWriter}
 import scala.concurrent.Future
@@ -20,12 +19,6 @@ object ErrorUtil {
     val result = new StringWriter()
     t.printStackTrace(new PrintWriter(result))
     result.toString
-  }
-
-  def internalErrorGrpc(msg: String)(implicit loggingContext: ErrorLoggingContext): Nothing = {
-    val t = new StatusRuntimeException(Status.INTERNAL.withDescription(msg))
-    logInternalError(t)
-    throw t
   }
 
   /** Logs and rethrows any throwable.
@@ -156,5 +149,13 @@ object ErrorUtil {
   ): FutureUnlessShutdown[Unit] =
     if (condition) FutureUnlessShutdown.unit
     else internalErrorAsyncShutdown(new IllegalStateException(message))
+
+  /** Indicates an illegal argument by logging an ERROR and returning a failed future with an
+    * [[java.lang.IllegalArgumentException]]
+    */
+  def invalidArgumentAsyncShutdown(message: => String)(implicit
+      loggingContext: ErrorLoggingContext
+  ): FutureUnlessShutdown[Nothing] =
+    internalErrorAsyncShutdown(new IllegalArgumentException(message))
 
 }
