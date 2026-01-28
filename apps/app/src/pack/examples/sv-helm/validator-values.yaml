@@ -1,7 +1,6 @@
-# Only for SV validators:
+# Only for SV validators
 # if you want to configure validator to connect to a single trusted sequencer, set ``useSequencerConnectionsFromScan`` to false.
 # and replace ``TRUSTED_SYNCHRONIZER_SEQUENCER_URL`` with the publicly accessible URL of the trusted sequencer.
-# This does mean that you depend on that single SV and if it is broken or malicious you will be unable to use the network so usually you want to default to not enabling this.
 # decentralizedSynchronizerUrl: "TRUSTED_SYNCHRONIZER_SEQUENCER_URL"
 # useSequencerConnectionsFromScan: false
 
