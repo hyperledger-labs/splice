@@ -4,7 +4,10 @@
 package org.lfdecentralizedtrust.splice.scan.config
 
 import com.digitalasset.canton.data.CantonTimestamp
-import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.AcsSnapshot
+import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
+  AcsSnapshot,
+  IncrementalAcsSnapshot,
+}
 
 import java.time.{Duration, ZoneOffset}
 import java.time.temporal.ChronoField
@@ -39,6 +42,9 @@ case class ScanStorageConfig(
   // Since we get an AcsSnapshot here and not an arbitrary CantonTimestamp, we can assume that this snapshot is valid.
   def nextSnapshotTime(lastSnapshot: AcsSnapshot): CantonTimestamp = {
     lastSnapshot.snapshotRecordTime.plus(Duration.ofHours(dbAcsSnapshotPeriodHours.toLong))
+  }
+  def nextSnapshotTime(lastSnapshot: IncrementalAcsSnapshot): CantonTimestamp = {
+    lastSnapshot.targetRecordTime.plus(Duration.ofHours(dbAcsSnapshotPeriodHours.toLong))
   }
 
   def computeSnapshotTimeAfter(
