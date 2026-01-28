@@ -192,7 +192,6 @@ async function installValidator(
       TARGET_HOSTNAME: CLUSTER_HOSTNAME,
       OPERATOR_WALLET_USER_ID: validatorConfig.operatorWalletUserId,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
-      TRUSTED_SCAN_URL: `https://scan.sv-2.${CLUSTER_HOSTNAME}`,
       YOUR_CONTACT_POINT: daContactPoint,
     }),
     ...loadYamlFromFile(
@@ -201,11 +200,15 @@ async function installValidator(
         MIGRATION_ID: DecentralizedSynchronizerUpgradeConfig.active.id.toString(),
         SPONSOR_SV_URL: `https://sv.sv-2.${CLUSTER_HOSTNAME}`,
         YOUR_VALIDATOR_NODE_NAME: validatorConfig.nodeIdentifier || validatorConfig.partyHint,
+        TRUSTED_SCAN_URL: `https://scan.sv-2.${CLUSTER_HOSTNAME}`,
       }
     ),
   };
 
-  if (validatorConfig.validatorApp?.scanClient != null) {
+  if (
+    validatorConfig.validatorApp?.scanClient != null ||
+    validatorValuesFromYamlFiles.scanClient != null
+  ) {
     delete validatorValuesFromYamlFiles.scanAddress;
   }
 
