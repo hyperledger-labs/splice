@@ -16,3 +16,10 @@ persistence:
 
 topup:
   enabled: false
+
+synchronizer:
+  connectionType: "bft"
+
+scanClient:
+  scanType: "trust-single"
+  scanAddress: "TRUSTED_SCAN_URL"
