@@ -21,6 +21,12 @@
     - deprecated ``/v0/total-amulet-balance`` and ``/v0/wallet-balance`` endpoints have been removed in favor of using `/registry/metadata/v1/instruments/{instrumentId} <app_dev/token_standard/openapi/token_metadata.html#get--registry-metadata-v1-instruments-instrumentId>`_
       and `/v0/holdings/summary <app_dev/scan_api/scan_openapi.html#post--v0-holdings-summary>`_, respectively.
 
+    - `canton.scan-apps.scan-app.acs-store-descriptor-user-version` and `canton.scan-apps.scan-app.tx-log-store-descriptor-user-version`
+      configuration settings
+      have been added to set a `user-version`, respectively for the ACS and TxLog store.
+      Modifying the `user-version` wipes the respective store and triggers re-ingestion.
+      See the :ref:`SV Operations docs <sv-reingest-scan-stores>` for more details.
+
     - Added a new external endpoint ``GET /v0/unclaimed-development-fund-coupons`` to retrieve all active unclaimed development fund coupon contracts.
 
   - Wallet

@@ -22,7 +22,12 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer as decentralizedsynchronizerCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules, Reason, Vote}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  DsoRules,
+  Reason,
+  Vote,
+  VoteRequest,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.FaucetState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
@@ -58,6 +63,11 @@ import scala.jdk.OptionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.reflect.ClassTag
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart.{
+  InitializeAcsAtLatestOffset,
+  InitializeAcsAtOffset,
+  ResumeAtOffset,
+}
 
 abstract class ScanStoreTest
     extends StoreTest
@@ -812,125 +822,9 @@ abstract class ScanStoreTest
       "listVoteRequestResults" should {
 
         "list all past VoteRequestResult" in {
-          for {
-            store <- mkStore()
-            voteRequestContract1 = voteRequest(
-              requester = userParty(1),
-              votes = (1 to 4)
-                .map(n =>
-                  new Vote(
-                    userParty(n).toProtoPrimitive,
-                    true,
-                    new Reason("", ""),
-                    Optional.empty(),
-                  )
-                ),
-            )
-            _ <- dummyDomain.create(voteRequestContract1)(store.multiDomainAcsStore)
-            result1 = mkVoteRequestResult(
-              voteRequestContract1
-            )
-            _ <- dummyDomain.exercise(
-              contract = dsoRules(dsoParty),
-              interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
-              choiceName = DsoRulesCloseVoteRequest.choice.name,
-              mkCloseVoteRequest(
-                voteRequestContract1.contractId
-              ),
-              result1.toValue,
-            )(
-              store.multiDomainAcsStore
-            )
-            voteRequestContract2 = voteRequest(
-              requester = userParty(2),
-              votes = (1 to 4)
-                .map(n =>
-                  new Vote(
-                    userParty(n).toProtoPrimitive,
-                    true,
-                    new Reason("", ""),
-                    Optional.empty(),
-                  )
-                ),
-            )
-            _ <- dummyDomain.create(voteRequestContract2)(store.multiDomainAcsStore)
-            result2 = mkVoteRequestResult(
-              voteRequestContract2,
-              effectiveAt = Instant.now().plusSeconds(1).truncatedTo(ChronoUnit.MICROS),
-            )
-            _ <- dummyDomain.exercise(
-              contract = dsoRules(dsoParty),
-              interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
-              choiceName = DsoRulesCloseVoteRequest.choice.name,
-              mkCloseVoteRequest(
-                voteRequestContract2.contractId
-              ),
-              result2.toValue,
-            )(
-              store.multiDomainAcsStore
-            )
-          } yield {
-            store
-              .listVoteRequestResults(
-                Some("AddSv"),
-                Some(true),
-                None,
-                None,
-                None,
-                PageLimit.tryCreate(1),
-              )
-              .futureValue
-              .toList
-              .loneElement shouldBe result2
-            store
-              .listVoteRequestResults(
-                Some("SRARC_AddSv"),
-                Some(false),
-                None,
-                None,
-                None,
-                PageLimit.tryCreate(1),
-              )
-              .futureValue
-              .toList
-              .size shouldBe (0)
-            store
-              .listVoteRequestResults(
-                None,
-                None,
-                None,
-                None,
-                None,
-                PageLimit.tryCreate(1),
-              )
-              .futureValue
-              .toList
-              .size shouldBe (1)
-            store
-              .listVoteRequestResults(
-                None,
-                None,
-                None,
-                Some(Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600).toString),
-                None,
-                PageLimit.tryCreate(1),
-              )
-              .futureValue
-              .toList
-              .size shouldBe (0)
-            store
-              .listVoteRequestResults(
-                None,
-                None,
-                None,
-                Some(Instant.now().truncatedTo(ChronoUnit.MICROS).minusSeconds(3600).toString),
-                None,
-                PageLimit.tryCreate(1),
-              )
-              .futureValue
-              .toList
-              .size shouldBe (1)
-          }
+          val store = mkStore().futureValue
+          val voteRequestContracts = mkVoteRequests()
+          assertListOfAllPastVoteRequestResults(voteRequestContracts, store)
         }
       }
 
@@ -1496,9 +1390,140 @@ abstract class ScanStoreTest
       }
     }
   }
+  def mkVoteRequests(): Vector[Contract[VoteRequest.ContractId, VoteRequest]] = {
+    val voteRequestContract1 = voteRequest(
+      requester = userParty(1),
+      votes = (1 to 4)
+        .map(n =>
+          new Vote(
+            userParty(n).toProtoPrimitive,
+            true,
+            new Reason("", ""),
+            Optional.empty(),
+          )
+        ),
+    )
+    val voteRequestContract2 = voteRequest(
+      requester = userParty(2),
+      votes = (1 to 4)
+        .map(n =>
+          new Vote(
+            userParty(n).toProtoPrimitive,
+            true,
+            new Reason("", ""),
+            Optional.empty(),
+          )
+        ),
+    )
+    Vector(voteRequestContract1, voteRequestContract2)
+  }
+  def assertListOfAllPastVoteRequestResults(
+      voteRequestContracts: Vector[Contract[VoteRequest.ContractId, VoteRequest]],
+      store: ScanStore,
+  ) = {
+    val voteRequestContract1 = voteRequestContracts(0)
+    val voteRequestContract2 = voteRequestContracts(1)
+
+    for {
+      _ <- dummyDomain.create(voteRequestContract1)(store.multiDomainAcsStore)
+      result1 = mkVoteRequestResult(
+        voteRequestContract1
+      )
+      _ <- dummyDomain.exercise(
+        contract = dsoRules(dsoParty),
+        interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
+        choiceName = DsoRulesCloseVoteRequest.choice.name,
+        mkCloseVoteRequest(
+          voteRequestContract1.contractId
+        ),
+        result1.toValue,
+      )(
+        store.multiDomainAcsStore
+      )
+      _ <- dummyDomain.create(voteRequestContract2)(store.multiDomainAcsStore)
+      result2 = mkVoteRequestResult(
+        voteRequestContract2,
+        effectiveAt = Instant.now().plusSeconds(1).truncatedTo(ChronoUnit.MICROS),
+      )
+      _ <- dummyDomain.exercise(
+        contract = dsoRules(dsoParty),
+        interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
+        choiceName = DsoRulesCloseVoteRequest.choice.name,
+        mkCloseVoteRequest(
+          voteRequestContract2.contractId
+        ),
+        result2.toValue,
+      )(
+        store.multiDomainAcsStore
+      )
+    } yield {
+      store
+        .listVoteRequestResults(
+          Some("AddSv"),
+          Some(true),
+          None,
+          None,
+          None,
+          PageLimit.tryCreate(1),
+        )
+        .futureValue
+        .toList
+        .loneElement shouldBe result2
+      store
+        .listVoteRequestResults(
+          Some("SRARC_AddSv"),
+          Some(false),
+          None,
+          None,
+          None,
+          PageLimit.tryCreate(1),
+        )
+        .futureValue
+        .toList
+        .size shouldBe (0)
+      store
+        .listVoteRequestResults(
+          None,
+          None,
+          None,
+          None,
+          None,
+          PageLimit.tryCreate(1),
+        )
+        .futureValue
+        .toList
+        .size shouldBe (1)
+      store
+        .listVoteRequestResults(
+          None,
+          None,
+          None,
+          Some(Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600).toString),
+          None,
+          PageLimit.tryCreate(1),
+        )
+        .futureValue
+        .toList
+        .size shouldBe (0)
+      store
+        .listVoteRequestResults(
+          None,
+          None,
+          None,
+          Some(Instant.now().truncatedTo(ChronoUnit.MICROS).minusSeconds(3600).toString),
+          None,
+          PageLimit.tryCreate(1),
+        )
+        .futureValue
+        .toList
+        .size shouldBe (1)
+    }
+  }
 
   protected def mkStore(
-      dsoParty: PartyId = dsoParty
+      dsoParty: PartyId = dsoParty,
+      acsStoreDescriptorUserVersion: Option[Long] = None,
+      txLogStoreDescriptorUserVersion: Option[Long] = None,
   ): Future[ScanStore]
 
   protected def mkUpdateHistory(
@@ -1923,7 +1948,9 @@ class DbScanStoreTest
     with AcsTables {
 
   override protected def mkStore(
-      dsoParty: PartyId
+      dsoParty: PartyId,
+      acsStoreDescriptorUserVersion: Option[Long] = None,
+      txLogStoreDescriptorUserVersion: Option[Long] = None,
   ): Future[ScanStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
@@ -1958,12 +1985,29 @@ class DbScanStoreTest
       IngestionConfig(),
       new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, timeouts),
       initialRound = 0,
+      acsStoreDescriptorUserVersion,
+      txLogStoreDescriptorUserVersion,
     )(parallelExecutionContext, implicitly, implicitly)
 
     for {
-      _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
-      _ <- store.multiDomainAcsStore.testIngestionSink
-        .ingestAcs(nextOffset(), Seq.empty, Seq.empty, Seq.empty)
+      initializeResult <- store.multiDomainAcsStore.testIngestionSink.initialize()
+      _ <- initializeResult match {
+        case ResumeAtOffset(_) => Future.unit
+        case InitializeAcsAtLatestOffset =>
+          store.multiDomainAcsStore.testIngestionSink.ingestAcs(
+            nextOffset(),
+            Seq.empty,
+            Seq.empty,
+            Seq.empty,
+          )
+        case InitializeAcsAtOffset(_) =>
+          store.multiDomainAcsStore.testIngestionSink.ingestAcs(
+            nextOffset(),
+            Seq.empty,
+            Seq.empty,
+            Seq.empty,
+          )
+      }
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(SynchronizerAlias.tryCreate(domain) -> dummyDomain)
       )
@@ -2066,6 +2110,84 @@ class DbScanStoreTest
         result should contain(aliceValidatorLicense)
         result should contain(bobValidatorLicense)
         result should not contain charlesValidatorLicense
+      }
+    }
+  }
+  "Changing the acsStoreDescriptorUserVersion" should {
+    val alice = userParty(443)
+    val aliceValidatorLicense = validatorLicense(
+      alice,
+      dsoParty,
+      Some(new FaucetState(new Round(0), new Round(1000), 0L)),
+    )
+
+    "force re-ingestion of acs" in {
+      for {
+        // ingestion in these store tests is simulated by directly interacting with the ingestion sink (dummyDomain.create)
+        // create store, ingest an update with aliceValidatorLicense
+        store <- mkStore()
+        _ <- dummyDomain.create(aliceValidatorLicense)(store.multiDomainAcsStore)
+        result <- store.getValidatorLicenseByValidator(
+          Vector(alice)
+        )
+        // create store again but now with new storeDescriptor userVersion, ingest an update with aliceValidatorLicense again
+        storeReingest <- mkStore(dsoParty = dsoParty, acsStoreDescriptorUserVersion = Some(1L))
+        // Below 'dummyDomain.create' would fail on the same storeId for aliceValidatorLicense without a new user version.
+        // there is a unique constraint on (store_id, migration_id, contract_id) in the acs table (acs_store_template_sid_mid_cid) that would be violated.
+        // Successfully creating the license again here proves that the store has switched to a new store descriptor.
+        _ <- dummyDomain.create(aliceValidatorLicense)(storeReingest.multiDomainAcsStore)
+        resultAfter <- storeReingest.getValidatorLicenseByValidator(
+          Vector(alice)
+        )
+      } yield {
+        result should contain(aliceValidatorLicense)
+        resultAfter should contain(aliceValidatorLicense)
+      }
+    }
+  }
+
+  "Changing the txLogStoreDescriptorUserVersion" should {
+    "force re-ingestion of txLog" in {
+      val activeVoteRequest = voteRequest(
+        requester = userParty(4),
+        votes = (1 to 4)
+          .map(n =>
+            new Vote(
+              userParty(n).toProtoPrimitive,
+              true,
+              new Reason("", ""),
+              Optional.empty(),
+            )
+          ),
+      )
+      for {
+        store <- mkStore()
+        voteRequestContracts = mkVoteRequests() :+ activeVoteRequest
+        _ <- assertListOfAllPastVoteRequestResults(voteRequestContracts, store)
+        _ <- dummyDomain.create(activeVoteRequest)(store.multiDomainAcsStore)
+        // create the store with a new txLogStoreDescriptorUserVersion and
+        // check that it has acs entries but no txLog entries of the previous store
+        // this proves that the store descriptor has changed and a new storeId is used.
+        storeReingest <- mkStore(
+          dsoParty = dsoParty,
+          txLogStoreDescriptorUserVersion = Some(1L),
+        )
+      } yield {
+        // new store should not have txLog entry from previous store
+        // because ingestion in these store tests is simulated by directly interacting with the ingestion sink
+        storeReingest
+          .listVoteRequestResults(
+            Some("AddSv"),
+            Some(true),
+            None,
+            None,
+            None,
+            PageLimit.tryCreate(1),
+          )
+          .futureValue
+          .toList should have size 0
+        // should have the active acs entry
+        storeReingest.listVoteRequests().futureValue.toList should contain(activeVoteRequest)
       }
     }
   }
