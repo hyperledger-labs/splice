@@ -336,7 +336,7 @@ function configureGatewayService(
   //   These IPs should be provided in externalIPRangesInIstio.
   //   See https://github.com/DACH-NY/canton-network-internal/issues/626
   // - For cometbft traffic, which is tcp traffic, we failed to use istio policies, so we route it through a dedicated
-  //   LaodBalancer service that uses loadBalancerSourceRanges. The size limit is not an issue as we need only SV IPs.
+  //   LoadBalancer service that uses loadBalancerSourceRanges. The size limit is not an issue as we need only SV IPs.
   //   These IPs should be provided in externalIPRangesInLB.
 
   const istioPolicies = istioAccessPolicies(ingressNs, externalIPRangesInIstio, suffix);
@@ -471,6 +471,15 @@ function configureGateway(
       metadata: {
         name: 'cn-http-gateway',
         namespace: ingressNs.ns.metadata.name,
+        ...(withSeparateGcpGateway
+          ? {
+              annotations: {
+                'proxy.istio.io/config': JSON.stringify({
+                  gatewayTopology: { numTrustedProxies: 2 },
+                }),
+              },
+            }
+          : {}),
       },
       spec: {
         selector: {

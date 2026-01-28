@@ -24,7 +24,6 @@ you may need to force the gateway destroy first:
 then normal up/apply should work
  */
 
-
 // possible values and their meaning: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gatewayclass
 // global vs regional:
 //   - the ingressAddress must match
