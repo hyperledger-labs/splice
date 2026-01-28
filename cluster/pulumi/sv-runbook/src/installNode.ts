@@ -438,14 +438,8 @@ async function installSvAndValidator(
     resources: svConfig.validatorApp?.resources,
   };
 
-  const validatorValuesWithScanAndSequencer: ChartValues = {
-    ...validatorValues,
-    scanClient: validatorValues.scanClient,
-    synchronizer: validatorValues.synchronizer,
-  };
-
   const validatorValuesWithSpecifiedAud: ChartValues = {
-    ...validatorValuesWithScanAndSequencer,
+    ...validatorValues,
     ...commonValidatorAppValues,
     ...persistenceForPostgres(appsPg, validatorValues),
     auth: {
@@ -471,6 +465,8 @@ async function installSvAndValidator(
     {
       ...validatorValuesWithMaybeTopups,
       additionalJvmOptions: getAdditionalJvmOptions(svConfig.validatorApp?.additionalJvmOptions),
+      scanClient: svConfig.validatorApp?.scanClient ?? validatorValues.scanClient,
+      synchronizer: svConfig.validatorApp?.synchronizer ?? validatorValues.synchronizer,
     },
     activeVersion,
     {
