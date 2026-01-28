@@ -10,11 +10,11 @@ import { ContractId } from '@daml/types';
 export const useVoteRequest = (
   contractId: ContractId<VoteRequest>
 ): UseQueryResult<Contract<VoteRequest>> => {
-  const scanClient = useScanClient();
+  const { lookupDsoRulesVoteRequest } = useScanClient();
   return useQuery({
     queryKey: ['listDsoRulesVoteRequests', contractId],
     queryFn: async () => {
-      const request = await scanClient.lookupDsoRulesVoteRequest(contractId);
+      const request = await lookupDsoRulesVoteRequest(contractId);
       return Contract.decodeOpenAPI(request.dso_rules_vote_request, VoteRequest);
     },
   });
