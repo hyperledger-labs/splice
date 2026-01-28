@@ -100,7 +100,7 @@ spec:
           value: |
             canton.validator-apps.validator_backend.scan-client.type = "trust-single"
             {{- if .Values.scanClient }}
-              {{- if eq .Values.scanClient.scanType "trust-single" } }
+              {{- if eq .Values.scanClient.scanType "trust-single" }}
             canton.validator-apps.validator_backend.scan-client.url = {{ .Values.scanClient.scanAddress | quote }}
               {{- end }}
             {{- else }}
@@ -145,7 +145,7 @@ spec:
             canton.validator-apps.validator_backend.domains.global.trusted-synchronizer-config.sv-names = {{ .Values.synchronizer.svNames | toJson}}
             canton.validator-apps.validator_backend.domains.global.trusted-synchronizer-config.threshold = {{ .Values.synchronizer.threshold }}
             {{- end }}
-        {{-else if not .Values.useSequencerConnectionsFromScan - }}
+        {{- else if not .Values.useSequencerConnectionsFromScan }}
         - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
           value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.decentralizedSynchronizerUrl | quote }}
         {{ end }}
