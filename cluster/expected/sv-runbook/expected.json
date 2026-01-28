@@ -1341,9 +1341,6 @@
           "networkName": "Splice"
         },
         "svValidator": true,
-        "synchronizer": {
-          "connectionType": "bft"
-        },
         "tolerations": [
           {
             "effect": "NoSchedule",
