@@ -25,7 +25,7 @@ jobs:
         with:
           test_name: deployment_test
           with_sbt: false
-          target: 'oss'
+          oss_only: true
 
       - name: Helm tests
         uses: ./.github/actions/nix/run_bash_command_in_nix

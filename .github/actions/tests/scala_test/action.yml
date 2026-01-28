@@ -101,7 +101,7 @@ runs:
         with_sbt: false # we setup SBT later while canton is starting up
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
-        target: ${{ inputs.oss_only }} && 'oss' || 'default'
+        oss_only: ${{ inputs.oss_only }}
         # The docs job saves the oss nix cache, here we save the non-oss one, but only in one runner to reduce contention
         # TODO(#1296): When this runner stops using non-oss, move this to one that does
         save_nix_cache: ${{ inputs.runner_index == 0 && inputs.test_suite_name == 'canton-enterprise' }}
