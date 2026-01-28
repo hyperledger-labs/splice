@@ -174,6 +174,28 @@
     - deprecated ``/v0/total-amulet-balance`` and ``/v0/wallet-balance`` endpoints have been removed in favor of using `/registry/metadata/v1/instruments/{instrumentId} <app_dev/token_standard/openapi/token_metadata.html#get--registry-metadata-v1-instruments-instrumentId>`_
       and `/v0/holdings/summary <app_dev/scan_api/scan_openapi.html#post--v0-holdings-summary>`_, respectively.
 
+    - Added a new external endpoint ``GET /v0/unclaimed-development-fund-coupons`` to retrieve all active unclaimed development fund coupon contracts.
+
+  - Wallet
+
+    - Added a new internal endpoint ``POST /v0/wallet/development-fund-coupons/allocate`` to allocate a development fund coupon for a given beneficiary,
+      amount, expiration time, and reason.
+
+    - Added a new internal endpoint ``GET /v0/wallet/development-fund-coupons`` to retrieve all active DevelopmentFundCoupon contracts,
+      sorted by expiration date, where the wallet user party is either the development fund manager or the beneficiary.
+
+    - Added a new internal endpoint ``POST /v0/wallet/development-fund-coupons/{contract_id}/withdraw`` to withdraw a development fund coupon
+      when the wallet user party is the development fund manager.
+
+  - Validator
+
+    - Add support for custom fault-tolerance configurations for **scan** and **sequencer** connections.
+      Please see the updated :ref:`documentation for Helm-based deployments <helm-validator-install>`.
+      This introduces the new configuration keys ``scanClient`` and ``synchronizer`` as the new recommended way to configure **scan** and **sequencer** connections.
+      Existing configuration options ``scanAddress``, ``nonSvValidatorTrustSingleScan``, ``decentralizedSynchronizerUrl``, ``useSequencerConnectionsFromScan`` are still supported, but will be deprecated in a future release.
+      We recommend to migrate to the new ``scanClient`` and ``synchronizer`` configuration options as soon as possible.
+      Docker Compose-based deployments do not currently support the new custom configuration options.
+
   - Deployments
 
     - The default logger has been switched to use an asynchronous appender, for all the nodes, for better performance.
@@ -301,13 +323,6 @@
   - Validator
 
     - Expose ``/v0/holdings/summary`` endpoint from scan proxy.
-
-    - Add support for custom fault-tolerance configurations for **scan** and **sequencer** connections.
-      Please see the updated :ref:`documentation for Helm-based deployments <helm-validator-install>`.
-      This introduces the new configuration keys ``scanClient`` and ``synchronizer`` as the new recommended way to configure **scan** and **sequencer** connections.
-      Existing configuration options ``scanAddress``, ``nonSvValidatorTrustSingleScan``, ``decentralizedSynchronizerUrl``, ``useSequencerConnectionsFromScan`` are still supported, but will be deprecated in a future release.
-      We recommend to migrate to the new ``scanClient`` and ``synchronizer`` configuration options as soon as possible.
-      Docker Compose-based deployments do not currently support the new custom configuration options.
 
 
 .. release-notes:: 0.5.6

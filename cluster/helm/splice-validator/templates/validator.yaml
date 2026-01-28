@@ -138,7 +138,7 @@ spec:
         {{ if .Values.synchronizer -}}
             {{- if eq .Values.synchronizer.connectionType "trust-single" }}
         - name: ADDITIONAL_CONFIG_SYNCHRONIZER_URL
-          value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.synchronizer.url | quote }} CHECK DOCS HOW WE set now
+          value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.synchronizer.url | quote }}
             {{- else if eq .Values.synchronizer.connectionType "bft-custom" }}
         - name: ADDITIONAL_CONFIG_SYNCHRONIZER_TRUSTED
           value: |
