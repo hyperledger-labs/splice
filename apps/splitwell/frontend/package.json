@@ -1,5 +1,5 @@
 {
-  "name": "splitwell-frontend",
+  "name": "@lfdecentralizedtrust/splice-splitwell-frontend",
   "version": "0.1.0",
   "browserslist": {
     "production": [
