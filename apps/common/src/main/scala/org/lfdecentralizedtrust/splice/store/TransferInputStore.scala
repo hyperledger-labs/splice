@@ -30,7 +30,7 @@ trait TransferInputStore extends AppStore with LimitHelpers {
     .map(c =>
       (
         SpliceUtil
-          .currentAmount(c.payload, submittingRound),
+          .currentAmount(c.payload, submittingRound, false),
         c,
       )
     )
