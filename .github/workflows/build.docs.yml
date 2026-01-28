@@ -26,7 +26,7 @@ jobs:
           test_name: docs
           save_nix_cache: true
           save_nix_cache_to_gcp: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-          oss_only: true
+          target: 'oss'
           upload_workload_identity_provider: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER_SPLICE }}
           upload_service_account: ${{ secrets.CACHE_UPLOADER_SA }}
 
