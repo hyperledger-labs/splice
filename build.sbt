@@ -1429,7 +1429,7 @@ lazy val `apps-splitwell-frontend` = {
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "splitwell-frontend",
+      frontendWorkspace := "@lfdecentralizedtrust/splice-splitwell-frontend",
       sharedFrontendSettings,
     )
 }
