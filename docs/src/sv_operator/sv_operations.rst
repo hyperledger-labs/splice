@@ -363,3 +363,486 @@ Based on that:
        and r.mining_round > UPGRADE_ROUND
        and r.template_id_qualified_name = 'Splice.Round:ClosedMiningRound'
      ) as m group by (template_id_qualified_name, reward_party);
+
+.. _sv_unclaimed_sv_rewards_script:
+
+Determining expired SV rewards for CIP-66 flows
+-----------------------------------------------
+
+SVs need, in the context of
+`CIP-0066 - Mint Canton Coin from Unminted/Unclaimed Pool <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0066/cip-0066.md>`_,
+to determine the total amount of SV rewards that were never claimed and therefore expired
+within a specific time range. These expired rewards form the basis for the amount that may
+later be minted from the unclaimed rewards pool through the CIP-66 governance process.
+
+The ``unclaimed_sv_rewards.py`` utility analyzes the transaction log exposed through the
+Splice Scan API and identifies all reward coupons issued for a beneficiary that subsequently
+expired within the configured interval. It then aggregates the corresponding reward amounts
+to produce the total expired amount relevant for CIP-66 calculations.
+
+In addition to this aggregation, the script verifies whether any of the inspected coupons
+were claimed. In the intended multi-tenant escrow setup operated by the GSF, claims for these
+coupons should not occur. A non-zero claimed amount therefore indicates a misconfiguration on
+the GSF-operated multi-tenant SV node and must be investigated before initiating any CIP-0066
+minting proposal.
+
+The script is part of the Splice repository:
+
+`unclaimed_sv_rewards.py <https://github.com/hyperledger-labs/splice/blob/main/scripts/scan-txlog/unclaimed_sv_rewards.py>`_
+
+``unclaimed_sv_rewards.py`` is intended for operational use by SV node operators. It does
+not modify on-ledger state; it reads from the Scan API and produces a deterministic and
+reproducible summary of expired SV rewards for the inspected time range.
+
+Prerequisites
++++++++++++++
+
+- A reachable and up-to-date Splice Scan API endpoint.
+
+- The beneficiary party whose expired rewards will be evaluated.
+  Operators must know the exact beneficiary party ID used during the relevant reward periods.
+
+- A correct record-time interval corresponding to the milestone being validated under CIP-0066.
+
+- The migration ID that was active at ``begin-record-time``.
+
+- Python 3.
+
+Inputs
+++++++
+
+The ``unclaimed_sv_rewards.py`` script accepts the following inputs:
+
+- ``scan_urls``
+  Address(es) of the Splice Scan server(s). Multiple URLs improve resilience
+  (round-robin failover) and increase throughput, as each chunk selects a
+  different URL to maximize concurrency. It is recommended to provide as many
+  Scan endpoints as possible for best performance.
+
+- ``--beneficiary``
+  The party for which expired rewards should be evaluated.
+
+- ``--begin-record-time``
+  Exclusive start of the record-time interval to inspect.
+
+- ``--begin-record-time``
+  Exclusive start of the record-time interval to inspect.
+  Expected in ISO format, for example: ``2025-07-01T10:30:00Z``.
+
+- ``--end-record-time``
+  Inclusive end of the record-time interval to inspect.
+  Expected in ISO format, for example: ``2025-07-01T12:30:00Z``.
+
+- ``--weight``
+  The weight to apply when calculating the amount associated with each coupon.
+  In CIPs, weights appear as values such as 0.5, 1, 2, etc.
+  In the script, these are expressed as basis points by multiplying the CIP weight by 10,000
+  (e.g., 0.5 → 5,000; 1 → 10,000; 2 → 20,000).
+
+- ``--already-minted-weight``
+  The amount of weight that has already been minted for the same interval. Uses the same scale as ``--weight``.
+
+Optional inputs:
+
+- ``--page-size`` (default: ``100``)
+  Number of transaction updates retrieved per Scan API request.
+
+- ``--loglevel`` (default: ``INFO``)
+  Logging level.
+
+- ``--log-file-path`` (default: ``log/unclaimed_sv_rewards.log``)
+  File path to save application log to.
+
+- ``--grace-period-for-mining-rounds-in-minutes`` (default: ``60``)
+  Additional time added to ``end-record-time`` when retrieving mining rounds.
+  Mining rounds contain the issuance information required to compute the final reward amount.
+  Extending the interval ensures that rounds created shortly after coupon creation are not missed.
+
+- ``--concurrency`` (default: 130)
+  Maximum number of concurrent chunk workers.
+
+- ``chunk-size-in-hours`` (default: 0.1)
+  Size of each processing chunk, expressed in hours (e.g. 0.5, 1, 24).
+
+- ``--cache-file-path``
+  Enables resumable execution by persisting internal state to the specified file.
+
+- ``--rebuild-cache``
+  Ignores any existing cache file and starts processing from scratch.
+
+Running the script
+++++++++++++++++++
+
+The ``unclaimed_sv_rewards.py`` script is executed as a standalone Python program.
+
+Example using default optional parameters:
+
+.. code-block:: bash
+
+  python3 unclaimed_sv_rewards.py \
+      https://scan.sv-1.global.canton.network.c7.digital \
+      https://scan.sv-1.global.canton.network.cumberland.io \
+      https://scan.sv-2.global.canton.network.cumberland.io \
+      https://scan.sv-1.global.canton.network.digitalasset.com \
+      https://scan.sv-2.global.canton.network.digitalasset.com \
+      https://scan.sv-1.global.canton.network.fivenorth.io \
+      https://scan.sv-1.global.canton.network.sync.global \
+      https://scan.sv-1.global.canton.network.lcv.mpch.io \
+      https://scan.sv-1.global.canton.network.mpch.io \
+      https://scan.sv-1.global.canton.network.orb1lp.mpch.io \
+      https://scan.sv-1.global.canton.network.proofgroup.xyz \
+      https://scan.sv.global.canton.network.sv-nodeops.com \
+      https://scan.sv-1.global.canton.network.tradeweb.com \
+      --beneficiary 'party::1234abcd' \
+      --begin-record-time '2025-07-20T10:30:00Z' \
+      --end-record-time '2025-07-20T11:30:00Z' \
+      --begin-migration-id 3 \
+      --weight 5000 \
+      --already-minted-weight 0
+
+Example with optional parameters:
+
+.. code-block:: bash
+
+  python3 unclaimed_sv_rewards.py \
+      https://scan.sv-1.global.canton.network.c7.digital \
+      https://scan.sv-1.global.canton.network.cumberland.io \
+      https://scan.sv-2.global.canton.network.cumberland.io \
+      https://scan.sv-1.global.canton.network.digitalasset.com \
+      https://scan.sv-2.global.canton.network.digitalasset.com \
+      https://scan.sv-1.global.canton.network.fivenorth.io \
+      https://scan.sv-1.global.canton.network.sync.global \
+      https://scan.sv-1.global.canton.network.lcv.mpch.io \
+      https://scan.sv-1.global.canton.network.mpch.io \
+      https://scan.sv-1.global.canton.network.orb1lp.mpch.io \
+      https://scan.sv-1.global.canton.network.proofgroup.xyz \
+      https://scan.sv.global.canton.network.sv-nodeops.com \
+      https://scan.sv-1.global.canton.network.tradeweb.com \
+      --loglevel DEBUG \
+      --log-file-path 'log/unclaimed_sv_rewards_2.log' \
+      --page-size 200 \
+      --grace-period-for-mining-rounds-in-minutes 70 \
+      --concurrency 117 \
+      --chunk-size-in-hours 0.2 \
+      --beneficiary 'party::1234abcd' \
+      --begin-record-time '2025-07-20T10:30:00Z' \
+      --end-record-time '2025-07-20T11:30:00Z' \
+      --begin-migration-id 3 \
+      --weight 5000 \
+      --already-minted-weight 0
+
+Using a cache:
+
+.. code-block:: bash
+
+  python3 unclaimed_sv_rewards.py \
+      https://scan.sv-1.global.canton.network.c7.digital \
+      https://scan.sv-1.global.canton.network.cumberland.io \
+      https://scan.sv-2.global.canton.network.cumberland.io \
+      https://scan.sv-1.global.canton.network.digitalasset.com \
+      https://scan.sv-2.global.canton.network.digitalasset.com \
+      https://scan.sv-1.global.canton.network.fivenorth.io \
+      https://scan.sv-1.global.canton.network.sync.global \
+      https://scan.sv-1.global.canton.network.lcv.mpch.io \
+      https://scan.sv-1.global.canton.network.mpch.io \
+      https://scan.sv-1.global.canton.network.orb1lp.mpch.io \
+      https://scan.sv-1.global.canton.network.proofgroup.xyz \
+      https://scan.sv.global.canton.network.sv-nodeops.com \
+      https://scan.sv-1.global.canton.network.tradeweb.com \
+      --cache-file-path 'cache.json' \
+      --beneficiary 'party::1234abcd' \
+      --begin-record-time '2025-07-20T10:30:00Z' \
+      --end-record-time '2025-07-20T11:30:00Z' \
+      --begin-migration-id 3 \
+      --weight 5000 \
+      --already-minted-weight 0
+
+To rebuild the cache:
+
+.. code-block:: bash
+
+  python3 unclaimed_sv_rewards.py \
+      https://scan.sv-1.global.canton.network.c7.digital \
+      https://scan.sv-1.global.canton.network.cumberland.io \
+      https://scan.sv-2.global.canton.network.cumberland.io \
+      https://scan.sv-1.global.canton.network.digitalasset.com \
+      https://scan.sv-2.global.canton.network.digitalasset.com \
+      https://scan.sv-1.global.canton.network.fivenorth.io \
+      https://scan.sv-1.global.canton.network.sync.global \
+      https://scan.sv-1.global.canton.network.lcv.mpch.io \
+      https://scan.sv-1.global.canton.network.mpch.io \
+      https://scan.sv-1.global.canton.network.orb1lp.mpch.io \
+      https://scan.sv-1.global.canton.network.proofgroup.xyz \
+      https://scan.sv.global.canton.network.sv-nodeops.com \
+      https://scan.sv-1.global.canton.network.tradeweb.com \
+      --cache-file-path 'cache.json' \
+      --beneficiary 'party::1234abcd' \
+      --begin-record-time '2025-07-20T10:30:00Z' \
+      --end-record-time '2025-07-20T11:30:00Z' \
+      --begin-migration-id 3 \
+      --weight 5000 \
+      --already-minted-weight 0 \
+      --rebuild-cache
+
+
+For operational details regarding cache behavior, see
+:ref:`Cache mechanism <sv_unclaimed_sv_rewards_cache>`
+
+Output
+++++++
+
+At the end of its execution, the script logs a summary of the SV rewards identified
+within the inspected record-time interval. The following fields are reported:
+
+- ``reward_expired_count``
+  Number of SV reward coupons that were not claimed and therefore expired.
+
+- ``reward_expired_total_amount``
+  Total amount corresponding to the expired SV reward coupons.
+
+- ``reward_claimed_count``
+  Number of SV reward coupons that were claimed.
+  In the expected GSF multi-tenant escrow setup, this value should always be ``0``.
+  A non-zero value indicates a configuration issue and must be investigated before
+  initiating any CIP-0066 governance proposal.
+
+- ``reward_claimed_total_amount``
+  Total amount corresponding to claimed SV reward coupons.
+  This value is expected to be ``0`` as well. A non-zero amount indicates the same
+  configuration issue described above and must be investigated before initiating any
+  CIP-0066 governance proposal.
+
+- ``reward_unclaimed_count``
+  Number of SV reward coupons that remain active after processing.
+  In the intended setup, all coupons should have either expired or (unexpectedly) been
+  claimed. A non-zero value causes the script to abort with an assertion error and
+  indicates that the inspected interval (including any grace period) does not fully
+  cover the lifecycle of the relevant coupons or that the input parameters need to
+  be reviewed.
+
+.. _sv_unclaimed_sv_rewards_cache:
+
+Cache mechanism
++++++++++++++++
+
+The ``unclaimed_sv_rewards.py`` script supports resumable execution through an optional
+cache file. When enabled, the script persists its internal state so that it can resume
+processing from the last completed batch if a run is interrupted.
+
+A cache file is automatically ignored when any input parameter that affects reward
+classification changes. The following arguments are part of the fingerprint that determines
+cache validity:
+
+- ``--beneficiary``
+- ``--begin-record-time``
+- ``--end-record-time``
+- ``--begin-migration-id``
+- ``--weight``
+- ``--already-minted-weight``
+
+If any of these values change, the script starts a new run, ignoring the existing cache.
+
+The cache can be controlled via:
+
+- ``--cache-file-path``
+  Enables the cache mechanism and specifies where state should be written.
+
+- ``--rebuild-cache``
+  Forces the script to recreate the cache from scratch, ignoring any existing file.
+
+Example: Reward calculations across multiple milestones
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+This example illustrates how the ``unclaimed_sv_rewards.py`` script is used in a
+milestone-based setup, where an SV receives escrowed reward weight that decreases
+as milestones are reached. The goal at each milestone is to determine the amount
+of expired SV rewards that may be considered under CIP-0066.
+
+The beneficiary’s escrowed reward weight evolves as follows:
+
+.. code-block:: text
+
+       t0                   t1                 t2                     t3
+       | m₁ (w=10K)         | m₂ (w=10K)       | m₃ (w=20K)           |
+    ---------------------------------------------------------------------------
+       |         40K        |        30K       |         20K          |   0 ...
+
+**Steps**
+
+- At t0
+
+  - GSF sets ``Ghost-party-A`` weight = 40K.
+
+- At t1 (Milestone 1 completed)
+
+  - GSF sets weight = 30K.
+  - GSF runs the script once for ``(t0, t1]``:
+
+  .. code-block:: bash
+
+     --begin-record-time=t0 --end-record-time=t1 \
+     --weight=10000 --already-minted-weight=0
+
+  - A vote is initiated for **m₁**.
+
+- At t2 (Milestone 2 completed)
+
+  - GSF sets weight = 20K.
+  - GSF runs the script twice:
+
+    - For ``(t0, t1]`` remaining portion:
+
+     .. code-block:: bash
+
+        --begin-record-time=t0 --end-record-time=t1 \
+        --weight=10000 --already-minted-weight=10000
+
+    - For ``(t1, t2]``:
+
+     .. code-block:: bash
+
+        --begin-record-time=t1 --end-record-time=t2 \
+        --weight=10000 --already-minted-weight=0
+
+  - A vote is initiated for **m₂**.
+
+- At t3 (Milestone 3 completed)
+
+  - GSF sets weight = 0 (party removed).
+  - GSF runs the script three times:
+
+    - For ``(t0, t1]`` remaining portion:
+
+     .. code-block:: bash
+
+        --begin-record-time=t0 --end-record-time=t1 \
+        --weight=20000 --already-minted-weight=20000
+
+    - For ``(t1, t2]`` remaining portion:
+
+     .. code-block:: bash
+
+        --begin-record-time=t1 --end-record-time=t2 \
+        --weight=20000 --already-minted-weight=10000
+
+    - For ``(t2, t3]``:
+
+     .. code-block:: bash
+
+        --begin-record-time=t2 --end-record-time=t3 \
+        --weight=20000 --already-minted-weight=0
+
+  - A vote is initiated for **m₃**.
+
+Operational notes
++++++++++++++++++
+
+When using the ``unclaimed_sv_rewards.py`` script in the context of CIP-0066 reward
+calculations, SV operators should keep the following considerations in mind:
+
+- **Expiration vs. claiming.**
+  In the intended escrow setup, SV reward coupons for the beneficiary
+  should always expire. Any claimed coupon indicates a configuration issue on the
+  GSF-operated SV node and must be investigated before proceeding with a CIP-0066
+  governance proposal.
+
+- **CIP weight vs. script weight.**
+  Weights appearing in CIPs (e.g., 0.5, 1, 2) must be multiplied by 10,000 when passed
+  to the script (e.g., 0.5 → 5,000; 1 → 10,000; 2 → 20,000).
+
+- **Using ``already-minted-weight``.**
+  This argument indicates how much of the configured weight has already been used in
+  earlier milestone calculations for the same interval. The script validates this
+  value against the weight of each reward coupon and automatically adjusts the
+  computation if the provided value is too high. As a result, incorrect inputs will
+  not lead to double-counting or incorrect reward amounts, but will cause the script
+  to emit a warning.
+
+- **Grace period for mining rounds.**
+  Mining rounds contain the issuance information required to compute the amount
+  associated with each expired reward. The default grace period (60 minutes) should
+  normally be sufficient. If the script reports missing round information, increase
+  the grace period so that rounds created shortly after coupon creation are included.
+
+- **Handling active coupons.**
+  A non-zero ``reward_unclaimed_count`` means that some SV reward coupons remain active.
+  This implies that their lifecycle (expire or claim) is not covered by the inspected
+  interval. The script will abort to avoid producing incomplete results.
+
+- **Ledger state is never modified.**
+  The script is read-only and relies solely on data returned by the Scan API.
+  All outputs are deterministic for a given set of inputs.
+
+- **Applying weight changes.**
+  In milestone-based flows, GSF should only reduce the beneficiary’s configured weight
+  after the SV has begun minting at the new weight, to avoid race conditions in reward
+  attribution.
+
+- **Concurrency and Scan server usage.**
+  For large time ranges, performance depends heavily on how the workload is
+  distributed across Scan servers. To maximize throughput:
+
+  - Provide as many Scan URLs as possible. Each chunk starts against a different
+    Scan server, which improves parallelism and reduces per-server load.
+  - Use relatively small chunk sizes (for example, ``0.1``–``0.2`` hours) to
+    improve load balancing and retry behavior.
+  - Avoid very large page sizes; moderate values (around 100) tend to yield
+    better latency and more predictable performance.
+  - Set ``--concurrency`` as a multiple of the number of Scan servers. In practice,
+    values around 5–10× the number of provided Scan URLs have shown good results.
+
+.. _sv-reingest-scan-stores:
+
+Trigger re-ingestion of the Scan Stores
+---------------------------------------
+
+The Scan App keeps track of the version of its database stores (ACS store and TxLog store) using a Store Descriptor.
+The Store Descriptor in the Scan App binary is compared against the Store Descriptor stored in the database.
+If the descriptors differ, the Scan App will update the descriptor in the database and re-ingest all data into a fresh store.
+This allows for fixing any unexpected parsing or storage bugs in a subsequent Splice Release.
+
+SV operators can trigger re-ingestion of the stores without requiring a new Splice Release.
+This is done by setting a `user version` on the Store Descriptor via a helm chart value. Once the `user version` is set,
+it will be compared and stored in the database as part of the Store Descriptor.
+
+The user version is an optional `Long` parameter that is not set by default. Setting it triggers a re-ingestion.
+The user version can be provided through a helm chart value. It's important to note that
+a user version should start with `1`, and only increment by one, whenever a re-ingestion is desired.
+Once the user version is set, it needs to be kept to that value in every subsequent helm chart deployment, to prevent an unwanted re-ingestion.
+
+The `ScanAppBackendConfig` has a field for both the ACS store and the TxLog store user versions,
+`acsStoreDescriptorUserVersion` for the ACS store and `txLogStoreDescriptorUserVersion` for the TxLog store.
+
+The helm chart value `acsStoreDescriptorUserVersion` sets the `user version` of the
+ACS store, which is shown in the example below:
+
+   .. code-block:: yaml
+
+      # Example to trigger re-ingestion of the ACS store for the first time
+      persistence:
+        acsStoreDescriptorUserVersion: 1
+
+A subsequent re-ingestion can be triggered by incrementing the value, as shown in the example below:
+
+   .. code-block:: yaml
+
+      # Example to trigger re-ingestion of the ACS store for the second time
+      persistence:
+        acsStoreDescriptorUserVersion: 2
+
+The helm chart value `txLogStoreDescriptorUserVersion` sets the `user version` of the
+TxLog store, which is shown in the example below:
+
+   .. code-block:: yaml
+
+      # Example to trigger re-ingestion of the TxLog store for the first time
+      persistence:
+        txLogStoreDescriptorUserVersion: 1
+
+A subsequent re-ingestion can be triggered by incrementing the value, as shown in the example below:
+
+   .. code-block:: yaml
+
+      # Example to trigger re-ingestion of the TxLog store for the second time
+      persistence:
+        txLogStoreDescriptorUserVersion: 2

@@ -15,8 +15,6 @@ import com.daml.ledger.api.v2.admin.user_management_service.{
 import com.daml.platform.v1.page_tokens.ListUsersPageTokenPayload
 import com.daml.tracing.Telemetry
 import com.digitalasset.base.error.ErrorResource
-import com.digitalasset.canton.auth.ClaimSet.Claims
-import com.digitalasset.canton.auth.{AuthInterceptor, AuthorizationChecksErrors, ClaimAdmin}
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import com.digitalasset.canton.ledger.api.validation.{FieldValidator, ValueValidator}
 import com.digitalasset.canton.ledger.api.{
@@ -26,7 +24,6 @@ import com.digitalasset.canton.ledger.api.{
   User,
   UserRight,
 }
-import com.digitalasset.canton.ledger.error.LedgerApiErrors
 import com.digitalasset.canton.ledger.error.groups.{
   RequestValidationErrors,
   UserManagementServiceErrors,
@@ -67,9 +64,11 @@ private[apiserver] final class ApiUserManagementService(
     executionContext: ExecutionContext
 ) extends proto.UserManagementServiceGrpc.UserManagementService
     with GrpcApiService
-    with NamedLogging {
+    with NamedLogging
+    with AuthenticatedUserContextResolver {
 
   import ApiUserManagementService.*
+  import AuthenticatedUserContextResolver.*
   import FieldValidator.*
   import ValueValidator.*
 
@@ -136,7 +135,7 @@ private[apiserver] final class ApiUserManagementService(
               user = user,
               rights = pRights,
             )
-          createdUser <- handleResult("creating user")(result)
+          createdUser <- Utils.handleResult("creating user")(result)
         } yield CreateUserResponse(Some(toProtoUser(createdUser)))
       }
     }
@@ -209,39 +208,13 @@ private[apiserver] final class ApiUserManagementService(
             }
           resp <- userManagementStore
             .updateUser(userUpdate = userUpdate)
-            .flatMap(handleResult("updating user"))
+            .flatMap(Utils.handleResult("updating user"))
             .map { u =>
               UpdateUserResponse(user = Some(toProtoUser(u)))
             }
         } yield resp
       }
     }
-
-  private def resolveAuthenticatedUserContext(implicit
-      errorLogger: ErrorLoggingContext
-  ): Future[AuthenticatedUserContext] =
-    AuthInterceptor
-      .extractClaimSetFromContext()
-      .fold(
-        fa = error =>
-          Future.failed(
-            LedgerApiErrors.InternalError
-              .Generic("Could not extract a claim set from the context", throwableO = Some(error))
-              .asGrpcError
-          ),
-        fb = {
-          case claims: Claims =>
-            Future.successful(AuthenticatedUserContext(claims))
-          case claimsSet =>
-            Future.failed(
-              LedgerApiErrors.InternalError
-                .Generic(
-                  s"Unexpected claims when trying to resolve the authenticated user: $claimsSet"
-                )
-                .asGrpcError
-            )
-        },
-      )
 
   override def getUser(request: proto.GetUserRequest): Future[GetUserResponse] = {
     implicit val loggingContextWithTrace = LoggingContextWithTrace(loggerFactory, telemetry)
@@ -257,7 +230,7 @@ private[apiserver] final class ApiUserManagementService(
     } { case (userId, identityProviderId) =>
       userManagementStore
         .getUser(userId, identityProviderId)
-        .flatMap(handleResult("getting user"))
+        .flatMap(Utils.handleResult("getting user"))
         .map(u => GetUserResponse(Some(toProtoUser(u))))
     }
   }
@@ -276,7 +249,7 @@ private[apiserver] final class ApiUserManagementService(
       } { case (userId, identityProviderId) =>
         userManagementStore
           .deleteUser(userId, identityProviderId)
-          .flatMap(handleResult("deleting user"))
+          .flatMap(Utils.handleResult("deleting user"))
           .map(_ => proto.DeleteUserResponse())
       }
     }
@@ -307,7 +280,7 @@ private[apiserver] final class ApiUserManagementService(
     ) { case (fromExcl, pageSize, identityProviderId) =>
       userManagementStore
         .listUsers(fromExcl, pageSize, identityProviderId)
-        .flatMap(handleResult("listing users"))
+        .flatMap(Utils.handleResult("listing users"))
         .map { page =>
           val protoUsers = page.users.map(toProtoUser)
           proto.ListUsersResponse(
@@ -350,7 +323,7 @@ private[apiserver] final class ApiUserManagementService(
               rights = rights,
               identityProviderId = identityProviderId,
             )
-          handledResult <- handleResult("grant user rights")(result)
+          handledResult <- Utils.handleResult("grant user rights")(result)
         } yield proto.GrantUserRightsResponse(handledResult.view.map(toProtoRight).toList)
       }
   }
@@ -386,7 +359,7 @@ private[apiserver] final class ApiUserManagementService(
               rights = rights,
               identityProviderId = identityProviderId,
             )
-          handledResult <- handleResult("revoke user rights")(result)
+          handledResult <- Utils.handleResult("revoke user rights")(result)
         } yield proto.RevokeUserRightsResponse(handledResult.view.map(toProtoRight).toList)
       }
   }
@@ -407,7 +380,7 @@ private[apiserver] final class ApiUserManagementService(
     } { case (userId, identityProviderId) =>
       userManagementStore
         .listUserRights(userId, identityProviderId)
-        .flatMap(handleResult("list user rights"))
+        .flatMap(Utils.handleResult("list user rights"))
         .map(_.view.map(toProtoRight).toList)
         .map(proto.ListUserRightsResponse(_))
     }
@@ -439,7 +412,7 @@ private[apiserver] final class ApiUserManagementService(
             targetIdp = targetIdentityProviderId,
             id = userId,
           )
-          .flatMap(handleResult("update user identity provider"))
+          .flatMap(Utils.handleResult("update user identity provider"))
           .map(_ => proto.UpdateUserIdentityProviderIdResponse())
       } yield result
     }
@@ -468,40 +441,27 @@ private[apiserver] final class ApiUserManagementService(
       errorLogger: ErrorLoggingContext,
   ): Future[Unit] = {
     val parties = userParties(rights)
-    val partiesExistingInPartyRecordStore =
-      if (isParticipantAdmin) partyRecordExist.filterPartiesExistingInPartyRecordStore(parties)
+    val partiesKnownF =
+      if (isParticipantAdmin)
+        indexKnownParties(parties)
       else
         partyRecordExist
           .filterPartiesExistingInPartyRecordStore(identityProviderId, parties)
 
-    partiesExistingInPartyRecordStore
-      .flatMap { partiesExist =>
-        val partiesWithoutRecord = parties -- partiesExist
-        if (partiesWithoutRecord.isEmpty)
+    partiesKnownF
+      .flatMap { partiesKnown =>
+        val unknownParties = parties -- partiesKnown
+        if (unknownParties.isEmpty)
           Future.unit
         else
-          verifyPartiesExistsInIdp(partiesWithoutRecord, identityProviderId)
+          partiesNotExistsError(unknownParties, identityProviderId)
       }
   }
 
-  private def verifyPartiesExistsInIdp(
-      partiesWithoutRecord: Set[Ref.Party],
-      identityProviderId: IdentityProviderId,
-  )(implicit
-      loggingContext: LoggingContextWithTrace,
-      errorLogger: ErrorLoggingContext,
-  ): Future[Unit] =
-    indexKnownParties(partiesWithoutRecord.toList).flatMap { partiesKnown =>
-      val unknownParties = partiesWithoutRecord -- partiesKnown
-      if (unknownParties.isEmpty) Future.unit
-      else
-        partiesNotExistsError(unknownParties, identityProviderId)
-    }
-
   private def indexKnownParties(
-      parties: Seq[Ref.Party]
+      parties: Set[Ref.Party]
   )(implicit loggingContext: LoggingContextWithTrace): Future[Set[Ref.Party]] =
-    indexPartyManagementService.getParties(parties).map { partyDetails =>
+    indexPartyManagementService.getParties(parties.toList).map { partyDetails =>
       partyDetails.map(_.party).toSet
     }
 
@@ -566,13 +526,11 @@ private[apiserver] final class ApiUserManagementService(
       case proto.Right(_: proto.Right.Kind.CanReadAsAnyParty) =>
         Right(UserRight.CanReadAsAnyParty)
 
-      // irrelevant for splice
-      case proto.Right(_: proto.Right.Kind.CanExecuteAsAnyParty) =>
-        ???
+      case proto.Right(proto.Right.Kind.CanExecuteAs(r)) =>
+        requireParty(r.party).map(UserRight.CanExecuteAs(_))
 
-      // irrelevant for splice
-      case proto.Right(proto.Right.Kind.CanExecuteAs(_)) =>
-        ???
+      case proto.Right(_: proto.Right.Kind.CanExecuteAsAnyParty) =>
+        Right(UserRight.CanExecuteAsAnyParty)
 
       case proto.Right(proto.Right.Kind.Empty) =>
         Left(
@@ -603,15 +561,6 @@ private[apiserver] final class ApiUserManagementService(
 }
 
 object ApiUserManagementService {
-  final case class AuthenticatedUserContext(userId: Option[String], isParticipantAdmin: Boolean)
-  object AuthenticatedUserContext {
-    def apply(claims: Claims): AuthenticatedUserContext = claims match {
-      case claims: Claims if claims.resolvedFromUser =>
-        AuthenticatedUserContext(claims.userId, claims.claims.contains(ClaimAdmin))
-      case claims: Claims =>
-        AuthenticatedUserContext(None, claims.claims.contains(ClaimAdmin))
-    }
-  }
 
   private def toProtoUser(user: User): proto.User =
     proto.User(
@@ -633,6 +582,10 @@ object ApiUserManagementService {
       proto.Right(proto.Right.Kind.CanReadAs(proto.Right.CanReadAs(party)))
     case UserRight.CanReadAsAnyParty =>
       proto.Right(proto.Right.Kind.CanReadAsAnyParty(proto.Right.CanReadAsAnyParty()))
+    case UserRight.CanExecuteAs(party) =>
+      proto.Right(proto.Right.Kind.CanExecuteAs(proto.Right.CanExecuteAs(party)))
+    case UserRight.CanExecuteAsAnyParty =>
+      proto.Right(proto.Right.Kind.CanExecuteAsAnyParty(proto.Right.CanExecuteAsAnyParty()))
   }
 
   def encodeNextPageToken(token: Option[Ref.UserId]): String =
@@ -675,52 +628,4 @@ object ApiUserManagementService {
     RequestValidationErrors.InvalidArgument
       .Reject("Invalid page token")
       .asGrpcError
-
-  def handleResult[T](operation: String)(
-      result: UserManagementStore.Result[T]
-  )(implicit errorLogger: ErrorLoggingContext): Future[T] =
-    result match {
-      case Left(UserManagementStore.PermissionDenied(id)) =>
-        Future.failed(
-          AuthorizationChecksErrors.PermissionDenied
-            .Reject(s"User $id belongs to another Identity Provider")
-            .asGrpcError
-        )
-      case Left(UserManagementStore.UserNotFound(id)) =>
-        Future.failed(
-          UserManagementServiceErrors.UserNotFound
-            .Reject(operation, id)
-            .asGrpcError
-        )
-
-      case Left(UserManagementStore.UserExists(id)) =>
-        Future.failed(
-          UserManagementServiceErrors.UserAlreadyExists
-            .Reject(operation, id)
-            .asGrpcError
-        )
-
-      case Left(UserManagementStore.TooManyUserRights(id)) =>
-        Future.failed(
-          UserManagementServiceErrors.TooManyUserRights
-            .Reject(operation, id: String)
-            .asGrpcError
-        )
-      case Left(e: UserManagementStore.ConcurrentUserUpdate) =>
-        Future.failed(
-          UserManagementServiceErrors.ConcurrentUserUpdateDetected
-            .Reject(userId = e.userId)
-            .asGrpcError
-        )
-
-      case Left(e: UserManagementStore.MaxAnnotationsSizeExceeded) =>
-        Future.failed(
-          UserManagementServiceErrors.MaxUserAnnotationsSizeExceeded
-            .Reject(userId = e.userId)
-            .asGrpcError
-        )
-
-      case scala.util.Right(t) =>
-        Future.successful(t)
-    }
 }

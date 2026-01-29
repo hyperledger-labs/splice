@@ -31,13 +31,13 @@ class TopologyManagerSigningKeyDetectionTest
     def mk() =
       new TopologyManagerSigningKeyDetection(
         new InMemoryTopologyStore(
-          SynchronizerStore(Factory.synchronizerId1),
+          SynchronizerStore(Factory.physicalSynchronizerId1),
           testedProtocolVersion,
           loggerFactory,
           timeouts,
         ),
-        Factory.cryptoApi.crypto.pureCrypto,
-        Factory.cryptoApi.crypto.cryptoPrivateStore,
+        Factory.syncCryptoClient.crypto.pureCrypto,
+        Factory.syncCryptoClient.crypto.cryptoPrivateStore,
         loggerFactory,
       )
 
@@ -55,8 +55,7 @@ class TopologyManagerSigningKeyDetectionTest
         .update(
           SequencedTime(ts(0)),
           EffectiveTime(ts(0)),
-          removeMapping = Map.empty,
-          removeTxs = Set.empty,
+          removals = Map.empty,
           additions = Seq(ns1k1_k1, ns1k2_k1, ns1k3_k2).map(ValidatedTopologyTransaction(_)),
         )
         .futureValueUS
@@ -83,8 +82,7 @@ class TopologyManagerSigningKeyDetectionTest
         .update(
           SequencedTime(ts(1)),
           EffectiveTime(ts(1)),
-          removeMapping = Map.empty,
-          removeTxs = Set(ns1k2_k1.hash),
+          removals = Map(ns1k2_k1.mapping.uniqueKey -> (None, Set(ns1k2_k1.hash))),
           additions = Seq.empty,
         )
         .futureValueUS
@@ -120,8 +118,7 @@ class TopologyManagerSigningKeyDetectionTest
         .update(
           SequencedTime(ts(0)),
           EffectiveTime(ts(0)),
-          removeMapping = Map.empty,
-          removeTxs = Set.empty,
+          removals = Map.empty,
           additions =
             Seq(ns1k1_k1, ns8k8_k8, ns9k9_k9, ns1k2_k1, dns1).map(ValidatedTopologyTransaction(_)),
         )
@@ -130,14 +127,14 @@ class TopologyManagerSigningKeyDetectionTest
       val otk = TopologyTransaction(
         Replace,
         PositiveInt.one,
-        OwnerToKeyMapping(
+        OwnerToKeyMapping.tryCreate(
           ParticipantId("decentralized-participant", dns1.mapping.namespace),
           NonEmpty(Seq, EncryptionKeys.key1, SigningKeys.key4),
         ),
         testedProtocolVersion,
       )
 
-      cryptoApi.crypto.cryptoPrivateStore
+      syncCryptoClient.crypto.cryptoPrivateStore
         .removePrivateKey(SigningKeys.key8.fingerprint)
         .futureValueUS
 

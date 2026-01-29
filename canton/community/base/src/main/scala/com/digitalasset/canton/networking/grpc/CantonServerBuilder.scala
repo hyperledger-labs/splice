@@ -3,19 +3,21 @@
 
 package com.digitalasset.canton.networking.grpc
 
-import com.daml.metrics.grpc.GrpcServerMetrics
 import com.daml.tracing.Telemetry
-import com.digitalasset.canton.auth.CantonAdminToken
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.TlsServerConfig.logTlsProtocolsAndCipherSuites
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.metrics.ActiveRequestsMetrics.GrpcServerMetricsX
+import com.digitalasset.canton.networking.grpc.ratelimiting.ActiveRequestCounterInterceptor
 import com.digitalasset.canton.tracing.TracingConfig
+import com.google.common.annotations.VisibleForTesting
 import io.grpc.*
-import io.grpc.netty.{GrpcSslContexts, NettyServerBuilder}
+import io.grpc.netty.shaded.io.grpc.netty.{GrpcSslContexts, NettyServerBuilder}
+import io.grpc.netty.shaded.io.netty.handler.ssl.{SslContext, SslContextBuilder}
 import io.grpc.util.MutableHandlerRegistry
-import io.netty.handler.ssl.{SslContext, SslContextBuilder}
 
 import java.net.InetSocketAddress
 import java.util.concurrent.{Executor, TimeUnit}
@@ -33,6 +35,7 @@ trait CantonServerBuilder {
   def build: Server
 
   def maxInboundMessageSize(bytes: NonNegativeInt): CantonServerBuilder
+
 }
 
 trait CantonMutableHandlerRegistry extends AutoCloseable {
@@ -49,6 +52,10 @@ trait CantonMutableHandlerRegistry extends AutoCloseable {
   def removeService(service: ServerServiceDefinition): CantonMutableHandlerRegistry
 
   def removeServiceU(service: ServerServiceDefinition): Unit = removeService(service).discard
+
+  @VisibleForTesting
+  def activeRequestCounter: Option[ActiveRequestCounterInterceptor]
+
 }
 
 object CantonServerBuilder {
@@ -57,7 +64,7 @@ object CantonServerBuilder {
     * configuration this is intentionally private.
     */
   private class BaseBuilder(
-      serverBuilder: ServerBuilder[_ <: ServerBuilder[?]],
+      serverBuilder: ServerBuilder[? <: ServerBuilder[?]],
       interceptors: CantonServerInterceptors,
   ) extends CantonServerBuilder {
 
@@ -92,6 +99,10 @@ object CantonServerBuilder {
               .removeService(registry.getServices.get(registry.getServices.size() - 1))
               .discard[Boolean]
           }
+
+        override def activeRequestCounter: Option[ActiveRequestCounterInterceptor] =
+          interceptors.activeRequestCounter
+
       }
 
     override def addService(service: BindableService, withLogging: Boolean): CantonServerBuilder = {
@@ -142,13 +153,14 @@ object CantonServerBuilder {
     */
   def forConfig(
       config: ServerConfig,
-      adminToken: Option[CantonAdminToken],
+      adminTokenDispenser: Option[CantonAdminTokenDispenser],
       executor: Executor,
       loggerFactory: NamedLoggerFactory,
       apiLoggingConfig: ApiLoggingConfig,
       tracing: TracingConfig,
-      grpcMetrics: GrpcServerMetrics,
+      grpcMetrics: GrpcServerMetricsX,
       telemetry: Telemetry,
+      additionalInterceptors: Seq[ServerInterceptor] = Seq.empty,
   ): CantonServerBuilder = {
     val builder =
       NettyServerBuilder
@@ -166,14 +178,19 @@ object CantonServerBuilder {
     new BaseBuilder(
       reifyBuilder(configureKeepAlive(config.keepAliveServer, builderWithSsl)),
       config.instantiateServerInterceptors(
+        config.name,
         tracing,
         apiLoggingConfig,
         loggerFactory,
         grpcMetrics,
         config.authServices,
-        adminToken,
+        adminTokenDispenser,
         config.jwtTimestampLeeway,
+        config.adminTokenConfig,
+        config.jwksCacheConfig,
         telemetry,
+        additionalInterceptors,
+        config.limits,
       ),
     )
   }
@@ -207,6 +224,6 @@ object CantonServerBuilder {
     * isolates the usage of `asInstanceOf` to only here.
     */
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  private def reifyBuilder(builder: ServerBuilder[?]): ServerBuilder[_ <: ServerBuilder[?]] =
-    builder.asInstanceOf[ServerBuilder[_ <: ServerBuilder[?]]]
+  private def reifyBuilder(builder: ServerBuilder[?]): ServerBuilder[? <: ServerBuilder[?]] =
+    builder.asInstanceOf[ServerBuilder[? <: ServerBuilder[?]]]
 }

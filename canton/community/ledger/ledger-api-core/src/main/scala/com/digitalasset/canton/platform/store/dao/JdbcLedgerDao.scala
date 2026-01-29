@@ -8,15 +8,16 @@ import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.api.ParticipantId
 import com.digitalasset.canton.ledger.api.health.{HealthStatus, ReportsHealth}
 import com.digitalasset.canton.ledger.participant.state
+import com.digitalasset.canton.ledger.participant.state.TestAcsChangeFactory
 import com.digitalasset.canton.ledger.participant.state.index.IndexerPartyDetails
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
+import com.digitalasset.canton.participant.store.ContractStore
 import com.digitalasset.canton.platform.*
 import com.digitalasset.canton.platform.config.{
   ActiveContractsServiceStreamsConfig,
-  TransactionTreeStreamsConfig,
   UpdatesStreamsConfig,
 }
 import com.digitalasset.canton.platform.store.*
@@ -26,12 +27,15 @@ import com.digitalasset.canton.platform.store.cache.LedgerEndCache
 import com.digitalasset.canton.platform.store.dao.events.*
 import com.digitalasset.canton.platform.store.interning.StringInterning
 import com.digitalasset.canton.platform.store.utils.QueueBasedConcurrencyLimiter
+import com.digitalasset.canton.protocol.{ContractInstance, ContractMetadata, UpdateId}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
-import com.digitalasset.daml.lf.transaction.CommittedTransaction
+import com.digitalasset.daml.lf.transaction.CreationTime.CreatedAt
+import com.digitalasset.daml.lf.transaction.{CommittedTransaction, Node}
+import com.google.protobuf.ByteString
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -50,7 +54,6 @@ private class JdbcLedgerDao(
     completionsPageSize: Int,
     activeContractsServiceStreamsConfig: ActiveContractsServiceStreamsConfig,
     updatesStreamsConfig: UpdatesStreamsConfig,
-    transactionTreeStreamsConfig: TransactionTreeStreamsConfig,
     globalMaxEventIdQueries: Int,
     globalMaxEventPayloadQueries: Int,
     tracer: Tracer,
@@ -62,7 +65,10 @@ private class JdbcLedgerDao(
     ) => FutureUnlessShutdown[Vector[Offset]],
     contractLoader: ContractLoader,
     translation: LfValueTranslation,
-) extends LedgerReadDao
+    contractStore: ContractStore,
+    pruningOffsetService: PruningOffsetService,
+)(implicit ec: ExecutionContext)
+    extends LedgerReadDao
     with LedgerWriteDaoForTests
     with NamedLogging {
 
@@ -120,7 +126,7 @@ private class JdbcLedgerDao(
             party = partyDetails.party,
             // HACK: the `PartyAddedToParticipant` transmits `participantId`s, while here we only have the information
             // whether the party is locally hosted or not. We use the `nonLocalParticipantId` to get the desired effect of
-            // the `isLocal = False` information to be transmitted via a `PartyAddedToParticpant` `Update`.
+            // the `isLocal = False` information to be transmitted via a `PartyAddedToParticipant` `Update`.
             //
             // This will be properly resolved once we move away from the `sandbox-classic` codebase.
             participantId = if (partyDetails.isLocal) participantId else NonLocalParticipantId,
@@ -184,70 +190,32 @@ private class JdbcLedgerDao(
     *
     * @param pruneUpToInclusive
     *   Offset up to which to prune archived history inclusively.
-    * @param pruneAllDivulgedContracts
-    *   Enables pruning of all immediately and retroactively divulged contracts up to
-    *   `pruneUpToInclusive`.
-    *
-    * NOTE: Pruning of all divulgence events needs to take into account the following
-    * considerations:
-    *   1. Migration from mutating schema to append-only schema:
-    *      - Divulgence events ingested prior to the migration to the append-only schema do not have
-    *        offsets assigned and cannot be pruned incrementally (i.e. respecting the
-    *        `pruneUpToInclusive)`.
-    *      - For this reason, when `pruneAllDivulgedContracts` is set, `pruneUpToInclusive` must be
-    *        after the last ingested event offset before the migration, otherwise an
-    *        INVALID_ARGUMENT response is returned.
-    *      - On the first call with `pruneUpToInclusive` higher than the migration offset, all
-    *        divulgence events are pruned.
-    *
-    * 2. Backwards compatibility restriction with regard to transaction-local divulgence in the
-    * SyncService:
-    *   - Ledgers populated with SyncService versions that do not forward transaction-local
-    *     divulgence will hydrate the index with the divulgence events only once for a specific
-    *     contract-party divulgence relationship regardless of the number of re-divulgences of the
-    *     contract to the same party have occurred after the initial one.
-    *   - In this case, pruning of all divulged contracts might lead to interpretation failures for
-    *     command submissions despite them relying on divulgences that happened after the
-    *     `pruneUpToInclusive` offset.
-    *   - We thus recommend participant node operators in the SDK Docs to either not prune all
-    *     divulgance events; or wait for a sufficient amount of time until the Daml application had
-    *     time to redivulge all events using transaction-local divulgence.
-    *
-    * 3. Backwards compatibility restriction with regard to backfilling lookups:
-    *   - Ledgers populated with an old KV SyncService that does not forward divulged contract
-    *     instances to the ReadService (see
-    *     [[com.digitalasset.canton.ledger.participant.state.kvutils.committer.transaction.TransactionCommitter.blind]])
-    *     will hydrate the divulgence entries in the index without the create argument and template
-    *     id.
-    *   - During command interpretation, on looking up a divulged contract, the create argument and
-    *     template id are backfilled from previous creates/immediate divulgence entries.
-    *   - In the case of pruning of all divulged contracts (which includes immediate divulgence
-    *     pruning), the previously-mentioned backfilling lookup might fail and lead to
-    *     interpretation failures for command submissions that rely on divulged contracts whose
-    *     associated immediate divulgence event has been pruned. As for Consideration 2, we thus
-    *     recommend participant node operators in the SDK Docs to either not prune all divulgance
-    *     events; or wait for a sufficient amount of time until the Daml application had time to
-    *     redivulge all events using transaction-local divulgence.
     */
   override def prune(
+      previousPruneUpToInclusive: Option[Offset],
+      previousIncompleteReassignmentOffsets: Vector[Offset],
       pruneUpToInclusive: Offset,
-      pruneAllDivulgedContracts: Boolean,
       incompleteReassignmentOffsets: Vector[Offset],
   )(implicit loggingContext: LoggingContextWithTrace): Future[Unit] = {
-    val allDivulgencePruningParticle =
-      if (pruneAllDivulgedContracts) " (including all divulged contracts)" else ""
-    logger.info(
-      s"Pruning the ledger api server index db$allDivulgencePruningParticle up to ${pruneUpToInclusive.unwrap}."
-    )
+    logger.info(s"Pruning the ledger api server index db up to ${pruneUpToInclusive.unwrap}.")
 
     implicit val ec: ExecutionContext = commandExecutionContext
 
     dbDispatcher
       .executeSql(metrics.index.db.pruneDbMetrics) { conn =>
+        // verifying pruning is continuous
+        val prunedUpToInDb = parameterStorageBackend.prunedUpToInclusive(conn)
+        if (prunedUpToInDb != previousPruneUpToInclusive) {
+          throw new IllegalStateException(
+            s"Previous pruned up to ($previousPruneUpToInclusive) is different from the current pruning offset in DB ($prunedUpToInDb)"
+          )
+        }
+
         readStorageBackend.eventStorageBackend.pruneEvents(
-          pruneUpToInclusive,
-          pruneAllDivulgedContracts,
-          incompleteReassignmentOffsets,
+          previousPruneUpToInclusive = previousPruneUpToInclusive,
+          previousIncompleteReassignmentOffsets = previousIncompleteReassignmentOffsets,
+          pruneUpToInclusive = pruneUpToInclusive,
+          incompleteReassignmentOffsets = incompleteReassignmentOffsets,
         )(
           conn,
           loggingContext.traceContext,
@@ -260,36 +228,35 @@ private class JdbcLedgerDao(
         parameterStorageBackend.updatePrunedUptoInclusive(
           pruneUpToInclusive
         )(conn)
-
-        if (pruneAllDivulgedContracts) {
-          parameterStorageBackend.updatePrunedAllDivulgedContractsUpToInclusive(pruneUpToInclusive)(
-            conn
-          )
-        }
       }
       .thereafter {
         case Success(_) =>
           logger.info(
-            s"Completed pruning of the ledger api server index db$allDivulgencePruningParticle"
+            s"Completed pruning of the ledger api server index db"
           )
         case Failure(ex) =>
           logger.warn("Pruning failed", ex)
       }
   }
 
-  override def pruningOffsets(implicit
+  def indexDbPrunedUpTo(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[(Option[Offset], Option[Offset])] =
-    dbDispatcher.executeSql(metrics.index.db.fetchPruningOffsetsMetrics) { conn =>
-      (
-        parameterStorageBackend
-          .prunedUpToInclusive(conn),
-        parameterStorageBackend
-          .participantAllDivulgedContractsPrunedUpToInclusive(conn),
+  ): Future[Option[Offset]] =
+    dbDispatcher
+      .executeSql(metrics.index.db.fetchPruningOffsetsMetrics)(
+        parameterStorageBackend.prunedUpToInclusive
       )
-    }
 
-  private val queryValidRange = QueryValidRangeImpl(parameterStorageBackend, loggerFactory)
+  override def pruningOffset(implicit
+      loggingContext: LoggingContextWithTrace
+  ): Future[Option[Offset]] =
+    pruningOffsetService.pruningOffset
+
+  private val queryValidRange = QueryValidRangeImpl(
+    ledgerEndCache = ledgerEndCache,
+    pruningOffsetService = pruningOffsetService,
+    loggerFactory = loggerFactory,
+  )
 
   private val globalIdQueriesLimiter = new QueueBasedConcurrencyLimiter(
     parallelism = globalMaxEventIdQueries,
@@ -309,6 +276,7 @@ private class JdbcLedgerDao(
     queryValidRange = queryValidRange,
     eventStorageBackend = readStorageBackend.eventStorageBackend,
     lfValueTranslation = translation,
+    contractStore = contractStore,
     incompleteOffsets = incompleteOffsets,
     metrics = metrics,
     tracer = tracer,
@@ -325,17 +293,6 @@ private class JdbcLedgerDao(
     loggerFactory = loggerFactory,
   )(queryExecutionContext)
 
-  private val reassignmentStreamReader = new ReassignmentStreamReader(
-    globalIdQueriesLimiter = globalIdQueriesLimiter,
-    globalPayloadQueriesLimiter = globalPayloadQueriesLimiter,
-    dbDispatcher = dbDispatcher,
-    queryValidRange = queryValidRange,
-    eventStorageBackend = readStorageBackend.eventStorageBackend,
-    lfValueTranslation = translation,
-    metrics = metrics,
-    loggerFactory = loggerFactory,
-  )(queryExecutionContext)
-
   private val updatesStreamReader = new UpdatesStreamReader(
     config = updatesStreamsConfig,
     globalIdQueriesLimiter = globalIdQueriesLimiter,
@@ -344,32 +301,10 @@ private class JdbcLedgerDao(
     queryValidRange = queryValidRange,
     eventStorageBackend = readStorageBackend.eventStorageBackend,
     lfValueTranslation = translation,
+    contractStore = contractStore,
     metrics = metrics,
     tracer = tracer,
     topologyTransactionsStreamReader = topologyTransactionsStreamReader,
-    reassignmentStreamReader = reassignmentStreamReader,
-    loggerFactory = loggerFactory,
-  )(queryExecutionContext)
-
-  private val treeTransactionsStreamReader = new TransactionsTreeStreamReader(
-    config = transactionTreeStreamsConfig,
-    globalIdQueriesLimiter = globalIdQueriesLimiter,
-    globalPayloadQueriesLimiter = globalPayloadQueriesLimiter,
-    dbDispatcher = dbDispatcher,
-    queryValidRange = queryValidRange,
-    eventStorageBackend = readStorageBackend.eventStorageBackend,
-    lfValueTranslation = translation,
-    metrics = metrics,
-    tracer = tracer,
-    reassignmentStreamReader = reassignmentStreamReader,
-    loggerFactory = loggerFactory,
-  )(queryExecutionContext)
-
-  private val reassignmentPointwiseReader = new ReassignmentPointwiseReader(
-    dbDispatcher = dbDispatcher,
-    eventStorageBackend = readStorageBackend.eventStorageBackend,
-    metrics = metrics,
-    lfValueTranslation = translation,
     loggerFactory = loggerFactory,
   )(queryExecutionContext)
 
@@ -378,14 +313,17 @@ private class JdbcLedgerDao(
     eventStorageBackend = readStorageBackend.eventStorageBackend,
     metrics = metrics,
     lfValueTranslation = translation,
+    queryValidRange = queryValidRange,
     loggerFactory = loggerFactory,
   )(queryExecutionContext)
 
-  private val transactionPointwiseReader = new TransactionPointwiseReader(
+  private val transactionPointwiseReader = new TransactionOrReassignmentPointwiseReader(
     dbDispatcher = dbDispatcher,
     eventStorageBackend = readStorageBackend.eventStorageBackend,
     metrics = metrics,
     lfValueTranslation = translation,
+    queryValidRange = queryValidRange,
+    contractStore = contractStore,
     loggerFactory = loggerFactory,
   )(queryExecutionContext)
 
@@ -395,16 +333,7 @@ private class JdbcLedgerDao(
     parameterStorageBackend = parameterStorageBackend,
     metrics = metrics,
     transactionPointwiseReader = transactionPointwiseReader,
-    reassignmentPointwiseReader = reassignmentPointwiseReader,
     topologyTransactionPointwiseReader = topologyTransactionPointwiseReader,
-    loggerFactory = loggerFactory,
-  )(queryExecutionContext)
-
-  private val treeTransactionPointwiseReader = new TransactionTreePointwiseReader(
-    dbDispatcher = dbDispatcher,
-    eventStorageBackend = readStorageBackend.eventStorageBackend,
-    metrics = metrics,
-    lfValueTranslation = translation,
     loggerFactory = loggerFactory,
   )(queryExecutionContext)
 
@@ -416,8 +345,6 @@ private class JdbcLedgerDao(
       metrics = metrics,
       updatesStreamReader = updatesStreamReader,
       updatePointwiseReader = updatePointwiseReader,
-      treeTransactionsStreamReader = treeTransactionsStreamReader,
-      treeTransactionPointwiseReader = treeTransactionPointwiseReader,
       acsReader = acsReader,
     )(queryExecutionContext)
 
@@ -432,13 +359,14 @@ private class JdbcLedgerDao(
 
   override def eventsReader: LedgerDaoEventsReader =
     new EventsReader(
-      dbDispatcher,
-      readStorageBackend.eventStorageBackend,
-      parameterStorageBackend,
-      metrics,
-      translation,
-      ledgerEndCache,
-      loggerFactory,
+      dbDispatcher = dbDispatcher,
+      eventStorageBackend = readStorageBackend.eventStorageBackend,
+      parameterStorageBackend = parameterStorageBackend,
+      metrics = metrics,
+      lfValueTranslation = translation,
+      contractStore = contractStore,
+      ledgerEndCache = ledgerEndCache,
+      loggerFactory = loggerFactory,
     )(queryExecutionContext)
 
   override val completions: CommandCompletionsReader =
@@ -451,8 +379,7 @@ private class JdbcLedgerDao(
       loggerFactory,
     )
 
-  /** This is a combined store transaction method to support sandbox-classic and tests !!! Usage of
-    * this is discouraged, with the removal of sandbox-classic this will be removed
+  /** This is a combined store transaction method to support tests !!! Usage of this is discouraged
     */
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   override def storeTransaction(
@@ -463,11 +390,40 @@ private class JdbcLedgerDao(
       offset: Offset,
       transaction: CommittedTransaction,
       recordTime: Timestamp,
+      contractActivenessChanged: Boolean,
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[PersistenceResponse] = {
-    logger.info("Storing transaction")
-    dbDispatcher
+  ): Future[PersistenceResponse] = for {
+    _ <- Future.successful(logger.info("Storing contracts into participant contract store"))
+    _ <- contractStore
+      .storeContracts(
+        transaction.nodes.values
+          .collect { case create: Node.Create => create }
+          .map(FatContract.fromCreateNode(_, CreatedAt(ledgerEffectiveTime), Bytes.Empty))
+          .map(
+            ContractInstance
+              .ContractInstanceImpl(
+                _,
+                ContractMetadata.empty,
+                ByteString.EMPTY,
+              )
+          )
+          .toSeq
+      )
+      .failOnShutdownTo(new IllegalStateException("Storing contracts was interrupted"))
+
+    contractIds =
+      transaction.nodes.values
+        .collect { case create: Node.Create => create.coid }
+
+    internalContractIds <- contractStore
+      .lookupBatchedNonCachedInternalIds(contractIds)
+      .failOnShutdownTo(
+        new IllegalStateException("Looking up internal contract ids was interrupted")
+      )
+
+    _ <- Future.successful(logger.info("Storing transaction"))
+    _ <- dbDispatcher
       .executeSql(metrics.index.db.storeTransactionDbMetrics) { implicit conn =>
         sequentialIndexer.store(
           conn,
@@ -487,7 +443,7 @@ private class JdbcLedgerDao(
               ),
               transaction = transaction,
               updateId = updateId,
-              contractMetadata = new Map[ContractId, Bytes] {
+              contractAuthenticationData = new Map[ContractId, Bytes] {
                 override def removed(key: ContractId): Map[ContractId, Bytes] = this
 
                 override def updated[V1 >: Bytes](
@@ -501,11 +457,16 @@ private class JdbcLedgerDao(
               }, // only for tests
               synchronizerId = SynchronizerId.tryFromString("invalid::deadbeef"),
               recordTime = CantonTimestamp(recordTime),
+              externalTransactionHash = None,
+              acsChangeFactory =
+                TestAcsChangeFactory(contractActivenessChanged = contractActivenessChanged),
+              internalContractIds = internalContractIds,
             )
           ),
         )
-        PersistenceResponse.Ok
       }
+  } yield {
+    PersistenceResponse.Ok
   }
 
 }
@@ -515,9 +476,6 @@ private[platform] object JdbcLedgerDao {
   object Logging {
     def submissionId(id: String): LoggingEntry =
       "submissionId" -> id
-
-    def updateId(id: UpdateId): LoggingEntry =
-      "updateId" -> id
   }
 
   def read(
@@ -531,7 +489,6 @@ private[platform] object JdbcLedgerDao {
       completionsPageSize: Int,
       activeContractsServiceStreamsConfig: ActiveContractsServiceStreamsConfig,
       updatesStreamsConfig: UpdatesStreamsConfig,
-      transactionTreeStreamsConfig: TransactionTreeStreamsConfig,
       globalMaxEventIdQueries: Int,
       globalMaxEventPayloadQueries: Int,
       tracer: Tracer,
@@ -543,7 +500,9 @@ private[platform] object JdbcLedgerDao {
       ) => FutureUnlessShutdown[Vector[Offset]],
       contractLoader: ContractLoader = ContractLoader.dummyLoader,
       lfValueTranslation: LfValueTranslation,
-  ): LedgerReadDao =
+      pruningOffsetService: PruningOffsetService,
+      contractStore: ContractStore,
+  )(implicit ec: ExecutionContext): LedgerReadDao =
     new JdbcLedgerDao(
       dbDispatcher = dbSupport.dbDispatcher,
       queryExecutionContext = queryExecutionContext,
@@ -559,7 +518,6 @@ private[platform] object JdbcLedgerDao {
       completionsPageSize = completionsPageSize,
       activeContractsServiceStreamsConfig = activeContractsServiceStreamsConfig,
       updatesStreamsConfig = updatesStreamsConfig,
-      transactionTreeStreamsConfig = transactionTreeStreamsConfig,
       globalMaxEventIdQueries = globalMaxEventIdQueries,
       globalMaxEventPayloadQueries = globalMaxEventPayloadQueries,
       tracer = tracer,
@@ -567,6 +525,8 @@ private[platform] object JdbcLedgerDao {
       incompleteOffsets = incompleteOffsets,
       contractLoader = contractLoader,
       translation = lfValueTranslation,
+      pruningOffsetService = pruningOffsetService,
+      contractStore = contractStore,
     )
 
   def writeForTests(
@@ -580,14 +540,15 @@ private[platform] object JdbcLedgerDao {
       completionsPageSize: Int,
       activeContractsServiceStreamsConfig: ActiveContractsServiceStreamsConfig,
       updatesStreamsConfig: UpdatesStreamsConfig,
-      transactionTreeStreamsConfig: TransactionTreeStreamsConfig,
       globalMaxEventIdQueries: Int,
       globalMaxEventPayloadQueries: Int,
       tracer: Tracer,
       loggerFactory: NamedLoggerFactory,
       contractLoader: ContractLoader = ContractLoader.dummyLoader,
       lfValueTranslation: LfValueTranslation,
-  ): LedgerReadDao with LedgerWriteDaoForTests =
+      pruningOffsetService: PruningOffsetService,
+      contractStore: ContractStore,
+  )(implicit ec: ExecutionContext): LedgerReadDao with LedgerWriteDaoForTests =
     new JdbcLedgerDao(
       dbDispatcher = dbSupport.dbDispatcher,
       queryExecutionContext = servicesExecutionContext,
@@ -603,7 +564,6 @@ private[platform] object JdbcLedgerDao {
       completionsPageSize = completionsPageSize,
       activeContractsServiceStreamsConfig = activeContractsServiceStreamsConfig,
       updatesStreamsConfig = updatesStreamsConfig,
-      transactionTreeStreamsConfig = transactionTreeStreamsConfig,
       globalMaxEventIdQueries = globalMaxEventIdQueries,
       globalMaxEventPayloadQueries = globalMaxEventPayloadQueries,
       tracer = tracer,
@@ -611,6 +571,8 @@ private[platform] object JdbcLedgerDao {
       incompleteOffsets = (_, _, _) => FutureUnlessShutdown.pure(Vector.empty),
       contractLoader = contractLoader,
       translation = lfValueTranslation,
+      pruningOffsetService = pruningOffsetService,
+      contractStore = contractStore,
     )
 
   val acceptType = "accept"

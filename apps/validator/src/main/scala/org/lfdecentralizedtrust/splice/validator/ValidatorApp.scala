@@ -6,16 +6,40 @@ package org.lfdecentralizedtrust.splice.validator
 import cats.implicits.{catsSyntaxApplicativeByValue as _, *}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
+import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.ledger.api.util.DurationConversion
+import com.digitalasset.canton.lifecycle.LifeCycle
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import com.digitalasset.canton.util.MonadUtil
+import com.google.protobuf.ByteString
+import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.cors.scaladsl.CorsDirectives.*
+import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
+import org.apache.pekko.http.scaladsl.model.HttpMethods
+import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
 import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
 import org.lfdecentralizedtrust.splice.admin.http.{AdminRoutes, HttpErrorHandler}
+import org.lfdecentralizedtrust.splice.auth.*
 import org.lfdecentralizedtrust.splice.automation.{
   DomainParamsAutomationService,
   DomainTimeAutomationService,
 }
-import org.lfdecentralizedtrust.splice.auth.*
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
+import org.lfdecentralizedtrust.splice.http.v0.status.wallet.WalletResource as StatusWalletResource
 import org.lfdecentralizedtrust.splice.http.v0.external.ans.AnsResource
 import org.lfdecentralizedtrust.splice.http.v0.external.wallet.WalletResource as ExternalWalletResource
 import org.lfdecentralizedtrust.splice.http.v0.scanproxy.ScanproxyResource
@@ -27,81 +51,55 @@ import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesStore
 import org.lfdecentralizedtrust.splice.migration.{
   DomainDataRestorer,
   DomainMigrationInfo,
+  MigrationTimeInfo,
   ParticipantUsersDataRestorer,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
   BftScanConnection,
   MinimalScanConnection,
   SingleScanConnection,
 }
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
-import org.lfdecentralizedtrust.splice.setup.{
-  NodeInitializer,
-  ParticipantInitializer,
-  ParticipantPartyMigrator,
-}
-import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, UpdateHistory}
+import org.lfdecentralizedtrust.splice.setup.{NodeInitializer, ParticipantInitializer}
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.util.{
-  AmuletConfigSchedule,
-  BackupDump,
-  HasHealth,
-  PackageVetting,
-  SpliceCircuitBreaker,
-}
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, HistoryMetrics, UpdateHistory}
+import org.lfdecentralizedtrust.splice.util.*
+import org.lfdecentralizedtrust.splice.validator.ValidatorApp.OAuthRealms
 import org.lfdecentralizedtrust.splice.validator.admin.http.*
 import org.lfdecentralizedtrust.splice.validator.automation.{
   ValidatorAutomationService,
   ValidatorPackageVettingTrigger,
 }
-import org.lfdecentralizedtrust.splice.validator.config.{
-  AppInstance,
-  MigrateValidatorPartyConfig,
-  ValidatorAppBackendConfig,
-  ValidatorCantonIdentifierConfig,
-  ValidatorOnboardingConfig,
-}
+import org.lfdecentralizedtrust.splice.validator.config.*
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import org.lfdecentralizedtrust.splice.validator.metrics.ValidatorAppMetrics
-import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump
-import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
-import org.lfdecentralizedtrust.splice.validator.util.ValidatorUtil
-import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
+import org.lfdecentralizedtrust.splice.validator.migration.{
+  DomainMigrationDump,
+  ParticipantPartyMigrator,
+}
+import org.lfdecentralizedtrust.splice.validator.store.{
+  ValidatorConfigProvider,
+  ValidatorInternalStore,
+  ValidatorStore,
+}
+import org.lfdecentralizedtrust.splice.validator.util.{ValidatorScanConnection, ValidatorUtil}
 import org.lfdecentralizedtrust.splice.wallet.admin.http.{
   HttpExternalWalletHandler,
+  HttpStatusWalletHandler,
   HttpWalletHandler,
+  UserWalletAuthExtractor,
 }
 import org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
-import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
-import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
+import org.lfdecentralizedtrust.splice.wallet.{ExternalPartyWalletManager, UserWalletManager}
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationResource
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource as TokenStandardAllocationInstructionResource
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.api.util.DurationConversion
-import com.digitalasset.canton.lifecycle.LifeCycle
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
-import com.digitalasset.canton.util.MonadUtil
-import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.cors.scaladsl.CorsDirectives.*
-import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
-import org.apache.pekko.http.scaladsl.model.HttpMethods
-import org.apache.pekko.http.scaladsl.server.Directives.*
-import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
-import com.google.protobuf.ByteString
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
@@ -111,7 +109,7 @@ class ValidatorApp(
     override val name: InstanceName,
     val config: ValidatorAppBackendConfig,
     val amuletAppParameters: SharedSpliceAppParameters,
-    storage: Storage,
+    storage: DbStorage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
@@ -166,18 +164,24 @@ class ValidatorApp(
                 )
                 .asRuntimeException()
             case _ =>
-              logger.info(
-                "Ensuring participant is initialized"
-              )
               val cantonIdentifierConfig =
                 ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(config)
-              ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+              val participantInitializer = new ParticipantInitializer(
                 cantonIdentifierConfig.participant,
-                participantAdminConnection,
                 config.participantBootstrappingDump,
                 loggerFactory,
                 retryProvider,
+                participantAdminConnection,
               )
+              if (config.svValidator) {
+                logger.info("Waiting for the participant to be initialized by the SV app")
+                participantInitializer.waitForNodeInitialized()
+              } else {
+                logger.info(
+                  "Ensuring participant is initialized"
+                )
+                participantInitializer.ensureInitializedWithExpectedId()
+              }
           }
       }
     }
@@ -191,6 +195,21 @@ class ValidatorApp(
       initialSynchronizerTime <-
         withParticipantAdminConnection { participantAdminConnection =>
           for {
+            participantId <- participantAdminConnection.getParticipantId()
+            internalStore <- ValidatorInternalStore(
+              participantId,
+              validatorParty = ParticipantPartyMigrator.toPartyId(
+                config.validatorPartyHint
+                  .getOrElse(
+                    BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
+                  ),
+                participantId,
+              ),
+              storage,
+              loggerFactory,
+            )
+            configProvider = new ValidatorConfigProvider(internalStore, loggerFactory)
+
             scanConnection <- appInitStep("Getting BFT scan connection") {
               client.BftScanConnection(
                 ledgerClient,
@@ -199,6 +218,8 @@ class ValidatorApp(
                 clock,
                 retryProvider,
                 loggerFactory,
+                ValidatorScanConnection.getPersistedScanList(configProvider),
+                ValidatorScanConnection.persistScanUrlListBuilder(configProvider),
               )
             }
             domainConnector = new DomainConnector(
@@ -224,7 +245,7 @@ class ValidatorApp(
               case Some(migrationDump) =>
                 for {
                   allSequencerConnections <- domainConnector
-                    .getDecentralizedSynchronizerSequencerConnections(now)
+                    .getDecentralizedSynchronizerSequencerConnections(clock)
                   sequencerConnections = allSequencerConnections.values.toSeq match {
                     case Seq() =>
                       sys.error("Expected at least one sequencer connection but got 0")
@@ -240,6 +261,7 @@ class ValidatorApp(
                       participantAdminConnection,
                       config.timeTrackerMinObservationDuration,
                       config.timeTrackerObservationLatency,
+                      config.parameters.enabledFeatures.newSequencerConnectionPool,
                       loggerFactory,
                     )
                     decentralizedSynchronizerInitializer.connectDomainAndRestoreData(
@@ -257,7 +279,8 @@ class ValidatorApp(
                       SpliceCircuitBreaker(
                         "restore",
                         config.parameters.circuitBreakers.mediumPriority,
-                        logger,
+                        clock,
+                        loggerFactory,
                       )(ac.scheduler, implicitly),
                     )
                     val participantUsersDataRestorer = new ParticipantUsersDataRestorer(
@@ -277,7 +300,7 @@ class ValidatorApp(
                 else
                   appInitStep("Ensuring decentralized synchronizer registered") {
                     domainConnector
-                      .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(now)
+                      .ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(clock)
                   }
             }
             _ <- appInitStep("Ensuring extra domains registered") {
@@ -288,7 +311,18 @@ class ValidatorApp(
             _ <- appInitStep("Vet packages") {
               for {
                 amuletRules <- scanConnection.getAmuletRules()
-                domainId <- scanConnection.getAmuletRulesDomain()(traceContext)
+                globalSynchronizerId: SynchronizerId <- scanConnection.getAmuletRulesDomain()(
+                  traceContext
+                )
+                // vet on extra synchronizers as well
+                // TODO(#2742) make sure we also vet on later connection + on upgrades (and maybe move below logic)
+                extraSynchronizerAliases: Set[SynchronizerAlias] = config.domains.extra
+                  .map(_.alias)
+                  .toSet
+                allConnectedSynchronizers <- participantAdminConnection.listConnectedDomains()
+                extraSynchronizerIds: Seq[SynchronizerId] = allConnectedSynchronizers
+                  .filter(result => extraSynchronizerAliases.contains(result.synchronizerAlias))
+                  .map(_.physicalSynchronizerId.logical)
                 packageVetting = new PackageVetting(
                   ValidatorPackageVettingTrigger.packages,
                   clock,
@@ -296,7 +330,11 @@ class ValidatorApp(
                   loggerFactory,
                   config.latestPackagesOnly,
                 )
-                _ <- packageVetting.vetCurrentPackages(domainId, amuletRules)
+                _ <-
+                  MonadUtil.sequentialTraverse_(Seq(globalSynchronizerId) ++ extraSynchronizerIds) {
+                    synchronizerId =>
+                      packageVetting.vetCurrentPackages(synchronizerId, amuletRules)
+                  }
               } yield ()
             }
             _ <- (config.migrateValidatorParty, config.participantBootstrappingDump) match {
@@ -308,10 +346,12 @@ class ValidatorApp(
                   .getOrElse(
                     BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
                   )
+
                 val participantPartyMigrator = new ParticipantPartyMigrator(
                   connection,
                   participantAdminConnection,
                   config.domains.global.alias,
+                  configProvider,
                   loggerFactory,
                 )
                 appInitStep("Migrating party data") {
@@ -403,38 +443,32 @@ class ValidatorApp(
                 }
               }
             }
-            _ <- MonadUtil.sequentialTraverse_(config.participantPruningSchedule.toList) {
-              pruningConfig =>
-                participantAdminConnection.ensurePruningSchedule(
-                  pruningConfig.cron,
-                  pruningConfig.maxDuration,
-                  pruningConfig.retention,
-                )
-            }
+            _ <- participantAdminConnection.ensurePruningSchedule(config.participantPruningSchedule)
           } yield initialSynchronizerTime
         }
     } yield initialSynchronizerTime
 
-  private def readRestoreDump = config.restoreFromMigrationDump.map { path =>
-    if (config.svValidator)
-      throw Status.INVALID_ARGUMENT
-        .withDescription("SV Validator should not be configured with a dump file")
-        .asRuntimeException()
-
-    val migrationDump = BackupDump.readFromPath[DomainMigrationDump](path) match {
-      case Failure(exception) =>
+  private def readRestoreDump: Option[DomainMigrationDump] = config.restoreFromMigrationDump.map {
+    path =>
+      if (config.svValidator)
         throw Status.INVALID_ARGUMENT
-          .withDescription(s"Failed to read migration dump from $path: ${exception.getMessage}")
+          .withDescription("SV Validator should not be configured with a dump file")
           .asRuntimeException()
-      case Success(value) => value
-    }
-    if (migrationDump.migrationId != config.domainMigrationId)
-      throw Status.INVALID_ARGUMENT
-        .withDescription(
-          s"Migration id from the dump ${migrationDump.migrationId} does not match the configured migration id in the validator ${config.domainMigrationId}. Please check if the validator app is configured with the correct migration id"
-        )
-        .asRuntimeException()
-    migrationDump
+
+      val migrationDump = BackupDump.readFromPath[DomainMigrationDump](path) match {
+        case Failure(exception) =>
+          throw Status.INVALID_ARGUMENT
+            .withDescription(s"Failed to read migration dump from $path: ${exception.getMessage}")
+            .asRuntimeException()
+        case Success(value) => value
+      }
+      if (migrationDump.migrationId != config.domainMigrationId)
+        throw Status.INVALID_ARGUMENT
+          .withDescription(
+            s"Migration id from the dump ${migrationDump.migrationId} does not match the configured migration id in the validator ${config.domainMigrationId}. Please check if the validator app is configured with the correct migration id"
+          )
+          .asRuntimeException()
+      migrationDump
   }
 
   private def getAcsSnapshotFromSingleScan(
@@ -488,6 +522,7 @@ class ValidatorApp(
         .onboard(
           instance.walletUser.getOrElse(instance.serviceUser),
           Some(party),
+          Some(false),
           storeWithIngestion,
           validatorUserName = config.ledgerApiUser,
           // we're initializing so AmuletRules is guaranteed to be on synchronizerId
@@ -573,7 +608,19 @@ class ValidatorApp(
             retryProvider,
             loggerFactory,
           ).flatMap(con => con.checkActive().andThen(_ => con.close()))
-        case BftScanClientConfig.Bft(seedUrls, _, _) =>
+        case BftScanClientConfig.BftCustom(seedUrls, _, _, _, _, _) =>
+          seedUrls
+            .traverse { url =>
+              val config = ScanAppClientConfig(NetworkAppClientConfig(url))
+              MinimalScanConnection(
+                config,
+                amuletAppParameters.upgradesConfig,
+                retryProvider,
+                loggerFactory,
+              ).flatMap(con => con.checkActive().andThen(_ => con.close()))
+            }
+            .map(_ => ())
+        case BftScanClientConfig.Bft(seedUrls, _, _, _) =>
           seedUrls
             .traverse { url =>
               val config = ScanAppClientConfig(NetworkAppClientConfig(url))
@@ -676,6 +723,22 @@ class ValidatorApp(
         config.participantIdentitiesBackup.map(_ -> clock),
         loggerFactory,
       )
+
+      participantId <- appInitStep("Get participant id") {
+        participantAdminConnection.getParticipantId()
+      }
+      internalStore <- ValidatorInternalStore(
+        participantId,
+        validatorParty = validatorParty,
+        storage,
+        loggerFactory,
+      )
+
+      configProvider = new ValidatorConfigProvider(
+        internalStore,
+        loggerFactory,
+      )
+
       scanConnection <- appInitStep("Get scan connection") {
         client.BftScanConnection(
           ledgerClient,
@@ -684,6 +747,8 @@ class ValidatorApp(
           clock,
           retryProvider,
           loggerFactory,
+          ValidatorScanConnection.getPersistedScanList(configProvider),
+          ValidatorScanConnection.persistScanUrlListBuilder(configProvider),
         )
       }
 
@@ -698,9 +763,7 @@ class ValidatorApp(
       dsoParty <- appInitStep("Get DSO party id") {
         scanConnection.getDsoPartyIdWithRetries()
       }
-      participantId <- appInitStep("Get participant id") {
-        participantAdminConnection.getParticipantId()
-      }
+
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
         dsoParty = dsoParty,
@@ -714,13 +777,17 @@ class ValidatorApp(
             )
           }
         } else {
-          val acsTimestamp =
-            readRestoreDump.map(dump => CantonTimestamp.assertFromInstant(dump.acsTimestamp))
+          val dump = readRestoreDump
           Future.successful(
             // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
             DomainMigrationInfo(
               config.domainMigrationId,
-              acsTimestamp,
+              dump.map(d =>
+                MigrationTimeInfo(
+                  CantonTimestamp.assertFromInstant(d.acsTimestamp),
+                  d.synchronizerWasPaused,
+                )
+              ),
             )
           )
         }
@@ -732,6 +799,20 @@ class ValidatorApp(
         retryProvider,
         domainMigrationInfo,
         participantId,
+        config.automation.ingestion,
+        config.acsStoreDescriptorUserVersion,
+      )
+      validatorUpdateHistory = new UpdateHistory(
+        storage,
+        domainMigrationInfo,
+        store.storeName,
+        participantId,
+        store.acsContractFilter.ingestionFilter.primaryParty,
+        BackfillingRequirement.BackfillingNotRequired,
+        loggerFactory,
+        enableissue12777Workaround = false,
+        enableImportUpdateBackfill = false,
+        HistoryMetrics(retryProvider.metricsFactory, domainMigrationInfo.currentMigrationId),
       )
       domainTimeAutomationService = new DomainTimeAutomationService(
         config.domains.global.alias,
@@ -759,11 +840,22 @@ class ValidatorApp(
           .toJavaProto(DurationConversion.toProto(config.deduplicationDuration.asJavaApproximation))
       )
       synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
+      cantonIdentifierConfig =
+        ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(config)
+      _ <- ParticipantInitializer.ensureInitializedWithRotatedOTK(
+        cantonIdentifierConfig.participant,
+        participantAdminConnection,
+        config.participantBootstrappingDump,
+        loggerFactory,
+        retryProvider,
+        synchronizerId,
+      )
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         synchronizerId,
         readOnlyLedgerConnection,
         loggerFactory,
       )
+
       walletManagerOpt =
         if (config.enableWallet) {
           val externalPartyWalletManager = new ExternalPartyWalletManager(
@@ -774,12 +866,13 @@ class ValidatorApp(
             clock,
             domainTimeAutomationService.domainTimeSync,
             domainParamsAutomationService.domainUnpausedSync,
-            storage: Storage,
+            storage,
             retryProvider,
             loggerFactory,
             domainMigrationInfo,
             participantId,
             config.parameters,
+            scanConnection,
           )
           val walletManager = new UserWalletManager(
             ledgerClient,
@@ -824,6 +917,7 @@ class ValidatorApp(
         domainParamsAutomationService.domainUnpausedSync,
         walletManagerOpt,
         store,
+        validatorUpdateHistory,
         storage,
         scanConnection,
         ledgerClient,
@@ -847,6 +941,7 @@ class ValidatorApp(
         config.maxVettingDelay,
         config.parameters,
         config.latestPackagesOnly,
+        config.parameters.enabledFeatures,
         loggerFactory,
       )
       _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>
@@ -872,6 +967,7 @@ class ValidatorApp(
           ValidatorUtil.onboard(
             endUserName = user,
             knownParty = Some(validatorParty),
+            Some(false),
             automation,
             validatorUserName = config.ledgerApiUser,
             // we're initializing so AmuletRules is guaranteed to be on synchronizerId
@@ -887,6 +983,10 @@ class ValidatorApp(
       _ <- appInitStep(s"Ensure validator is onboarded") {
         ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
       }
+
+      userRightsProvider = new ParticipantUserRightsProvider(
+        automation.connection(SpliceLedgerConnectionPriority.Low)
+      )
 
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
@@ -932,33 +1032,53 @@ class ValidatorApp(
         )
 
       walletInternalHandler = walletManagerOpt.map(walletManager =>
-        new HttpWalletHandler(
+        (
+          new HttpWalletHandler(
+            walletManager,
+            scanConnection,
+            loggerFactory,
+            retryProvider,
+            validatorTopupConfig,
+            dedupDuration,
+            packageVersionSupport,
+          ),
           walletManager,
-          scanConnection,
-          loggerFactory,
-          retryProvider,
-          validatorTopupConfig,
-          dedupDuration,
-          packageVersionSupport,
         )
       )
 
       walletExternalHandler = walletManagerOpt.map(walletManager =>
-        new HttpExternalWalletHandler(
+        (
+          new HttpExternalWalletHandler(
+            walletManager,
+            loggerFactory,
+            retryProvider,
+            participantAdminConnection,
+            config.domainMigrationId,
+          ),
           walletManager,
-          loggerFactory,
-          retryProvider,
-          participantAdminConnection,
-          config.domainMigrationId,
+        )
+      )
+
+      walletStatusHandler = walletManagerOpt.map(walletManager =>
+        (
+          new HttpStatusWalletHandler(
+            walletManager,
+            loggerFactory,
+            packageVersionSupport,
+          ),
+          walletManager,
         )
       )
 
       ansExternalHandler = walletManagerOpt.map(walletManager =>
-        new HttpExternalAnsHandler(
+        (
+          new HttpExternalAnsHandler(
+            walletManager,
+            scanConnection,
+            loggerFactory,
+            retryProvider,
+          ),
           walletManager,
-          scanConnection,
-          loggerFactory,
-          retryProvider,
         )
       )
 
@@ -1000,7 +1120,11 @@ class ValidatorApp(
                     handler,
                     operation =>
                       metrics.httpServerMetrics.withMetrics("validator")(operation).tflatMap { _ =>
-                        AuthExtractor(verifier, loggerFactory, "splice validator realm")(
+                        AuthenticationOnlyAuthExtractor(
+                          verifier,
+                          loggerFactory,
+                          OAuthRealms.Validator,
+                        )(
                           traceContext
                         )(
                           operation
@@ -1011,7 +1135,11 @@ class ValidatorApp(
                     scanProxyHandler,
                     operation =>
                       metrics.httpServerMetrics.withMetrics("scanProxy")(operation).tflatMap { _ =>
-                        AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
+                        AuthenticationOnlyAuthExtractor(
+                          verifier,
+                          loggerFactory,
+                          OAuthRealms.ScanProxy,
+                        )(
                           traceContext
                         )(operation)
                       },
@@ -1024,7 +1152,11 @@ class ValidatorApp(
                           metrics.httpServerMetrics
                             .withMetrics("tokenStandardMetadata")(operation)
                             .tflatMap { _ =>
-                              AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
+                              AuthenticationOnlyAuthExtractor(
+                                verifier,
+                                loggerFactory,
+                                OAuthRealms.ScanProxy,
+                              )(
                                 traceContext
                               )(
                                 operation
@@ -1038,7 +1170,11 @@ class ValidatorApp(
                           metrics.httpServerMetrics
                             .withMetrics("tokenStandardTransfer")(operation)
                             .tflatMap { _ =>
-                              AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
+                              AuthenticationOnlyAuthExtractor(
+                                verifier,
+                                loggerFactory,
+                                OAuthRealms.ScanProxy,
+                              )(
                                 traceContext
                               )(
                                 operation
@@ -1051,7 +1187,11 @@ class ValidatorApp(
                           metrics.httpServerMetrics
                             .withMetrics("tokenStandardAllocationInstruction")(operation)
                             .tflatMap { _ =>
-                              AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
+                              AuthenticationOnlyAuthExtractor(
+                                verifier,
+                                loggerFactory,
+                                OAuthRealms.ScanProxy,
+                              )(
                                 traceContext
                               )(
                                 operation
@@ -1064,7 +1204,11 @@ class ValidatorApp(
                           metrics.httpServerMetrics
                             .withMetrics("tokenStandardAllocation")(operation)
                             .tflatMap { _ =>
-                              AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
+                              AuthenticationOnlyAuthExtractor(
+                                verifier,
+                                loggerFactory,
+                                OAuthRealms.ScanProxy,
+                              )(
                                 traceContext
                               )(
                                 operation
@@ -1082,9 +1226,9 @@ class ValidatorApp(
                           AdminAuthExtractor(
                             verifier,
                             validatorParty,
-                            automation.connection(SpliceLedgerConnectionPriority.Medium),
+                            userRightsProvider,
                             loggerFactory,
-                            "splice validator operator realm",
+                            OAuthRealms.ValidatorOperator,
                           )(traceContext)(operationId)
                         },
                   ),
@@ -1095,38 +1239,72 @@ class ValidatorApp(
                         .withMetrics("public")(operation)
                         .tflatMap { _ => provide(()) },
                   ),
-                ) ++ walletInternalHandler.toList.map { walletHandler =>
+                ) ++ walletInternalHandler.toList.map { case (walletHandler, walletManager) =>
                   InternalWalletResource.routes(
                     walletHandler,
                     operation =>
                       metrics.httpServerMetrics
                         .withMetrics("walletInternal")(operation)
                         .tflatMap { _ =>
-                          AuthExtractor(verifier, loggerFactory, "splice wallet realm")(
+                          UserWalletAuthExtractor(
+                            verifier,
+                            walletManager,
+                            userRightsProvider,
+                            loggerFactory,
+                            OAuthRealms.Wallet,
+                          )(
                             traceContext
                           )(operation)
                         },
                   )
-                } ++ walletExternalHandler.toList.map { walletHandler =>
+                } ++ walletExternalHandler.toList.map { case (walletHandler, walletManager) =>
                   ExternalWalletResource.routes(
                     walletHandler,
                     operation =>
                       metrics.httpServerMetrics
                         .withMetrics("walletExternal")(operation)
                         .tflatMap { _ =>
-                          AuthExtractor(verifier, loggerFactory, "splice wallet realm")(
+                          UserWalletAuthExtractor(
+                            verifier,
+                            walletManager,
+                            userRightsProvider,
+                            loggerFactory,
+                            OAuthRealms.Wallet,
+                          )(
                             traceContext
                           )(operation)
                         },
                   )
-                } ++ ansExternalHandler.toList.map { ansHandler =>
+                } ++ walletStatusHandler.toList.map { case (walletHandler, walletManager) =>
+                  StatusWalletResource.routes(
+                    walletHandler,
+                    operation =>
+                      metrics.httpServerMetrics
+                        .withMetrics("walletStatus")(operation)
+                        .tflatMap { _ =>
+                          AuthenticationOnlyAuthExtractor(
+                            verifier,
+                            loggerFactory,
+                            OAuthRealms.Wallet,
+                          )(
+                            traceContext
+                          )(operation)
+                        },
+                  )
+                } ++ ansExternalHandler.toList.map { case (ansHandler, walletManager) =>
                   AnsResource.routes(
                     ansHandler,
                     operation =>
                       metrics.httpServerMetrics
                         .withMetrics("ans")(operation)
                         .tflatMap { _ =>
-                          AuthExtractor(verifier, loggerFactory, "splice ans realm")(traceContext)(
+                          UserWalletAuthExtractor(
+                            verifier,
+                            walletManager,
+                            userRightsProvider,
+                            loggerFactory,
+                            OAuthRealms.Ans,
+                          )(traceContext)(
                             operation
                           )
                         },
@@ -1146,6 +1324,7 @@ class ValidatorApp(
         domainTimeAutomationService,
         domainParamsAutomationService,
         store,
+        configProvider,
         automation,
         walletManagerOpt,
         timeouts,
@@ -1167,6 +1346,7 @@ object ValidatorApp {
       domainTimeAutomationService: DomainTimeAutomationService,
       domainParamsAutomationService: DomainParamsAutomationService,
       store: ValidatorStore,
+      configProvider: ValidatorConfigProvider,
       automation: ValidatorAutomationService,
       walletManager: Option[UserWalletManager],
       timeouts: ProcessingTimeout,
@@ -1191,4 +1371,13 @@ object ValidatorApp {
         ))*
       )(logger)
   }
+
+  object OAuthRealms {
+    val Validator = "splice validator realm"
+    val ValidatorOperator = "splice validator operator realm"
+    val ScanProxy = "splice scan proxy realm"
+    val Wallet = "splice wallet realm"
+    val Ans = "splice ans realm"
+  }
+
 }

@@ -10,11 +10,13 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.{HashOps, Signature, SynchronizerSnapshotSyncCryptoApi}
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod, ViewType}
 import com.digitalasset.canton.error.TransactionError
-import com.digitalasset.canton.ledger.participant.state.SequencedUpdate
+import com.digitalasset.canton.ledger.participant.state.{AcsChangeFactory, SequencedUpdate}
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
 import com.digitalasset.canton.participant.protocol.ProcessingSteps.{
+  InternalContractIds,
   ParsedRequest,
   WrapsProcessorError,
 }
@@ -34,7 +36,7 @@ import com.digitalasset.canton.participant.protocol.submission.{
 }
 import com.digitalasset.canton.participant.protocol.validation.PendingTransaction
 import com.digitalasset.canton.participant.store.ReassignmentLookup
-import com.digitalasset.canton.participant.sync.{SyncEphemeralState, SyncEphemeralStateLookup}
+import com.digitalasset.canton.participant.sync.SyncEphemeralState
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.protocol.*
@@ -42,9 +44,11 @@ import com.digitalasset.canton.store.{ConfirmationRequestSessionKeyStore, Sessio
 import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.TopologySnapshot
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.Target
-import com.digitalasset.canton.{LedgerSubmissionId, RequestCounter, SequencerCounter}
+import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.{LedgerSubmissionId, RequestCounter, SequencerCounter, checked}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -86,15 +90,10 @@ trait ProcessingSteps[
   /** The data stored for submissions that have been sent out, if any. It is created by
     * [[createSubmission]] and passed to [[createSubmissionResult]]
     */
-  type PendingSubmissionData
+  type PendingSubmissionData <: Option[?]
 
   /** The type used for look-ups into the [[PendingSubmissions]] */
   type PendingSubmissionId
-
-  /** The type of data needed to generate the submission result in [[createSubmissionResult]]. The
-    * data is created by [[updatePendingSubmissions]].
-    */
-  type SubmissionResultArgs
 
   /** The type of decrypted view trees */
   type DecryptedView = RequestViewType#View
@@ -103,6 +102,8 @@ trait ProcessingSteps[
   type FullView = RequestViewType#FullView
 
   type ViewSubmitterMetadata = RequestViewType#ViewSubmitterMetadata
+
+  type ViewAbsoluteLedgerEffects
 
   /** Type of a request that has been parsed and contains at least one well-formed view. */
   type ParsedRequestType <: ParsedRequest[ViewSubmitterMetadata]
@@ -147,6 +148,9 @@ trait ProcessingSteps[
 
   /** Phase 1, step 1:
     *
+    * Creates the data that controls submission handling, and records the pending submission for
+    * protocols such as reassignment that return an UntrackedSubmission.
+    *
     * @param submissionParam
     *   The parameter object encapsulating the parameters of the submit method
     * @param mediator
@@ -159,9 +163,11 @@ trait ProcessingSteps[
   def createSubmission(
       submissionParam: SubmissionParam,
       mediator: MediatorGroupRecipient,
-      ephemeralState: SyncEphemeralStateLookup,
+      ephemeralState: SyncEphemeralState,
       recentSnapshot: SynchronizerSnapshotSyncCryptoApi,
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SubmissionError, Submission]
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SubmissionError, (Submission, PendingSubmissionData)]
 
   def embedNoMediatorError(error: NoMediatorError): SubmissionError
 
@@ -301,31 +307,21 @@ trait ProcessingSteps[
     def submissionErrorTrackingData(error: SubmissionSendError)(implicit
         traceContext: TraceContext
     ): SubmissionTrackingData
+
+    /** Log the submission send error */
+    def logSubmissionSendError(error: SubmissionSendError)(implicit
+        errorLoggingContext: ErrorLoggingContext
+    ): Unit
   }
 
   /** Phase 1, step 2:
-    *
-    * @param pendingSubmissions
-    *   Stateful store to be updated with data on the pending submission
-    * @param submissionParam
-    *   Implementation-specific details on the submission, used for logging
-    * @param pendingSubmissionId
-    *   The key used for updates to the [[pendingSubmissions]]
-    */
-  def updatePendingSubmissions(
-      pendingSubmissions: PendingSubmissions,
-      submissionParam: SubmissionParam,
-      pendingSubmissionId: PendingSubmissionId,
-  ): EitherT[Future, SubmissionSendError, SubmissionResultArgs]
-
-  /** Phase 1, step 3:
     */
   def createSubmissionResult(
       deliver: Deliver[Envelope[?]],
-      submissionResultArgs: SubmissionResultArgs,
+      submissionResultArgs: PendingSubmissionData,
   ): SubmissionResult
 
-  /** Phase 1, step 4; and Phase 7, step 1:
+  /** Phase 1, step 3; and Phase 7, step 1:
     *
     * Remove the pending submission from the pending submissions. Called when sending the submission
     * failed or did not lead to a result in time or a result has arrived for the request.
@@ -342,14 +338,13 @@ trait ProcessingSteps[
     * the tick is no longer needed. Called when sending the submission succeeded.
     */
   def setDecisionTimeTickRequest(
-      pendingSubmissions: PendingSubmissions,
-      pendingSubmissionId: PendingSubmissionId,
+      pendingSubmissionData: PendingSubmissionData,
       requestedTick: SynchronizerTimeTracker.TickRequest,
   ): Unit
 
   // Phase 3: Request processing
 
-  /** Phase 3, step 1:
+  /** Phase 3, step 1a:
     *
     * @param batch
     *   The batch of messages in the request to be processed
@@ -392,15 +387,44 @@ trait ProcessingSteps[
 
   /** Phase 3, step 1b
     *
+    * Extracts the ledger effects from the decrypted view and makes them absolute. When
+    * absolutization fails for a view, say because an unknown contract ID versions appear in an
+    * input contract value, the view should be considered malformed.
+    *
+    * Conflict detection needs absolutized contract IDs. As it happens in parallel to model
+    * conformance, absolutization cannot be delayed until model conformance.
+    *
+    * @param viewsWithCorrectRootHashAndRecipientsAndSignature
+    *   The list of decrypted views, as returned by [[decryptViews]], after the additional checks
+    *   for the root hash and the recipients.
+    */
+  def absolutizeLedgerEffects(
+      viewsWithCorrectRootHashAndRecipientsAndSignature: Seq[
+        (WithRecipients[DecryptedView], Option[Signature])
+      ]
+  ): (
+      Seq[(WithRecipients[DecryptedView], Option[Signature], ViewAbsoluteLedgerEffects)],
+      Seq[MalformedPayload],
+  )
+
+  type FullViewAbsoluteLedgerEffects
+
+  /** Phase 3, step 1c
+    *
     * Converts the decrypted (possible light-weight) view trees to the corresponding full view
     * trees. Views that cannot be converted are mapped to [[ProtocolProcessor.MalformedPayload]]
     * errors.
     */
   def computeFullViews(
-      decryptedViewsWithSignatures: Seq[(WithRecipients[DecryptedView], Option[Signature])]
-  ): (Seq[(WithRecipients[FullView], Option[Signature])], Seq[MalformedPayload])
+      decryptedViewsWithSignatures: Seq[
+        (WithRecipients[DecryptedView], Option[Signature], ViewAbsoluteLedgerEffects)
+      ]
+  ): (
+      Seq[(WithRecipients[FullView], Option[Signature], FullViewAbsoluteLedgerEffects)],
+      Seq[MalformedPayload],
+  )
 
-  /** Phase 3, step 1c
+  /** Phase 3, step 1d
     *
     * Create a ParsedRequest out of the data computed so far.
     */
@@ -409,7 +433,7 @@ trait ProcessingSteps[
       ts: CantonTimestamp,
       sc: SequencerCounter,
       rootViewsWithMetadata: NonEmpty[
-        Seq[(WithRecipients[FullView], Option[Signature])]
+        Seq[(WithRecipients[FullView], Option[Signature], FullViewAbsoluteLedgerEffects)]
       ],
       submitterMetadataO: Option[ViewSubmitterMetadata],
       isFreshOwnTimelyRequest: Boolean,
@@ -555,7 +579,7 @@ trait ProcessingSteps[
     *   The [[com.digitalasset.canton.participant.protocol.conflictdetection.CommitSet]], the
     *   contracts from Phase 3 to be persisted to the contract store, and the event to be published
     */
-  def getCommitSetAndContractsToBeStoredAndEvent(
+  def getCommitSetAndContractsToBeStoredAndEventFactory(
       event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
       verdict: Verdict,
       pendingRequestData: requestType.PendingRequestData,
@@ -578,8 +602,8 @@ trait ProcessingSteps[
     */
   case class CommitAndStoreContractsAndPublishEvent(
       commitSet: Option[FutureUnlessShutdown[CommitSet]],
-      contractsToBeStored: Seq[SerializableContract],
-      maybeEvent: Option[SequencedUpdate],
+      contractsToBeStored: Seq[ContractInstance],
+      maybeEvent: Option[AcsChangeFactory => InternalContractIds => SequencedUpdate],
   )
 
   /** Phase 7, step 4:
@@ -606,7 +630,7 @@ trait ProcessingSteps[
 object ProcessingSteps {
   def getAssignmentExclusivity(
       topologySnapshot: Target[TopologySnapshot],
-      ts: CantonTimestamp,
+      ts: Target[CantonTimestamp],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -615,7 +639,9 @@ object ProcessingSteps {
       synchronizerParameters <- EitherT(topologySnapshot.unwrap.findDynamicSynchronizerParameters())
 
       assignmentExclusivity <- EitherT
-        .fromEither[FutureUnlessShutdown](synchronizerParameters.assignmentExclusivityLimitFor(ts))
+        .fromEither[FutureUnlessShutdown](
+          synchronizerParameters.assignmentExclusivityLimitFor(ts.unwrap)
+        )
     } yield Target(assignmentExclusivity)
 
   def getDecisionTime(
@@ -631,6 +657,49 @@ object ProcessingSteps {
         synchronizerParameters.decisionTimeFor(ts)
       )
     } yield decisionTime
+
+  def constructResponsesForMalformedPayloads(
+      requestId: RequestId,
+      rootHash: RootHash,
+      malformedPayloads: Seq[MalformedPayload],
+      synchronizerId: PhysicalSynchronizerId,
+      participantId: ParticipantId,
+      protocolVersion: ProtocolVersion,
+  )(implicit
+      errorLoggingContext: ErrorLoggingContext
+  ): Option[ConfirmationResponses] = {
+    val rejectError = LocalRejectError.MalformedRejects.Payloads.Reject(malformedPayloads.toString)
+
+    val dueToTopologyChange = malformedPayloads.forall {
+      case WrongRecipientsDueToTopologyChange(_) => true
+      case _ => false
+    }
+    if (!dueToTopologyChange) rejectError.logWithContext(Map("requestId" -> requestId.toString))
+
+    checked(
+      Some(
+        ConfirmationResponses
+          .tryCreate(
+            requestId,
+            rootHash,
+            synchronizerId,
+            participantId,
+            NonEmpty.mk(
+              Seq,
+              ConfirmationResponse.tryCreate(
+                // We don't have to specify a viewPosition.
+                // The mediator will interpret this as a rejection
+                // for all views and on behalf of all declared confirming parties hosted by the participant.
+                None,
+                rejectError.toLocalReject(protocolVersion),
+                Set.empty,
+              ),
+            ),
+            protocolVersion,
+          )
+      )
+    )
+  }
 
   trait RequestType {
     type PendingRequestData <: ProcessingSteps.PendingRequestData
@@ -763,4 +832,8 @@ object ProcessingSteps {
 
     override def cancelDecisionTimeTickRequest(): Unit = ()
   }
+
+  // TODO(#27996) remove this type when internal contract ids are no longer fetched from ProtocolProcessor
+  type InternalContractIds = Map[LfContractId, Long]
+
 }

@@ -17,6 +17,7 @@ import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   PrepareSubmissionRequest,
 }
 import com.daml.ledger.api.v2.reassignment_commands.{ReassignmentCommand, ReassignmentCommands}
+import com.digitalasset.canton.LfTimestamp
 import com.digitalasset.canton.data.{DeduplicationPeriod, Offset}
 import com.digitalasset.canton.ledger.api.messages.command.submission
 import com.digitalasset.canton.ledger.api.util.{DurationConversion, TimestampConversion}
@@ -27,6 +28,7 @@ import com.digitalasset.canton.ledger.api.validation.CommandsValidator.{
 import com.digitalasset.canton.ledger.api.{CommandId, Commands}
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.protocol.ReassignmentId
 import com.digitalasset.canton.util.OptionUtil
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.daml.lf.command.*
@@ -41,11 +43,10 @@ import scalaz.syntax.tag.*
 import java.time.{Duration, Instant}
 import scala.Ordering.Implicits.infixOrderingOps
 import scala.collection.immutable
-import scala.util.Try
 
 final class CommandsValidator(
-    validateDisclosedContracts: ValidateDisclosedContracts,
     validateUpgradingPackageResolutions: ValidateUpgradingPackageResolutions,
+    validateDisclosedContracts: ValidateDisclosedContracts = ValidateDisclosedContracts,
     topologyAwarePackageSelectionEnabled: Boolean = false,
 ) {
 
@@ -57,7 +58,6 @@ final class CommandsValidator(
       prepareRequest: PrepareSubmissionRequest,
       currentLedgerTime: Instant,
       currentUtcTime: Instant,
-      maxDeduplicationDuration: Duration,
   )(implicit
       errorLoggingContext: ErrorLoggingContext
   ): Either[StatusRuntimeException, Commands] =
@@ -75,7 +75,7 @@ final class CommandsValidator(
         prepareRequest.minLedgerTime.flatMap(_.time.minLedgerTimeAbs),
         prepareRequest.minLedgerTime.flatMap(_.time.minLedgerTimeRel),
       )
-      validatedDisclosedContracts <- validateDisclosedContracts.fromDisclosedContracts(
+      validatedDisclosedContracts <- validateDisclosedContracts.validateDisclosedContracts(
         prepareRequest.disclosedContracts
       )
       packageResolutions <- validateUpgradingPackageResolutions(
@@ -93,7 +93,7 @@ final class CommandsValidator(
       readAs = submitters.readAs,
       submittedAt = Time.Timestamp.assertFromInstant(currentUtcTime),
       // Unused for transaction preparation
-      deduplicationPeriod = DeduplicationPeriod.DeduplicationDuration(maxDeduplicationDuration),
+      deduplicationPeriod = DeduplicationPeriod.DeduplicationDuration(Duration.ZERO),
       commands = ApiCommands(
         commands = validatedCommands.to(ImmArray),
         ledgerEffectiveTime = ledgerEffectiveTimestamp,
@@ -139,7 +139,7 @@ final class CommandsValidator(
         commands.deduplicationPeriod,
         maxDeduplicationDuration,
       )
-      validatedDisclosedContracts <- validateDisclosedContracts(commands)
+      validatedDisclosedContracts <- validateDisclosedContracts.validateCommands(commands)
       packageResolutions <- validateUpgradingPackageResolutions(
         commands.packageIdSelectionPreference
       )
@@ -191,18 +191,17 @@ final class CommandsValidator(
             for {
               sourceSynchronizerId <- requireSynchronizerId(assignCommand.value.source, "source")
               targetSynchronizerId <- requireSynchronizerId(assignCommand.value.target, "target")
-              longUnassignId <- Try(assignCommand.value.unassignId.toLong).toEither.left.map(_ =>
-                ValidationErrors.invalidField("unassign_id", "Invalid unassign ID")
-              )
-              timestampUnassignId <- Time.Timestamp
-                .fromLong(longUnassignId)
+              reassignmentId <- ReassignmentId
+                .fromProtoPrimitive(assignCommand.value.reassignmentId)
                 .left
-                .map(_ => ValidationErrors.invalidField("unassign_id", "Invalid unassign ID"))
+                .map(_ =>
+                  ValidationErrors.invalidField("reassignment_id", "Invalid reassignment ID")
+                )
             } yield Left(
               submission.AssignCommand(
                 sourceSynchronizerId = Source(sourceSynchronizerId),
                 targetSynchronizerId = Target(targetSynchronizerId),
-                unassignId = timestampUnassignId,
+                reassignmentId = reassignmentId,
               )
             )
           case unassignCommand: ReassignmentCommand.Command.UnassignCommand =>
@@ -258,6 +257,18 @@ final class CommandsValidator(
         )
 
     } yield ledgerEffectiveTimestamp
+
+  def validateLfTime(protoTimestamp: com.google.protobuf.timestamp.Timestamp)(implicit
+      errorLoggingContext: ErrorLoggingContext
+  ): Either[StatusRuntimeException, LfTimestamp] =
+    LfTimestamp
+      .fromInstant(TimestampConversion.toInstant(protoTimestamp))
+      .left
+      .map(_ =>
+        invalidArgument(
+          s"Can not represent ledger time $protoTimestamp as a Daml timestamp"
+        )
+      )
 
   // Public because it is used by Canton.
   def validateInnerCommands(

@@ -67,14 +67,6 @@
   },
   {
     "custom": true,
-    "id": "projects/test-project/global/networks/default",
-    "inputs": {},
-    "name": "default",
-    "provider": "",
-    "type": "gcp:compute/network:Network"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",
@@ -85,7 +77,9 @@
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {}
+        "value": {
+          "googleCredentials": "base64-decoded-mock"
+        }
       },
       "type": "Opaque"
     },
@@ -285,6 +279,16 @@
   },
   {
     "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
     "id": "",
     "inputs": {},
     "name": "participantKmsServiceAccountKey",
@@ -334,7 +338,7 @@
         }
       }
     },
-    "name": "splice-auth0-secret-validator1-validator1",
+    "name": "splice-auth0-secret-validator1-validator",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -452,6 +456,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -580,6 +591,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -597,6 +615,7 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
+        "disableAuth": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "extraVolumeMounts": [
@@ -750,6 +769,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -878,6 +904,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -907,6 +940,7 @@
           "name": "cn-mocknet"
         },
         "contactPoint": "sv-support@digitalasset.com",
+        "disableAuth": false,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
@@ -939,6 +973,11 @@
             "prefix": "mock/validator1"
           }
         },
+        "participantPruningSchedule": {
+          "cron": "0 /10 * * * ?",
+          "maxDuration": "5m",
+          "retention": "30d"
+        },
         "persistence": {
           "databaseName": "validator1",
           "port": 5432,
@@ -946,6 +985,10 @@
           "schema": "validator1",
           "secretName": "validator-pg-secrets",
           "user": "cnadmin"
+        },
+        "pvc": {
+          "volumeName": "domain-migration-validator-pvc",
+          "volumeStorageClass": "standard-rwo"
         },
         "resources": {},
         "scanAddress": "http://scan-app.sv-1:5012",

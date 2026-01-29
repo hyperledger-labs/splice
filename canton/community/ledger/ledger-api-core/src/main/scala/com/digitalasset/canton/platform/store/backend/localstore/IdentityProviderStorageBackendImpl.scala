@@ -5,8 +5,9 @@ package com.digitalasset.canton.platform.store.backend.localstore
 
 import anorm.SqlParser.{bool, int, str}
 import anorm.{RowParser, SqlParser, ~}
+import com.daml.jwt.JwksUrl
 import com.daml.scalautil.Statement.discard
-import com.digitalasset.canton.ledger.api.{IdentityProviderConfig, IdentityProviderId, JwksUrl}
+import com.digitalasset.canton.ledger.api.{IdentityProviderConfig, IdentityProviderId}
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
 import com.digitalasset.canton.platform.store.backend.common.SimpleSqlExtensions.*
 
@@ -84,7 +85,7 @@ object IdentityProviderStorageBackendImpl extends IdentityProviderStorageBackend
       issuer: String,
   )(connection: Connection): Boolean = {
     import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
-    val res: Seq[_] =
+    val res: Seq[?] =
       SQL"""
          SELECT 1 AS dummy
          FROM lapi_identity_provider_config t
@@ -98,7 +99,7 @@ object IdentityProviderStorageBackendImpl extends IdentityProviderStorageBackend
 
   override def idpConfigByIdExists(id: IdentityProviderId.Id)(connection: Connection): Boolean = {
     import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
-    val res: Seq[_] =
+    val res: Seq[?] =
       SQL"""
            SELECT 1 AS dummy
            FROM lapi_identity_provider_config t

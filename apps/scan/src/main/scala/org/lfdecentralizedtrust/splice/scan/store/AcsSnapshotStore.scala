@@ -14,18 +14,18 @@ import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
 }
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.SelectFromCreateEvents
 import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, LimitHelpers, UpdateHistory}
-import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries}
+import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsQueries, AdvisoryLockIds}
 import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
-import slick.dbio.DBIOAction
+import slick.dbio.{DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.{GetResult, JdbcProfile}
 
@@ -50,7 +50,7 @@ class AcsSnapshotStore(
 
   private def historyId = updateHistory.historyId
 
-  def lookupSnapshotBefore(
+  def lookupSnapshotAtOrBefore(
       migrationId: Long,
       before: CantonTimestamp,
   )(implicit tc: TraceContext): Future[Option[AcsSnapshot]] = {
@@ -68,6 +68,34 @@ class AcsSnapshotStore(
       .value
   }
 
+  def lookupSnapshotAfter(
+      migrationId: Long,
+      after: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Option[AcsSnapshot]] = {
+
+    val select =
+      sql"select snapshot_record_time, migration_id, history_id, first_row_id, last_row_id, unlocked_amulet_balance, locked_amulet_balance "
+    val orderLimit = sql" order by snapshot_record_time asc limit 1 "
+    val sameMig = select ++ sql""" from acs_snapshot
+            where snapshot_record_time > $after
+              and migration_id = $migrationId
+              and history_id = $historyId """ ++ orderLimit
+    val largerMig = select ++ sql""" from acs_snapshot
+            where migration_id > $migrationId
+              and history_id = $historyId """ ++ orderLimit
+
+    val query =
+      sql"select * from ((" ++ sameMig ++ sql") union all (" ++ largerMig ++ sql")) all_queries order by snapshot_record_time asc limit 1"
+
+    storage
+      .querySingle(
+        query.toActionBuilder.as[AcsSnapshot].headOption,
+        "lookupSnapshotAfter",
+      )
+      .value
+
+  }
+
   def insertNewSnapshot(
       lastSnapshot: Option[AcsSnapshot],
       migrationId: Long,
@@ -81,6 +109,7 @@ class AcsSnapshotStore(
       }
     }.flatMap { _ =>
       val from = lastSnapshot.map(_.snapshotRecordTime).getOrElse(CantonTimestamp.MinValue)
+      val gtFrom = lastSnapshot.fold(">=")(_ => ">")
       val previousSnapshotDataFilter = lastSnapshot match {
         case Some(AcsSnapshot(_, _, _, firstRowId, lastRowId, _, _)) =>
           sql"where snapshot.row_id >= $firstRowId and snapshot.row_id <= $lastRowId"
@@ -91,8 +120,8 @@ class AcsSnapshotStore(
         sql"""
           where #$tableAlias.history_id = $historyId
             and #$tableAlias.migration_id = $migrationId
-            and #$tableAlias.record_time >= $from -- this will be >= MinValue for the first snapshot, which includes ACS imports
-            and #$tableAlias.record_time < $until
+            and #$tableAlias.record_time #$gtFrom $from -- this will be >= MinValue for the first snapshot, which includes ACS imports, otherwise >
+            and #$tableAlias.record_time <= $until
            """
       val statement = (sql"""
             with previous_snapshot_data as (select contract_id
@@ -158,11 +187,40 @@ class AcsSnapshotStore(
         join creates_to_insert on inserted_rows.create_id = creates_to_insert.row_id
         having min(inserted_rows.row_id) is not null;
              """).toActionBuilder.asUpdate
-      storage.update(statement, "insertNewSnapshot")
+      storage.queryAndUpdate(withExclusiveSnapshotDataLock(statement), "insertNewSnapshot")
     }.andThen { _ =>
       AcsSnapshotStore.PreventConcurrentSnapshotsSemaphore.release()
     }
   }
+
+  /** Wraps the given action in a transaction that holds an exclusive lock on the acs_snapshot_data table.
+    *
+    *  Note: The acs_snapshot_data table must not have interleaved rows from two different acs snapshots.
+    *  In rare cases, it can happen that the application crashes while writing a snapshot, then
+    *  restarts and starts writing a different snapshot while the previous statement is still running.
+    *
+    *  The exclusive lock prevents this.
+    *  We use a transaction-scoped advisory lock, which is released when the transaction ends.
+    *  Regular locks (e.g. obtained via `LOCK TABLE ... IN EXCLUSIVE MODE`) would conflict with harmless
+    *  background operations like autovacuum or create index concurrently.
+    *
+    *  In case the application crashes while holding the lock, the server _should_ close the connection
+    *  and abort the transaction as soon as it detects a disconnect.
+    *  TODO(#2488): Verify that the server indeed closes connections in a reasonable time.
+    */
+  private def withExclusiveSnapshotDataLock[T, E <: Effect](
+      action: DBIOAction[T, NoStream, E]
+  ): DBIOAction[T, NoStream, Effect.Read & Effect.Transactional & E] =
+    (for {
+      lockResult <- sql"SELECT pg_try_advisory_xact_lock(${AdvisoryLockIds.acsSnapshotDataInsert})"
+        .as[Boolean]
+        .head
+      result <- lockResult match {
+        case true => action
+        // Lock conflicts should almost never happen. If they do, we fail immediately and rely on the trigger infrastructure to retry and log errors.
+        case false => DBIOAction.failed(new Exception("Failed to acquire exclusive lock"))
+      }
+    } yield result).transactionally
 
   def deleteSnapshot(
       snapshot: AcsSnapshot
@@ -333,7 +391,7 @@ class AcsSnapshotStore(
         recordTime,
         None,
         // if the limit is exceeded by the results from the DB, an exception will be thrown
-        HardLimit.tryCreate(Limit.MaxPageSize),
+        HardLimit.tryCreate(Limit.DefaultMaxPageSize),
         partyIds,
       )
       .map { result =>
@@ -398,9 +456,9 @@ object AcsSnapshotStore {
   )
 
   private val amuletQualifiedName =
-    PackageQualifiedName.getFromResources(Amulet.TEMPLATE_ID_WITH_PACKAGE_ID)
+    PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION)
   private val lockedAmuletQualifiedName =
-    PackageQualifiedName.getFromResources(LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID)
+    PackageQualifiedName.fromJavaCodegenCompanion(LockedAmulet.COMPANION)
   private val holdingsTemplates = Vector(amuletQualifiedName, lockedAmuletQualifiedName)
 
   private def decodeHoldingContract(createdEvent: CreatedEvent): Either[
@@ -411,16 +469,14 @@ object AcsSnapshotStore {
       .withDescription(s"Failed to decode $createdEvent")
       .asRuntimeException()
     if (
-      PackageQualifiedName.fromEvent(createdEvent) == PackageQualifiedName.getFromResources(
-        Amulet.TEMPLATE_ID_WITH_PACKAGE_ID
-      )
+      PackageQualifiedName
+        .fromEvent(createdEvent) == PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION)
     ) {
       Right(Contract.fromCreatedEvent(Amulet.COMPANION)(createdEvent).getOrElse(failedToDecode))
     } else {
       if (
-        PackageQualifiedName.fromEvent(createdEvent) != PackageQualifiedName.getFromResources(
-          LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID
-        )
+        PackageQualifiedName.fromEvent(createdEvent) != PackageQualifiedName
+          .fromJavaCodegenCompanion(LockedAmulet.COMPANION)
       ) {
         throw io.grpc.Status.INTERNAL
           .withDescription(
@@ -453,16 +509,12 @@ object AcsSnapshotStore {
   }
 
   def apply(
-      storage: Storage,
+      storage: DbStorage,
       updateHistory: UpdateHistory,
       dsoParty: PartyId,
       migrationId: Long,
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext, closeContext: CloseContext): AcsSnapshotStore =
-    storage match {
-      case db: DbStorage =>
-        new AcsSnapshotStore(db, updateHistory, dsoParty, migrationId, loggerFactory)
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-    }
+    new AcsSnapshotStore(storage, updateHistory, dsoParty, migrationId, loggerFactory)
 
 }

@@ -1,4 +1,4 @@
-# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
 import time
@@ -37,7 +37,7 @@ from com.digitalasset.canton.admin.participant.v30 import (
     participant_status_service_pb2,
     participant_status_service_pb2_grpc,
 )
-from external_party_onboarding import (
+from external_party_onboarding_admin_api import (
     onboard_external_party,
     wait_to_observe_party_to_participant,
 )
@@ -82,7 +82,7 @@ def authorize_external_party_hosting(
             topology_manager_read_service_pb2.ListPartyToParticipantRequest(
                 base_query=topology_manager_read_service_pb2.BaseQuery(
                     store=common_pb2.StoreId(
-                        synchronizer=common_pb2.StoreId.Synchronizer(
+                        synchronizer=common_pb2.Synchronizer(
                             id=synchronizer_id,
                         ),
                     ),
@@ -115,7 +115,7 @@ def authorize_external_party_hosting(
             transaction_hash=party_to_participant_proposal.context.transaction_hash.hex(),
             must_fully_authorize=False,
             store=common_pb2.StoreId(
-                synchronizer=common_pb2.StoreId.Synchronizer(
+                synchronizer=common_pb2.Synchronizer(
                     id=synchronizer_id,
                 ),
             ),
@@ -161,7 +161,9 @@ def update_party_to_participant_transaction(
         topology_manager_read_service_pb2.ListPartyToParticipantRequest(
             base_query=topology_manager_read_service_pb2.BaseQuery(
                 store=common_pb2.StoreId(
-                    synchronizer=common_pb2.StoreId.Synchronizer(id=synchronizer_id)
+                    synchronizer=common_pb2.Synchronizer(
+                        id=synchronizer_id,
+                    ),
                 ),
                 head_state=empty_pb2.Empty(),
             ),
@@ -267,7 +269,7 @@ def update_external_party_hosting(
         transaction=updated_party_to_participant_transaction,
         signatures=[
             crypto_pb2.Signature(
-                format=crypto_pb2.SignatureFormat.SIGNATURE_FORMAT_RAW,
+                format=crypto_pb2.SignatureFormat.SIGNATURE_FORMAT_DER,
                 signature=signature,
                 signed_by=fingerprint,
                 signing_algorithm_spec=crypto_pb2.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_EC_DSA_SHA_256,
@@ -287,9 +289,9 @@ def update_external_party_hosting(
         topology_manager_write_service_pb2.AddTransactionsRequest(
             transactions=[signed_topology_transaction],
             store=common_pb2.StoreId(
-                synchronizer=common_pb2.StoreId.Synchronizer(
+                synchronizer=common_pb2.Synchronizer(
                     id=synchronizer_id,
-                )
+                ),
             ),
         )
     )
@@ -373,7 +375,7 @@ def read_id_from_file(file_path):
    Exemple script demonstrating how to onboard a multi hosted external party, and update the hosting relationships of an existing party.
    ATTENTION: Replicating an existing party to additional hosting nodes requires following a specific procedure.
    Check the offline party replication documentation for more details. This script simply demonstrates how to authorize changes
-   to the PartyToParticipant mapping for an external party.  
+   to the PartyToParticipant mapping for an external party.
 """
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Multi-Hosted external party")

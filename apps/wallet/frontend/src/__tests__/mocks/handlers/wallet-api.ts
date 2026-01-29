@@ -10,9 +10,15 @@ import {
 import { ListTransferOffersResponse } from '@lfdecentralizedtrust/wallet-external-openapi';
 import {
   GetBalanceResponse,
+  ListMintingDelegationsResponse,
+  ListMintingDelegationProposalsResponse,
   ListTransactionsResponse,
   UserStatusResponse,
 } from '@lfdecentralizedtrust/wallet-openapi';
+import {
+  MintingDelegation,
+  MintingDelegationProposal,
+} from '@daml.js/splice-wallet/lib/Splice/Wallet/MintingDelegation/module';
 
 import {
   aliceEntry,
@@ -23,6 +29,13 @@ import {
   miningRounds,
   nameServiceEntries,
 } from '../constants';
+import {
+  mockMintingDelegations,
+  mockMintingDelegationProposals,
+  mockDelegationHostedStatus,
+  mockProposalHostedStatus,
+} from '../delegation-constants';
+import { mkContract } from '../contract';
 
 export const buildWalletMock = (walletUrl: string): RestHandler[] => [
   rest.get(`${walletUrl}/v0/wallet/user-status`, (_, res, ctx) => {
@@ -219,5 +232,39 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
 
   rest.get(`${walletUrl}/v0/scan-proxy/featured-apps/:party`, (_, res, ctx) => {
     return res(ctx.status(404), ctx.json({}));
+  }),
+
+  rest.get(`${walletUrl}/v0/wallet/minting-delegations`, (_, res, ctx) => {
+    return res(
+      ctx.json<ListMintingDelegationsResponse>({
+        delegations: mockMintingDelegations.map((delegation, index) => ({
+          contract: mkContract(MintingDelegation, delegation),
+          beneficiary_hosted: mockDelegationHostedStatus[index],
+        })),
+      })
+    );
+  }),
+
+  rest.get(`${walletUrl}/v0/wallet/minting-delegation-proposals`, (_, res, ctx) => {
+    return res(
+      ctx.json<ListMintingDelegationProposalsResponse>({
+        proposals: mockMintingDelegationProposals.map((proposal, index) => ({
+          contract: mkContract(MintingDelegationProposal, proposal),
+          beneficiary_hosted: mockProposalHostedStatus[index],
+        })),
+      })
+    );
+  }),
+
+  rest.post(`${walletUrl}/v0/wallet/minting-delegations/:cid/reject`, (_, res, ctx) => {
+    return res(ctx.status(200));
+  }),
+
+  rest.post(`${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/accept`, (_, res, ctx) => {
+    return res(ctx.status(200));
+  }),
+
+  rest.post(`${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/reject`, (_, res, ctx) => {
+    return res(ctx.status(200));
   }),
 ];

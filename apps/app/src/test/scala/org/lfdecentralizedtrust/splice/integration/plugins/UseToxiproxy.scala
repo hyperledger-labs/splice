@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.plugins.toxiproxy
 
-import org.lfdecentralizedtrust.splice.config.{SpliceConfig, ParticipantClientConfig}
+import org.lfdecentralizedtrust.splice.config.{ParticipantClientConfig, SpliceConfig}
 import org.lfdecentralizedtrust.splice.sv.config.SvParticipantClientConfig
 import org.lfdecentralizedtrust.splice.environment.SpliceEnvironment
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
@@ -167,7 +167,23 @@ case class UseToxiproxy(
                         BftScanClientConfig.TrustSingle(newUrl, amuletRulesCacheTimeToLive)
                       ),
                     )
-                  case BftScanClientConfig.Bft(seedUrls, _, amuletRulesCacheTimeToLive) =>
+                  case BftScanClientConfig.Bft(seedUrls, _, amuletRulesCacheTimeToLive, _) =>
+                    val newUrl = addScanAppHttpProxy(n.unwrap, seedUrls.head, basePortBump)
+                    (
+                      n,
+                      config.copy(scanClient =
+                        BftScanClientConfig.TrustSingle(newUrl, amuletRulesCacheTimeToLive)
+                      ),
+                    )
+                  case BftScanClientConfig
+                        .BftCustom(
+                          seedUrls,
+                          _,
+                          _,
+                          amuletRulesCacheTimeToLive,
+                          scansRefreshInterval,
+                          _,
+                        ) =>
                     val newUrl = addScanAppHttpProxy(n.unwrap, seedUrls.head, basePortBump)
                     (
                       n,
@@ -243,8 +259,8 @@ case class UseToxiproxy(
   def disableConnectionViaProxy(connection: String): Unit = {
     proxies.get(connection) match {
       case Some(p) =>
-        logger.info(s"Disabled $connection")
         p.disable()
+        logger.info(s"Disabled $connection")
       case _ => fail(s"No proxy named ${connection}")
     }
   }

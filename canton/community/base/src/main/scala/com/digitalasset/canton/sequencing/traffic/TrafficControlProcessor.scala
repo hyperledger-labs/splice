@@ -28,7 +28,7 @@ import com.digitalasset.canton.sequencing.traffic.TrafficControlErrors.{
 }
 import com.digitalasset.canton.sequencing.traffic.TrafficControlProcessor.TrafficControlSubscriber
 import com.digitalasset.canton.time.SynchronizerTimeTracker
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 
@@ -37,7 +37,7 @@ import scala.concurrent.ExecutionContext
 
 class TrafficControlProcessor(
     cryptoApi: SynchronizerCryptoClient,
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     maxFromStoreO: => Option[CantonTimestamp],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -93,7 +93,7 @@ class TrafficControlProcessor(
           val synchronizerEnvelopes =
             ProtocolMessage.filterSynchronizerEnvelopes(batch.envelopes, synchronizerId) {
               wrongMessages =>
-                val wrongSynchronizerIds = wrongMessages.map(_.protocolMessage.synchronizerId)
+                val wrongSynchronizerIds = wrongMessages.map(_.protocolMessage.psid)
                 logger.error(
                   s"Received traffic purchased entry messages with wrong synchronizer ids: $wrongSynchronizerIds"
                 )

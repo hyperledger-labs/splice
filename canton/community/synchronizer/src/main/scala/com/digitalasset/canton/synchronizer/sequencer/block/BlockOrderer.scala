@@ -5,6 +5,7 @@ package com.digitalasset.canton.synchronizer.sequencer.block
 
 import cats.data.EitherT
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.sequencer.admin.v30
 import com.digitalasset.canton.sequencing.protocol.{
   AcknowledgeRequest,
@@ -12,7 +13,7 @@ import com.digitalasset.canton.sequencing.protocol.{
   SignedContent,
 }
 import com.digitalasset.canton.synchronizer.block.{RawLedgerBlock, SequencerDriverHealthStatus}
-import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedOrderingRequest
+import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedSubmissionRequest
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.ServerServiceDefinition
@@ -71,16 +72,11 @@ trait BlockOrderer extends AutoCloseable {
       traceContext: TraceContext
   ): Source[RawLedgerBlock, KillSwitch]
 
-  /** Orders a submission. If the sequencer node is honest, this normally results in a
+  /** Orders a sender-signed submission. If the sequencer node is honest, this normally results in a
     * [[block.RawLedgerBlock.RawBlockEvent.Send]]. In exceptional cases (crashes, high load, ...), a
-    * sequencer may drop submissions. There's a double
-    * [[com.digitalasset.canton.sequencing.protocol.SignedContent]] wrapping because the outer
-    * signature is the sequencer's, and the inner signature is the sender's. The sequencer signature
-    * may be used by the implementation to ensure that the submission originates from the expected
-    * sequencer node. This may be necessary if the implementation is split across multiple
-    * processes.
+    * sequencer may drop submissions.
     */
-  def send(signedOrderingRequest: SignedOrderingRequest)(implicit
+  def send(signedSubmissionRequest: SignedSubmissionRequest)(implicit
       traceContext: TraceContext
   ): EitherT[Future, SequencerDeliverError, Unit]
 
@@ -104,4 +100,12 @@ trait BlockOrderer extends AutoCloseable {
   def sequencerSnapshotAdditionalInfo(
       timestamp: CantonTimestamp
   ): EitherT[Future, SequencerError, Option[v30.BftSequencerSnapshotAdditionalInfo]]
+
+  /** Return a "current" sequencing time such that, when a `send` operation is subsequently called,
+    * if sequenced, the sequencing time of the resulting event is guaranteed to be later than the
+    * sequencing time previously returned by the `sequencingTime` call.
+    */
+  def sequencingTime(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[CantonTimestamp]]
 }

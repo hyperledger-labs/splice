@@ -11,17 +11,16 @@ import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.daml.metrics.api.{MetricName, MetricsContext}
-import com.daml.metrics.grpc.GrpcServerMetrics
 import com.digitalasset.canton.*
-import com.digitalasset.canton.auth.CantonAdminToken
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
 }
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.StartupMemoryCheckConfig.ReportingLevel
 import com.digitalasset.canton.crypto.Crypto
-import com.digitalasset.canton.crypto.kms.CommunityKmsFactory
 import com.digitalasset.canton.crypto.store.CryptoPrivateStoreFactory
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.{
@@ -30,6 +29,7 @@ import com.digitalasset.canton.health.{
   LivenessHealthService,
 }
 import com.digitalasset.canton.lifecycle.{LifeCycle, ShutdownFailedException}
+import com.digitalasset.canton.metrics.ActiveRequestsMetrics.GrpcServerMetricsX
 import com.digitalasset.canton.metrics.{
   CommonMockMetrics,
   DbStorageMetrics,
@@ -38,14 +38,12 @@ import com.digitalasset.canton.metrics.{
   OnDemandMetricsReader,
 }
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
-import com.digitalasset.canton.resource.{
-  CommunityDbMigrationsFactory,
-  CommunityStorageFactory,
-  Storage,
-}
+import com.digitalasset.canton.resource.{Storage, StorageSingleFactory}
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
+import com.digitalasset.canton.store.IndexedStringStore
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.SimClock
+import com.digitalasset.canton.topology.admin.grpc.PSIdLookup
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClientWithInit
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.{
@@ -73,7 +71,7 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
   trait TestNode extends CantonNode
   case class TestNodeConfig()
       extends LocalNodeConfig
-      with ConfigDefaults[DefaultPorts, TestNodeConfig] {
+      with ConfigDefaults[Option[DefaultPorts], TestNodeConfig] {
     override val init: InitConfig = InitConfig()
     override val adminApi: AdminServerConfig =
       AdminServerConfig(internalPort = Some(UniquePortGenerator.next))
@@ -82,7 +80,8 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
     override val sequencerClient: SequencerClientConfig = SequencerClientConfig()
     override def nodeTypeName: String = "test-node"
     override def clientAdminApi = adminApi.clientConfig
-    override def withDefaults(ports: DefaultPorts, edition: CantonEdition): TestNodeConfig = this
+    override def withDefaults(ports: Option[DefaultPorts], edition: CantonEdition): TestNodeConfig =
+      this
     override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()
     override val topology: TopologyConfig = TopologyConfig.NotUsed
     override def parameters: LocalNodeParametersConfig = new LocalNodeParametersConfig {
@@ -90,7 +89,6 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
       override def caching: CachingConfigs = CachingConfigs()
       override def alphaVersionSupport: Boolean = false
       override def watchdog: Option[WatchdogConfig] = None
-      override def sessionSigningKeys: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled
     }
   }
 
@@ -108,7 +106,6 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
       nonStandardConfig: Boolean = false,
       dbMigrateAndStart: Boolean = false,
       disableUpgradeValidation: Boolean = false,
-      sessionSigningKeys: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
       alphaVersionSupport: Boolean = false,
       betaVersionSupport: Boolean = false,
       dontWarnOnDeprecatedPV: Boolean = false,
@@ -118,13 +115,15 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
       startupMemoryCheckConfig: StartupMemoryCheckConfig = StartupMemoryCheckConfig(
         ReportingLevel.Warn
       ),
+      dispatchQueueBackpressureLimit: NonNegativeInt = NonNegativeInt.two,
   ) extends CantonNodeParameters
 
   private val metricsFactory: LabeledMetricsFactory = new InMemoryMetricsFactory
   case class TestMetrics(
       prefix: MetricName = MetricName("test-metrics"),
       openTelemetryMetricsFactory: LabeledMetricsFactory = metricsFactory,
-      grpcMetrics: GrpcServerMetrics = LedgerApiServerMetrics.ForTesting.grpc,
+      grpcMetrics: GrpcServerMetricsX =
+        (LedgerApiServerMetrics.ForTesting.grpc, LedgerApiServerMetrics.ForTesting.requests),
       healthMetrics: HealthMetrics = LedgerApiServerMetrics.ForTesting.health,
       storageMetrics: DbStorageMetrics = CommonMockMetrics.dbStorage,
   ) extends BaseMetrics {
@@ -153,10 +152,8 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
 
   def arguments(config: TestNodeConfig) = factoryArguments(config)
     .toCantonNodeBootstrapCommonArguments(
-      storageFactory = new CommunityStorageFactory(StorageConfig.Memory()),
-      cryptoPrivateStoreFactory =
-        CryptoPrivateStoreFactory.withoutKms(wallClock, parallelExecutionContext),
-      kmsFactory = CommunityKmsFactory,
+      storageFactory = new StorageSingleFactory(StorageConfig.Memory()),
+      cryptoPrivateStoreFactory = CryptoPrivateStoreFactory.withoutKms(),
     )
     .value
 
@@ -178,13 +175,14 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
 
     override def metrics: BaseMetrics = TestNodeBootstrap.this.arguments.metrics
 
-    override protected val adminTokenConfig: Option[String] = None
+    override protected val adminTokenConfig: AdminTokenConfig = AdminTokenConfig()
 
     override protected def customNodeStages(
         storage: Storage,
+        indexedStringStore: IndexedStringStore,
         crypto: Crypto,
         adminServerRegistry: CantonMutableHandlerRegistry,
-        adminToken: CantonAdminToken,
+        adminTokenDispenser: CantonAdminTokenDispenser,
         nodeId: UniqueIdentifier,
         manager: AuthorizedTopologyManager,
         healthReporter: GrpcHealthReporter,
@@ -211,6 +209,8 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
 
     override protected def sequencedTopologyManagers: Seq[SynchronizerTopologyManager] = Nil
 
+    override protected def lookupActivePSId: PSIdLookup =
+      _ => None
   }
 
   class TestNodeFactory {
@@ -230,7 +230,6 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
   class TestNodes(factory: TestNodeFactory, configs: Map[String, TestNodeConfig])
       extends ManagedNodes[TestNode, TestNodeConfig, CantonNodeParameters, TestNodeBootstrap](
         (_, _) => factory.create(),
-        new CommunityDbMigrationsFactory(loggerFactory),
         timeouts,
         configs,
         _ => MockedNodeParameters.cantonNodeParameters(),

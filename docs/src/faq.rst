@@ -40,6 +40,15 @@ Validators
 
   How do I determine the traffic used for a specific transaction?
 
+    Since Splice 0.5.x, there are two options: (1) using the traffic cost estimate returned from preparing a transaction or (2) checking the participant logs for the actual traffic used.
+
+    **Option 1:** call the ``/v2/interactive-submission/prepare``
+    `Ledger API endpoint <https://github.com/digital-asset/canton/blob/025cdcf3c04ef052f775d6ccfb88c049a82d65a8/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1916>`__
+    and check the ``costEstimation`` field in the response. It contains an estimate for both the traffic used for submission and the traffic used for confirmation. It is an estimate
+    as the topology state can change between preparing and submitting the transaction.
+
+    **Option 2:** check the participant logs for the actual traffic used for a specific transaction. To do so, follow these steps:
+
     1. Ensure you have ``DEBUG`` logs enabled in your participant configuration.
     2. Determine the trace-id of your command submission in your participant logs.
     3. Search for the ``DEBUG`` log lines containing ``EventCost`` and that ``trace-id``.
@@ -121,12 +130,10 @@ ________
           participants {
             participant1 {
               http-ledger-api {
-                server {
-                    address = 0.0.0.0
-                    port = 10010
-                    port-file = "./json.port"
-                    path-prefix = "my-prefix"
-                }
+                address = 0.0.0.0
+                port = 10010
+                port-file = "./json.port"
+                path-prefix = "my-prefix"
                 websocket-config {
                     http-list-max-elements-limit = 1000,
                     http-list-wait-time = 2s,
@@ -142,10 +149,10 @@ ________
 
     Then you can add an extra limit on query `(?limit=xyz)` to the request but the result will never exceed server limit.
 
-    One alternative is the use the `websockets APIs <https://docs.digitalasset.com/build/3.3/reference/json-api/asyncapi.html>`__  which don't have a hard limit.
+    One alternative is the use the `websockets APIs <https://docs.digitalasset.com/build/3.4/reference/json-api/asyncapi.html>`__  which don't have a hard limit.
 
-    Another alternative is to use the `PQS <https://docs.digitalasset.com/build/3.3/sdlc-howtos/applications/develop/pqs/index.html>`__
-    which can simplify debugging via `Daml Shell <https://docs.digitalasset.com/build/3.3/sdlc-howtos/applications/develop/debug/daml-shell/index.html#contract-summaries>`__.
+    Another alternative is to use the `PQS <https://docs.digitalasset.com/build/3.4/sdlc-howtos/applications/develop/pqs/index.html>`__
+    which can simplify debugging via `Daml Shell <https://docs.digitalasset.com/build/3.4/sdlc-howtos/applications/develop/debug/daml-shell/index.html#contract-summaries>`__.
 
   How can I create a transaction with more than one root node?
 
@@ -185,7 +192,7 @@ ________
           ``/canton/tree/main/community/ledger/ledger-json-api/src/test/resources/json-api-docs`` to the ``openapi.yaml`` and ``asyncapi.yaml`` files.
 
       - Another source for the JSON API's specifications is to retrieve them from a running Canton participant node.  A
-        description of this is in the `Verification - download OpenAPI <https://docs.digitalasset.com/build/3.3/tutorials/json-api/canton_and_the_json_ledger_api.html#verification-download-openapi>`__
+        description of this is in the `Verification - download OpenAPI <https://docs.digitalasset.com/build/3.4/tutorials/json-api/canton_and_the_json_ledger_api.html#verification-download-openapi>`__
         section.  The specifications are available as:
 
         * For OpenAPI: ``http://<host>:<port>/docs/openapi``

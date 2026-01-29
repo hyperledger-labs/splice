@@ -1,6 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import { useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
 import { DesktopDateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import dayjs, { Dayjs } from 'dayjs';
@@ -19,6 +20,8 @@ export const DateField: React.FC<DateFieldProps> = props => {
   const { title, description, minDate, id } = props;
   const field = useFieldContext<string>();
 
+  const dateValue = useMemo(() => dayjs(field.state.value), [field.state.value]);
+
   return (
     <Box>
       {title && (
@@ -35,11 +38,12 @@ export const DateField: React.FC<DateFieldProps> = props => {
 
       <LocalizationProvider dateAdapter={AdapterDayjs}>
         <DesktopDateTimePicker
-          value={dayjs(field.state.value)}
+          value={dateValue}
           format={dateTimeFormatISO}
           minDateTime={minDate || dayjs()}
           ampm={false}
           onChange={newDate => field.handleChange(newDate?.format(dateTimeFormatISO)!)}
+          enableAccessibleFieldDOMStructure={false}
           slotProps={{
             textField: {
               fullWidth: true,

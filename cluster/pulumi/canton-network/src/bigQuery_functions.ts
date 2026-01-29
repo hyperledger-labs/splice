@@ -65,10 +65,12 @@ const daml_prim_path = new BQScalarFunction(
   STRING,
   `
       CASE selector
+        WHEN 'optional_numeric' THEN '.optional.value.numeric'
         WHEN 'numeric' THEN '.numeric'
         WHEN 'contractId' THEN '.contractId'
         WHEN 'list' THEN '.list.elements'
         WHEN 'party' THEN '.party'
+        WHEN 'int64' THEN '.int64'
         -- we treat records just like outer layer;
         -- see how paths start with '$.record'
         WHEN 'record' THEN ''
@@ -288,7 +290,9 @@ const TransferSummary_minted = new BQScalarFunction(
       \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [0]) AS appRewardAmount,
       \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [1]) AS validatorRewardAmount,
       \`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [2]) AS svRewardAmount,
-      IFNULL(\`$$FUNCTIONS_DATASET$$.daml_record_numeric\`(tr_json, [11]), 0) AS unclaimedActivityRecordAmount -- (was added only in Splice 0.4.4)
+      IFNULL(
+        PARSE_BIGNUMERIC(JSON_VALUE(tr_json,
+          \`$$FUNCTIONS_DATASET$$.daml_record_path\`([11], 'optional_numeric'))), 0) AS unclaimedActivityRecordAmount -- (was added only in Splice 0.4.4)
     )
   `
 );
@@ -586,6 +590,24 @@ const coin_price = new BQScalarFunction(
   `
 );
 
+const latest_round = new BQScalarFunction(
+  'latest_round',
+  as_of_args,
+  INT64,
+  `
+    (SELECT
+        CAST(JSON_VALUE(c.create_arguments, \`$$FUNCTIONS_DATASET$$.daml_record_path\`([1,0], 'int64')) AS INT64)
+      FROM \`$$SCAN_DATASET$$.scan_sv_1_update_history_creates\` c
+          WHERE template_id_entity_name = 'SummarizingMiningRound'
+          AND c.template_id_module_name = 'Splice.Round'
+          AND package_name = 'splice-amulet'
+          AND \`$$FUNCTIONS_DATASET$$.up_to_time\`(
+            as_of_record_time, migration_id,
+            c.record_time, c.migration_id)
+          ORDER BY c.record_time DESC LIMIT 1)
+  `
+);
+
 const all_dashboard_stats = new BQTableFunction(
   'all_dashboard_stats',
   as_of_args,
@@ -689,6 +711,7 @@ const all_finance_stats = new BQTableFunction(
     new BQColumn('total_burn', BIGNUMERIC),
     new BQColumn('num_amulet_holders', INT64),
     new BQColumn('num_active_validators', INT64),
+    new BQColumn('latest_round', INT64),
   ],
   `
     SELECT
@@ -729,7 +752,9 @@ const all_finance_stats = new BQTableFunction(
             migration_id),
         0) AS total_burn,
       \`$$FUNCTIONS_DATASET$$.num_amulet_holders\`(as_of_record_time, migration_id) as num_amulet_holders,
-      \`$$FUNCTIONS_DATASET$$.num_active_validators\`(as_of_record_time, migration_id) as num_active_validators
+      \`$$FUNCTIONS_DATASET$$.num_active_validators\`(as_of_record_time, migration_id) as num_active_validators,
+      \`$$FUNCTIONS_DATASET$$.latest_round\`(as_of_record_time, migration_id) as latest_round
+
   `
 );
 
@@ -878,6 +903,7 @@ export const allScanFunctions = [
   average_tps,
   peak_tps,
   coin_price,
+  latest_round,
   all_dashboard_stats,
   all_finance_stats,
 ];

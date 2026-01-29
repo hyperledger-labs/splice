@@ -58,7 +58,7 @@ class GrpcAdminCommandRunner(
   private val retryPolicyV =
     new AtomicReference[GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean](_ => _ => false)
 
-  def retryPolicy: GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean = _ => _ => false
+  def retryPolicy: GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean = retryPolicyV.get()
 
   def setRetryPolicy(policy: GrpcAdminCommand[?, ?, ?] => GrpcError => Boolean): Unit =
     retryPolicyV.set(policy)
@@ -72,7 +72,7 @@ class GrpcAdminCommandRunner(
 
   def runCommandAsync[Result](
       instanceName: String,
-      command: GrpcAdminCommand[_, _, Result],
+      command: GrpcAdminCommand[?, ?, Result],
       clientConfig: ClientConfig,
       token: Option[String],
   )(implicit traceContext: TraceContext): (NonNegativeDuration, EitherT[Future, String, Result]) = {
@@ -91,6 +91,7 @@ class GrpcAdminCommandRunner(
       case _ => awaitTimeout
     }
 
+    logger.debug(s"Running command $command on $instanceName against $clientConfig")
     val resultET = for {
       _ <- {
         channels.get((instanceName, clientConfig.address, clientConfig.port)) match {
@@ -115,7 +116,6 @@ class GrpcAdminCommandRunner(
         }
       }
       channel = getOrCreateChannel(instanceName, clientConfig)
-      _ = logger.debug(s"Running command $command on $instanceName against $clientConfig")
       result <- grpcRunner.run(
         instanceName,
         command,
@@ -133,7 +133,7 @@ class GrpcAdminCommandRunner(
 
   def runCommandWithExistingTrace[Result](
       instanceName: String,
-      command: GrpcAdminCommand[_, _, Result],
+      command: GrpcAdminCommand[?, ?, Result],
       clientConfig: ClientConfig,
       token: Option[String],
   )(implicit traceContext: TraceContext): ConsoleCommandResult[Result] = {
@@ -150,7 +150,7 @@ class GrpcAdminCommandRunner(
 
   def runCommand[Result](
       instanceName: String,
-      command: GrpcAdminCommand[_, _, Result],
+      command: GrpcAdminCommand[?, ?, Result],
       clientConfig: ClientConfig,
       token: Option[String],
   ): ConsoleCommandResult[Result] =
@@ -188,7 +188,7 @@ class GrpcAdminCommandRunner(
 
 object GrpcAdminCommandRunner {
   def apply(
-      environment: Environment[_ <: SharedCantonConfig[_]],
+      environment: Environment[? <: SharedCantonConfig[?]],
       apiName: String,
   ): GrpcAdminCommandRunner =
     new GrpcAdminCommandRunner(

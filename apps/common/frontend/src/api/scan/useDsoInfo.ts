@@ -20,7 +20,7 @@ export const useDsoInfo = (): UseQueryResult<DsoInfo> => {
         svUser: resp.sv_user,
         svPartyId: resp.sv_party_id,
         dsoPartyId: resp.dso_party_id,
-        votingThreshold: resp.voting_threshold,
+        votingThreshold: BigInt(resp.voting_threshold),
         amuletRules: Contract.decodeOpenAPI(resp.amulet_rules.contract, AmuletRules),
         dsoRules: Contract.decodeOpenAPI(resp.dso_rules.contract, DsoRules),
         nodeStates: resp.sv_node_states.map(c => Contract.decodeOpenAPI(c.contract, SvNodeState)),

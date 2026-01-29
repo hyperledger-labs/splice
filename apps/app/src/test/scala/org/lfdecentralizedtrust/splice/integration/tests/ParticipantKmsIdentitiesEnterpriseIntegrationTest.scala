@@ -34,7 +34,6 @@ class ParticipantKmsIdentitiesEnterpriseIntegrationTest
       .clearConfigTransforms() // mainly to get static daml names
       .addConfigTransforms(
         (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
-        (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
         (_, conf) =>
           updateAllValidatorConfigs { case (name, c) =>
             if (name == "aliceValidator") {

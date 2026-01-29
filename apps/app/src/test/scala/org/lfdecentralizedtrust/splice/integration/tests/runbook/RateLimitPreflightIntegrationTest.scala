@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.MonadUtil
@@ -10,6 +11,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
 }
 import org.scalatest.Assertion
+import org.slf4j.event.Level
 
 import scala.concurrent.{Future, blocking}
 import scala.util.control.NonFatal
@@ -62,8 +64,20 @@ class RateLimitPreflightIntegrationTest extends IntegrationTestWithSharedEnviron
   def rateLimitIsEnforced(limit: Int, call: => Unit)(implicit
       env: SpliceTestConsoleEnvironment
   ): Assertion = {
-    val results = collectResponses(limit, call)
-    allWereSuccessfull(results)
+    val results = loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
+      collectResponses(limit, call),
+      forAll(_)(
+        // This hits the Canton limit on concurrent requests
+        _.message should include(
+          "Reached the limit of concurrent requests for com.digitalasset.canton.admin.participant.v30.ParticipantRepairService/ExportAcs"
+        )
+      ),
+    )
+    // Note: failures are expected due to the Canton rate limiter.
+    forAtLeast(1, results) {
+      _ shouldBe a[scala.util.Success[?]]
+    }
+    // This now hits istio rate limit
     assertThrowsAndLogsCommandFailures(
       call,
       entry => entry.message should include("HTTP 429 Too Many Requests"),

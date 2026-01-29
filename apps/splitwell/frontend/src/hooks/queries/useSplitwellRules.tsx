@@ -9,7 +9,7 @@ import { SplitwellRules } from '@daml.js/splitwell/lib/Splice/Splitwell';
 import { useSplitwellClient } from '../../contexts/SplitwellServiceContext';
 
 export const QuerySplitwellRulesOperationName = 'querySplitwellRules';
-export const useSplitwellRules = (): UseQueryResult<AssignedContract<SplitwellRules>[]> => {
+export const useSplitwellRules = (): UseQueryResult<AssignedContract<SplitwellRules>[] | null> => {
   const splitwellClient = useSplitwellClient();
   const primaryPartyQuery = usePrimaryParty();
   const primaryPartyId = primaryPartyQuery.data;

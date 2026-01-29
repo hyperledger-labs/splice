@@ -6,6 +6,7 @@ import type {
   AmuletRules_ActionRequiringConfirmation,
   DsoRules_ActionRequiringConfirmation,
   DsoRules_SetConfig,
+  DsoRulesConfig,
   SvInfo,
   Vote,
   VoteRequest,
@@ -28,12 +29,16 @@ import type {
   Proposal,
   ProposalListingStatus,
   SupportedActionTag,
+  UnclaimedActivityRecordProposal,
   UnfeatureAppProposal,
   UpdateSvRewardWeightProposal,
   YourVoteStatus,
 } from '../utils/types';
 import { buildAmuletConfigChanges } from './buildAmuletConfigChanges';
 import { buildDsoConfigChanges } from './buildDsoConfigChanges';
+import { AmuletRules_SetConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
+import { AmuletConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
+import { Optional } from '@daml/types';
 
 export const actionTagToTitle = (amuletName: string): Record<SupportedActionTag, string> => ({
   CRARC_AddFutureAmuletConfigSchedule: `Add Future ${amuletName} Configuration Schedule`,
@@ -41,6 +46,7 @@ export const actionTagToTitle = (amuletName: string): Record<SupportedActionTag,
   SRARC_GrantFeaturedAppRight: 'Feature Application',
   SRARC_OffboardSv: 'Offboard Member',
   SRARC_RevokeFeaturedAppRight: 'Unfeature Application',
+  SRARC_CreateUnallocatedUnclaimedActivityRecord: 'Create Unclaimed Activity Record',
   SRARC_SetConfig: 'Set Dso Rules Configuration',
   SRARC_UpdateSvRewardWeight: 'Update SV Reward Weight',
 });
@@ -53,6 +59,10 @@ export const createProposalActions: {
   { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
   { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
   { name: 'Set Dso Rules Configuration', value: 'SRARC_SetConfig' },
+  {
+    name: 'Create Unclaimed Activity Record',
+    value: 'SRARC_CreateUnallocatedUnclaimedActivityRecord',
+  },
   { name: 'Set Amulet Rules Configuration', value: 'CRARC_SetConfig' },
   { name: 'Update SV Reward Weight', value: 'SRARC_UpdateSvRewardWeight' },
 ];
@@ -105,48 +115,103 @@ export function buildProposal(action: ActionRequiringConfirmation, dsoInfo?: Dso
     const dsoAction = action.value.dsoAction;
     switch (dsoAction.tag) {
       case 'SRARC_OffboardSv':
-        return {
-          memberToOffboard: dsoAction.value.sv,
-        } as OffBoardMemberProposal;
+        return createOffboardMemberProposal(dsoAction.value.sv);
       case 'SRARC_UpdateSvRewardWeight': {
         const allSvInfos = dsoInfo?.dsoRules.payload.svs.entriesArray() || [];
-        const svPartyId = dsoInfo?.svPartyId || '';
-        const currentWeight = getSvRewardWeight(allSvInfos, svPartyId);
+        const svToUpdate = dsoAction.value.svParty;
+        const currentWeight = getSvRewardWeight(allSvInfos, svToUpdate);
 
-        return {
-          svToUpdate: dsoAction.value.svParty,
-          currentWeight: currentWeight,
-          weightChange: dsoAction.value.newRewardWeight,
-        } as UpdateSvRewardWeightProposal;
+        return createSvRewardWeightProposal(
+          svToUpdate,
+          currentWeight,
+          dsoAction.value.newRewardWeight
+        );
       }
+      case 'SRARC_CreateUnallocatedUnclaimedActivityRecord':
+        return createUnallocatedUnclaimedActivityRecordProposal(
+          dsoAction.value.beneficiary,
+          dsoAction.value.amount,
+          dsoAction.value.expiresAt
+        );
       case 'SRARC_GrantFeaturedAppRight':
-        return {
-          provider: dsoAction.value.provider,
-        } as FeatureAppProposal;
+        return createGrantFeatureAppProposal(dsoAction.value.provider);
       case 'SRARC_RevokeFeaturedAppRight':
-        return {
-          rightContractId: dsoAction.value.rightCid,
-        } as UnfeatureAppProposal;
+        return createRevokeFeatureAppProposal(dsoAction.value.rightCid);
       case 'SRARC_SetConfig':
-        return {
-          configChanges: buildDsoConfigChanges(
-            dsoAction.value.baseConfig,
-            dsoAction.value.newConfig
-          ),
-        } as DsoRulesConfigProposal;
+        return createDsoRulesConfigProposal(dsoAction.value.baseConfig, dsoAction.value.newConfig);
     }
   } else if (action.tag === 'ARC_AmuletRules') {
     const amuletAction = action.value.amuletRulesAction;
     switch (amuletAction.tag) {
       case 'CRARC_SetConfig':
-        return {
-          configChanges: buildAmuletConfigChanges(
-            amuletAction.value.baseConfig,
-            amuletAction.value.newConfig
-          ),
-        } as AmuletRulesConfigProposal;
+        return createAmuletRulesConfigProposal(
+          amuletAction.value.baseConfig,
+          amuletAction.value.newConfig
+        );
     }
   }
+}
+
+function createOffboardMemberProposal(memberToOffboard: string): OffBoardMemberProposal {
+  return { memberToOffboard };
+}
+
+function createGrantFeatureAppProposal(provider: string): FeatureAppProposal {
+  return {
+    provider: provider,
+  };
+}
+
+function createRevokeFeatureAppProposal(rightContractId: string): UnfeatureAppProposal {
+  return {
+    rightContractId: rightContractId,
+  };
+}
+
+function createSvRewardWeightProposal(
+  svToUpdate: string,
+  currentWeight: string,
+  weightChange: string
+): UpdateSvRewardWeightProposal {
+  return {
+    svToUpdate: svToUpdate,
+    currentWeight: currentWeight,
+    weightChange: weightChange,
+  };
+}
+
+function createUnallocatedUnclaimedActivityRecordProposal(
+  beneficiary: string,
+  amount: string,
+  mintBefore: string
+): UnclaimedActivityRecordProposal {
+  return {
+    beneficiary: beneficiary,
+    amount: amount,
+    mintBefore: mintBefore,
+  };
+}
+
+function createAmuletRulesConfigProposal(
+  baseConfig: AmuletConfig<'USD'>,
+  newConfig: AmuletConfig<'USD'>
+): AmuletRulesConfigProposal {
+  return {
+    configChanges: buildAmuletConfigChanges(baseConfig, newConfig),
+    baseConfig: baseConfig,
+    newConfig: newConfig,
+  };
+}
+
+function createDsoRulesConfigProposal(
+  baseConfig: Optional<DsoRulesConfig>,
+  newConfig: DsoRulesConfig
+): DsoRulesConfigProposal {
+  return {
+    configChanges: buildDsoConfigChanges(baseConfig, newConfig),
+    baseConfig: baseConfig,
+    newConfig: newConfig,
+  };
 }
 
 export function getActionValue(
@@ -217,6 +282,35 @@ export function buildPendingConfigFields(
       const dsoAction = (proposal.payload.action.value as ActionRequiringConfirmation.ARC_DsoRules)
         .dsoAction.value as DsoRules_SetConfig;
       const changes = buildDsoConfigChanges(dsoAction.baseConfig, dsoAction.newConfig);
+
+      return changes.map(change => ({
+        fieldName: change.fieldName,
+        pendingValue: change.newValue as string,
+        proposalCid: proposal.contractId,
+        effectiveDate: proposal.payload.targetEffectiveAt
+          ? dayjs(proposal.payload.targetEffectiveAt).format(dateTimeFormatISO)
+          : 'Threshold',
+      }));
+    });
+}
+
+export function buildAmuletRulesPendingConfigFields(
+  proposals: Contract<VoteRequest>[] | undefined
+): PendingConfigFieldInfo[] {
+  if (!proposals?.length) {
+    return [];
+  }
+
+  return proposals
+    .filter(proposal => {
+      const a = proposal.payload.action;
+      return a.tag === 'ARC_AmuletRules' && a.value.amuletRulesAction.tag === 'CRARC_SetConfig';
+    })
+    .flatMap(proposal => {
+      const amuletAction = (
+        proposal.payload.action.value as ActionRequiringConfirmation.ARC_AmuletRules
+      ).amuletRulesAction.value as AmuletRules_SetConfig;
+      const changes = buildAmuletConfigChanges(amuletAction.baseConfig, amuletAction.newConfig);
 
       return changes.map(change => ({
         fieldName: change.fieldName,

@@ -1,95 +1,74 @@
 package org.lfdecentralizedtrust.splice.store.db
 
 import com.daml.ledger.javaapi.data.{DamlRecord, Unit as damlUnit}
+import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.crypto.Fingerprint
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
-  Amulet,
-  Amulet_ExpireResult,
-  LockedAmulet_ExpireAmuletResult,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, Amulet_ExpireResult}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   AmuletRules_BuyMemberTrafficResult,
   AmuletRules_MintResult,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer as decentralizedsynchronizerCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  DsoRules,
+  Reason,
+  Vote,
+  VoteRequest,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.FaucetState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
-  round as roundCodegen,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
-import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   cometbft as cometbftCodegen,
   dsorules as dsorulesCodegen,
+  round as roundCodegen,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer as decentralizedsynchronizerCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules, Reason, Vote}
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
-import org.lfdecentralizedtrust.splice.history.{
-  AmuletExpire,
-  ExternalPartyAmuletRules_CreateTransferCommand,
-  LockedAmuletExpireAmulet,
-  Transfer,
-  TransferCommand_Expire,
-  TransferCommand_Send,
-  TransferCommand_Withdraw,
-}
+import org.lfdecentralizedtrust.splice.history.*
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
-import org.lfdecentralizedtrust.splice.scan.store.{
-  OpenMiningRoundTxLogEntry,
-  ReceiverAmount,
-  SenderAmount,
-  TransferCommandCreated,
-  TransferCommandExpired,
-  TransferCommandFailed,
-  TransferCommandSent,
-  TransferCommandTxLogEntry,
-  TransferCommandWithdrawn,
-  TransferTxLogEntry,
-}
-import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.scan.store.db.{
   DbScanStore,
   DbScanStoreMetrics,
   ScanAggregatesReader,
   ScanAggregator,
 }
-import org.lfdecentralizedtrust.splice.store.{PageLimit, SortOrder, StoreErrors, StoreTest}
+import org.lfdecentralizedtrust.splice.scan.store.*
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState.Assigned
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.events.DsoRulesCloseVoteRequest
+import org.lfdecentralizedtrust.splice.store.*
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.damlDecimal
-import org.lfdecentralizedtrust.splice.util.{
-  Contract,
-  ContractWithState,
-  EventId,
-  ResourceTemplateDecoder,
-  TemplateJsonDecoder,
-}
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.crypto.Fingerprint
-import com.digitalasset.canton.data.CantonTimestamp
-import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
+import org.lfdecentralizedtrust.splice.util.*
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.{Collections, Optional}
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.reflect.ClassTag
-import com.digitalasset.canton.util.MonadUtil
-
-import java.time.temporal.ChronoUnit
-import scala.concurrent.ExecutionContext
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart.{
+  InitializeAcsAtLatestOffset,
+  InitializeAcsAtOffset,
+  InitializeAtParticipantBegin,
+  ResumeAtOffset,
+}
 
 abstract class ScanStoreTest
     extends StoreTest
@@ -98,375 +77,6 @@ abstract class ScanStoreTest
     with AmuletTransferUtil {
 
   "ScanStore" should {
-
-    "getTotalAmuletBalance" should {
-
-      "return correct total amulet balance for the round where the transfer happened and for the rounds before and after" in {
-        val amuletAmount = 100.0
-        // For aggregation to work correctly, all closed mining rounds for totals have to exist.
-        val closedRounds = (0 to 3).map { round =>
-          closedMiningRound(dsoParty, round = round.toLong)
-        }
-        for {
-          store <- mkStore()
-          amuletRulesContract = amuletRules()
-          _ <- dummyDomain.exercise(
-            amuletRulesContract,
-            interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
-            Transfer.choice.name,
-            mkAmuletRulesTransfer(user1, amuletAmount),
-            mkTransferResultRecord(
-              round = 2,
-              inputAppRewardAmount = 0,
-              inputAmuletAmount = amuletAmount,
-              inputValidatorRewardAmount = 0,
-              inputSvRewardAmount = 0,
-              balanceChanges = Map(
-                user1.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
-                  BigDecimal(amuletAmount).bigDecimal,
-                  holdingFee.bigDecimal,
-                )
-              ),
-              amuletPrice = 0.0005,
-            ),
-            nextOffset(),
-          )(
-            store.multiDomainAcsStore
-          )
-          _ = closedRounds.map(closed =>
-            dummyDomain.create(closed)(store.multiDomainAcsStore).futureValue
-          )
-          _ <- store.aggregate()
-        } yield {
-          store.getTotalAmuletBalance(1).futureValue shouldBe (0.0)
-          // 100.0 is the initial amount as of round 0, so at the end of round 2 the holding fee was applied three times
-          store.getTotalAmuletBalance(2).futureValue shouldBe (amuletAmount - 3 * holdingFee)
-          store.getTotalAmuletBalance(3).futureValue shouldBe (amuletAmount - 4 * holdingFee)
-        }
-      }
-
-      "return correct total amulet balance for the round where the amulet expired and for the rounds before and after" in {
-        val amuletRound1 = 100.0
-        val changeToInitialAmountAsOfRoundZero = -50.0
-        // For aggregation to work correctly, all closed mining rounds for totals have to exist.
-        val closedRounds = (0 to 3).map { round =>
-          closedMiningRound(dsoParty, round = round.toLong)
-        }
-
-        for {
-          store <- mkStore()
-          _ <- dummyDomain.ingest(mintTransaction(user1, amuletRound1, 1, holdingFee))(
-            store.multiDomainAcsStore
-          )
-          amuletContract = amulet(user1, amuletRound1, 1, holdingFee)
-          _ <- dummyDomain.exercise(
-            amuletContract,
-            interfaceId = Some(splice.amulet.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID),
-            AmuletExpire.choice.name,
-            mkAmuletExpire(),
-            mkAmuletExpireResult(
-              user1,
-              2,
-              changeToInitialAmountAsOfRoundZero,
-              holdingFee,
-            ),
-            nextOffset(),
-          )(
-            store.multiDomainAcsStore
-          )
-          _ = closedRounds.map(closed =>
-            dummyDomain.create(closed)(store.multiDomainAcsStore).futureValue
-          )
-          _ <- store.aggregate()
-        } yield {
-          store.getTotalAmuletBalance(1).futureValue shouldBe (amuletRound1 - 1 * holdingFee)
-          store
-            .getTotalAmuletBalance(2)
-            .futureValue shouldBe (amuletRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
-          store
-            .getTotalAmuletBalance(3)
-            .futureValue shouldBe (amuletRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
-        }
-      }
-
-      "return correct total amulet balance for the round where the locked amulet expired and for the rounds before and after" in {
-        val amuletRound1 = 100.0
-        val changeToInitialAmountAsOfRoundZero = BigDecimal(-50.0)
-        // For aggregation to work correctly, all closed mining rounds for totals have to exist.
-        val closedRounds = (0 to 3).map { round =>
-          closedMiningRound(dsoParty, round = round.toLong)
-        }
-
-        for {
-          store <- mkStore()
-          _ <- dummyDomain.ingest(mintTransaction(user1, amuletRound1, 1, holdingFee))(
-            store.multiDomainAcsStore
-          )
-          amuletContract = lockedAmulet(user1, amuletRound1, 1, holdingFee)
-          _ <- dummyDomain.exercise(
-            amuletContract,
-            interfaceId = Some(splice.amulet.LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID),
-            LockedAmuletExpireAmulet.choice.name,
-            mkLockedAmuletExpireAmulet(),
-            new LockedAmulet_ExpireAmuletResult(
-              new splice.amulet.AmuletExpireSummary(
-                user1.toProtoPrimitive,
-                new splice.types.Round(2),
-                changeToInitialAmountAsOfRoundZero.bigDecimal,
-                holdingFee.bigDecimal,
-              ),
-              Optional.empty(),
-            ).toValue,
-            nextOffset(),
-          )(
-            store.multiDomainAcsStore
-          )
-          _ = closedRounds.map(closed =>
-            dummyDomain.create(closed)(store.multiDomainAcsStore).futureValue
-          )
-          _ <- store.aggregate()
-        } yield {
-          store.getTotalAmuletBalance(1).futureValue shouldBe (amuletRound1 - 1 * holdingFee)
-          store
-            .getTotalAmuletBalance(2)
-            .futureValue shouldBe (amuletRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
-          store
-            .getTotalAmuletBalance(3)
-            .futureValue shouldBe (amuletRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
-        }
-      }
-
-      "return correct total amulet balance for the round where the mint happened and for the rounds before and after" in {
-        val mintAmount = 100.0
-        // For aggregation to work correctly, all closed mining rounds for totals have to exist.
-        val closedRounds = (0 to 3).map { round =>
-          closedMiningRound(dsoParty, round = round.toLong)
-        }
-
-        for {
-          store <- mkStore()
-          _ <- dummyDomain.ingest(mintTransaction(user1, mintAmount, 2, holdingFee))(
-            store.multiDomainAcsStore
-          )
-          _ = closedRounds.map(closed =>
-            dummyDomain.create(closed)(store.multiDomainAcsStore).futureValue
-          )
-          _ <- store.aggregate()
-        } yield {
-          store.getTotalAmuletBalance(1).futureValue shouldBe (0.0)
-          // The amulet is minted at round 2, so at the end of that round it's already incurring 1 x holding fee
-          store.getTotalAmuletBalance(2).futureValue shouldBe (mintAmount - 1 * holdingFee)
-          store.getTotalAmuletBalance(3).futureValue shouldBe (mintAmount - 2 * holdingFee)
-        }
-      }
-
-    }
-
-    "getWalletBalance" should {
-      "return correct wallet balance for the round where the transfer happened and for the rounds before and after" in {
-        val keptAmuletAmount = 60.0
-        val sentAmuletAmount = 40.0
-        val amuletAmount = keptAmuletAmount + sentAmuletAmount
-        val lastClosedRound = 5
-        val balanceChanges = Seq(
-          // round 0: no change
-          // round 1: user1 gets balance increase, no change for user2
-          1L -> Map(
-            user1.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
-              BigDecimal(10.0).bigDecimal,
-              holdingFee.bigDecimal,
-            )
-          ),
-          // round 2: both users get a balance increase
-          2L -> Map(
-            user1.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
-              BigDecimal(60.0).bigDecimal,
-              holdingFee.bigDecimal,
-            ),
-            user2.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
-              BigDecimal(40.0).bigDecimal,
-              (2 * holdingFee).bigDecimal,
-            ),
-          ),
-          // round 3: user1 reduces balance, no change for user2
-          3L -> Map(
-            user1.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
-              BigDecimal(-40.0).bigDecimal,
-              (-holdingFee).bigDecimal,
-            )
-          ),
-          // round 4: user2 reduces balance, no change for user1
-          4L -> Map(
-            user2.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
-              BigDecimal(-30.0).bigDecimal,
-              (-holdingFee).bigDecimal,
-            )
-          ),
-          // round 5: both users increase their balance
-          5L -> Map(
-            user1.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
-              BigDecimal(10.0).bigDecimal,
-              holdingFee.bigDecimal,
-            ),
-            user2.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
-              BigDecimal(10.0).bigDecimal,
-              holdingFee.bigDecimal,
-            ),
-          ),
-        )
-        // We only care about the balance changes in the result, just add a random dummy argument.
-        val dummyTransferArg = mkAmuletRulesTransfer(user1, 0.0)
-        for {
-          store <- mkStore()
-          // Close the first 2 rounds, no events for them.
-          _ <- MonadUtil.sequentialTraverse_(Seq(0L, 1L)) { round =>
-            for {
-              _ <- dummyDomain.create(
-                closedMiningRound(dsoParty, round)
-              )(store.multiDomainAcsStore)
-              _ <- store.aggregate()
-            } yield ()
-          }
-          amuletRulesContract = amuletRules()
-          _ <- MonadUtil.sequentialTraverse_(balanceChanges) { case (round, balanceChanges) =>
-            for {
-              _ <- dummyDomain.exercise(
-                amuletRulesContract,
-                interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID),
-                Transfer.choice.name,
-                dummyTransferArg,
-                mkTransferResultRecord(
-                  round = round,
-                  inputAppRewardAmount = 0,
-                  inputAmuletAmount = amuletAmount,
-                  inputValidatorRewardAmount = 0,
-                  inputSvRewardAmount = 0,
-                  balanceChanges = balanceChanges,
-                  amuletPrice = 0.0005,
-                ),
-                nextOffset(),
-              )(
-                store.multiDomainAcsStore
-              )
-              _ <- dummyDomain.create(
-                closedMiningRound(dsoParty, round)
-              )(store.multiDomainAcsStore)
-              _ <- store.aggregate()
-            } yield ()
-          }
-        } yield {
-          // 100.0 is the initial amount as of round 0, so at the end of round 2 the holding fee was applied three times
-          forEvery(
-            Table(
-              ("user", "round", "initial amulet amount", "holding fee rate"),
-              (user1, 0L, BigDecimal(0.0), BigDecimal(0.0)),
-              (user2, 0L, BigDecimal(0.0), BigDecimal(0.0)),
-              (user1, 1L, BigDecimal(10.0), holdingFee),
-              (user2, 1L, BigDecimal(0.0), BigDecimal(0.0)),
-              (user1, 2L, BigDecimal(10.0 + 60.0), 2 * holdingFee),
-              (user2, 2L, BigDecimal(40.0), 2 * holdingFee),
-              (user1, 3L, BigDecimal(10.0 + 60.0 - 40.0), holdingFee),
-              (user2, 3L, BigDecimal(40.0), 2 * holdingFee),
-              (user1, 4L, BigDecimal(10.0 + 60.0 - 40.0), holdingFee),
-              (user2, 4L, BigDecimal(40.0 - 30.0), holdingFee),
-              (user1, 5L, BigDecimal(10.0 + 60.0 - 40.0 + 10), 2 * holdingFee),
-              (user2, 5L, BigDecimal(40.0 - 30.0 + 10), 2 * holdingFee),
-            )
-          ) { (user, round, initialAmuletAmount, holdingFeeRate) =>
-            store
-              .getWalletBalance(user, round)
-              .futureValue shouldBe initialAmuletAmount - BigDecimal(round + 1) * holdingFeeRate
-          }
-
-          forAll(Seq(user1, user2)) { user =>
-            val failure = store.getWalletBalance(user, lastClosedRound + 1L).failed.futureValue
-            failure.getMessage should be(roundNotAggregated().getMessage)
-          }
-        }
-      }
-
-      "accumulate on amulet expiry, locked amulet expiry, and minting" in {
-        import MonadUtil.sequentialTraverse_
-        val mintAmount1 = 60.0
-        val mintAmount2 = 40.0
-        val expireAmount1 = -24.0
-        val expireAmount2 = -18.0
-        for {
-          store <- mkStore()
-          _ = amuletRules()
-          // the round where the mint happened and for the rounds before and after
-          _ <- sequentialTraverse_(Seq(user1 -> mintAmount1, user2 -> mintAmount2)) {
-            case (user, mintAmount) =>
-              dummyDomain.ingest(
-                mintTransaction(user, mintAmount, 2, holdingFee)
-              )(store.multiDomainAcsStore)
-          }
-          // "the round where the amulet expired and for the rounds before and after"
-          amuletContract = amulet(user1, mintAmount1, 2, holdingFee)
-          _ <- dummyDomain.exercise(
-            amuletContract,
-            interfaceId = Some(splice.amulet.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID),
-            AmuletExpire.choice.name,
-            mkAmuletExpire(),
-            mkAmuletExpireResult(
-              user1,
-              4,
-              expireAmount1,
-              holdingFee,
-            ),
-            nextOffset(),
-          )(store.multiDomainAcsStore)
-          // "the round where the locked amulet expired and for the rounds before and after
-          lockedAmuletContract = lockedAmulet(user2, mintAmount2, 2, holdingFee)
-          _ <- dummyDomain.exercise(
-            lockedAmuletContract,
-            interfaceId = Some(splice.amulet.LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID),
-            LockedAmuletExpireAmulet.choice.name,
-            mkLockedAmuletExpireAmulet(),
-            mkAmuletExpireResult(
-              user2,
-              6,
-              expireAmount2,
-              holdingFee,
-            ),
-            nextOffset(),
-          )(
-            store.multiDomainAcsStore
-          )
-          closedRounds = (0 to 7).map { round =>
-            closedMiningRound(dsoParty, round = round.toLong)
-          }
-          _ <- MonadUtil.sequentialTraverse(closedRounds) { closed =>
-            dummyDomain.create(closed)(store.multiDomainAcsStore)
-          }
-          _ <- store.aggregate()
-        } yield forEvery(
-          Table(
-            ("user", "round", "amulet amount"),
-            (user1, 1L, BigDecimal(0)),
-            (user2, 1L, BigDecimal(0)),
-            // check mints
-            (user1, 2L, mintAmount1 - 1 * holdingFee),
-            (user2, 2L, mintAmount2 - 1 * holdingFee),
-            (user1, 3L, mintAmount1 - 2 * holdingFee),
-            (user2, 3L, mintAmount2 - 2 * holdingFee),
-            // check expire user1
-            (user1, 4L, mintAmount1 - 3 * holdingFee + expireAmount1 - 5 * holdingFee),
-            (user2, 4L, mintAmount2 - 3 * holdingFee),
-            (user1, 5L, mintAmount1 - 4 * holdingFee + expireAmount1 - 6 * holdingFee),
-            (user2, 5L, mintAmount2 - 4 * holdingFee),
-            // check locked expire user2
-            (user1, 6L, mintAmount1 - 5 * holdingFee + expireAmount1 - 7 * holdingFee),
-            (user2, 6L, mintAmount2 - 5 * holdingFee + expireAmount2 - 7 * holdingFee),
-            (user1, 7L, mintAmount1 - 6 * holdingFee + expireAmount1 - 8 * holdingFee),
-            (user2, 7L, mintAmount2 - 6 * holdingFee + expireAmount2 - 8 * holdingFee),
-          )
-        ) { (user, round, amuletAmount) =>
-          store.getWalletBalance(user, round).futureValue shouldBe amuletAmount
-        }
-      }
-    }
-
     "getTotalRewardsCollectedEver" should {
 
       "return the sum of reward amounts (ValidatorReward & AppReward)" in {
@@ -1213,125 +823,9 @@ abstract class ScanStoreTest
       "listVoteRequestResults" should {
 
         "list all past VoteRequestResult" in {
-          for {
-            store <- mkStore()
-            voteRequestContract1 = voteRequest(
-              requester = userParty(1),
-              votes = (1 to 4)
-                .map(n =>
-                  new Vote(
-                    userParty(n).toProtoPrimitive,
-                    true,
-                    new Reason("", ""),
-                    Optional.empty(),
-                  )
-                ),
-            )
-            _ <- dummyDomain.create(voteRequestContract1)(store.multiDomainAcsStore)
-            result1 = mkVoteRequestResult(
-              voteRequestContract1
-            )
-            _ <- dummyDomain.exercise(
-              contract = dsoRules(dsoParty),
-              interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
-              choiceName = DsoRulesCloseVoteRequest.choice.name,
-              mkCloseVoteRequest(
-                voteRequestContract1.contractId
-              ),
-              result1.toValue,
-            )(
-              store.multiDomainAcsStore
-            )
-            voteRequestContract2 = voteRequest(
-              requester = userParty(2),
-              votes = (1 to 4)
-                .map(n =>
-                  new Vote(
-                    userParty(n).toProtoPrimitive,
-                    true,
-                    new Reason("", ""),
-                    Optional.empty(),
-                  )
-                ),
-            )
-            _ <- dummyDomain.create(voteRequestContract2)(store.multiDomainAcsStore)
-            result2 = mkVoteRequestResult(
-              voteRequestContract2,
-              effectiveAt = Instant.now().plusSeconds(1).truncatedTo(ChronoUnit.MICROS),
-            )
-            _ <- dummyDomain.exercise(
-              contract = dsoRules(dsoParty),
-              interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
-              choiceName = DsoRulesCloseVoteRequest.choice.name,
-              mkCloseVoteRequest(
-                voteRequestContract2.contractId
-              ),
-              result2.toValue,
-            )(
-              store.multiDomainAcsStore
-            )
-          } yield {
-            store
-              .listVoteRequestResults(
-                Some("AddSv"),
-                Some(true),
-                None,
-                None,
-                None,
-                PageLimit.tryCreate(1),
-              )
-              .futureValue
-              .toList
-              .loneElement shouldBe result2
-            store
-              .listVoteRequestResults(
-                Some("SRARC_AddSv"),
-                Some(false),
-                None,
-                None,
-                None,
-                PageLimit.tryCreate(1),
-              )
-              .futureValue
-              .toList
-              .size shouldBe (0)
-            store
-              .listVoteRequestResults(
-                None,
-                None,
-                None,
-                None,
-                None,
-                PageLimit.tryCreate(1),
-              )
-              .futureValue
-              .toList
-              .size shouldBe (1)
-            store
-              .listVoteRequestResults(
-                None,
-                None,
-                None,
-                Some(Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600).toString),
-                None,
-                PageLimit.tryCreate(1),
-              )
-              .futureValue
-              .toList
-              .size shouldBe (0)
-            store
-              .listVoteRequestResults(
-                None,
-                None,
-                None,
-                Some(Instant.now().truncatedTo(ChronoUnit.MICROS).minusSeconds(3600).toString),
-                None,
-                PageLimit.tryCreate(1),
-              )
-              .futureValue
-              .toList
-              .size shouldBe (1)
-          }
+          val store = mkStore().futureValue
+          val voteRequestContracts = mkVoteRequests()
+          assertListOfAllPastVoteRequestResults(voteRequestContracts, store)
         }
       }
 
@@ -1826,24 +1320,26 @@ abstract class ScanStoreTest
         val recordTimeThird = now.plusSeconds(9).toInstant
         for {
           store <- mkStore()
-          _ <- store.updateHistory.ingestionSink.initialize()
+          updateHistory <- mkUpdateHistory(domainMigrationId)
+          _ <- updateHistory.ingestionSink.initialize()
           first <- dummyDomain.create(
             firstDsoRules,
             recordTime = recordTimeFirst,
           )(
-            store.updateHistory
+            updateHistory
           )
           firstRecordTime = CantonTimestamp.fromInstant(first.getRecordTime).getOrElse(now)
           _ <- dummyDomain.create(
             secondDsoRules,
             recordTime = recordTimeSecond,
-          )(store.updateHistory)
+          )(updateHistory)
           _ <- dummyDomain.create(
             thirdDsoRules,
             recordTime = recordTimeThird,
-          )(store.updateHistory)
+          )(updateHistory)
           result <- store.lookupContractByRecordTime(
             DsoRules.COMPANION,
+            updateHistory,
             firstRecordTime.plusSeconds(1),
           )
         } yield {
@@ -1863,26 +1359,28 @@ abstract class ScanStoreTest
         val recordTimeThird = now.plusSeconds(9).toInstant
         for {
           store <- mkStore()
-          _ <- store.updateHistory.ingestionSink.initialize()
+          updateHistory <- mkUpdateHistory(domainMigrationId)
+          _ <- updateHistory.ingestionSink.initialize()
           first <- dummyDomain.create(
             firstAmuletRules,
             recordTime = recordTimeFirst,
           )(
-            store.updateHistory
+            updateHistory
           )
           firstRecordTime = CantonTimestamp.fromInstant(first.getRecordTime).getOrElse(now)
           _ <- dummyDomain.create(
             secondAmuletRules,
             recordTime = recordTimeSecond,
           )(
-            store.updateHistory
+            updateHistory
           )
           _ <- dummyDomain.create(
             thirdAmuletRules,
             recordTime = recordTimeThird,
-          )(store.updateHistory)
+          )(updateHistory)
           result <- store.lookupContractByRecordTime(
             AmuletRules.COMPANION,
+            updateHistory,
             firstRecordTime.plusSeconds(1),
           )
         } yield {
@@ -1893,10 +1391,145 @@ abstract class ScanStoreTest
       }
     }
   }
+  def mkVoteRequests(): Vector[Contract[VoteRequest.ContractId, VoteRequest]] = {
+    val voteRequestContract1 = voteRequest(
+      requester = userParty(1),
+      votes = (1 to 4)
+        .map(n =>
+          new Vote(
+            userParty(n).toProtoPrimitive,
+            true,
+            new Reason("", ""),
+            Optional.empty(),
+          )
+        ),
+    )
+    val voteRequestContract2 = voteRequest(
+      requester = userParty(2),
+      votes = (1 to 4)
+        .map(n =>
+          new Vote(
+            userParty(n).toProtoPrimitive,
+            true,
+            new Reason("", ""),
+            Optional.empty(),
+          )
+        ),
+    )
+    Vector(voteRequestContract1, voteRequestContract2)
+  }
+  def assertListOfAllPastVoteRequestResults(
+      voteRequestContracts: Vector[Contract[VoteRequest.ContractId, VoteRequest]],
+      store: ScanStore,
+  ) = {
+    val voteRequestContract1 = voteRequestContracts(0)
+    val voteRequestContract2 = voteRequestContracts(1)
+
+    for {
+      _ <- dummyDomain.create(voteRequestContract1)(store.multiDomainAcsStore)
+      result1 = mkVoteRequestResult(
+        voteRequestContract1
+      )
+      _ <- dummyDomain.exercise(
+        contract = dsoRules(dsoParty),
+        interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
+        choiceName = DsoRulesCloseVoteRequest.choice.name,
+        mkCloseVoteRequest(
+          voteRequestContract1.contractId
+        ),
+        result1.toValue,
+      )(
+        store.multiDomainAcsStore
+      )
+      _ <- dummyDomain.create(voteRequestContract2)(store.multiDomainAcsStore)
+      result2 = mkVoteRequestResult(
+        voteRequestContract2,
+        effectiveAt = Instant.now().plusSeconds(1).truncatedTo(ChronoUnit.MICROS),
+      )
+      _ <- dummyDomain.exercise(
+        contract = dsoRules(dsoParty),
+        interfaceId = Some(DsoRules.TEMPLATE_ID_WITH_PACKAGE_ID),
+        choiceName = DsoRulesCloseVoteRequest.choice.name,
+        mkCloseVoteRequest(
+          voteRequestContract2.contractId
+        ),
+        result2.toValue,
+      )(
+        store.multiDomainAcsStore
+      )
+    } yield {
+      store
+        .listVoteRequestResults(
+          Some("AddSv"),
+          Some(true),
+          None,
+          None,
+          None,
+          PageLimit.tryCreate(1),
+        )
+        .futureValue
+        .toList
+        .loneElement shouldBe result2
+      store
+        .listVoteRequestResults(
+          Some("SRARC_AddSv"),
+          Some(false),
+          None,
+          None,
+          None,
+          PageLimit.tryCreate(1),
+        )
+        .futureValue
+        .toList
+        .size shouldBe (0)
+      store
+        .listVoteRequestResults(
+          None,
+          None,
+          None,
+          None,
+          None,
+          PageLimit.tryCreate(1),
+        )
+        .futureValue
+        .toList
+        .size shouldBe (1)
+      store
+        .listVoteRequestResults(
+          None,
+          None,
+          None,
+          Some(Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600).toString),
+          None,
+          PageLimit.tryCreate(1),
+        )
+        .futureValue
+        .toList
+        .size shouldBe (0)
+      store
+        .listVoteRequestResults(
+          None,
+          None,
+          None,
+          Some(Instant.now().truncatedTo(ChronoUnit.MICROS).minusSeconds(3600).toString),
+          None,
+          PageLimit.tryCreate(1),
+        )
+        .futureValue
+        .toList
+        .size shouldBe (1)
+    }
+  }
 
   protected def mkStore(
-      dsoParty: PartyId = dsoParty
+      dsoParty: PartyId = dsoParty,
+      acsStoreDescriptorUserVersion: Option[Long] = None,
+      txLogStoreDescriptorUserVersion: Option[Long] = None,
   ): Future[ScanStore]
+
+  protected def mkUpdateHistory(
+      migrationId: Long
+  ): Future[UpdateHistory]
 
   private lazy val user1 = userParty(1)
   private lazy val user2 = userParty(2)
@@ -2005,6 +1638,7 @@ trait AmuletTransferUtil { self: StoreTest =>
     // We'll set this here once we add support for showing faucet coupon rewards separately
     // from the usage-based validator rewards.
     // TODO(#968): track faucet coupon inputs separately
+    java.util.Optional.empty(),
     java.util.Optional.empty(),
     java.util.Optional.empty(),
   )
@@ -2315,7 +1949,9 @@ class DbScanStoreTest
     with AcsTables {
 
   override protected def mkStore(
-      dsoParty: PartyId
+      dsoParty: PartyId,
+      acsStoreDescriptorUserVersion: Option[Long] = None,
+      txLogStoreDescriptorUserVersion: Option[Long] = None,
   ): Future[ScanStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
@@ -2347,19 +1983,54 @@ class DbScanStoreTest
         None,
       ),
       participantId = mkParticipantId("ScanStoreTest"),
-      enableImportUpdateBackfill = true,
+      IngestionConfig(),
       new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, timeouts),
       initialRound = 0,
+      acsStoreDescriptorUserVersion,
+      txLogStoreDescriptorUserVersion,
     )(parallelExecutionContext, implicitly, implicitly)
 
     for {
-      _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
-      _ <- store.multiDomainAcsStore.testIngestionSink
-        .ingestAcs(nextOffset(), Seq.empty, Seq.empty, Seq.empty)
+      initializeResult <- store.multiDomainAcsStore.testIngestionSink.initialize()
+      _ <- initializeResult match {
+        case ResumeAtOffset(_) | InitializeAtParticipantBegin => Future.unit
+        case InitializeAcsAtLatestOffset =>
+          store.multiDomainAcsStore.testIngestionSink.ingestAcs(
+            nextOffset(),
+            Seq.empty,
+            Seq.empty,
+            Seq.empty,
+          )
+        case InitializeAcsAtOffset(_) =>
+          store.multiDomainAcsStore.testIngestionSink.ingestAcs(
+            nextOffset(),
+            Seq.empty,
+            Seq.empty,
+            Seq.empty,
+          )
+      }
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(SynchronizerAlias.tryCreate(domain) -> dummyDomain)
       )
     } yield store
+  }
+
+  override def mkUpdateHistory(
+      migrationId: Long
+  ): Future[UpdateHistory] = {
+    val updateHistory = new UpdateHistory(
+      storage.underlying, // not under test
+      new DomainMigrationInfo(migrationId, None),
+      "update_history_scan_store_test",
+      mkParticipantId("whatever"),
+      dsoParty,
+      BackfillingRequirement.BackfillingNotRequired,
+      loggerFactory,
+      enableissue12777Workaround = true,
+      enableImportUpdateBackfill = true,
+      HistoryMetrics(NoOpMetricsFactory, migrationId),
+    )
+    updateHistory.ingestionSink.initialize().map(_ => updateHistory)
   }
 
   override protected def cleanDb(
@@ -2440,6 +2111,84 @@ class DbScanStoreTest
         result should contain(aliceValidatorLicense)
         result should contain(bobValidatorLicense)
         result should not contain charlesValidatorLicense
+      }
+    }
+  }
+  "Changing the acsStoreDescriptorUserVersion" should {
+    val alice = userParty(443)
+    val aliceValidatorLicense = validatorLicense(
+      alice,
+      dsoParty,
+      Some(new FaucetState(new Round(0), new Round(1000), 0L)),
+    )
+
+    "force re-ingestion of acs" in {
+      for {
+        // ingestion in these store tests is simulated by directly interacting with the ingestion sink (dummyDomain.create)
+        // create store, ingest an update with aliceValidatorLicense
+        store <- mkStore()
+        _ <- dummyDomain.create(aliceValidatorLicense)(store.multiDomainAcsStore)
+        result <- store.getValidatorLicenseByValidator(
+          Vector(alice)
+        )
+        // create store again but now with new storeDescriptor userVersion, ingest an update with aliceValidatorLicense again
+        storeReingest <- mkStore(dsoParty = dsoParty, acsStoreDescriptorUserVersion = Some(1L))
+        // Below 'dummyDomain.create' would fail on the same storeId for aliceValidatorLicense without a new user version.
+        // there is a unique constraint on (store_id, migration_id, contract_id) in the acs table (acs_store_template_sid_mid_cid) that would be violated.
+        // Successfully creating the license again here proves that the store has switched to a new store descriptor.
+        _ <- dummyDomain.create(aliceValidatorLicense)(storeReingest.multiDomainAcsStore)
+        resultAfter <- storeReingest.getValidatorLicenseByValidator(
+          Vector(alice)
+        )
+      } yield {
+        result should contain(aliceValidatorLicense)
+        resultAfter should contain(aliceValidatorLicense)
+      }
+    }
+  }
+
+  "Changing the txLogStoreDescriptorUserVersion" should {
+    "force re-ingestion of txLog" in {
+      val activeVoteRequest = voteRequest(
+        requester = userParty(4),
+        votes = (1 to 4)
+          .map(n =>
+            new Vote(
+              userParty(n).toProtoPrimitive,
+              true,
+              new Reason("", ""),
+              Optional.empty(),
+            )
+          ),
+      )
+      for {
+        store <- mkStore()
+        voteRequestContracts = mkVoteRequests() :+ activeVoteRequest
+        _ <- assertListOfAllPastVoteRequestResults(voteRequestContracts, store)
+        _ <- dummyDomain.create(activeVoteRequest)(store.multiDomainAcsStore)
+        // create the store with a new txLogStoreDescriptorUserVersion and
+        // check that it has acs entries but no txLog entries of the previous store
+        // this proves that the store descriptor has changed and a new storeId is used.
+        storeReingest <- mkStore(
+          dsoParty = dsoParty,
+          txLogStoreDescriptorUserVersion = Some(1L),
+        )
+      } yield {
+        // new store should not have txLog entry from previous store
+        // because ingestion in these store tests is simulated by directly interacting with the ingestion sink
+        storeReingest
+          .listVoteRequestResults(
+            Some("AddSv"),
+            Some(true),
+            None,
+            None,
+            None,
+            PageLimit.tryCreate(1),
+          )
+          .futureValue
+          .toList should have size 0
+        // should have the active acs entry
+        storeReingest.listVoteRequests().futureValue.toList should contain(activeVoteRequest)
       }
     }
   }

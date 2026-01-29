@@ -18,7 +18,11 @@ import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
 }
-import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.config.{
+  EnabledFeaturesConfig,
+  SpliceInstanceNamesConfig,
+  UpgradesConfig,
+}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
@@ -40,12 +44,11 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.*
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
-import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
 import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.{BftSequencerConfig, LocalSynchronizerNode}
-import org.lfdecentralizedtrust.splice.util.{QualifiedName, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import java.nio.file.Path
 import scala.concurrent.ExecutionContextExecutor
@@ -66,6 +69,7 @@ class SvDsoAutomationService(
     spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     packageVersionSupport: PackageVersionSupport,
+    enabledFeatures: EnabledFeaturesConfig,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -86,6 +90,8 @@ class SvDsoAutomationService(
   override def companion
       : org.lfdecentralizedtrust.splice.sv.automation.SvDsoAutomationService.type =
     SvDsoAutomationService
+
+  // notice the absence of UpdateHistory: the history for the dso party is duplicate with Scan
 
   private[splice] val restartDsoDelegateBasedAutomationTrigger =
     new RestartDsoDelegateBasedAutomationTrigger(
@@ -219,6 +225,7 @@ class SvDsoAutomationService(
             participantAdminConnection,
             synchronizerNode.sequencerAdminConnection,
             dumpPath: Path,
+            enabledFeatures,
           )
         )
       case _ => ()
@@ -230,7 +237,6 @@ class SvDsoAutomationService(
         participantAdminConnection,
         config.preparationTimeRecordTimeTolerance,
         config.mediatorDeduplicationTimeout,
-        config.topologyChangeDelayDuration,
       )
     )
 
@@ -299,7 +305,7 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         participantAdminConnection,
-        connection(SpliceLedgerConnectionPriority.Medium),
+        connection(SpliceLedgerConnectionPriority.High),
         config.extraBeneficiaries,
       )
     )
@@ -364,18 +370,22 @@ class SvDsoAutomationService(
         connection(SpliceLedgerConnectionPriority.Low),
       )
     )
-
-    config.scan.foreach { scan =>
-      registerTrigger(
-        new PublishScanConfigTrigger(
-          triggerContext,
-          dsoStore,
-          connection(SpliceLedgerConnectionPriority.Low),
-          scan,
-          upgradesConfig,
-        )
+    registerTrigger(
+      new AmuletPriceMetricsTrigger(
+        triggerContext,
+        dsoStore,
       )
-    }
+    )
+
+    registerTrigger(
+      new PublishScanConfigTrigger(
+        triggerContext,
+        dsoStore,
+        connection(SpliceLedgerConnectionPriority.Low),
+        config.scan,
+        upgradesConfig,
+      )
+    )
 
     config.followAmuletConversionRateFeed.foreach { c =>
       registerTrigger(
@@ -420,6 +430,7 @@ class SvDsoAutomationService(
           internalClientConfig.sequencerInternalConfig,
           config.participantClient.sequencerRequestAmplification,
           config.domainMigrationId,
+          newSequencerConnectionPool = enabledFeatures.newSequencerConnectionPool,
         )
       )
     }
@@ -436,6 +447,8 @@ class SvDsoAutomationService(
         new SequencerPruningTrigger(
           contextWithSpecificPolling,
           dsoStore,
+          config.scan,
+          upgradesConfig,
           sequencerContext.sequencerAdminConnection,
           sequencerContext.mediatorAdminConnection,
           clock,
@@ -460,23 +473,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       sequencerInternalConfig: ClientConfig,
       decentralizedSynchronizerAlias: SynchronizerAlias,
   )
-
-  private[automation] def bootstrapPackageIdResolver(
-      initialPackageConfig: Option[InitialPackageConfig]
-  )(template: QualifiedName): Option[String] =
-    template.moduleName match {
-      // DsoBootstrap is how we create AmuletRules in the first place so we cannot infer the package id for that from AmuletRules.
-      // We could infer it from initialPackageConfig
-      case "Splice.DsoBootstrap" =>
-        initialPackageConfig
-          .flatMap(config =>
-            DarResources.dsoGovernance.getPackageIdWithVersion(config.dsoGovernanceVersion)
-          )
-          .orElse(
-            Some(DarResources.dsoGovernance.bootstrap.packageId)
-          )
-      case _ => None
-    }
 
   // defined because some triggers are registered later by
   // registerPostOnboardingTriggers
@@ -513,5 +509,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvBftSequencerPeerOffboardingTrigger],
       aTrigger[SvBftSequencerPeerOnboardingTrigger],
       aTrigger[FollowAmuletConversionRateFeedTrigger],
+      aTrigger[AmuletPriceMetricsTrigger],
     )
 }

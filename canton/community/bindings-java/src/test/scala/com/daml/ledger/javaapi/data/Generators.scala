@@ -9,12 +9,12 @@ import com.daml.ledger.api.v2.{
   StateServiceOuterClass,
   TransactionFilterOuterClass,
 }
+import com.daml.ledger.javaapi.data.Event.fromProtoEvent
 import com.google.protobuf.{ByteString, Empty, Timestamp}
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.{Arbitrary, Gen}
 
 import java.time.{Duration, Instant, LocalDate}
-import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 import scala.util.chaining.scalaUtilChainingOps
 
@@ -238,20 +238,6 @@ object Generators {
       .build()
   }
 
-  @nowarn("cat=deprecation")
-  def treeEventGen: Gen[v2.TransactionOuterClass.TreeEvent] = {
-    import v2.TransactionOuterClass.TreeEvent
-    for {
-      event <- Gen.oneOf(
-        createdEventGen.map(e => (b: TreeEvent.Builder) => b.setCreated(e)),
-        exercisedEventGen.map(e => (b: TreeEvent.Builder) => b.setExercised(e)),
-      )
-    } yield v2.TransactionOuterClass.TreeEvent
-      .newBuilder()
-      .pipe(event)
-      .build()
-  }
-
   def topologyEventGen: Gen[v2.TopologyTransactionOuterClass.TopologyEvent] = {
     import v2.TopologyTransactionOuterClass.TopologyEvent
     for {
@@ -363,6 +349,8 @@ object Generators {
       witnessParties <- Gen.listOf(Arbitrary.arbString.arbitrary)
       signatories <- Gen.listOf(Gen.asciiPrintableStr)
       observers <- Gen.listOf(Gen.asciiPrintableStr)
+      isAcsDelta <- Arbitrary.arbBool.arbitrary
+      representativePackageId <- identifierGen.map(_.getPackageId)
     } yield v2.EventOuterClass.CreatedEvent
       .newBuilder()
       .setCreatedAt(createdAt)
@@ -377,6 +365,8 @@ object Generators {
       .addAllWitnessParties(witnessParties.asJava)
       .addAllSignatories(signatories.asJava)
       .addAllObservers(observers.asJava)
+      .setAcsDelta(isAcsDelta)
+      .setRepresentativePackageId(representativePackageId)
       .build()
 
   val createdEventGen: Gen[v2.EventOuterClass.CreatedEvent] =
@@ -423,6 +413,7 @@ object Generators {
       isConsuming <- Arbitrary.arbBool.arbitrary
       witnessParties <- Gen.listOf(Arbitrary.arbString.arbitrary)
       exerciseResult <- valueGen
+      isAcsDelta <- Arbitrary.arbBool.arbitrary
     } yield v2.EventOuterClass.ExercisedEvent
       .newBuilder()
       .setContractId(contractId)
@@ -436,6 +427,7 @@ object Generators {
       .setLastDescendantNodeId(lastDescendantNodeId)
       .addAllWitnessParties(witnessParties.asJava)
       .setExerciseResult(exerciseResult)
+      .setAcsDelta(isAcsDelta)
       .build()
 
   val participantPermissionGen: Gen[StateServiceOuterClass.ParticipantPermission] =
@@ -481,28 +473,6 @@ object Generators {
       .setPartyId(partyId)
       .setParticipantId(participantId)
       .build()
-
-  @nowarn("cat=deprecation")
-  def transactionFilterGen: Gen[v2.TransactionFilterOuterClass.TransactionFilter] =
-    for {
-      filtersByParty <- Gen.mapOf(partyWithFiltersGen)
-      filterForAnyPartyO <- Gen.option(filtersGen)
-    } yield {
-
-      filterForAnyPartyO match {
-        case None =>
-          v2.TransactionFilterOuterClass.TransactionFilter
-            .newBuilder()
-            .putAllFiltersByParty(filtersByParty.asJava)
-            .build()
-        case Some(filterForAnyParty) =>
-          v2.TransactionFilterOuterClass.TransactionFilter
-            .newBuilder()
-            .putAllFiltersByParty(filtersByParty.asJava)
-            .setFiltersForAnyParty(filterForAnyParty)
-            .build()
-      }
-    }
 
   def partyWithFiltersGen: Gen[(String, v2.TransactionFilterOuterClass.Filters)] =
     for {
@@ -570,16 +540,13 @@ object Generators {
         .build()
     }
 
-  @nowarn("cat=deprecation")
   def getActiveContractRequestGen: Gen[v2.StateServiceOuterClass.GetActiveContractsRequest] =
     for {
-      transactionFilter <- transactionFilterGen
-      verbose <- Arbitrary.arbBool.arbitrary
+      eventFormat <- eventFormatGen
       activeAtOffset <- Arbitrary.arbLong.arbitrary
     } yield v2.StateServiceOuterClass.GetActiveContractsRequest
       .newBuilder()
-      .setFilter(transactionFilter)
-      .setVerbose(verbose)
+      .setEventFormat(eventFormat)
       .setActiveAtOffset(activeAtOffset)
       .build()
 
@@ -597,7 +564,7 @@ object Generators {
 
   def unassignedEventGen: Gen[v2.ReassignmentOuterClass.UnassignedEvent] =
     for {
-      unassignId <- Arbitrary.arbString.arbitrary
+      reassignmentId <- Arbitrary.arbString.arbitrary
       contractId <- contractIdValueGen.map(_.getContractId)
       templateId <- identifierGen
       source <- Arbitrary.arbString.arbitrary
@@ -608,7 +575,7 @@ object Generators {
       witnessParties <- Gen.listOf(Arbitrary.arbString.arbitrary)
     } yield v2.ReassignmentOuterClass.UnassignedEvent
       .newBuilder()
-      .setUnassignId(unassignId)
+      .setReassignmentId(reassignmentId)
       .setContractId(contractId)
       .setTemplateId(templateId)
       .setSource(source)
@@ -623,7 +590,7 @@ object Generators {
     for {
       source <- Arbitrary.arbString.arbitrary
       target <- Arbitrary.arbString.arbitrary
-      unassignId <- Arbitrary.arbString.arbitrary
+      reassignmentId <- Arbitrary.arbString.arbitrary
       submitter <- Arbitrary.arbString.arbitrary
       reassignmentCounter <- Arbitrary.arbLong.arbitrary
       createdEvent <- createdEventGen
@@ -631,7 +598,7 @@ object Generators {
       .newBuilder()
       .setSource(source)
       .setTarget(target)
-      .setUnassignId(unassignId)
+      .setReassignmentId(reassignmentId)
       .setSubmitter(submitter)
       .setReassignmentCounter(reassignmentCounter)
       .setCreatedEvent(createdEvent)
@@ -903,32 +870,6 @@ object Generators {
       .build()
   }
 
-  def transactionGen: Gen[v2.TransactionOuterClass.Transaction] = {
-    import v2.TransactionOuterClass.Transaction
-    for {
-      updateId <- Arbitrary.arbString.arbitrary
-      commandId <- Arbitrary.arbString.arbitrary
-      workflowId <- Arbitrary.arbString.arbitrary
-      effectiveAt <- instantGen
-      events <- Gen.listOf(eventGen)
-      offset <- Arbitrary.arbLong.arbitrary
-      synchronizerId <- Arbitrary.arbString.arbitrary
-      traceContext <- Gen.const(Utils.newProtoTraceContext("parent", "state"))
-      recordTime <- instantGen
-    } yield Transaction
-      .newBuilder()
-      .setUpdateId(updateId)
-      .setCommandId(commandId)
-      .setWorkflowId(workflowId)
-      .setEffectiveAt(Utils.instantToProto(effectiveAt))
-      .addAllEvents(events.asJava)
-      .setOffset(offset)
-      .setSynchronizerId(synchronizerId)
-      .setTraceContext(traceContext)
-      .setRecordTime(Utils.instantToProto(recordTime))
-      .build()
-  }
-
   final case class Node(children: Seq[Node])
 
   def genNodeTree(maxDepth: Int, maxChildren: Int): Gen[Node] = {
@@ -964,57 +905,7 @@ object Generators {
     getDescendants(node, 0)._1
   }
 
-  @nowarn("cat=deprecation")
-  def transactionTreeGenWithIdsInPreOrder: Gen[v2.TransactionOuterClass.TransactionTree] = {
-    import v2.TransactionOuterClass.{TransactionTree, TreeEvent}
-    def treeEventGen(nodeId: Int, lastDescendantNodeId: Int): Gen[(Integer, TreeEvent)] =
-      for {
-        event <-
-          if (lastDescendantNodeId == nodeId) // the node is a leaf node
-            Gen.oneOf(
-              createdEventGen(nodeId).map(e => (b: TreeEvent.Builder) => b.setCreated(e)),
-              exercisedEventGen(nodeId, lastDescendantNodeId).map(e =>
-                (b: TreeEvent.Builder) => b.setExercised(e)
-              ),
-            )
-          else
-            exercisedEventGen(nodeId, lastDescendantNodeId).map(e =>
-              (b: TreeEvent.Builder) => b.setExercised(e)
-            )
-      } yield Int.box(nodeId) -> v2.TransactionOuterClass.TreeEvent
-        .newBuilder()
-        .pipe(event)
-        .build()
-    for {
-      updateId <- Arbitrary.arbString.arbitrary
-      commandId <- Arbitrary.arbString.arbitrary
-      workflowId <- Arbitrary.arbString.arbitrary
-      effectiveAt <- instantGen
-      nodeIds <- genNodeTree(maxDepth = 5, maxChildren = 5).map(assignIdsInPreOrder)
-      multipleRoots <- Gen.oneOf(Gen.const(false), Gen.const(nodeIds.sizeIs > 1))
-      nodeIdsFiltered = if (multipleRoots) nodeIds.filterNot(_.id == 0) else nodeIds
-      eventsById <- Gen.sequence(nodeIdsFiltered.map { case NodeIds(start, end) =>
-        treeEventGen(start, end)
-      })
-      offset <- Arbitrary.arbLong.arbitrary
-      synchronizerId <- Arbitrary.arbString.arbitrary
-      traceContext <- Gen.const(Utils.newProtoTraceContext("parent", "state"))
-      recordTime <- instantGen
-    } yield TransactionTree
-      .newBuilder()
-      .setUpdateId(updateId)
-      .setCommandId(commandId)
-      .setWorkflowId(workflowId)
-      .setEffectiveAt(Utils.instantToProto(effectiveAt))
-      .putAllEventsById(eventsById.asScala.toMap.asJava)
-      .setOffset(offset)
-      .setSynchronizerId(synchronizerId)
-      .setTraceContext(traceContext)
-      .setRecordTime(Utils.instantToProto(recordTime))
-      .build()
-  }
-
-  def transactionGenWithIdsInPreOrder: Gen[v2.TransactionOuterClass.Transaction] = {
+  def transactionGen: Gen[v2.TransactionOuterClass.Transaction] = {
     import v2.TransactionOuterClass.Transaction
     import v2.EventOuterClass.Event
     def eventGen(nodeId: Int, lastDescendantNodeId: Int): Gen[Event] =
@@ -1064,41 +955,16 @@ object Generators {
       .build()
   }
 
-  @nowarn("cat=deprecation")
-  def transactionTreeGen: Gen[v2.TransactionOuterClass.TransactionTree] = {
-    import v2.TransactionOuterClass.{TransactionTree, TreeEvent}
-    def idTreeEventPairGen =
-      treeEventGen.map { e =>
-        val id: Integer = e.getKindCase match {
-          case TreeEvent.KindCase.CREATED => e.getCreated.getNodeId
-          case TreeEvent.KindCase.EXERCISED => e.getExercised.getNodeId
-          case TreeEvent.KindCase.KIND_NOT_SET => sys.error("unrecognized TreeEvent")
-        }
-        id -> e
-      }
+  def transactionGenFilteredEvents: Gen[v2.TransactionOuterClass.Transaction] =
     for {
-      updateId <- Arbitrary.arbString.arbitrary
-      commandId <- Arbitrary.arbString.arbitrary
-      workflowId <- Arbitrary.arbString.arbitrary
-      effectiveAt <- instantGen
-      eventsById <- Gen.mapOfN(10, idTreeEventPairGen)
-      offset <- Arbitrary.arbLong.arbitrary
-      synchronizerId <- Arbitrary.arbString.arbitrary
-      traceContext <- Gen.const(Utils.newProtoTraceContext("parent", "state"))
-      recordTime <- instantGen
-    } yield TransactionTree
-      .newBuilder()
-      .setUpdateId(updateId)
-      .setCommandId(commandId)
-      .setWorkflowId(workflowId)
-      .setEffectiveAt(Utils.instantToProto(effectiveAt))
-      .putAllEventsById(eventsById.asJava)
-      .setOffset(offset)
-      .setSynchronizerId(synchronizerId)
-      .setTraceContext(traceContext)
-      .setRecordTime(Utils.instantToProto(recordTime))
-      .build()
-  }
+      transaction <- transactionGen
+      events = transaction.getEventsList
+      // keep only a random number of events to simulate filtering of transactions
+      eventsSize <- Gen.chooseNum(1, events.size)
+      eventsFiltered <- Gen
+        .pick(eventsSize, events.asScala)
+        .map(_.sortBy(e => fromProtoEvent(e).getNodeId))
+    } yield transaction.toBuilder.clearEvents().addAllEvents(eventsFiltered.asJava).build()
 
   def topologyTransactionGen: Gen[v2.TopologyTransactionOuterClass.TopologyTransaction] = {
     import v2.TopologyTransactionOuterClass.TopologyTransaction
@@ -1155,22 +1021,6 @@ object Generators {
       .build()
   }
 
-  @nowarn("cat=deprecation")
-  def getTransactionByOffsetRequestGen
-      : Gen[v2.UpdateServiceOuterClass.GetTransactionByOffsetRequest] = {
-    import v2.UpdateServiceOuterClass.GetTransactionByOffsetRequest as Request
-    for {
-      offset <- Arbitrary.arbLong.arbitrary
-      requestingParties <- Gen
-        .listOf(Arbitrary.arbString.arbitrary.suchThat(_.nonEmpty))
-        .suchThat(_.nonEmpty)
-    } yield Request
-      .newBuilder()
-      .setOffset(offset)
-      .addAllRequestingParties(requestingParties.asJava)
-      .build()
-  }
-
   def getUpdateByOffsetRequestGen: Gen[v2.UpdateServiceOuterClass.GetUpdateByOffsetRequest] = {
     import v2.UpdateServiceOuterClass.GetUpdateByOffsetRequest as Request
     for {
@@ -1195,53 +1045,17 @@ object Generators {
       .build()
   }
 
-  @nowarn("cat=deprecation")
-  def getTransactionByIdRequestGen: Gen[v2.UpdateServiceOuterClass.GetTransactionByIdRequest] = {
-    import v2.UpdateServiceOuterClass.GetTransactionByIdRequest as Request
-    for {
-      updateId <- Arbitrary.arbString.arbitrary.suchThat(_.nonEmpty)
-      requestingParties <- Gen
-        .listOf(Arbitrary.arbString.arbitrary.suchThat(_.nonEmpty))
-        .suchThat(_.nonEmpty)
-    } yield Request
-      .newBuilder()
-      .setUpdateId(updateId)
-      .addAllRequestingParties(requestingParties.asJava)
-      .build()
-  }
-
-  @nowarn("cat=deprecation")
-  def getTransactionResponseGen: Gen[v2.UpdateServiceOuterClass.GetTransactionResponse] =
-    transactionGen.map(
-      v2.UpdateServiceOuterClass.GetTransactionResponse
-        .newBuilder()
-        .setTransaction(_)
-        .build()
-    )
-
-  @nowarn("cat=deprecation")
-  def getTransactionTreeResponseGen: Gen[v2.UpdateServiceOuterClass.GetTransactionTreeResponse] =
-    transactionTreeGen.map(
-      v2.UpdateServiceOuterClass.GetTransactionTreeResponse
-        .newBuilder()
-        .setTransaction(_)
-        .build()
-    )
-
-  @nowarn("cat=deprecation")
   def getUpdatesRequestGen: Gen[v2.UpdateServiceOuterClass.GetUpdatesRequest] = {
     import v2.UpdateServiceOuterClass.GetUpdatesRequest as Request
     for {
       beginExclusive <- Arbitrary.arbLong.arbitrary
       endInclusiveO <- Gen.option(Arbitrary.arbLong.arbitrary)
-      filter <- transactionFilterGen
-      verbose <- Arbitrary.arbBool.arbitrary
+      updateFormat <- updateFormatGen
     } yield {
       val partialBuilder = Request
         .newBuilder()
         .setBeginExclusive(beginExclusive)
-        .setFilter(filter)
-        .setVerbose(verbose)
+        .setUpdateFormat(updateFormat)
 
       val builder =
         endInclusiveO.fold(partialBuilder)(partialBuilder.setEndInclusive)
@@ -1293,27 +1107,6 @@ object Generators {
         ),
         topologyTransactionGen.map(topologyTransaction =>
           (b: Response.Builder) => b.setTopologyTransaction(topologyTransaction)
-        ),
-      )
-    } yield Response
-      .newBuilder()
-      .pipe(update)
-      .build()
-  }
-
-  @nowarn("cat=deprecation")
-  def getUpdateTreesResponseGen: Gen[v2.UpdateServiceOuterClass.GetUpdateTreesResponse] = {
-    import v2.UpdateServiceOuterClass.GetUpdateTreesResponse as Response
-    for {
-      update <- Gen.oneOf(
-        transactionTreeGen.map(transactionTree =>
-          (b: Response.Builder) => b.setTransactionTree(transactionTree)
-        ),
-        reassignmentGen.map(reassingment =>
-          (b: Response.Builder) => b.setReassignment(reassingment)
-        ),
-        offsetCheckpointGen.map(checkpoint =>
-          (b: Response.Builder) => b.setOffsetCheckpoint(checkpoint)
         ),
       )
     } yield Response
@@ -1455,7 +1248,7 @@ object Generators {
   val assignCommandGen: Gen[v2.ReassignmentCommandOuterClass.ReassignmentCommand] = {
     import v2.ReassignmentCommandOuterClass.{AssignCommand, ReassignmentCommand}
     for {
-      unassignId <- Arbitrary.arbString.arbitrary
+      reassignmentId <- Arbitrary.arbString.arbitrary
       source <- Arbitrary.arbString.arbitrary
       target <- Arbitrary.arbString.arbitrary
     } yield ReassignmentCommand
@@ -1463,7 +1256,7 @@ object Generators {
       .setAssignCommand(
         AssignCommand
           .newBuilder()
-          .setUnassignId(unassignId)
+          .setReassignmentId(reassignmentId)
           .setSource(source)
           .setTarget(target)
       )
@@ -1522,17 +1315,6 @@ object Generators {
     } yield Response
       .newBuilder()
       .setReassignment(reassignment)
-      .build()
-  }
-  @nowarn("cat=deprecation")
-  def submitAndWaitForTransactionTreeResponseGen
-      : Gen[v2.CommandServiceOuterClass.SubmitAndWaitForTransactionTreeResponse] = {
-    import v2.CommandServiceOuterClass.SubmitAndWaitForTransactionTreeResponse as Response
-    for {
-      transaction <- transactionTreeGen
-    } yield Response
-      .newBuilder()
-      .setTransaction(transaction)
       .build()
   }
 

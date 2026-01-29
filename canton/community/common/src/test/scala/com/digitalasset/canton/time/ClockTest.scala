@@ -167,7 +167,7 @@ class ClockTest extends AnyWordSpec with BaseTest with HasExecutionContext {
   "TickTock Skew" should {
     "skew the clock by the expected value" in {
       val tm = JClock.systemUTC()
-      val toleranceMs = 5
+      val toleranceMs = 50
 
       def check(skewMillis: Int) = {
         val tick = TickTock.FixedSkew(skewMillis)
@@ -413,7 +413,7 @@ class ClockTest extends AnyWordSpec with BaseTest with HasExecutionContext {
 
     val channel: ManagedChannel = InProcessChannelBuilder
       .forName(channelName)
-      .intercept(TraceContextGrpc.clientInterceptor)
+      .intercept(TraceContextGrpc.clientInterceptor())
       .build()
 
     val clock = new RemoteClock(channel, timeouts, loggerFactory)

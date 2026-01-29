@@ -8,7 +8,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -16,6 +16,7 @@ import io.grpc.Status
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommand
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
@@ -38,6 +39,7 @@ import org.lfdecentralizedtrust.splice.store.{
   PageLimit,
   SortOrder,
   TxLogAppStore,
+  UpdateHistory,
   VotesStore,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, TemplateJsonDecoder}
@@ -154,14 +156,8 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[ContractWithState[splice.ans.AnsRules.ContractId, splice.ans.AnsRules]]]
 
-  def getTotalAmuletBalance(asOfEndOfRound: Long)(implicit tc: TraceContext): Future[BigDecimal]
-
   def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal]
   def getRewardsCollectedInRound(round: Long)(implicit tc: TraceContext): Future[BigDecimal]
-
-  def getWalletBalance(partyId: PartyId, asOfEndOfRound: Long)(implicit
-      tc: TraceContext
-  ): Future[BigDecimal]
 
   def getAmuletConfigForRound(round: Long)(implicit
       tc: TraceContext
@@ -279,8 +275,9 @@ trait ScanStore
       tc: TraceContext
   ): Future[Map[TransferCommand.ContractId, TransferCommandTxLogEntry]]
 
-  def lookupContractByRecordTime[C, TCId <: ContractId[_], T](
+  def lookupContractByRecordTime[C, TCId <: ContractId[?], T](
       companion: C,
+      updateHistory: UpdateHistory,
       recordTime: CantonTimestamp = CantonTimestamp.MinValue,
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
@@ -301,7 +298,7 @@ object ScanStore {
 
   def apply(
       key: ScanStore.Key,
-      storage: Storage,
+      storage: DbStorage,
       isFirstSv: Boolean,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
@@ -309,37 +306,37 @@ object ScanStore {
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       cacheConfigs: ScanCacheConfig,
-      enableImportUpdateBackfill: Boolean,
       metrics: DbScanStoreMetrics,
+      ingestionConfig: IngestionConfig,
       initialRound: Long,
+      acsStoreDescriptorUserVersion: Option[Long] = None,
+      txLogStoreDescriptorUserVersion: Option[Long] = None,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       close: CloseContext,
   ): ScanStore = {
-    storage match {
-      case db: DbStorage =>
-        new CachingScanStore(
-          loggerFactory,
-          retryProvider,
-          new DbScanStore(
-            key = key,
-            db,
-            isFirstSv,
-            loggerFactory,
-            retryProvider,
-            createScanAggregatesReader,
-            domainMigrationInfo,
-            participantId,
-            enableImportUpdateBackfill,
-            metrics,
-            initialRound,
-          ),
-          cacheConfigs,
-          metrics,
-        )
-      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
-    }
+    new CachingScanStore(
+      loggerFactory,
+      retryProvider,
+      new DbScanStore(
+        key = key,
+        storage,
+        isFirstSv,
+        loggerFactory,
+        retryProvider,
+        createScanAggregatesReader,
+        domainMigrationInfo,
+        participantId,
+        ingestionConfig,
+        metrics,
+        initialRound,
+        acsStoreDescriptorUserVersion,
+        txLogStoreDescriptorUserVersion,
+      ),
+      cacheConfigs,
+      metrics,
+    )
   }
 
   def contractFilter(
@@ -417,6 +414,11 @@ object ScanStore {
               amount = Some(contract.payload.amulet.amount.initialAmount),
             )
         },
+        mkFilter(splice.amulet.UnclaimedDevelopmentFundCoupon.COMPANION)(co =>
+          co.payload.dso == dso
+        )(
+          ScanAcsStoreRowData(_)
+        ),
         mkFilter(splice.ans.AnsEntry.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,

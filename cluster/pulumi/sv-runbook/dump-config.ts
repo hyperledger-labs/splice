@@ -20,9 +20,10 @@ async function main() {
   const authOClient = {
     getSecrets: () => Promise.resolve(secrets),
     /* eslint-disable @typescript-eslint/no-unused-vars */
-    getClientAccessToken: (clientId: string, clientSecret: string, audience?: string) =>
+    getClientAccessToken: (clientId: string, clientSecret: string, audience: string) =>
       Promise.resolve('access_token'),
     getCfg: () => svRunbookAuth0Config,
+    reuseNamespaceConfig: (fromNamespace: string, toNamespace: string) => {},
   };
   const buildSvAppConfig = (await import('./src/config')).buildSvAppConfig;
   const svAppConfig = buildSvAppConfig(false);

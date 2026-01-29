@@ -7,7 +7,8 @@ import cats.data.{EitherT, OptionT}
 import cats.syntax.parallel.*
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.common.sequencer.RegisterTopologyTransactionHandle
-import com.digitalasset.canton.crypto.Crypto
+import com.digitalasset.canton.config.TopologyConfig
+import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
@@ -30,13 +31,15 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
 trait SynchronizerOutboxDispatchHelper extends NamedLogging {
-  protected def synchronizerId: SynchronizerId
+  protected def psid: PhysicalSynchronizerId
 
   protected def memberId: Member
 
-  protected def protocolVersion: ProtocolVersion
+  final protected def protocolVersion: ProtocolVersion = psid.protocolVersion
 
-  protected def crypto: Crypto
+  protected def crypto: SynchronizerCrypto
+
+  protected def topologyConfig: TopologyConfig
 
   protected def convertTransactions(transactions: Seq[GenericSignedTopologyTransaction])(implicit
       ec: ExecutionContext,
@@ -59,7 +62,7 @@ trait SynchronizerOutboxDispatchHelper extends NamedLogging {
       transactions: Seq[GenericSignedTopologyTransaction]
   ): FutureUnlessShutdown[Seq[GenericSignedTopologyTransaction]] =
     FutureUnlessShutdown.pure(
-      transactions.filter(x => x.mapping.restrictedToSynchronizer.forall(_ == synchronizerId))
+      transactions.filter(x => x.mapping.restrictedToSynchronizer.forall(_ == psid.logical))
     )
 
   protected def isFailedState(response: TopologyTransactionsBroadcast.State): Boolean =
@@ -169,7 +172,7 @@ trait SynchronizerOutboxDispatch extends NamedLogging with FlagCloseable {
         .Backoff(
           logger,
           this,
-          timeouts.unbounded.retries(1.second),
+          topologyConfig.topologyTransactionObservationTimeout.retries(1.second),
           1.second,
           10.seconds,
           "push topology transaction",
@@ -177,7 +180,8 @@ trait SynchronizerOutboxDispatch extends NamedLogging with FlagCloseable {
         .unlessShutdown(
           {
             logger.debug(
-              s"Attempting to push ${transactions.size} topology transactions to $synchronizerAlias: $transactions"
+              s"Attempting to push ${transactions.size} topology transactions to $synchronizerAlias: ${transactions
+                  .map(_.hash)}"
             )
             FutureUnlessShutdownUtil.logOnFailureUnlessShutdown(
               handle.submit(transactions),

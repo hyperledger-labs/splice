@@ -38,6 +38,9 @@ object Dependencies {
   lazy val pekko_http_cors =
     "org.apache.pekko" %% "pekko-http-cors" % CantonDependencies.pekko_http_version
 
+  lazy val pekko_connectors_google_cloud_storage =
+    "org.apache.pekko" %% "pekko-connectors-google-cloud-storage" % "1.0.2"
+
   lazy val spray_json =
     "io.spray" %% "spray-json" % "1.3.6"
 
@@ -57,4 +60,9 @@ object Dependencies {
 
   lazy val parallel_collections = "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4"
 
+  lazy val zstd = "com.github.luben" % "zstd-jni" % "1.5.7-6"
+
+  lazy val aws_s3 = "software.amazon.awssdk" % "s3" % CantonDependencies.aws_version
+
+  lazy val s3mock_testcontainers = "com.adobe.testing" % "s3mock-testcontainers" % "4.11.0" % "test"
 }

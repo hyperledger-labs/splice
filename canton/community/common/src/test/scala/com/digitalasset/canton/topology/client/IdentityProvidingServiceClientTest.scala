@@ -4,7 +4,6 @@
 package com.digitalasset.canton.topology.client
 
 import cats.syntax.either.*
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.topology.*
@@ -73,11 +72,6 @@ class PartyTopologySnapshotClientTest extends AsyncWordSpec with BaseTest with F
           }.toMap
         )
 
-      override def consortiumThresholds(
-          parties: Set[LfPartyId]
-      )(implicit traceContext: TraceContext): FutureUnlessShutdown[Map[LfPartyId, PositiveInt]] =
-        ???
-
       override def canNotSubmit(
           participant: ParticipantId,
           parties: Seq[LfPartyId],
@@ -95,9 +89,9 @@ class PartyTopologySnapshotClientTest extends AsyncWordSpec with BaseTest with F
       } yield {
         right1 shouldBe Either.unit
         right2 shouldBe Either.unit
-        left1.left.value shouldBe a[Set[_]]
-        left2.left.value shouldBe a[Set[_]]
-        left3.left.value shouldBe a[Set[_]]
+        left1.left.value shouldBe a[Set[?]]
+        left2.left.value shouldBe a[Set[?]]
+        left3.left.value shouldBe a[Set[?]]
       }
     }
 
@@ -105,12 +99,12 @@ class PartyTopologySnapshotClientTest extends AsyncWordSpec with BaseTest with F
       for {
         yes1 <- client.allHostedOn(Set(party1.toLf), participant1)
         yes2 <- client.allHostedOn(Set(party1.toLf), participant2)
-        no1 <- client.allHostedOn(Set(party1.toLf), participant2, _.permission.canConfirm)
+        no1 <- client.allHostedOn(Set(party1.toLf), participant2, _.canConfirm)
         no2 <- client.allHostedOn(Set(party1.toLf, party3.toLf), participant1)
         no3 <- client.allHostedOn(
           Set(party1.toLf, party2.toLf),
           participant2,
-          _.permission.canConfirm,
+          _.canConfirm,
         )
         yes3 <- client.allHostedOn(
           Set(party1.toLf, party2.toLf),

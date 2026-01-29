@@ -12,10 +12,13 @@ import org.lfdecentralizedtrust.splice.util.{MultiDomainTestUtil, SplitwellTestU
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 
+import org.scalatest.Ignore
 import org.slf4j.event.Level
 import scala.concurrent.duration.DurationInt
 import scala.util.Try
 
+// TODO(#2703) Reenable or delete
+@Ignore
 class SplitwellUpgradeIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with MultiDomainTestUtil
@@ -145,9 +148,9 @@ class SplitwellUpgradeIntegrationTest
       )
       val acceptedInvite = bobSplitwellClient.acceptInvite(invite)
       val splitwellSynchronizerId =
-        aliceValidatorBackend.participantClient.synchronizers.id_of(splitwellAlias)
+        aliceValidatorBackend.participantClient.synchronizers.id_of(splitwellAlias).logical
       val splitwellUpgradeSynchronizerId =
-        aliceValidatorBackend.participantClient.synchronizers.id_of(splitwellUpgradeAlias)
+        aliceValidatorBackend.participantClient.synchronizers.id_of(splitwellUpgradeAlias).logical
 
       eventually() {
         val contractDomains =

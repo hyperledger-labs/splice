@@ -3,6 +3,7 @@
 import { Optional } from '@daml/types';
 import { AmuletConfig, PackageConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
 import { Tuple2 } from '@daml.js/daml-prim-DA-Types-1.0.0/lib/DA/Types';
+import { Set as DamlSet } from '@daml.js/daml-stdlib-DA-Set-Types-1.0.0/lib/DA/Set/Types';
 import { RelTime } from '@daml.js/daml-stdlib-DA-Time-Types-1.0.0/lib/DA/Time/Types';
 import { IssuanceConfig } from '@daml.js/splice-amulet/lib/Splice/Issuance';
 import { Schedule } from '@daml.js/splice-amulet/lib/Splice/Schedule';
@@ -32,6 +33,12 @@ export function buildAmuletConfigChanges(
       label: 'Featured App Activity Marker Amount',
       currentValue: before?.featuredAppActivityMarkerAmount || '',
       newValue: after?.featuredAppActivityMarkerAmount || '',
+    },
+    {
+      fieldName: 'optDevelopmentFundManager',
+      label: 'Development Fund Manager',
+      currentValue: before?.optDevelopmentFundManager || '',
+      newValue: after?.optDevelopmentFundManager || '',
     },
     {
       fieldName: 'transferConfigCreateFee',
@@ -152,8 +159,12 @@ function buildTransferFeeStepsChanges(
 ) {
   return (
     before
-      ?.map((b, idx) => {
+      ?.map((b, i) => {
+        const idx = i + 1;
         const a = after?.[idx];
+
+        if (b._2 === '0.0') return [];
+
         return [
           {
             fieldName: `transferFeeSteps${idx}_1`,
@@ -222,6 +233,12 @@ function buildIssuanceCurveChanges(
       currentValue: before?.initialValue?.optValidatorFaucetCap || '',
       newValue: after?.initialValue?.optValidatorFaucetCap || '',
     },
+    {
+      fieldName: 'issuanceCurveInitialValueOptDevelopmentFundPercentage',
+      label: 'Issuance Curve Initial Value (Development Fund Percentage)',
+      currentValue: before?.initialValue?.optDevelopmentFundPercentage || '',
+      newValue: after?.initialValue?.optDevelopmentFundPercentage || '',
+    },
   ] as ConfigChange[];
 
   const futureValues =
@@ -276,6 +293,12 @@ function buildIssuanceCurveChanges(
             currentValue: fv._2.optValidatorFaucetCap || '',
             newValue: after?.futureValues[idx]._2.optValidatorFaucetCap || '',
           },
+          {
+            fieldName: `issuanceCurveFutureValues${idx}OptDevelopmentFundPercentage`,
+            label: `Issuance Curve Future Value (Development Fund Percentage) (${idx})`,
+            currentValue: fv._2.optDevelopmentFundPercentage || '',
+            newValue: after?.futureValues[idx]._2.optDevelopmentFundPercentage || '',
+          },
         ] as ConfigChange[];
       })
       .flat() || [];
@@ -288,6 +311,28 @@ function buildDecentralizedSynchronizerChanges(
   after: AmuletDecentralizedSynchronizerConfig | undefined
 ) {
   if (!before && !after) return [];
+
+  const getRequiredSynchronizers = (synchronizers: DamlSet<string> | undefined) => {
+    if (!synchronizers) return [];
+
+    return synchronizers.map
+      .entriesArray()
+      .map(r => r[0])
+      .sort();
+  };
+
+  const beforeRequiredSynchronizers = getRequiredSynchronizers(before?.requiredSynchronizers);
+  const afterRequiredSynchronizers = getRequiredSynchronizers(after?.requiredSynchronizers);
+
+  const allSynchronizers = [
+    ...new Set([...beforeRequiredSynchronizers, ...afterRequiredSynchronizers]),
+  ].sort();
+  const requiredSynchronizersChanges = allSynchronizers.map((sync, idx) => ({
+    fieldName: `decentralizedSynchronizerRequiredSynchronizers${idx + 1}`,
+    label: `Decentralized Synchronizer (Required Synchronizer ${idx + 1})`,
+    currentValue: beforeRequiredSynchronizers.includes(sync) ? sync : '',
+    newValue: afterRequiredSynchronizers.includes(sync) ? sync : '',
+  }));
 
   return [
     {
@@ -327,5 +372,6 @@ function buildDecentralizedSynchronizerChanges(
       currentValue: before?.fees.minTopupAmount || '',
       newValue: after?.fees.minTopupAmount || '',
     },
+    ...requiredSynchronizersChanges,
   ] as ConfigChange[];
 }

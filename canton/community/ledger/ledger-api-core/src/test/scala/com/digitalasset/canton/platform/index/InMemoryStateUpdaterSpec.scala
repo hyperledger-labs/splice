@@ -7,6 +7,8 @@ import cats.data.NonEmptyVector
 import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
 import com.daml.ledger.api.v2.completion.Completion
+import com.digitalasset.canton.crypto.HashAlgorithm.Sha256
+import com.digitalasset.canton.crypto.{Hash, HashPurpose}
 import com.digitalasset.canton.data.{CantonTimestamp, LedgerTimeBoundaries, Offset}
 import com.digitalasset.canton.ledger.participant.state.Update.CommandRejected.FinalReason
 import com.digitalasset.canton.ledger.participant.state.Update.TopologyTransactionEffective.AuthorizationEvent.Added
@@ -19,6 +21,7 @@ import com.digitalasset.canton.ledger.participant.state.{
   CompletionInfo,
   Reassignment,
   ReassignmentInfo,
+  TestAcsChangeFactory,
   TransactionMeta,
   Update,
 }
@@ -39,22 +42,35 @@ import com.digitalasset.canton.platform.store.cache.{
 }
 import com.digitalasset.canton.platform.store.dao.events.ContractStateEvent
 import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate
-import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate.CreatedEvent
+import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate.{
+  CreatedEvent,
+  TransactionAccepted,
+}
 import com.digitalasset.canton.platform.store.interning.StringInterningView
 import com.digitalasset.canton.platform.{DispatcherState, InMemoryState}
+import com.digitalasset.canton.protocol.{ReassignmentId, TestUpdateId, UpdateId}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag
-import com.digitalasset.canton.{BaseTest, HasExecutorServiceGeneric, TestEssentials, data}
+import com.digitalasset.canton.{BaseTest, HasExecutorServiceGeneric, TestEssentials}
 import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.data.Ref.Identifier
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
-import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.test.TestNodeBuilder.CreateTransactionVersion
-import com.digitalasset.daml.lf.transaction.test.{TestNodeBuilder, TransactionBuilder}
-import com.digitalasset.daml.lf.transaction.{CommittedTransaction, Node, NodeId}
+import com.digitalasset.daml.lf.transaction.test.TestNodeBuilder.CreateSerializationVersion
+import com.digitalasset.daml.lf.transaction.test.{
+  NodeIdTransactionBuilder,
+  TestNodeBuilder,
+  TransactionBuilder,
+}
+import com.digitalasset.daml.lf.transaction.{
+  CommittedTransaction,
+  Node,
+  NodeId,
+  SerializationVersion as LfSerializationVersion,
+}
 import com.digitalasset.daml.lf.value.Value
+import com.google.protobuf.ByteString
 import com.google.rpc.status.Status
 import org.apache.pekko.Done
 import org.apache.pekko.stream.Materializer
@@ -78,6 +94,13 @@ class InMemoryStateUpdaterSpec
     with MockitoSugar
     with BaseTest {
 
+  import TransactionBuilder.Implicits.*
+
+  object TxBuilder {
+    def apply(): NodeIdTransactionBuilder & TestNodeBuilder = new NodeIdTransactionBuilder
+      with TestNodeBuilder
+  }
+
   "flow" should "correctly process updates in order" in new Scope {
     val secondLedgerEnd = someLedgerEnd.copy(
       lastOffset = Offset.tryFromLong(12),
@@ -85,8 +108,8 @@ class InMemoryStateUpdaterSpec
     )
     runFlow(
       Seq(
-        (Vector(update1, metadataChangedUpdate), someLedgerEnd),
-        (Vector(update3, update4), secondLedgerEnd),
+        (Vector(update1, metadataChangedUpdate), someLedgerEnd, traceContext),
+        (Vector(update3, update4), secondLedgerEnd, traceContext),
       )
     )
     cacheUpdates should contain theSameElementsInOrderAs Seq(
@@ -107,10 +130,10 @@ class InMemoryStateUpdaterSpec
     )
     runFlow(
       Seq(
-        // Empty input batch should have not effect
-        (Vector.empty, someLedgerEnd),
-        (Vector(update3), secondLedgerEnd),
-        (Vector(anotherMetadataChangedUpdate), thirdLedgerEnd),
+        // Empty input batch should have no effect
+        (Vector.empty, someLedgerEnd, traceContext),
+        (Vector(update3), secondLedgerEnd, traceContext),
+        (Vector(anotherMetadataChangedUpdate), thirdLedgerEnd, traceContext),
       )
     )
 
@@ -126,6 +149,7 @@ class InMemoryStateUpdaterSpec
       InMemoryStateUpdater.prepare(
         Vector.empty,
         someLedgerEnd,
+        traceContext,
       )
     }
   }
@@ -134,21 +158,55 @@ class InMemoryStateUpdaterSpec
     InMemoryStateUpdater.prepare(
       Vector(update1),
       someLedgerEnd,
+      traceContext,
     ) shouldBe PrepareResult(
       Vector(txLogUpdate1),
       someLedgerEnd,
       update1._2.traceContext,
+      traceContext,
     )
+  }
+
+  "prepare" should "correctly populate external transaction hash" in new Scope {
+    val externalTransactionHash =
+      Hash.digest(HashPurpose.PreparedSubmission, ByteString.copyFrom("mock_hash".getBytes), Sha256)
+    val updateWithTransactionHash = offset(11L) -> transactionAccepted(
+      t = 0L,
+      synchronizerId = synchronizerId1,
+      externalTransactionHash = Some(externalTransactionHash),
+    )
+
+    val preparedWithHashResult = InMemoryStateUpdater.prepare(
+      Vector(updateWithTransactionHash),
+      someLedgerEnd,
+      traceContext,
+    )
+    inside(preparedWithHashResult.updates.loneElement) {
+      case transactionAccepted: TransactionAccepted =>
+        transactionAccepted.externalTransactionHash shouldBe Some(externalTransactionHash)
+    }
+
+    val preparedWithoutHashResult = InMemoryStateUpdater.prepare(
+      Vector(update1),
+      someLedgerEnd,
+      traceContext,
+    )
+    inside(preparedWithoutHashResult.updates.loneElement) {
+      case transactionAccepted: TransactionAccepted =>
+        transactionAccepted.externalTransactionHash shouldBe None
+    }
   }
 
   "prepare" should "prepare a batch with reassignments" in new Scope {
     InMemoryStateUpdater.prepare(
       Vector(update1, update7, update8),
       someLedgerEnd,
+      traceContext,
     ) shouldBe PrepareResult(
       Vector(txLogUpdate1, assignLogUpdate, unassignLogUpdate),
       someLedgerEnd,
       update1._2.traceContext,
+      traceContext,
     )
   }
 
@@ -156,10 +214,12 @@ class InMemoryStateUpdaterSpec
     InMemoryStateUpdater.prepare(
       Vector(update1, update9),
       someLedgerEnd,
+      traceContext,
     ) shouldBe PrepareResult(
       Vector(txLogUpdate1, topologyTransactionLogUpdate),
       someLedgerEnd,
       update1._2.traceContext,
+      traceContext,
     )
   }
 
@@ -167,15 +227,76 @@ class InMemoryStateUpdaterSpec
     InMemoryStateUpdater.prepare(
       Vector(update1, metadataChangedUpdate),
       someLedgerEnd,
+      traceContext,
     ) shouldBe PrepareResult(
       Vector(txLogUpdate1),
       someLedgerEnd,
       metadataChangedUpdate._2.traceContext,
+      traceContext,
     )
   }
 
+  private def checkPrepareFlatEventWitnesses(isAcsDelta: Boolean): Unit =
+    "prepare" should s"produce ${if (isAcsDelta) "non-empty"
+      else "empty"} flatEventWitnesses for created and consuming exercised events with isAcsDelta $isAcsDelta" in new Scope {
+      private val builder = TxBuilder()
+      private val createNode = genCreateNode
+      private val exerciseNode = TestNodeBuilder.exercise(
+        contract = createNode,
+        choice = "someChoice",
+        consuming = true,
+        actingParties = Set("signatory"),
+        argument = Value.ValueUnit,
+        result = Some(Value.ValueUnit),
+        choiceObservers = Set("divulgee"),
+        byKey = false,
+      )
+      builder.add(createNode)
+      builder.add(exerciseNode)
+      private val tx = builder.buildCommitted()
+
+      private val update = offset(1L) -> transactionAccepted(
+        t = 0L,
+        transaction = tx,
+        synchronizerId = synchronizerId1,
+        contractAuthenticationData = Map(createNode.coid -> someContractMetadataBytes),
+        contractActivenessChanged = isAcsDelta,
+      )
+
+      private val events =
+        InMemoryStateUpdater
+          .prepare(
+            Vector(update),
+            someLedgerEnd,
+            traceContext,
+          )
+          .updates
+          .collect { case txAccepted: TransactionLogUpdate.TransactionAccepted => txAccepted }
+          .flatMap(_.events)
+
+      events.size shouldBe 2
+
+      private val createdEvent = events.collectFirst { case c: TransactionLogUpdate.CreatedEvent =>
+        c
+      }.value
+      private val exercisedEvent = events.collectFirst {
+        case e: TransactionLogUpdate.ExercisedEvent => e
+      }.value
+
+      if (isAcsDelta) {
+        createdEvent.flatEventWitnesses should not be empty
+        exercisedEvent.flatEventWitnesses should not be empty
+      } else {
+        createdEvent.flatEventWitnesses shouldBe empty
+        exercisedEvent.flatEventWitnesses shouldBe empty
+      }
+    }
+
+  checkPrepareFlatEventWitnesses(isAcsDelta = false)
+  checkPrepareFlatEventWitnesses(isAcsDelta = true)
+
   "update" should "update the in-memory state" in new Scope {
-    InMemoryStateUpdater.update(inMemoryState, logger)(prepareResult, false)
+    InMemoryStateUpdater.update(inMemoryState, logger)(prepareResult, repairMode = false)
 
     inOrder
       .verify(inMemoryFanoutBuffer)
@@ -183,14 +304,14 @@ class InMemoryStateUpdaterSpec
         tx_accepted_withCompletionStreamResponse
       )
     inOrder
-      .verify(contractStateCaches)
-      .push(any[NonEmptyVector[ContractStateEvent]])(any[TraceContext])
-    inOrder
       .verify(inMemoryFanoutBuffer)
       .push(
         tx_accepted_withoutCompletionStreamResponse
       )
     inOrder.verify(inMemoryFanoutBuffer).push(tx_rejected)
+    inOrder
+      .verify(contractStateCaches)
+      .push(any[NonEmptyVector[ContractStateEvent]], any[Long])(any[TraceContext])
 
     inOrder
       .verify(ledgerEndCache)
@@ -212,7 +333,10 @@ class InMemoryStateUpdaterSpec
   }
 
   "update" should "update the caches even if it only has reassignments" in new Scope {
-    InMemoryStateUpdater.update(inMemoryState, logger)(prepareResultOnlyReassignment, false)
+    InMemoryStateUpdater.update(inMemoryState, logger)(
+      prepareResultOnlyReassignment,
+      repairMode = false,
+    )
 
     inOrder
       .verify(inMemoryFanoutBuffer)
@@ -221,7 +345,7 @@ class InMemoryStateUpdaterSpec
       )
     inOrder
       .verify(contractStateCaches)
-      .push(any[NonEmptyVector[ContractStateEvent]])(any[TraceContext])
+      .push(any[NonEmptyVector[ContractStateEvent]], any[Long])(any[TraceContext])
     inOrder
       .verify(ledgerEndCache)
       .set(Some(lastLedgerEnd))
@@ -230,7 +354,7 @@ class InMemoryStateUpdaterSpec
   }
 
   "update" should "update the in-memory state, but not the ledger-end and the dispatcher in repair mode" in new Scope {
-    InMemoryStateUpdater.update(inMemoryState, logger)(prepareResult, true)
+    InMemoryStateUpdater.update(inMemoryState, logger)(prepareResult, repairMode = true)
 
     inOrder
       .verify(inMemoryFanoutBuffer)
@@ -238,14 +362,14 @@ class InMemoryStateUpdaterSpec
         tx_accepted_withCompletionStreamResponse
       )
     inOrder
-      .verify(contractStateCaches)
-      .push(any[NonEmptyVector[ContractStateEvent]])(any[TraceContext])
-    inOrder
       .verify(inMemoryFanoutBuffer)
       .push(
         tx_accepted_withoutCompletionStreamResponse
       )
     inOrder.verify(inMemoryFanoutBuffer).push(tx_rejected)
+    inOrder
+      .verify(contractStateCaches)
+      .push(any[NonEmptyVector[ContractStateEvent]], any[Long])(any[TraceContext])
 
     inOrder
       .verify(transactionSubmissionTracker)
@@ -259,6 +383,34 @@ class InMemoryStateUpdaterSpec
       .verify(reassignmentSubmissionTracker)
       .onCompletion(tx_rejected_completionStreamResponse)
 
+    inOrder.verifyNoMoreInteractions()
+  }
+
+  "update" should "only push TransactionAccepted updates with non-empty flatEventWitnesses to inMemoryFanoutBuffer and contractStateCaches" in new Scope {
+    InMemoryStateUpdater.update(inMemoryState, logger)(
+      prepareResultWithEmptyFlatEventWitnesses,
+      repairMode = false,
+    )
+
+    inOrder
+      .verify(inMemoryFanoutBuffer)
+      .push(tx_accepted_withFlatEventWitnesses)
+    inOrder
+      .verify(inMemoryFanoutBuffer)
+      .push(
+        tx_accepted_withoutFlatEventWitnesses
+      )
+    inOrder
+      .verify(contractStateCaches)
+      .push(any[NonEmptyVector[ContractStateEvent]], any[Long])(any[TraceContext])
+
+    // the tx_accepted_withoutFlatEventWitnesses should not be pushed as it has empty flatEventWitnesses
+    verifyNoMoreInteractions(contractStateCaches)
+
+    inOrder
+      .verify(ledgerEndCache)
+      .set(Some(lastLedgerEnd.copy(lastOffset = tx_accepted_withoutFlatEventWitnesses.offset)))
+    inOrder.verify(dispatcher).signalNewHead(tx_accepted_withoutFlatEventWitnesses.offset)
     inOrder.verifyNoMoreInteractions()
   }
 
@@ -382,10 +534,10 @@ object InMemoryStateUpdaterSpec {
 
   import TraceContext.Implicits.Empty.*
 
-  private val txId1 = Ref.TransactionId.assertFromString("tx1")
-  private val txId2 = Ref.TransactionId.assertFromString("tx2")
-  private val txId3 = Ref.TransactionId.assertFromString("tx3")
-  private val txId4 = Ref.TransactionId.assertFromString("tx4")
+  private val txId1 = TestUpdateId("tx1")
+  private val txId2 = TestUpdateId("tx2")
+  private val txId3 = TestUpdateId("tx3")
+  private val txId4 = TestUpdateId("tx4")
 
   private val synchronizerId1 = SynchronizerId.tryFromString("x::synchronizerID1")
   private val synchronizerId2 = SynchronizerId.tryFromString("x::synchronizerID2")
@@ -401,6 +553,8 @@ object InMemoryStateUpdaterSpec {
   private val participantId = Ref.ParticipantId.assertFromString("participant1")
   private val someContractMetadataBytes = Bytes.assertFromString("00aabb")
   private val workflowId: Ref.WorkflowId = Ref.WorkflowId.assertFromString("Workflow")
+  private val representativePackageId =
+    Ref.PackageId.assertFromString("some-representative-package-id")
 
   trait Scope
       extends Matchers
@@ -417,7 +571,7 @@ object InMemoryStateUpdaterSpec {
 
     val txLogUpdate1 =
       TransactionLogUpdate.TransactionAccepted(
-        updateId = txId1,
+        updateId = txId1.toHexString,
         commandId = "",
         workflowId = workflowId,
         effectiveAt = Timestamp.Epoch,
@@ -426,11 +580,12 @@ object InMemoryStateUpdaterSpec {
         completionStreamResponse = None,
         synchronizerId = synchronizerId1.toProtoPrimitive,
         recordTime = Timestamp.Epoch,
+        externalTransactionHash = None,
       )(emptyTraceContext)
 
     val assignLogUpdate =
       TransactionLogUpdate.ReassignmentAccepted(
-        updateId = txId3,
+        updateId = txId3.toHexString,
         commandId = "",
         workflowId = workflowId,
         offset = offset(17L),
@@ -440,42 +595,24 @@ object InMemoryStateUpdaterSpec {
           sourceSynchronizer = ReassignmentTag.Source(synchronizerId1),
           targetSynchronizer = ReassignmentTag.Target(synchronizerId2),
           submitter = Option(party1),
-          reassignmentCounter = 15L,
-          unassignId = CantonTimestamp.assertFromLong(155555L),
+          reassignmentId = ReassignmentId.tryCreate("00155555"),
           isReassigningParticipant = true,
         ),
-        reassignment = TransactionLogUpdate.ReassignmentAccepted.Assigned(
-          CreatedEvent(
-            eventOffset = offset(17L),
-            updateId = txId3,
-            nodeId = 0,
-            eventSequentialId = 0,
-            contractId = someCreateNode.coid,
+        reassignment = Reassignment.Batch(
+          Reassignment.Assign(
             ledgerEffectiveTime = Timestamp.assertFromLong(12222),
-            templateId = someCreateNode.templateId,
-            packageName = someCreateNode.packageName,
-            packageVersion = None,
-            commandId = "",
-            workflowId = workflowId,
-            contractKey = None,
-            treeEventWitnesses = Set.empty,
-            flatEventWitnesses = Set(party1, party2),
-            submitters = Set.empty,
-            createArgument = com.digitalasset.daml.lf.transaction
-              .Versioned(someCreateNode.version, someCreateNode.arg),
-            createSignatories = Set(party1),
-            createObservers = Set(party2),
-            createKeyHash = None,
-            createKey = None,
-            createKeyMaintainers = None,
-            driverMetadata = someContractMetadataBytes,
+            createNode = someCreateNode,
+            contractAuthenticationData = someContractMetadataBytes,
+            reassignmentCounter = 15L,
+            nodeId = 0,
           )
         ),
+        synchronizerId = synchronizerId2.toProtoPrimitive,
       )(emptyTraceContext)
 
     val unassignLogUpdate =
       TransactionLogUpdate.ReassignmentAccepted(
-        updateId = txId4,
+        updateId = txId4.toHexString,
         commandId = "",
         workflowId = workflowId,
         offset = offset(18L),
@@ -485,24 +622,26 @@ object InMemoryStateUpdaterSpec {
           sourceSynchronizer = ReassignmentTag.Source(synchronizerId2),
           targetSynchronizer = ReassignmentTag.Target(synchronizerId1),
           submitter = Option(party2),
-          reassignmentCounter = 15L,
-          unassignId = CantonTimestamp.assertFromLong(1555551L),
+          reassignmentId = ReassignmentId.tryCreate("0001555551"),
           isReassigningParticipant = true,
         ),
-        reassignment = TransactionLogUpdate.ReassignmentAccepted.Unassigned(
+        reassignment = Reassignment.Batch(
           Reassignment.Unassign(
             contractId = someCreateNode.coid,
             templateId = templateId2,
             packageName = packageName,
-            stakeholders = List(party2),
+            stakeholders = Set(party2),
             assignmentExclusivity = Some(Timestamp.assertFromLong(123456L)),
+            reassignmentCounter = 15L,
+            nodeId = 0,
           )
         ),
+        synchronizerId = synchronizerId2.toProtoPrimitive,
       )(emptyTraceContext)
 
     val topologyTransactionLogUpdate =
       TransactionLogUpdate.TopologyTransactionEffective(
-        updateId = txId3,
+        updateId = txId3.toHexString,
         synchronizerId = synchronizerId1.toProtoPrimitive,
         offset = offset(19L),
         effectiveTime = Timestamp.Epoch,
@@ -565,7 +704,7 @@ object InMemoryStateUpdaterSpec {
       logger = logger,
     )(
       inMemoryState = inMemoryState,
-      prepare = (_, ledgerEnd) => result(ledgerEnd),
+      prepare = (_, ledgerEnd, _) => result(ledgerEnd),
       update = cachesUpdateCaptor,
     )(emptyTraceContext)
 
@@ -610,9 +749,12 @@ object InMemoryStateUpdaterSpec {
 
     val tx_rejected_offset: Offset = Offset.tryFromLong(3333L)
 
+    val tx_accepted_withFlatEventWitnesses_offset: Offset = Offset.tryFromLong(4444L)
+    val tx_accepted_withoutFlatEventWitnesses_offset: Offset = Offset.tryFromLong(5555L)
+
     val tx_accepted_withCompletionStreamResponse: TransactionLogUpdate.TransactionAccepted =
       TransactionLogUpdate.TransactionAccepted(
-        updateId = tx_accepted_updateId,
+        updateId = TestUpdateId(tx_accepted_updateId).toHexString,
         commandId = tx_accepted_commandId,
         workflowId = "wAccepted",
         effectiveAt = Timestamp.assertFromLong(1L),
@@ -622,7 +764,7 @@ object InMemoryStateUpdaterSpec {
             toCreatedEvent(
               genCreateNode,
               tx_accepted_withCompletionStreamResponse_offset,
-              Ref.TransactionId.assertFromString(tx_accepted_updateId),
+              TestUpdateId(tx_accepted_updateId),
               NodeId(i),
             )
           )
@@ -630,12 +772,41 @@ object InMemoryStateUpdaterSpec {
         completionStreamResponse = Some(tx_accepted_completionStreamResponse),
         synchronizerId = synchronizerId1.toProtoPrimitive,
         recordTime = Timestamp(1),
+        externalTransactionHash = None,
       )(emptyTraceContext)
 
     val tx_accepted_withoutCompletionStreamResponse: TransactionLogUpdate.TransactionAccepted =
       tx_accepted_withCompletionStreamResponse.copy(
         completionStreamResponse = None,
         offset = tx_accepted_withoutCompletionStreamResponse_offset,
+      )(emptyTraceContext)
+
+    val tx_accepted_withFlatEventWitnesses: TransactionLogUpdate.TransactionAccepted =
+      tx_accepted_withoutCompletionStreamResponse.copy(
+        offset = tx_accepted_withFlatEventWitnesses_offset,
+        events = Vector(
+          toCreatedEvent(
+            genCreateNode,
+            tx_accepted_withFlatEventWitnesses_offset,
+            TestUpdateId(tx_accepted_updateId),
+            NodeId(0),
+          )
+        ),
+      )(emptyTraceContext)
+
+    val tx_accepted_withoutFlatEventWitnesses: TransactionLogUpdate.TransactionAccepted =
+      tx_accepted_withFlatEventWitnesses.copy(
+        offset = tx_accepted_withoutFlatEventWitnesses_offset,
+        events = Vector(
+          toCreatedEvent(
+            genCreateNode,
+            tx_accepted_withoutFlatEventWitnesses_offset,
+            TestUpdateId(tx_accepted_updateId),
+            NodeId(0),
+          ).copy(
+            flatEventWitnesses = Set.empty
+          )
+        ),
       )(emptyTraceContext)
 
     val tx_rejected: TransactionLogUpdate.TransactionRejected =
@@ -664,11 +835,22 @@ object InMemoryStateUpdaterSpec {
       updates = updates,
       ledgerEnd = lastLedgerEnd,
       emptyTraceContext,
+      traceContext,
     )
     val prepareResultOnlyReassignment: PrepareResult = PrepareResult(
       updates = Vector(assignLogUpdate),
       ledgerEnd = lastLedgerEnd,
       emptyTraceContext,
+      traceContext,
+    )
+    val prepareResultWithEmptyFlatEventWitnesses: PrepareResult = PrepareResult(
+      updates = Vector(
+        tx_accepted_withFlatEventWitnesses,
+        tx_accepted_withoutFlatEventWitnesses,
+      ),
+      ledgerEnd = lastLedgerEnd.copy(lastOffset = tx_accepted_withoutFlatEventWitnesses.offset),
+      emptyTraceContext,
+      traceContext,
     )
 
     def result(ledgerEnd: LedgerEnd): PrepareResult =
@@ -676,10 +858,11 @@ object InMemoryStateUpdaterSpec {
         Vector.empty,
         ledgerEnd,
         emptyTraceContext,
+        traceContext,
       )
 
     def runFlow(
-        input: Seq[(Vector[(Offset, Update)], LedgerEnd)]
+        input: Seq[(Vector[(Offset, Update)], LedgerEnd, TraceContext)]
     )(implicit mat: Materializer): Done =
       Source(input)
         .via(inMemoryStateUpdater(false))
@@ -697,7 +880,7 @@ object InMemoryStateUpdaterSpec {
         argument = Value.ValueUnit,
         signatories = Set(party1),
         observers = Set(party2),
-        version = CreateTransactionVersion.Version(LanguageVersion.v2_dev),
+        version = CreateSerializationVersion.Version(LfSerializationVersion.VDev),
       )
   }
   private val someCreateNode = genCreateNode
@@ -705,12 +888,12 @@ object InMemoryStateUpdaterSpec {
   private def toCreatedEvent(
       createdNode: Node.Create,
       txOffset: Offset,
-      updateId: data.UpdateId,
+      updateId: UpdateId,
       nodeId: NodeId,
   ) =
     CreatedEvent(
       eventOffset = txOffset,
-      updateId = updateId,
+      updateId = updateId.toHexString,
       nodeId = nodeId.index,
       eventSequentialId = 0,
       contractId = createdNode.coid,
@@ -731,7 +914,8 @@ object InMemoryStateUpdaterSpec {
       createKeyHash = createdNode.keyOpt.map(_.globalKey.hash),
       createKey = createdNode.keyOpt.map(_.globalKey),
       createKeyMaintainers = createdNode.keyOpt.map(_.maintainers),
-      driverMetadata = someContractMetadataBytes,
+      authenticationData = someContractMetadataBytes,
+      representativePackageId = representativePackageId,
     )
 
   implicit val defaultValueProviderCreatedEvent
@@ -743,7 +927,7 @@ object InMemoryStateUpdaterSpec {
             toCreatedEvent(
               genCreateNode,
               Offset.firstOffset,
-              Ref.TransactionId.assertFromString("yolo"),
+              TestUpdateId("yolo"),
               NodeId(0),
             )
           )
@@ -776,9 +960,11 @@ object InMemoryStateUpdaterSpec {
       transactionMeta = someTransactionMeta,
       transaction = CommittedTransaction(TransactionBuilder.Empty),
       updateId = txId2,
-      contractMetadata = Map.empty,
+      contractAuthenticationData = Map.empty,
       synchronizerId = SynchronizerId.tryFromString("da::default"),
       recordTime = CantonTimestamp.MinValue,
+      acsChangeFactory = TestAcsChangeFactory(),
+      internalContractIds = Map.empty,
     )
 
   private val update4 = offset(14L) ->
@@ -900,7 +1086,7 @@ object InMemoryStateUpdaterSpec {
     var checkpoints: Seq[OffsetCheckpoint] = Seq.empty
 
     val output = sourceSomes
-      .map((_, someLedgerEnd))
+      .map((_, someLedgerEnd, emptyTraceContext))
       .via(
         InMemoryStateUpdaterFlow
           .updateOffsetCheckpointCacheFlowWithTickingSource(
@@ -922,15 +1108,22 @@ object InMemoryStateUpdaterSpec {
   private def transactionAccepted(
       t: Long,
       synchronizerId: SynchronizerId,
+      externalTransactionHash: Option[Hash] = None,
+      transaction: CommittedTransaction = CommittedTransaction(TransactionBuilder.Empty),
+      contractAuthenticationData: Map[Value.ContractId, Bytes] = Map.empty,
+      contractActivenessChanged: Boolean = true,
   ): Update.TransactionAccepted =
     Update.SequencedTransactionAccepted(
       completionInfoO = None,
       transactionMeta = someTransactionMeta,
-      transaction = CommittedTransaction(TransactionBuilder.Empty),
+      transaction = transaction,
       updateId = txId1,
-      contractMetadata = Map.empty,
+      contractAuthenticationData = contractAuthenticationData,
       synchronizerId = synchronizerId,
       recordTime = CantonTimestamp(Timestamp(t)),
+      externalTransactionHash = externalTransactionHash,
+      acsChangeFactory = TestAcsChangeFactory(contractActivenessChanged),
+      internalContractIds = Map.empty,
     )
 
   private def assignmentAccepted(
@@ -946,16 +1139,22 @@ object InMemoryStateUpdaterSpec {
         sourceSynchronizer = ReassignmentTag.Source(source),
         targetSynchronizer = ReassignmentTag.Target(target),
         submitter = Option(party1),
-        reassignmentCounter = 15L,
-        unassignId = CantonTimestamp.assertFromLong(155555L),
+        reassignmentId = ReassignmentId.tryCreate("00155555"),
         isReassigningParticipant = true,
       ),
-      reassignment = Reassignment.Assign(
-        ledgerEffectiveTime = Timestamp.assertFromLong(12222),
-        createNode = someCreateNode,
-        contractMetadata = someContractMetadataBytes,
+      reassignment = Reassignment.Batch(
+        Reassignment.Assign(
+          ledgerEffectiveTime = Timestamp.assertFromLong(12222),
+          createNode = someCreateNode,
+          contractAuthenticationData = someContractMetadataBytes,
+          reassignmentCounter = 15L,
+          nodeId = 0,
+        )
       ),
       recordTime = CantonTimestamp(Timestamp(t)),
+      synchronizerId = target,
+      acsChangeFactory = TestAcsChangeFactory(),
+      internalContractIds = Map.empty,
     )
 
   private def unassignmentAccepted(
@@ -971,18 +1170,24 @@ object InMemoryStateUpdaterSpec {
         sourceSynchronizer = ReassignmentTag.Source(source),
         targetSynchronizer = ReassignmentTag.Target(target),
         submitter = Option(party2),
-        reassignmentCounter = 15L,
-        unassignId = CantonTimestamp.assertFromLong(1555551L),
+        reassignmentId = ReassignmentId.tryCreate("0001555551"),
         isReassigningParticipant = true,
       ),
-      reassignment = Reassignment.Unassign(
-        contractId = someCreateNode.coid,
-        templateId = templateId2,
-        packageName = packageName,
-        stakeholders = List(party2),
-        assignmentExclusivity = Some(Timestamp.assertFromLong(123456L)),
+      reassignment = Reassignment.Batch(
+        Reassignment.Unassign(
+          contractId = someCreateNode.coid,
+          templateId = templateId2,
+          packageName = packageName,
+          stakeholders = Set(party2),
+          assignmentExclusivity = Some(Timestamp.assertFromLong(123456L)),
+          reassignmentCounter = 15L,
+          nodeId = 0,
+        )
       ),
       recordTime = CantonTimestamp(Timestamp(t)),
+      synchronizerId = source,
+      acsChangeFactory = TestAcsChangeFactory(),
+      internalContractIds = Map.empty,
     )
 
   private def commandRejected(t: Long, synchronizerId: SynchronizerId): Update.CommandRejected =

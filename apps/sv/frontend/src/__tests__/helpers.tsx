@@ -10,8 +10,9 @@ import {
 import { replaceEqualDeep } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { ThemeProvider } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, screen } from '@testing-library/react';
-import { MemoryRouter, useNavigate } from 'react-router-dom';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, useNavigate } from 'react-router';
+import { Toaster } from 'sonner';
 import { expect } from 'vitest';
 import { SvAdminClientProvider } from '../contexts/SvAdminServiceContext';
 import { SvAppVotesHooksProvider } from '../contexts/SvAppVotesHooksContext';
@@ -56,19 +57,42 @@ export const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =
     <MemoryRouter>
       <SvConfigProvider>
         <WrapperProviders children={children} />
+        <Toaster richColors />
       </SvConfigProvider>
     </MemoryRouter>
   );
 };
 
-export function changeAction(actionName: string = 'SRARC_SetConfig'): void {
+// Strong type for syntax hints
+type ActionName =
+  | 'SRARC_OffboardSv'
+  | 'SRARC_GrantFeaturedAppRight'
+  | 'SRARC_RevokeFeaturedAppRight'
+  | 'SRARC_SetConfig'
+  | 'CRARC_SetConfig'
+  | 'SRARC_UpdateSvRewardWeight'
+  | 'SRARC_CreateUnallocatedUnclaimedActivityRecord'
+  | (string & {});
+
+export async function changeAction(actionName: ActionName = 'SRARC_SetConfig'): Promise<void> {
   const dropdown = screen.getByTestId('display-actions');
   expect(dropdown).toBeDefined();
-  fireEvent.change(dropdown!, { target: { value: actionName } });
+  fireEvent.change(dropdown, { target: { value: actionName } });
 
   const actionChangeDialog = screen.getByTestId('action-change-dialog');
   expect(actionChangeDialog).toBeDefined();
   const actionChangeDialogProceed = screen.getByTestId('action-change-dialog-proceed');
   expect(actionChangeDialogProceed).toBeDefined();
   fireEvent.click(actionChangeDialogProceed);
+
+  switch (actionName) {
+    case 'SRARC_SetConfig':
+      await waitFor(() => expect(screen.getByTestId('set-dso-rules-config-header')).toBeDefined());
+      break;
+    case 'CRARC_SetConfig':
+      await waitFor(() =>
+        expect(screen.getByTestId('set-amulet-rules-config-header')).toBeDefined()
+      );
+      break;
+  }
 }

@@ -8,14 +8,16 @@ import com.digitalasset.canton.config.{
   CachingConfigs,
   LocalNodeParametersConfig,
   NonNegativeFiniteDuration,
-  SessionSigningKeysConfig,
   WatchdogConfig,
 }
+import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 import org.lfdecentralizedtrust.splice.util.SpliceRateLimitConfig
 
 final case class SpliceParametersConfig(
     batching: BatchingConfig = BatchingConfig(),
     caching: CachingConfigs = CachingConfigs(),
+    contractFetchLedgerFallbackConfig: ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig =
+      ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig(),
     // Do not define any defaults on the class containing the `SpliceParametersConfig` as they'll be overwritten.
     // Do it instead on the app.conf file in `cluster/images/${the_app}/app.conf`
     customTimeouts: Map[String, NonNegativeFiniteDuration] = Map.empty,
@@ -23,10 +25,9 @@ final case class SpliceParametersConfig(
       RateLimitersConfig(SpliceRateLimitConfig(enabled = true, ratePerSecond = 200), Map.empty),
     // Configuration for the circuit breaker for ledger API command submissions.
     circuitBreakers: CircuitBreakersConfig = CircuitBreakersConfig(),
+    enabledFeatures: EnabledFeaturesConfig = EnabledFeaturesConfig(),
 ) extends LocalNodeParametersConfig {
   override def alphaVersionSupport: Boolean = false
 
   override def watchdog: Option[WatchdogConfig] = None
-
-  override def sessionSigningKeys: SessionSigningKeysConfig = ???
 }

@@ -8,7 +8,11 @@ import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2Bearer
 import com.digitalasset.daml.lf.archive.DarParser
 import org.lfdecentralizedtrust.splice.admin.api.client.HttpAdminAppClient
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
-import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SpliceBackendConfig}
+import org.lfdecentralizedtrust.splice.config.{
+  BaseParticipantClientConfig,
+  NetworkAppClientConfig,
+  SpliceBackendConfig,
+}
 import org.lfdecentralizedtrust.splice.environment.{
   NodeBase,
   SpliceConsoleEnvironment,
@@ -16,6 +20,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.util.HasHealth
 import com.daml.scalautil.Statement.discard
+import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.NonNegativeDuration
@@ -40,9 +45,11 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
 import com.digitalasset.canton.topology.NodeIdentity
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import com.digitalasset.canton.topology.transaction.VettedPackage
 
 import java.io.File
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration.*
 import scala.reflect.ClassTag
 import scala.util.Try
@@ -106,7 +113,7 @@ trait HttpAppReference extends AppReference with HttpCommandRunner {
   override def keys: KeyAdministrationGroup = noGrpcError()
 
   override def adminCommand[Result](
-      grpcCommand: GrpcAdminCommand[_, _, Result]
+      grpcCommand: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] = noGrpcError()
 
   private def noGrpcError() = throw new NotImplementedError(
@@ -120,8 +127,8 @@ trait HttpAppReference extends AppReference with HttpCommandRunner {
 
   def httpClientConfig: NetworkAppClientConfig
 
-  override protected[splice] def httpCommand[Result](
-      httpCommand: HttpCommand[_, Result],
+  override protected[splice] def httpCommand[Res, Result, Client](
+      httpCommand: HttpCommand[Res, Result, Client],
       basePath: Option[String] = None,
   ): ConsoleCommandResult[Result] =
     spliceConsoleEnvironment.httpCommandRunner.runCommand(
@@ -234,6 +241,39 @@ trait AppBackendReference extends AppReference with LocalInstanceReference {
       x => x,
     )
   }
+
+  protected def getParticipantClient()(implicit
+      ec: ExecutionContext
+  ): ParticipantClientReference = {
+    val remoteParticipantClientConfig = getRemoteParticipantConfigWithToken(
+      config.participantClient
+    )
+    new ParticipantClientReference(
+      spliceConsoleEnvironment,
+      s"remote participant for `$name``",
+      remoteParticipantClientConfig,
+    )
+  }
+
+  private def getRemoteParticipantConfigWithToken(
+      participantClientConfig: BaseParticipantClientConfig
+  )(implicit ec: ExecutionContext): RemoteParticipantConfig = {
+    val tokenStrO = Await.result(
+      spliceConsoleEnvironment.httpClient
+        .getToken(participantClientConfig.ledgerApi.authConfig)
+        .map(_.map(_.accessToken)),
+      30.seconds,
+    )
+    RemoteParticipantConfig(
+      participantClientConfig.adminApi,
+      participantClientConfig.ledgerApi.clientConfig,
+      tokenStrO,
+    )
+  }
+  implicit val ec: ExecutionContext = executionContext
+
+  /** Remote participant this splitwell app is configured to interact with. */
+  lazy val participantClient = getParticipantClient()
 }
 
 /** Subclass of participantClient that takes the config as an argument
@@ -250,10 +290,25 @@ class ParticipantClientReference(
   def upload_dar_unless_exists(
       path: String
   ): Unit = {
-    val hash = DarParser.assertReadArchiveFromFile(new File(path)).main.getHash
+    val dar = DarParser.assertReadArchiveFromFile(new File(path))
+    val hash = dar.main.getHash
     val pkgs = this.ledger_api.packages.list()
     if (!pkgs.map(_.packageId).contains(hash)) {
-      discard[String](this.dars.upload(path))
+      discard[String](this.dars.upload(path, vetAllPackages = false))
+    }
+    val connected = this.synchronizers.list_connected()
+    if (connected.isEmpty) {
+      logger.error(s"Trying to vet $path on ${this.id} but not connected to any synchronizer")
+    }
+    connected.foreach { sync =>
+      this.topology.vetted_packages.propose_delta(
+        this.id,
+        adds = dar.all
+          .map(p => LfPackageId.assertFromString(p.getHash))
+          .distinct
+          .map(VettedPackage(_, None, None)),
+        store = TopologyStoreId.Synchronizer(sync.synchronizerId),
+      )
     }
   }
 }

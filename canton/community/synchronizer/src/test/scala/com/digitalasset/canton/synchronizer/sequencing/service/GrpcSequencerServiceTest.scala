@@ -9,7 +9,8 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveDouble, PositiveInt}
 import com.digitalasset.canton.config.{PositiveFiniteDuration, ProcessingTimeout}
-import com.digitalasset.canton.crypto.{Signature, SynchronizerCryptoClient}
+import com.digitalasset.canton.crypto.topology.TopologyStateHash
+import com.digitalasset.canton.crypto.{Hash, Signature, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.SuppressionRule.Level
@@ -42,10 +43,9 @@ import com.digitalasset.canton.topology.processing.{
   SequencedTime,
   TopologyTransactionTestFactory,
 }
-import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
+import com.digitalasset.canton.topology.store.StoredTopologyTransaction.GenericStoredTopologyTransaction
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
-  StoredTopologyTransactions,
   TopologyStateForInitializationService,
 }
 import com.digitalasset.canton.tracing.TraceContext
@@ -53,6 +53,7 @@ import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
 import com.digitalasset.canton.version.{ProtocolVersion, VersionedMessage}
 import com.digitalasset.canton.{
   BaseTest,
+  HasActorSystem,
   HasExecutionContext,
   ProtocolVersionChecksFixtureAsyncWordSpec,
 }
@@ -61,12 +62,16 @@ import io.grpc.Status.Code.*
 import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
 import io.grpc.{StatusException, StatusRuntimeException}
 import monocle.macros.syntax.lens.*
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
 import org.mockito.{ArgumentMatchers, Mockito}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.FixtureAsyncWordSpec
 import org.scalatest.{Assertion, FutureOutcome}
 import org.slf4j.event
 
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Success
 
@@ -76,7 +81,8 @@ class GrpcSequencerServiceTest
     extends FixtureAsyncWordSpec
     with BaseTest
     with ProtocolVersionChecksFixtureAsyncWordSpec
-    with HasExecutionContext {
+    with HasExecutionContext
+    with HasActorSystem {
   type Subscription = GrpcManagedSubscription[?]
 
   import GrpcSequencerServiceTest.*
@@ -121,7 +127,6 @@ class GrpcSequencerServiceTest
     private val synchronizerParamLookup
         : DynamicSynchronizerParametersLookup[SequencerSynchronizerParameters] =
       SynchronizerParametersLookup.forSequencerSynchronizerParameters(
-        BaseTest.defaultStaticSynchronizerParameters,
         None,
         topologyClient,
         loggerFactory,
@@ -142,21 +147,27 @@ class GrpcSequencerServiceTest
         override def initialSnapshot(member: Member)(implicit
             executionContext: ExecutionContext,
             traceContext: TraceContext,
-        ): FutureUnlessShutdown[GenericStoredTopologyTransactions] = FutureUnlessShutdown.pure(
-          StoredTopologyTransactions(
-            // As we don't expect the actual transactions in this test, we can repeat the same transaction a bunch of times
-            List
-              .fill(maxItemsInTopologyBatch * numBatches)(factory.ns1k1_k1)
-              .map(
-                StoredTopologyTransaction(
-                  SequencedTime.MinValue,
-                  EffectiveTime.MinValue,
-                  None,
-                  _,
-                  None,
-                )
+        ): Source[GenericStoredTopologyTransaction, NotUsed] = Source(
+          // As we don't expect the actual transactions in this test, we can repeat the same transaction a bunch of times
+          List
+            .fill(maxItemsInTopologyBatch * numBatches)(factory.ns1k1_k1)
+            .map(
+              StoredTopologyTransaction(
+                SequencedTime.MinValue,
+                EffectiveTime.MinValue,
+                None,
+                _,
+                None,
               )
-          )
+            )
+        )
+
+        override def initialSnapshotHash(member: Member)(implicit
+            executionContext: ExecutionContext,
+            materializer: Materializer,
+            traceContext: TraceContext,
+        ): FutureUnlessShutdown[Hash] = FutureUnlessShutdown.pure(
+          TopologyStateHash.build().finish().hash
         )
       }
 
@@ -573,8 +584,8 @@ class GrpcSequencerServiceTest
     "return error if called with observer not capable of observing server calls" in { env =>
       val observer = new MockStreamObserver[v30.SubscriptionResponse]()
       loggerFactory.suppressWarningsAndErrors {
-        env.service.subscribeV2(
-          v30.SubscriptionRequestV2(
+        env.service.subscribe(
+          v30.SubscriptionRequest(
             member = "",
             timestamp = Some(CantonTimestamp.Epoch.toProtoPrimitive),
           ),
@@ -591,8 +602,8 @@ class GrpcSequencerServiceTest
 
     "return error if request cannot be deserialized" in { env =>
       val observer = new MockServerStreamObserver[v30.SubscriptionResponse]()
-      env.service.subscribeV2(
-        v30.SubscriptionRequestV2(
+      env.service.subscribe(
+        v30.SubscriptionRequest(
           member = "",
           timestamp = Some(CantonTimestamp.Epoch.toProtoPrimitive),
         ),
@@ -610,7 +621,7 @@ class GrpcSequencerServiceTest
     "return error if pool registration fails" in { env =>
       val observer = new MockServerStreamObserver[v30.SubscriptionResponse]()
       val requestP =
-        SubscriptionRequestV2(
+        SubscriptionRequest(
           participant,
           timestamp = None,
           testedProtocolVersion,
@@ -625,7 +636,7 @@ class GrpcSequencerServiceTest
         )
         .thenReturn(EitherT.leftT(PoolClosed))
 
-      env.service.subscribeV2(requestP, observer)
+      env.service.subscribe(requestP, observer)
 
       eventually() {
         inside(observer.items.loneElement) { case StreamError(ex: StatusException) =>
@@ -638,14 +649,14 @@ class GrpcSequencerServiceTest
     "return error if sending request with member that is not authenticated" in { env =>
       val observer = new MockServerStreamObserver[v30.SubscriptionResponse]()
       val requestP =
-        SubscriptionRequestV2(
+        SubscriptionRequest(
           ParticipantId("Wrong participant"),
           timestamp = Some(CantonTimestamp.Epoch),
           testedProtocolVersion,
         ).toProtoV30
 
       loggerFactory.suppressWarningsAndErrors {
-        env.service.subscribeV2(requestP, observer)
+        env.service.subscribe(requestP, observer)
         eventually() {
           observer.items.toSeq should matchPattern {
             case Seq(StreamError(err: StatusException))
@@ -653,6 +664,69 @@ class GrpcSequencerServiceTest
           }
         }
       }
+    }
+
+    "close subscription if canceled before fully created" in { env =>
+      val observer = mock[MockServerStreamObserver[v30.SubscriptionResponse]]
+      val cancelHandler = new AtomicReference[Option[Runnable]](None)
+      val subscriptionClosed = new AtomicBoolean(false)
+
+      // Subscription augmented to let us know when it is closed.
+      val subscription =
+        new GrpcManagedSubscription(
+          _ => ???,
+          observer,
+          participant,
+          None,
+          timeouts,
+          loggerFactory,
+          _ => ???,
+        ) {
+          override def onClosed(): Unit = {
+            super.onClosed()
+            subscriptionClosed.set(true)
+          }
+        }
+
+      // Remember the cancel handler once set, so we can simulate a grpc context cancel.
+      Mockito
+        .when(observer.setOnCancelHandler(ArgumentMatchers.any[Runnable]()))
+        .thenAnswer(mockInvocation =>
+          cancelHandler.set(Some(mockInvocation.getArgument[Runnable](0)))
+        )
+
+      // Slow down the subscription pool to improve our chances of canceling before the
+      // subscription is fully created.
+      Mockito
+        .when(
+          env.subscriptionPool.create(
+            ArgumentMatchers.any[() => FutureUnlessShutdown[Subscription]](),
+            ArgumentMatchers.any[Member](),
+          )(anyTraceContext)
+        )
+        .thenReturn {
+          EitherT.right(Future {
+            logger.info("Test slowing down subscription creation")
+            // Simulate a delay in subscription creation to let us cancel the GRPC call
+            // before the subscription is fully created.
+            Threading.sleep(1000)
+            logger.info("Test done slowing down subscription creation")
+            subscription
+          })
+        }
+
+      // Initiate creating a subscription asynchronously.
+      val requestP =
+        SubscriptionRequest(participant, timestamp = None, testedProtocolVersion).toProtoV30
+      env.service.subscribe(requestP, observer)
+
+      // Cancel the grpc subscription once the cancel handler is known.
+      eventually()(cancelHandler.get().nonEmpty shouldBe true)
+      logger.info("Test canceling grpc request")
+      cancelHandler.get().foreach(_.run())
+
+      // The point of this test: Make sure the subscription is closed.
+      eventually()(subscriptionClosed.get() shouldBe true)
     }
   }
 
@@ -717,7 +791,7 @@ class GrpcSequencerServiceTest
 
   "downloadTopologyStateForInit" should {
     "stream batches of topology transactions" in { env =>
-      val observer = new MockStreamObserver[v30.DownloadTopologyStateForInitResponse]()
+      val observer = new MockServerStreamObserver[v30.DownloadTopologyStateForInitResponse]()
       env.service.downloadTopologyStateForInit(
         TopologyStateForInitRequest(participant, testedProtocolVersion).toProtoV30,
         observer,

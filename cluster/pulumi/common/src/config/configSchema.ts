@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from 'zod';
 
+import { CloudSqlConfigSchema } from './cloudSql';
 import { defaultActiveMigration, SynchronizerMigrationSchema } from './migrationSchema';
 
 // This is a config that's relevant for all (most) pulumi projects. For project-specific configuration,
@@ -11,22 +12,9 @@ const PulumiProjectConfigSchema = z.object({
   isExternalCluster: z.boolean(),
   hasPublicInfo: z.boolean(),
   interAppsDependencies: z.boolean(),
-  cloudSql: z.object({
-    enabled: z.boolean(),
-    // Docs on cloudsql maintenance windows: https://cloud.google.com/sql/docs/postgres/set-maintenance-window
-    maintenanceWindow: z
-      .object({
-        day: z.number().min(1).max(7).default(2), // 1 (Monday) to 7 (Sunday)
-        hour: z.number().min(0).max(23).default(8), // 24-hour format UTC
-      })
-      .default({ day: 2, hour: 8 }),
-    protected: z.boolean(),
-    tier: z.string(),
-    enterprisePlus: z.boolean(),
-    // https://cloud.google.com/sql/docs/mysql/backup-recovery/backups#retained-backups
-    // controls the number of automated gcp sql backups to retain
-    backupsToRetain: z.number().optional(),
-  }),
+  cloudSql: CloudSqlConfigSchema,
+  allowDowngrade: z.boolean(),
+  replacePostgresStatefulSetOnChanges: z.boolean().default(false),
 });
 export type PulumiProjectConfig = z.infer<typeof PulumiProjectConfigSchema>;
 export const ConfigSchema = z.object({
@@ -49,6 +37,8 @@ const SingleResourceSchema = z
     cpu: z.string().optional(),
   })
   .optional();
+
+export type K8sResourceSchema = z.infer<typeof K8sResourceSchema>;
 
 export const K8sResourceSchema = z
   .object({

@@ -18,7 +18,8 @@ import scala.concurrent.Future
 
 trait TransferInputStore extends AppStore with LimitHelpers {
 
-  /** List all non-expired amulets owned by a user in descending order according to their current amount in the given submitting round. */
+  /** List all amulets owned by a user in descending order */
+  // TODO(#2257): we don't really need the round here anymore
   def listSortedAmuletsAndQuantity(
       submittingRound: Long,
       limit: Limit = Limit.DefaultLimit,
@@ -29,12 +30,10 @@ trait TransferInputStore extends AppStore with LimitHelpers {
   } yield amulets
     .map(c =>
       (
-        SpliceUtil
-          .currentAmount(c.payload, submittingRound),
+        SpliceUtil.currentAmount(c.payload, submittingRound, deductHoldingFees = false),
         c,
       )
     )
-    .filter { quantityAndAmulet => quantityAndAmulet._1.compareTo(BigDecimal.valueOf(0)) > 0 }
     .sortBy(quantityAndAmulet =>
       // negating because largest values should come first.
       quantityAndAmulet._1.negate()

@@ -9,6 +9,76 @@
       "type": "object",
       "description": "The authentication configuration for the application"
     },
+    "synchronizer": {
+      "type": "object",
+      "description": "Configuration parameters for the sequencer connections.",
+      "properties": {
+        "connectionType": {
+          "type": "string",
+          "enum": [
+            "trust-single",
+            "bft",
+            "bft-custom"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "description": "Trusted sequencer Url."
+        },
+        "svNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "list of trusted sequencer / SV names. Optional unless connectionType is bft-custom."
+        },
+        "threshold": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "bft-custom threshold. Optional unless connectionType is bft-custom."
+        }
+      }
+    },
+    "scanClient": {
+      "type": "object",
+      "description": "Configuration parameters for the scan client.",
+      "properties": {
+        "scanType": {
+          "type": "string",
+          "enum": [
+            "trust-single",
+            "bft",
+            "bft-custom"
+          ],
+          "description": "The type of scan client configuration."
+        },
+        "scanAddress": {
+          "type": "string",
+          "description": "scan address for trust single type."
+        },
+        "threshold": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "bft-custom threshold. Optional unless scan-type is bft-custom."
+        },
+        "svNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of trusted scans. Optional unless scan-type is bft-custom."
+        },
+        "seedUrls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of seed URLs for the scan client."
+        }
+      }
+    },
     "svValidator": {
       "type": "boolean",
       "description": "Whether this validator is part of an SV node"
@@ -23,6 +93,52 @@
     }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": {
+          "scanClient": {
+            "type": "object"
+          }
+        },
+        "required": ["scanClient"]
+      },
+      "then": {
+        "properties": {
+          "scanClient": {
+            "properties": {
+              "seedUrls": {
+                "type": "array",
+                "minItems": 1,
+                "description": "List of seed URLs for the scan client. Must be non-empty if scanClient is set."
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scanClient": {
+            "type": "object",
+            "properties": {
+              "scanType": {
+                "const": "bft-custom"
+              }
+            },
+            "required": ["scanType"]
+          }
+        },
+        "required": ["scanClient"]
+      },
+      "then": {
+        "properties": {
+          "scanClient": {
+            "required": ["threshold", "svNames"]
+          }
+        }
+      }
+    },
     {
       "if": {
         "properties": {
@@ -81,14 +197,12 @@
     },
     {
       "required": [
-        "auth",
         "defaultJvmOptions",
         "enableWallet",
         "imageRepo",
         "migration",
         "nodeIdentifier",
         "persistence",
-        "scanAddress",
         "spliceInstanceNames"
       ],
       "properties": {
@@ -241,6 +355,21 @@
               "description": "The URL for the JWKS endpoint for the validator app API"
             }
           }
+        },
+        "disableAuth": {
+          "type": "boolean"
+        },
+        "if": {
+          "properties": {
+            "disableAuth": {
+              "const": "true"
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "auth"
+          ]
         },
         "scanAddress": {
           "type": "string"
@@ -438,6 +567,86 @@
           "not": { "required": ["validatorWalletUser"] }
         }
       ]
+    },
+    {
+      "if": {
+        "properties": {
+          "scanClient": {
+            "type": "object"
+          }
+        },
+        "required": ["scanClient"]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": ["scanAddress"]
+            },
+            {
+              "required": ["nonSvValidatorTrustSingleScan"]
+            }
+          ]
+        },
+        "errorMessage": "If 'scanClient' is set, 'scanAddress' and 'nonSvValidatorTrustSingleScan' must not be set. All the scan specific configuration must be done inside the 'scanClient' object."
+      }
+    },
+    {
+      "if": {
+        "required": ["synchronizer"],
+        "properties": {
+          "synchronizer": { "required": ["connectionType"] }
+        }
+      },
+      "then": {
+        "allOf": [
+          {
+            "if": {
+              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "bft" } } } }
+            },
+            "then": {
+              "properties": {
+                "synchronizer": {
+                  "not": { "required": ["url", "svNames", "threshold"] }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "trust-single" } } } }
+            },
+            "then": {
+              "properties": {
+                "synchronizer": {
+                  "required": ["url"],
+                  "properties": {
+                    "url": { "minLength": 1 },
+                    "svNames": false,
+                    "threshold": false
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "synchronizer": { "properties": { "connectionType": { "const": "bft-custom" } } } }
+            },
+            "then": {
+              "properties": {
+                "synchronizer": {
+                  "required": ["svNames", "threshold"],
+                  "properties": {
+                    "url": false,
+                    "svNames": { "minItems": 1 }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
     }
   ]
 }

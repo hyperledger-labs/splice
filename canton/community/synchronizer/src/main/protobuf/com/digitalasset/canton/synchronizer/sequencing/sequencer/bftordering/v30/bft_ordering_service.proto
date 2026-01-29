@@ -14,33 +14,14 @@ import "scalapb/scalapb.proto";
 //  implementation, which uses signed integers because the JVM doesn't support unsigned integers.
 
 service BftOrderingService {
-  rpc Ping(PingRequest) returns (PingResponse);
-
-  // For simplicity and to avoid the usage of mTLS, which is not well supported by all network
-  // infrastructure, each BFT ordering node (client endpoint) opens its own P2P connection to every
-  // other server endpoint, performs server authentication and then pushes messages to it.
-  //
-  // Note that the Java gRPC implementation seems to implement unidirectional streams as
-  // bidirectional ones, which seems to require anyway at least one server-sent message before
-  // completion (according to https://github.com/grpc/grpc-java/issues/6568).
-  // Using a unidirectional stream and sending an empty response from the server results
-  // in Netty reference-counted buffer leaks.
-  rpc Receive(stream BftOrderingServiceReceiveRequest) returns (stream BftOrderingServiceReceiveResponse);
+  rpc Receive(stream BftOrderingMessage) returns (stream BftOrderingMessage);
 }
 
-message PingRequest {}
-
-message PingResponse {}
-
-message BftOrderingServiceReceiveRequest {
+message BftOrderingMessage {
   string trace_context = 1;
   BftOrderingMessageBody body = 2;
   string sent_by = 3;
   google.protobuf.Timestamp sent_at = 4;
-}
-
-message BftOrderingServiceReceiveResponse {
-  string from = 1;
 }
 
 message BftOrderingMessageBody {
@@ -48,7 +29,8 @@ message BftOrderingMessageBody {
     SignedMessage /* AvailabilityMessage */availability_message = 1;
     SignedMessage /* ConsensusMessage */consensus_message = 2;
     SignedMessage /* StateTransferMessage */state_transfer_message = 3;
-    SignedMessage /* EpochStatus */retransmission_message = 4;
+    RetransmissionMessage retransmission_message = 4;
+    ConnectionOpened connection_opened = 5;
   }
 }
 
@@ -57,6 +39,8 @@ message SignedMessage {
   string from = 2;
   com.digitalasset.canton.crypto.v30.Signature signature = 3;
 }
+
+message ConnectionOpened {}
 
 message AvailabilityMessage {
   option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
@@ -201,9 +185,8 @@ message CommitCertificate {
 
 // Retransmissions
 message RetransmissionMessage {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
   oneof message {
-    EpochStatus retransmission_request = 1;
+    SignedMessage /* EpochStatus */ retransmission_request = 1;
     RetransmissionResponse retransmission_response = 2;
   }
 }
@@ -216,6 +199,8 @@ message RetransmissionResponse {
 // where receiving node will compute what they can retransmit based on what the requesting
 // node is lacking from looking at this status message.
 message EpochStatus {
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+
   int64 epoch_number = 1;
   repeated SegmentStatus segments = 2;
 }

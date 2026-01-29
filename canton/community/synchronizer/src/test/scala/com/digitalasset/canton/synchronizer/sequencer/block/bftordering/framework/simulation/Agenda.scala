@@ -49,8 +49,8 @@ class Agenda(clock: SimClock, loggerFactory: NamedLoggerFactory) {
         case InternalTick(machine, _, _, _) if machine == node =>
           logger.info(s"Removing internal tick $scheduledCommand to simulate crash")
           false
-        case RunFuture(machine, _, _, _, _) if machine == node =>
-          logger.info(s"Removing future from $scheduledCommand to simulate crash")
+        case RunFuture(machine, _, future, _, _) if machine == node =>
+          logger.info(s"Removing future ${future.name} from $scheduledCommand to simulate crash")
           false
         case _ => true
       }
@@ -70,12 +70,12 @@ class Agenda(clock: SimClock, loggerFactory: NamedLoggerFactory) {
   ): Unit = {
     require(at >= clock.now)
     queue.addOne(ScheduledCommand(command, at, nextCommandSequencerNumber, priority))
-    updateCache(command, at)
+    updateCache(command, at, priority)
     nextCommandSequencerNumber += 1
   }
 
   def removeInternalTick(node: BftNodeId, tickId: Int): Unit = filterCommand {
-    case i: InternalTick[_] =>
+    case i: InternalTick[?] =>
       i.node != node ||
       i.tickId != tickId
     case _ => true
@@ -84,16 +84,23 @@ class Agenda(clock: SimClock, loggerFactory: NamedLoggerFactory) {
   private def updateCache(
       command: Command,
       at: CantonTimestamp,
+      priority: ScheduledCommand.Priority,
   ): Unit =
     command match {
-      case i: InternalEvent[_] =>
+      case i: InternalEvent[?] =>
         i.from match {
           case EventOriginator.FromInternalModule(from) =>
-            latestScheduledMessageCache
-              .put(LatestScheduledMessageKey(i.node, from = from, to = i.to), at)
-              .foreach { oldValue =>
-                require(oldValue.isBefore(at) || oldValue == at)
-              }
+            val key = LatestScheduledMessageKey(i.node, from = from, to = i.to)
+            latestScheduledMessageCache.updateWith(key) {
+              case Some(oldValue) if oldValue.isBefore(at) || oldValue == at => Some(at)
+              case Some(oldValue) =>
+                require(
+                  priority == ScheduledCommand.HighestPriority,
+                  "only highest priority is allowed to be scheduled before other commands",
+                )
+                Some(oldValue)
+              case None => Some(at)
+            }
           case _ =>
         }
       case _ =>
@@ -115,7 +122,7 @@ class Agenda(clock: SimClock, loggerFactory: NamedLoggerFactory) {
     }
 
   def removeClientTick(node: BftNodeId, tickId: Int): Unit = filterCommand {
-    case i: ClientTick[_] =>
+    case i: ClientTick[?] =>
       i.node != node ||
       i.tickId != tickId
     case _ => true

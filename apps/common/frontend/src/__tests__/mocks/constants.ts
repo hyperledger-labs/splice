@@ -90,6 +90,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                     featuredAppRewardCap: '100.0',
                     unfeaturedAppRewardCap: '0.6',
                     optValidatorFaucetCap: '2.85',
+                    optDevelopmentFundPercentage: '0.05',
                   },
                   futureValues: [
                     {
@@ -104,6 +105,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                         featuredAppRewardCap: '100.0',
                         unfeaturedAppRewardCap: '0.6',
                         optValidatorFaucetCap: '2.85',
+                        optDevelopmentFundPercentage: '0.05',
                       },
                     },
                     {
@@ -118,6 +120,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                         featuredAppRewardCap: '100.0',
                         unfeaturedAppRewardCap: '0.6',
                         optValidatorFaucetCap: '2.85',
+                        optDevelopmentFundPercentage: '0.05',
                       },
                     },
                     {
@@ -132,6 +135,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                         featuredAppRewardCap: '100.0',
                         unfeaturedAppRewardCap: '0.6',
                         optValidatorFaucetCap: '2.85',
+                        optDevelopmentFundPercentage: '0.05',
                       },
                     },
                     {
@@ -146,6 +150,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                         featuredAppRewardCap: '100.0',
                         unfeaturedAppRewardCap: '0.6',
                         optValidatorFaucetCap: '2.85',
+                        optDevelopmentFundPercentage: '0.05',
                       },
                     },
                   ],
@@ -186,6 +191,7 @@ export const plannedVoteResult: DsoRules_CloseVoteRequestResult = {
                 },
                 transferPreapprovalFee: null,
                 featuredAppActivityMarkerAmount: null,
+                optDevelopmentFundManager: null,
               },
             },
           },
@@ -352,7 +358,7 @@ export const votedRequest: Contract<VoteRequest> = {
   createdAt: '2024-09-05T08:13:23.038772Z',
 };
 
-export const unvotedRequest = {
+export const unvotedRequest: Contract<VoteRequest> = {
   templateId:
     '1790a114f83d5f290261fae1e7e46fba75a861a3dd603c6b4ef6b67b49053948:Splice.DsoRules:VoteRequest',
   contractId:
@@ -366,6 +372,7 @@ export const unvotedRequest = {
       url: '',
       body: 'Test 3',
     },
+    targetEffectiveAt: null,
     trackingCid: null,
     action: {
       tag: 'ARC_DsoRules',

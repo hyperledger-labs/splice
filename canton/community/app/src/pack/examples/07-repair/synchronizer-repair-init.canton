@@ -11,15 +11,18 @@ bootstrap.synchronizer(
   staticSynchronizerParameters = StaticSynchronizerParameters.defaultsWithoutKMS(ProtocolVersion.forSynchronizer),
 )
 
+// connect participants to synchronizer
+Seq(participant1, participant2).foreach(_.synchronizers.connect_local(sequencer1, alias = "lostSynchronizer"))
+
 // upload the Daml model to all participants
 val darPath = Option(System.getProperty("canton-examples.dar-path")).getOrElse("dars/CantonExamples.dar")
 participants.all.dars.upload(darPath)
 
+
+// setup parties
 val Alice = participant1.parties.enable("Alice")
 val Bob = participant2.parties.enable("Bob")
 
-// setup parties and connect participants to synchronizer
-Seq(participant1, participant2).foreach(_.synchronizers.connect_local(sequencer1, alias = "lostSynchronizer"))
 
 utils.retry_until_true {
     participant1.synchronizers.active("lostSynchronizer") && participant2.synchronizers.active("lostSynchronizer")
@@ -33,7 +36,7 @@ import com.digitalasset.canton.protocol.ContractIdSyntax._
 import scala.jdk.CollectionConverters._
 
 def createIou(participant: ParticipantReference, payer: PartyId, owner: PartyId, value: Int) =
-  participant.ledger_api.javaapi.commands.submit_flat(Seq(payer), new iou.Iou(payer.toProtoPrimitive,
+  participant.ledger_api.javaapi.commands.submit(Seq(payer), new iou.Iou(payer.toProtoPrimitive,
                                                                          owner.toProtoPrimitive,
                                                                          new iou.Amount(value.toLong.toBigDecimal, "USD"),
                                                                          List.empty.asJava

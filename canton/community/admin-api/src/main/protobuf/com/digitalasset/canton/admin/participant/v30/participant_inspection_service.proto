@@ -5,7 +5,6 @@ syntax = "proto3";
 
 package com.digitalasset.canton.admin.participant.v30;
 
-import "com/digitalasset/canton/admin/participant/v30/active_contract.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "scalapb/scalapb.proto";
@@ -23,9 +22,7 @@ service ParticipantInspectionService {
   rpc LookupOffsetByTime(LookupOffsetByTimeRequest) returns (LookupOffsetByTimeResponse);
   // Request metadata about shared contracts used in commitment computation at a specific time
   // Subject to the data still being available on the participant
-  // TODO(#9557) R2
   rpc OpenCommitment(OpenCommitmentRequest) returns (stream OpenCommitmentResponse);
-  // TODO(#9557) R2
   rpc InspectCommitmentContracts(InspectCommitmentContractsRequest) returns (stream InspectCommitmentContractsResponse);
   // Look up the ACS commitments computed and sent by a participant
   rpc LookupSentAcsCommitments(LookupSentAcsCommitmentsRequest) returns (LookupSentAcsCommitmentsResponse);
@@ -58,7 +55,7 @@ message LookupOffsetByTimeResponse {
 message OpenCommitmentRequest {
   // the commitment to be opened
   bytes commitment = 1;
-  string synchronizer_id = 2;
+  string physical_synchronizer_id = 2;
   // the participant for whom the receiving participant computed the commitment
   string computed_for_counter_participant_uid = 3;
   // interval end tick which the commitment corresponds to
@@ -99,7 +96,7 @@ message CommitmentContract {
   option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
   bytes cid = 1;
   bool active_on_expected_synchronizer = 2;
-  Contract serialized_contract = 3;
+  optional bytes contract = 3; // Encoded ContractInstance
   repeated ContractState.SynchronizerState states = 4;
 }
 
@@ -146,8 +143,8 @@ message ContractState {
 
   message ReassignmentId {
     option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
-    string source_synchronizer_id = 1;
-    google.protobuf.Timestamp unassign_timestamp = 2;
+    // identifies the reassignment batch, built from a hash of source, target, contract ids, contract counters and timestamp.
+    string id = 1;
   }
 }
 
@@ -162,7 +159,7 @@ message LookupReceivedAcsCommitmentsRequest {
   // retrieve commitments received from specific counter participants
   // if a specified counter participant is not a counter-participant in some synchronizer, we do not return it in the response
   // an empty set means we return commitments received from all counter participants on the synchronizers matching the synchronizer filter.
-  repeated string counter_participant_uids = 2;
+  repeated string counter_participant_ids = 2;
   // filter by commitment state: only return commitments with the states below
   // if no state is given, we return all commitments
   repeated ReceivedCommitmentState commitment_state = 3;
@@ -270,7 +267,7 @@ message LookupSentAcsCommitmentsRequest {
   // retrieve commitments sent to specific counter participants
   // if a specified counter participant is not a counter-participant in some synchronizer, we do not return it in the response
   // an empty set means we return commitments sent to all counter participants on the synchronizers matching the synchronizer filter.
-  repeated string counter_participant_uids = 2;
+  repeated string counter_participant_ids = 2;
   // filter by commitment state: only return commitments with the states below
   // if no state is given, we return all commitments
   repeated SentCommitmentState commitment_state = 3;
@@ -347,7 +344,7 @@ message CounterParticipantInfo {
 
 message GetIntervalsBehindForCounterParticipantsRequest {
   // if empty, all counter-participants are considered
-  repeated string counter_participant_uids = 1;
+  repeated string counter_participant_ids = 1;
   // if empty, all synchronizers are considered
   repeated string synchronizer_ids = 2;
   // if set, only counter-participants that are behind by at least this number of intervals are returned

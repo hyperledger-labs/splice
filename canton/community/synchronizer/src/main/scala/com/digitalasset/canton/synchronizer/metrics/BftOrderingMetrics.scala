@@ -7,22 +7,34 @@ import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.*
 import com.daml.metrics.api.HistogramInventory.Item
 import com.daml.metrics.api.MetricHandle.*
-import com.daml.metrics.grpc.GrpcServerMetrics
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.BaseMetrics
 import com.digitalasset.canton.logging.pretty.PrettyNameOnlyCase
+import com.digitalasset.canton.metrics.ActiveRequestsMetrics.GrpcServerMetricsX
 import com.digitalasset.canton.metrics.{
   DbStorageHistograms,
   DbStorageMetrics,
   DeclarativeApiMetrics,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.ModuleName
+import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics.updateTimer
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.SequencerBftAdminData.{
+  PeerConnectionStatus,
+  PeerEndpointHealth,
+  PeerEndpointHealthStatus,
+  PeerNetworkStatus,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.Membership
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
+  Env,
+  ModuleContext,
+}
 
 import java.time.{Duration, Instant}
+import java.util.concurrent.ConcurrentHashMap
 import scala.collection.mutable
-import scala.concurrent.blocking
 import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{Future, blocking}
 import scala.jdk.DurationConverters.ScalaDurationOps
 
 private[metrics] final class BftOrderingHistograms(val parent: MetricName)(implicit
@@ -157,7 +169,8 @@ private[metrics] final class BftOrderingHistograms(val parent: MetricName)(impli
       private[metrics] val grpcLatency: Item = Item(
         prefix :+ "grpc-latency",
         summary = "Latency of a gRPC message send",
-        description = "Records the rate and latency of a gRPC message send.",
+        description =
+          "Records the rate of gRPC message sends and their latency (up to receiving them on the other side).",
         qualification = MetricQualification.Latency,
       )
     }
@@ -182,11 +195,11 @@ private[metrics] final class BftOrderingHistograms(val parent: MetricName)(impli
 class BftOrderingMetrics private[metrics] (
     histograms: BftOrderingHistograms,
     override val openTelemetryMetricsFactory: LabeledMetricsFactory,
-    override val grpcMetrics: GrpcServerMetrics,
+    override val grpcMetrics: GrpcServerMetricsX,
     override val healthMetrics: HealthMetrics,
 ) extends BaseMetrics {
 
-  private implicit val mc: MetricsContext = MetricsContext.Empty
+  private implicit val metricsContext: MetricsContext = MetricsContext.Empty
 
   val dbStorage: DbStorageMetrics =
     new DbStorageMetrics(histograms.dbStorage, openTelemetryMetricsFactory)
@@ -199,6 +212,9 @@ class BftOrderingMetrics private[metrics] (
 
   // Private constructor to avoid being instantiated multiple times by accident
   final class PerformanceMetrics private[BftOrderingMetrics] {
+
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
+    @volatile var enabled: Boolean = true
 
     // Private constructor to avoid being instantiated multiple times by accident
     final class OrderingStageLatencyMetrics private[BftOrderingMetrics] {
@@ -237,59 +253,150 @@ class BftOrderingMetrics private[metrics] (
                 val BatchQueuedForBlockInclusion = "batch-queued-for-block-inclusion"
               }
             }
+
+            object consensus {
+              // Time waited for a block proposal from availability
+              val BlockProposalWait = "consensus-block-proposal-wait"
+              // Time waited for a new epoch to complete
+              val EpochCompletionWait = "consensus-epoch-completion-wait"
+              // Time waited for a new epoch to start
+              val EpochStartWait = "consensus-epoch-start-wait"
+              // Time elapsed between sending a PrePrepare and seeing that the block has been ordered
+              val SegmentProposalToCommitLatency = "consensus-segment-proposal-to-commit-latency"
+              // Time elapsed between ordered blocks proposed by a segment
+              val SegmentBlockCommitLatency = "consensus-segment-block-commit-latency"
+
+              // Time spent by view messages in the postponed queue
+              val PostponedViewMessagesQueueLatency =
+                "consensus-postponed-view-messages-queue-latency"
+
+              object stateTransfer {
+                // Time spent by consensus messages in the postponed queue during state transfer
+                val PostponedMessagesQueueLatency =
+                  "state-transfer-postponed-consensus-messages-queue-latency"
+              }
+            }
+
+            object output {
+              val Fetch = "output-block-fetch-batches"
+              val Inspection = "output-block-inspection"
+            }
           }
         }
       }
 
-      val timer: Timer =
+      private val timer: Timer =
         openTelemetryMetricsFactory.timer(histograms.performance.orderingStageLatency.info)
 
+      private val queueSizeGauges = new ConcurrentHashMap[String, Gauge[Int]]()
+
+      private def queueSize(
+          moduleName: String
+      )(implicit metricsContext: MetricsContext): Gauge[Int] =
+        queueSizeGauges
+          .computeIfAbsent(
+            moduleName,
+            _ =>
+              openTelemetryMetricsFactory.gauge(
+                MetricInfo(
+                  histograms.performance.prefix :+ "moduleQueueSize" :+ moduleName,
+                  summary = s"Module queue size for $moduleName",
+                  description = s"Size of the module queue for $moduleName.",
+                  qualification = MetricQualification.Latency,
+                ),
+                0,
+              ),
+          )
+
+      def time[T](
+          call: => T
+      )(implicit metricsContext: MetricsContext = MetricsContext.Empty): T =
+        if (enabled)
+          timer.time(call)(metricsContext)
+        else
+          call
+
+      def timeFuture[T](call: => Future[T])(implicit
+          context: MetricsContext = MetricsContext.Empty
+      ): Future[T] =
+        if (enabled)
+          timer.timeFuture(call)(context)
+        else
+          call
+
+      def timeFuture[E <: Env[E], X](
+          moduleContext: ModuleContext[E, ?],
+          futureUnlessShutdown: E#FutureUnlessShutdownT[X],
+          orderingStage: String,
+      )(implicit metricsContext: MetricsContext): E#FutureUnlessShutdownT[X] =
+        if (enabled)
+          moduleContext.timeFuture(timer, futureUnlessShutdown)(
+            metricsContext.withExtraLabels(
+              labels.stage.Key -> orderingStage
+            )
+          )
+        else
+          futureUnlessShutdown
+
       def emitModuleQueueLatency(
-          moduleName: ModuleName,
+          moduleName: String,
           sendInstant: Instant,
           maybeDelay: Option[FiniteDuration],
-      )(implicit metricsContext: MetricsContext): Unit = {
-        val latency =
-          Duration.between(sendInstant, Instant.now).minus(maybeDelay.fold(Duration.ZERO)(_.toJava))
-        timer.update(latency)(
-          metricsContext.withExtraLabels(labels.stage.Key -> s"module-queue-${moduleName.name}")
-        )
-      }
+      )(implicit metricsContext: MetricsContext): Unit =
+        if (enabled) {
+          val latency =
+            Duration
+              .between(sendInstant, Instant.now)
+              .minus(maybeDelay.fold(Duration.ZERO)(_.toJava))
+          updateTimer(timer, latency)(
+            metricsContext.withExtraLabels(labels.stage.Key -> s"module-queue-$moduleName")
+          )
+        }
+
+      def emitModuleQueueSize(
+          moduleName: String,
+          size: Int,
+      )(implicit metricsContext: MetricsContext): Unit =
+        if (enabled) {
+          queueSize(moduleName).updateValue(size)
+        }
 
       def emitOrderingStageLatency[R](
           stage: String,
           op: () => R,
-      )(implicit
-          mc: MetricsContext
-      ): R = {
-        val startInstant = Instant.now()
-        val result = op()
-        val duration = Duration.between(startInstant, Instant.now())
-        emitOrderingStageLatency(stage, duration)
-        result
+      )(implicit metricsContext: MetricsContext): R =
+        if (enabled) {
+          val startInstant = Instant.now()
+          val result = op()
+          val duration = Duration.between(startInstant, Instant.now())
+          emitOrderingStageLatency(stage, duration)
+          result
+        } else {
+          op()
+        }
+
+      def emitOrderingStageLatency(
+          stage: String,
+          startInstant: Option[Instant],
+          endInstant: Instant = Instant.now(),
+          cleanup: () => Unit = () => (),
+      )(implicit metricsContext: MetricsContext): Unit = {
+        startInstant.foreach(start =>
+          emitOrderingStageLatency(
+            stage,
+            Duration.between(start, endInstant),
+          )(metricsContext)
+        )
+        cleanup()
       }
 
       def emitOrderingStageLatency(
           stage: String,
-          startInstant: Instant,
-          endInstant: Instant,
-      )(implicit
-          mc: MetricsContext
-      ): Unit =
-        emitOrderingStageLatency(
-          stage,
-          Duration.between(startInstant, endInstant),
-        )
-
-      def emitOrderingStageLatency(
-          stage: String,
           duration: Duration,
-      )(implicit
-          mc: MetricsContext
-      ): Unit =
-        performance.orderingStageLatency.timer
-          .update(duration)(
-            mc.withExtraLabels(
+      )(implicit metricsContext: MetricsContext): Unit =
+        if (enabled)
+          updateTimer(performance.orderingStageLatency.timer, duration)(
+            metricsContext.withExtraLabels(
               performance.orderingStageLatency.labels.stage.Key ->
                 stage
             )
@@ -303,6 +410,7 @@ class BftOrderingMetrics private[metrics] (
 
     object labels {
       val ReportingSequencer: String = "reporting-sequencer"
+      val IsBlockEmpty: String = "is-block-empty" // true or false
     }
 
     private val prefix = histograms.global.prefix
@@ -312,6 +420,24 @@ class BftOrderingMetrics private[metrics] (
         prefix :+ "ordered-blocks",
         summary = "Blocks ordered",
         description = "Measures the total blocks ordered.",
+        qualification = MetricQualification.Traffic,
+      )
+    )
+
+    val batchesOrdered: Meter = openTelemetryMetricsFactory.meter(
+      MetricInfo(
+        prefix :+ "ordered-batches",
+        summary = "Batches ordered",
+        description = "Measures the total batches ordered.",
+        qualification = MetricQualification.Traffic,
+      )
+    )
+
+    val requestsOrdered: Meter = openTelemetryMetricsFactory.meter(
+      MetricInfo(
+        prefix :+ "ordered-requests",
+        summary = "Requests ordered",
+        description = "Measures the total requests ordered.",
         qualification = MetricQualification.Traffic,
       )
     )
@@ -345,6 +471,8 @@ class BftOrderingMetrics private[metrics] (
           case object Success extends OutcomeValue
           case object QueueFull extends OutcomeValue
           case object RequestTooBig extends OutcomeValue
+          case object InvalidTag extends OutcomeValue
+          case object P2PNotReady extends OutcomeValue
         }
       }
     }
@@ -507,9 +635,6 @@ class BftOrderingMetrics private[metrics] (
       object labels {
         val Endpoint: String = "endpoint"
         val Sequencer: String = "sequencer"
-        val Epoch: String = "epoch"
-        val View: String = "view"
-        val Block: String = "block"
 
         object violationType {
           val Key: String = "violationType"
@@ -524,6 +649,7 @@ class BftOrderingMetrics private[metrics] (
             case object ConsensusRoleEquivocation extends ViolationTypeValue
             case object StateTransferInvalidMessage extends ViolationTypeValue
             case object RetransmissionResponseInvalidMessage extends ViolationTypeValue
+            case object WrongGrpcMessageSentByBftNodeId extends ViolationTypeValue
           }
         }
       }
@@ -563,6 +689,60 @@ class BftOrderingMetrics private[metrics] (
       ),
       0,
     )
+
+    val epochViewChanges: Gauge[Long] = openTelemetryMetricsFactory.gauge(
+      MetricInfo(
+        prefix :+ "epoch-view-changes",
+        summary = "Number of view changes occurred",
+        description = "Number of view changes occurred.",
+        qualification = MetricQualification.Latency,
+      ),
+      0,
+    )
+
+    val postponedViewMessagesQueueSize: Gauge[Int] =
+      openTelemetryMetricsFactory.gauge(
+        MetricInfo(
+          prefix :+ "postponed-view-messages-queue-size",
+          summary = "Size of the queue containing postponed view messages",
+          description = "Size of the queue containing postponed view messages.",
+          qualification = MetricQualification.Saturation,
+        ),
+        0,
+      )
+
+    val postponedViewMessagesQueueMaxSize: Gauge[Int] =
+      openTelemetryMetricsFactory.gauge(
+        MetricInfo(
+          prefix :+ "postponed-view-messages-queue-max-size",
+          summary = "Actual maximum size of the queue containing postponed view messages",
+          description = "Actual maximum size of the queue containing postponed view messages.",
+          qualification = MetricQualification.Saturation,
+        ),
+        0,
+      )
+
+    val postponedViewMessagesQueueDuplicatesMeter: Meter =
+      openTelemetryMetricsFactory.meter(
+        MetricInfo(
+          prefix :+ "postponed-view-messages-duplicates",
+          summary =
+            "Count of messages dropped as duplicates by queue containing postponed view messages",
+          description =
+            "Count of messages dropped as duplicates by queue containing postponed view messages.",
+          qualification = MetricQualification.Saturation,
+        )
+      )
+
+    val postponedViewMessagesQueueDropMeter: Meter =
+      openTelemetryMetricsFactory.meter(
+        MetricInfo(
+          prefix :+ "postponed-view-messages-dropped",
+          summary = "Count of messages dropped by queue containing postponed view messages",
+          description = "Count of messages dropped by queue containing postponed view messages.",
+          qualification = MetricQualification.Saturation,
+        )
+      )
 
     val commitLatency: Timer =
       openTelemetryMetricsFactory.timer(histograms.consensus.consensusCommitLatency.info)
@@ -631,7 +811,6 @@ class BftOrderingMetrics private[metrics] (
 
       object labels {
         val VotingSequencer: String = "voting-sequencer"
-        val Epoch: String = "epoch"
       }
 
       private val prepareGauges = mutable.Map[BftNodeId, Gauge[Double]]()
@@ -680,11 +859,11 @@ class BftOrderingMetrics private[metrics] (
           summary: String,
           description: String,
       ): Gauge[Double] = {
-        val mc1 = mc.withExtraLabels(labels.VotingSequencer -> node)
+        val mc1 = metricsContext.withExtraLabels(labels.VotingSequencer -> node)
         blocking {
           synchronized {
             locally {
-              implicit val mc: MetricsContext = mc1
+              implicit val metricsContext: MetricsContext = mc1
               gauges.getOrElseUpdate(
                 node,
                 openTelemetryMetricsFactory.gauge(
@@ -711,8 +890,53 @@ class BftOrderingMetrics private[metrics] (
           gaugesMap.remove(id).discard
         }
     }
+
+    // Private constructor to avoid being instantiated multiple times by accident
+    final class StateTransferMetrics private[BftOrderingMetrics] {
+      private val prefix = ConsensusMetrics.this.prefix :+ "state-transfer"
+
+      val postponedMessagesQueueSize: Gauge[Int] =
+        openTelemetryMetricsFactory.gauge(
+          MetricInfo(
+            prefix :+ "postponed-consensus-messages-queue-size",
+            summary =
+              "Size of the queue containing consensus messages postponed during state transfer",
+            description =
+              "Size of the queue containing consensus messages postponed during state transfer.",
+            qualification = MetricQualification.Saturation,
+          ),
+          0,
+        )
+
+      val postponedMessagesQueueMaxSize: Gauge[Int] =
+        openTelemetryMetricsFactory.gauge(
+          MetricInfo(
+            prefix :+ "postponed-consensus-messages-queue-max-size",
+            summary =
+              "Actual maximum size of the queue containing consensus messages postponed during state transfer",
+            description =
+              "Actual maximum size of the queue containing consensus messages postponed during state transfer.",
+            qualification = MetricQualification.Saturation,
+          ),
+          0,
+        )
+
+      val postponedMessagesQueueDropMeter: Meter =
+        openTelemetryMetricsFactory.meter(
+          MetricInfo(
+            prefix :+ "postponed-consensus-messages-dropped",
+            summary =
+              "Count of messages dropped by queue containing consensus messages postponed during state transfer",
+            description =
+              "Count of messages dropped by queue containing consensus messages postponed during state transfer.",
+            qualification = MetricQualification.Saturation,
+          )
+        )
+    }
+
     val votes = new VotesMetrics
     val retransmissions = new RetransmissionsMetrics
+    val stateTransfer = new StateTransferMetrics
   }
   val consensus = new ConsensusMetrics
 
@@ -761,12 +985,227 @@ class BftOrderingMetrics private[metrics] (
 
     val queryLatency: Timer =
       openTelemetryMetricsFactory.timer(histograms.topology.queryLatency.info)
+
+    object labels {
+      val sequencerId: String = "sequencer-id"
+    }
+
+    // We assign different values to different nodes just to make it easier to distinguish them in Grafana
+    private val topologyGauges = mutable.Map[BftNodeId, Gauge[Int]]()
+    private val leadersGauges = mutable.Map[BftNodeId, Gauge[Int]]()
+
+    private val maxToleratedFaultsGauge =
+      openTelemetryMetricsFactory.gauge(
+        MetricInfo(
+          prefix :+ "max-tolerated-faults",
+          "Maximum number of tolerated faults",
+          MetricQualification.Traffic,
+          "Maximum number of tolerated faults",
+        ),
+        0,
+      )
+    private val weakQuorumGauge =
+      openTelemetryMetricsFactory.gauge(
+        MetricInfo(
+          prefix :+ "weak-quorum",
+          "Number of non-faulty nodes required for a weak quorum",
+          MetricQualification.Traffic,
+          "Number of non-faulty nodes required for a weak quorum, like for batch dissemination",
+        ),
+        0,
+      )
+    private val strongQuorumGauge = openTelemetryMetricsFactory.gauge(
+      MetricInfo(
+        prefix :+ "strong-quorum",
+        "Number of non-faulty nodes required for a strong quorum",
+        MetricQualification.Traffic,
+        "Number of non-faulty nodes required for a strong quorum, like for consensus",
+      ),
+      0,
+    )
+
+    def update(newMembership: Membership)(implicit metricsContext: MetricsContext): Unit = {
+      val orderingTopology = newMembership.orderingTopology
+      val members = orderingTopology.nodes
+      val sortedMembersWithIndex = members.toSeq.sorted.zipWithIndex
+      val sortedLeadersWithIndex = newMembership.leaders.toSeq.sorted.zipWithIndex
+
+      maxToleratedFaultsGauge.updateValue(orderingTopology.maxToleratedFaults)
+      weakQuorumGauge.updateValue(orderingTopology.weakQuorum)
+      strongQuorumGauge.updateValue(orderingTopology.strongQuorum)
+
+      blocking {
+        synchronized {
+          cleanupGauges(topologyGauges, members)
+          cleanupGauges(leadersGauges, members)
+          updateMetrics(
+            sortedMembersWithIndex,
+            topologyGauges,
+            labels.sequencerId,
+            prefix,
+            "topology-member",
+            "Topology members",
+            "Topology members sorted by node ID with their index",
+          )
+          updateMetrics(
+            sortedLeadersWithIndex,
+            leadersGauges,
+            labels.sequencerId,
+            prefix,
+            "topology-leader",
+            "Topology leaders",
+            "Topology leaders sorted by node ID with their index",
+          )
+        }
+      }
+    }
   }
   val topology = new TopologyMetrics
 
   // Private constructor to avoid being instantiated multiple times by accident
+  final class BlacklistLeaderSelectionPolicyMetrics private[BftOrderingMetrics] {
+    object labels {
+      val blacklistNode: String = "blacklist-sequencer"
+    }
+
+    private val blacklistGauges = mutable.Map[BftNodeId, Gauge[Long]]()
+
+    def blacklist(node: BftNodeId): Gauge[Long] = {
+      val mc1 = metricsContext.withExtraLabels(labels.blacklistNode -> node)
+      blocking {
+        synchronized {
+          locally {
+            implicit val metricsContext: MetricsContext = mc1
+            blacklistGauges.getOrElseUpdate(
+              node,
+              openTelemetryMetricsFactory.gauge(
+                MetricInfo(
+                  prefix :+ "blacklist-sequencer",
+                  "Amount of epochs the node is blacklisted for",
+                  MetricQualification.Traffic,
+                  "The amount of epochs an BFT sequencer is blacklisted from being a leader",
+                ),
+                0,
+              ),
+            )
+          }
+        }
+      }
+    }
+
+    def cleanupBlacklistGauges(keepOnly: Set[BftNodeId]): Unit =
+      blocking {
+        synchronized {
+          blacklistGauges.view.filterKeys(!keepOnly.contains(_)).foreach { case (id, gauge) =>
+            gauge.close()
+            blacklistGauges.remove(id).discard
+          }
+        }
+      }
+  }
+  val blacklistLeaderSelectionPolicyMetrics = new BlacklistLeaderSelectionPolicyMetrics
+
+  // Private constructor to avoid being instantiated multiple times by accident
   final class P2PMetrics private[BftOrderingMetrics] {
     private val p2pPrefix = histograms.p2p.p2pPrefix
+
+    object labels {
+      val endpoint: String = "endpoint"
+    }
+
+    // We assign different values to different endpoints just to make it easier to distinguish them in Grafana
+    private val authenticatedGauges = mutable.Map[String, Gauge[Int]]()
+    private val unauthenticatedGauges = mutable.Map[String, Gauge[Int]]()
+    private val disconnectedGauges = mutable.Map[String, Gauge[Int]]()
+
+    def update(status: PeerNetworkStatus)(implicit metricsContext: MetricsContext): Unit = {
+      val statusView = status.endpointStatuses.view
+      val authenticated =
+        statusView
+          .flatMap {
+            case PeerConnectionStatus.PeerIncomingConnection(sequencerId) =>
+              Some(sequencerId.toProtoPrimitive)
+            case PeerConnectionStatus.PeerEndpointStatus(
+                  p2pEndpointId,
+                  isOutgoingConnection,
+                  PeerEndpointHealth(
+                    PeerEndpointHealthStatus.Authenticated(sequencerId),
+                    _description,
+                  ),
+                ) =>
+              Some(
+                s"${p2pEndpointId.url} (${sequencerId.toProtoPrimitive}, outgoing = $isOutgoingConnection)"
+              )
+            case _ => None
+          }
+      val unauthenticated =
+        statusView
+          .flatMap {
+            case PeerConnectionStatus.PeerEndpointStatus(
+                  p2pEndpointId,
+                  _isOutgoingConnection,
+                  PeerEndpointHealth(
+                    PeerEndpointHealthStatus.Unauthenticated,
+                    _description,
+                  ),
+                ) =>
+              Some(p2pEndpointId.url)
+            case _ => None
+          }
+      val disconnected =
+        statusView
+          .flatMap {
+            case PeerConnectionStatus.PeerEndpointStatus(
+                  p2pEndpointId,
+                  _isOutgoingConnection,
+                  PeerEndpointHealth(
+                    PeerEndpointHealthStatus.Disconnected,
+                    _description,
+                  ),
+                ) =>
+              Some(p2pEndpointId.url)
+            case _ => None
+          }
+      val authenticatedSortedWithIndex = authenticated.toSeq.sorted.zipWithIndex
+      val connectedSortedWithIndex = unauthenticated.toSeq.sorted.zipWithIndex
+      val disconnectedSortedWithIndex = disconnected.toSeq.sorted.zipWithIndex
+
+      blocking {
+        synchronized {
+          cleanupGauges(authenticatedGauges, authenticated.toSet)
+          cleanupGauges(unauthenticatedGauges, unauthenticated.toSet)
+          cleanupGauges(disconnectedGauges, disconnected.toSet)
+
+          updateMetrics(
+            authenticatedSortedWithIndex,
+            authenticatedGauges,
+            labels.endpoint,
+            p2pPrefix,
+            "authenticated-endpoint",
+            "Authenticated P2P endpoints",
+            "P2P endpoints that are authenticated.",
+          )
+          updateMetrics(
+            connectedSortedWithIndex,
+            unauthenticatedGauges,
+            labels.endpoint,
+            p2pPrefix,
+            "unauthenticated-endpoint",
+            "Connected but unauthenticated P2P endpoints",
+            "P2P endpoints that are connected but not yet authenticated.",
+          )
+          updateMetrics(
+            disconnectedSortedWithIndex,
+            disconnectedGauges,
+            labels.endpoint,
+            p2pPrefix,
+            "disconnected-endpoint",
+            "Disconnected P2P endpoints",
+            "P2P endpoints that are disconnected.",
+          )
+        }
+      }
+    }
 
     // Private constructor to avoid being instantiated multiple times by accident
     final class ConnectionsMetrics private[P2PMetrics] {
@@ -863,6 +1302,7 @@ class BftOrderingMetrics private[metrics] (
             sealed trait SourceValue extends PrettyNameOnlyCase
             case object SourceParsingFailed extends SourceValue
             case class Empty(from: BftNodeId) extends SourceValue
+            case class ConnectionOpener(from: BftNodeId) extends SourceValue
             case class Availability(from: BftNodeId) extends SourceValue
             case class Consensus(from: BftNodeId) extends SourceValue
             case class Retransmissions(from: BftNodeId) extends SourceValue
@@ -895,8 +1335,59 @@ class BftOrderingMetrics private[metrics] (
     val receive = new ReceiveMetrics
   }
   val p2p = new P2PMetrics
+
+  private def cleanupGauges[T <: String](
+      nodeGauges: mutable.Map[T, Gauge[Int]],
+      keepOnlyNodes: Set[T],
+  ): Unit =
+    nodeGauges.view.filterKeys(!keepOnlyNodes.contains(_)).foreach { case (id, gauge) =>
+      gauge.close()
+      nodeGauges.remove(id).discard
+    }
+
+  private def updateMetrics[N <: String](
+      sortedMembersWithIndex: Seq[(N, Int)],
+      gauges: mutable.Map[N, Gauge[Int]],
+      label: String,
+      prefix: MetricName,
+      metricName: String,
+      metricSummary: String,
+      metricDescription: String,
+  )(implicit metricsContext: MetricsContext): Unit =
+    sortedMembersWithIndex.foreach { case (txt, index) =>
+      val mc1 = metricsContext.withExtraLabels(label -> txt)
+      locally {
+        implicit val metricsContext: MetricsContext = mc1
+        gauges
+          .getOrElseUpdate(
+            txt,
+            openTelemetryMetricsFactory.gauge(
+              MetricInfo(
+                prefix :+ metricName,
+                metricSummary,
+                MetricQualification.Traffic,
+                metricDescription,
+              ),
+              index + 1,
+            ),
+          )
+          .updateValue(index + 1)
+      }
+    }
 }
 
 object BftOrderingMetrics {
+
   val Prefix: MetricName = MetricName("bftordering")
+
+  def updateTimer(
+      timer: Timer,
+      duration: Duration,
+  )(implicit metricsContext: MetricsContext): Unit =
+    // Java's `Instant` does not have to provide monotonically increasing times
+    //  (see the documentation for details: https://docs.oracle.com/javase/8/docs/api/java/time/Instant.html)
+    //  and emitting negative durations is generally disallowed by metrics infrastructure, as it can
+    //  result in warnings/errors and/or unexpected behavior.
+    if (!duration.isNegative)
+      timer.update(duration)
 }

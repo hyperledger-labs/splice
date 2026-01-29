@@ -17,6 +17,7 @@ import {
   validateUrl,
   validateWeight,
 } from './formValidators';
+import { THRESHOLD_DEADLINE_SUBTITLE } from '../../utils/constants';
 import {
   createProposalActions,
   getInitialExpiration,
@@ -150,7 +151,7 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
               {field => (
                 <field.DateField
                   title="Threshold Deadline"
-                  description="This is the last day voters can vote on this proposal"
+                  description={THRESHOLD_DEADLINE_SUBTITLE}
                   id="update-sv-reward-weight-expiry-date"
                 />
               )}
@@ -177,9 +178,7 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
                 onChange: ({ value }) => validateSummary(value),
               }}
             >
-              {field => (
-                <field.TextArea title="Proposal Summary" id="update-sv-reward-weight-summary" />
-              )}
+              {field => <field.ProposalSummaryField id="update-sv-reward-weight-summary" />}
             </form.AppField>
 
             <form.AppField
@@ -196,7 +195,9 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
               name="sv"
               validators={{
                 onBlur: ({ value }) => validateSvSelection(value),
-                onChange: ({ value }) => validateSvSelection(value),
+                onChange: ({ value }) => {
+                  return validateSvSelection(value);
+                },
               }}
             >
               {field => (
@@ -204,6 +205,7 @@ export const UpdateSvRewardWeightForm: React.FC = _ => {
                   title="Member"
                   options={svOptions}
                   id="update-sv-reward-weight-member"
+                  onChange={() => form.resetField('weight')}
                 />
               )}
             </form.AppField>

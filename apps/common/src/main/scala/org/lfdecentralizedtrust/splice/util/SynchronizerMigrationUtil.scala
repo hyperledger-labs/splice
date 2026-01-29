@@ -7,6 +7,7 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{ForceFlag, ForceFlags}
 import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection
@@ -15,7 +16,7 @@ import scala.concurrent.Future
 
 final object SynchronizerMigrationUtil {
   // We only check mediatorReactionTimeout here as that is what matters for safety and it ensures that
-  // synchronizerIsUnpaused = !synchronizerIsUnpaused instead of checking that both are 0 or both are non-zero.
+  // synchronizerIsUnpaused = !synchronizerIsUnpaused instead of checking that all 3 are 0 or both are non-zero.
   def synchronizerIsPaused(params: TopologyResult[SynchronizerParametersState]): Boolean =
     params.mapping.parameters.mediatorReactionTimeout == NonNegativeFiniteDuration.Zero
 
@@ -33,11 +34,17 @@ final object SynchronizerMigrationUtil {
         // instaed of timing out. It is only enforced on the
         // write path so there can still be transaction going through after we set it to zero
         // if the sequencer has not yet observed the topology change.
-        // mediator reaction timeout is enforced as part of the transaction protocol so there we really get a guarantee
+        // mediator reaction timeout and participant response timeout is enforced as part of the transaction protocol so there we really get a guarantee
         // that no transactions go through.
         confirmationRequestsMaxRate = NonNegativeInt.zero,
         mediatorReactionTimeout = NonNegativeFiniteDuration.Zero,
+        // We want to block all transactions, ideally we would set this to zero but Canton doesn't like it when mediatorReactionTimeout + confirmationResponseTimeout = 0.
+        // So instead we set this to 1 microsecond. This still makes it impossible to get a transaction through as
+        // you need at a minimum two microseconds difference between confirmation request and verdict.
+        confirmationResponseTimeout = NonNegativeFiniteDuration.tryOfMicros(1),
       ),
+      forceChanges =
+        ForceFlags(ForceFlag.AllowOutOfBoundsValue), // required for mediatorReactionTimeout = 0
     )
 
   def ensureSynchronizerIsUnpaused(
@@ -51,6 +58,8 @@ final object SynchronizerMigrationUtil {
         confirmationRequestsMaxRate =
           DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate,
         mediatorReactionTimeout = DynamicSynchronizerParameters.defaultMediatorReactionTimeout,
+        confirmationResponseTimeout =
+          DynamicSynchronizerParameters.defaultConfirmationResponseTimeout,
       ),
     )
 

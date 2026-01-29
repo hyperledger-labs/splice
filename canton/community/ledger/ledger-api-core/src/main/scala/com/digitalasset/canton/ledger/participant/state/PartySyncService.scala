@@ -3,8 +3,15 @@
 
 package com.digitalasset.canton.ledger.participant.state
 
+import com.digitalasset.canton.crypto.HashOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.topology.{
+  ExternalPartyOnboardingDetails,
+  ParticipantId,
+  SynchronizerId,
+}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref
 
 /** An interface for on-boarding parties via a participant. */
@@ -29,14 +36,31 @@ trait PartySyncService {
     *   A party identifier suggestion
     * @param submissionId
     *   Client picked submission identifier for matching the responses with the request.
-    *
+    * @param synchronizerIdO
+    *   The synchronizer on which the party should be allocated. Can be omitted if the participant
+    *   is connected to only one synchronizer.
+    * @param externalPartyOnboardingDetails
+    *   Onboarding information when allocating an external party
     * @return
     *   an async result of a SubmissionResult
     */
   def allocateParty(
       hint: Ref.Party,
       submissionId: Ref.SubmissionId,
+      synchronizerIdO: Option[SynchronizerId],
+      externalPartyOnboardingDetails: Option[ExternalPartyOnboardingDetails],
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[SubmissionResult]
+
+  /** Return the protocol version for a synchronizer ID if the node is connected to it.
+    */
+  def protocolVersionForSynchronizerId(synchronizerId: SynchronizerId): Option[ProtocolVersion]
+
+  /** The participant id */
+  def participantId: ParticipantId
+
+  /** Hash ops of the participant */
+  def hashOps: HashOps
+
 }

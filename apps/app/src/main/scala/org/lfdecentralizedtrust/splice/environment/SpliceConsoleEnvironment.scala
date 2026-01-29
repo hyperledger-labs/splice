@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
+import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
@@ -11,9 +13,12 @@ import com.digitalasset.canton.console.{
   NodeReferences,
   StandardConsoleOutput,
 }
+import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.daml.lf.typesig.PackageSignature
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.console.*
+import org.lfdecentralizedtrust.splice.http.{HttpClient, HttpClientMetrics}
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.util.ResourceTemplateDecoder
@@ -23,6 +28,8 @@ import org.lfdecentralizedtrust.splice.validator.config.{
 }
 import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 
+import scala.concurrent.ExecutionContext
+
 class SpliceConsoleEnvironment(
     override val environment: SpliceEnvironment,
     val consoleOutput: ConsoleOutput = StandardConsoleOutput,
@@ -31,23 +38,29 @@ class SpliceConsoleEnvironment(
 
   override type Config = SpliceConfig
 
-  val packageSignatures = ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-    DarResources.TokenStandard.allPackageResources.flatMap(_.all) ++
-      DarResources.splitwell.all ++
-      DarResources.validatorLifecycle.all ++
-      DarResources.wallet.all ++
-      DarResources.amulet.all ++
-      DarResources.dsoGovernance.all
+  private implicit lazy val actorSystem: ActorSystem = environment.actorSystem
+  private implicit lazy val ec: ExecutionContext = environment.executionContext
+  private lazy val templateDecoder = new ResourceTemplateDecoder(
+    SpliceConsoleEnvironment.packageSignatures,
+    environment.loggerFactory,
   )
-  implicit val actorSystem: ActorSystem = environment.actorSystem
-  val templateDecoder = new ResourceTemplateDecoder(packageSignatures, environment.loggerFactory)
+
+  private val metricsContext = MetricsContext("component" -> "splice-console-environment")
+
+  lazy val metricsFactory: LabeledMetricsFactory =
+    environment.metrics.metricsFactoryProvider.generateMetricsFactory(
+      metricsContext
+    )
+  lazy val httpClient: HttpClient = HttpClient(
+    HttpClient.HttpRequestParameters(environment.config.parameters.timeouts.requestTimeout),
+    HttpClientMetrics(metricsFactory),
+    logger,
+  )
 
   lazy val httpCommandRunner: ConsoleHttpCommandRunner = new ConsoleHttpCommandRunner(
-    environment,
-    environment.config.parameters.timeouts.processing,
     environment.config.parameters.timeouts.console,
-    environment.config.parameters.timeouts.requestTimeout,
-  )(this.tracer, templateDecoder)
+    environment.loggerFactory,
+  )(this.tracer, templateDecoder, httpClient, environment.executionContext, actorSystem)
 
   def mergeLocalSpliceInstances(
       locals: Seq[AppBackendReference]*
@@ -210,7 +223,7 @@ class SpliceConsoleEnvironment(
   private def createRemoteSplitwellReference(name: String): SplitwellAppClientReference =
     new SplitwellAppClientReference(this, name, environment.config.splitwellClientsByString(name))
 
-  override protected def topLevelValues: Seq[TopLevelValue[_]] = {
+  override protected def topLevelValues: Seq[TopLevelValue[?]] = {
 
     super.topLevelValues ++
       validators.local.map(v =>
@@ -340,4 +353,18 @@ class SpliceConsoleEnvironment(
       case _: ValidatorAppBackendReference => 3
       case _ => 5
     }
+}
+
+object SpliceConsoleEnvironment {
+
+  private lazy val packageSignatures: Map[PackageId, PackageSignature] =
+    ResourceTemplateDecoder.loadPackageSignaturesFromResources(
+      DarResources.TokenStandard.allPackageResources.flatMap(_.all) ++
+        DarResources.splitwell.all ++
+        DarResources.validatorLifecycle.all ++
+        DarResources.wallet.all ++
+        DarResources.amulet.all ++
+        DarResources.dsoGovernance.all
+    )
+
 }

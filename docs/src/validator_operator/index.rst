@@ -42,6 +42,7 @@ You can find hardware requirements for both options in a :ref:`dedicated section
    validator_disaster_recovery.rst
    validator_security.rst
    validator_users.rst
+   validator_delegations.rst
    validator_networking.rst
 
 .. todo:: Add top-level sections on node onboarding, validator functionality

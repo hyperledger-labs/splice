@@ -5,10 +5,11 @@ package com.digitalasset.canton.participant.store
 
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
+import com.digitalasset.canton.data.{BufferedAcsCommitment, CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.event.RecordTime
+import com.digitalasset.canton.participant.store.AcsCommitmentStore.ReinitializationStatus
 import com.digitalasset.canton.protocol.messages.AcsCommitment.HashedCommitmentType
 import com.digitalasset.canton.protocol.messages.{
   AcsCommitment,
@@ -97,7 +98,7 @@ class ThrowOnWriteCommitmentStore()(override implicit val ec: ExecutionContext)
   override def outstanding(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipants: Seq[ParticipantId],
+      counterParticipantsFilter: Option[NonEmpty[Seq[ParticipantId]]] = None,
       includeMatchedPeriods: Boolean,
   )(implicit
       traceContext: TraceContext
@@ -107,7 +108,7 @@ class ThrowOnWriteCommitmentStore()(override implicit val ec: ExecutionContext)
   override def searchComputedBetween(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipants: Seq[ParticipantId],
+      counterParticipantsFilter: Option[NonEmpty[Seq[ParticipantId]]] = None,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Iterable[(CommitmentPeriod, ParticipantId, HashedCommitmentType)]] =
@@ -116,7 +117,7 @@ class ThrowOnWriteCommitmentStore()(override implicit val ec: ExecutionContext)
   override def searchReceivedBetween(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipants: Seq[ParticipantId],
+      counterParticipantsFilter: Option[NonEmpty[Seq[ParticipantId]]] = None,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Iterable[SignedProtocolMessage[AcsCommitment]]] =
@@ -145,8 +146,24 @@ class ThrowOnWriteCommitmentStore()(override implicit val ec: ExecutionContext)
         rt: RecordTime,
         updates: Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType],
         deletes: Set[SortedSet[LfPartyId]],
+        updateMode: UpdateMode,
     )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
       incrementCounterAndErr()
+
+    override def readReinitilizationStatus()(implicit
+        traceContext: TraceContext
+    ): FutureUnlessShutdown[ReinitializationStatus] =
+      FutureUnlessShutdown.pure(
+        ReinitializationStatus(Some(CantonTimestamp.MinValue), Some(CantonTimestamp.MinValue))
+      )
+
+    override def markReinitializationStarted(timestamp: CantonTimestamp)(implicit
+        traceContext: TraceContext
+    ): FutureUnlessShutdown[Unit] = incrementCounterAndErr()
+
+    override def markReinitializationCompleted(timestamp: CantonTimestamp)(implicit
+        traceContext: TraceContext
+    ): FutureUnlessShutdown[Boolean] = incrementCounterAndErr[Boolean]()
   }
 
   class ThrowOnWriteCommitmentQueue extends CommitmentQueue {
@@ -156,19 +173,23 @@ class ThrowOnWriteCommitmentStore()(override implicit val ec: ExecutionContext)
 
     override def peekThrough(timestamp: CantonTimestamp)(implicit
         traceContext: TraceContext
-    ): FutureUnlessShutdown[List[AcsCommitment]] = FutureUnlessShutdown.pure(List.empty)
+    ): FutureUnlessShutdown[List[BufferedAcsCommitment]] = FutureUnlessShutdown.pure(List.empty)
 
     override def peekThroughAtOrAfter(
         timestamp: CantonTimestamp
-    )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[AcsCommitment]] =
+    )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[BufferedAcsCommitment]] =
       FutureUnlessShutdown.pure(List.empty)
+
+    override def nonEmptyAtOrAfter(timestamp: CantonTimestamp)(implicit
+        traceContext: TraceContext
+    ): FutureUnlessShutdown[Boolean] = FutureUnlessShutdown.pure(false)
 
     def peekOverlapsForCounterParticipant(
         period: CommitmentPeriod,
         counterParticipant: ParticipantId,
     )(implicit
         traceContext: TraceContext
-    ): FutureUnlessShutdown[Seq[AcsCommitment]] = FutureUnlessShutdown.pure(List.empty)
+    ): FutureUnlessShutdown[Seq[BufferedAcsCommitment]] = FutureUnlessShutdown.pure(List.empty)
 
     override def deleteThrough(timestamp: CantonTimestamp)(implicit
         traceContext: TraceContext

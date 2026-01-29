@@ -3,13 +3,12 @@
 
 package com.digitalasset.canton.synchronizer
 
-import com.digitalasset.canton.crypto.{Fingerprint, HashPurpose, Signature, SigningKeyUsage}
+import com.digitalasset.canton.crypto.{Fingerprint, HashPurpose, SigningKeyUsage}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.sequencing.protocol.*
-import com.digitalasset.canton.synchronizer.sequencer.OrderingRequest
-import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedOrderingRequest
+import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedSubmissionRequest
+import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.topology.processing.TopologyTransactionTestFactory
-import com.digitalasset.canton.topology.{DefaultTestIdentities, Member}
 import com.digitalasset.canton.{BaseTest, HasExecutionContext, HasExecutorService}
 import com.google.protobuf.ByteString
 
@@ -27,12 +26,12 @@ trait HasTopologyTransactionTestFactory {
   protected final val ts0 = CantonTimestamp.Epoch
   protected final val ts1 = ts0.plusSeconds(10)
 
-  protected final def sequencerSignedAndSenderSignedSubmissionRequest(
+  protected final def senderSignedSubmissionRequest(
       sender: Member
-  ): Future[SignedOrderingRequest] =
-    sequencerSignedAndSenderSignedSubmissionRequest(sender, Recipients.cc(sender))
+  ): Future[SignedSubmissionRequest] =
+    senderSignedSubmissionRequest(sender, Recipients.cc(sender))
 
-  protected final def sequencerSignedAndSenderSignedSubmissionRequest(
+  protected final def senderSignedSubmissionRequest(
       sender: Member,
       recipients: Recipients,
       messageId: MessageId = MessageId.randomMessageId(),
@@ -41,7 +40,7 @@ trait HasTopologyTransactionTestFactory {
       signingKey: Fingerprint = participant1Key.fingerprint,
       maxSequencingTime: CantonTimestamp = CantonTimestamp.MaxValue,
       aggregationRule: Option[AggregationRule] = None,
-  ): Future[SignedOrderingRequest] =
+  ): Future[SignedSubmissionRequest] =
     for {
       request <- submissionRequest(
         sender,
@@ -54,11 +53,11 @@ trait HasTopologyTransactionTestFactory {
         aggregationRule,
       )
       hash =
-        topologyTransactionFactory.cryptoApi.crypto.pureCrypto.digest(
+        topologyTransactionFactory.syncCryptoClient.crypto.pureCrypto.digest(
           HashPurpose.SubmissionRequestSignature,
           request.getCryptographicEvidence,
         )
-      signed <- topologyTransactionFactory.cryptoApi.crypto.privateCrypto
+      signed <- topologyTransactionFactory.syncCryptoClient.crypto.privateCrypto
         .sign(hash, signingKey, SigningKeyUsage.ProtocolOnly)
         .map(signature =>
           SignedContent(
@@ -72,12 +71,33 @@ trait HasTopologyTransactionTestFactory {
         .value
         .failOnShutdown
         .map(_.value)
-    } yield SignedContent(
-      OrderingRequest.create(DefaultTestIdentities.sequencerId, signed, testedProtocolVersion),
-      Signature.noSignature,
-      Some(ts0.immediateSuccessor),
-      testedProtocolVersion,
-    )
+    } yield signed
+
+  protected final def senderSignedAcknowledgeRequest(
+      sender: Member,
+      signingKey: Fingerprint = participant1Key.fingerprint,
+  ): Future[SignedContent[AcknowledgeRequest]] = {
+    val request = AcknowledgeRequest(sender, ts0, testedProtocolVersion)
+    val hash =
+      topologyTransactionFactory.syncCryptoClient.crypto.pureCrypto.digest(
+        HashPurpose.AcknowledgementSignature,
+        request.getCryptographicEvidence,
+      )
+    topologyTransactionFactory.syncCryptoClient.crypto.privateCrypto
+      .sign(hash, signingKey, SigningKeyUsage.ProtocolOnly)
+      .map(signature =>
+        SignedContent(
+          request,
+          signature,
+          Some(ts1),
+          testedProtocolVersion,
+        )
+      )
+      .leftMap(_.toString)
+      .value
+      .failOnShutdown
+      .map(_.value)
+  }
 
   protected final def submissionRequest(
       sender: Member,
@@ -121,9 +141,9 @@ trait HasTopologyTransactionTestFactory {
     } else {
       envelope.bytes
     }
-    val hash = topologyTransactionFactory.cryptoApi.crypto.pureCrypto
+    val hash = topologyTransactionFactory.syncCryptoClient.crypto.pureCrypto
       .digest(HashPurpose.SignedProtocolMessageSignature, bytes)
-    topologyTransactionFactory.cryptoApi.crypto.privateCrypto
+    topologyTransactionFactory.syncCryptoClient.crypto.privateCrypto
       .sign(hash, envelopeSigningKey, SigningKeyUsage.ProtocolOnly)
       .valueOrFailShutdown(s"Failed to sign $envelope")
       .map(sig => envelope.copy(signatures = Seq(sig)))

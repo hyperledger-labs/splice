@@ -6,11 +6,20 @@ package com.digitalasset.canton.http.json.v2
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.api.v2.command_service.{
   CommandServiceGrpc,
+  SubmitAndWaitForTransactionRequest,
   SubmitAndWaitRequest,
   SubmitAndWaitResponse,
 }
 import com.daml.ledger.api.v2.commands.Commands.DeduplicationPeriod
-import com.daml.ledger.api.v2.transaction_filter.TransactionFormat
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS
+import com.daml.ledger.api.v2.transaction_filter.{
+  CumulativeFilter,
+  EventFormat,
+  Filters,
+  TransactionFormat,
+  WildcardFilter,
+}
+import com.daml.ledger.api.v2.value.Identifier
 import com.daml.ledger.api.v2.{
   command_completion_service,
   command_service,
@@ -19,6 +28,7 @@ import com.daml.ledger.api.v2.{
   completion,
   reassignment_commands,
 }
+import com.digitalasset.canton.auth.AuthInterceptor
 import com.digitalasset.canton.http.WebsocketConfig
 import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
 import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInput, v2Endpoint}
@@ -29,6 +39,7 @@ import com.digitalasset.canton.http.json.v2.JsSchema.{
   JsTransaction,
   JsTransactionTree,
 }
+import com.digitalasset.canton.http.json.v2.LegacyDTOs.toTransactionTree
 import com.digitalasset.canton.http.json.v2.damldefinitionsservice.Schema.Codecs.*
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -44,7 +55,6 @@ import sttp.tapir.generic.auto.*
 import sttp.tapir.json.circe.*
 import sttp.tapir.{AnyEndpoint, CodecFormat, Schema, webSocketBody}
 
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class JsCommandService(
@@ -56,6 +66,7 @@ class JsCommandService(
     esf: ExecutionSequencerFactory,
     materializer: Materializer,
     wsConfig: WebsocketConfig,
+    val authInterceptor: AuthInterceptor,
 ) extends Endpoints
     with NamedLogging {
 
@@ -106,7 +117,7 @@ class JsCommandService(
     asList(
       JsCommandService.completionListEndpoint,
       commandCompletionStream,
-      timeoutOpenEndedStream = true,
+      timeoutOpenEndedStream = (_: command_completion_service.CompletionStreamRequest) => true,
     ),
   )
 
@@ -138,7 +149,6 @@ class JsCommandService(
     } yield result
   }
 
-  @nowarn("cat=deprecation")
   def submitAndWaitForTransactionTree(
       callerContext: CallerContext
   ): TracedInput[JsCommands] => Future[
@@ -148,14 +158,47 @@ class JsCommandService(
     for {
 
       commands <- protocolConverters.Commands.fromJson(req.in)
-      submitAndWaitRequest =
-        SubmitAndWaitRequest(commands = Some(commands))
+      submitAndWaitForTransactionRequest =
+        SubmitAndWaitForTransactionRequest(
+          commands = Some(commands),
+          transactionFormat = Some(
+            TransactionFormat(
+              eventFormat = Some(
+                EventFormat(
+                  filtersByParty = commands.actAs
+                    .map(party =>
+                      party -> Filters(
+                        Seq(
+                          CumulativeFilter.defaultInstance
+                            .withWildcardFilter(WildcardFilter.defaultInstance)
+                        )
+                      )
+                    )
+                    .toMap,
+                  filtersForAnyParty = None,
+                  verbose = true,
+                )
+              ),
+              transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
+            )
+          ),
+        )
       result <- commandServiceClient(callerContext.token())
-        .submitAndWaitForTransactionTree(submitAndWaitRequest)
-        .flatMap(r => protocolConverters.SubmitAndWaitTransactionTreeResponse.toJson(r))
+        .submitAndWaitForTransaction(submitAndWaitForTransactionRequest)
+        .flatMap(r =>
+          protocolConverters.SubmitAndWaitTransactionTreeResponseLegacy
+            .toJson(toSubmitAndWaitTransactionTreeResponse(r))
+        )
         .resultToRight
     } yield result
   }
+
+  private def toSubmitAndWaitTransactionTreeResponse(
+      response: command_service.SubmitAndWaitForTransactionResponse
+  ): LegacyDTOs.SubmitAndWaitForTransactionTreeResponse =
+    LegacyDTOs.SubmitAndWaitForTransactionTreeResponse(
+      response.transaction.map(toTransactionTree)
+    )
 
   def submitAndWaitForTransaction(
       callerContext: CallerContext
@@ -229,28 +272,28 @@ final case class JsSubmitAndWaitForReassignmentResponse(
 )
 
 object JsCommand {
-  sealed trait Command
+  sealed trait Command extends Product with Serializable
   final case class CreateCommand(
-      templateId: String,
+      templateId: Identifier,
       createArguments: Json,
   ) extends Command
 
   final case class ExerciseCommand(
-      templateId: String,
+      templateId: Identifier,
       contractId: String,
       choice: String,
       choiceArgument: Json,
   ) extends Command
 
   final case class CreateAndExerciseCommand(
-      templateId: String,
+      templateId: Identifier,
       createArguments: Json,
       choice: String,
       choiceArgument: Json,
   ) extends Command
 
   final case class ExerciseByKeyCommand(
-      templateId: String,
+      templateId: Identifier,
       contractKey: Json,
       choice: String,
       choiceArgument: Json,
@@ -271,6 +314,7 @@ final case class JsCommands(
     disclosedContracts: Seq[com.daml.ledger.api.v2.commands.DisclosedContract] = Seq.empty,
     synchronizerId: Option[String] = None,
     packageIdSelectionPreference: Seq[String] = Seq.empty,
+    prefetchContractKeys: Seq[js.PrefetchContractKey] = Seq.empty,
 )
 
 object JsCommandService extends DocumentationEndpoints {
@@ -295,7 +339,10 @@ object JsCommandService extends DocumentationEndpoints {
     .in(sttp.tapir.stringToPath("submit-and-wait-for-transaction-tree"))
     .in(jsonBody[JsCommands])
     .out(jsonBody[JsSubmitAndWaitForTransactionTreeResponse])
-    .description("Submit a batch of commands and wait for the transaction trees response")
+    .deprecated()
+    .description(
+      "Submit a batch of commands and wait for the transaction trees response. Provided for backwards compatibility, it will be removed in the Canton version 3.5.0, use submit-and-wait-for-transaction instead."
+    )
 
   val submitAndWait = commands.post
     .in(sttp.tapir.stringToPath("submit-and-wait"))
@@ -336,8 +383,8 @@ object JsCommandService extends DocumentationEndpoints {
       .in(sttp.tapir.stringToPath("completions"))
       .in(jsonBody[command_completion_service.CompletionStreamRequest])
       .out(jsonBody[Seq[command_completion_service.CompletionStreamResponse]])
-      .inStreamListParams()
       .description("Query completions list (blocking call)")
+      .inStreamListParamsAndDescription()
 
   override def documentation: Seq[AnyEndpoint] = Seq(
     submitAndWait,

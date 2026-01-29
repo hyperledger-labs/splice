@@ -5,7 +5,8 @@ package com.digitalasset.canton.synchronizer.sequencer
 
 import cats.data.EitherT
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
+import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.health.{AtomicHealthElement, CloseableHealthQuasiComponent}
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLogging}
@@ -21,6 +22,7 @@ import com.digitalasset.canton.synchronizer.sequencer.admin.data.{
   SequencerAdminStatus,
   SequencerHealthStatus,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.BlockOrderer
 import com.digitalasset.canton.synchronizer.sequencer.errors.*
 import com.digitalasset.canton.synchronizer.sequencer.traffic.TimestampSelector.TimestampSelector
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
@@ -30,7 +32,9 @@ import com.digitalasset.canton.synchronizer.sequencer.traffic.{
 }
 import com.digitalasset.canton.time.SynchronizerTimeTracker
 import com.digitalasset.canton.topology.Member
+import com.digitalasset.canton.topology.processing.EffectiveTime
 import com.digitalasset.canton.tracing.TraceContext
+import com.google.common.annotations.VisibleForTesting
 import io.grpc.ServerServiceDefinition
 import org.apache.pekko.Done
 import org.apache.pekko.stream.KillSwitch
@@ -83,6 +87,9 @@ trait Sequencer
     SequencerHealthStatus(isActive = true)
   override def closingState: SequencerHealthStatus = SequencerHealthStatus.shutdownStatus
 
+  @VisibleForTesting
+  private[canton] def orderer: Option[BlockOrderer]
+
   /** True if member is registered in sequencer persistent state / storage (i.e. database).
     */
   def isRegistered(member: Member)(implicit
@@ -99,11 +106,19 @@ trait Sequencer
 
   def sendAsyncSigned(signedSubmission: SignedContent[SubmissionRequest])(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit]
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit]
 
-  def readV2(member: Member, timestampInclusive: Option[CantonTimestamp])(implicit
+  def read(member: Member, timestampInclusive: Option[CantonTimestamp])(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CreateSubscriptionError, Sequencer.SequencedEventSource]
+
+  /** Return a "current" sequencing time such that, when a `sendAsyncSigned` operation is
+    * subsequently called, if sequenced, the sequencing time of the resulting event is guaranteed to
+    * be later than the sequencing time previously returned by the `sequencingTime` call.
+    */
+  def sequencingTime(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[CantonTimestamp]]
 
   /** Return the last timestamp of the containing block of the provided timestamp. This is needed to
     * determine the effective timestamp to observe in topology processing, required to produce a
@@ -180,6 +195,13 @@ trait Sequencer
   /** Status relating to administrative sequencer operations.
     */
   def adminStatus: SequencerAdminStatus
+
+  /** To be called by the topology processing to set/update/remove a synchronizer upgrade
+    */
+  private[sequencer] def updateSynchronizerSuccessor(
+      successorO: Option[SynchronizerSuccessor],
+      announcementEffectiveTime: EffectiveTime,
+  )(implicit traceContext: TraceContext): Unit
 }
 
 /** Sequencer pruning interface.
@@ -212,7 +234,7 @@ trait SequencerPruning {
     * response When index > 1, returns the timestamp of the index'th oldest response which is useful
     * for pruning in batches when index == batchSize.
     */
-  def locatePruningTimestamp(index: PositiveInt)(implicit
+  def findPruningTimestamp(index: PositiveInt)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, PruningSupportError, Option[CantonTimestamp]]
 
@@ -272,32 +294,19 @@ object Sequencer extends HasLoggerName {
     */
   type SenderSigned[A <: HasCryptographicEvidence] = SignedContent[A]
 
-  /** Type alias for content that has been signed by the sequencer. The purpose of this is to
-    * identify which sequencer has processed a submission request, such that after the request is
-    * ordered and processed by all sequencers, each sequencer knows which sequencer received the
-    * submission request. The signature here will always be one of a sequencer.
-    */
-  type SequencerSigned[A <: HasCryptographicEvidence] =
-    SignedContent[OrderingRequest[SenderSigned[A]]]
-
-  /** Ordering request signed by the sequencer. Outer signature is the signature of the sequencer
-    * that received the submission request. Inner signature is the signature of the member from
-    * which the submission request originated.
+  /** An ordering request wraps a sender-signed submission request, adding the receiving Sequencer
+    * ID.
     *
-    * ┌─────────────────┐ ┌────────────┐ │SenderSigned │ │Sequencer │ ┌─────────────────┐ │
-    * ┌──────────────┤ │ │ │Sender │signs │ │Submission │sends │ │ │(e.g participant)├───────►│
-    * │Request ├──────►│ │ └─────────────────┘ └──┴──────────────┘ └─────┬──────┘ │ │signs ▼
-    * ┌──────────────────────┐ │SequencerSigned │ │ ┌────────────────────┤ send to │ │SenderSigned │
-    * ordering│ │ ┌──────────────────┤ ◄────────┤ │ │Submission │ │ │ │Request │
-    * └─┴─┴──────────────────┘
+    * {{{
+    *                            ┌─────────────────┐       ┌────────────┐
+    *                            │SenderSigned     │       │Sequencer   │
+    * ┌─────────────────┐        │  ┌──────────────┤       │            │ pass to
+    * │Sender           │signs   │  │Submission    │sends  │            │ ordering
+    * │(e.g participant)├───────►│  │Request       ├──────►│            │──────────►
+    * └─────────────────┘        └──┴──────────────┘       └────────────┘
+    * }}}
     */
-  type SignedOrderingRequest = SequencerSigned[SubmissionRequest]
-
-  implicit class SignedOrderingRequestOps(val value: SignedOrderingRequest) extends AnyVal {
-    def signedSubmissionRequest: SignedContent[SubmissionRequest] =
-      value.content.content
-    def submissionRequest: SubmissionRequest = signedSubmissionRequest.content
-  }
+  type SignedSubmissionRequest = SenderSigned[SubmissionRequest]
 
   type RegisterError = SequencerWriteError[RegisterMemberError]
 }

@@ -5,7 +5,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
 import org.lfdecentralizedtrust.splice.integration.tests.AppUpgradeIntegrationTest.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
+}
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import org.lfdecentralizedtrust.splice.util.{
   PostgresAroundEach,
@@ -22,7 +25,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.BalanceChangeTxLogEntry
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.store.TimeQuery.HeadState
 import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
@@ -229,7 +232,7 @@ class AppUpgradeIntegrationTest
           // SV1 does not vet DAR before the vote goes through
           val sv1Packages = vettedPackages(sv1Backend.participantClientWithAdminToken)
           forAll(sv1Packages) { pkg =>
-            pkg.packageId should not be DarResources.amulet.bootstrap.packageId
+            pkg.packageId should not be DarResources.amulet.latest.packageId
           }
 
           val amuletRules = sv2ScanBackend.getAmuletRules()
@@ -246,13 +249,14 @@ class AppUpgradeIntegrationTest
             amuletConfig.decentralizedSynchronizer,
             amuletConfig.tickDuration,
             new splice.amuletconfig.PackageConfig(
-              DarResources.amulet.bootstrap.metadata.version.toString(),
-              DarResources.amuletNameService.bootstrap.metadata.version.toString(),
-              DarResources.dsoGovernance.bootstrap.metadata.version.toString(),
-              DarResources.validatorLifecycle.bootstrap.metadata.version.toString(),
-              DarResources.wallet.bootstrap.metadata.version.toString(),
-              DarResources.walletPayments.bootstrap.metadata.version.toString(),
+              DarResources.amulet.latest.metadata.version.toString(),
+              DarResources.amuletNameService.latest.metadata.version.toString(),
+              DarResources.dsoGovernance.latest.metadata.version.toString(),
+              DarResources.validatorLifecycle.latest.metadata.version.toString(),
+              DarResources.wallet.latest.metadata.version.toString(),
+              DarResources.walletPayments.latest.metadata.version.toString(),
             ),
+            java.util.Optional.empty(),
             java.util.Optional.empty(),
             java.util.Optional.empty(),
           )
@@ -361,7 +365,7 @@ class AppUpgradeIntegrationTest
             vettedPackages(sv1Backend.participantClientWithAdminToken)
           forExactly(1, sv1PackagesAfterUpgrade) { pkg =>
             withClue(s"Package ${pkg.packageId}") {
-              pkg.packageId shouldBe DarResources.amulet.bootstrap.packageId
+              pkg.packageId shouldBe DarResources.amulet.latest.packageId
             }
           }
 
@@ -521,15 +525,17 @@ class AppUpgradeIntegrationTest
     }
   }
 
-  private def vettedPackages(participant: ParticipantClientReference) = {
+  private def vettedPackages(
+      participant: ParticipantClientReference
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     participant.topology.vetted_packages
       .list(
         filterParticipant = participant.id.filterString,
         timeQuery = HeadState,
-        store = Some(Authorized),
+        store = Some(TopologyStoreId.Synchronizer(decentralizedSynchronizerId)),
       )
       .flatMap(_.item.packages)
-      .filter(_.validFrom.forall(_.isBefore(CantonTimestamp.now())))
+      .filter(_.validFromInclusive.forall(_.isBefore(CantonTimestamp.now())))
   }
 }
 

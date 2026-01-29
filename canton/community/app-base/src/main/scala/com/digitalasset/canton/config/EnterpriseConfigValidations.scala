@@ -19,16 +19,17 @@ import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 object EnterpriseConfigValidations extends ConfigValidations {
   private val Valid: Validated[NonEmpty[Seq[String]], Unit] = Validated.valid(())
 
-  override protected val validations: List[Validation] =
+  override protected def validations(ensurePortsSet: Boolean): List[Validation] =
     List[CantonConfig => Validated[NonEmpty[Seq[String]], Unit]](
       dbLockFeaturesRequireUsingLockSupportingStorage,
       highlyAvailableSequencerTotalNodeCount,
       noDuplicateStorageUnlessReplicated,
       atLeastOneNode,
       sequencerClientRetryDelays,
-    ) ++ CommunityConfigValidations.genericValidations
+      awsKmsDisableSSLVerificationRequiresNonStandard,
+    ) ++ CommunityConfigValidations.genericValidations(ensurePortsSet = ensurePortsSet)
 
-  def isUsingHaSequencer(config: SequencerConfig): Boolean =
+  private def isUsingHaSequencer(config: SequencerConfig): Boolean =
     PartialFunction.cond(config) {
       // needs to be using both a database sequencer config with that set to use HA
       case dbConfig: SequencerConfig.Database =>
@@ -231,5 +232,28 @@ object EnterpriseConfigValidations extends ConfigValidations {
       NonEmpty(Seq, "At least one node must be defined in the configuration"),
     )
   }
+
+  private def awsKmsDisableSSLVerificationRequiresNonStandard(
+      config: CantonConfig
+  ): Validated[NonEmpty[Seq[String]], Unit] = {
+
+    val errors = config.allLocalNodes.toSeq.mapFilter { case (name, nodeConfig) =>
+      val nonStandardConfig = config.parameters.nonStandardConfig
+
+      nodeConfig.crypto.kms.collect { case aws: KmsConfig.Aws =>
+        Option.when(!nonStandardConfig && aws.disableSslVerification)(
+          awsKmsDisableSSLVerificationRequiresNonStandardError(
+            nodeType = nodeConfig.nodeTypeName,
+            nodeName = name.unwrap,
+          )
+        )
+      }.flatten
+    }
+
+    toValidated(errors)
+  }
+
+  def awsKmsDisableSSLVerificationRequiresNonStandardError(nodeType: String, nodeName: String) =
+    s"Disabling SSL verification for AWS KMS on $nodeType $nodeName requires you to explicitly set canton.parameters.non-standard-config = yes"
 
 }

@@ -4,16 +4,16 @@
 package com.digitalasset.canton.config
 
 import com.daml.jwt.JwtTimestampLeeway
-import com.daml.metrics.grpc.GrpcServerMetrics
 import com.daml.nonempty.NonEmpty
 import com.daml.tls.{OcspProperties, ProtocolDisabler, TlsInfo, TlsVersion}
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.SequencerAlias
-import com.digitalasset.canton.auth.CantonAdminToken
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.config.AdminServerConfig.defaultAddress
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.metrics.ActiveRequestsMetrics.GrpcServerMetricsX
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.networking.grpc.{
   CantonCommunityServerInterceptors,
@@ -21,14 +21,43 @@ import com.digitalasset.canton.networking.grpc.{
   CantonServerInterceptors,
 }
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TracingConfig
-import io.netty.handler.ssl.{ClientAuth, SslContext}
+import io.grpc.ServerInterceptor
+import io.grpc.netty.shaded.io.netty.handler.ssl.{ClientAuth, SslContext}
 import org.slf4j.LoggerFactory
 
+import scala.concurrent.duration.DurationInt
 import scala.math.Ordering.Implicits.infixOrderingOps
+
+/** Configuration to limit the number of open requests per service
+  *
+  * @param active
+  *   map of service name to maximum number of parallel active requests or streams
+  * @param warnOnUndefinedLimits
+  *   emit warning if a limit is not configured for a stream
+  * @param throttleLoggingRatePerSecond
+  *   maximum rate for logging rejections for requests exceeding the limit (prevents DOS on logs)
+  */
+final case class ActiveRequestLimitsConfig(
+    active: Map[String, NonNegativeInt] = Map.empty,
+    warnOnUndefinedLimits: Boolean = false,
+    throttleLoggingRatePerSecond: NonNegativeInt = NonNegativeInt.tryCreate(10),
+) extends UniformCantonConfigValidation
+
+object ActiveRequestLimitsConfig {
+  implicit val activeRequestLimitsConfigCantonConfigValidator
+      : CantonConfigValidator[ActiveRequestLimitsConfig] = {
+    import CantonConfigValidatorInstances.*
+    CantonConfigValidatorDerivation[ActiveRequestLimitsConfig]
+  }
+}
 
 /** Configuration for hosting a server api */
 trait ServerConfig extends Product with Serializable {
+
+  /** The name of the api */
+  def name: String
 
   /** The address of the interface to be listening on */
   val address: String
@@ -68,10 +97,10 @@ trait ServerConfig extends Product with Serializable {
     */
   def jwtTimestampLeeway: Option[JwtTimestampLeeway]
 
-  /** If defined, the admin-token based authoriztion will be supported when accessing this node
-    * through the given `address` and `port`.
+  /** The configuration of the admin-token based authorization that will be supported when accessing
+    * this node through the given `address` and `port`.
     */
-  def adminToken: Option[String]
+  def adminTokenConfig: AdminTokenConfig
 
   /** server cert chain file if TLS is defined
     *
@@ -85,31 +114,51 @@ trait ServerConfig extends Product with Serializable {
   /** maximum inbound message size in bytes on the ledger api and the admin api */
   def maxInboundMessageSize: NonNegativeInt
 
+  /** maximum expiration time accepted for tokens */
+  def maxTokenLifetime: NonNegativeDuration
+
+  /** settings for the jwks cache */
+  def jwksCacheConfig: JwksCacheConfig
+
+  /** configure limits for open streams per service */
+  def limits: Option[ActiveRequestLimitsConfig]
+
   /** Use the configuration to instantiate the interceptors for this server */
   def instantiateServerInterceptors(
+      api: String,
       tracingConfig: TracingConfig,
       apiLoggingConfig: ApiLoggingConfig,
       loggerFactory: NamedLoggerFactory,
-      grpcMetrics: GrpcServerMetrics,
+      grpcMetrics: GrpcServerMetricsX,
       authServices: Seq[AuthServiceConfig],
-      adminToken: Option[CantonAdminToken],
+      adminTokenDispenser: Option[CantonAdminTokenDispenser],
       jwtTimestampLeeway: Option[JwtTimestampLeeway],
+      adminTokenConfig: AdminTokenConfig,
+      jwksCacheConfig: JwksCacheConfig,
       telemetry: Telemetry,
+      additionalInterceptors: Seq[ServerInterceptor] = Seq.empty,
+      requestLimits: Option[ActiveRequestLimitsConfig],
   ): CantonServerInterceptors = new CantonCommunityServerInterceptors(
+    api,
     tracingConfig,
     apiLoggingConfig,
     loggerFactory,
     grpcMetrics,
     authServices,
-    adminToken,
+    adminTokenDispenser,
     jwtTimestampLeeway,
+    adminTokenConfig,
+    jwksCacheConfig,
     telemetry,
+    additionalInterceptors,
+    requestLimits,
   )
 
 }
 
 object ServerConfig {
   val defaultMaxInboundMessageSize: NonNegativeInt = NonNegativeInt.tryCreate(10 * 1024 * 1024)
+  val defaultMaxInboundMetadataSize: NonNegativeInt = NonNegativeInt.tryCreate(8 * 1024)
 }
 
 /** A variant of [[ServerConfig]] that by default listens to connections only on the loopback
@@ -125,9 +174,13 @@ final case class AdminServerConfig(
     ),
     override val maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize,
     override val authServices: Seq[AuthServiceConfig] = Seq.empty,
-    override val adminToken: Option[String] = None,
+    override val adminTokenConfig: AdminTokenConfig = AdminTokenConfig(),
+    override val maxTokenLifetime: NonNegativeDuration = NonNegativeDuration(5.minutes),
+    override val jwksCacheConfig: JwksCacheConfig = JwksCacheConfig(),
+    override val limits: Option[ActiveRequestLimitsConfig] = None,
 ) extends ServerConfig
     with UniformCantonConfigValidation {
+  override val name: String = "admin"
   def clientConfig: FullClientConfig =
     FullClientConfig(
       address,
@@ -204,7 +257,7 @@ final case class LedgerApiKeepAliveServerConfig(
     permitKeepAliveWithoutCalls: Boolean = false,
 ) extends KeepAliveServerConfig
 
-/** GRPC keep alive client configuration
+/** gRPC keep alive client configuration
   *
   * Settings according to
   * [[https://grpc.github.io/grpc-java/javadoc/io/grpc/ManagedChannelBuilder.html#keepAliveTime-long-java.util.concurrent.TimeUnit-]]
@@ -213,11 +266,17 @@ final case class LedgerApiKeepAliveServerConfig(
   *   Sets the time without read activity before sending a keepalive ping. Do not set to small
   *   numbers (default is 40s)
   * @param timeout
-  *   Sets the time waiting for read activity after sending a keepalive ping (default is 20s)
+  *   Sets the time waiting for read activity after sending a keepalive ping (default is 15s).
+  *
+  * The default timeout was previously 20s and was lowered to 15s, because besides configuring the
+  * gRPC KeepAliveManager, it also sets up the socket's TCP_USER_TIMEOUT (see
+  * [[https://man7.org/linux/man-pages/man7/tcp.7.html]]). 15s gives a larger margin to detect a
+  * faulty connection earlier and retry a submission on another sequencer via amplification, thereby
+  * avoiding a request failure.
   */
 final case class KeepAliveClientConfig(
     time: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(40),
-    timeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(20),
+    timeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(15),
 ) extends UniformCantonConfigValidation
 
 object KeepAliveClientConfig {
@@ -276,7 +335,8 @@ final case class SequencerApiClientConfig(
   override def tlsConfig: Option[TlsClientConfig] = tls.map(_.toTlsClientConfig)
 
   def asSequencerConnection(
-      sequencerAlias: SequencerAlias = SequencerAlias.Default
+      sequencerAlias: SequencerAlias = SequencerAlias.Default,
+      sequencerId: Option[SequencerId] = None,
   ): GrpcSequencerConnection = {
     val endpoint = Endpoint(address, port)
     GrpcSequencerConnection(
@@ -284,6 +344,7 @@ final case class SequencerApiClientConfig(
       tls.exists(_.enabled),
       tls.flatMap(_.trustCollectionFile).map(_.pemBytes),
       sequencerAlias,
+      sequencerId = sequencerId,
     )
   }
 }
@@ -345,9 +406,7 @@ sealed trait BaseTlsArguments {
   *   supported ciphers. Set to None (or null in config file) to default to JVM settings.
   * @param enableCertRevocationChecking
   *   whether to enable certificate revocation checking per
-  *   https://tersesystems.com/blog/2014/03/22/fixing-certificate-revocation/ TODO(#4881): implement
-  *   cert-revocation at the participant and synchronizer admin endpoints Ledger api server
-  *   reference PR: https://github.com/digital-asset/daml/pull/7965
+  *   https://tersesystems.com/blog/2014/03/22/fixing-certificate-revocation/
   */
 // Information in this ScalaDoc comment has been taken from https://grpc.io/docs/guides/auth/.
 final case class TlsServerConfig(
@@ -416,22 +475,24 @@ object TlsServerConfig {
     )
     val logger = LoggerFactory.getLogger(TlsServerConfig.getClass)
     val filtered = candidates.filter { x =>
-      io.netty.handler.ssl.OpenSsl.availableOpenSslCipherSuites().contains(x) ||
-      io.netty.handler.ssl.OpenSsl.availableJavaCipherSuites().contains(x)
+      io.grpc.netty.shaded.io.netty.handler.ssl.OpenSsl
+        .availableOpenSslCipherSuites()
+        .contains(x) ||
+      io.grpc.netty.shaded.io.netty.handler.ssl.OpenSsl.availableJavaCipherSuites().contains(x)
     }
     if (filtered.isEmpty) {
-      val len = io.netty.handler.ssl.OpenSsl
+      val len = io.grpc.netty.shaded.io.netty.handler.ssl.OpenSsl
         .availableOpenSslCipherSuites()
-        .size() + io.netty.handler.ssl.OpenSsl
+        .size() + io.grpc.netty.shaded.io.netty.handler.ssl.OpenSsl
         .availableJavaCipherSuites()
         .size()
       logger.warn(
         s"All of Canton's default TLS ciphers are unsupported by your JVM (netty reports $len ciphers). Defaulting to JVM settings."
       )
-      if (!io.netty.handler.ssl.OpenSsl.isAvailable) {
+      if (!io.grpc.netty.shaded.io.netty.handler.ssl.OpenSsl.isAvailable) {
         logger.info(
           "Netty OpenSSL is not available because of an issue",
-          io.netty.handler.ssl.OpenSsl.unavailabilityCause(),
+          io.grpc.netty.shaded.io.netty.handler.ssl.OpenSsl.unavailabilityCause(),
         )
       }
       None
@@ -595,4 +656,59 @@ object ServerAuthRequirementConfig {
   case object None extends ServerAuthRequirementConfig {
     val clientAuth = ClientAuth.NONE
   }
+}
+
+/** Configuration for jwks cache underpinning JWT token validation.
+  */
+final case class JwksCacheConfig(
+    cacheMaxSize: Long = JwksCacheConfig.DefaultCacheMaxSize,
+    cacheExpiration: NonNegativeFiniteDuration = JwksCacheConfig.DefaultCacheExpiration,
+    connectionTimeout: NonNegativeFiniteDuration = JwksCacheConfig.DefaultConnectionTimeout,
+    readTimeout: NonNegativeFiniteDuration = JwksCacheConfig.DefaultReadTimeout,
+) extends UniformCantonConfigValidation
+
+object JwksCacheConfig {
+  implicit val basicJwksCacheConfigCantonConfigValidator: CantonConfigValidator[JwksCacheConfig] =
+    CantonConfigValidatorDerivation[JwksCacheConfig]
+  private val DefaultCacheMaxSize: Long = 1000
+  private val DefaultCacheExpiration: NonNegativeFiniteDuration =
+    NonNegativeFiniteDuration.ofMinutes(5)
+  private val DefaultConnectionTimeout: NonNegativeFiniteDuration =
+    NonNegativeFiniteDuration.ofSeconds(10)
+  private val DefaultReadTimeout: NonNegativeFiniteDuration =
+    NonNegativeFiniteDuration.ofSeconds(10)
+}
+
+/** Configuration for admin-token based authorization.
+  *
+  * The given token will be valid forever but it will not be used internally. Other admin-tokens
+  * will be generated and rotated periodically. The fixed token is only used for testing purposes
+  * and should not be used in production.
+  *
+  * The admin-token based authorization will create tokens and rotate them periodically. Each
+  * admin-token is valid for the defined token duration. The half of this value is used as the
+  * rotation interval, after which a new admin-token is generated (if needed).
+  */
+final case class AdminTokenConfig(
+    fixedAdminToken: Option[String] = None,
+    adminTokenDuration: PositiveFiniteDuration = AdminTokenConfig.DefaultAdminTokenDuration,
+    actAsAnyPartyClaim: Boolean = false,
+    adminClaim: Boolean = false,
+) extends UniformCantonConfigValidation {
+
+  def merge(other: AdminTokenConfig): AdminTokenConfig =
+    AdminTokenConfig(
+      fixedAdminToken = fixedAdminToken.orElse(other.fixedAdminToken),
+      adminTokenDuration = adminTokenDuration.min(other.adminTokenDuration),
+      actAsAnyPartyClaim = actAsAnyPartyClaim || other.actAsAnyPartyClaim,
+      adminClaim = adminClaim || other.adminClaim,
+    )
+}
+
+object AdminTokenConfig {
+
+  implicit val adminTokenConfigCantonConfigValidator: CantonConfigValidator[AdminTokenConfig] =
+    CantonConfigValidatorDerivation[AdminTokenConfig]
+
+  val DefaultAdminTokenDuration: PositiveFiniteDuration = PositiveFiniteDuration.ofMinutes(5)
 }

@@ -10,7 +10,7 @@ paths:
   /v0/wallet/user-status:
     get:
       tags: [wallet]
-      x-jvm-package: wallet
+      x-jvm-package: status.wallet
       operationId: "userStatus"
       responses:
         "200":
@@ -756,7 +756,7 @@ paths:
   /v0/feature-support:
     get:
       tags: [ wallet ]
-      x-jvm-package: wallet
+      x-jvm-package: status.wallet
       operationId: "featureSupport"
       responses:
         "200":
@@ -868,6 +868,216 @@ paths:
             application/json:
               schema:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/development-fund-coupons/allocate:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "allocateDevelopmentFundCoupon"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AllocateDevelopmentFundCouponRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AllocateDevelopmentFundCouponResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/development-fund-coupons:
+    get:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "listActiveDevelopmentFundCoupons"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListActiveDevelopmentFundCouponsResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/development-fund-coupons/{contract_id}/withdraw:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "withdrawDevelopmentFundCoupon"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/WithdrawDevelopmentFundCouponRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WithdrawDevelopmentFundCouponResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/minting-delegation-proposals:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listMintingDelegationProposals"
+      description: |
+        List all MintingDelegationProposal contracts where the user is the delegate.
+      parameters:
+        - name: "after"
+          description: |
+            A `next_page_token` from a prior response; if absent, return the first page.
+          in: "query"
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: "limit"
+          description: Maximum number of elements to return, 1000 by default.
+          in: "query"
+          required: false
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListMintingDelegationProposalsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/minting-delegation-proposals/{contract_id}/accept:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "acceptMintingDelegationProposal"
+      description: |
+        As the delegate, accept a MintingDelegationProposal, creating a MintingDelegation contract.
+        If an existing MintingDelegation contract exists with the same beneficiary it will
+        be archived while accepting this proposal.
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AcceptMintingDelegationProposalResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/minting-delegation-proposals/{contract_id}/reject:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "rejectMintingDelegationProposal"
+      description: |
+        As the delegate, reject a MintingDelegationProposal.
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/minting-delegations:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listMintingDelegations"
+      description: |
+        List all MintingDelegation contracts where the user is the delegate.
+      parameters:
+        - name: "after"
+          description: |
+            A `next_page_token` from a prior response; if absent, return the first page.
+          in: "query"
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: "limit"
+          description: Maximum number of elements to return, 1000 by default.
+          in: "query"
+          required: false
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListMintingDelegationsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/wallet/minting-delegations/{contract_id}/reject:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "rejectMintingDelegation"
+      description: |
+        As the delegate, reject/terminate a MintingDelegation contract.
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
@@ -1612,3 +1822,123 @@ components:
           type: object
           additionalProperties:
             type: string
+
+    AllocateDevelopmentFundCouponRequest:
+      type: object
+      required:
+        - beneficiary
+        - amount
+        - expiresAt
+        - reason
+      properties:
+        beneficiary:
+          type: string
+        amount:
+          type: string
+        expiresAt:
+          type: integer
+          format: int64
+        reason:
+          type: string
+
+    AllocateDevelopmentFundCouponResponse:
+      type: object
+      required:
+        - development_fund_coupon_contract_id
+      properties:
+        development_fund_coupon_contract_id:
+          type: string
+        unclaimed_development_fund_coupon_contract_id:
+          type: string
+
+    ListActiveDevelopmentFundCouponsResponse:
+      type: object
+      description: Includes only up to 1000 elements.
+      required:
+        - active_development_fund_coupons
+      properties:
+        active_development_fund_coupons:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    WithdrawDevelopmentFundCouponRequest:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+
+    WithdrawDevelopmentFundCouponResponse:
+      type: object
+      required:
+        - unclaimed_development_fund_coupon_contract_id
+      properties:
+        unclaimed_development_fund_coupon_contract_id:
+          type: string
+
+    MintingDelegationProposalWithStatus:
+      type: object
+      required:
+        - contract
+        - beneficiary_hosted
+      properties:
+        contract:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        beneficiary_hosted:
+          type: boolean
+          description: Whether the beneficiary party is currently hosted on this validator
+
+    ListMintingDelegationProposalsResponse:
+      type: object
+      required:
+        - proposals
+      properties:
+        proposals:
+          type: array
+          items:
+            $ref: "#/components/schemas/MintingDelegationProposalWithStatus"
+        next_page_token:
+          type: integer
+          format: int64
+          description: |
+            When requesting the next page of results, pass this as URL query parameter `after`.
+            If absent or `null`, there are no more pages.
+
+    AcceptMintingDelegationProposalResponse:
+      type: object
+      required:
+        - contract_id
+      properties:
+        contract_id:
+          type: string
+          description: Contract ID of the created MintingDelegation
+
+    MintingDelegationWithStatus:
+      type: object
+      required:
+        - contract
+        - beneficiary_hosted
+      properties:
+        contract:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        beneficiary_hosted:
+          type: boolean
+          description: Whether the beneficiary party is currently hosted on this validator
+
+    ListMintingDelegationsResponse:
+      type: object
+      required:
+        - delegations
+      properties:
+        delegations:
+          type: array
+          items:
+            $ref: "#/components/schemas/MintingDelegationWithStatus"
+        next_page_token:
+          type: integer
+          format: int64
+          description: |
+            When requesting the next page of results, pass this as URL query parameter `after`.
+            If absent or `null`, there are no more pages.

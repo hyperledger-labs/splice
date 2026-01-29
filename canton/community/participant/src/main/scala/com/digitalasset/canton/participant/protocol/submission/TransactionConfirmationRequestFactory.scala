@@ -25,7 +25,7 @@ import com.digitalasset.canton.participant.protocol.submission.EncryptedViewMess
 }
 import com.digitalasset.canton.participant.protocol.submission.TransactionConfirmationRequestFactory.*
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.{
-  SerializableContractOfId,
+  ContractInstanceOfId,
   TransactionTreeConversionError,
 }
 import com.digitalasset.canton.participant.protocol.validation.ContractConsistencyChecker.ReferenceToFutureContractError
@@ -46,7 +46,7 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submission
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.util.{ContractHasher, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.concurrent.ExecutionContext
@@ -88,7 +88,7 @@ class TransactionConfirmationRequestFactory(
       mediator: MediatorGroupRecipient,
       cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
       sessionKeyStore: SessionKeyStore,
-      contractInstanceOfId: SerializableContractOfId,
+      contractInstanceOfId: ContractInstanceOfId,
       maxSequencingTime: CantonTimestamp,
       protocolVersion: ProtocolVersion,
   )(implicit
@@ -192,8 +192,8 @@ class TransactionConfirmationRequestFactory(
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, ParticipantAuthorizationError, Unit] = {
-    // Signatures have been validated synchronously in the TransactionProcessor before the submission
-    // makes it here. Therefore we only do authorization checks at this point
+    // Signatures have been validated in the Ledger API when the execute request was received.
+    // Therefore we only do authorization checks at this point
     val signedAs = externallySignedSubmission.signatures.keySet.map(_.toLf)
     val unauthorized = submitterInfo.actAs.toSet -- signedAs
     for {
@@ -359,10 +359,10 @@ class TransactionConfirmationRequestFactory(
 object TransactionConfirmationRequestFactory {
   def apply(
       submitterNode: ParticipantId,
-      synchronizerId: SynchronizerId,
-      protocolVersion: ProtocolVersion,
+      synchronizerId: PhysicalSynchronizerId,
   )(
       cryptoOps: HashOps & HmacOps,
+      hasher: ContractHasher,
       seedGenerator: SeedGenerator,
       loggingConfig: LoggingConfig,
       loggerFactory: NamedLoggerFactory,
@@ -372,8 +372,10 @@ object TransactionConfirmationRequestFactory {
       TransactionTreeFactoryImpl(
         submitterNode,
         synchronizerId,
-        protocolVersion,
+        // TODO(#23971): Make this dependent on the protocol version when introducing V2 contract IDs
+        AuthenticatedContractIdVersionV12,
         cryptoOps,
+        hasher,
         loggerFactory,
       )
 

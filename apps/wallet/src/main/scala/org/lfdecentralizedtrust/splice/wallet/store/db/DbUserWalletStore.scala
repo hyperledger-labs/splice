@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.wallet.store.db
 
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
@@ -15,13 +14,14 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{AcsStoreId, SelectFromAcsTableResult}
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
   DbTxLogAppStore,
+  DbTransferInputQueries,
   TxLogQueries,
 }
 import org.lfdecentralizedtrust.splice.store.{Limit, LimitHelpers, PageLimit, TxLogStore}
@@ -44,9 +44,8 @@ import com.digitalasset.canton.util.ShowUtil.*
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
-import slick.jdbc.canton.SQLActionBuilder
 
 import scala.concurrent.*
 import scala.jdk.OptionConverters.*
@@ -58,10 +57,11 @@ class DbUserWalletStore(
     override protected val retryProvider: RetryProvider,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    ingestionConfig: IngestionConfig,
 )(implicit
-    ec: ExecutionContext,
-    templateJsonDecoder: TemplateJsonDecoder,
-    closeContext: CloseContext,
+    override protected val ec: ExecutionContext,
+    override protected val templateJsonDecoder: TemplateJsonDecoder,
+    override protected val closeContext: CloseContext,
 ) extends DbTxLogAppStore[TxLogEntry](
       storage = storage,
       acsTableName = WalletTables.acsTableName,
@@ -70,9 +70,7 @@ class DbUserWalletStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
-        // Note that the V005__no_end_user_name_in_user_wallet_store.sql DB migration converts from version 1 descriptors
-        // to version 2 descriptors.
-        version = 2,
+        version = 4,
         name = "DbUserWalletStore",
         party = key.endUserParty,
         participant = participantId,
@@ -96,12 +94,10 @@ class DbUserWalletStore(
         ),
       ),
       domainMigrationInfo,
-      participantId,
-      enableissue12777Workaround = true,
-      enableImportUpdateBackfill = false,
-      BackfillingRequirement.BackfillingNotRequired,
+      ingestionConfig,
     )
     with UserWalletStore
+    with DbTransferInputQueries
     with AcsTables
     with AcsQueries
     with TxLogQueries[TxLogEntry]
@@ -110,13 +106,15 @@ class DbUserWalletStore(
   import multiDomainAcsStore.waitUntilAcsIngested
   import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
-  private def acsStoreId: AcsStoreId = multiDomainAcsStore.acsStoreId
+  override protected def acsStoreId: AcsStoreId = multiDomainAcsStore.acsStoreId
   private def txLogStoreId: TxLogStoreId = multiDomainAcsStore.txLogStoreId
   override def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
+  override protected def acsTableName: String = WalletTables.acsTableName
+  override protected def dbStorage: DbStorage = storage
 
   override def toString: String = show"DbUserWalletStore(endUserParty=${key.endUserParty})"
 
-  override protected def acsContractFilter
+  override def acsContractFilter
       : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
         org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletAcsStoreRowData,
         org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletAcsInterfaceViewRowData,
@@ -192,52 +190,6 @@ class DbUserWalletStore(
       ccValue = sql"rti.issuance * acs.reward_coupon_weight",
     )
 
-  private def listSortedRewardCoupons[C, TCid <: ContractId[_], T](
-      companion: C,
-      issuingRoundsMap: Map[Round, IssuingMiningRound],
-      roundToIssuance: IssuingMiningRound => Option[BigDecimal],
-      limit: Limit,
-      ccValue: SQLActionBuilder = sql"rti.issuance",
-  )(implicit
-      companionClass: ContractCompanion[C, TCid, T],
-      traceContext: TraceContext,
-  ): Future[Seq[(Contract[TCid, T], BigDecimal)]] = {
-    val templateId = companionClass.typeId(companion)
-    issuingRoundsMap
-      .flatMap { case (round, contract) =>
-        roundToIssuance(contract).map(round.number.longValue() -> _)
-      }
-      .map { case (round, issuance) =>
-        sql"($round, $issuance)"
-      }
-      .reduceOption { (acc, next) =>
-        (acc ++ sql"," ++ next).toActionBuilder
-      } match {
-      case None => Future.successful(Seq.empty) // no rounds = no results
-      case Some(roundToIssuance) =>
-        for {
-          result <- storage.query(
-            (sql"""
-                 with round_to_issuance(round, issuance) as (values """ ++ roundToIssuance ++ sql""")
-                 select
-                   #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()},""" ++ ccValue ++ sql"""
-                 from #${WalletTables.acsTableName} acs join round_to_issuance rti on acs.reward_coupon_round = rti.round
-                 where acs.store_id = $acsStoreId
-                   and migration_id = $domainMigrationId
-                   and acs.template_id_qualified_name = ${QualifiedName(templateId)}
-                 order by (acs.reward_coupon_round, -""" ++ ccValue ++ sql""")
-                 limit ${sqlLimit(limit)}""").toActionBuilder
-              .as[(SelectFromAcsTableResult, BigDecimal)],
-            s"listSorted${templateId.getEntityName}",
-          )
-        } yield applyLimit(s"listSorted${templateId.getEntityName}", limit, result).map {
-          case (row, issuance) =>
-            val contract = contractFromRow(companion)(row)
-            contract -> issuance
-        }
-    }
-  }
-
   override def listTransactions(
       beginAfterEventIdO: Option[String],
       limit: PageLimit,
@@ -295,8 +247,10 @@ class DbUserWalletStore(
              where """ ++
         filterAcsStoreMigrationIds("ansEntry.", "ansEntryContext.", "sub.", "st.") ++
         sql" and " ++ subscriptionFilter(now) ++ sql"""
+               and ansEntry.package_name = ${ansCodegen.AnsEntry.PACKAGE_NAME}
                and ansEntry.template_id_qualified_name =
                      ${QualifiedName(ansCodegen.AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID)}
+               and ansEntryContext.package_name = ${ansCodegen.AnsEntryContext.PACKAGE_NAME}
                and ansEntryContext.template_id_qualified_name =
                      ${QualifiedName(ansCodegen.AnsEntryContext.TEMPLATE_ID_WITH_PACKAGE_ID)}
                and ansEntry.create_arguments ->> 'name' = ansEntryContext.create_arguments ->> 'name'
@@ -388,8 +342,8 @@ class DbUserWalletStore(
         // provide a grace period for subscription payments.
         (sql"""select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("st.")},
                       #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("sub.")},
-                      (case when st.template_id_qualified_name =
-                                   ${QualifiedName(
+                      (case when st.package_name = ${subsCodegen.SubscriptionIdleState.PACKAGE_NAME}
+                             and st.template_id_qualified_name = ${QualifiedName(
             subsCodegen.SubscriptionIdleState.TEMPLATE_ID_WITH_PACKAGE_ID
           )}
                             then $idleStateFlag
@@ -420,12 +374,12 @@ class DbUserWalletStore(
   }
 
   private[this] def subscriptionFilter(now: CantonTimestamp) =
-    sql"""((st.template_id_qualified_name =
+    sql"""((st.package_name = ${subsCodegen.SubscriptionIdleState.PACKAGE_NAME} and st.template_id_qualified_name =
                ${QualifiedName(subsCodegen.SubscriptionIdleState.TEMPLATE_ID_WITH_PACKAGE_ID)}
             and st.contract_expires_at >= $now)
-           or st.template_id_qualified_name =
+           or st.package_name = ${subsCodegen.SubscriptionPayment.PACKAGE_NAME} and st.template_id_qualified_name =
                 ${QualifiedName(subsCodegen.SubscriptionPayment.TEMPLATE_ID_WITH_PACKAGE_ID)})
-      and sub.template_id_qualified_name =
+      and sub.package_name = ${subsCodegen.Subscription.PACKAGE_NAME} and sub.template_id_qualified_name =
             ${QualifiedName(subsCodegen.Subscription.TEMPLATE_ID_WITH_PACKAGE_ID)}
       and (st.create_arguments ->> 'subscription') = sub.contract_id"""
 
@@ -446,12 +400,8 @@ class DbUserWalletStore(
               WalletTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              sql"""
-            template_id_qualified_name = ${QualifiedName(
-                  TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}
-              and transfer_preapproval_receiver = ${receiver}
-            """,
+              TransferPreapproval.COMPANION,
+              sql""" transfer_preapproval_receiver = $receiver """,
               sql"limit 1",
             ).headOption,
             "lookupTransferPreapproval",
@@ -478,12 +428,8 @@ class DbUserWalletStore(
               WalletTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              sql"""
-            template_id_qualified_name = ${QualifiedName(
-                  TransferPreapprovalProposal.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}
-              and transfer_preapproval_receiver = ${receiver}
-            """,
+              TransferPreapprovalProposal.COMPANION,
+              sql"""transfer_preapproval_receiver = $receiver""",
               sql"limit 1",
             ).headOption,
             "lookupTransferPreapprovalProposal",

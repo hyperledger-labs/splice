@@ -61,6 +61,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -134,14 +141,6 @@
     "name": "cn-app-validator-postgres-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "projects/test-project/global/networks/default",
-    "inputs": {},
-    "name": "default",
-    "provider": "",
-    "type": "gcp:compute/network:Network"
   },
   {
     "custom": true,
@@ -295,6 +294,16 @@
   },
   {
     "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",
@@ -431,6 +440,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -448,6 +464,7 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
+        "disableAuth": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
@@ -514,6 +531,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -527,20 +551,30 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
+        "config": {
+          "jsonLedgerApiUrl": "http://participant-3:7575",
+          "keyDirectory": "/keys",
+          "maxParties": 1234,
+          "parallelism": 321,
+          "preapprovalRetries": 9876,
+          "preapprovalRetryDelayMs": 42,
+          "scanApiUrl": "http://scan-app.sv-1:5012",
+          "token": "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN}",
+          "userId": "${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME}",
+          "validatorApiUrl": "http://validator-app:5003"
+        },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "jsonLedgerApiUrl": "http://participant-3:7575",
-        "keysDirectory": "/keys",
-        "maxParties": 1234,
-        "parallelism": 321,
-        "scanApiUrl": "http://scan-app.sv-1:5012",
+        "pvc": {
+          "name": "party-allocator-keys",
+          "volumeStorageClass": "standard-rwo"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
             "key": "cn_apps",
             "operator": "Exists"
           }
-        ],
-        "validatorApiUrl": "http://validator-app:5003"
+        ]
       },
       "version": "0.3.20"
     },
@@ -588,6 +622,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -650,6 +691,13 @@
       "namespace": "validator",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_ENV_VAR_VALIDATOR_NAME",
+            "value": "ADDITIONAL_ENV_VAR_VALIDATOR_NAME"
+          }
+        ],
+        "additionalJvmOptions": "-Dparticipantoption",
         "affinity": {
           "nodeAffinity": {
             "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -659,6 +707,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -698,12 +753,32 @@
             "prefix": "mock/validator"
           }
         },
+        "participantPruningSchedule": {
+          "cron": "0 /10 * * * ?",
+          "maxDuration": "5m",
+          "retention": "30d"
+        },
         "persistence": {
           "host": "postgres",
           "postgresName": "postgres",
           "secretName": "postgres-secrets"
         },
-        "scanAddress": "https://scan.sv-2.mock.global.canton.network.digitalasset.com",
+        "pvc": {
+          "volumeName": "domain-migration-validator-pvc",
+          "volumeStorageClass": "standard-rwo"
+        },
+        "scanClient": {
+          "scanType": "bft-custom",
+          "seedUrls": [
+            "https://scan.sv-2-eng.test.network.canton.global",
+            "https://scan.sv-3-eng.test.network.canton.global"
+          ],
+          "svNames": [
+            "Digital-Asset-Eng-2",
+            "Digital-Asset-Eng-3"
+          ],
+          "threshold": 2
+        },
         "spliceInstanceNames": {
           "amuletName": "Amulet",
           "amuletNameAcronym": "AMT",

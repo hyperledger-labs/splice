@@ -33,25 +33,28 @@ case class DomainMigrationDump(
     participantUsers: ParticipantUsersData,
     createdAt: Instant,
 ) {
-  def toHttp: http.GetDomainMigrationDumpResponse = http.GetDomainMigrationDumpResponse(
-    migrationId,
-    nodeIdentities.toHttp(),
-    domainDataSnapshot.toHttp,
-    participantUsers.toHttp,
-    createdAt.toString,
-  )
+  // if output directory is specified we use the new format, otherwise the old one.
+  // Only the DR endpoint should use the old one.
+  def toHttp(outputDirectory: Option[String]): http.GetDomainMigrationDumpResponse =
+    http.GetDomainMigrationDumpResponse(
+      migrationId,
+      nodeIdentities.toHttp(),
+      domainDataSnapshot.toHttp(outputDirectory),
+      participantUsers.toHttp,
+      createdAt.toString,
+    )
 }
 
 object DomainMigrationDump {
 
-  implicit val domainMigrationDumpCodec: Codec[DomainMigrationDump] = Codec.from(
+  def codec(outputDirectory: Option[String]): Codec[DomainMigrationDump] = Codec.from(
     Decoder.decodeJson.emap(json =>
       json
         .as[http.GetDomainMigrationDumpResponse]
         .leftMap(err => s"Failed to decode: ${err.message}")
         .flatMap(fromHttp)
     ),
-    (a: DomainMigrationDump) => a.toHttp.asJson,
+    (a: DomainMigrationDump) => a.toHttp(outputDirectory).asJson,
   )
 
   def fromHttp(
@@ -102,4 +105,38 @@ object DomainMigrationDump {
     )
   }
 
+  def getDomainMigrationDumpUnsafe(
+      synchronizerAlias: SynchronizerAlias,
+      ledgerConnection: SpliceLedgerConnection,
+      participantAdminConnection: ParticipantAdminConnection,
+      synchronizerNode: LocalSynchronizerNode,
+      loggerFactory: NamedLoggerFactory,
+      dsoStore: SvDsoStore,
+      migrationId: Long,
+      domainDataSnapshotGenerator: DomainDataSnapshotGenerator,
+      atTime: Instant,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[DomainMigrationDump] = {
+    for {
+      identities <- getSynchronizerNodeIdentities(
+        participantAdminConnection,
+        synchronizerNode,
+        dsoStore,
+        synchronizerAlias,
+        loggerFactory,
+      )
+      participantUsersDataExporter = new ParticipantUsersDataExporter(ledgerConnection)
+      participantUsersData <- participantUsersDataExporter.exportParticipantUsersData()
+      // we set force to true in order to bypass the timestamp equality check
+      snapshot <- domainDataSnapshotGenerator.getDomainDataSnapshot(atTime, None, force = true)
+    } yield DomainMigrationDump(
+      migrationId,
+      identities,
+      snapshot,
+      participantUsersData,
+      Instant.now(),
+    )
+  }
 }

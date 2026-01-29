@@ -5,6 +5,7 @@ package com.digitalasset.canton.config
 
 import cats.Monoid
 import cats.syntax.either.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric.SubtractionResult
 import pureconfig.error.{CannotConvert, FailureReason}
 import pureconfig.{ConfigReader, ConfigWriter}
@@ -188,10 +189,32 @@ object RequireTypes {
     lazy val zero: NonNegativeInt = NonNegativeInt.tryCreate(0)
     lazy val one: NonNegativeInt = NonNegativeInt.tryCreate(1)
     lazy val two: NonNegativeInt = NonNegativeInt.tryCreate(2)
+    lazy val three: NonNegativeInt = NonNegativeInt.tryCreate(3)
     lazy val maxValue: NonNegativeInt = NonNegativeInt.tryCreate(Int.MaxValue)
 
     def create(n: Int): Either[InvariantViolation, NonNegativeInt] = NonNegativeNumeric.create(n)
     def tryCreate(n: Int): NonNegativeInt = NonNegativeNumeric.tryCreate(n)
+    def size[T](collection: Iterable[T]): NonNegativeInt = tryCreate(collection.size)
+  }
+
+  type NonNegativeDouble = NonNegativeNumeric[Double]
+
+  object NonNegativeDouble {
+    lazy val zero: NonNegativeDouble = NonNegativeDouble.tryCreate(0.0)
+    lazy val one: NonNegativeDouble = NonNegativeDouble.tryCreate(1.0)
+    lazy val maxValue: NonNegativeDouble = NonNegativeDouble.tryCreate(Double.MaxValue)
+
+    def create(n: Double): Either[InvariantViolation, NonNegativeDouble] =
+      NonNegativeNumeric.create(n)
+    def tryCreate(n: Double): NonNegativeDouble = NonNegativeNumeric.tryCreate(n)
+  }
+
+  final case class NonNegativeProportion(n: NonNegativeDouble) {
+    require(n <= NonNegativeDouble.one, "proportion may not be larger than 1")
+  }
+
+  object NonNegativeProportion {
+    lazy val zero: NonNegativeProportion = NonNegativeProportion(NonNegativeDouble.zero)
   }
 
   type NonNegativeLong = NonNegativeNumeric[Long]
@@ -206,8 +229,8 @@ object RequireTypes {
     lazy val maxValue: NonNegativeLong = NonNegativeLong.tryCreate(Long.MaxValue)
 
     def create(n: Long): Either[InvariantViolation, NonNegativeLong] = NonNegativeNumeric.create(n)
-
     def tryCreate(n: Long): NonNegativeLong = NonNegativeNumeric.tryCreate(n)
+    def size[T](collection: Iterable[T]): NonNegativeLong = tryCreate(collection.size.toLong)
   }
 
   final case class PositiveNumeric[T] private (value: T)(implicit val num: Numeric[T])
@@ -240,6 +263,7 @@ object RequireTypes {
   object PositiveInt {
     def create(n: Int): Either[InvariantViolation, PositiveInt] = PositiveNumeric.create(n)
     def tryCreate(n: Int): PositiveInt = PositiveNumeric.tryCreate(n)
+    def size[T](collection: NonEmpty[Iterable[T]]): PositiveInt = tryCreate(collection.size)
 
     lazy val one: PositiveInt = PositiveInt.tryCreate(1)
     lazy val two: PositiveInt = PositiveInt.tryCreate(2)
@@ -251,8 +275,8 @@ object RequireTypes {
 
   object PositiveLong {
     def create(n: Long): Either[InvariantViolation, PositiveLong] = PositiveNumeric.create(n)
-
     def tryCreate(n: Long): PositiveLong = PositiveNumeric.tryCreate(n)
+    def size[T](collection: NonEmpty[Iterable[T]]): PositiveLong = tryCreate(collection.size.toLong)
 
     lazy val one: PositiveLong = PositiveLong.tryCreate(1)
     lazy val MaxValue: PositiveLong = PositiveLong.tryCreate(Long.MaxValue)

@@ -839,14 +839,6 @@
   },
   {
     "custom": true,
-    "id": "projects/test-project/global/networks/default",
-    "inputs": {},
-    "name": "default",
-    "provider": "",
-    "type": "gcp:compute/network:Network"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",
@@ -857,7 +849,9 @@
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {}
+        "value": {
+          "googleCredentials": "base64-decoded-mock"
+        }
       },
       "type": "Opaque"
     },
@@ -877,7 +871,9 @@
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {}
+        "value": {
+          "googleCredentials": "base64-decoded-mock"
+        }
       },
       "type": "Opaque"
     },
@@ -1134,11 +1130,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-1-client-id@clients"
+          "ledger-api-user": "sv1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-1-sv-canton-migration-1-sv-1",
+    "name": "splice-auth0-user-sv-1-sv-canton-migration-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1155,11 +1151,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-1-client-id@clients"
+          "ledger-api-user": "sv1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-1-sv-canton-migration-2-sv-1",
+    "name": "splice-auth0-user-sv-1-sv-canton-migration-2-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1176,11 +1172,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-1-client-id@clients"
+          "ledger-api-user": "sv1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-1-sv-canton-migration-3-sv-1",
+    "name": "splice-auth0-user-sv-1-sv-canton-migration-3-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1197,11 +1193,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-1-client-id@clients"
+          "ledger-api-user": "sv1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-1-sv-canton-migration-4-sv-1",
+    "name": "splice-auth0-user-sv-1-sv-canton-migration-4-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1218,11 +1214,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-da-1-client-id@clients"
+          "ledger-api-user": "sv-da-1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-1-sv-da-1",
+    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1239,11 +1235,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-da-1-client-id@clients"
+          "ledger-api-user": "sv-da-1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-2-sv-da-1",
+    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-2-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1260,11 +1256,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-da-1-client-id@clients"
+          "ledger-api-user": "sv-da-1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-3-sv-da-1",
+    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-3-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1281,11 +1277,11 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "sv-da-1-client-id@clients"
+          "ledger-api-user": "sv-da-1-sv-client-id@clients"
         }
       }
     },
-    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-4-sv-da-1",
+    "name": "splice-auth0-user-sv-da-1-sv-canton-migration-4-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1393,6 +1389,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -1492,6 +1495,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -1720,6 +1730,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -1735,14 +1752,30 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_3_mediator",
             "port": 5432,
             "postgresName": "mediator-3-pg",
             "secretName": "mediator-3-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
           }
         },
         "metrics": {
@@ -1768,6 +1801,15 @@
             "port": 5432,
             "postgresName": "sequencer-3-pg",
             "secretName": "sequencer-3-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
           }
         },
         "serviceAccountName": "sv-canton-migration-3",
@@ -1814,6 +1856,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -1829,14 +1878,30 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_4_mediator",
             "port": 5432,
             "postgresName": "mediator-4-pg",
             "secretName": "mediator-4-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
           }
         },
         "metrics": {
@@ -1862,6 +1927,15 @@
             "port": 5432,
             "postgresName": "sequencer-4-pg",
             "secretName": "sequencer-4-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
           }
         },
         "serviceAccountName": "sv-canton-migration-4",
@@ -2375,6 +2449,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -2395,6 +2476,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "metrics": {
@@ -2534,6 +2616,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -2554,6 +2643,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "metrics": {
@@ -2655,7 +2745,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "1"
@@ -2722,7 +2812,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "2"
@@ -2789,7 +2879,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "3"
@@ -2856,7 +2946,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "4"
@@ -3303,6 +3393,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -3399,6 +3496,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -3495,6 +3599,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -3594,6 +3705,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -3822,6 +3940,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -3837,14 +3962,30 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_3_mediator",
             "port": 5432,
             "postgresName": "mediator-3-pg",
             "secretName": "mediator-3-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
           }
         },
         "metrics": {
@@ -3870,6 +4011,15 @@
             "port": 5432,
             "postgresName": "sequencer-3-pg",
             "secretName": "sequencer-3-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
           }
         },
         "serviceAccountName": "sv-canton-migration-3",
@@ -3916,6 +4066,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -3931,14 +4088,30 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "global_domain_4_mediator",
             "port": 5432,
             "postgresName": "mediator-4-pg",
             "secretName": "mediator-4-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
           }
         },
         "metrics": {
@@ -3964,6 +4137,15 @@
             "port": 5432,
             "postgresName": "sequencer-4-pg",
             "secretName": "sequencer-4-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
           }
         },
         "serviceAccountName": "sv-canton-migration-4",
@@ -4481,6 +4663,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -4522,6 +4711,7 @@
           "projectId": "da-cn-devnet",
           "type": "gcp"
         },
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "metrics": {
@@ -4665,6 +4855,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -4706,6 +4903,7 @@
           "projectId": "da-cn-devnet",
           "type": "gcp"
         },
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "metrics": {
@@ -4807,7 +5005,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "1"
@@ -4874,7 +5072,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "2"
@@ -4941,7 +5139,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "3"
@@ -5008,7 +5206,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "4"
@@ -5428,6 +5626,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -5443,14 +5648,30 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "mediator_3",
             "port": 5432,
             "postgresName": "mediator-3-pg",
             "secretName": "mediator-3-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
           }
         },
         "metrics": {
@@ -5476,6 +5697,15 @@
             "port": 5432,
             "postgresName": "sequencer-3-pg",
             "secretName": "sequencer-3-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
           }
         },
         "serviceAccountName": "sv-canton-migration-3",
@@ -5522,6 +5752,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -5537,14 +5774,30 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "mediator": {
+          "additionalEnvVars": [
+            {
+              "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+              "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+            }
+          ],
           "persistence": {
             "databaseName": "mediator_4",
             "port": 5432,
             "postgresName": "mediator-4-pg",
             "secretName": "mediator-4-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
           }
         },
         "metrics": {
@@ -5570,6 +5823,15 @@
             "port": 5432,
             "postgresName": "sequencer-4-pg",
             "secretName": "sequencer-4-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "memory": "2Gi"
+            },
+            "requests": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
           }
         },
         "serviceAccountName": "sv-canton-migration-4",
@@ -6083,6 +6345,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -6103,6 +6372,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "metrics": {
@@ -6242,6 +6512,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -6262,6 +6539,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "logLevelStdout": "DEBUG",
         "metrics": {
@@ -6363,7 +6641,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "1"
@@ -6430,7 +6708,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "2"
@@ -6497,7 +6775,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "3"
@@ -6564,7 +6842,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "sequencer-override-tier",
         "userLabels": {
           "cluster": "mock",
           "migration_id": "4"

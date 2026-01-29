@@ -100,16 +100,15 @@ class TokenStandardMetadataTimeBasedIntegrationTest
         "Advance rounds to a point where round totals are defined and the tapped amulet",
         // We sadly need 7 rounds as we need to get to a point where round 0 is closed
         for (i <- 1 to 7) {
-          advanceRoundsByOneTick
+          advanceRoundsToNextRoundOpening
           sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
         },
       )(
         "rounds are defined and include tapped amulet",
         _ => {
-          val (roundNumber, _) = sv1ScanBackend.getRoundOfLatestData()
-          val totalBalance = sv1ScanBackend
-            .getTotalAmuletBalance(roundNumber)
-            .getOrElse(fail("total balance not yet defined"))
+          val totalBalance =
+            sv1ScanBackend
+              .getTotalAmuletBalance("Amulet")
           totalBalance should be >= walletUsdToAmulet(99.0)
         },
       )

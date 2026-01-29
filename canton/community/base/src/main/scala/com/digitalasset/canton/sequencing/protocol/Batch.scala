@@ -54,6 +54,8 @@ final case class Batch[+Env <: Envelope[?]] private (envelopes: List[Env])(
       case AllMembersOfSynchronizer => AllMembersOfSynchronizer
     }
 
+  lazy val isBroadcast: Boolean = allRecipients.contains(AllMembersOfSynchronizer)
+
   private[protocol] def toProtoV30: v30.CompressedBatch = {
     val batch = v30.Batch(envelopes = envelopes.map(_.closeEnvelope.toProtoV30))
     val compressed = ByteStringUtil.compressGzip(checkedToByteString(batch))
@@ -71,7 +73,7 @@ final case class Batch[+Env <: Envelope[?]] private (envelopes: List[Env])(
 
   def envelopesCount: Int = envelopes.size
 
-  private[sequencing] def traverse[F[_], Env2 <: Envelope[_]](f: Env => F[Env2])(implicit
+  private[sequencing] def traverse[F[_], Env2 <: Envelope[?]](f: Env => F[Env2])(implicit
       F: Applicative[F]
   ): F[Batch[Env2]] =
     F.map(envelopes.traverse(f))(Batch(_)(representativeProtocolVersion))
@@ -86,17 +88,17 @@ object Batch extends VersioningCompanion2[Batch[Envelope[?]], Batch[ClosedEnvelo
 
   override val versioningTable: VersioningTable = VersioningTable(
     ProtoVersion(30) -> VersionedProtoCodec(
-      ProtocolVersion.v33
+      ProtocolVersion.v34
     )(v30.CompressedBatch)(
       supportedProtoVersion(_)(
-        // TODO(i10428) Prevent zip bombing when decompressing the request
+        // TODO(i26169) Prevent zip bombing when decompressing the request
         Batch.fromProtoV30(_, maxRequestSize = MaxRequestSizeToDeserialize.NoLimit)
       ),
       _.toProtoV30,
     )
   )
 
-  def apply[Env <: Envelope[_]](
+  def apply[Env <: Envelope[?]](
       envelopes: List[Env],
       protocolVersion: ProtocolVersion,
   ): Batch[Env] = Batch(envelopes)(protocolVersionRepresentativeFor(protocolVersion))
@@ -148,7 +150,7 @@ object Batch extends VersioningCompanion2[Batch[Envelope[?]], Batch[ClosedEnvelo
     }
 
   /** Constructs a batch with no envelopes */
-  def empty[Env <: Envelope[_]](protocolVersion: ProtocolVersion): Batch[Env] =
+  def empty[Env <: Envelope[?]](protocolVersion: ProtocolVersion): Batch[Env] =
     Batch(List.empty[Env])(protocolVersionRepresentativeFor(protocolVersion))
 
   def filterClosedEnvelopesFor(

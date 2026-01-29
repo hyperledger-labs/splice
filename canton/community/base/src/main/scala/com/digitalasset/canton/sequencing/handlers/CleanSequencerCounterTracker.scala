@@ -60,7 +60,7 @@ class CleanSequencerCounterTracker(
       Traced[SequencerCounterCursorPrehead],
     ](Counter[EventBatchCounterDiscriminator](0L))
 
-  def apply[E <: Envelope[_]](
+  def apply[E <: Envelope[?]](
       handler: PossiblyIgnoredApplicationHandler[E]
   )(implicit callerCloseContext: CloseContext): PossiblyIgnoredApplicationHandler[E] =
     handler.replace { tracedEvents =>
@@ -73,7 +73,7 @@ class CleanSequencerCounterTracker(
             val eventBatchCounter = allocateEventBatchCounter()
             handler(tracedEvents).map { asyncF =>
               val asyncFSignalled = asyncF.andThenF { case () =>
-                store.performUnlessClosingUSF("signal-clean-event-batch")(
+                store.synchronizeWithClosing("signal-clean-event-batch")(
                   signalCleanEventBatch(eventBatchCounter, lastSc, lastTs)
                 )
               }

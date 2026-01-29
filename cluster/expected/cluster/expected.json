@@ -9,11 +9,11 @@
       },
       "cluster": "cn-mocknet",
       "initialNodeCount": 0,
-      "name": "cn-apps-pool",
       "nodeConfig": {
         "labels": {
-          "cn_apps": "true"
+          "cn_apps": "standard"
         },
+        "loggingVariant": "DEFAULT",
         "machineType": "n2-standard-16",
         "taints": [
           {
@@ -38,11 +38,11 @@
       },
       "cluster": "cn-mocknet",
       "initialNodeCount": 1,
-      "name": "cn-infra-pool",
       "nodeConfig": {
         "labels": {
           "cn_infra": "true"
         },
+        "loggingVariant": "DEFAULT",
         "machineType": "e2-standard-8",
         "taints": [
           {
@@ -69,6 +69,7 @@
       "initialNodeCount": 1,
       "name": "gke-pool",
       "nodeConfig": {
+        "loggingVariant": "DEFAULT",
         "machineType": "e2-standard-4",
         "taints": [
           {
@@ -103,5 +104,34 @@
     "name": "hyperdisk-balanced-rwo",
     "provider": "",
     "type": "kubernetes:storage.k8s.io/v1:StorageClass"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "storage.k8s.io/v1",
+      "kind": "StorageClass",
+      "metadata": {
+        "name": "hyperdisk-standard-rwo"
+      },
+      "parameters": {
+        "type": "hyperdisk-balanced"
+      },
+      "provisioner": "pd.csi.storage.gke.io",
+      "volumeBindingMode": "WaitForFirstConsumer"
+    },
+    "name": "hyperdisk-standard-rwo",
+    "provider": "",
+    "type": "kubernetes:storage.k8s.io/v1:StorageClass"
+  },
+  {
+    "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
   }
 ]

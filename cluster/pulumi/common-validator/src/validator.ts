@@ -11,23 +11,25 @@ import {
   CnInput,
   config,
   daContactPoint,
-  DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
   failOnAppVersionMismatch,
   fetchAndInstallParticipantBootstrapDump,
   getAdditionalJvmOptions,
-  installAuth0Secret,
-  installAuth0UISecret,
+  getValidatorAppApiAudience,
   installBootstrapDataBucketSecret,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
+  installValidatorSecrets,
+  K8sResourceSchema,
   LogLevel,
   networkWideConfig,
   participantBootstrapDumpSecretName,
   ParticipantPruningConfig,
   PersistenceConfig,
+  pvcSuffix,
   spliceInstanceNames,
+  standardStorageClassName,
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
@@ -47,14 +49,6 @@ export type ValidatorBackupConfig = {
   config: BackupConfig;
 };
 
-export type ValidatorSecrets = {
-  validatorSecret: Secret;
-  legacyValidatorSecret?: Secret;
-  wallet: Secret;
-  cns: Secret;
-  auth0Client: Auth0Client;
-};
-
 type BasicValidatorConfig = {
   xns: ExactNamespace;
   topupConfig?: ValidatorTopupConfig;
@@ -72,14 +66,18 @@ type BasicValidatorConfig = {
   additionalEnvVars?: k8s.types.input.core.v1.EnvVar[];
   additionalJvmOptions?: string;
   participantAddress: Output<string> | string;
-  secrets: ValidatorSecrets | ValidatorSecretsConfig;
+  auth0Client: Auth0Client;
+  auth0ValidatorAppName: string;
   sweep?: SweepConfig;
   autoAcceptTransfers?: AutoAcceptTransfersConfig;
   nodeIdentifier: string;
   dependencies: CnInput<pulumi.Resource>[];
   participantPruningConfig?: ParticipantPruningConfig;
   deduplicationDuration?: string;
+  disableAuth?: boolean;
   logLevel?: LogLevel;
+  logAsync?: boolean;
+  resources?: K8sResourceSchema;
 };
 
 export type ValidatorInstallConfig = BasicValidatorConfig & {
@@ -133,10 +131,9 @@ export async function installValidatorApp(
 
   const config = { ...baseConfig, backupConfig };
 
-  const validatorSecrets =
-    'validatorSecret' in config.secrets
-      ? config.secrets
-      : await installValidatorSecrets(config.secrets);
+  const validatorSecrets: Secret[] = baseConfig.disableAuth
+    ? []
+    : await installValidatorSecrets(config.xns, config.auth0Client);
 
   const participantBootstrapDumpSecret: pulumi.Resource | undefined =
     !config.svValidator && config.participantBootstrapDump
@@ -158,7 +155,7 @@ export async function installValidatorApp(
     .concat(validatorOnboardingSecret)
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
-    .concat([validatorSecrets.validatorSecret, validatorSecrets.wallet, validatorSecrets.cns])
+    .concat(validatorSecrets)
     .concat(config.extraDependsOn || []);
 
   const walletSweep = config.sweep && {
@@ -174,8 +171,6 @@ export async function installValidatorApp(
       fromParties: [config.autoAcceptTransfers.fromParty],
     },
   };
-
-  const chartVersion = activeVersion;
 
   return installSpliceHelmChart(
     config.xns,
@@ -223,11 +218,15 @@ export async function installValidatorApp(
       additionalJvmOptions: getAdditionalJvmOptions(config.additionalJvmOptions),
       failOnAppVersionMismatch: failOnAppVersionMismatch,
       enablePostgresMetrics: true,
-      auth: {
-        audience:
-          config.secrets.auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
-        jwksUrl: `https://${config.secrets.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
-      },
+      auth: config.disableAuth
+        ? undefined
+        : {
+            audience: getValidatorAppApiAudience(
+              config.auth0Client.getCfg(),
+              config.xns.logicalName
+            ),
+            jwksUrl: `https://${config.auth0Client.getCfg().auth0Domain}/.well-known/jwks.json`,
+          },
       walletSweep,
       autoAcceptTransfers,
       contactPoint: daContactPoint,
@@ -235,42 +234,17 @@ export async function installValidatorApp(
       participantPruningSchedule: config.participantPruningConfig,
       deduplicationDuration: config.deduplicationDuration,
       maxVettingDelay: networkWideConfig?.maxVettingDelay,
+      disableAuth: baseConfig.disableAuth || false,
       logLevel: config.logLevel,
-      resources: baseConfig.svValidator
-        ? {
-            requests: {
-              memory: '2Gi',
-            },
-            limits: {
-              memory: '4Gi',
-            },
-          }
-        : {},
+      logAsyncFlush: config.logAsync,
+      resources: baseConfig.svValidator ? config.resources : {},
       ...spliceInstanceNames,
+      pvc: {
+        volumeStorageClass: standardStorageClassName,
+        volumeName: `domain-migration-validator-${pvcSuffix}`,
+      },
     },
-    chartVersion,
+    activeVersion,
     { dependsOn }
   );
-}
-
-type ValidatorSecretsConfig = {
-  xns: ExactNamespace;
-  auth0Client: Auth0Client;
-  auth0AppName: string;
-};
-
-export async function installValidatorSecrets(
-  config: ValidatorSecretsConfig
-): Promise<ValidatorSecrets> {
-  return {
-    validatorSecret: await installAuth0Secret(
-      config.auth0Client,
-      config.xns,
-      'validator',
-      config.auth0AppName
-    ),
-    wallet: await installAuth0UISecret(config.auth0Client, config.xns, 'wallet', 'wallet'),
-    cns: await installAuth0UISecret(config.auth0Client, config.xns, 'cns', 'cns'),
-    auth0Client: config.auth0Client,
-  };
 }

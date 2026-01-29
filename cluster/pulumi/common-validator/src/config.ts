@@ -3,21 +3,94 @@
 import {
   DeployValidatorRunbook,
   EnvVarConfigSchema,
+  K8sResourceSchema,
   KmsConfigSchema,
   LogLevelSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
-import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
+import { clusterSubConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { z } from 'zod';
+
+export const SynchronizerConfigSchema = z.union([
+  z
+    .object({
+      connectionType: z.literal('trust-single'),
+      url: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      connectionType: z.literal('bft-custom'),
+      svNames: z.array(z.string()).min(1),
+      threshold: z.number().int().min(1),
+    })
+    .strict()
+    .refine(data => data.svNames.length >= data.threshold, {
+      message: 'svNames length must be greater than or equal to the threshold',
+      path: ['threshold'], // Point the error to the threshold field
+    }),
+  z
+    .object({
+      connectionType: z.literal('bft').default('bft'),
+    })
+    .strict(),
+]);
+
+export type synchronizerConfigSchema = z.infer<typeof SynchronizerConfigSchema>;
+
+export const ScanClientConfigSchema = z
+  .object({
+    scanType: z.enum(['trust-single', 'bft', 'bft-custom']),
+    scanAddress: z.string().optional(),
+    threshold: z.number().default(0),
+    svNames: z.array(z.string()).default([]),
+    seedUrls: z.array(z.string()).min(1, 'seedUrls must contain at least one element.').optional(),
+  })
+  .refine(
+    data => {
+      if (data.scanType === 'bft-custom') {
+        const threshold = data.threshold;
+        const svNamesSize = data.svNames.length;
+        const seedUrlsSize = data.seedUrls ? data.seedUrls.length : 0;
+        return svNamesSize >= threshold && seedUrlsSize >= threshold;
+      } else {
+        return true;
+      }
+    },
+    {
+      message:
+        "For 'bft-custom' scanType, both 'svNames' and 'seedUrls' must have a length greater than or equal to 'threshold'.",
+      path: ['scanType'],
+    }
+  );
+
+export type ScanClientConfig = z.infer<typeof ScanClientConfigSchema>;
+
+export const ValidatorAppConfigSchema = z.object({
+  additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
+  additionalJvmOptions: z.string().optional(),
+  scanClient: ScanClientConfigSchema.optional(),
+  synchronizer: SynchronizerConfigSchema.optional(),
+  resources: K8sResourceSchema,
+});
 
 export const ParticipantConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
   additionalJvmOptions: z.string().optional(),
+  resources: K8sResourceSchema.default({
+    requests: {
+      memory: '4Gi',
+    },
+    limits: {
+      memory: '8Gi',
+    },
+  }),
 });
 
 export const ValidatorNodeConfigSchema = z.object({
   logging: z
     .object({
       level: LogLevelSchema.optional(),
+      async: z.boolean().optional(),
     })
     .default({}),
   kms: KmsConfigSchema.optional(),
@@ -28,14 +101,20 @@ export const ValidatorNodeConfigSchema = z.object({
       retention: z.string(),
     })
     .optional(),
-  participant: ParticipantConfigSchema.optional(),
+  participant: ParticipantConfigSchema.default({}),
+  validatorApp: ValidatorAppConfigSchema.optional(),
+  disableAuth: z.boolean().default(false), // Note that this is currently ignored everywhere except for validator1, where it is used for testing only
 });
 export const PartyAllocatorConfigSchema = z.object({
   enable: z.boolean(),
   parallelism: z.number().default(30),
   maxParties: z.number().default(1000000),
+  preapprovalRetries: z.number().default(120),
+  preapprovalRetryDelayMs: z.number().default(1000),
+  pvcSize: z.string().optional(),
 });
 export type PartyAllocatorConfig = z.infer<typeof PartyAllocatorConfigSchema>;
+
 export type ValidatorNodeConfig = z.infer<typeof ValidatorNodeConfigSchema>;
 export const ValidatorConfigSchema = z
   .object({

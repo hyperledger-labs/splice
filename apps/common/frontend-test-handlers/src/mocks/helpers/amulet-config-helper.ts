@@ -158,6 +158,7 @@ export function getAmuletRulesConfig(
         amuletToIssuePerYear: '40000000000.0',
         validatorRewardCap: '0.2',
         optValidatorFaucetCap: '2.85',
+        optDevelopmentFundPercentage: '0.05',
       },
       futureValues: [
         {
@@ -172,6 +173,7 @@ export function getAmuletRulesConfig(
             amuletToIssuePerYear: '20000000000.0',
             validatorRewardCap: '0.2',
             optValidatorFaucetCap: '2.85',
+            optDevelopmentFundPercentage: '0.05',
           },
         },
         {
@@ -186,6 +188,7 @@ export function getAmuletRulesConfig(
             amuletToIssuePerYear: '10000000000.0',
             validatorRewardCap: '0.2',
             optValidatorFaucetCap: '2.85',
+            optDevelopmentFundPercentage: '0.05',
           },
         },
         {
@@ -200,6 +203,7 @@ export function getAmuletRulesConfig(
             amuletToIssuePerYear: '5000000000.0',
             validatorRewardCap: '0.2',
             optValidatorFaucetCap: '2.85',
+            optDevelopmentFundPercentage: '0.05',
           },
         },
         {
@@ -214,12 +218,14 @@ export function getAmuletRulesConfig(
             amuletToIssuePerYear: '2500000000.0',
             validatorRewardCap: '0.2',
             optValidatorFaucetCap: '2.85',
+            optDevelopmentFundPercentage: '0.05',
           },
         },
       ],
     },
     transferPreapprovalFee: null,
     featuredAppActivityMarkerAmount: null,
+    optDevelopmentFundManager: null,
   };
 }
 
@@ -252,7 +258,7 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
       data-key="decentralizedSynchronizer"
       class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div
         class="jsondiffpatch-property-name">decentralizedSynchronizer</div><ul
-        class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li
+        class="jsondiffpatch-node jsondiffpatch-node-type-object"><li
       data-key="activeSynchronizer" class="jsondiffpatch-unchanged"><div
         class="jsondiffpatch-property-name">activeSynchronizer</div><div
         class="jsondiffpatch-value"><pre>"global-domain::12200c1f141acd0b2e48defae40aa2eb3daae48e4c16b7e1fa5d9211d352cc150c81"</pre></div></li><li
@@ -271,7 +277,7 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
 }</pre></div></li><li data-key="requiredSynchronizers"
       class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div
         class="jsondiffpatch-property-name">requiredSynchronizers</div><ul
-        class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li
+        class="jsondiffpatch-node jsondiffpatch-node-type-object"><li
       data-key="map" class="jsondiffpatch-modified"><div
         class="jsondiffpatch-property-name">map</div><div
         class="jsondiffpatch-value jsondiffpatch-left-value"><pre>[
@@ -292,7 +298,7 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
   "_values": [
     {}
   ]
-}</pre></div></li></ul><li data-key="featuredAppActivityMarkerAmount"
+}</pre></div></li></ul></li></ul></li><li data-key="featuredAppActivityMarkerAmount"
     class="jsondiffpatch-unchanged"><div
       class="jsondiffpatch-property-name">featuredAppActivityMarkerAmount</div><div
       class="jsondiffpatch-value"><pre>null</pre></div></li><li
@@ -306,7 +312,8 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
     "validatorRewardCap": "0.2",
     "featuredAppRewardCap": "100.0",
     "unfeaturedAppRewardCap": "0.6",
-    "optValidatorFaucetCap": "2.85"
+    "optValidatorFaucetCap": "2.85",
+    "optDevelopmentFundPercentage": "0.05"
   },
   "futureValues": [
     {
@@ -320,7 +327,8 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
         "validatorRewardCap": "0.2",
         "featuredAppRewardCap": "100.0",
         "unfeaturedAppRewardCap": "0.6",
-        "optValidatorFaucetCap": "2.85"
+        "optValidatorFaucetCap": "2.85",
+        "optDevelopmentFundPercentage": "0.05"
       }
     },
     {
@@ -334,7 +342,8 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
         "validatorRewardCap": "0.2",
         "featuredAppRewardCap": "100.0",
         "unfeaturedAppRewardCap": "0.6",
-        "optValidatorFaucetCap": "2.85"
+        "optValidatorFaucetCap": "2.85",
+        "optDevelopmentFundPercentage": "0.05"
       }
     },
     {
@@ -348,7 +357,8 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
         "validatorRewardCap": "0.2",
         "featuredAppRewardCap": "100.0",
         "unfeaturedAppRewardCap": "0.6",
-        "optValidatorFaucetCap": "2.85"
+        "optValidatorFaucetCap": "2.85",
+        "optDevelopmentFundPercentage": "0.05"
       }
     },
     {
@@ -362,12 +372,16 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
         "validatorRewardCap": "0.2",
         "featuredAppRewardCap": "100.0",
         "unfeaturedAppRewardCap": "0.6",
-        "optValidatorFaucetCap": "2.85"
+        "optValidatorFaucetCap": "2.85",
+        "optDevelopmentFundPercentage": "0.05"
       }
     }
   ]
-}</pre></div></li><li data-key="packageConfig"
+}</pre></div></li><li data-key="optDevelopmentFundManager"
     class="jsondiffpatch-unchanged"><div
+      class="jsondiffpatch-property-name">optDevelopmentFundManager</div><div
+      class="jsondiffpatch-value"><pre>null</pre></div></li><li
+      data-key="packageConfig" class="jsondiffpatch-unchanged"><div
       class="jsondiffpatch-property-name">packageConfig</div><div
       class="jsondiffpatch-value"><pre>{
   "amulet": "0.1.8",
@@ -384,15 +398,15 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
 }</pre></div></li><li data-key="transferConfig"
     class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div
       class="jsondiffpatch-property-name">transferConfig</div><ul
-      class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li
+      class="jsondiffpatch-node jsondiffpatch-node-type-object"><li
     data-key="createFee"
     class="jsondiffpatch-node jsondiffpatch-child-node-type-object"><div
       class="jsondiffpatch-property-name">createFee</div><ul
-      class="jsondiffpatch-node jsondiffpatch-node-type-object"></ul></li><li
+      class="jsondiffpatch-node jsondiffpatch-node-type-object"><li
     data-key="fee" class="jsondiffpatch-modified"><div
       class="jsondiffpatch-property-name">fee</div><div
       class="jsondiffpatch-value jsondiffpatch-left-value"><pre>"${originalCreateFee}"</pre></div><div
-      class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"${replacementCreateFee}"</pre></div></li><li
+      class="jsondiffpatch-value jsondiffpatch-right-value"><pre>"${replacementCreateFee}"</pre></div></li></ul></li><li
     data-key="extraFeaturedAppRewardAmount" class="jsondiffpatch-unchanged"><div
       class="jsondiffpatch-property-name">extraFeaturedAppRewardAmount</div><div
       class="jsondiffpatch-value"><pre>"1.0"</pre></div></li><li
@@ -433,10 +447,10 @@ export function getExpectedAmuletRulesConfigDiffsHTML(
       "_2": "0.00001"
     }
   ]
-}</pre></div></li><li data-key="transferPreapprovalFee"
+}</pre></div></li></ul></li><li data-key="transferPreapprovalFee"
     class="jsondiffpatch-unchanged"><div
       class="jsondiffpatch-property-name">transferPreapprovalFee</div><div
-      class="jsondiffpatch-value"><pre>null</pre></div></li></div>
+      class="jsondiffpatch-value"><pre>null</pre></div></li></ul></div>
   `;
   return mock;
 }

@@ -7,24 +7,23 @@ import * as _ from 'lodash';
 import { Resource } from '@pulumi/pulumi';
 
 import { CnChartVersion } from './artifacts';
-import { clusterSmallDisk, config } from './config';
+import { clusterSmallDisk, CloudSqlConfig, config } from './config';
 import { spliceConfig } from './config/config';
-import { installSpliceHelmChart } from './helm';
+import { hyperdiskSupportConfig } from './config/hyperdiskSupportConfig';
+import {
+  appsAffinityAndTolerations,
+  infraAffinityAndTolerations,
+  installSpliceHelmChart,
+} from './helm';
 import { installPostgresPasswordSecret } from './secrets';
+import { standardStorageClassName } from './storage/storageClass';
+import { createVolumeSnapshot } from './storage/volumeSnapshot';
 import { ChartValues, CLUSTER_BASENAME, ExactNamespace, GCP_ZONE } from './utils';
-
-const enableCloudSql = spliceConfig.pulumiProjectConfig.cloudSql.enabled;
-export const protectCloudSql = spliceConfig.pulumiProjectConfig.cloudSql.protected;
-const cloudSqlDbInstance = spliceConfig.pulumiProjectConfig.cloudSql.tier;
-const cloudSqlEnterprisePlus = spliceConfig.pulumiProjectConfig.cloudSql.enterprisePlus;
 
 const project = gcp.organizations.getProjectOutput({});
 
 // use existing default network (needs to have a private vpc connection)
-export const privateNetwork = gcp.compute.Network.get(
-  'default',
-  pulumi.interpolate`projects/${project.name}/global/networks/default`
-);
+export const privateNetworkId = pulumi.interpolate`projects/${project.name}/global/networks/default`;
 
 export function generatePassword(
   name: string,
@@ -67,12 +66,13 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     instanceName: string,
     alias: string,
     secretName: string,
+    cloudSqlConfig: CloudSqlConfig,
     active: boolean = true,
     opts: { disableProtection?: boolean; migrationId?: string; logicalDecoding?: boolean } = {}
   ) {
     const instanceLogicalName = xns.logicalName + '-' + instanceName;
     const instanceLogicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
-    const deletionProtection = opts.disableProtection ? false : protectCloudSql;
+    const deletionProtection = opts.disableProtection ? false : cloudSqlConfig.protected;
     const baseOpts = {
       protect: deletionProtection,
       aliases: [{ name: instanceLogicalNameAlias }],
@@ -109,9 +109,9 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
           insightsConfig: {
             queryInsightsEnabled: true,
           },
-          tier: cloudSqlDbInstance,
-          edition: cloudSqlEnterprisePlus ? 'ENTERPRISE_PLUS' : 'ENTERPRISE',
-          ...(cloudSqlEnterprisePlus
+          tier: cloudSqlConfig.tier,
+          edition: cloudSqlConfig.enterprisePlus ? 'ENTERPRISE_PLUS' : 'ENTERPRISE',
+          ...(cloudSqlConfig.enterprisePlus
             ? {
                 dataCacheConfig: {
                   dataCacheEnabled: true,
@@ -120,7 +120,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
             : undefined),
           ipConfiguration: {
             ipv4Enabled: false,
-            privateNetwork: privateNetwork.id,
+            privateNetwork: privateNetworkId,
             enablePrivatePathForGoogleCloudServices: true,
           },
           userLabels: opts.migrationId
@@ -203,12 +203,13 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
     values?: ChartValues,
     overrideDbSizeFromValues?: boolean,
     disableProtection?: boolean,
-    version?: CnChartVersion
+    version?: CnChartVersion,
+    useInfraAffinityAndTolerations: boolean = false
   ) {
     const logicalName = xns.logicalName + '-' + instanceName;
     const logicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
     super('canton:network:postgres', logicalName, [], {
-      protect: disableProtection ? false : protectCloudSql,
+      protect: disableProtection ? false : spliceConfig.pulumiProjectConfig.cloudSql.protected,
       aliases: [{ name: logicalNameAlias, type: 'canton:network:postgres' }],
     });
 
@@ -226,6 +227,23 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
 
     // an initial database named cantonnet is created automatically (configured in the Helm chart).
     const smallDiskSize = clusterSmallDisk ? '240Gi' : undefined;
+    const supportsHyperdisk = useInfraAffinityAndTolerations
+      ? hyperdiskSupportConfig.hyperdiskSupport.enabledForInfra
+      : hyperdiskSupportConfig.hyperdiskSupport.enabled;
+    const migratingToHyperdisk = useInfraAffinityAndTolerations
+      ? hyperdiskSupportConfig.hyperdiskSupport.migratingInfra
+      : hyperdiskSupportConfig.hyperdiskSupport.migrating;
+
+    let hyperdiskMigrationValues = {};
+    if (supportsHyperdisk && migratingToHyperdisk) {
+      const { dataSource } = createVolumeSnapshot({
+        resourceName: `pg-data-${xns.logicalName}-${instanceName}-snapshot`,
+        snapshotName: `pg-data-${instanceName}-snapshot`,
+        namespace: xns.logicalName,
+        pvcName: `pg-data-${instanceName}-0`,
+      });
+      hyperdiskMigrationValues = { dataSource };
+    }
     const pg = installSpliceHelmChart(
       xns,
       instanceName,
@@ -235,6 +253,13 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
           volumeSize: overrideDbSizeFromValues
             ? values?.db?.volumeSize || smallDiskSize
             : smallDiskSize,
+          ...(supportsHyperdisk
+            ? {
+                volumeStorageClass: standardStorageClassName,
+                pvcTemplateName: 'pg-data-hd',
+                ...hyperdiskMigrationValues,
+              }
+            : {}),
         },
         persistence: {
           secretName: this.secretName,
@@ -244,7 +269,19 @@ export class SplicePostgres extends pulumi.ComponentResource implements Postgres
       {
         aliases: [{ name: logicalNameAlias, type: 'kubernetes:helm.sh/v3:Release' }],
         dependsOn: [passwordSecret],
-      }
+        ...((supportsHyperdisk &&
+          // during the migration we first delete the stateful set, which keeps the old pvcs (stateful sets always keep the pvcs), and then recreate with the new pvcs
+          // the stateful sets are immutable so they need to be recreated to force the change of the pvcs
+          migratingToHyperdisk) ||
+        spliceConfig.pulumiProjectConfig.replacePostgresStatefulSetOnChanges
+          ? {
+              replaceOnChanges: ['*'],
+              deleteBeforeReplace: true,
+            }
+          : {}),
+      },
+      true,
+      useInfraAffinityAndTolerations ? infraAffinityAndTolerations : appsAffinityAndTolerations
     );
     this.pg = pg;
 
@@ -262,6 +299,7 @@ export function installPostgres(
   instanceName: string,
   alias: string,
   version: CnChartVersion,
+  cloudSqlConfig: CloudSqlConfig,
   uniqueSecretName = false,
   opts: {
     isActive?: boolean;
@@ -273,8 +311,8 @@ export function installPostgres(
   const o = { isActive: true, ...opts };
   let ret: Postgres;
   const secretName = uniqueSecretName ? instanceName + '-secrets' : 'postgres-secrets';
-  if (enableCloudSql) {
-    ret = new CloudPostgres(xns, instanceName, alias, secretName, o.isActive, {
+  if (cloudSqlConfig.enabled) {
+    ret = new CloudPostgres(xns, instanceName, alias, secretName, cloudSqlConfig, o.isActive, {
       disableProtection: o.disableProtection,
       migrationId: o.migrationId?.toString(),
       logicalDecoding: o.logicalDecoding,

@@ -21,6 +21,6 @@ served by the Canton Participant node running as part of a Validator Node.
 
 
 Use the following documentation to learn how to use the Ledger API:
-https://docs.digitalasset.com/build/3.3/explanations/ledger-api.
+https://docs.digitalasset.com/build/3.4/explanations/ledger-api.
 
 

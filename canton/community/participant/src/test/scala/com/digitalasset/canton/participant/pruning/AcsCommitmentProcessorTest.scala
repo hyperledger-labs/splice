@@ -9,32 +9,32 @@ import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
 import com.digitalasset.canton.config.RequireTypes.{
-  NonNegativeInt,
   NonNegativeLong,
+  NonNegativeProportion,
   PositiveInt,
   PositiveNumeric,
 }
 import com.digitalasset.canton.config.{
   BatchingConfig,
+  CommitmentSendDelay,
   DefaultProcessingTimeouts,
   NonNegativeDuration,
+  PositiveDurationSeconds,
   TestingConfigInternal,
 }
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.ledger.participant.state.{
+  AcsChange,
+  ContractStakeholdersAndReassignmentCounter,
   RepairIndex,
   SequencerIndex,
   SynchronizerIndex,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LogEntry
-import com.digitalasset.canton.participant.event.{
-  AcsChange,
-  ContractStakeholdersAndReassignmentCounter,
-  RecordTime,
-}
+import com.digitalasset.canton.participant.event.{AcsChangeSupport, RecordTime}
 import com.digitalasset.canton.participant.metrics.ParticipantTestMetrics
 import com.digitalasset.canton.participant.protocol.RequestJournal.{RequestData, RequestState}
 import com.digitalasset.canton.participant.protocol.conflictdetection.CommitSet
@@ -88,7 +88,7 @@ import java.time.Duration as JDuration
 import java.util.UUID
 import scala.annotation.nowarn
 import scala.collection.concurrent.TrieMap
-import scala.collection.immutable.{Seq, SortedSet}
+import scala.collection.immutable.{Seq, Set, SortedSet}
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -105,7 +105,7 @@ sealed trait AcsCommitmentProcessorBaseTest
   protected lazy val interval = PositiveSeconds.tryOfSeconds(5)
   protected lazy val synchronizerId = SynchronizerId(
     UniqueIdentifier.tryFromProtoPrimitive("synchronizer::da")
-  )
+  ).toPhysical
   protected lazy val localId = ParticipantId(
     UniqueIdentifier.tryFromProtoPrimitive("localParticipant::synchronizer")
   )
@@ -273,8 +273,18 @@ sealed trait AcsCommitmentProcessorBaseTest
         )
     }
 
-  // Create the processor, but return the changes instead of publishing them, such that the user can decide when
-  // to publish
+  /** Create the processor, but return the changes instead of publishing them, such that the user
+    * can decide when to publish
+    *
+    * @param warnOnAcsCommitmentDegradation
+    *   Whether to warn on acs commitment degradation errors. Setting this to true is needed only
+    *   when specifically testing acs commitment degradation.
+    * @param increasePerceivedComputationTimeForCommitments
+    *   This parameter will artificially increase the measured computation time for commitments used
+    *   to decide whether to trigger catch-up mode. This is useful to test catch-up mode without
+    *   having to create a large number of commitments. This parameter does not influence neither
+    *   the actual time spent to compute commitments, nor the compute metrics.
+    */
   protected def testSetupDontPublish(
       timeProofs: List[CantonTimestamp],
       contractSetup: Map[
@@ -290,9 +300,8 @@ sealed trait AcsCommitmentProcessorBaseTest
       synchronizerParametersUpdates: List[
         SynchronizerParameters.WithValidity[DynamicSynchronizerParameters]
       ] = List.empty,
-      // Whether to warn on acs commitment degradation errors.
-      // Setting this to true is needed only when specifically testing acs commitment degradation.
       warnOnAcsCommitmentDegradation: Boolean = false,
+      increasePerceivedComputationTimeForCommitments: Boolean = false,
   )(implicit ec: ExecutionContext): (
       FutureUnlessShutdown[AcsCommitmentProcessor],
       AcsCommitmentStore,
@@ -348,7 +357,6 @@ sealed trait AcsCommitmentProcessorBaseTest
     val indexedStringStore = new InMemoryIndexedStringStore(minIndex = 1, maxIndex = 1)
 
     val acsCommitmentProcessor = AcsCommitmentProcessor(
-      synchronizerId,
       localId,
       sequencerClient,
       synchronizerCrypto,
@@ -356,7 +364,6 @@ sealed trait AcsCommitmentProcessorBaseTest
       store,
       _ => (),
       ParticipantTestMetrics.synchronizer.commitments,
-      testedProtocolVersion,
       DefaultProcessingTimeouts.testing
         .copy(storageMaxRetryInterval = NonNegativeDuration.tryFromDuration(1.millisecond)),
       futureSupervisor,
@@ -372,7 +379,17 @@ sealed trait AcsCommitmentProcessorBaseTest
       exitOnFatalFailures = true,
       BatchingConfig(),
       // do not delay sending commitments for testing, because tests often expect to see commitments after an interval
-      Some(NonNegativeInt.zero),
+      Some(CommitmentSendDelay(Some(NonNegativeProportion.zero), Some(NonNegativeProportion.zero))),
+      increasePerceivedComputationTimeForCommitments = Option.when(
+        increasePerceivedComputationTimeForCommitments
+      )(interval.duration.multipliedBy(2)),
+      doNotAwaitOnCheckingIncomingCommitments = false,
+      commitmentCheckpointInterval =
+        PositiveDurationSeconds.ofSeconds(interval.duration.getSeconds),
+      // just as for the additional consistency checks flag: if enabled, one needs to populate the above ACS
+      // and contract stores correctly, otherwise the tests will fail
+      commitmentMismatchDebugging = false,
+      commitmentProcessorNrAcsChangesBehindToTriggerCatchUp = Some(PositiveInt.tryCreate(5)),
     )
     (acsCommitmentProcessor, store, sequencerClient, changes, acsCommitmentConfigStore)
   }
@@ -507,11 +524,7 @@ sealed trait AcsCommitmentProcessorBaseTest
       unassignments = Map.empty[LfContractId, UnassignmentCommit],
       assignments = Map.empty[LfContractId, AssignmentCommit],
     )
-    val acs2 = AcsChange.tryFromCommitSet(
-      cs2,
-      Map.empty[LfContractId, ReassignmentCounter],
-      Map.empty[LfContractId, ReassignmentCounter],
-    )
+    val acs2 = AcsChangeSupport.fromCommitSet(cs2).tryAcsChange(Map.empty)
 
     val cs4 = CommitSet(
       creations = Map.empty[LfContractId, CreationCommit],
@@ -527,11 +540,11 @@ sealed trait AcsCommitmentProcessorBaseTest
       ),
       assignments = Map.empty[LfContractId, AssignmentCommit],
     )
-    val acs4 = AcsChange.tryFromCommitSet(
-      cs4,
-      Map[LfContractId, ReassignmentCounter](coid(0, 0) -> initialReassignmentCounter),
-      Map.empty[LfContractId, ReassignmentCounter],
-    )
+    val acs4 = AcsChangeSupport
+      .fromCommitSet(cs4)
+      .tryAcsChange(
+        Map[LfContractId, ReassignmentCounter](coid(0, 0) -> initialReassignmentCounter)
+      )
 
     val cs7 = CommitSet(
       creations = Map[LfContractId, CreationCommit](
@@ -544,17 +557,14 @@ sealed trait AcsCommitmentProcessorBaseTest
       unassignments = Map.empty[LfContractId, UnassignmentCommit],
       assignments = Map[LfContractId, AssignmentCommit](
         coid(1, 0) -> AssignmentCommit(
-          ReassignmentId(Source(synchronizerId), ts(4).forgetRefinement),
+          Source(synchronizerId),
+          ReassignmentId.tryCreate("0004"),
           ContractMetadata.tryCreate(Set.empty, Set(alice, bob), None),
           reassignmentCounter2,
         )
       ),
     )
-    val acs7 = AcsChange.tryFromCommitSet(
-      cs7,
-      Map.empty[LfContractId, ReassignmentCounter],
-      Map.empty[LfContractId, ReassignmentCounter],
-    )
+    val acs7 = AcsChangeSupport.fromCommitSet(cs7).tryAcsChange(Map.empty)
 
     val cs8 = CommitSet(
       creations = Map.empty[LfContractId, CreationCommit],
@@ -573,11 +583,11 @@ sealed trait AcsCommitmentProcessorBaseTest
       assignments = Map.empty[LfContractId, AssignmentCommit],
     )
     val acs8 =
-      AcsChange.tryFromCommitSet(
-        cs8,
-        Map[LfContractId, ReassignmentCounter](coid(1, 0) -> reassignmentCounter2),
-        Map.empty[LfContractId, ReassignmentCounter],
-      )
+      AcsChangeSupport
+        .fromCommitSet(cs8)
+        .tryAcsChange(
+          Map[LfContractId, ReassignmentCounter](coid(1, 0) -> reassignmentCounter2)
+        )
 
     val cs9 = CommitSet(
       creations = Map[LfContractId, CreationCommit](
@@ -594,11 +604,11 @@ sealed trait AcsCommitmentProcessorBaseTest
       unassignments = Map.empty[LfContractId, UnassignmentCommit],
       assignments = Map.empty[LfContractId, AssignmentCommit],
     )
-    val acs9 = AcsChange.tryFromCommitSet(
-      cs9,
-      Map.empty[LfContractId, ReassignmentCounter],
-      Map[LfContractId, ReassignmentCounter](coid(3, 0) -> initialReassignmentCounter),
-    )
+    val acs9 = AcsChangeSupport
+      .fromCommitSet(cs9)
+      .tryAcsChange(
+        Map[LfContractId, ReassignmentCounter](coid(3, 0) -> initialReassignmentCounter)
+      )
 
     val cs10 = CommitSet(
       creations = Map.empty[LfContractId, CreationCommit],
@@ -606,17 +616,14 @@ sealed trait AcsCommitmentProcessorBaseTest
       unassignments = Map.empty[LfContractId, UnassignmentCommit],
       assignments = Map[LfContractId, AssignmentCommit](
         coid(2, 0) -> AssignmentCommit(
-          ReassignmentId(Source(synchronizerId), ts(8).forgetRefinement),
+          Source(synchronizerId),
+          ReassignmentId.tryCreate("0008"),
           ContractMetadata.tryCreate(Set.empty, Set(alice, bob, carol), None),
           reassignmentCounter2,
         )
       ),
     )
-    val acs10 = AcsChange.tryFromCommitSet(
-      cs10,
-      Map.empty[LfContractId, ReassignmentCounter],
-      Map.empty[LfContractId, ReassignmentCounter],
-    )
+    val acs10 = AcsChangeSupport.fromCommitSet(cs10).tryAcsChange(Map.empty)
 
     val cs12 = CommitSet(
       creations = Map.empty[LfContractId, CreationCommit],
@@ -630,11 +637,7 @@ sealed trait AcsCommitmentProcessorBaseTest
       ),
       assignments = Map.empty[LfContractId, AssignmentCommit],
     )
-    val acs12 = AcsChange.tryFromCommitSet(
-      cs12,
-      Map.empty[LfContractId, ReassignmentCounter],
-      Map.empty[LfContractId, ReassignmentCounter],
-    )
+    val acs12 = AcsChangeSupport.fromCommitSet(cs12).tryAcsChange(Map.empty)
 
     val acsChanges = Map(
       ts(2) -> acs2,
@@ -774,11 +777,7 @@ sealed trait AcsCommitmentProcessorBaseTest
       unassignments = Map.empty[LfContractId, UnassignmentCommit],
       assignments = Map.empty[LfContractId, AssignmentCommit],
     )
-    val acs2 = AcsChange.tryFromCommitSet(
-      cs2,
-      Map.empty[LfContractId, ReassignmentCounter],
-      Map.empty[LfContractId, ReassignmentCounter],
-    )
+    val acs2 = AcsChangeSupport.fromCommitSet(cs2).tryAcsChange(Map.empty)
 
     val cs4 = CommitSet(
       creations = Map.empty[LfContractId, CreationCommit],
@@ -793,14 +792,14 @@ sealed trait AcsCommitmentProcessorBaseTest
       unassignments = Map.empty[LfContractId, UnassignmentCommit],
       assignments = Map.empty[LfContractId, AssignmentCommit],
     )
-    val acs4 = AcsChange.tryFromCommitSet(
-      cs4,
-      Map[LfContractId, ReassignmentCounter](
-        coid(0, 0) -> initialReassignmentCounter,
-        coid(3, 0) -> initialReassignmentCounter,
-      ),
-      Map.empty[LfContractId, ReassignmentCounter],
-    )
+    val acs4 = AcsChangeSupport
+      .fromCommitSet(cs4)
+      .tryAcsChange(
+        Map[LfContractId, ReassignmentCounter](
+          coid(0, 0) -> initialReassignmentCounter,
+          coid(3, 0) -> initialReassignmentCounter,
+        )
+      )
 
     val acsChanges = Map(ts(2) -> acs2, ts(4) -> acs4)
     (contracts, acsChanges)
@@ -809,7 +808,7 @@ sealed trait AcsCommitmentProcessorBaseTest
   protected def rt(timestamp: Long, tieBreaker: Int): RecordTime =
     RecordTime(ts(timestamp).forgetRefinement, tieBreaker.toLong)
 
-  protected val coid = (txId, discriminator) =>
+  protected val coid: (Int, Int) => LfContractId = (txId, discriminator) =>
     ExampleTransactionFactory.suffixedId(txId, discriminator)
 }
 
@@ -824,11 +823,8 @@ class AcsCommitmentProcessorTest
       contracts: Map[LfContractId, ReassignmentCounter]
   ): AcsCommitment.CommitmentType = {
     val h = LtHash16()
-    contracts.keySet.foreach { cid =>
-      h.add(
-        (cid.encodeDeterministically
-          concat ReassignmentCounter.encodeDeterministically(contracts(cid))).toByteArray
-      )
+    contracts.foreach { case (cid, reassignmentCounter) =>
+      AcsCommitmentProcessor.addContractToCommitmentDigest(h, cid, reassignmentCounter)
     }
     h.getByteString()
   }
@@ -895,7 +891,7 @@ class AcsCommitmentProcessorTest
 
     snapshotF.flatMap { snapshot =>
       SignedProtocolMessage
-        .trySignAndCreate(payload, snapshot, testedProtocolVersion)
+        .trySignAndCreate(payload, snapshot)
     }
   }
 
@@ -1289,7 +1285,7 @@ class AcsCommitmentProcessorTest
         // First ask for the remote commitments to be processed, and then compute locally
         _ <- delivered
           .parTraverse_ { case (ts, batch) =>
-            processor.processBatchInternal(ts.forgetRefinement, batch)
+            processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
           }
         _ <- processChanges(processor, store, changes)
 
@@ -1376,7 +1372,7 @@ class AcsCommitmentProcessorTest
         // First ask for the remote commitments to be processed, and then compute locally
         _ <- delivered
           .parTraverse_ { case (ts, batch) =>
-            processor.processBatchInternal(ts.forgetRefinement, batch)
+            processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
           }
 
         _ <- processor.flush()
@@ -1807,7 +1803,7 @@ class AcsCommitmentProcessorTest
         )
         // First ask for the remote commitments to be processed
         _ <- delivered.parTraverse_ { case (ts, batch) =>
-          processor.processBatchInternal(ts.forgetRefinement, batch)
+          processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
         }
         _ <- processChanges(processor, store, changes)
 
@@ -1895,6 +1891,117 @@ class AcsCommitmentProcessorTest
       snap3.deleted shouldBe Set.empty
     }
 
+    "running commitments work as expected with garbage collection" in {
+      val rc =
+        new pruning.AcsCommitmentProcessor.RunningCommitments(RecordTime.MinValue, TrieMap.empty)
+
+      rc.watermark shouldBe RecordTime.MinValue
+      rc.snapshot(gc = false) shouldBe CommitmentSnapshot(
+        RecordTime.MinValue,
+        Map.empty,
+        Map.empty,
+        Set.empty,
+      )
+      val ch1 = AcsChange(
+        activations = Map(
+          coid(0, 0) ->
+            ContractStakeholdersAndReassignmentCounter(
+              Set(alice, bob),
+              initialReassignmentCounter,
+            ),
+          coid(0, 1) ->
+            ContractStakeholdersAndReassignmentCounter(
+              Set(bob, carol),
+              initialReassignmentCounter,
+            ),
+        ),
+        deactivations = Map.empty,
+      )
+      rc.update(rt(1, 0), ch1)
+      rc.watermark shouldBe rt(1, 0)
+      val snap1 = rc.snapshot(gc = false)
+      snap1.recordTime shouldBe rt(1, 0)
+      snap1.active.keySet shouldBe Set(SortedSet(alice, bob), SortedSet(bob, carol))
+      snap1.delta.keySet shouldBe Set(SortedSet(alice, bob), SortedSet(bob, carol))
+      snap1.deleted shouldBe Set.empty
+
+      val ch2 = AcsChange(
+        deactivations = Map(
+          coid(0, 0) -> ContractStakeholdersAndReassignmentCounter(
+            Set(alice, bob),
+            initialReassignmentCounter,
+          )
+        ),
+        activations = Map(
+          coid(1, 1) ->
+            ContractStakeholdersAndReassignmentCounter(
+              Set(alice, carol),
+              initialReassignmentCounter,
+            )
+        ),
+      )
+      rc.update(rt(1, 1), ch2)
+      rc.watermark shouldBe rt(1, 1)
+      val snap2 = rc.snapshot(gc = false)
+      snap2.recordTime shouldBe rt(1, 1)
+      snap2.active.keySet should contain theSameElementsAs Set(
+        SortedSet(alice, bob),
+        SortedSet(alice, carol),
+        SortedSet(bob, carol),
+      )
+      // doesn't contain (alice, bob) because delta doesn't contain deleted
+      snap2.delta.keySet should contain theSameElementsAs Set(
+        SortedSet(alice, carol),
+        SortedSet(bob, carol),
+      )
+      snap2.deleted shouldBe Set(SortedSet(alice, bob))
+
+      val ch3 = AcsChange(
+        deactivations = Map.empty,
+        activations = Map(
+          coid(2, 1) ->
+            ContractStakeholdersAndReassignmentCounter(
+              Set(alice, carol),
+              initialReassignmentCounter,
+            )
+        ),
+      )
+      rc.update(rt(3, 0), ch3)
+      val snap3 = rc.snapshot(gc = false)
+      snap3.recordTime shouldBe rt(3, 0)
+      snap3.active.keySet should contain theSameElementsAs Set(
+        SortedSet(alice, bob),
+        SortedSet(alice, carol),
+        SortedSet(bob, carol),
+      )
+      snap3.delta.keySet should contain theSameElementsAs Set(
+        SortedSet(alice, carol),
+        SortedSet(bob, carol),
+      )
+      snap3.deleted shouldBe Set(SortedSet(alice, bob))
+
+      val snap3WithGc = rc.snapshot()
+      snap3WithGc.recordTime shouldBe rt(3, 0)
+      snap3WithGc.active.keySet should contain theSameElementsAs Set(
+        SortedSet(alice, carol),
+        SortedSet(bob, carol),
+      )
+      snap3WithGc.delta.keySet should contain theSameElementsAs Set(
+        SortedSet(alice, carol),
+        SortedSet(bob, carol),
+      )
+      snap3WithGc.deleted shouldBe Set(SortedSet(alice, bob))
+
+      val snap4WithGc = rc.snapshot()
+      snap4WithGc.recordTime shouldBe rt(3, 0)
+      snap4WithGc.active.keySet should contain theSameElementsAs Set(
+        SortedSet(alice, carol),
+        SortedSet(bob, carol),
+      )
+      snap4WithGc.delta.keySet shouldBe empty
+      snap4WithGc.deleted shouldBe empty
+    }
+
     "contracts differing by reassignment counter result in different commitments if the PV support reassignment counters" in {
       val rc1 =
         new pruning.AcsCommitmentProcessor.RunningCommitments(RecordTime.MinValue, TrieMap.empty)
@@ -1938,7 +2045,8 @@ class AcsCommitmentProcessorTest
         ),
         assignments = Map[LfContractId, AssignmentCommit](
           cid3.leftSide -> CommitSet.AssignmentCommit(
-            ReassignmentId(Source(synchronizerId), CantonTimestamp.Epoch),
+            Source(synchronizerId),
+            ReassignmentId.tryCreate("00"),
             ContractMetadata.tryCreate(Set.empty, Set(bob), None),
             reassignmentCounter1,
           )
@@ -1948,33 +2056,13 @@ class AcsCommitmentProcessorTest
       val reassignmentCounterOfArchival =
         Map[LfContractId, ReassignmentCounter](cid4 -> reassignmentCounter3)
 
-      val reassignmentCountersForArchivedTransient =
-        AcsCommitmentProcessor.reassignmentCountersForArchivedTransient(cs)
       val acs1 =
-        AcsChange.tryFromCommitSet(
-          cs,
-          reassignmentCounterOfArchival,
-          reassignmentCountersForArchivedTransient,
-        )
+        AcsChangeSupport.fromCommitSet(cs).tryAcsChange(reassignmentCounterOfArchival)
 
       // cid1 is a transient creation with reassignment counter initialReassignmentCounter and should not appear in the ACS change
-      reassignmentCountersForArchivedTransient
-        .get(cid1)
-        .fold(
-          fail(
-            s"$cid1 should be transient, but is not in $reassignmentCountersForArchivedTransient"
-          )
-        )(_ shouldBe initialReassignmentCounter)
       acs1.activations.get(cid1) shouldBe None
       acs1.deactivations.get(cid1) shouldBe None
       // cid3 is a transient assignment and should not appear in the ACS change
-      reassignmentCountersForArchivedTransient
-        .get(cid3)
-        .fold(
-          fail(
-            s"$cid3 should be transient, but is not in $reassignmentCountersForArchivedTransient"
-          )
-        )(_ shouldBe reassignmentCounter1)
       acs1.activations.get(cid3) shouldBe None
       acs1.deactivations.get(cid3) shouldBe None
       // unassignment cid2 is a deactivation with reassignment counter reassignmentCounter2
@@ -2150,6 +2238,7 @@ class AcsCommitmentProcessorTest
             topology,
             acsCommitmentsCatchUpModeEnabled = true,
             warnOnAcsCommitmentDegradation = true,
+            increasePerceivedComputationTimeForCommitments = true,
           )
 
         val remoteCommitments = List(
@@ -2179,7 +2268,7 @@ class AcsCommitmentProcessorTest
           // First ask for the remote commitments to be processed, and then compute locally
           // This triggers catch-up mode
           _ <- delivered.parTraverse_ { case (ts, batch) =>
-            processor.processBatchInternal(ts.forgetRefinement, batch)
+            processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
           }
           _ <- processChanges(processor, store, changes)
 
@@ -2205,6 +2294,113 @@ class AcsCommitmentProcessorTest
           assert(received.size === 5)
           // all local commitments were matched and can be pruned
           assert(outstanding.contains(toc(55).timestamp))
+        })
+      }
+
+      "enter catch up mode when processing falls behind and enqueued acs changes exceed the threshold" in {
+        val timeProofs = List(3L, 8, 20, 35, 59, 70, 90, 110, 130, 150, 200).map(
+          CantonTimestamp.ofEpochSecond
+        )
+        val contractSetup = (1 to 99).map(i =>
+          // contract ID to stakeholders, creation and archival time
+          coid(0, i) -> (
+            Set(alice, bob),
+            toc(i.toLong),
+            toc(i.toLong + 1),
+            initialReassignmentCounter,
+            initialReassignmentCounter,
+          )
+        ) ++ Seq(
+          coid(0, 100) -> (
+            Set(alice, bob),
+            toc(99),
+            toc(101),
+            initialReassignmentCounter,
+            initialReassignmentCounter,
+          )
+        ) ++ (100 to 199)
+          .map(i =>
+            // contract ID to stakeholders, creation and archival time
+            coid(0, i) -> (
+              Set(alice, carol),
+              toc(i.toLong),
+              toc(i.toLong + 1),
+              initialReassignmentCounter,
+              initialReassignmentCounter,
+            )
+          ) ++ Seq(
+          coid(0, 200) -> (
+            Set(alice, carol),
+            toc(199),
+            toc(201),
+            initialReassignmentCounter,
+            initialReassignmentCounter,
+          )
+        ).toMap
+
+        val topology = Map(
+          localId -> Set(alice),
+          remoteId1 -> Set(bob),
+          remoteId2 -> Set(carol),
+        )
+
+        val (proc, store, sequencerClient, changes, _) =
+          testSetupDontPublish(
+            timeProofs,
+            contractSetup.toMap,
+            topology,
+            acsCommitmentsCatchUpModeEnabled = true,
+            warnOnAcsCommitmentDegradation = true,
+            // this will force us to evaluate the condition for catch-up when acs change queue exceeds a threshold
+            increasePerceivedComputationTimeForCommitments = false,
+          )
+
+        val remoteCommitments = List(
+          (remoteId1, Map((coid(0, 100), initialReassignmentCounter)), ts(95), ts(100), None),
+          (remoteId2, Map((coid(0, 200), initialReassignmentCounter)), ts(195), ts(200), None),
+        )
+
+        (for {
+          processor <- proc
+          _ <- checkCatchUpModeCfgCorrect(processor, timeProofs.head)
+          remote <- remoteCommitments.parTraverse(commitmentMsg)
+          delivered = remote.map(cmt =>
+            (
+              cmt.message.period.toInclusive.plusSeconds(1),
+              List(OpenEnvelope(cmt, Recipients.cc(localId))(testedProtocolVersion)),
+            )
+          )
+          // First ask for the remote commitments to be processed, and then compute locally
+          // This triggers catch-up mode
+          _ <- delivered.parTraverse_ { case (ts, batch) =>
+            processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
+          }
+          _ <- processChanges(processor, store, changes)
+
+          outstanding <- store.noOutstandingCommitments(timeProofs.lastOption.value)
+          computedAll <- store
+            .searchComputedBetween(
+              CantonTimestamp.Epoch,
+              timeProofs.lastOption.value,
+            )
+          computed = computedAll.filter(_._2 != localId)
+          received <- store
+            .searchReceivedBetween(
+              CantonTimestamp.Epoch,
+              timeProofs.lastOption.value,
+            )
+        } yield {
+          // the participant doesn't catch up to tick 10, because we're probably too late to see the enqueued acs changes when we
+          // evaluate the catch-up condition, so it'll send commitments for both ticks 5 and 10
+          // after that, the participant catches up to ticks 20, 30, .., 3:20, which corresponds to toc 200
+          // this sums up to 21 commitments
+          sequencerClient.requests.size shouldBe 21
+          assert(computed.size === 21)
+          assert(received.size === 2)
+          // all local commitments were matched and can be pruned
+          eventually() {
+            assert(outstanding.contains(toc(200).timestamp))
+          }
         })
       }
 
@@ -2367,6 +2563,7 @@ class AcsCommitmentProcessorTest
             acsCommitmentsCatchUpModeEnabled = true,
             synchronizerParametersUpdates = List(startConfigWithValidity),
             warnOnAcsCommitmentDegradation = true,
+            increasePerceivedComputationTimeForCommitments = true,
           )
 
         (for {
@@ -2446,6 +2643,7 @@ class AcsCommitmentProcessorTest
             acsCommitmentsCatchUpModeEnabled = true,
             synchronizerParametersUpdates = List(startConfigWithValidity),
             warnOnAcsCommitmentDegradation = true,
+            increasePerceivedComputationTimeForCommitments = true,
           )
 
         (for {
@@ -2530,6 +2728,7 @@ class AcsCommitmentProcessorTest
             topology,
             acsCommitmentsCatchUpModeEnabled = true,
             warnOnAcsCommitmentDegradation = true,
+            increasePerceivedComputationTimeForCommitments = true,
           )
 
         val remoteCommitments = List(
@@ -2560,7 +2759,10 @@ class AcsCommitmentProcessorTest
           _ <- processChanges(processor, store, changes)
 
           _ <- delivered.parTraverse_ { case (ts, batch) =>
-            processor.processBatchInternal(ts.forgetRefinement, batch)
+            processor
+              .processBatchInternal(ts.forgetRefinement, batch)
+              .flatMap(_.unwrap)
+
           }
           _ <- processor.flush()
           outstanding <- store.noOutstandingCommitments(timeProofs.lastOption.value)
@@ -2634,6 +2836,7 @@ class AcsCommitmentProcessorTest
             topology,
             acsCommitmentsCatchUpModeEnabled = true,
             warnOnAcsCommitmentDegradation = true,
+            increasePerceivedComputationTimeForCommitments = true,
           )
 
         val remoteCommitments = List(
@@ -2666,7 +2869,7 @@ class AcsCommitmentProcessorTest
           )
           // First ask for the remote commitments to be processed, and then compute locally
           _ <- delivered.parTraverse_ { case (ts, batch) =>
-            processor.processBatchInternal(ts.forgetRefinement, batch)
+            processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
           }
 
           _ <- loggerFactory
@@ -2783,6 +2986,7 @@ class AcsCommitmentProcessorTest
             synchronizerParametersUpdates =
               List(disabledConfigWithValidity, changedConfigWithValidity),
             warnOnAcsCommitmentDegradation = true,
+            increasePerceivedComputationTimeForCommitments = true,
           )
 
         (for {
@@ -2888,6 +3092,7 @@ class AcsCommitmentProcessorTest
             synchronizerParametersUpdates =
               List(startConfigWithValidity, disabledConfigWithValidity),
             warnOnAcsCommitmentDegradation = true,
+            increasePerceivedComputationTimeForCommitments = true,
           )
 
         (for {
@@ -2976,6 +3181,7 @@ class AcsCommitmentProcessorTest
             acsCommitmentsCatchUpModeEnabled = true,
             synchronizerParametersUpdates = List(startConfigWithValidity, changeConfigWithValidity),
             warnOnAcsCommitmentDegradation = true,
+            increasePerceivedComputationTimeForCommitments = true,
           )
 
         (for {
@@ -3062,6 +3268,7 @@ class AcsCommitmentProcessorTest
             topology,
             acsCommitmentsCatchUpModeEnabled = true,
             warnOnAcsCommitmentDegradation = true,
+            increasePerceivedComputationTimeForCommitments = true,
           )
 
         (for {
@@ -3133,7 +3340,7 @@ class AcsCommitmentProcessorTest
           // This triggers catch-up mode
           _ <- delivered
             .parTraverse_ { case (ts, batch) =>
-              processor.processBatchInternal(ts.forgetRefinement, batch)
+              processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
             }
 
           _ <- processChanges(
@@ -3144,11 +3351,11 @@ class AcsCommitmentProcessorTest
           )
 
           received <- store.searchReceivedBetween(
-            sequence.head,
+            sequence.head.minusMillis(1),
             endOfRemoteCommitsPeriod,
           )
           computed <- store.searchComputedBetween(
-            sequence.head,
+            sequence.head.minusMillis(1),
             endOfRemoteCommitsPeriod,
           )
         } yield {
@@ -3216,6 +3423,7 @@ class AcsCommitmentProcessorTest
             topology,
             acsCommitmentsCatchUpModeEnabled = true,
             warnOnAcsCommitmentDegradation = true,
+            increasePerceivedComputationTimeForCommitments = true,
           )
 
         val remoteCommitments = List(
@@ -3250,7 +3458,7 @@ class AcsCommitmentProcessorTest
           // First ask for the remote commitments to be processed, and then compute locally
           // This triggers catch-up mode
           _ <- delivered.parTraverse_ { case (ts, batch) =>
-            processor.processBatchInternal(ts.forgetRefinement, batch)
+            processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
           }
 
           _ <- loggerFactory.assertLoggedWarningsAndErrorsSeq(
@@ -3338,6 +3546,7 @@ class AcsCommitmentProcessorTest
             topology,
             acsCommitmentsCatchUpModeEnabled = true,
             warnOnAcsCommitmentDegradation = true,
+            increasePerceivedComputationTimeForCommitments = true,
           )
 
         val remoteCommitmentsFast = List(
@@ -3416,7 +3625,7 @@ class AcsCommitmentProcessorTest
           // which are up to timestamp 30
           // This causes the local participant to enter catch-up mode
           _ <- deliveredFast.parTraverse_ { case (ts, batch) =>
-            processor.processBatchInternal(ts.forgetRefinement, batch)
+            processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
           }
 
           _ = loggerFactory.assertLogs(
@@ -3443,7 +3652,7 @@ class AcsCommitmentProcessorTest
           )
 
           _ <- deliveredNormal.parTraverse_ { case (ts, batch) =>
-            processor.processBatchInternal(ts.forgetRefinement, batch)
+            processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
           }
           _ <- processor.flush()
 
@@ -3506,6 +3715,7 @@ class AcsCommitmentProcessorTest
             topology,
             acsCommitmentsCatchUpModeEnabled = true,
             warnOnAcsCommitmentDegradation = true,
+            increasePerceivedComputationTimeForCommitments = true,
           )
 
         val remoteCommitmentsFast = List(
@@ -3598,7 +3808,7 @@ class AcsCommitmentProcessorTest
             // This causes the local participant to enter catch-up mode, and observe mismatch for timestamp 20,
             // and fine-grained compute and send commitment 10-15
             _ <- deliveredFast.parTraverse_ { case (ts, batch) =>
-              processor.processBatchInternal(ts.forgetRefinement, batch)
+              processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
             }
 
             _ = changes.foreach { case (recordTime, change) =>
@@ -3620,7 +3830,7 @@ class AcsCommitmentProcessorTest
             )
 
             _ <- deliveredNormal.parTraverse_ { case (ts, batch) =>
-              processor.processBatchInternal(ts.forgetRefinement, batch)
+              processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
             }
             _ <- processor.flush()
 
@@ -4104,7 +4314,7 @@ class AcsCommitmentProcessorTest
         // This triggers catch-up mode
         _ <- delivered
           .parTraverse_ { case (ts, batch) =>
-            processor.processBatchInternal(ts.forgetRefinement, batch)
+            processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
           }
 
       } yield {
@@ -4201,7 +4411,7 @@ class AcsCommitmentProcessorTest
         // This triggers catch-up mode
         _ <- delivered
           .parTraverse_ { case (ts, batch) =>
-            processor.processBatchInternal(ts.forgetRefinement, batch)
+            processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
           }
 
       } yield {
@@ -4293,7 +4503,7 @@ class AcsCommitmentProcessorTest
         // This triggers catch-up mode
         _ <- delivered
           .parTraverse_ { case (ts, batch) =>
-            processor.processBatchInternal(ts.forgetRefinement, batch)
+            processor.processBatchInternal(ts.forgetRefinement, batch).flatMap(_.unwrap)
           }
 
       } yield {

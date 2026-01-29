@@ -20,7 +20,7 @@ class TransactionTreeExtensionsTest extends AnyWordSpec with BaseTest {
       .copy(minSuccessful = 100)
 
   "preorderDescendants" should {
-    "respond for all members of the tree with other members" in scForAll { (t: j.TransactionTree) =>
+    "respond for all members of the tree with other members" in scForAll { (t: j.Transaction) =>
       val events = t.getEventsById.asScala.values.toSeq
       forEvery(Table("event", events*)) { e =>
         val result = t.preorderDescendants(e).toSeq
@@ -90,11 +90,11 @@ object TransactionTreeExtensionsTest {
   import org.scalacheck.Arbitrary
   import j.Generators
 
-  implicit val `arb TransactionTree`: Arbitrary[j.TransactionTree] = Arbitrary(
-    Generators.transactionTreeGen.map(j.TransactionTree.fromProto)
+  implicit val `arb TransactionTree`: Arbitrary[j.Transaction] = Arbitrary(
+    Generators.transactionGen.map(j.Transaction.fromProto)
   )
 
-  val txTreeWithGuaranteedCreate = Generators.transactionTreeGen
-    .filter(_.getEventsByIdMap.asScala.values.exists(_.hasCreated))
-    .map(j.TransactionTree.fromProto)
+  val txTreeWithGuaranteedCreate = Generators.transactionGen
+    .filter(_.getEventsList.asScala.exists(_.hasCreated))
+    .map(j.Transaction.fromProto)
 }

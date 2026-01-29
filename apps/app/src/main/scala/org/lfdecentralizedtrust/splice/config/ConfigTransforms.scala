@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvBftSequencerPeerOffboardingTrigger
@@ -197,6 +198,10 @@ object ConfigTransforms {
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
       setDefaultGrpcDeadlineForTreasuryService(),
       disableZeroFees(),
+      updateAllAutomationConfigs(
+        _.copy(rewardOperationRoundsCloseBufferDuration = NonNegativeFiniteDuration.ofMillis(100))
+      ),
+      disableDevelopmentFund(),
     )
   }
 
@@ -296,6 +301,9 @@ object ConfigTransforms {
   def disableZeroFees(): ConfigTransform =
     updateAllSvAppFoundDsoConfigs_(c => c.copy(zeroTransferFees = false))
 
+  def disableDevelopmentFund(): ConfigTransform =
+    updateAllSvAppFoundDsoConfigs_(c => c.copy(developmentFundPercentage = Some(0.0)))
+
   def updateAllValidatorAppConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig
   ): ConfigTransform =
@@ -333,6 +341,18 @@ object ConfigTransforms {
         }
     )
 
+  def updateInitialTickDuration(tick: NonNegativeFiniteDuration): ConfigTransform = {
+    ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+      _.copy(initialTickDuration = tick)
+    ) compose ConfigTransforms.updateAllAutomationConfigs(config =>
+      if (config.pollingInterval.toInternal > tick.toInternal)
+        config.copy(
+          pollingInterval = tick
+        )
+      else config
+    )
+  }
+
   def noDevNet: ConfigTransform =
     updateAllSvAppFoundDsoConfigs_(_.focus(_.isDevNet).replace(false))
 
@@ -360,42 +380,29 @@ object ConfigTransforms {
         .seq
     )
 
+  def updateAllSplitwellAppConfigs(
+      update: (String, SplitwellAppBackendConfig) => SplitwellAppBackendConfig
+  ): ConfigTransform =
+    _.focus(_.splitwellApps).modify(_.map { case (name, config) =>
+      (name, update(name.unwrap, config))
+    })
+
   def updateAllSplitwellAppConfigs_(
       update: SplitwellAppTransform
   ): ConfigTransform =
-    _.focus(_.splitwellApps).modify(_.map { case (name, config) =>
-      (name, update(config))
+    updateAllSplitwellAppConfigs((_, config) => update(config))
+
+  def updateAllRemoteSplitwellAppConfigs(
+      update: (String, SplitwellAppClientConfig) => SplitwellAppClientConfig
+  ): ConfigTransform =
+    _.focus(_.splitwellAppClients).modify(_.map { case (name, config) =>
+      (name, update(name.unwrap, config))
     })
 
   def updateAllRemoteSplitwellAppConfigs_(
       update: RemoteSplitwellAppTransform
   ): ConfigTransform =
-    _.focus(_.splitwellAppClients).modify(_.map { case (name, config) =>
-      (name, update(config))
-    })
-
-  def bumpCantonDomainPortsBy(bump: Int): ConfigTransform =
-    bumpSvAppCantonDomainPortsBy(bump) compose bumpValidatorAppCantonDomainPortsBy(
-      bump
-    ) compose bumpScanCantonDomainPortsBy(bump)
-
-  def bumpSvAppCantonDomainPortsBy(bump: Int): ConfigTransform = {
-    updateAllSvAppConfigs_(
-      _.focus(_.domains.global.url)
-        .modify(_.map(bumpUrl(bump, _)))
-        .focus(_.localSynchronizerNode)
-        .modify(
-          _.map(d =>
-            d.copy(
-              sequencer = d.sequencer
-                .copy(
-                  externalPublicApiUrl = bumpUrl(bump, d.sequencer.externalPublicApiUrl)
-                )
-            )
-          )
-        )
-    )
-  }
+    updateAllRemoteSplitwellAppConfigs((_, config) => update(config))
 
   def bumpScanCantonDomainPortsBy(bump: Int) = {
     updateAllScanAppConfigs_(
@@ -409,47 +416,57 @@ object ConfigTransforms {
     )
   }
 
-  def bumpValidatorAppCantonDomainPortsBy(bump: Int): ConfigTransform = {
-    def bumpUrl(s: String): String = {
-      val uri = Uri(s)
-      uri.withPort(uri.effectivePort + bump).toString
-    }
-    def bumpOptionalUrl(o: Option[String]): Option[String] = {
-      o.map(bumpUrl(_))
-    }
-    updateAllValidatorConfigs_(
-      _.focus(_.domains.global.url)
-        .modify(bumpOptionalUrl(_))
-        .focus(_.domains.extra)
-        .modify(_.map(d => d.copy(url = bumpUrl(d.url))))
-    )
+  def bumpOptionalUrl(o: Option[String], bump: Int): Option[String] = {
+    o.map(bumpUrl(bump, _))
   }
 
-  def bumpCantonPortsBy(bump: Int): ConfigTransform = {
+  def bumpCantonPortsBy(bump: Int, predicate: String => Boolean = _ => true): ConfigTransform = {
 
     val transforms = Seq(
-      updateAllSvAppConfigs_(
-        _.focus(_.participantClient)
-          .modify(portTransform(bump, _))
-          .focus(_.localSynchronizerNode)
-          .modify(_.map(portTransform(bump, _)))
+      updateAllSvAppConfigs((name, conf) =>
+        if (predicate(name))
+          conf
+            .focus(_.participantClient)
+            .modify(portTransform(bump, _))
+            .focus(_.domains.global.url)
+            .modify(_.map(bumpUrl(bump, _)))
+            .focus(_.localSynchronizerNode)
+            .modify(_.map(portTransform(bump, _)))
+        else conf
       ),
-      updateAllScanAppConfigs_(
-        _.focus(_.participantClient)
-          .modify(portTransform(bump, _))
-          .focus(_.sequencerAdminClient)
-          .modify(portTransform(bump, _))
-          .focus(_.mediatorAdminClient)
-          .modify(portTransform(bump, _))
-          .focus(_.bftSequencers)
-          .modify(_.map(_.focus(_.sequencerAdminClient).modify(portTransform(bump, _))))
+      updateAllScanAppConfigs((name, conf) =>
+        if (predicate(name))
+          conf
+            .focus(_.participantClient)
+            .modify(portTransform(bump, _))
+            .focus(_.sequencerAdminClient)
+            .modify(portTransform(bump, _))
+            .focus(_.mediatorAdminClient)
+            .modify(portTransform(bump, _))
+            .focus(_.bftSequencers)
+            .modify(_.map(_.focus(_.sequencerAdminClient).modify(portTransform(bump, _))))
+        else conf
       ),
-      updateAllValidatorConfigs_(
-        _.focus(_.participantClient)
-          .modify(portTransform(bump, _))
+      updateAllValidatorConfigs((name, conf) =>
+        if (predicate(name))
+          conf
+            .focus(_.participantClient)
+            .modify(portTransform(bump, _))
+            .focus(_.domains.global.url)
+            .modify(bumpOptionalUrl(_, bump))
+            .focus(_.domains.extra)
+            .modify(_.map(d => d.copy(url = bumpUrl(bump, d.url))))
+        else conf
       ),
-      updateAllSplitwellAppConfigs_(
-        _.focus(_.participantClient).modify(portTransform(bump, _))
+      updateAllSplitwellAppConfigs((name, conf) =>
+        if (predicate(name))
+          conf.focus(_.participantClient).modify(portTransform(bump, _))
+        else conf
+      ),
+      updateAllRemoteSplitwellAppConfigs((name, conf) =>
+        if (predicate(name))
+          conf.focus(_.participantClient).modify(portTransform(bump, _))
+        else conf
       ),
     )
 
@@ -461,34 +478,27 @@ object ConfigTransforms {
     updateAllSvAppConfigs((name, config) => {
       if (svApps.contains(name)) {
         config
-          .focus(_.participantClient)
-          .modify(portTransform(bump, _))
-          .focus(_.localSynchronizerNode)
-          .modify(_.map(portTransform(bump, _)))
           .focus(_.adminApi)
           .modify(portTransform(bump, _))
       } else {
         config
       }
-    })
+    }) compose bumpSomeSvAppCantonPortsBy(bump, svApps)
   }
 
-  def bumpSomeSvAppCantonDomainPortsBy(bump: Int, svApps: Seq[String]): ConfigTransform = {
+  def bumpSomeSvAppCantonPortsBy(bump: Int, svApps: Seq[String]): ConfigTransform = {
     updateAllSvAppConfigs((name, config) => {
       if (svApps.contains(name)) {
         config
           .focus(_.domains.global.url)
           .modify(_.map(bumpUrl(bump, _)))
+          .focus(_.participantClient)
+          .modify(portTransform(bump, _))
           .focus(_.localSynchronizerNode)
-          .modify(
-            _.map(d =>
-              d.copy(
-                sequencer = d.sequencer
-                  .copy(externalPublicApiUrl = bumpUrl(bump, d.sequencer.externalPublicApiUrl))
-              )
-            )
-          )
-      } else config
+          .modify(_.map(portTransform(bump, _)))
+      } else {
+        config
+      }
     })
   }
 
@@ -547,9 +557,19 @@ object ConfigTransforms {
     updateAllScanAppConfigs((name, config) => {
       if (scanApps.contains(name)) {
         config
-          .focus(_.participantClient)
-          .modify(portTransform(bump, _))
           .focus(_.adminApi)
+          .modify(portTransform(bump, _))
+      } else {
+        config
+      }
+    }) compose bumpSomeScanAppCantonPortsBy(bump, scanApps)
+  }
+
+  def bumpSomeScanAppCantonPortsBy(bump: Int, scanApps: Seq[String]): ConfigTransform = {
+    updateAllScanAppConfigs((name, config) => {
+      if (scanApps.contains(name)) {
+        config
+          .focus(_.participantClient)
           .modify(portTransform(bump, _))
           .focus(_.sequencerAdminClient)
           .modify(portTransform(bump, _))
@@ -587,9 +607,19 @@ object ConfigTransforms {
     updateAllValidatorAppConfigs((name, config) => {
       if (validatorApps.contains(name)) {
         config
-          .focus(_.participantClient)
-          .modify(portTransform(bump, _))
           .focus(_.adminApi)
+          .modify(portTransform(bump, _))
+      } else {
+        config
+      }
+    }) compose bumpSomeValidatorAppCantonPortsBy(bump, validatorApps)
+  }
+
+  def bumpSomeValidatorAppCantonPortsBy(bump: Int, validatorApps: Seq[String]): ConfigTransform = {
+    updateAllValidatorAppConfigs((name, config) => {
+      if (validatorApps.contains(name)) {
+        config
+          .focus(_.participantClient)
           .modify(portTransform(bump, _))
       } else {
         config
@@ -646,42 +676,38 @@ object ConfigTransforms {
     )
   }
 
-  def bumpSelfHostedParticipantPortsBy(bump: Int): ConfigTransform = {
-    val transforms = Seq(
-      updateAllValidatorConfigs { case (name, config) =>
-        if (name.startsWith("sv")) config
-        else
-          config.focus(_.participantClient).modify(portTransform(bump, _))
-      }
-    )
-    transforms.foldLeft((c: SpliceConfig) => c)((f, tf) => f compose tf)
-  }
-
-  def withBftSequencers(): ConfigTransform = {
-    updateAllSvAppConfigs_(appConfig =>
-      appConfig
-        .focus(_.localSynchronizerNode)
-        .modify(
-          _.map(
-            _.focus(_.sequencer).modify(
-              _.copy(
-                isBftSequencer = true
-              )
-            )
-          )
-        )
-    ) compose {
-      updateAllScanAppConfigs((scan, config) =>
-        config.copy(
-          bftSequencers = Seq(
-            BftSequencerConfig(
-              0,
-              config.sequencerAdminClient,
-              s"http://localhost:${5010 + Integer.parseInt(scan.stripPrefix("sv").take(1)) * 100}",
+  def withBftSequencer(config: SvAppBackendConfig): SvAppBackendConfig =
+    config
+      .focus(_.localSynchronizerNode)
+      .modify(
+        _.map(
+          _.focus(_.sequencer).modify(
+            _.copy(
+              isBftSequencer = true
             )
           )
         )
       )
+
+  def withBftSequencer(
+      name: String,
+      config: ScanAppBackendConfig,
+      migrationId: Long = 0,
+      basePort: Int = 5010,
+  ): ScanAppBackendConfig =
+    config.copy(
+      bftSequencers = Seq(
+        BftSequencerConfig(
+          migrationId,
+          config.sequencerAdminClient,
+          s"http://localhost:${basePort + Integer.parseInt(name.stripPrefix("sv").take(1)) * 100}",
+        )
+      )
+    )
+
+  def withBftSequencers(): ConfigTransform = {
+    updateAllSvAppConfigs_(withBftSequencer(_)) compose {
+      updateAllScanAppConfigs((scan, config) => withBftSequencer(scan, config))
     }
   }
 
@@ -696,6 +722,12 @@ object ConfigTransforms {
       )
     }
   }
+
+  def withDevelopmentFundPercentage(percentage: BigDecimal): ConfigTransform =
+    updateAllSvAppFoundDsoConfigs_(c => c.copy(developmentFundPercentage = Some(percentage)))
+
+  def withDevelopmentFundManager(fundManager: PartyId): ConfigTransform =
+    updateAllSvAppFoundDsoConfigs_(c => c.copy(developmentFundManager = Some(fundManager)))
 
   private def portTransform(bump: Int, c: AdminServerConfig): AdminServerConfig =
     c.copy(internalPort = c.internalPort.map(_ + bump))
@@ -729,6 +761,8 @@ object ConfigTransforms {
       .modify(portTransform(bump, _))
       .focus(_.internalApi)
       .modify(portTransform(bump, _))
+      .focus(_.externalPublicApiUrl)
+      .modify(bumpUrl(bump, _))
 
   private def portTransform(bump: Int, c: SvMediatorConfig): SvMediatorConfig =
     c.focus(_.adminApi).modify(portTransform(bump, _))
@@ -777,7 +811,10 @@ object ConfigTransforms {
       user: String,
       c: LedgerApiClientConfig,
   ): LedgerApiClientConfig = {
-    val userToken = AuthUtil.LedgerApi.testToken(user = user, secret = secret)
+    val userToken = AuthUtil.LedgerApi.testToken(
+      user = user,
+      secret = secret,
+    )
     c.copy(
       authConfig = AuthTokenSourceConfig.Static(
         userToken,
@@ -801,16 +838,15 @@ object ConfigTransforms {
     })
 
   def useDecentralizedSynchronizerSplitwell(): ConfigTransform =
-    updateAllSplitwellAppConfigs_(c => {
-      c.copy(
-        domains = c.domains.copy(
-          splitwell = SplitwellDomains(
+    updateAllSplitwellAppConfigs_(
+      _.focus(_.domains.splitwell)
+        .replace(
+          SplitwellDomains(
             SynchronizerConfig(SynchronizerAlias.tryCreate("global")),
             Seq.empty,
           )
         )
-      )
-    })
+    ) compose updateAllValidatorAppConfigs_(_.focus(_.domains.extra).replace(Seq.empty))
 
   def modifyAllANStorageConfigs(
       storageConfigModifier: (

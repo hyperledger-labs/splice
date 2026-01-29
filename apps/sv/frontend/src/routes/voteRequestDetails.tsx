@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import React from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { ContractId } from '@daml/types';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import {
@@ -89,7 +89,7 @@ export const VoteRequestDetails: React.FC = () => {
   const votingInformation: ProposalVotingInformation = {
     requester: request.requester,
     requesterIsYou: request.requester === svPartyId,
-    votingCloses: dayjs(request.voteBefore).format(dateTimeFormatISO),
+    votingThresholdDeadline: dayjs(request.voteBefore).format(dateTimeFormatISO),
     voteTakesEffect: request.targetEffectiveAt
       ? dayjs(request.targetEffectiveAt).format(dateTimeFormatISO)
       : 'Threshold',

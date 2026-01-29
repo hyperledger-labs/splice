@@ -364,7 +364,7 @@ object TestSequencerSubscriptionFactoryPekko {
   case object Complete extends Element
   final case class Event(
       timestamp: CantonTimestamp,
-      signatures: NonEmpty[Set[Signature]] = Signature.noSignatures,
+      signatures: NonEmpty[Seq[Signature]] = Signature.noSignatures,
   ) extends Element {
     def asOrdinarySerializedEvent: SequencedSerializedEvent =
       mkOrdinarySerializedEvent(timestamp, signatures)
@@ -372,24 +372,23 @@ object TestSequencerSubscriptionFactoryPekko {
 
   def mkOrdinarySerializedEvent(
       timestamp: CantonTimestamp,
-      signatures: NonEmpty[Set[Signature]] = Signature.noSignatures,
+      signatures: NonEmpty[Seq[Signature]] = Signature.noSignatures,
   ): SequencedSerializedEvent = {
     val pts =
       if (timestamp == CantonTimestamp.Epoch) None else Some(timestamp.addMicros(-1L))
     val sequencedEvent = Deliver.create(
       pts,
       timestamp,
-      DefaultTestIdentities.synchronizerId,
+      DefaultTestIdentities.physicalSynchronizerId,
       None,
       Batch.empty(BaseTest.testedProtocolVersion),
       None,
-      BaseTest.testedProtocolVersion,
       Option.empty[TrafficReceipt],
     )
     val signedContent =
       SignedContent.create(
         sequencedEvent,
-        signatures.toSeq,
+        signatures,
         None,
         SignedContent.protocolVersionRepresentativeFor(BaseTest.testedProtocolVersion),
       )

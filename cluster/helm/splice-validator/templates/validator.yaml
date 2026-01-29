@@ -27,6 +27,10 @@ spec:
         migration: {{ .Values.migration.id | quote }}
     spec:
       {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
       containers:
       - name: validator-app
         image: "{{ .Values.imageRepo }}/validator-app:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).validator_app) }}"
@@ -42,7 +46,6 @@ spec:
         - name: SPLICE_APP_DARS
           value: {{ .Values.appDars | toJson | quote }}
         {{ end }}
-        {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "validator" "keyName" "validator" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         {{- range $ii, $user := .Values.additionalUsers }}
         - name: {{ $user.name }}
           {{ if $user.value }}
@@ -89,18 +92,6 @@ spec:
         - name: SPLICE_APP_VALIDATOR_PARTY_HINT
           value: {{ .Values.validatorPartyHint }}
         {{ end }}
-        - name: SPLICE_APP_VALIDATOR_AUTH_AUDIENCE
-          value: {{ .Values.auth.audience | quote }}
-        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_URL
-          value: {{ .Values.auth.jwksUrl | quote }}
-        {{ if (.Values.auth.jwks).connectionTimeout }}
-        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_CONNECTION_TIMEOUT
-          value: {{ .Values.auth.jwks.connectionTimeout | quote }}
-        {{ end }}
-        {{ if (.Values.auth.jwks).readTimeout }}
-        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT
-          value: {{ .Values.auth.jwks.readTimeout | quote }}
-        {{ end }}
         {{ if .Values.svValidator }}
         - name: SPLICE_APP_VALIDATOR_SV_VALIDATOR
           value: "true"
@@ -117,12 +108,40 @@ spec:
         {{ else -}}
         - name: ADDITIONAL_CONFIG_BFT_SCAN
           value: |
+            {{- if .Values.scanClient }}
+              {{- if eq .Values.scanClient.scanType "trust-single" }}
+            canton.validator-apps.validator_backend.scan-client.type = "trust-single"
+            canton.validator-apps.validator_backend.scan-client.url = {{ .Values.scanClient.scanAddress | quote }}
+              {{- else if eq .Values.scanClient.scanType "bft"}}
+            canton.validator-apps.validator_backend.scan-client.type = "bft"
+            canton.validator-apps.validator_backend.scan-client.seed-urls = {{ .Values.scanClient.seedUrls | toJson }}
+              {{- else if eq .Values.scanClient.scanType "bft-custom"}}
+            canton.validator-apps.validator_backend.scan-client.type = "bft-custom"
+            canton.validator-apps.validator_backend.scan-client.seed-urls = {{ .Values.scanClient.seedUrls | toJson }}
+            canton.validator-apps.validator_backend.scan-client.sv-names = {{ .Values.scanClient.svNames | toJson }}
+            canton.validator-apps.validator_backend.scan-client.threshold = {{ .Values.scanClient.threshold }}
+              {{- else }}
+            canton.validator-apps.validator_backend.scan-client.type = "bft"
+            canton.validator-apps.validator_backend.scan-client.seed-urls = {{ .Values.scanClient.seedUrls | toJson }}
+              {{- end }}
+            {{- else }}
             canton.validator-apps.validator_backend.scan-client.type = "bft"
             canton.validator-apps.validator_backend.scan-client.seed-urls = [ ${_scan.admin-api.address} ]
+            {{- end }}
         {{ end }}
-        {{ if not .Values.useSequencerConnectionsFromScan }}
+        {{ if not .Values.useSequencerConnectionsFromScan -}}
         - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
           value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.decentralizedSynchronizerUrl | quote }}
+        {{ else if .Values.synchronizer -}}
+            {{- if eq .Values.synchronizer.connectionType "trust-single" }}
+        - name: ADDITIONAL_CONFIG_SYNCHRONIZER_URL
+          value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.synchronizer.url | quote }}
+            {{- else if eq .Values.synchronizer.connectionType "bft-custom" }}
+        - name: ADDITIONAL_CONFIG_SYNCHRONIZER_TRUSTED
+          value: |
+            canton.validator-apps.validator_backend.domains.global.trusted-synchronizer-config.sv-names = {{ .Values.synchronizer.svNames | toJson}}
+            canton.validator-apps.validator_backend.domains.global.trusted-synchronizer-config.threshold = {{ .Values.synchronizer.threshold }}
+            {{- end }}
         {{ end }}
         {{- range $ii, $domain := .Values.extraDomains }}
         - name: ADDITIONAL_CONFIG_EXTRA_DOMAIN_{{ $ii }}
@@ -277,6 +296,45 @@ spec:
         - name: ADDITIONAL_CONFIG_MAX_VETTING_DELAY
           value: canton.validator-apps.validator_backend.max-vetting-delay = "{{ . }}"
         {{- end }}
+        {{- if .Values.disableAuth }}
+        - name: ADDITIONAL_CONFIG_DISABLE_AUTH
+          value: |
+            canton.validator-apps.validator_backend {
+              auth=""
+            }
+            canton.validator-apps.validator_backend {
+              auth={
+                algorithm = "hs-256-unsafe"
+                audience = "https://validator.example.com"
+                secret = "unsafe"
+              }
+            }
+            canton.validator-apps.validator_backend.participant-client.ledger-api.auth-config=""
+            canton.validator-apps.validator_backend.participant-client.ledger-api.auth-config {
+              type = "self-signed"
+              user = "ledger-api-user"
+              audience = "https://ledger_api.example.com"
+              secret = "unsafe"
+            }
+        - name: SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME
+          value: ledger-api-user
+        - name: SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE
+          value: "https://ledger_api.example.com"
+        {{- else }}
+        - name: SPLICE_APP_VALIDATOR_AUTH_AUDIENCE
+          value: {{ .Values.auth.audience | quote }}
+        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_URL
+          value: {{ .Values.auth.jwksUrl | quote }}
+        {{ if (.Values.auth.jwks).connectionTimeout }}
+        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_CONNECTION_TIMEOUT
+          value: {{ .Values.auth.jwks.connectionTimeout | quote }}
+        {{ end }}
+        {{ if (.Values.auth.jwks).readTimeout }}
+        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT
+          value: {{ .Values.auth.jwks.readTimeout | quote }}
+        {{ end }}
+        {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "validator" "keyName" "validator" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
+        {{- end }}
         ports:
         - containerPort: 5003
           name: val-http
@@ -315,11 +373,9 @@ spec:
       {{- if or .Values.participantIdentitiesDumpImport $requiresMigrationPvc }}
       volumes:
       {{- with .Values.participantIdentitiesDumpImport }}
-        - name: participant-bootstrapping-dump-secret
+        - name: participant-bootstrapping-dump-volume
           secret:
             secretName: {{ .secretName }}
-        - name: participant-bootstrapping-dump-volume
-          emptyDir: {}
       {{- end }}
       {{- if $requiresMigrationPvc }}
         - name: domain-upgrade-dump-volume
@@ -354,24 +410,6 @@ spec:
         {{- end }}
         {{- if .Values.extraInitContainers }}
         {{ .Values.extraInitContainers | toYaml | nindent 8 }}
-        {{- end }}
-        {{- if .Values.participantIdentitiesDumpImport }}
-        - name: chown-participant-bootstrapping-dump
-          image: busybox:1.37.0
-          command: ["sh", "-c", "cp /participant-bootstrapping-dump-secret/content /participant-bootstrapping-dump/ && chown -R 1001:1001 /participant-bootstrapping-dump"]
-          volumeMounts:
-            - name: participant-bootstrapping-dump-secret
-              mountPath: /participant-bootstrapping-dump-secret
-            - name: participant-bootstrapping-dump-volume
-              mountPath: /participant-bootstrapping-dump
-        {{- end }}
-        {{- if $requiresMigrationPvc }}
-        - name: chown-domain-upgrade-dump
-          image: busybox:1.37.0
-          command: ["sh", "-c", "chown -R 1001:1001 /domain-upgrade-dump"]
-          volumeMounts:
-            - name: domain-upgrade-dump-volume
-              mountPath: /domain-upgrade-dump
         {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}

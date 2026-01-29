@@ -53,10 +53,19 @@ message Enums {
     TOPOLOGY_MAPPING_CODE_MEDIATOR_SYNCHRONIZER_STATE = 12;
     TOPOLOGY_MAPPING_CODE_SEQUENCER_SYNCHRONIZER_STATE = 13;
     reserved 14; // was OffboardParticipant
-    TOPOLOGY_MAPPING_CODE_PURGE_TOPOLOGY_TXS = 15;
+    reserved 15; // was PurgeTopologyTransaction
     reserved 16; // was TrafficControlState
     TOPOLOGY_MAPPING_CODE_SEQUENCING_DYNAMIC_PARAMETERS_STATE = 17;
     TOPOLOGY_MAPPING_CODE_PARTY_TO_KEY_MAPPING = 18;
+    TOPOLOGY_MAPPING_CODE_SYNCHRONIZER_MIGRATION_ANNOUNCEMENT = 19;
+    TOPOLOGY_MAPPING_CODE_SEQUENCER_CONNECTION_SUCCESSOR = 20;
+  }
+
+  enum ParticipantFeatureFlag {
+    PARTICIPANT_FEATURE_FLAG_UNSPECIFIED = 0;
+    // UNUSED in PV >= 34 - Was meant to tactically fix a bug in the external signing hash computation
+    // in model conformance in PV 33
+    PARTICIPANT_FEATURE_FLAG_PV33_EXTERNAL_SIGNING_LOCAL_CONTRACT_IN_SUBVIEW = 1;
   }
 }
 
@@ -67,6 +76,8 @@ message Enums {
 // authorization: a namespace delegation is either signed by the root key, or is signed by
 //   a key for which there exists a series of properly authorized namespace delegations
 //   that are ultimately signed by the root key
+// revocation: a revoked namespace delegation cannot be re-created. While the delegation itself is revoked,
+//   valid transactions that have been signed using the authority of the delegation before its revocation stay valid.
 // UNIQUE(namespace, target_key)
 message NamespaceDelegation {
   // fingerprint of the root key defining the namespace
@@ -166,6 +177,9 @@ message SynchronizerTrustCertificate {
   reserved 3; // was bool reassignment_only_to_given_target_synchronizer_ids = 3;
 
   reserved 4; // was repeated string target_synchronizer_ids = 4;
+
+  // Feature flags that this node declares to support on this synchronizer
+  repeated Enums.ParticipantFeatureFlag feature_flags = 5;
 }
 
 // the optional trust certificate of the synchronizer towards the participant
@@ -204,12 +218,12 @@ message VettedPackages {
   message VettedPackage {
     // the hash of the vetted package
     string package_id = 1;
-    // optional earliest ledger effective time (exclusive) as of which the package is considered valid.
+    // optional earliest ledger effective time (inclusive) as of which the package is considered valid.
     // must be less than or equal to valid_until if both are present.
-    google.protobuf.Timestamp valid_from = 2;
-    // optional latest ledger effective time (inclusive) until which the package is considered valid.
+    google.protobuf.Timestamp valid_from_inclusive = 2;
+    // optional latest ledger effective time (exclusive) until which the package is considered valid.
     // must be greater than or equal to valid_from if both are present.
-    google.protobuf.Timestamp valid_until = 3;
+    google.protobuf.Timestamp valid_until_exclusive = 3;
   }
   // the participant vetting the packages
   string participant_uid = 1;
@@ -227,23 +241,38 @@ message VettedPackages {
   reserved 3; // was synchronizer_id = 3;
 }
 
-// mapping that maps a party to a participant
-// authorization: whoever controls the party and all the owners of the participants that
-//   were not already present in the tx with serial = n - 1
-//   exception:
-//     - a participant can disassociate itself with the party unilaterally as long there will be
-//       enough participants to reach "threshold" during confirmation. The disassociating participant
-//       must lower the threshold by one, if otherwise the number of hosting participants would go
-//       below the threshold.
+// Mapping that maps a party to a participant
+// The PartyToParticipant mapping may also specify a list of signing keys for setting up an external party, in which
+// case the keys and the threshold take precedence over any PartyToKeyMapping for the same party.
+// Additionally, the list of signing keys may contain the public key of the party's namespace, which allows this
+// mapping to authorize itself without the need of a NamespaceDelegation root certificate (called self-signed).
+// authorization: the required authorization of the mapping is a union of the authorization for individual changes
+//  - threshold change: party namespace
+//  - adding a signing key: party namespace + all the new signing key
+//  - removing a signing key: party namespace
+//  - changing the signing key threshold: party namespace
+//  - upgrading a participant permission or adding a new participant: namespaces from party and the participant namespace
+//  - downgrading a participant permission or removing a participant: party namespace OR the participant namespace
+//  - setting a participant's onboarding flag from false to true: party namespace
+//  - setting a participant's onboarding flag from true to false: participant namespace
+//  - the removal of a PTP must be authorized just by the party
+// revocation: Revoking a self-signed PTP does not prevent later re-creation of a PTP with the same partyId.
+//  To prevent further usage of the key associated with the party's namespace,
+//  revoke a NamespaceDelegation root certificate for that namespace.
 // UNIQUE(party)
 message PartyToParticipant {
   message HostingParticipant {
+    message Onboarding {}
+
     // the target participant that the party should be mapped to
     string participant_uid = 1;
 
     // permission of the participant for this particular party (the actual
     // will be min of ParticipantSynchronizerPermission.ParticipantPermission and this setting)
     Enums.ParticipantPermission permission = 2;
+
+    // optional, present iff the party is being onboarded to the participant
+    Onboarding onboarding = 3;
   }
 
   // the party that is to be represented by the participants
@@ -254,12 +283,19 @@ message PartyToParticipant {
   uint32 threshold = 2;
 
   // which participants will host the party.
-  // if threshold > 1, must be Confirmation or Observation
+  // if threshold > 1, must be Confirmation or Observation.
+  // if all participants have Observation permission, the confirmation treshold is ignored, making the party
+  // a purely observing party.
   repeated HostingParticipant participants = 3;
 
   reserved 4; // was group_addressing = 4;
 
   reserved 5; // was synchronizer = 5;
+
+  // Contains protocol signing keys for the party used to authorize externally signed Daml transactions,
+  // along with a signing threshold.
+  // The max number of keys is 20
+  optional com.digitalasset.canton.crypto.v30.SigningKeysWithThreshold party_signing_keys = 6;
 }
 
 // which dynamic synchronizer parameters are supposed to be used on the given synchronizer
@@ -325,17 +361,41 @@ message SequencerSynchronizerState {
   repeated string observers = 4;
 }
 
-// explicitly invalidate topology transactions for good
-// this can be used by the synchronizer to offboard participants forcefully or to
-// remove stray topology transactions
+// indicates the beginning of a synchronizer upgrade and effectuates a topology freeze,
+// after which only synchronizer upgrade specific topology mappings are accepted.
+// removing this mapping unfreezes the topology state again.
 // authorization: whoever controls the synchronizer
-// UNIQUE(synchronizer_id)
-message PurgeTopologyTransaction {
-  // the synchronizer id
-  string synchronizer_id = 1;
+// UNIQUE(successor_physical_synchronizer_id.logical)
+message SynchronizerUpgradeAnnouncement {
+  // the physical synchronizer id of the successor synchronizer
+  string successor_physical_synchronizer_id = 1;
+  // when the upgrade happens
+  google.protobuf.Timestamp upgrade_time = 2;
+}
 
-  // the list of mappings to remove from this synchronizer
-  repeated TopologyMapping mappings = 2;
+// a sequencer can announce its connections on the successor synchronizer
+// authorization: whoever controls the sequencer
+// UNIQUE(sequencer_id, synchronizer_id)
+message SequencerConnectionSuccessor {
+  // the sequencer id
+  string sequencer_id = 1;
+  // to synchronizer id
+  string synchronizer_id = 2;
+  // the connection details with which members can connect to the sequencer on the successor synchronizer
+  SequencerConnection connection = 3;
+
+  message SequencerConnection {
+    oneof connection_type {
+      Grpc grpc = 1;
+    }
+
+    message Grpc {
+      // connection information to sequencer (http[s]://<host>:<port>")
+      // all endpoints must agree on using HTTPS or HTTP
+      repeated string endpoints = 1;
+      optional bytes custom_trust_certificates = 2;
+    }
+  }
 }
 
 // [docs-entry-start: topology mapping]
@@ -356,13 +416,16 @@ message TopologyMapping {
     SynchronizerParametersState synchronizer_parameters_state = 11;
     MediatorSynchronizerState mediator_synchronizer_state = 12;
     SequencerSynchronizerState sequencer_synchronizer_state = 13;
-    PurgeTopologyTransaction purge_topology_txs = 14;
     DynamicSequencingParametersState sequencing_dynamic_parameters_state = 15;
 
     PartyToKeyMapping party_to_key_mapping = 16;
+
+    SynchronizerUpgradeAnnouncement synchronizer_upgrade_announcement = 17;
+    SequencerConnectionSuccessor sequencer_connection_successor = 18;
   }
   reserved 2; // was identifier_delegation
   reserved 10; // was authority_of
+  reserved 14; // was purge_topology_txs
 }
 // [docs-entry-end: topology mapping]
 
@@ -431,6 +494,6 @@ message SignedTopologyTransactions {
 message TopologyTransactionsBroadcast {
   option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
-  string synchronizer_id = 1;
+  string physical_synchronizer_id = 1;
   SignedTopologyTransactions signed_transactions = 2;
 }

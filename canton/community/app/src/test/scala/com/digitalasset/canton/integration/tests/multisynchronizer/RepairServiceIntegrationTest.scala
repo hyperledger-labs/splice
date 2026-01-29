@@ -8,14 +8,11 @@ import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.Updat
   UnassignedWrapper,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.DbConfig
+import com.digitalasset.canton.config.{DbConfig, NonNegativeDuration}
 import com.digitalasset.canton.console.LocalSequencerReference
 import com.digitalasset.canton.examples.java.iou.Iou
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.AcsInspection
 import com.digitalasset.canton.integration.{
@@ -69,10 +66,13 @@ abstract class RepairServiceIntegrationTest
         participant1.synchronizers.connect_local(sequencer1, alias = daName)
         participant1.synchronizers.connect_local(sequencer3, alias = acmeName)
 
-        participant1.dars.upload(CantonExamplesPath)
+        participant1.dars.upload(CantonExamplesPath, synchronizerId = daId)
+        participant1.dars.upload(CantonExamplesPath, synchronizerId = acmeId)
 
-        payer = participant1.parties.enable(payerName)
-        owner = participant1.parties.enable(ownerName)
+        payer = participant1.parties.enable(payerName, synchronizer = daName)
+        participant1.parties.enable(payerName, synchronizer = acmeName)
+        owner = participant1.parties.enable(ownerName, synchronizer = daName)
+        participant1.parties.enable(ownerName, synchronizer = acmeName)
       }
 
   "repair.change_assignation" when {
@@ -97,8 +97,9 @@ abstract class RepairServiceIntegrationTest
 
         eventually() {
           val afterRepair = participant1.ledger_api.state.end()
-          val updates = participant1.ledger_api.updates.flat(
+          val updates = participant1.ledger_api.updates.reassignments(
             partyIds = Set(payer),
+            filterTemplates = Seq.empty,
             completeAfter = Int.MaxValue,
             beginOffsetExclusive = beforeRepair,
             endOffsetInclusive = Some(afterRepair),
@@ -119,19 +120,19 @@ abstract class RepairServiceIntegrationTest
                 s"Unable to find an unassigned event for contract ID ${iou.coid}"
               )
 
-          unassigned.source shouldBe daId.toProtoPrimitive
-          unassigned.target shouldBe acmeId.toProtoPrimitive
+          unassigned.source shouldBe daId.logical.toProtoPrimitive
+          unassigned.target shouldBe acmeId.logical.toProtoPrimitive
           unassigned.submitter shouldBe empty
 
           val assigned =
             assignedEvents
-              .find(_.unassignId == unassigned.unassignId)
+              .find(_.reassignmentId == unassigned.reassignmentId)
               .valueOrFail(
-                s"Unable to find an assigned event for unassign ID ${unassigned.unassignId}"
+                s"Unable to find an assigned event for unassign ID ${unassigned.reassignmentId}"
               )
 
-          assigned.source shouldBe daId.toProtoPrimitive
-          assigned.target shouldBe acmeId.toProtoPrimitive
+          assigned.source shouldBe daId.logical.toProtoPrimitive
+          assigned.target shouldBe acmeId.logical.toProtoPrimitive
           assigned.submitter shouldBe empty
 
         }
@@ -153,7 +154,7 @@ abstract class RepairServiceIntegrationTest
           .filter(_.createdEvent.value.contractId == cid.coid)
           .loneElement
 
-        beforeAssignation.synchronizerId shouldBe daId.toProtoPrimitive
+        beforeAssignation.synchronizerId shouldBe daId.logical.toProtoPrimitive
         beforeAssignation.reassignmentCounter shouldBe 4
 
         participant1.synchronizers.disconnect_all()
@@ -165,8 +166,7 @@ abstract class RepairServiceIntegrationTest
         )
 
         // Because we changed the reassignment counter of a contract, the running commitments will not match the ACS
-        // TODO(#23735) Add here the sequence of repair commands that bring the system into a consistent state
-        //  and remove the suppression of ACS_COMMITMENT_INTERNAL_ERROR
+        // This is why we repair the commitments
         val expectedLogs: Seq[(LogEntryOptionality, LogEntry => Assertion)] = Seq(
           (
             LogEntryOptionality.OptionalMany,
@@ -182,26 +182,45 @@ abstract class RepairServiceIntegrationTest
         loggerFactory.assertLogsUnorderedOptional(
           {
             participant1.synchronizers.reconnect_all()
-
+            // TODO(i23735) remove this comment when fixed
+            //  first wait for the assignation change to go through, and only then reinitialize the commitments
             val afterAssignation = participant1.ledger_api.state.acs
               .active_contracts_of_party(payer)
               .filter(_.createdEvent.value.contractId == cid.coid)
               .loneElement
-
-            afterAssignation.synchronizerId shouldBe acmeId.toProtoPrimitive
+            afterAssignation.synchronizerId shouldBe acmeId.logical.toProtoPrimitive
             afterAssignation.reassignmentCounter shouldBe 2
 
-            val archiveCmd = participant1.ledger_api.javaapi.state.acs
-              .await(Iou.COMPANION)(payer, predicate = _.id.toLf == cid)
-              .id
-              .exerciseArchive()
-              .commands()
-              .asScala
-              .toSeq
-            participant1.ledger_api.javaapi.commands.submit(Seq(payer), archiveCmd)
+            // TODO(i23735): when we fix the issue, the commitment reinitialization below shouldn't be necessary,
+            //  because upon reconnection recovery events would essentially get commitments back to a good state
+            //  Repairing commitments happens when we are connected to the synchronizer, so we reconnect first.
+            //  In between reconnecting and repairing, a commitment tick might still happen, which is why we still
+            //  have the log suppression until after repairing the commitments
+            val reinitCmtsResult = participant1.commitments.reinitialize_commitments(
+              Seq.empty,
+              Seq.empty,
+              Seq.empty,
+              NonNegativeDuration.ofSeconds(30),
+            )
+            reinitCmtsResult.map(_.synchronizerId) should contain theSameElementsAs Seq(
+              daId.logical,
+              acmeId.logical,
+            )
+            forAll(reinitCmtsResult)(_.acsTimestamp.isDefined shouldBe true)
           },
-          expectedLogs*
+          expectedLogs *,
         )
+
+        // After reinitializing the commitments, there should not be any more ACS_COMMITMENT_INTERNAL_ERROR
+
+        val archiveCmd = participant1.ledger_api.javaapi.state.acs
+          .await(Iou.COMPANION)(payer, predicate = _.id.toLf == cid)
+          .id
+          .exerciseArchive()
+          .commands()
+          .asScala
+          .toSeq
+        participant1.ledger_api.javaapi.commands.submit(Seq(payer), archiveCmd)
       }
     }
   }
@@ -209,7 +228,7 @@ abstract class RepairServiceIntegrationTest
 
 class ReferenceRepairServiceIntegrationTest extends RepairServiceIntegrationTest {
   override protected lazy val plugin =
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(

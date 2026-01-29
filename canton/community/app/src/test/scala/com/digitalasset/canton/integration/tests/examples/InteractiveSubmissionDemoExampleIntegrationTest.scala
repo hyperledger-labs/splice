@@ -9,13 +9,14 @@ import com.digitalasset.canton.integration.plugins.UseH2
 import com.digitalasset.canton.integration.tests.examples.ExampleIntegrationTest.interactiveSubmissionFolder
 import com.digitalasset.canton.integration.{CommunityIntegrationTest, ConfigTransform}
 import com.digitalasset.canton.logging.LoggingContextWithTrace
+import com.digitalasset.canton.platform.apiserver.services.command.interactive.GeneratorsInteractiveSubmission
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.{
   PrepareTransactionData,
   PreparedTransactionEncoder,
 }
 import com.digitalasset.canton.protocol.hash.HashTracer
 import com.digitalasset.canton.util.{ConcurrentBufferedLogger, HexString, ResourceUtil}
-import com.digitalasset.canton.version.HashingSchemeVersion
+import com.digitalasset.canton.version.{CommonGenerators, HashingSchemeVersion}
 import monocle.macros.syntax.lens.*
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
@@ -28,7 +29,11 @@ sealed abstract class InteractiveSubmissionDemoExampleIntegrationTest
     with CommunityIntegrationTest
     with ScalaCheckPropertyChecks {
 
-  import com.digitalasset.canton.platform.apiserver.services.command.interactive.InteractiveSubmissionGenerators.*
+  private lazy val generators = new CommonGenerators(testedProtocolVersion)
+  private lazy val generatorsInteractiveSubmission =
+    new GeneratorsInteractiveSubmission(generators.lf, generators.topology)
+
+  import generatorsInteractiveSubmission.*
 
   private implicit val loggingContext: LoggingContextWithTrace = LoggingContextWithTrace.ForTesting
 
@@ -67,6 +72,9 @@ sealed abstract class InteractiveSubmissionDemoExampleIntegrationTest
       interactiveSubmissionFolder / "com",
       interactiveSubmissionFolder / "google",
       interactiveSubmissionFolder / "scalapb",
+      File("canton_ports.json"),
+      File("private_key.der"),
+      File("public_key.der"),
     ).foreach(_.delete(swallowIOExceptions = true))
   }
 
@@ -286,7 +294,55 @@ sealed abstract class InteractiveSubmissionDemoExampleIntegrationTest
       mkProcessLogger(logErrors = false),
       "Invalid unique identifier `invalid_Store` with missing namespace",
     )
+
   }
+
+  "run external party onboarding via ledger api" in { implicit env =>
+    setupTest
+    runAndAssertCommandSuccess(
+      Process(
+        Seq(
+          "./external_party_onboarding.sh",
+          "--name",
+          "Hans",
+        ),
+        cwd = interactiveSubmissionFolder.toJava,
+      ),
+      processLogger,
+    )
+
+    eventually() {
+      env.participant1.parties.hosted("Hans") should not be empty
+    }
+
+  }
+
+  "run external multi-hosted party onboarding via ledger api" in { implicit env =>
+    setupTest
+    runAndAssertCommandSuccess(
+      Process(
+        Seq(
+          "./external_party_onboarding.sh",
+          "--name",
+          "Wurst",
+          "--multi-hosted",
+        ),
+        cwd = interactiveSubmissionFolder.toJava,
+      ),
+      processLogger,
+    )
+
+    import env.*
+    eventually() {
+      participant1.parties
+        .hosted("Wurst")
+        .map(_.participants.map(_.participant).toSet) shouldBe Seq(
+        Set(participant1.id, participant2.id)
+      )
+    }
+
+  }
+
 }
 
 final class InteractiveSubmissionDemoExampleIntegrationTestH2

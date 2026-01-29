@@ -18,6 +18,7 @@ import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionCo
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnection,
+  SequencerConnectionPoolDelays,
   SequencerConnections,
   SubmissionRequestAmplification,
 }
@@ -38,6 +39,7 @@ class ReconcileSequencerConnectionsTrigger(
     domainConnector: DomainConnector,
     patience: NonNegativeFiniteDuration,
     initialSynchronizerTimeO: Option[CantonTimestamp],
+    newSequencerConnectionPool: Boolean,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -77,7 +79,9 @@ class ReconcileSequencerConnectionsTrigger(
             case _ => domainTime
           }
           for {
-            sequencerConnections <- domainConnector.getSequencerConnectionsFromScan(maxDomainTime)
+            (sequencerConnections, _) <- domainConnector.getSequencerConnectionsFromScan(
+              Left(maxDomainTime)
+            )
             _ <- MonadUtil.sequentialTraverse_(sequencerConnections.toList) {
               case (alias, connections) =>
                 val sequencerConnectionConfig = NonEmpty.from(connections) match {
@@ -93,12 +97,16 @@ class ReconcileSequencerConnectionsTrigger(
                     SequencerConnections.tryMany(
                       nonEmptyConnections.forgetNE,
                       Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
+                      sequencerLivenessMargin =
+                        Thresholds.sequencerConnectionsLivenessMargin(nonEmptyConnections.size),
                       submissionRequestAmplification = SubmissionRequestAmplification(
                         Thresholds.sequencerSubmissionRequestAmplification(
                           nonEmptyConnections.size
                         ),
                         patience,
                       ),
+                      // TODO(#2666) Make the delays configurable.
+                      sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
                     )
                 }
                 participantAdminConnection.modifyOrRegisterSynchronizerConnectionConfigAndReconnect(
@@ -106,6 +114,7 @@ class ReconcileSequencerConnectionsTrigger(
                     alias,
                     sequencerConnectionConfig,
                   ),
+                  newSequencerConnectionPool,
                   modifySequencerConnections(sequencerConnectionConfig),
                   RetryFor.Automation,
                 )
@@ -146,16 +155,20 @@ class ReconcileSequencerConnectionsTrigger(
       connections: NonEmpty[Seq[SequencerConnection]],
   )(implicit tc: TraceContext) =
     sequencerConnections.connections.forgetNE
+      .map(ParticipantAdminConnection.dropSequencerId)
       .flatMap(c => sequencerConnectionEndpoint(c).toList)
-      .toSet != connections.forgetNE.flatMap(c => sequencerConnectionEndpoint(c).toList).toSet
+      .toSet != connections.forgetNE
+      .map(ParticipantAdminConnection.dropSequencerId)
+      .flatMap(c => sequencerConnectionEndpoint(c).toList)
+      .toSet
 
   private def sequencerConnectionEndpoint(
       connection: SequencerConnection
   )(implicit tc: TraceContext): Option[Endpoint] =
     connection match {
-      case GrpcSequencerConnection(endpoints, _, _, _) if endpoints.size == 1 =>
+      case GrpcSequencerConnection(endpoints, _, _, _, _) if endpoints.size == 1 =>
         Some(endpoints.head1)
-      case GrpcSequencerConnection(endpoints, _, _, _) =>
+      case GrpcSequencerConnection(endpoints, _, _, _, _) =>
         logger.warn(s"expected exactly 1 endpoint in a sequencer connection but got: $endpoints")
         None
     }

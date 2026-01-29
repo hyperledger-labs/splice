@@ -59,11 +59,8 @@ class DsoDelegateBasedAutomationService(
     }
     registerTrigger(new MergeMemberTrafficContractsTrigger(triggerContext, svTaskContext))
 
-    if (config.automation.enableExpireAmulet) {
-      registerTrigger(new ExpiredAmuletTrigger(triggerContext, svTaskContext))
-    }
-
-    registerTrigger(new ExpiredLockedAmuletTrigger(triggerContext, svTaskContext))
+    registerTrigger(new ExpiredAmuletTrigger(config, triggerContext, svTaskContext))
+    registerTrigger(new ExpiredLockedAmuletTrigger(config, triggerContext, svTaskContext))
     registerTrigger(new ExpiredSvOnboardingRequestTrigger(triggerContext, svTaskContext))
     registerTrigger(new CloseVoteRequestTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpiredSvOnboardingConfirmedTrigger(triggerContext, svTaskContext))
@@ -97,6 +94,7 @@ class DsoDelegateBasedAutomationService(
       new FeaturedAppActivityMarkerTrigger(
         triggerContext,
         svTaskContext,
+        config,
       )
     )
 
@@ -117,6 +115,9 @@ class DsoDelegateBasedAutomationService(
         triggerContext,
         svTaskContext,
       )
+    )
+    registerTrigger(
+      new MergeUnclaimedDevelopmentFundCouponsTrigger(config, triggerContext, svTaskContext)
     )
   }
 
@@ -151,5 +152,6 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[AllocateUnallocatedUnclaimedActivityRecordTrigger],
     aTrigger[ExpiredUnallocatedUnclaimedActivityRecordTrigger],
     aTrigger[ExpiredUnclaimedActivityRecordTrigger],
+    aTrigger[MergeUnclaimedDevelopmentFundCouponsTrigger],
   )
 }

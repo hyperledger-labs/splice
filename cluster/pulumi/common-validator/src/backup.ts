@@ -26,6 +26,7 @@ export async function readBackupConfig(): Promise<{
   let periodicBackupConfig: BackupConfig | undefined;
   let bootstrappingDumpConfig: BootstrappingDumpConfig | undefined;
 
+  // TODO(#3224): Put it in config.yaml like we do for topology snapshots
   const bootstrapBucketSpec = await bootstrapDataBucketSpec(
     config.optionalEnv('DATA_DUMPS_PROJECT') || 'da-cn-devnet',
     config.optionalEnv('DATA_DUMPS_BUCKET') || 'da-cn-data-dumps'

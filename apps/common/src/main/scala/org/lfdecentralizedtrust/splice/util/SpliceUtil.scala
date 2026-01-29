@@ -53,16 +53,16 @@ import scala.jdk.OptionConverters.*
 object SpliceUtil {
 
   private def readDarVersion(resource: DarResource): PackageVersion =
-    DarUtil.readDarMetadata(resource.path).version
+    resource.metadata.version
 
   def readPackageConfig(): splice.amuletconfig.PackageConfig = {
     new splice.amuletconfig.PackageConfig(
-      readDarVersion(DarResources.amulet.bootstrap).toString,
-      readDarVersion(DarResources.amuletNameService.bootstrap).toString,
-      readDarVersion(DarResources.dsoGovernance.bootstrap).toString,
-      readDarVersion(DarResources.validatorLifecycle.bootstrap).toString,
-      readDarVersion(DarResources.wallet.bootstrap).toString,
-      readDarVersion(DarResources.walletPayments.bootstrap).toString,
+      readDarVersion(DarResources.amulet.latest).toString,
+      readDarVersion(DarResources.amuletNameService.latest).toString,
+      readDarVersion(DarResources.dsoGovernance.latest).toString,
+      readDarVersion(DarResources.validatorLifecycle.latest).toString,
+      readDarVersion(DarResources.wallet.latest).toString,
+      readDarVersion(DarResources.walletPayments.latest).toString,
     )
   }
 
@@ -207,6 +207,7 @@ object SpliceUtil {
       amuletsToIssuePerYear: Double,
       validatorPercentage: Double,
       appPercentage: Double,
+      developmentFundPercentage: Option[BigDecimal] = None,
   ): splice.issuance.IssuanceConfig = new IssuanceConfig(
     damlDecimal(amuletsToIssuePerYear),
     damlDecimal(validatorPercentage),
@@ -223,18 +224,29 @@ object SpliceUtil {
 
     // validatorFaucetCap
     Some(damlDecimal(2.85)).toJava,
+
+    // developmentFundPercentage
+    developmentFundPercentage.map(damlDecimal).toJava,
   )
 
   private def hours(h: Long): RelTime = new RelTime(TimeUnit.HOURS.toMicros(h))
 
-  val defaultIssuanceCurve: splice.schedule.Schedule[RelTime, IssuanceConfig] =
+  def defaultIssuanceCurve(
+      developmentFundPercentage: Option[BigDecimal] = None
+  ): splice.schedule.Schedule[RelTime, IssuanceConfig] =
     new Schedule(
-      issuanceConfig(40e9, 0.05, 0.15),
+      issuanceConfig(40e9, 0.05, 0.15, developmentFundPercentage),
       Seq(
-        new Tuple2(hours(365 * 12), issuanceConfig(20e9, 0.12, 0.4)),
-        new Tuple2(hours(3 * 365 * 12), issuanceConfig(10e9, 0.18, 0.62)),
-        new Tuple2(hours(5 * 365 * 24), issuanceConfig(5e9, 0.21, 0.69)),
-        new Tuple2(hours(10 * 365 * 24), issuanceConfig(2.5e9, 0.20, 0.75)),
+        new Tuple2(hours(365 * 12), issuanceConfig(20e9, 0.12, 0.4, developmentFundPercentage)),
+        new Tuple2(
+          hours(3 * 365 * 12),
+          issuanceConfig(10e9, 0.18, 0.62, developmentFundPercentage),
+        ),
+        new Tuple2(hours(5 * 365 * 24), issuanceConfig(5e9, 0.21, 0.69, developmentFundPercentage)),
+        new Tuple2(
+          hours(10 * 365 * 24),
+          issuanceConfig(2.5e9, 0.20, 0.75, developmentFundPercentage),
+        ),
       ).asJava,
     )
 
@@ -365,13 +377,15 @@ object SpliceUtil {
       transferPreapprovalFee: Option[BigDecimal] = None,
       featuredAppActivityMarkerAmount: Option[BigDecimal] = None,
       nextSynchronizerId: Option[SynchronizerId] = None,
+      developmentFundPercentage: Option[BigDecimal] = None,
+      developmentFundManager: Option[PartyId] = None,
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.AmuletConfig(
       // transferConfig
       defaultTransferConfig(initialMaxNumInputs, holdingFee, zeroTransferFees = zeroTransferFees),
 
       // issuance curve
-      defaultIssuanceCurve,
+      defaultIssuanceCurve(developmentFundPercentage),
 
       // global domain config
       defaultDecentralizedSynchronizerConfig(
@@ -389,6 +403,7 @@ object SpliceUtil {
       initialPackageConfig,
       transferPreapprovalFee.map(_.bigDecimal).toJava,
       featuredAppActivityMarkerAmount.map(_.bigDecimal).toJava,
+      developmentFundManager.map(_.toProtoPrimitive).toJava,
     )
 
   def defaultAnsConfig(

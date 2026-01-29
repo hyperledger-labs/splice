@@ -28,7 +28,7 @@ object ProtoDeserializationError extends ProtoDeserializationErrorGroup {
       extends ProtoDeserializationError {
     override val message = error.message
   }
-  final case class TransactionDeserialization(message: String) extends ProtoDeserializationError
+  final case class ContractDeserializationError(message: String) extends ProtoDeserializationError
   final case class ValueDeserializationError(field: String, message: String)
       extends ProtoDeserializationError
   final case class StringConversionError(error: String, field: Option[String] = None)
@@ -59,13 +59,14 @@ object ProtoDeserializationError extends ProtoDeserializationErrorGroup {
       extends ProtoDeserializationError {
     override val message = s"Unable to convert numeric field `$field`: $error"
   }
-
   final case class InvariantViolation(field: Option[String], error: String)
       extends ProtoDeserializationError {
     override def message =
       field.fold(error)(field => s"Invariant violation in field `$field`: $error")
   }
-
+  final case class CryptoParseAndValidationError(error: String) extends ProtoDeserializationError {
+    override def message = error
+  }
   final case class MaxBytesToDecompressExceeded(error: String) extends ProtoDeserializationError {
     override def message = error
   }
@@ -77,10 +78,15 @@ object ProtoDeserializationError extends ProtoDeserializationErrorGroup {
     override def message =
       s"Message $protoMessage has no versioning information corresponding to protobuf $version"
   }
+  final case class UnknownContractAuthenticationDataVersion(version: Int)
+      extends ProtoDeserializationError {
+    override def message =
+      s"ContractAuthenticationData serialization version $version is unknown"
+  }
 
   /** Common Deserialization error code
     *
-    * USE THIS ERROR CODE ONLY WITHIN A GRPC SERVICE, PARSING THE INITIAL REQUEST. Don't used it for
+    * USE THIS ERROR CODE ONLY WITHIN A GRPC SERVICE, PARSING THE INITIAL REQUEST. Don't use it for
     * something like transaction processing or reading from the database.
     */
   @Explanation(

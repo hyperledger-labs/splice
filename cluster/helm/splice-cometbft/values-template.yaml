@@ -74,10 +74,10 @@ db:
 
 resources:
   limits:
-    memory: 4Gi
+    memory: 6Gi
   requests:
     cpu: 2
-    memory: 2Gi
+    memory: 3Gi
 
 metrics:
   enable: false
@@ -98,7 +98,7 @@ metrics:
 
 enableAntiAffinity: true
 
-logLevel: debug
+logLevel: info
 mempool:
   # max number of transactions kept in the mempool
   size: 2000

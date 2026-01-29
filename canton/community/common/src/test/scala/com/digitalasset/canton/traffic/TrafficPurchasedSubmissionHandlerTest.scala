@@ -58,7 +58,8 @@ class TrafficPurchasedSubmissionHandlerTest
   when(
     synchronizerTimeTracker.requestTick(any[CantonTimestamp], any[Boolean])(any[TraceContext])
   ).thenReturn(SynchronizerTimeTracker.DummyTickRequest)
-  private val synchronizerId = SynchronizerId.tryFromString("da::default")
+
+  private val synchronizerId = SynchronizerId.tryFromString("da::default").toPhysical
   private val clock = new SimClock(loggerFactory = loggerFactory)
   private val trafficParams = TrafficControlParameters()
   private val handler = new TrafficPurchasedSubmissionHandler(clock, loggerFactory)
@@ -103,8 +104,6 @@ class TrafficPurchasedSubmissionHandlerTest
     val resultF = handler
       .sendTrafficPurchasedRequest(
         recipient1,
-        synchronizerId,
-        testedProtocolVersion,
         PositiveInt.tryCreate(5),
         NonNegativeLong.tryCreate(1000),
         sequencerClient,
@@ -117,7 +116,7 @@ class TrafficPurchasedSubmissionHandlerTest
       Try(callbackCapture.getValue).isSuccess shouldBe true
     }
     callbackCapture.getValue.asInstanceOf[SendCallback.CallbackFuture](
-      UnlessShutdown.Outcome(SendResult.Success(mock[Deliver[Envelope[_]]]))
+      UnlessShutdown.Outcome(SendResult.Success(mock[Deliver[Envelope[?]]]))
     )
     maxSequencingTimeCapture.getValue shouldBe clock.now.plusSeconds(
       trafficParams.setBalanceRequestSubmissionWindowSize.duration.toSeconds
@@ -143,11 +142,11 @@ class TrafficPurchasedSubmissionHandlerTest
       )
     )
     batch.envelopes.foreach { envelope =>
-      envelope.protocolMessage shouldBe a[SignedProtocolMessage[_]]
+      envelope.protocolMessage shouldBe a[SignedProtocolMessage[?]]
       val topUpMessage = envelope.protocolMessage
         .asInstanceOf[SignedProtocolMessage[SetTrafficPurchasedMessage]]
         .message
-      topUpMessage.synchronizerId shouldBe synchronizerId
+      topUpMessage.psid shouldBe synchronizerId
       topUpMessage.serial.value shouldBe 5
       topUpMessage.member shouldBe recipient1
       topUpMessage.totalTrafficPurchased.value shouldBe 1000
@@ -185,8 +184,6 @@ class TrafficPurchasedSubmissionHandlerTest
     val resultF = handler
       .sendTrafficPurchasedRequest(
         recipient1,
-        synchronizerId,
-        testedProtocolVersion,
         PositiveInt.tryCreate(5),
         NonNegativeLong.tryCreate(1000),
         sequencerClient,
@@ -203,7 +200,7 @@ class TrafficPurchasedSubmissionHandlerTest
     }
     callbackCapture.getAllValues.asScala.foreach {
       _.asInstanceOf[SendCallback.CallbackFuture](
-        UnlessShutdown.Outcome(SendResult.Success(mock[Deliver[Envelope[_]]]))
+        UnlessShutdown.Outcome(SendResult.Success(mock[Deliver[Envelope[?]]]))
       )
     }
 
@@ -241,8 +238,6 @@ class TrafficPurchasedSubmissionHandlerTest
     handler
       .sendTrafficPurchasedRequest(
         recipient1,
-        synchronizerId,
-        testedProtocolVersion,
         PositiveInt.tryCreate(5),
         NonNegativeLong.tryCreate(1000),
         sequencerClient,
@@ -281,7 +276,6 @@ class TrafficPurchasedSubmissionHandlerTest
       synchronizerId,
       messageId,
       Status.defaultInstance.withMessage("BOOM"),
-      testedProtocolVersion,
       Option.empty[TrafficReceipt],
     )
 
@@ -289,8 +283,6 @@ class TrafficPurchasedSubmissionHandlerTest
       {
         val resultF = handler.sendTrafficPurchasedRequest(
           recipient1,
-          synchronizerId,
-          testedProtocolVersion,
           PositiveInt.tryCreate(5),
           NonNegativeLong.tryCreate(1000),
           sequencerClient,
@@ -311,7 +303,7 @@ class TrafficPurchasedSubmissionHandlerTest
         Seq(
           (
             _.message should include(
-              s"The traffic balance request submission failed: DeliverError(previous timestamp = None(), timestamp = 1970-01-01T00:00:00Z, synchronizer id = da::default, message id = $messageId, reason = Status(OK, BOOM))"
+              s"The traffic balance request submission failed: DeliverError(previous timestamp = None(), timestamp = 1970-01-01T00:00:00Z, id = $synchronizerId, message id = $messageId, reason = Status(OK, BOOM))"
             ),
             "sequencing failure",
           )
@@ -342,8 +334,6 @@ class TrafficPurchasedSubmissionHandlerTest
       {
         val resultF = handler.sendTrafficPurchasedRequest(
           recipient1,
-          synchronizerId,
-          testedProtocolVersion,
           PositiveInt.tryCreate(5),
           NonNegativeLong.tryCreate(1000),
           sequencerClient,

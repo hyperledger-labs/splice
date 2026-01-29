@@ -9,11 +9,9 @@ import {
   CLUSTER_HOSTNAME,
   clusterSmallDisk,
   CnInput,
-  cnsUiSecret,
   config,
   daContactPoint,
   DecentralizedSynchronizerUpgradeConfig,
-  DEFAULT_AUDIENCE,
   activeVersion,
   exactNamespace,
   ExactNamespace,
@@ -32,19 +30,23 @@ import {
   SPLICE_ROOT,
   setupBootstrapping,
   spliceInstanceNames,
-  validatorSecrets,
+  installValidatorSecrets,
   ValidatorTopupConfig,
   InstalledHelmChart,
   ansDomainPrefix,
   failOnAppVersionMismatch,
   networkWideConfig,
+  getValidatorAppApiAudience,
+  getNamespaceConfig,
+  standardStorageClassName,
+  pvcSuffix,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { installParticipant } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
 import { installPartyAllocator } from './partyAllocator';
-import { validatorConfig } from './validatorConfig';
+import { validatorConfig, validatorName } from './validatorConfig';
 
 type BootstrapCliConfig = {
   cluster: string;
@@ -66,6 +68,8 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const xns = exactNamespace(validatorConfig.namespace, true);
 
+  auth0Client.reuseNamespaceConfig('validator', xns.logicalName);
+
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
       xns,
@@ -75,9 +79,10 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       bootstrappingConfig,
     });
 
-  const onboardingSecret = preApproveValidatorRunbook
-    ? validatorConfig.onboardingSecret
-    : undefined;
+  const onboardingSecret =
+    preApproveValidatorRunbook || validatorName != 'validator-runbook'
+      ? validatorConfig.onboardingSecret
+      : undefined;
 
   const loopback = installLoopback(xns);
 
@@ -145,6 +150,8 @@ async function installValidator(
     topupConfig,
   } = validatorDeploymentConfig;
 
+  const participantPruningConfig = validatorConfig?.participantPruningSchedule;
+
   const supportsValidatorRunbookReset = config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET', false);
   const postgresValues: ChartValues = loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
@@ -164,6 +171,7 @@ async function installValidator(
     DecentralizedSynchronizerUpgradeConfig.active.id,
     xns,
     auth0Client.getCfg(),
+    false, // We don't currently support non-auth for validator-runbook
     activeVersion,
     postgres,
     {
@@ -177,20 +185,7 @@ async function installValidator(
     },
   };
 
-  const validatorNameSpaceAuth0Clients = auth0Client.getCfg().namespaceToUiToClientId['validator'];
-  if (!validatorNameSpaceAuth0Clients) {
-    throw new Error('No validator namespace in auth0 config');
-  }
-  const walletUiClientId = validatorNameSpaceAuth0Clients['wallet'];
-  if (!walletUiClientId) {
-    throw new Error('No wallet ui client id in auth0 config');
-  }
-
-  const { appSecret: validatorAppSecret, uiSecret: validatorUISecret } = await validatorSecrets(
-    xns,
-    auth0Client,
-    walletUiClientId
-  );
+  const validatorSecrets = await installValidatorSecrets(xns, auth0Client);
 
   const validatorValuesFromYamlFiles = {
     ...loadYamlFromFile(`${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
@@ -210,6 +205,10 @@ async function installValidator(
     ),
   };
 
+  if (validatorConfig.validatorApp?.scanClient != null) {
+    delete validatorValuesFromYamlFiles.scanAddress;
+  }
+
   const newParticipantIdentifier =
     validatorConfig.newParticipantId ||
     validatorValuesFromYamlFiles?.participantIdentitiesDumpImport?.newParticipantIdentifier;
@@ -222,6 +221,8 @@ async function installValidator(
         ? true
         : validatorValuesFromYamlFiles.migration.migrating,
     },
+    scanClient: validatorConfig.validatorApp?.scanClient,
+    synchronizer: validatorConfig.validatorApp?.synchronizer,
     metrics: {
       enable: true,
     },
@@ -236,15 +237,23 @@ async function installValidator(
           newParticipantIdentifier,
         }
       : undefined,
+    participantPruningSchedule: participantPruningConfig,
     ...(participantBootstrapDumpSecret ? { nodeIdentifier: newParticipantIdentifier } : {}),
     persistence: {
       ...validatorValuesFromYamlFiles.persistence,
       postgresName: 'postgres',
     },
+    pvc: {
+      volumeStorageClass: standardStorageClassName,
+      volumeName: `domain-migration-validator-${pvcSuffix}`,
+    },
     db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined },
     enablePostgresMetrics: true,
     ...spliceInstanceNames,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
+    additionalEnvVars: validatorConfig.validatorApp?.additionalEnvVars,
+    additionalJvmOptions: validatorConfig.validatorApp?.additionalJvmOptions,
+    resources: validatorConfig.validatorApp?.resources,
   };
 
   const validatorValuesWithOnboardingOverride = onboardingSecret
@@ -260,7 +269,7 @@ async function installValidator(
     ...validatorValuesWithOnboardingOverride,
     auth: {
       ...validatorValuesWithOnboardingOverride.auth,
-      audience: auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
+      audience: getValidatorAppApiAudience(auth0Client.getCfg(), xns.logicalName),
     },
   };
 
@@ -274,14 +283,13 @@ async function installValidator(
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
-  const cnsUiClientId = validatorNameSpaceAuth0Clients['cns'];
+  const cnsUiClientId = getNamespaceConfig(auth0Client.getCfg(), xns.logicalName).uiClientIds.cns;
   if (!cnsUiClientId) {
     throw new Error('No validator ui client id in auth0 config');
   }
   const dependsOn = imagePullDeps
     .concat(loopback ? loopback : [])
-    .concat([validatorAppSecret, validatorUISecret])
-    .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
+    .concat(validatorSecrets)
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(
       onboardingSecret ? [installValidatorOnboardingSecret(xns, 'validator', onboardingSecret)] : []

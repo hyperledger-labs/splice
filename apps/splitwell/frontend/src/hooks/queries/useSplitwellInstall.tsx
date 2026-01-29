@@ -9,7 +9,7 @@ import { useConnectedDomains } from './useConnectedDomains';
 import { useSplitwellDomains } from './useSplitwellDomains';
 
 export const QuerySplitwellInstallOperationName = 'querySplitwellInstalls';
-export const useSplitwellInstalls = (): UseQueryResult<SplitwellInstall[]> => {
+export const useSplitwellInstalls = (): UseQueryResult<SplitwellInstall[] | null> => {
   const splitwellClient = useSplitwellClient();
   const primaryPartyQuery = usePrimaryParty();
   const primaryPartyId = primaryPartyQuery.data;

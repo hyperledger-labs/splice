@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Box, Typography } from '@mui/material';
-import { ConfigChange } from '../../utils/types';
+import { THRESHOLD_DEADLINE_SUBTITLE } from '../../utils/constants';
+import type { ConfigChange } from '../../utils/types';
 import { ConfigValuesChanges } from './ConfigValuesChanges';
 
 interface BaseProposalSummaryProps {
@@ -39,6 +40,12 @@ type ProposalSummaryProps = BaseProposalSummaryProps &
         formType: 'config-change';
         configFormData: ConfigChange[];
       }
+    | {
+        formType: 'create-unallocated-unclaimed-activity-record';
+        beneficiary: string;
+        amount: string;
+        expiresAt: string;
+      }
   );
 
 export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
@@ -59,8 +66,8 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
 
         <ProposalField
           id="expiryDate"
-          title="Expiry Date"
-          subtitle="This is the last day voters can vote on this proposal"
+          title="Threshold Deadline"
+          subtitle={THRESHOLD_DEADLINE_SUBTITLE}
           value={expiryDate}
         />
 
@@ -77,15 +84,21 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
               title="Member"
               value={props.svRewardWeightMember}
             />
-            <ConfigValuesChanges
-              changes={[
-                {
-                  label: 'SV Reward Weight',
-                  fieldName: 'svRewardWeight',
-                  currentValue: props.currentWeight,
-                  newValue: props.svRewardWeight,
-                },
-              ]}
+            <ProposalField
+              id="configChange"
+              title="Proposed Changes"
+              value={
+                <ConfigValuesChanges
+                  changes={[
+                    {
+                      label: 'SV Reward Weight',
+                      fieldName: 'svRewardWeight',
+                      currentValue: props.currentWeight,
+                      newValue: props.svRewardWeight,
+                    },
+                  ]}
+                />
+              }
             />
           </>
         )}
@@ -106,9 +119,23 @@ export const ProposalSummary: React.FC<ProposalSummaryProps> = props => {
           <ProposalField id="offboardMember" title="Offboard Member" value={props.offboardMember} />
         )}
 
+        {formType === 'create-unallocated-unclaimed-activity-record' && (
+          <>
+            <ProposalField id="beneficiary" title="Beneficiary" value={props.beneficiary} />
+
+            <ProposalField id="amount" title="Amount" value={props.amount} />
+
+            <ProposalField id="expiresAt" title="Must Mint Before" value={props.expiresAt} />
+          </>
+        )}
+
         <Box mt={4}>
           {formType === 'config-change' && (
-            <ConfigValuesChanges changes={props.configFormData} isSummaryView />
+            <ProposalField
+              id="configChange"
+              title="Proposed Changes"
+              value={<ConfigValuesChanges changes={props.configFormData} isSummaryView />}
+            />
           )}
         </Box>
       </Box>
@@ -120,7 +147,7 @@ interface ProposalFieldProps {
   id: string;
   title: string;
   subtitle?: string;
-  value: string;
+  value: React.ReactNode;
 }
 
 const ProposalField: React.FC<ProposalFieldProps> = props => {
@@ -150,9 +177,13 @@ const ProposalField: React.FC<ProposalFieldProps> = props => {
           </Typography>
         )}
 
-        <Typography variant="body2" data-testid={`${id}-field`} color="grey">
-          {value}
-        </Typography>
+        {typeof value === 'string' ? (
+          <Typography variant="body2" data-testid={`${id}-field`} color="grey">
+            {value}
+          </Typography>
+        ) : (
+          value
+        )}
       </Box>
     </Box>
   );

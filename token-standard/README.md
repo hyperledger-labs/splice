@@ -47,7 +47,7 @@ The CLI is available at `token-standard/cli`.
 
 ### Install dependencies
 
-First of all, make sure to [setup your development environment for the project](../README.md#setting-up-your-development-environment).
+First of all, make sure to [setup your development environment for the project](../DEVELOPMENT.md).
 Dependencies can be installed by running `sbt token-standard-cli/compile` in the root of the project.
 This will download all the necessary dependencies and compile openAPI bindings used by the CLI.
 

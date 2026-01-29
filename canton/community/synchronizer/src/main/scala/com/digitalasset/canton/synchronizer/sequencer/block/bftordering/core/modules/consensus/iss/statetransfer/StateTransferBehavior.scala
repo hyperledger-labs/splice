@@ -8,9 +8,11 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.collection.FairBoundedQueue
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.collection.FairBoundedQueue.EnqueueResult
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.{
+  CryptoProvider,
+  DelegationCryptoProvider,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.EpochState.Epoch
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStore
@@ -20,32 +22,29 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
   StateTransferType,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.shortType
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.{
-  CryptoProvider,
-  DelegationCryptoProvider,
-}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
   EpochLength,
   EpochNumber,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.SignedMessage
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.iss.EpochInfo
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.{
   Membership,
   OrderingTopologyInfo,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusSegment.ConsensusMessage.PbftNetworkMessage
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.dependencies.ConsensusModuleDependencies
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.{
   Availability,
   Consensus,
+  P2PNetworkOut,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
   Env,
   ModuleRef,
   PureFun,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.FairBoundedQueue
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.utils.FairBoundedQueue.EnqueueResult
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.collection.BoundedQueue.DropStrategy
@@ -110,11 +109,18 @@ final class StateTransferBehavior[E <: Env[E]](
   private var cancelledSegments = 0
 
   @VisibleForTesting
-  private[bftordering] val postponedConsensusMessages: FairBoundedQueue[Consensus.Message[E]] =
+  private[iss] val postponedConsensusMessages: FairBoundedQueue[Consensus.Message[E]] =
     new FairBoundedQueue(
       config.consensusQueueMaxSize,
       config.consensusQueuePerNodeQuota,
-      DropStrategy.DropNewest, // To ensure continuity of messages (and resort to another catch-up if necessary)
+      DropStrategy.DropNewest, // To ensure continuity of messages (and resort to another catch-up if necessary).
+      maxSizeGauge = Some(metrics.consensus.stateTransfer.postponedMessagesQueueMaxSize),
+      metrics = Some(metrics),
+      sizeGauge = Some(metrics.consensus.stateTransfer.postponedMessagesQueueSize),
+      dropMeter = Some(metrics.consensus.stateTransfer.postponedMessagesQueueDropMeter),
+      orderingStageLatencyLabel = Some(
+        metrics.performance.orderingStageLatency.labels.stage.values.consensus.stateTransfer.PostponedMessagesQueueLatency
+      ),
     )
 
   private val stateTransferManager = maybeCustomStateTransferManager.getOrElse(
@@ -139,11 +145,11 @@ final class StateTransferBehavior[E <: Env[E]](
   private var latestCompletedEpoch = initialState.latestCompletedEpoch
 
   @VisibleForTesting
-  private[bftordering] var maybeLastReceivedEpochTopology: Option[Consensus.NewEpochTopology[E]] =
+  private[iss] var maybeLastReceivedEpochTopology: Option[Consensus.NewEpochTopology[E]] =
     None
 
   override def ready(self: ModuleRef[Consensus.Message[E]]): Unit =
-    self.asyncSend(Consensus.Init)
+    self.asyncSendNoTrace(Consensus.Init)
 
   override protected def receiveInternal(
       message: Consensus.Message[E]
@@ -152,13 +158,18 @@ final class StateTransferBehavior[E <: Env[E]](
 
     message match {
       case Consensus.Init =>
+        val epochNumber = initialState.epochState.epoch.info.number
         // Note that for onboarding, segments are created but not started
-        initialState.epochState
-          .notifyEpochCancellationToSegments(initialState.epochState.epoch.info.number)
+        logger.info(s"$messageType: cancelling segment modules for epoch $epochNumber")
+        initialState.epochState.notifyEpochCancellationToSegments(epochNumber)
 
       case Consensus.SegmentCancelledEpoch =>
         cancelledSegments += 1
-        if (initialState.epochState.epoch.segments.sizeIs == cancelledSegments) {
+        val numberOfSegments = initialState.epochState.epoch.segments.size
+        logger.info(
+          s"$messageType: received segment cancellation $cancelledSegments out of $numberOfSegments"
+        )
+        if (numberOfSegments == cancelledSegments) {
           if (stateTransferManager.inStateTransfer) {
             abort(
               s"$messageType: $stateTransferType state transfer cannot be already in progress during another state transfer"
@@ -209,6 +220,14 @@ final class StateTransferBehavior[E <: Env[E]](
             newEpochTopologyMessage.cryptoProvider,
             messageType,
           )
+        } else if (newEpochNumber <= currentEpochNumber) {
+          // The output module re-sent a topology for an already completed epoch; this can happen upon restart if
+          //  either the output module, or the subscribing sequencer runtime, or both are more than one epoch behind
+          //  state transfer, because the output module will just reprocess the blocks to be recovered.
+          logger.info(
+            s"$messageType: received NewEpochTopology for epoch $newEpochNumber, but the latest current epoch " +
+              s"is already $currentEpochNumber; ignoring"
+          )
         } else {
           abort(
             s"$messageType: internal inconsistency, $stateTransferType state transfer received wrong new topology " +
@@ -244,22 +263,29 @@ final class StateTransferBehavior[E <: Env[E]](
       // We drop retransmission messages, as they will likely be stale once state transfer is finished.
       case _: Consensus.RetransmissionsMessage =>
 
-      case Consensus.ConsensusMessage.PbftUnverifiedNetworkMessage(_, underlyingMessage) =>
-        enqueuePbftNetworkMessage(message, underlyingMessage)
+      case Consensus.ConsensusMessage.PbftUnverifiedNetworkMessage(underlyingMessage) =>
+        // Use the actual sender to prevent the node from filling up other nodes' quotas in the queue.
+        val actualSender =
+          underlyingMessage.message.actualSender.getOrElse(
+            abort(
+              s"$messageType: internal inconsistency, actualSender needs to be provided for network messages"
+            )
+          )
+        enqueuePbftNetworkMessage(message, actualSender)
 
       case Consensus.ConsensusMessage.PbftVerifiedNetworkMessage(underlyingMessage) =>
         // likely a late response from the crypto provider
-        enqueuePbftNetworkMessage(message, underlyingMessage)
+        enqueuePbftNetworkMessage(message, underlyingMessage.from)
 
       case _ =>
         postponedConsensusMessages.enqueue(BftNodeId.Empty, message) match {
           case EnqueueResult.PerNodeQuotaExceeded(_) =>
-            logger.info(
+            logger.trace(
               s"Postponed messages without an originating node exceeded their quota on `$messageType` " +
                 s"(likely a late internal message)"
             )
           case EnqueueResult.TotalCapacityExceeded =>
-            logger.info(
+            logger.trace(
               s"Postponed message queue total capacity has been exceeded by a message without an originating node " +
                 s"(`$messageType`, likely a late internal message)"
             )
@@ -268,6 +294,8 @@ final class StateTransferBehavior[E <: Env[E]](
               s"Successfully postponed a message without an originating node (`$messageType`, " +
                 s"likely a late internal message)"
             )
+          case FairBoundedQueue.EnqueueResult.Duplicate(_) =>
+            abort("Deduplication is disabled")
         }
     }
   }
@@ -307,7 +335,7 @@ final class StateTransferBehavior[E <: Env[E]](
   }
 
   @VisibleForTesting
-  private[bftordering] def handleStateTransferMessageResult(
+  private[iss] def handleStateTransferMessageResult(
       result: StateTransferMessageResult,
       messageType: => String,
   )(implicit
@@ -341,7 +369,9 @@ final class StateTransferBehavior[E <: Env[E]](
         }
     }
 
-  private def updateAvailabilityTopology(newEpochTopology: Consensus.NewEpochTopology[E]): Unit =
+  private def updateAvailabilityTopology(newEpochTopology: Consensus.NewEpochTopology[E])(implicit
+      traceContext: TraceContext
+  ): Unit =
     dependencies.availability.asyncSend(
       Availability.Consensus.UpdateTopologyDuringStateTransfer(
         newEpochTopology.membership.orderingTopology,
@@ -363,13 +393,14 @@ final class StateTransferBehavior[E <: Env[E]](
   )(implicit context: E#ActorContextT[Consensus.Message[E]], traceContext: TraceContext): Unit = {
     val currentEpochNumber = currentEpochInfo.number
     val newEpochNumber = newEpochInfo.number
-    logger.debug(
+    logger.info(
       s"$messageType: storing completed epoch $currentEpochNumber and new epoch $newEpochNumber"
     )
     pipeToSelf(
       context.flatMapFuture(
         epochStore.completeEpoch(currentEpochNumber),
         PureFun.Const(epochStore.startEpoch(newEpochInfo)),
+        orderingStage = Some("state-transfer-store-epochs"),
       )
     ) {
       case Failure(exception) => Consensus.ConsensusMessage.AsyncException(exception)
@@ -383,25 +414,24 @@ final class StateTransferBehavior[E <: Env[E]](
 
   private def enqueuePbftNetworkMessage(
       message: Consensus.Message[E],
-      underlyingNetworkMessage: SignedMessage[PbftNetworkMessage],
-  )(implicit traceContext: TraceContext): Unit =
-    postponedConsensusMessages.enqueue(
-      underlyingNetworkMessage.message.from,
-      message,
-    ) match {
+      from: BftNodeId,
+  )(implicit context: E#ActorContextT[Consensus.Message[E]], traceContext: TraceContext): Unit =
+    postponedConsensusMessages.enqueue(from, message) match {
       case EnqueueResult.PerNodeQuotaExceeded(nodeId) =>
-        logger.info(s"Node `$nodeId` exceeded its postponed message queue quota")
+        logger.trace(s"Node `$nodeId` exceeded its postponed message queue quota")
       case EnqueueResult.TotalCapacityExceeded =>
-        logger.info("Postponed message queue total capacity has been exceeded")
+        logger.trace("Postponed message queue total capacity has been exceeded")
       case EnqueueResult.Success =>
         logger.trace("Successfully postponed a message")
+      case FairBoundedQueue.EnqueueResult.Duplicate(_) =>
+        abort("Deduplication is disabled")
     }
 
   private def cleanUpPostponedMessageQueue(): Unit = {
     val currentEpochNumber = epochState.epoch.info.number
 
     postponedConsensusMessages.dequeueAll {
-      case Consensus.ConsensusMessage.PbftUnverifiedNetworkMessage(_, underlyingMessage) =>
+      case Consensus.ConsensusMessage.PbftUnverifiedNetworkMessage(underlyingMessage) =>
         underlyingMessage.message.blockMetadata.epochNumber < currentEpochNumber
       case Consensus.ConsensusMessage.PbftVerifiedNetworkMessage(underlyingMessage) =>
         // likely a late response from the crypto provider
@@ -495,6 +525,10 @@ final class StateTransferBehavior[E <: Env[E]](
       loggerFactory = loggerFactory,
       timeouts = timeouts,
     )
+
+    dependencies.p2pNetworkOut.asyncSend(
+      P2PNetworkOut.Network.TopologyUpdate(epochState.epoch.currentMembership)
+    )
   }
 }
 
@@ -517,7 +551,7 @@ object StateTransferBehavior {
   )
 
   @VisibleForTesting
-  private[bftordering] def unapply(
+  private[iss] def unapply(
       behavior: StateTransferBehavior[?]
   ): Option[
     (

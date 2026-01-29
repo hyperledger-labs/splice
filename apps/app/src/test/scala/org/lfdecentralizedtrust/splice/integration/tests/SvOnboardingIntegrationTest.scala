@@ -58,7 +58,9 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
           .singleRequest(registerGet.withHeaders(tokenHeader(invalidUserToken)))
           .futureValue
         responseForInvalidUser.status should be(StatusCodes.Forbidden)
-        responseForInvalidUser.entity.getContentType().toString should be("application/json")
+        responseForInvalidUser.entity.getContentType().toString should be(
+          "application/json"
+        )
       },
       _.warningMessage should include(
         "Authorization Failed"
@@ -107,9 +109,12 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     val svParty = sv.getDsoInfo().svParty
     val sv1Party = sv1Backend.getDsoInfo().svParty
     sv.listOngoingValidatorOnboardings() should have length 0
+
+    val name = "dummy" + env.environment.config.name.getOrElse("")
+
     val (secret, onboardingContract) = actAndCheck(
       "the sv operator prepares the onboarding", {
-        sv.prepareValidatorOnboarding(1.hour)
+        sv.prepareValidatorOnboarding(1.hour, Some(name))
       },
     )(
       "a validator onboarding contract is created",
@@ -128,11 +133,13 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         .config(sv1Backend.config.domains.global.alias)
         .value
     bobValidatorBackend.participantClient.synchronizers.connect_by_config(config)
+    bobValidatorBackend.participantClient.upload_dar_unless_exists(amuletDarPath)
     val candidate = clue("create a dummy party") {
       val name = "dummy" + env.environment.config.name.getOrElse("")
       bobValidatorBackend.participantClientWithAdminToken.ledger_api.parties
         .allocate(
-          name
+          name,
+          synchronizerId = Some(decentralizedSynchronizerId),
         )
         .party
 
@@ -152,11 +159,29 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
           ValidatorOnboardingSecret(
             sv1Party,
             onboardingContract.payload.candidateSecret,
+            None,
           ).toApiResponse,
           contactPoint,
         ),
         _.errorMessage should include(
           s"Secret is for SV $sv1Party but this SV is $svParty, validate your SV sponsor URL"
+        ),
+      )
+    }
+
+    clue("try to onboard with a secret that has an incorrect party hint") {
+      val partyId = PartyId
+        .fromProtoPrimitive("invalid-name-1::dummy", "partyId")
+        .getOrElse(sys.error("Could not parse PartyId"))
+
+      assertThrowsAndLogsCommandFailures(
+        sv.onboardValidator(
+          partyId,
+          onboardingContract.payload.candidateSecret,
+          contactPoint,
+        ),
+        _.errorMessage should include(
+          s"The onboarding secret entered does not match the secret issued for validatorPartyHint: $name"
         ),
       )
     }

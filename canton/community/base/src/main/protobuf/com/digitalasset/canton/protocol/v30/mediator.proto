@@ -27,6 +27,7 @@ message ParticipantReject {
 message RejectionReason {
   repeated string parties = 1;
   com.digitalasset.canton.protocol.v30.LocalVerdict reject = 2;
+  string participant_id = 3;
 }
 
 message MediatorReject {
@@ -48,7 +49,7 @@ message Verdict {
 message ConfirmationResultMessage {
   option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
 
-  string synchronizer_id = 1;
+  string physical_synchronizer_id = 1;
   com.digitalasset.canton.protocol.v30.ViewType view_type = 2;
   int64 request_id = 3;
   bytes root_hash = 4;

@@ -29,25 +29,15 @@ spec:
           {{- end }}
           env:
             {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "validator" "keyName" "validator" "fixedTokens" (.Values.cluster).fixedTokens) | indent 12}}
-            - name: JSON_LEDGER_API_URL
-              value: {{ .Values.jsonLedgerApiUrl | quote }}
-            - name: SCAN_API_URL
-              value: {{ .Values.scanApiUrl | quote }}
-            - name: VALIDATOR_API_URL
-              value: {{ .Values.validatorApiUrl | quote }}
-            - name: MAX_PARTIES
-              value: {{ .Values.maxParties | quote }}
-            - name: KEYS_DIRECTORY
-              value: {{ .Values.keysDirectory | quote }}
-            - name: PARALLELISM
-              value: {{ .Values.parallelism | quote }}
+            - name: EXTERNAL_CONFIG
+              value: {{ .Values.config | toJson | quote }}
           volumeMounts:
             - name: party-allocator-keys-volume
               mountPath: /keys
       volumes:
         - name: party-allocator-keys-volume
           persistentVolumeClaim:
-            claimName: party-allocator-keys
+            claimName: {{ .Values.pvc.name }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -64,7 +54,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: party-allocator-keys
+  name: {{ .Values.pvc.name }}
   namespace: {{ $.Release.Namespace }}
   annotations:
     helm.sh/resource-policy: keep
@@ -73,8 +63,12 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 10G
+      storage: {{ .Values.pvc.size }}
   storageClassName: {{ .Values.pvc.volumeStorageClass }}
+  {{- with .Values.pvc.dataSource }}
+  dataSource:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -87,8 +81,8 @@ spec:
   selector:
     app: {{ .Release.Name }}
   ports:
-  - name: metrics
-    port: 10013
+    - name: metrics
+      port: 10013
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
@@ -99,11 +93,11 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   endpoints:
-  - port: metrics
-    interval: {{ .Values.metrics.interval }}
+    - port: metrics
+      interval: {{ .Values.metrics.interval }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}
   namespaceSelector:
     matchNames:
-    - {{ .Release.Namespace }}
+      - {{ .Release.Namespace }}

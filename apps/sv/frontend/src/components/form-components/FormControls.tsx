@@ -3,7 +3,7 @@
 
 import { Box, Button } from '@mui/material';
 import { useFormContext } from '../../hooks/formContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 export interface FormControlsProps {
   showConfirmation?: boolean;
@@ -52,6 +52,7 @@ export const FormControls: React.FC<FormControlsProps> = props => {
             type={'submit'}
             size="large"
             disabled={!canSubmit || isSubmitting}
+            id="submit-button"
             data-testid="submit-button"
           >
             {isSubmitting ? 'Submitting' : submitTitle}

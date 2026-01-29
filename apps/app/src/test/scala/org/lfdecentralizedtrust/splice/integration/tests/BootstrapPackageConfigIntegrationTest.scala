@@ -6,10 +6,11 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
   PackageConfig,
@@ -17,7 +18,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.balanceupdatetype
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
@@ -40,33 +40,23 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvPackageVettingTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
-import org.lfdecentralizedtrust.splice.util.SpliceUtil
-import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, SplitwellTestUtil, StandaloneCanton}
+import org.lfdecentralizedtrust.splice.util.{SpliceUtil, SplitwellTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ValidatorPackageVettingTrigger
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.scalatest.time.{Minute, Span}
-import scala.concurrent.duration.DurationInt
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import scala.concurrent.duration.DurationInt
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
-class BootstrapPackageConfigIntegrationTest
-    extends IntegrationTest
-    with ProcessTestUtil
-    with SplitwellTestUtil
-    with StandaloneCanton {
+class BootstrapPackageConfigIntegrationTest extends IntegrationTest with SplitwellTestUtil {
 
   // this test starts up on older version (see initialPackageConfig), which don't define token-standard interfaces
   // and thus everything will show up as raw create/archives.
   override protected lazy val tokenStandardCliBehavior
       : TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior =
     TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior.IgnoreAll
-
-  override def dbsSuffix = "bootstrapdso"
-
-  // Runs against a temporary Canton instance.
-  override lazy val resetRequiredTopologyState = false
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
@@ -168,13 +158,18 @@ class BootstrapPackageConfigIntegrationTest
       // This simulates an app vetting newer versions of their own DARs depending on newer splice-amulet versions
       // before the SVs do so. Topology aware package selection will then force the old splice-amulet and old splitwell versions
       // for composed transactions. Note that for this to work splitwell contracts must be downgradeable.
+
+      // Split into batches to avoid gRPC message size limit (10 MB)
+      val batchSize = 12
+      val versionBatches =
+        DarResources.splitwell.all.map(_.metadata.version).distinct.grouped(batchSize).toSeq
+
       Seq(aliceValidatorBackend, bobValidatorBackend, splitwellValidatorBackend).foreach { p =>
-        p.participantClient.dars.upload_many(
-          DarResources.splitwell.all
-            .map(_.metadata.version)
-            .distinct
-            .map((v: PackageVersion) => s"daml/dars/splitwell-$v.dar")
-        )
+        versionBatches.foreach { batch =>
+          p.participantClient.dars.upload_many(
+            batch.map((v: PackageVersion) => s"daml/dars/splitwell-$v.dar")
+          )
+        }
       }
     }
 
@@ -225,13 +220,14 @@ class BootstrapPackageConfigIntegrationTest
         amuletConfig.decentralizedSynchronizer,
         amuletConfig.tickDuration,
         new PackageConfig(
-          DarResources.amulet.bootstrap.metadata.version.toString(),
-          DarResources.amuletNameService.bootstrap.metadata.version.toString(),
-          DarResources.dsoGovernance.bootstrap.metadata.version.toString(),
-          DarResources.validatorLifecycle.bootstrap.metadata.version.toString(),
-          DarResources.wallet.bootstrap.metadata.version.toString(),
-          DarResources.walletPayments.bootstrap.metadata.version.toString(),
+          DarResources.amulet.latest.metadata.version.toString(),
+          DarResources.amuletNameService.latest.metadata.version.toString(),
+          DarResources.dsoGovernance.latest.metadata.version.toString(),
+          DarResources.validatorLifecycle.latest.metadata.version.toString(),
+          DarResources.wallet.latest.metadata.version.toString(),
+          DarResources.walletPayments.latest.metadata.version.toString(),
         ),
+        java.util.Optional.empty(),
         java.util.Optional.empty(),
         java.util.Optional.empty(),
       )
@@ -276,7 +272,7 @@ class BootstrapPackageConfigIntegrationTest
         _ => {
           val newAmuletRules = sv1Backend.getDsoInfo().amuletRules
 
-          newAmuletRules.payload.configSchedule.initialValue.packageConfig.amulet shouldBe DarResources.amulet.bootstrap.metadata.version
+          newAmuletRules.payload.configSchedule.initialValue.packageConfig.amulet shouldBe DarResources.amulet.latest.metadata.version
             .toString()
         },
       )
@@ -301,10 +297,11 @@ class BootstrapPackageConfigIntegrationTest
             None,
           ), // due to the early splitwell dar upload this is vetted without a timestamp
         ).foreach { case (participantClient, scheduledTimeO) =>
-          clue(s"Vetting state for ${participantClient.id}") {
+          clue(s"Alice sees updated vetting state for ${participantClient.id}") {
             eventually() {
               vettingIsUpdatedForTheNewConfig(
-                participantClient,
+                aliceValidatorBackend.participantClient,
+                participantClient.id,
                 scheduledTimeO,
                 Some(vettingScheduledTime),
                 Some(vettingScheduledTime),
@@ -328,10 +325,11 @@ class BootstrapPackageConfigIntegrationTest
     sv2PackageVettingTrigger.resume()
     sv2ValidatorPackageVettingTrigger.resume()
 
-    clue(s"Vetting state for slow sv is updated after the trigger runs") {
+    clue(s"Vetting state for slow sv is updated after the trigger runs, and alice sees it") {
       eventually() {
         vettingIsUpdatedForTheNewConfig(
-          sv2Backend.participantClient,
+          aliceValidatorBackend.participantClient,
+          sv2Backend.participantClient.id,
           Some(
             vettingScheduledTime
           ),
@@ -344,7 +342,7 @@ class BootstrapPackageConfigIntegrationTest
     }
 
     clue("alice taps amulet with new package after all the svs vet the new packages") {
-      alicesTapsWithPackageId(DarResources.amulet.bootstrap.packageId)
+      alicesTapsWithPackageId(DarResources.amulet.latest.packageId)
     }
 
     clue("ExternalPartyAmuletRules gets created") {
@@ -371,6 +369,7 @@ class BootstrapPackageConfigIntegrationTest
         amuletConfig.decentralizedSynchronizer,
         amuletConfig.tickDuration,
         amuletConfig.packageConfig,
+        java.util.Optional.empty(),
         java.util.Optional.empty(),
         java.util.Optional.empty(),
       )
@@ -431,18 +430,19 @@ class BootstrapPackageConfigIntegrationTest
   }
 
   private def vettingIsUpdatedForTheNewConfig(
-      participantClient: ParticipantClientReference,
+      checkViaParticipant: ParticipantClientReference,
+      vettedByParticipant: ParticipantId,
       scheduledTimeO: Option[CantonTimestamp],
       scheduledTime1: Option[CantonTimestamp],
       scheduledTime2: Option[CantonTimestamp],
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
-    val vettingTopologyState = participantClient.topology.vetted_packages.list(
+    val vettingTopologyState = checkViaParticipant.topology.vetted_packages.list(
       store = Some(
         TopologyStoreId.Synchronizer(
           decentralizedSynchronizerId
         )
       ),
-      filterParticipant = participantClient.id.filterString,
+      filterParticipant = vettedByParticipant.filterString,
     )
     val vettingState = vettingTopologyState.loneElement.item
     def packagesAreVetted(
@@ -462,14 +462,14 @@ class BootstrapPackageConfigIntegrationTest
         val newVettedPackage = vettingState.packages
           .find(_.packageId == expectedVettedVersion.packageId)
           .value
-        newVettedPackage.validFrom should (
+        newVettedPackage.validFromInclusive should (
           equal(scheduledTimeO) or equal(scheduledTime1) or equal(scheduledTime2)
         )
       }
     }
-    packagesAreVetted(DarResources.amulet.bootstrap, PackageIdResolver.Package.SpliceAmulet)
+    packagesAreVetted(DarResources.amulet.latest, PackageIdResolver.Package.SpliceAmulet)
     // also check wallet because for the sv we have 2 vetting triggers, and the wallet is used in the tap call but it's vetted by the validator trigger (amulet rules can be vetted by any of the triggers)
-    packagesAreVetted(DarResources.wallet.bootstrap, PackageIdResolver.Package.SpliceWallet)
+    packagesAreVetted(DarResources.wallet.latest, PackageIdResolver.Package.SpliceWallet)
   }
 
   private def alicesTapsWithPackageId(
