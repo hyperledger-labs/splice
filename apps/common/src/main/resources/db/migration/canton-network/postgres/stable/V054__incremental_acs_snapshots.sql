@@ -1,6 +1,11 @@
 -- Incremental ACS snapshot for ingestion
 create table acs_incremental_snapshot_data_next
 (
+    -- In production, we have a separate table for each scan instance so this
+    -- column will be the same for all rows. However, in tests we can have multiple
+    -- scan instances writing to the same table, so we need to include it.
+    history_id   bigint      not null references update_history_descriptors (id),
+
     create_id    bigint      not null,
     contract_id  text        not null,
 
@@ -16,15 +21,20 @@ create table acs_incremental_snapshot_data_next
 -- Needed for fast insert/remove by contract id
 alter table acs_incremental_snapshot_data_next
     add constraint acs_incremental_snapshot_data_next_pk
-       primary key (contract_id);
+       primary key (history_id, contract_id);
 
 -- Needed because ACS snapshots are ordered by creation time
 create index acs_incremental_snapshot_data_next_ca_ci
-    on acs_incremental_snapshot_data_next (created_at, contract_id);
+    on acs_incremental_snapshot_data_next (history_id, created_at, contract_id);
 
 -- Incremental ACS snapshot for backfilling
 create table acs_incremental_snapshot_data_backfill
 (
+    -- In production, we have a separate table for each scan instance so this
+    -- column will be the same for all rows. However, in tests we can have multiple
+    -- scan instances writing to the same table, so we need to include it.
+    history_id   bigint      not null references update_history_descriptors (id),
+
     create_id    bigint      not null,
     contract_id  text        not null,
 
@@ -37,10 +47,10 @@ create table acs_incremental_snapshot_data_backfill
 
 alter table acs_incremental_snapshot_data_backfill
     add constraint acs_incremental_snapshot_data_backfill_pk
-        primary key (contract_id);
+        primary key (history_id, contract_id);
 
 create index acs_incremental_snapshot_data_backfill_ca_ci
-    on acs_incremental_snapshot_data_backfill (created_at, contract_id);
+    on acs_incremental_snapshot_data_backfill (history_id, created_at, contract_id);
 
 -- State of the incremental ACS snapshots
 create table acs_incremental_snapshot
@@ -59,7 +69,6 @@ create table acs_incremental_snapshot
 
     -- The time at which the snapshot should be copied to acs_snapshot_data.
     target_record_time              bigint not null
-
 );
 
 create unique index acs_incremental_snapshot_hid_tn

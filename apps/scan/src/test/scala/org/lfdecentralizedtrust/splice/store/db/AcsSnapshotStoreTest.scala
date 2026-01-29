@@ -1031,7 +1031,7 @@ class AcsSnapshotStoreTest
       }
     }
 
-    "incremental snapshot generation XXXX" should {
+    "incremental snapshot generation" should {
       "return None when no snapshot is available" in {
         for {
           updateHistory <- mkUpdateHistory()
