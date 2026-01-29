@@ -90,11 +90,15 @@ class AcsSnapshotBackfillingTrigger(
   override def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[AcsSnapshotTriggerBase.Task]] = {
-    getState().flatMap {
-      case State.Done =>
-        Future.successful(Seq.empty)
-      case State.WorkingOnMigrationId(migrationId) =>
-        retrieveTaskForPastMigrationId(migrationId).map(_.toList)
+    if (!updateHistory.isReady) {
+      Future.successful(Seq.empty)
+    } else {
+      getState().flatMap {
+        case State.Done =>
+          Future.successful(Seq.empty)
+        case State.WorkingOnMigrationId(migrationId) =>
+          retrieveTaskForPastMigrationId(migrationId).map(_.toList)
+      }
     }
   }
 
