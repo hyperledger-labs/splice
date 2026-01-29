@@ -9,3 +9,6 @@
 
 .. release-notes:: Upcoming
 
+- Deployment
+
+  - postgres-exporter: disabled exporting the settings table, to workaround an issue of postgres-exporter.
