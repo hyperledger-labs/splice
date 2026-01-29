@@ -733,7 +733,7 @@ class AcsSnapshotStore(
     assert(snapshot.historyId == historyId)
     val statement = for {
       _ <- sqlu"""delete from acs_incremental_snapshot where snapshot_id = ${snapshot.snapshotId}"""
-      _ <- sqlu"""delete from table #${table.tableName} where history_id = $historyId"""
+      _ <- sqlu"""delete from #${table.tableName} where history_id = $historyId"""
     } yield ()
     storage.queryAndUpdate(
       withIncrementalSnapshotIdempotencyCheck(table, statement, Some(snapshot)),
