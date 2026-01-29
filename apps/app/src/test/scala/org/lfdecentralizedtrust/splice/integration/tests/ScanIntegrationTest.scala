@@ -355,9 +355,6 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
 
       bobMergeAmuletsTrigger.pause().futureValue
 
-      val latestRound =
-        sv1ScanBackend.getLatestOpenMiningRound(CantonTimestamp.now()).contract.payload.round.number
-
       val bobTapAmount = 100000.0
       val aliceTapAmount = 100000.0
 

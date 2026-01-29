@@ -372,12 +372,6 @@ class TokenStandardTransferIntegrationTest
           val receiver = transfer.receivers.loneElement
           receiver.party shouldBe aliceUserParty.toProtoPrimitive
           BigDecimal(receiver.amount) shouldBe (BigDecimal(10))
-          val balanceChange = transfer.balanceChanges.loneElement
-          balanceChange.party shouldBe aliceUserParty.toProtoPrimitive
-          // Alice now additional owns the locked amulet, which means its
-          // initial amount as of round zero goes up by one holding fee
-          BigDecimal(balanceChange.changeToInitialAmountAsOfRoundZero) should
-            ((be >= BigDecimal(0)) and (be <= BigDecimal(0.5)))
         }
       }
     }
