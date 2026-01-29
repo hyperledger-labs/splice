@@ -363,12 +363,13 @@ trait BaseTest
     logger.debug(s"Running clue: $message")
     Try(expr) match {
       case Success(value) =>
-        value.andThen {
+        value.onComplete {
           case Success(_) =>
             logger.debug(s"Finished clue: $message")
           case Failure(ex) =>
             logger.error(s"Failed clue: $message", ex)
         }
+        value
       case Failure(ex) =>
         throw ex
     }
