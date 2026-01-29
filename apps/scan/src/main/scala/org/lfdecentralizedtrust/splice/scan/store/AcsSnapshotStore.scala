@@ -608,7 +608,6 @@ class AcsSnapshotStore(
         order by created_at, contract_id
       """
 
-
       (min_row_id, max_row_id) <- sql"""
         select
           min(row_id) as min_row_id,
