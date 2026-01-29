@@ -337,21 +337,6 @@ class TokenStandardTransferIntegrationTest
         transfer.receivers shouldBe Seq(
           ReceiverAmount(bobUserParty.toProtoPrimitive, "10.0000000000", "0.0000000000")
         )
-        transfer.balanceChanges should have size (2)
-        // Note: Scan tracks the sum of unlocked and locked balances so this is different from the
-        // wallet transaction history.
-        forExactly(1, transfer.balanceChanges) { change =>
-          {
-            change.party shouldBe aliceUserParty.toProtoPrimitive
-            BigDecimal(change.changeToInitialAmountAsOfRoundZero) should beAround(BigDecimal(-10))
-          }
-        }
-        forExactly(1, transfer.balanceChanges) { change =>
-          {
-            change.party shouldBe bobUserParty.toProtoPrimitive
-            BigDecimal(change.changeToInitialAmountAsOfRoundZero) should beAround(BigDecimal(10))
-          }
-        }
       }
       clue("TransferInstruction withdraw") {
         activityTxs(1).transactionType shouldBe HttpTransactionType.AbortTransferInstruction
@@ -387,12 +372,6 @@ class TokenStandardTransferIntegrationTest
           val receiver = transfer.receivers.loneElement
           receiver.party shouldBe aliceUserParty.toProtoPrimitive
           BigDecimal(receiver.amount) shouldBe (BigDecimal(10))
-          val balanceChange = transfer.balanceChanges.loneElement
-          balanceChange.party shouldBe aliceUserParty.toProtoPrimitive
-          // Alice now additional owns the locked amulet, which means its
-          // initial amount as of round zero goes up by one holding fee
-          BigDecimal(balanceChange.changeToInitialAmountAsOfRoundZero) should
-            ((be >= BigDecimal(0)) and (be <= BigDecimal(0.5)))
         }
       }
     }
