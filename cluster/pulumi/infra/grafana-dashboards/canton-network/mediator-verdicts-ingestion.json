@@ -406,7 +406,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Mediator Verdicts Ingestion",
   "uid": "86f70b02-f283-469e-bf90-033dc9f55888",
   "version": 9

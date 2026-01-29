@@ -1186,7 +1186,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "ACS Commitment Performance",
   "uid": "eesa90lstfk00b",
   "version": 4

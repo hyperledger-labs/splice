@@ -698,7 +698,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Sequencer Client",
   "uid": "eecxhade03n5se",
   "version": 2

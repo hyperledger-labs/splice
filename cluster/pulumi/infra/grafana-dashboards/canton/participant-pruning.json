@@ -187,7 +187,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Participant Pruning",
   "uid": "076b0c9a-d21c-4cc6-8aa4-83414353bbcb",
   "version": 9
