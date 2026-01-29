@@ -8,7 +8,7 @@ import os
 import sys
 
 APPS_DIR = "apps"
-REQUIRED_NAMESPACE = "@lfdecentralizedtrust/splice-"
+REQUIRED_NAMESPACE = "@lfdecentralizedtrust/"
 
 
 def main():
