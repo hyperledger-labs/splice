@@ -26,16 +26,14 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+        target="$(cat /tmp/nix_target)"
+        echo "target=$target"
         echo "sourcing nix profile"
         export USER=$(whoami)
         . ~/.nix-profile/etc/profile.d/nix.sh
-        if [ -f /tmp/oss-only ]; then
-          target="oss"
-        else
-          target="default"
-        fi
+        
 
-        echo "Running command with nix version $(nix --version)"
+        echo "Running command with nix version $(nix --version) and nix target $target"
 
         # Attempt to build the nix env with retries to work around transient download failures
         echo "building nix env"
