@@ -21,6 +21,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletru
   TransferCommandResultFailure,
   TransferCommandResultSuccess,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions as sws
 import org.lfdecentralizedtrust.splice.history.*
 import org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.*
 import org.lfdecentralizedtrust.splice.store.TxLogStore
@@ -191,9 +192,21 @@ class ScanTxLogParser(
           case LockedAmuletOwnerExpireLock(_) =>
             State.empty
           case AnsRules_CollectInitialEntryPayment(_) =>
-            State.empty
+            fromAnsEntryPaymentCollection(
+              tree,
+              exercised,
+              synchronizerId,
+              sws.SubscriptionInitialPayment.COMPANION,
+              sws.SubscriptionInitialPayment.CHOICE_SubscriptionInitialPayment_Collect,
+            )(_.amulet)
           case AnsRules_CollectEntryRenewalPayment(_) =>
-            State.empty
+            fromAnsEntryPaymentCollection(
+              tree,
+              exercised,
+              synchronizerId,
+              sws.SubscriptionPayment.COMPANION,
+              sws.SubscriptionPayment.CHOICE_SubscriptionPayment_Collect,
+            )(_.amulet)
           case AmuletArchive(_) =>
             throw new RuntimeException(
               s"Unexpected amulet archive event for amulet ${exercised.getContractId} in transaction ${tree.getUpdateId}"
@@ -249,6 +262,30 @@ class ScanTxLogParser(
       case _ =>
         sys.error("The above match should be exhaustive")
     }
+  }
+
+  private def fromAnsEntryPaymentCollection[Marker, Res](
+      tree: Transaction,
+      exercised: ExercisedEvent,
+      synchronizerId: SynchronizerId,
+      paymentCollectionTemplate: codegen.ContractCompanion[?, ?, Marker],
+      paymentCollectionChoice: codegen.Choice[Marker, ?, Res],
+  )(
+      collectionProducedAmulet: Res => AmuletCreate.TCid
+  )(implicit tc: TraceContext) = {
+    // first child event is the initial subscription payment collected by DSO
+    val (paymentCollectionEvent, _) =
+      tree
+        .firstDescendantExercise(exercised, paymentCollectionTemplate, paymentCollectionChoice)
+        .map { case (e, pr) => (e, collectionProducedAmulet(pr)) }
+        .getOrElse {
+          sys.error(
+            s"Unable to find ${paymentCollectionChoice.name} in ${exercised.getChoice}"
+          )
+        }
+
+    val stateFromPaymentCollection = parseTree(tree, synchronizerId, paymentCollectionEvent)
+    State.empty.appended(stateFromPaymentCollection)
   }
 
   private def parseTrees(
