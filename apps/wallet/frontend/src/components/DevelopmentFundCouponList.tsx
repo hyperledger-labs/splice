@@ -140,7 +140,7 @@ const ActiveCouponsTable: React.FC = () => {
                   <TableRow>
                     <TableCell colSpan={6} align="center">
                       <Typography variant="body2" color="text.secondary">
-                        No active coupons found
+                        No development fund allocations found
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -191,7 +191,7 @@ const ActiveCouponsTable: React.FC = () => {
         <DialogContent>
           <Stack spacing={2} mt={1}>
             <Typography variant="body2">
-              Please provide a reason for withdrawing this coupon.
+              Please provide a reason for withdrawing this development fund allocation.
             </Typography>
             <TextField
               label="Withdrawal Reason"
@@ -330,7 +330,7 @@ const DevelopmentFundCouponList: React.FC = () => {
   return (
     <Stack spacing={4}>
       <Stack spacing={2}>
-        <Typography variant="h4">Active Coupons</Typography>
+        <Typography variant="h4">Unclaimed Development Fund Allocations</Typography>
         <ActiveCouponsTable />
       </Stack>
 
