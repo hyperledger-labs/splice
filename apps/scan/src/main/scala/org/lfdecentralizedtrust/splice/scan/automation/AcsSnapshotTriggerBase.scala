@@ -116,17 +116,13 @@ abstract class AcsSnapshotTriggerBase(
   )(implicit
       tc: TraceContext
   ): Future[Option[AcsSnapshotTriggerBase.Task]] =
-    if (!updateHistory.isReady) {
-      Future.successful(None)
-    } else {
-      updateHistory.isHistoryBackfilled(migrationId).flatMap { historyBackfilled =>
-        if (historyBackfilled) {
-          retrieveTaskForCompleteMigration(migrationId, historyIngestedUntil)
-        } else {
-          // UpdateHistoryBackfillingTrigger is still running for this migration,
-          // wait until it's done.
-          Future.successful(None)
-        }
+    updateHistory.isHistoryBackfilled(migrationId).flatMap { historyBackfilled =>
+      if (historyBackfilled) {
+        retrieveTaskForCompleteMigration(migrationId, historyIngestedUntil)
+      } else {
+        // UpdateHistoryBackfillingTrigger is still running for this migration,
+        // wait until it's done.
+        Future.successful(None)
       }
     }
 
