@@ -1231,6 +1231,35 @@ class AcsSnapshotStoreTest
           succeed
         }
       }
+
+      "delete snapshot" in {
+        for {
+          updateHistory <- mkUpdateHistory()
+          store = mkStore(updateHistory)
+
+          _ <- store.initializeEmptyIncrementalSnapshot(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+            timestamp2,
+            timestamp3,
+            DefaultMigrationId,
+          )
+
+          incrementalSnapshotBefore <- store.getIncrementalSnapshot(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+          )
+
+          _ <- store.deleteIncrementalSnapshot(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+            incrementalSnapshotBefore.value,
+          )
+
+          incrementalSnapshotAfter <- store.getIncrementalSnapshot(
+            AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
+          )
+        } yield {
+          incrementalSnapshotAfter shouldBe None
+        }
+      }
     }
   }
 
