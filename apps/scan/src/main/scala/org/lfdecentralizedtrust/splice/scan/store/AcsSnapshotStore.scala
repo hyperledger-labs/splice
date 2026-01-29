@@ -587,6 +587,7 @@ class AcsSnapshotStore(
       s"Saving incremental snapshot ${snapshot.snapshotId} at ${snapshot.recordTime}"
     )
     assert(snapshot.tableName == table.tableName)
+    assert(snapshot.historyId == historyId)
     assert(snapshot.recordTime == snapshot.targetRecordTime)
     val statement = for {
       // Note: Only one client can write to acs_snapshot_data at a time, enforced via advisory locks.
@@ -602,8 +603,10 @@ class AcsSnapshotStore(
         select s.create_id, s.template_id, stakeholder
         from #${table.tableName} s
         cross join unnest(s.stakeholders) as stakeholder
+        where s.history_id = $historyId
         order by created_at, contract_id
       """
+
 
       (min_row_id, max_row_id) <- sql"""
         select
@@ -618,6 +621,7 @@ class AcsSnapshotStore(
             sum(s.unlocked_amulet_balance) AS unlocked_amulet_balance,
             sum(s.locked_amulet_balance) AS locked_amulet_balance
         from #${table.tableName} s
+        where history_id = $historyId
       """.as[(BigDecimal, BigDecimal)].head
 
       _ <- sqlu"""
@@ -673,6 +677,7 @@ class AcsSnapshotStore(
       targetRecordTime: CantonTimestamp,
   )(implicit tc: TraceContext): Future[Unit] = {
     assert(snapshot.tableName == table.tableName)
+    assert(snapshot.historyId == historyId)
     // snapshot.recordTime < targetRecordTime <= snapshot.targetRecordTime
     assert(targetRecordTime.isAfter(snapshot.recordTime))
     assert(!targetRecordTime.isAfter(snapshot.targetRecordTime))
@@ -700,6 +705,7 @@ class AcsSnapshotStore(
           using update_history_exercises as e
           where s.contract_id = e.contract_id
             and e.history_id = $historyId
+            and s.history_id = $historyId
             and migration_id = ${snapshot.migrationId}
             and e.record_time > ${snapshot.recordTime}
             and e.record_time <= $targetRecordTime
@@ -724,9 +730,10 @@ class AcsSnapshotStore(
       snapshot: IncrementalAcsSnapshot,
   )(implicit tc: TraceContext): Future[Unit] = {
     assert(snapshot.tableName == table.tableName)
+    assert(snapshot.historyId == historyId)
     val statement = for {
       _ <- sqlu"""delete from acs_incremental_snapshot where snapshot_id = ${snapshot.snapshotId}"""
-      _ <- sqlu"""truncate table #${table.tableName}"""
+      _ <- sqlu"""delete from table #${table.tableName} where history_id = $historyId"""
     } yield ()
     storage.queryAndUpdate(
       withIncrementalSnapshotIdempotencyCheck(table, statement, Some(snapshot)),
@@ -784,6 +791,7 @@ object AcsSnapshotStore {
 
     val copyFromUpdateHistoryTargetColumns: SQLActionBuilder =
       sql"""
+      history_id,
       create_id,
       contract_id,
       created_at,
@@ -794,6 +802,7 @@ object AcsSnapshotStore {
     """
     val copyFromUpdateHistorySourceColumns: SQLActionBuilder =
       sql"""
+      c.history_id,
       c.row_id,
       c.contract_id,
       c.created_at,
