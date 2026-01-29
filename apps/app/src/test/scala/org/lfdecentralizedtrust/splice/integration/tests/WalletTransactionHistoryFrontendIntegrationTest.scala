@@ -181,11 +181,14 @@ class WalletTransactionHistoryFrontendIntegrationTest
             )
         }
 
-        txs.map(row => {
-          val updateId = readTransactionFromRow(row).updateId
-          updateId should not be empty
-          updateId
-        })
+        txs
+          .map(row => {
+            val updateId = readTransactionFromRow(row).updateId
+            updateId should not be empty
+            updateId
+          })
+          // remove the balance change tx for scan comparison
+          .init
       }
 
       withFrontEnd("scan") { implicit webDriver =>

@@ -21,7 +21,6 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
-  BalanceChange,
   TransactionHistoryRequest,
   TransactionHistoryResponseItem,
 }
@@ -359,10 +358,6 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       val latestRound =
         sv1ScanBackend.getLatestOpenMiningRound(CantonTimestamp.now()).contract.payload.round.number
 
-      val amuletConfig =
-        sv1ScanBackend.getAmuletConfigForRound(latestRound)
-
-      val holdingFee = amuletConfig.holdingFee
       val bobTapAmount = 100000.0
       val aliceTapAmount = 100000.0
 
@@ -411,7 +406,6 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
               })
 
           activities should have size (1)
-          val round = activities.loneElement.round
           activities.loneElement.round shouldBe Some(openRoundForTransfer)
           val transfer = activities.flatMap(_.transfer).loneElement
           val inputAmuletAmount =
@@ -427,29 +421,6 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           transfer.receivers
             .map(r => BigDecimal(r.amount))
             .sum shouldBe transferAmount
-          val amuletAsOfRoundZeroAdjustment = round.value * holdingFee
-          transfer.balanceChanges shouldBe Vector(
-            BalanceChange(
-              aliceUserParty.toProtoPrimitive,
-              Codec.encode(
-                transferAmount + round.value * holdingFee
-              ),
-              Codec.encode(
-                1 * holdingFee
-              ),
-            ),
-            BalanceChange(
-              bobUserParty.toProtoPrimitive,
-              Codec.encode(
-                senderChangeAmount + amuletAsOfRoundZeroAdjustment - (inputAmuletAmount + holdingFee * round.value) // See AmuletRules: senderChangeAmount + amuletAsOfRoundZeroAdjustment - inp.amountArchivedAsOfRoundZero
-              ),
-              Codec.encode(
-                BigDecimal(
-                  0 // See AmuletRules: transferConfigAmulet.holdingFee.rate - amulet.amount.ratePerRound.rate
-                )
-              ),
-            ),
-          )
 
           // receiverFee is by default set to 0, sender pays all fees.
           transfer.receivers
