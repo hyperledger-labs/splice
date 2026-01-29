@@ -32,10 +32,14 @@ class AcsSnapshotTrigger(
   override def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[AcsSnapshotTriggerBase.Task]] = {
-    retrieveTaskForMigration(
-      migrationId = store.currentMigrationId,
-      historyIngestedUntil = updateHistory.lastIngestedRecordTime,
-    ).map(_.toList)
+    if (!updateHistory.isReady) {
+      Future.successful(Seq.empty)
+    } else {
+      retrieveTaskForMigration(
+        migrationId = store.currentMigrationId,
+        historyIngestedUntil = updateHistory.lastIngestedRecordTime,
+      ).map(_.toList)
+    }
   }
 
 }
