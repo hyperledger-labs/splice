@@ -39,18 +39,11 @@ import { usePrimaryParty, useTransactions } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import { BalanceChange, Transaction, Transfer } from '../models/models';
 import { useWalletConfig } from '../utils/config';
+import { shortenPartyId } from '../utils/partyId';
 import BftAnsEntry from './BftAnsEntry';
 
 const shortenContractId = (cid: string): string => {
   return `${cid.slice(0, 10)}…`;
-};
-
-const shortenPartyId = (partyId: string): string => {
-  const elements = partyId.split('::');
-  if (elements.length == 2) {
-    return `${elements[0]}::${elements[1].slice(0, 10)}…`;
-  }
-  return partyId;
 };
 
 const TransactionHistory: React.FC = () => {

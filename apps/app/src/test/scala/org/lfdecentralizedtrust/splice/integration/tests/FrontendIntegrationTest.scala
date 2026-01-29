@@ -684,6 +684,16 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     clickOn(query)
   }
 
+  protected def clickByCssSelector(selector: String)(implicit
+      webDriver: WebDriver
+  ): Unit = {
+    val query = cssSelector(selector)
+    waitForCondition(query) {
+      ExpectedConditions.elementToBeClickable(_)
+    }
+    eventuallyClickOn(query)
+  }
+
   protected def eventuallyFind(query: Query)(implicit driver: WebDriver) = {
     clue(s"Waiting for $query to be found") {
       waitForCondition(query) {
