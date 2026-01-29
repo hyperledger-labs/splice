@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
@@ -53,9 +52,9 @@ class AcsSnapshotBulkStorageTest
 
   "AcsSnapshotBulkStorage" should {
     "successfully dump a single ACS snapshot" in {
-      withS3Mock {
+      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
         val store = new MockAcsSnapshotStore().store
-        val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(loggerFactory)
+        val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(bucketConnection)
         for {
           _ <- SingleAcsSnapshotBulkStorage
             .asSource(
@@ -105,9 +104,9 @@ class AcsSnapshotBulkStorageTest
     }
 
     "correctly process multiple ACS snapshots" in {
-      withS3Mock {
+      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
         val store = new MockAcsSnapshotStore()
-        val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(loggerFactory)
+        val s3BucketConnection = getS3BucketConnectionWithInjectedErrors(bucketConnection)
         val ts1 = CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(10))
         val ts2 = CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20))
         for {
@@ -246,10 +245,9 @@ class AcsSnapshotBulkStorageTest
   }
 
   def getS3BucketConnectionWithInjectedErrors(
-      loggerFactory: NamedLoggerFactory
+      bucketConnection: S3BucketConnection
   ): S3BucketConnection = {
-    val s3BucketConnection: S3BucketConnection = getS3BucketConnection(loggerFactory)
-    val s3BucketConnectionWithErrors = Mockito.spy(s3BucketConnection)
+    val s3BucketConnectionWithErrors = Mockito.spy(bucketConnection)
     var failureCount = 0
     val _ = doAnswer { (invocation: InvocationOnMock) =>
       val args = invocation.getArguments
