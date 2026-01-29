@@ -50,6 +50,8 @@
 
     - Support for managing minting delegation has been added to the wallet UI. See the :ref:`minting delegations <minting-delegations>` section for details.
 
+    - Enhanced the rewards collection automation to support collecting development fund coupons.
+
   - Validator
 
     - Automation has been added to perform minting for hosted external-parties if they have an active ``MintingDelegation`` contract with an internal party.

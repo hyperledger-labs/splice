@@ -349,6 +349,29 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
         .toSeq,
     )
 
+  /** Returns the list of development fund coupons. */
+  def listDevelopmentFundCoupons(
+      limit: Limit = Limit.DefaultLimit
+  )(implicit tc: TraceContext): Future[Seq[
+    Contract[
+      amuletCodegen.DevelopmentFundCoupon.ContractId,
+      amuletCodegen.DevelopmentFundCoupon,
+    ]
+  ]] = {
+    // it is assumed that there are no more than 1,000 active coupons
+    for {
+      rewards <- multiDomainAcsStore.listContracts(
+        amuletCodegen.DevelopmentFundCoupon.COMPANION
+      )
+    } yield applyLimit(
+      "listDevelopmentFundCoupons",
+      limit,
+      rewards.view
+        .map(_.contract)
+        .toSeq,
+    )
+  }
+
   final def lookupFeaturedAppRight()(implicit ec: ExecutionContext, tc: TraceContext): Future[
     Option[Contract[amuletCodegen.FeaturedAppRight.ContractId, amuletCodegen.FeaturedAppRight]]
   ] =
