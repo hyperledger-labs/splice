@@ -2978,27 +2978,39 @@ class State:
 
     def handle_transfer_preapproval_send(self, transaction, event):
         for event_id in event.child_event_ids:
-            event = transaction.events_by_id[event_id]
+            child_event = transaction.events_by_id[event_id]
             if (
-                isinstance(event, ExercisedEvent)
-                and event.choice_name == "AmuletRules_Transfer"
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "AmuletRules_Transfer"
             ):
                 return self.handle_transfer(
                     transaction,
-                    event,
+                    child_event,
                     "TransferPreapproval_Send",
                 )
+        raise Exception(
+            f"Could not find the AmuletRules_Transfer child event for TransferPreapproval_Send: {transaction}"
+        )
 
     def handle_transfer_command_send(self, transaction, event):
         for event_id in event.child_event_ids:
-            event = transaction.events_by_id[event_id]
+            child_event = transaction.events_by_id[event_id]
             if (
-                isinstance(event, ExercisedEvent)
-                and event.choice_name == "TransferPreapproval_Send"
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "TransferPreapproval_Send"
             ):
                 return self.handle_transfer_preapproval_send(
                     transaction,
-                    event,
+                    child_event,
+                )
+            # Or a direct call to AmuletRules_Transfer (when DSO doesn't see
+            # TransferPreapproval_Send due to visibility projection)
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "AmuletRules_Transfer"
+            ):
+                return self.handle_transfer(
+                    transaction, child_event, description="TransferCommand_Send"
                 )
         # This can happen when the transfer failed and the contract just got archived.
         return HandleTransactionResult.empty()
