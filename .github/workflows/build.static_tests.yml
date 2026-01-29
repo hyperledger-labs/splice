@@ -88,7 +88,7 @@ jobs:
       - name: Check that npm packages are properly namespaced
         uses: ./.github/actions/nix/run_bash_command_in_nix
         with:
-          cmd: ./scripts/check-npm-package-names.sh
+          cmd: ./scripts/check-npm-package-names.py
 
       - name: SBT-based static checks
         uses: ./.github/actions/sbt/execute_sbt_command
