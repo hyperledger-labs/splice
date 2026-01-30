@@ -27,6 +27,12 @@ import {
 } from '../../common';
 import { clusterBasename, infraConfig, loadIPRanges } from './config';
 
+interface ConfiguredIstio {
+  allResources: pulumi.Resource[];
+  httpServiceName: string;
+  istioResource: k8s.helm.v3.Release;
+}
+
 export const istioVersion = {
   istio: '1.28.1',
   //   updated from https://grafana.com/orgs/istio/dashboards, must be updated on each istio version
@@ -170,7 +176,7 @@ function ingressPort(name: string, port: number): IngressPort {
 // service and the istio-ingress pod.
 function configureInternalGatewayService(
   ingressNs: k8s.core.v1.Namespace,
-  ingressIp: pulumi.Output<string>,
+  ingress: { ip: pulumi.Output<string>; viaGKEL7: false } | { viaGKEL7: true },
   istiod: k8s.helm.v3.Release
 ) {
   const cluster = gcp.container.getCluster({
@@ -187,9 +193,14 @@ function configureInternalGatewayService(
   const externalIPRanges = loadIPRanges();
   return configureGatewayService(
     ingressNs,
-    ingressIp,
     pulumi.all([externalIPRanges, internalIPRanges]).apply(([a, b]) => a.concat(b)),
-    pulumi.output(['0.0.0.0/0']),
+    ingress.viaGKEL7
+      ? { type: 'ClusterIP' }
+      : {
+          type: 'LoadBalancer',
+          ingressIp: ingress.ip,
+          externalIPRangesInLB: pulumi.output(['0.0.0.0/0']),
+        },
     [
       ingressPort('grpc-cd-pub-api', 5008),
       ingressPort('grpc-cs-p2p-api', 5010),
@@ -241,9 +252,8 @@ function configureCometBFTGatewayService(
   );
   return configureGatewayService(
     ingressNs,
-    ingressIp,
     pulumi.output(['0.0.0.0/0']),
-    externalIPRanges,
+    { type: 'LoadBalancer', ingressIp, externalIPRangesInLB: externalIPRanges },
     cometBftIngressPorts,
     istiod,
     '-cometbft'
@@ -301,14 +311,22 @@ function istioAccessPolicies(
   });
 }
 
+// how gateway is configured: https://github.com/istio/istio/blob/master/manifests/charts/gateway/templates/service.yaml
+type IstioGatewayVariant =
+  | {
+      type: 'LoadBalancer';
+      ingressIp: pulumi.Output<string>;
+      externalIPRangesInLB: pulumi.Output<string[]>;
+    }
+  | { type: 'ClusterIP' };
+
 // Note that despite the helm chart name being "gateway", this does not actually
 // deploy an istio "gateway" resource, but rather the istio-ingress LoadBalancer
 // service and the istio-ingress pod.
 function configureGatewayService(
   ingressNs: k8s.core.v1.Namespace,
-  ingressIp: pulumi.Output<string>,
   externalIPRangesInIstio: pulumi.Output<string[]>,
-  externalIPRangesInLB: pulumi.Output<string[]>,
+  gatewayVariant: IstioGatewayVariant,
   ingressPorts: IngressPort[],
   istiod: k8s.helm.v3.Release,
   suffix: string
@@ -318,10 +336,37 @@ function configureGatewayService(
   //   These IPs should be provided in externalIPRangesInIstio.
   //   See https://github.com/DACH-NY/canton-network-internal/issues/626
   // - For cometbft traffic, which is tcp traffic, we failed to use istio policies, so we route it through a dedicated
-  //   LaodBalancer service that uses loadBalancerSourceRanges. The size limit is not an issue as we need only SV IPs.
+  //   LoadBalancer service that uses loadBalancerSourceRanges. The size limit is not an issue as we need only SV IPs.
   //   These IPs should be provided in externalIPRangesInLB.
 
   const istioPolicies = istioAccessPolicies(ingressNs, externalIPRangesInIstio, suffix);
+
+  const serviceValues =
+    gatewayVariant.type == 'LoadBalancer'
+      ? {
+          // type's default is LoadBalancer; see values.yaml
+          loadBalancerIP: gatewayVariant.ingressIp,
+          loadBalancerSourceRanges: gatewayVariant.externalIPRangesInLB,
+          // See https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#network
+          // If you are using a TCP/UDP network load balancer that preserves the client IP address ..
+          // then you can use the externalTrafficPolicy: Local setting to also preserve the client IP inside Kubernetes by bypassing kube-proxy
+          // and preventing it from sending traffic to other nodes.
+          externalTrafficPolicy: 'Local',
+        }
+      : // Create a ClusterIP Service for the istio ingress so the GKE L7 Gateway can
+        // target it (the GKE controller will create NEGs for the service ports).
+        {
+          // without LoadBalancer, the istio Gateway will not create a public IP
+          type: gatewayVariant.type,
+          // TODO (#2723) works without?
+          // (prior to IP fixes) without this ALB returns 5xx, with it returns 403
+          /*annotations: {
+            // Use numeric port keys (as strings) to avoid
+            // error parsing value of NEG annotation "cloud.google.com/neg" on service "cluster-ingress"/"istio-ingress": NEG annotation is invalid
+            'cloud.google.com/neg': JSON.stringify({ exposed_ports: { '80': {} } }),
+          },*/
+        };
+
   const gateway = new k8s.helm.v3.Release(
     `istio-ingress${suffix}`,
     {
@@ -350,13 +395,7 @@ function configureGatewayService(
           maxUnavailable: 1,
         },
         service: {
-          loadBalancerIP: ingressIp,
-          loadBalancerSourceRanges: externalIPRangesInLB,
-          // See https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#network
-          // If you are using a TCP/UDP network load balancer that preserves the client IP address ..
-          // then you can use the externalTrafficPolicy: Local setting to also preserve the client IP inside Kubernetes by bypassing kube-proxy
-          // and preventing it from sending traffic to other nodes.
-          externalTrafficPolicy: 'Local',
+          ...serviceValues,
           ports: [
             ingressPort('status-port', 15021), // istio default
             ingressPort('http2', 80),
@@ -372,7 +411,7 @@ function configureGatewayService(
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
-      replaceOnChanges: ['values.annotations'],
+      replaceOnChanges: ['values.annotations', 'values.service.annotations', 'values.service.type'],
       deleteBeforeReplace: true,
       dependsOn: istioPolicies
         ? istioPolicies.apply(policies => {
@@ -415,7 +454,8 @@ function configureGatewayService(
 function configureGateway(
   ingressNs: ExactNamespace,
   gwSvc: k8s.helm.v3.Release,
-  cometBftSvc: k8s.helm.v3.Release
+  cometBftSvc: k8s.helm.v3.Release,
+  withSeparateGcpGateway: boolean
 ): k8s.apiextensions.CustomResource[] {
   const hosts = [
     getDnsNames().cantonDnsName,
@@ -431,6 +471,15 @@ function configureGateway(
       metadata: {
         name: 'cn-http-gateway',
         namespace: ingressNs.ns.metadata.name,
+        ...(withSeparateGcpGateway
+          ? {
+              annotations: {
+                'proxy.istio.io/config': JSON.stringify({
+                  gatewayTopology: { numTrustedProxies: 2 },
+                }),
+              },
+            }
+          : {}),
       },
       spec: {
         selector: {
@@ -445,22 +494,24 @@ function configureGateway(
               number: 80,
               protocol: 'HTTP',
             },
-            tls: {
-              httpsRedirect: true,
-            },
+            ...(withSeparateGcpGateway ? {} : { tls: { httpsRedirect: true } }),
           },
-          {
-            hosts,
-            port: {
-              name: 'https',
-              number: 443,
-              protocol: 'HTTPS',
-            },
-            tls: {
-              mode: 'SIMPLE',
-              credentialName: `cn-${clusterBasename}net-tls`,
-            },
-          },
+          ...(withSeparateGcpGateway
+            ? []
+            : [
+                {
+                  hosts,
+                  port: {
+                    name: 'https',
+                    number: 443,
+                    protocol: 'HTTPS',
+                  },
+                  tls: {
+                    mode: 'SIMPLE',
+                    credentialName: `cn-${clusterBasename}net-tls`,
+                  },
+                },
+              ]),
         ],
       },
     },
@@ -692,8 +743,9 @@ function configureSequencerHighPerformanceGrpcDestinationRule(
 export function configureIstio(
   ingressNs: ExactNamespace,
   ingressIp: pulumi.Output<string>,
-  cometBftIngressIp: pulumi.Output<string>
-): pulumi.Resource[] {
+  cometBftIngressIp: pulumi.Output<string>,
+  expectGKEL7Gateway: boolean
+): ConfiguredIstio {
   const nsName = 'istio-system';
   const istioSystemNs = new k8s.core.v1.Namespace(nsName, {
     metadata: {
@@ -702,15 +754,28 @@ export function configureIstio(
   });
   const base = configureIstioBase(istioSystemNs, ingressNs.ns);
   const istiod = configureIstiod(ingressNs.ns, base);
-  const gwSvc = configureInternalGatewayService(ingressNs.ns, ingressIp, istiod);
+  const gwSvc = configureInternalGatewayService(
+    ingressNs.ns,
+    expectGKEL7Gateway ? { viaGKEL7: true } : { viaGKEL7: false, ip: ingressIp },
+    istiod
+  );
   const cometBftSvc = configureCometBFTGatewayService(ingressNs.ns, cometBftIngressIp, istiod);
-  const gateways = configureGateway(ingressNs, gwSvc, cometBftSvc);
+  const gateways = configureGateway(ingressNs, gwSvc, cometBftSvc, expectGKEL7Gateway);
   const docsAndReleases = configureDocsAndReleases(true, gateways);
   const publicInfo = configurePublicInfo(ingressNs.ns);
   const sequencerHighPerformanceGrpcRules = configureSequencerHighPerformanceGrpcDestinationRules(
     ingressNs.ns
   );
-  return [...gateways, ...docsAndReleases, ...publicInfo, ...sequencerHighPerformanceGrpcRules];
+  return {
+    allResources: [
+      ...gateways,
+      ...docsAndReleases,
+      ...publicInfo,
+      ...sequencerHighPerformanceGrpcRules,
+    ],
+    httpServiceName: 'istio-ingress',
+    istioResource: gwSvc,
+  };
 }
 
 export function istioMonitoring(
