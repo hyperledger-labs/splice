@@ -202,9 +202,8 @@ const FeesTable: React.FC<{
   if (featureSupport.isError) {
     return <ErrorDisplay message="Failed to fetch feature support info" />;
   }
-  const holdingFeesDescription = featureSupport.data!.noHoldingFeesOnTransfers
-    ? `A fixed fee for maintaining each active ${amuletName} record, computed per round, but only charged if it surpasses the ${amuletName} amount.`
-    : `A fixed fee for maintaining each active ${amuletName} record, charged per round.`;
+  const holdingFeesDescription =
+    `A fixed fee for maintaining each active ${amuletName} record, computed per round, but only charged if it surpasses the ${amuletName} amount.`;
 
   return (
     <TableContainer>

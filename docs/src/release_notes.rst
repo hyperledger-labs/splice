@@ -109,6 +109,8 @@
 
 .. release-notes:: 0.5.7
 
+   Daml:
+
   .. important::
 
       **Action recommended from app devs:**

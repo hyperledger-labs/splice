@@ -197,7 +197,6 @@ object ConfigTransforms {
       disableOnboardingParticipantPromotionDelay(),
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
       setDefaultGrpcDeadlineForTreasuryService(),
-      disableZeroFees(),
       updateAllAutomationConfigs(
         _.copy(rewardOperationRoundsCloseBufferDuration = NonNegativeFiniteDuration.ofMillis(100))
       ),
@@ -297,9 +296,6 @@ object ConfigTransforms {
         )
       )
     )
-
-  def disableZeroFees(): ConfigTransform =
-    updateAllSvAppFoundDsoConfigs_(c => c.copy(zeroTransferFees = false))
 
   def disableDevelopmentFund(): ConfigTransform =
     updateAllSvAppFoundDsoConfigs_(c => c.copy(developmentFundPercentage = Some(0.0)))

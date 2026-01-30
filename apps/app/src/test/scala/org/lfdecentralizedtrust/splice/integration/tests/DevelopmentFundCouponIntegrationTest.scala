@@ -330,7 +330,7 @@ class DevelopmentFundCouponIntegrationTest
         checkWallet(
           bobParty,
           bobWalletClient,
-          Seq(exactly(194)), // 5 * 40 - fees
+          Seq(exactly(200)),
         )
       }
     }

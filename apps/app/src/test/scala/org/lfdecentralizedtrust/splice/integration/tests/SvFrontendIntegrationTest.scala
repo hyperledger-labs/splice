@@ -1144,7 +1144,6 @@ class SvFrontendIntegrationTest
           // If we try to create two vote requests for identical configs,
           // the second request will be rejected with "This vote request has already been created."
           def submitSetAmuletConfigRequestViaBackend(
-              createFee: String,
               holdingFee: String = "0.001",
               expiresSoon: Boolean,
           ): Unit = {
@@ -1158,7 +1157,6 @@ class SvFrontendIntegrationTest
               defaultTickDuration,
               1000,
               holdingFee = BigDecimal(holdingFee),
-              createFee = BigDecimal(createFee),
             )
             val setAmuletConfigAction: ActionRequiringConfirmation = new ARC_AmuletRules(
               new CRARC_SetConfig(
@@ -1218,7 +1216,7 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator creates a new vote request with a short expiration time", {
-              submitSetAmuletConfigRequestViaBackend(createFee = "41", expiresSoon = true)
+              submitSetAmuletConfigRequestViaBackend(expiresSoon = true)
             },
           )(
             "sv1 can see the new vote request in the progress tab",
@@ -1228,7 +1226,6 @@ class SvFrontendIntegrationTest
           val (_, requestId) = actAndCheck(
             "sv1 operator creates a new vote request with a long expiration time", {
               submitSetAmuletConfigRequestViaBackend(
-                createFee = "0.03",
                 holdingFee = "42",
                 expiresSoon = false,
               )
