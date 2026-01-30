@@ -7,7 +7,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import io.circe.Codec
 import io.circe.generic.semiauto.deriveCodec
-import org.lfdecentralizedtrust.splice.store.KeyValueStore
+import org.lfdecentralizedtrust.splice.store.{KeyValueStore, TimestampWithMigrationId}
 import cats.data.OptionT
 import cats.implicits.toBifunctorOps
 import com.digitalasset.canton.tracing.TraceContext
@@ -21,34 +21,27 @@ class ScanKeyValueProvider(val store: KeyValueStore, val loggerFactory: NamedLog
   private val latestAcsSnapshotInBulkStorageKey = "latest_acs_snapshot_in_bulk_storage"
 
   final def setLatestAcsSnapshotsInBulkStorage(
-      migrationId: Long,
-      timestamp: CantonTimestamp,
+      ts: TimestampWithMigrationId
   )(implicit tc: TraceContext): Future[Unit] = store.setValue(
     latestAcsSnapshotInBulkStorageKey,
-    AcsSnapshotTimestampMigration(migrationId, timestamp),
+    ts,
   )
 
   final def getLatestAcsSnapshotInBulkStorage()(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): OptionT[Future, (Long, CantonTimestamp)] = {
-    val result: OptionT[Future, AcsSnapshotTimestampMigration] =
-      store.readValueAndLogOnDecodingFailure(latestAcsSnapshotInBulkStorageKey)
-    result.map(result => (result.migrationId, result.timestamp))
+  ): OptionT[Future, TimestampWithMigrationId] = {
+    store.readValueAndLogOnDecodingFailure(latestAcsSnapshotInBulkStorageKey)
   }
 }
 
 object ScanKeyValueProvider {
-  final case class AcsSnapshotTimestampMigration(
-      migrationId: Long,
-      timestamp: CantonTimestamp,
-  )
   implicit val timestampCodec: Codec[CantonTimestamp] =
     Codec
       .from[Long](implicitly, implicitly)
       .iemap(timestamp => CantonTimestamp.fromProtoPrimitive(timestamp).leftMap(_.message))(
         _.toProtoPrimitive
       )
-  implicit val acsSnapshotTimestampMigrationCodec: Codec[AcsSnapshotTimestampMigration] =
-    deriveCodec[AcsSnapshotTimestampMigration]
+  implicit val acsSnapshotTimestampMigrationCodec: Codec[TimestampWithMigrationId] =
+    deriveCodec[TimestampWithMigrationId]
 }
