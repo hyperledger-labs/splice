@@ -67,11 +67,6 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
   type FixtureParam = TestConsoleEnvironment[C, E]
 
   override protected def withFixture(test: OneArgTest): Outcome = {
-    val integrationTestPackage = "com.digitalasset.canton.integration.tests"
-    getClass.getName should startWith(
-      integrationTestPackage
-    ) withClue s"\nAll integration tests must be located in $integrationTestPackage or a subpackage thereof."
-
     super[RepeatableTestSuiteTest].withFixture(new TestWithSetup(test))
   }
 
