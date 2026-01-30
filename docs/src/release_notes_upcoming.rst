@@ -9,3 +9,6 @@
 
 .. release-notes:: Upcoming
 
+   - SV app
+
+    - Add a new trigger, ``ExpiredDevelopmentFundCouponTrigger`` for expiring development fund coupons.
