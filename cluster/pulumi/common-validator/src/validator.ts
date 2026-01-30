@@ -3,11 +3,11 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import {
-  activeVersion,
   Auth0Client,
   BackupConfig,
   BootstrappingDumpConfig,
   CLUSTER_BASENAME,
+  CnChartVersion,
   CnInput,
   config,
   daContactPoint,
@@ -78,6 +78,7 @@ type BasicValidatorConfig = {
   logLevel?: LogLevel;
   logAsync?: boolean;
   resources?: K8sResourceSchema;
+  version: CnChartVersion;
 };
 
 export type ValidatorInstallConfig = BasicValidatorConfig & {
@@ -244,7 +245,7 @@ export async function installValidatorApp(
         volumeName: `domain-migration-validator-${pvcSuffix}`,
       },
     },
-    activeVersion,
+    config.version,
     { dependsOn }
   );
 }

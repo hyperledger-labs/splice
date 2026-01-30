@@ -9,6 +9,7 @@ import {
 import { ValidatorAppConfigSchema } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/config';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
+import { CnChartVersionSchema } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/versionSchema';
 import { merge } from 'lodash';
 import util from 'node:util';
 import { z } from 'zod';
@@ -154,6 +155,7 @@ const SingleSvConfigSchema = z
       })
       .optional(),
     periodicSnapshots: z.object({ topology: GCPBucketSchema.optional() }).optional(),
+    versionOverride: CnChartVersionSchema.optional(),
   })
   .strict();
 const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema).and(

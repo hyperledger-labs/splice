@@ -12,6 +12,7 @@ import {
   SvIdKey,
   ValidatorTopupConfig,
   RateLimitSchema,
+  CnChartVersion,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
@@ -78,6 +79,7 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
   cometBftGovernanceKey?: CnInput<SvCometBftGovernanceKey>;
   initialRound?: string;
   periodicTopologySnapshotConfig?: BackupConfig;
+  version: CnChartVersion;
 }
 
 export const GCPBucketSchema = z.object({

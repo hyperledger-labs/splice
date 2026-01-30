@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
 import {
+  activeVersion,
   Auth0Client,
   BackupConfig,
   BackupLocation,
@@ -68,6 +69,7 @@ export class Dso extends pulumi.ComponentResource {
     cometBftGovernanceKey: CnInput<SvCometBftGovernanceKey> | undefined = undefined,
     extraDependsOn: CnInput<pulumi.Resource>[] = []
   ) {
+    const dynamicConfig = configForSv(svConf.nodeName);
     return installSvNode(
       {
         isFirstSv,
@@ -95,7 +97,8 @@ export class Dso extends pulumi.ComponentResource {
         sweep: svConf.sweep,
         cometBftGovernanceKey,
         initialRound: initialRound?.toString(),
-        ...configForSv(svConf.nodeName),
+        version: dynamicConfig.versionOverride ?? activeVersion,
+        ...dynamicConfig,
       },
       this.args.decentralizedSynchronizerUpgradeConfig,
       extraDependsOn
