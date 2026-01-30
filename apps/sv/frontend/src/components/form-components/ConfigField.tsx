@@ -45,7 +45,9 @@ export const ConfigField: React.FC<ConfigFieldProps> = props => {
     isEffectiveAtThreshold && (isSynchronizerUpgradeTime || isSynchronizerUpgradeMigrationId);
 
   const isDisabled =
-    isPendingAndDefaultValue || isEffectiveAtThresholdAndSyncUpgradeTimeOrMigrationId;
+    isPendingAndDefaultValue ||
+    isEffectiveAtThresholdAndSyncUpgradeTimeOrMigrationId ||
+    configChange.disabled;
 
   const textFieldProps = {
     variant: 'outlined' as const,
