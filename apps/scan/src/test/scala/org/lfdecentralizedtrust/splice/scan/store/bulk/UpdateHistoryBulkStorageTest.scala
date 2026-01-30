@@ -66,7 +66,7 @@ class UpdateHistoryBulkStorageTest
             toTimestamp,
             loggerFactory,
           )
-          .toMat(TestSink.probe[(Long, CantonTimestamp)])(Keep.right)
+          .toMat(TestSink.probe[TimestampWithMigrationId])(Keep.right)
           .run()
 
         probe.request(2)
@@ -78,10 +78,10 @@ class UpdateHistoryBulkStorageTest
         }
 
         clue(
-          "Ingest 1000 more events. Now the last timestamp will be beyond of the segment, so the source will complete and emit the last timestamp"
+          "Ingest 1000 more events. Now the last timestamp will be beyond the segment, so the source will complete and emit the last timestamp"
         ) {
           mockStore.mockIngestion(1000)
-          probe.expectNext(20.seconds) should be((0, toTimestamp))
+          probe.expectNext(20.seconds) should be(TimestampWithMigrationId(toTimestamp, 0))
         }
 
         clue("Check that the dumped content is correct") {

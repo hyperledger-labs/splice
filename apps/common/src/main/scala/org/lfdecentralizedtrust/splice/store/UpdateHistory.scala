@@ -2591,6 +2591,11 @@ object UpdateHistory {
   private def missingStringSeq: Seq[String] = Seq.empty
 }
 
+final case class TimestampWithMigrationId(
+    timestamp: CantonTimestamp,
+    migrationId: Long,
+)
+
 final case class TreeUpdateWithMigrationId(
     update: UpdateHistory.UpdateHistoryResponse,
     migrationId: Long,

@@ -15,7 +15,12 @@ import org.apache.pekko.util.ByteString
 import org.apache.pekko.pattern.after
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
-import org.lfdecentralizedtrust.splice.store.{HardLimit, TreeUpdateWithMigrationId, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
+  TimestampWithMigrationId,
+  TreeUpdateWithMigrationId,
+  UpdateHistory,
+}
 import io.circe.syntax.*
 import org.apache.pekko.actor.ActorSystem
 
@@ -34,7 +39,7 @@ object UpdatesPosition {
 
   case object End extends UpdatesPosition
 
-  final case class TS(migrationId: Long, timestamp: CantonTimestamp) extends UpdatesPosition
+  final case class TS(ts: TimestampWithMigrationId) extends UpdatesPosition
 }
 class UpdateHistorySegmentBulkStorage(
     val config: ScanStorageConfig,
@@ -53,12 +58,11 @@ class UpdateHistorySegmentBulkStorage(
   private val updatesPollingInterval = 5.seconds
 
   private def getUpdatesChunk(
-      afterMigrationId: Long,
-      afterTimestamp: CantonTimestamp,
+      afterTs: TimestampWithMigrationId
   )(implicit actorSystem: ActorSystem): Future[(UpdatesPosition, ByteString)] = {
     for {
       updates <- updateHistory.getUpdatesWithoutImportUpdates(
-        Some((afterMigrationId, afterTimestamp)),
+        Some((afterTs.migrationId, afterTs.timestamp)),
         HardLimit.tryCreate(config.bulkDbReadChunkSize),
       )
       updatesInSegment = updates.filter(update =>
@@ -76,11 +80,11 @@ class UpdateHistorySegmentBulkStorage(
               throw new RuntimeException("Unexpected failure")
             )
             lastEmitted.set(
-              Some((last.migrationId, last.update.update.recordTime))
+              Some(TimestampWithMigrationId(last.update.update.recordTime, last.migrationId))
             )
             Future.successful(
               (
-                TS(last.migrationId, last.update.update.recordTime),
+                TS(TimestampWithMigrationId(last.update.update.recordTime, last.migrationId)),
                 updatesBytes,
               )
             )
@@ -93,7 +97,7 @@ class UpdateHistorySegmentBulkStorage(
             s"Not enough updates yet (queried for ${config.bulkDbReadChunkSize}, found ${updates.length}), sleeping..."
           )
           after(updatesPollingInterval, actorSystem.scheduler) {
-            Future.successful((TS(afterMigrationId, afterTimestamp), ByteString.empty))
+            Future.successful((TS(afterTs), ByteString.empty))
           }: Future[(UpdatesPosition.UpdatesPosition, ByteString)]
         }
     } yield {
@@ -118,15 +122,16 @@ class UpdateHistorySegmentBulkStorage(
   }
 
   private val s3ObjIdx = new AtomicInteger(0)
-  private val lastEmitted = new AtomicReference[Option[(Long, CantonTimestamp)]](None)
+  private val lastEmitted = new AtomicReference[Option[TimestampWithMigrationId]](None)
 
   private def getSource(implicit
       actorSystem: ActorSystem
-  ): Source[(Long, CantonTimestamp), NotUsed] = {
+  ): Source[TimestampWithMigrationId, NotUsed] = {
     Source
       .unfoldAsync(Start: UpdatesPosition) {
-        case Start => getUpdatesChunk(fromMigrationId, fromTimestamp).map(Some(_))
-        case TS(migrationId, timestamp) => getUpdatesChunk(migrationId, timestamp).map(Some(_))
+        case Start =>
+          getUpdatesChunk(TimestampWithMigrationId(fromTimestamp, fromMigrationId)).map(Some(_))
+        case ts: TS => getUpdatesChunk(ts.ts).map(Some(_))
         case End => Future.successful(None)
       }
       .via(ZstdGroupedWeight(config.bulkMaxFileSize))
@@ -151,7 +156,9 @@ class UpdateHistorySegmentBulkStorage(
       // emit a Unit upon completion of the write to s3
       .fold(()) { case ((), _) => () }
       // emit the timestamp of the last update dumped upon completion.
-      .map(_ => lastEmitted.get().getOrElse((fromMigrationId, fromTimestamp)))
+      .map(_ =>
+        lastEmitted.get().getOrElse(TimestampWithMigrationId(fromTimestamp, fromMigrationId))
+      )
 
   }
 }
@@ -165,20 +172,20 @@ object UpdateHistorySegmentBulkStorage {
       tc: TraceContext,
       ec: ExecutionContext,
       actorSystem: ActorSystem,
-  ): Flow[((Long, CantonTimestamp), (Long, CantonTimestamp)), (Long, CantonTimestamp), NotUsed] =
-    Flow[((Long, CantonTimestamp), (Long, CantonTimestamp))].flatMapConcat {
+  ): Flow[(TimestampWithMigrationId, TimestampWithMigrationId), TimestampWithMigrationId, NotUsed] =
+    Flow[(TimestampWithMigrationId, TimestampWithMigrationId)].flatMapConcat {
       case (
-            (fromMigrationId: Long, fromTimestamp: CantonTimestamp),
-            (toMigrationId: Long, toTimestamp: CantonTimestamp),
+            from: TimestampWithMigrationId,
+            to: TimestampWithMigrationId,
           ) =>
         new UpdateHistorySegmentBulkStorage(
           config,
           updateHistory,
           s3Connection,
-          fromMigrationId,
-          fromTimestamp,
-          toMigrationId,
-          toTimestamp,
+          from.migrationId,
+          from.timestamp,
+          to.migrationId,
+          to.timestamp,
           loggerFactory,
         ).getSource
     }
@@ -196,7 +203,7 @@ object UpdateHistorySegmentBulkStorage {
       tc: TraceContext,
       ec: ExecutionContext,
       actorSystem: ActorSystem,
-  ): Source[(Long, CantonTimestamp), NotUsed] =
+  ): Source[TimestampWithMigrationId, NotUsed] =
     new UpdateHistorySegmentBulkStorage(
       config,
       updateHistory,
