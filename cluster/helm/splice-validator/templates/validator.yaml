@@ -276,11 +276,6 @@ spec:
               {{- end }}
             }
         {{- end }}
-        {{ if .Values.disableIngestUpdateHistoryFromParticipantBegin }}
-        - name: ADDITIONAL_CONFIG_UPDATE_HISTORY_INGESTION
-          value: |
-            canton.validator-apps.validator_backend.ingest-update-history-from-participant-begin = false
-        {{ end }}
         - name: FAIL_ON_APP_VERSION_MISMATCH
           value: {{ .Values.failOnAppVersionMismatch | quote }}
         {{- include "splice-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}

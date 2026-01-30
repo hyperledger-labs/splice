@@ -64,7 +64,6 @@ class SplitwellAutomationService(
       store,
       ledgerClient,
       retryProvider,
-      ingestFromParticipantBegin = true,
       params,
     ) {
 

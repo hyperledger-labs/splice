@@ -66,6 +66,7 @@ import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart.{
   InitializeAcsAtLatestOffset,
   InitializeAcsAtOffset,
+  InitializeAtParticipantBegin,
   ResumeAtOffset,
 }
 
@@ -1992,7 +1993,7 @@ class DbScanStoreTest
     for {
       initializeResult <- store.multiDomainAcsStore.testIngestionSink.initialize()
       _ <- initializeResult match {
-        case ResumeAtOffset(_) => Future.unit
+        case ResumeAtOffset(_) | InitializeAtParticipantBegin => Future.unit
         case InitializeAcsAtLatestOffset =>
           store.multiDomainAcsStore.testIngestionSink.ingestAcs(
             nextOffset(),
