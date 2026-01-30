@@ -178,13 +178,13 @@ object SingleAcsSnapshotBulkStorage {
       ec: ExecutionContext,
   ): Flow[TimestampWithMigrationId, TimestampWithMigrationId, NotUsed] =
     Flow[TimestampWithMigrationId].flatMapConcat {
-        new SingleAcsSnapshotBulkStorage(
-          _,
-          config,
-          acsSnapshotStore,
-          s3Connection,
-          loggerFactory,
-        ).getSource
+      new SingleAcsSnapshotBulkStorage(
+        _,
+        config,
+        acsSnapshotStore,
+        s3Connection,
+        loggerFactory,
+      ).getSource
     }
 
   /** The same flow as a source, currently used only for unit testing.

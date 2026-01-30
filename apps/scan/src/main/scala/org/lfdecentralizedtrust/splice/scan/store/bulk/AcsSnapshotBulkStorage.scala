@@ -40,27 +40,26 @@ class AcsSnapshotBulkStorage(
       start: TimestampWithMigrationId
   ): Source[TimestampWithMigrationId, NotUsed] = {
     Source
-      .unfoldAsync(start) {
-        case last: TimestampWithMigrationId =>
-          acsSnapshotStore.lookupSnapshotAfter(last.migrationId, last.timestamp).flatMap {
-            case Some(snapshot) =>
-              logger.info(
-                s"next snapshot available, at migration ${snapshot.migrationId}, record time ${snapshot.snapshotRecordTime}"
-              )
-              Future.successful(
-                Some(
-                  (
-                    TimestampWithMigrationId(snapshot.snapshotRecordTime, snapshot.migrationId),
-                    Some(TimestampWithMigrationId(snapshot.snapshotRecordTime, snapshot.migrationId)),
-                  )
+      .unfoldAsync(start) { case last: TimestampWithMigrationId =>
+        acsSnapshotStore.lookupSnapshotAfter(last.migrationId, last.timestamp).flatMap {
+          case Some(snapshot) =>
+            logger.info(
+              s"next snapshot available, at migration ${snapshot.migrationId}, record time ${snapshot.snapshotRecordTime}"
+            )
+            Future.successful(
+              Some(
+                (
+                  TimestampWithMigrationId(snapshot.snapshotRecordTime, snapshot.migrationId),
+                  Some(TimestampWithMigrationId(snapshot.snapshotRecordTime, snapshot.migrationId)),
                 )
               )
-            case None =>
-              logger.debug("No new snapshot available, sleeping...")
-              after(snapshotPollingInterval, actorSystem.scheduler) {
-                Future.successful(Some((last, None)))
-              }
-          }
+            )
+          case None =>
+            logger.debug("No new snapshot available, sleeping...")
+            after(snapshotPollingInterval, actorSystem.scheduler) {
+              Future.successful(Some((last, None)))
+            }
+        }
       }
       .collect { case Some(ts: TimestampWithMigrationId) => ts }
   }
