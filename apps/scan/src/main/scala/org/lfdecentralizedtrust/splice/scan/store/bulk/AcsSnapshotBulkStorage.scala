@@ -39,7 +39,7 @@ class AcsSnapshotBulkStorage(
       start: TimestampWithMigrationId
   ): Source[TimestampWithMigrationId, NotUsed] = {
     Source
-      .unfoldAsync(start) { case last: TimestampWithMigrationId =>
+      .unfoldAsync(start) { last: TimestampWithMigrationId =>
         acsSnapshotStore.lookupSnapshotAfter(last.migrationId, last.timestamp).flatMap {
           case Some(snapshot) =>
             logger.info(
