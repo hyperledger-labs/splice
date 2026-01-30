@@ -258,6 +258,7 @@ class GrpcMediatorInspectionService(
       confirmingParties = params.quorums
         .map(q => mediatorV30.Quorum(q.confirmers.keySet.toSeq, q.threshold.value)),
       subViews = childNodes,
+      viewHash = "", // TODO(#3740): replace this stub with the proper implementation
     )
   }
 
