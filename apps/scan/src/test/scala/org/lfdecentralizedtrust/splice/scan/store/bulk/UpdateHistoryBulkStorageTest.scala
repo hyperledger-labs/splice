@@ -7,7 +7,8 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import org.apache.pekko.stream.scaladsl.Sink
+import org.apache.pekko.stream.scaladsl.Keep
+import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
@@ -18,7 +19,7 @@ import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
 import java.time.Instant
 import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 
@@ -36,36 +37,6 @@ class UpdateHistoryBulkStorageTest
 
   "UpdateHistoryBulkStorage" should {
 
-    // FIXME: name
-    "new implementation should work" in {
-      withS3Mock {
-        val initialStoreSize = 2500
-        val segmentSize = 2200L
-        val segmentFromTimestamp = 100L
-        val mockStore = new MockUpdateHistoryStore(initialStoreSize)
-        val bucketConnection = getS3BucketConnection(loggerFactory)
-        val fromTimestamp =
-          CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp))
-        val toTimestamp =
-          CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp + segmentSize))
-
-        for {
-          _ <- UpdateHistorySegmentBulkStorageNew.asSource(
-            bulkStorageTestConfig,
-            mockStore.store,
-            bucketConnection,
-            0,
-            fromTimestamp,
-            0,
-            toTimestamp,
-            loggerFactory,
-          ).runWith(Sink.ignore)
-        } yield {
-          succeed
-        }
-      }
-    }
-
     "work" in {
       withS3Mock {
         val initialStoreSize = 1500
@@ -77,60 +48,67 @@ class UpdateHistoryBulkStorageTest
           CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp))
         val toTimestamp =
           CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp + segmentSize))
-        val segment = new UpdateHistorySegmentBulkStorage(
-          bulkStorageTestConfig,
-          mockStore.store,
-          bucketConnection,
-          0,
-          fromTimestamp,
-          0,
-          toTimestamp,
-          loggerFactory,
-        )
-        clue(
-          "Start reading updates, should push 1000 updates, and not be ready for the next 1000"
-        ) {
-          segment
-            .next()
-            .futureValue(timeout =
-              PatienceConfiguration.Timeout(FiniteDuration(120, "seconds"))
-            ) shouldBe Result.NotDone
-          segment.next().futureValue shouldBe Result.NotReady
+
+        clue("Wait for the store to be ready by getting the first update from it") {
+          eventually(2.minutes) {
+            mockStore.store.getUpdatesWithoutImportUpdates(None, HardLimit.tryCreate(1)).futureValue should not be Seq.empty
+          }
         }
-        clue(
-          "Ingest 1000 more events, and continue reading. Should push 1000 more, then 200 more and be done with the segment"
-        ) {
+
+
+        val probe = UpdateHistorySegmentBulkStorageNew
+          .asSource(
+            bulkStorageTestConfig,
+            mockStore.store,
+            bucketConnection,
+            0,
+            fromTimestamp,
+            0,
+            toTimestamp,
+            loggerFactory,
+          )
+          .toMat(TestSink.probe[(Long, CantonTimestamp)])(Keep.right)
+          .run()
+
+        probe.request(2)
+
+        clue("Initially, 1000 updates will be ready, but the segment will not be complete, so no output is expected") {
+          probe.expectNoMessage(20.seconds)
+        }
+
+        clue("Ingest 1000 more events. Now the last timestamp will be beyond of the segment, so the source will complete and emit the last timestamp") {
           mockStore.mockIngestion(1000)
-          segment.next().futureValue shouldBe Result.NotDone
-          segment.next().futureValue shouldBe Result.Done
+          probe.expectNext(20.seconds) should be((0, toTimestamp))
         }
-        segment.watchCompletion().futureValue
-        for {
-          s3Objects <- bucketConnection.s3Client
-            .listObjects(
-              ListObjectsRequest.builder().bucket("bucket").build()
+
+        clue("Check that the dumped content is correct") {
+          for {
+            s3Objects <- bucketConnection.s3Client
+              .listObjects(
+                ListObjectsRequest.builder().bucket("bucket").build()
+              )
+              .asScala
+            allUpdates <- mockStore.store.getUpdatesWithoutImportUpdates(
+              None,
+              HardLimit.tryCreate(segmentSize.toInt * 2, segmentSize.toInt * 2),
             )
-            .asScala
-          allUpdates <- mockStore.store.getUpdatesWithoutImportUpdates(
-            None,
-            HardLimit.tryCreate(segmentSize.toInt * 2, segmentSize.toInt * 2),
-          )
-          segmentUpdates = allUpdates.filter(update =>
-            update.update.update.recordTime > fromTimestamp &&
-              update.update.update.recordTime <= toTimestamp
-          )
-        } yield {
-          val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
-          objectKeys should have length 2
-          s3Objects.contents().get(0).size().toInt should be >= maxFileSize.toInt
-          val allUpdatesFromS3 = objectKeys.flatMap(
-            readUncompressAndDecode(bucketConnection, io.circe.parser.decode[UpdateHistoryItemV2])
-          )
-          allUpdatesFromS3.length shouldBe segmentUpdates.length
-          allUpdatesFromS3
-            .map(
-              CompactJsonScanHttpEncodingsWithFieldLabels().httpToLapiUpdate
-            ) should contain theSameElementsInOrderAs segmentUpdates
+            segmentUpdates = allUpdates.filter(update =>
+              update.update.update.recordTime > fromTimestamp &&
+                update.update.update.recordTime <= toTimestamp
+            )
+          } yield {
+            val objectKeys = s3Objects.contents.asScala.sortBy(_.key())
+            objectKeys should have length 2
+            s3Objects.contents().get(0).size().toInt should be >= maxFileSize.toInt
+            val allUpdatesFromS3 = objectKeys.flatMap(
+              readUncompressAndDecode(bucketConnection, io.circe.parser.decode[UpdateHistoryItemV2])
+            )
+            allUpdatesFromS3.length shouldBe segmentUpdates.length
+            allUpdatesFromS3
+              .map(
+                CompactJsonScanHttpEncodingsWithFieldLabels().httpToLapiUpdate
+              ) should contain theSameElementsInOrderAs segmentUpdates
+          }
         }
       }
     }

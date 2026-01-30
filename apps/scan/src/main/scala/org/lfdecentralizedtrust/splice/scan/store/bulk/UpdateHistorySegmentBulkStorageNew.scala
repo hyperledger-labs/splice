@@ -15,7 +15,7 @@ import org.apache.pekko.util.ByteString
 import org.apache.pekko.pattern.after
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
-import org.lfdecentralizedtrust.splice.store.{HardLimit, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, TreeUpdateWithMigrationId, UpdateHistory}
 import io.circe.syntax.*
 import org.apache.pekko.actor.ActorSystem
 
@@ -50,7 +50,7 @@ class UpdateHistorySegmentBulkStorageNew(
 
   // When more updates are not yet available, how long to wait for more.
   // TODO(#3429): make it longer for prod (so consider making it configurable/overridable for tests)
-  private val snapshotPollingInterval = 5.seconds
+  private val updatesPollingInterval = 5.seconds
 
   private def getUpdatesChunk(
       afterMigrationId: Long,
@@ -65,49 +65,60 @@ class UpdateHistorySegmentBulkStorageNew(
         update.migrationId < toMigrationId ||
           update.migrationId == toMigrationId && update.update.update.recordTime <= toTimestamp
       )
-    } yield {
-      if (
-        updatesInSegment.length < updates.length || updates.length == config.bulkDbReadChunkSize
-      ) {
-        if (updatesInSegment.nonEmpty) {
-          logger.debug(s"Adding ${updatesInSegment.length} updates to the queue")
-          val encoded = updatesInSegment.map(update =>
-            ScanHttpEncodings.encodeUpdate(
-              update,
-              definitions.DamlValueEncoding.CompactJson,
-              ScanHttpEncodings.V1,
+      result: (UpdatesPosition.UpdatesPosition, ByteString) <-
+        if (
+          updatesInSegment.length < updates.length || updates.length == config.bulkDbReadChunkSize
+        ) {
+          if (updatesInSegment.nonEmpty) {
+            // Found enough updates to add
+            val updatesBytes: ByteString = encodeUpdates(updatesInSegment)
+            val last = updatesInSegment.lastOption.getOrElse(
+              throw new RuntimeException("Unexpected failure")
             )
-          )
-          val updatesStr = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n") + "\n"
-          val updatesBytes = ByteString(updatesStr.getBytes(StandardCharsets.UTF_8))
-          logger.debug(
-            s"Read ${encoded.length} updates from DB, to a bytestring of size ${updatesBytes.length} bytes"
-          )
-          val last = updatesInSegment.lastOption.getOrElse(throw new RuntimeException("Unexpected failure"))
-          lastEmitted.set(
-            Some((last.migrationId, last.update.update.recordTime))
-          )
-          (
-            TS(last.migrationId, last.update.update.recordTime),
-            updatesBytes,
-          )
+            lastEmitted.set(
+              Some((last.migrationId, last.update.update.recordTime))
+            )
+            Future.successful((
+              TS(last.migrationId, last.update.update.recordTime),
+              updatesBytes,
+            ))
+          } else {
+            // All updates are outside the segment, so we're done
+            Future.successful((End, ByteString.empty))
+          }
         } else {
-          (End, ByteString.empty)
+          logger.debug(
+            s"Not enough updates yet (queried for ${config.bulkDbReadChunkSize}, found ${updates.length}), sleeping..."
+          )
+          after(updatesPollingInterval, actorSystem.scheduler) {
+            Future.successful((TS(afterMigrationId, afterTimestamp), ByteString.empty))
+          }: Future[(UpdatesPosition.UpdatesPosition, ByteString)]
         }
-      } else {
-        logger.debug(
-          s"Not enough updates yet (queried for ${config.bulkDbReadChunkSize}, found ${updates.length}), nothing to do"
-        )
-        // FIXME: sleep
-        (TS(afterMigrationId, afterTimestamp), ByteString.empty)
-      }
+    } yield {
+      result
     }
   }
+
+  private def encodeUpdates(updates: Seq[TreeUpdateWithMigrationId]) = {
+    val encoded = updates.map(update =>
+      ScanHttpEncodings.encodeUpdate(
+        update,
+        definitions.DamlValueEncoding.CompactJson,
+        ScanHttpEncodings.V1,
+      )
+    )
+    val updatesStr = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n") + "\n"
+    val updatesBytes = ByteString(updatesStr.getBytes(StandardCharsets.UTF_8))
+    logger.debug(
+      s"Read and encoded ${encoded.length} updates from DB, to a bytestring of size ${updatesBytes.length} bytes"
+    )
+    updatesBytes
+  }
+
   private val s3ObjIdx = new AtomicInteger(0)
   private val lastEmitted = new AtomicReference[Option[(Long, CantonTimestamp)]](None)
 
-  private def getSource: Source[(Long, CantonTimestamp), NotUsed] = {
-    // FIXME: handle the case where no more updates exist yet (sleep before retrying, similarly to what we do between ACS snapshots (but not for a single snapshot))
+  private def getSource(implicit actorSystem: ActorSystem): Source[(Long, CantonTimestamp), NotUsed] = {
     Source
       .unfoldAsync(Start: UpdatesPosition) {
         case Start => getUpdatesChunk(fromMigrationId, fromTimestamp).map(Some(_))
@@ -149,6 +160,7 @@ object UpdateHistorySegmentBulkStorageNew {
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
+      actorSystem: ActorSystem,
   ): Flow[((Long, CantonTimestamp), (Long, CantonTimestamp)), (Long, CantonTimestamp), NotUsed] =
     Flow[((Long, CantonTimestamp), (Long, CantonTimestamp))].flatMapConcat {
       case (
@@ -179,6 +191,7 @@ object UpdateHistorySegmentBulkStorageNew {
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
+      actorSystem: ActorSystem,
   ): Source[(Long, CantonTimestamp), NotUsed] =
     new UpdateHistorySegmentBulkStorageNew(
       config,
