@@ -1,0 +1,51 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Support for using a token compliant registry API in tests.
+--
+-- These simulate the OpenAPI endpoints that would be served by the backend of the registry implementation.
+module Splice.Testing.TokenStandard.RegistryApiV2
+  ( RegistryApi(..)
+  ) where
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.AllocationV2 as Api.Token.AllocationV2
+import Splice.Api.Token.AllocationInstructionV2
+import Splice.Api.Token.TransferInstructionV2
+
+import Splice.Testing.UtilsV2
+
+import Daml.Script
+
+
+-- | Type-class for simulating calls to the off-ledger API of a registry.
+--
+-- The function names match the names of the handlers defined in the OpenAPI specification.
+class RegistryApi app where
+  -- TODO (DACH-NY/canton-network-node#17541): add functions for simulating all OpenAPI endpoints as part of testing the unhappy paths
+
+  getTransferFactory
+    : app -> TransferFactory_Transfer
+    -> Script (EnrichedFactoryChoice TransferFactory TransferFactory_Transfer)
+
+  getAllocationFactory
+    : app -> AllocationFactory_Allocate
+    -> Script (EnrichedFactoryChoice AllocationFactory AllocationFactory_Allocate)
+
+  getAllocation_TransferContext
+    : app -> ContractId Allocation -> Metadata -> Script OpenApiChoiceContext
+
+  getAllocation_WithdrawContext
+    : app -> ContractId Allocation -> Metadata -> Script OpenApiChoiceContext
+
+  getAllocation_CancelContext
+    : app -> ContractId Allocation -> Metadata -> Script OpenApiChoiceContext
+
+  getTransferInstruction_AcceptContext
+    : app -> ContractId TransferInstruction -> Metadata -> Script OpenApiChoiceContext
+
+  getTransferInstruction_RejectContext
+    : app -> ContractId TransferInstruction -> Metadata -> Script OpenApiChoiceContext
+
+  getTransferInstruction_WithdrawContext
+    : app -> ContractId TransferInstruction -> Metadata -> Script OpenApiChoiceContext

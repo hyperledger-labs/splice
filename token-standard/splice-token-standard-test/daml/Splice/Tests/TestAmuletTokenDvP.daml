@@ -150,7 +150,7 @@ setupOtcTrade  = do
         expiresAt = Some settleBefore
         expiresAfter = None
         holders = [registry.dso]
-        context = Some "allocation for transfer leg \"leg0\" to 'bob'"
+        context = Some "allocation for settlement OTCTradeProposal"
   lockedHolding.lock === expectedLock
 
   -- Bob sees the allocation request in his wallet as well
