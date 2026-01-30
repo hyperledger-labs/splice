@@ -60,7 +60,7 @@ class AcsSnapshotBulkStorage(
             }
         }
       }
-      .collect { case Some(ts: TimestampWithMigrationId) => ts }
+      .collect { case Some(ts) => ts }
   }
 
   /**  This is the main implementation of the pipeline. It is a Pekko Source that reads a `start` timestamp
