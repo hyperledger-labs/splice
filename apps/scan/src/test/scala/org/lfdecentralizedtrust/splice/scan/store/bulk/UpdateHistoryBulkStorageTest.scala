@@ -60,10 +60,8 @@ class UpdateHistoryBulkStorageTest
             bulkStorageTestConfig,
             mockStore.store,
             bucketConnection,
-            0,
-            fromTimestamp,
-            0,
-            toTimestamp,
+            TimestampWithMigrationId(fromTimestamp, 0),
+            TimestampWithMigrationId(toTimestamp, 0),
             loggerFactory,
           )
           .toMat(TestSink.probe[TimestampWithMigrationId])(Keep.right)
