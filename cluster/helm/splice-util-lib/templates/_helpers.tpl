@@ -206,6 +206,8 @@ spec:
   value: {{ .logLevel | default "INFO" }}
 - name: LOG_LEVEL_STDOUT
   value: {{ .logLevelStdout | default "DEBUG" }}
+- name: LOG_LEVEL_API_REQUEST
+  value: {{ .logLevelApiRequest| default "INFO" }}
 - name: LOG_IMMEDIATE_FLUSH
   value: {{ .logAsyncFlush | default true | not | quote }}
 {{- end }}
