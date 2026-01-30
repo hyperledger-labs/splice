@@ -2596,6 +2596,11 @@ final case class TimestampWithMigrationId(
     migrationId: Long,
 )
 
+object TimestampWithMigrationId {
+  implicit val ordering: Ordering[TimestampWithMigrationId] =
+    Ordering.by(x => (x.migrationId, x.timestamp))
+}
+
 final case class TreeUpdateWithMigrationId(
     update: UpdateHistory.UpdateHistoryResponse,
     migrationId: Long,

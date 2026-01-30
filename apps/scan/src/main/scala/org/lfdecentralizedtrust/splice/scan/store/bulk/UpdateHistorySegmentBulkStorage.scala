@@ -28,6 +28,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
+import scala.math.Ordering.Implicits._
 
 // TODO(#3429): some duplication between this and SingleAcsSnapshotBulkStorage, see if we can more nicely reuse stuff
 
@@ -35,10 +36,8 @@ class UpdateHistorySegmentBulkStorage(
     val config: ScanStorageConfig,
     val updateHistory: UpdateHistory,
     val s3Connection: S3BucketConnection,
-    val fromMigrationId: Long,
-    val fromTimestamp: CantonTimestamp,
-    val toMigrationId: Long,
-    val toTimestamp: CantonTimestamp,
+    val fromTimestamp: TimestampWithMigrationId,
+    val toTimestamp: TimestampWithMigrationId,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
@@ -56,8 +55,7 @@ class UpdateHistorySegmentBulkStorage(
         HardLimit.tryCreate(config.bulkDbReadChunkSize),
       )
       updatesInSegment = updates.filter(update =>
-        update.migrationId < toMigrationId ||
-          update.migrationId == toMigrationId && update.update.update.recordTime <= toTimestamp
+        TimestampWithMigrationId(update.update.update.recordTime, update.migrationId) < toTimestamp
       )
       result <-
         if (
@@ -118,7 +116,7 @@ class UpdateHistorySegmentBulkStorage(
       actorSystem: ActorSystem
   ): Source[TimestampWithMigrationId, NotUsed] = {
     Source
-      .unfoldAsync(TimestampWithMigrationId(fromTimestamp, fromMigrationId))(ts => getUpdatesChunk(ts))
+      .unfoldAsync(fromTimestamp)(ts => getUpdatesChunk(ts))
       .via(ZstdGroupedWeight(config.bulkMaxFileSize))
       // Add a buffer so that the next object continues accumulating while we write the previous one
       .buffer(
@@ -142,7 +140,7 @@ class UpdateHistorySegmentBulkStorage(
       .fold(()) { case ((), _) => () }
       // emit the timestamp of the last update dumped upon completion.
       .map(_ =>
-        lastEmitted.get().getOrElse(TimestampWithMigrationId(fromTimestamp, fromMigrationId))
+        lastEmitted.get().getOrElse(fromTimestamp)
       )
 
   }
@@ -167,10 +165,8 @@ object UpdateHistorySegmentBulkStorage {
           config,
           updateHistory,
           s3Connection,
-          from.migrationId,
-          from.timestamp,
-          to.migrationId,
-          to.timestamp,
+          from,
+          to,
           loggerFactory,
         ).getSource
     }
@@ -179,10 +175,8 @@ object UpdateHistorySegmentBulkStorage {
       config: ScanStorageConfig,
       updateHistory: UpdateHistory,
       s3Connection: S3BucketConnection,
-      fromMigrationId: Long,
-      fromTimestamp: CantonTimestamp,
-      toMigrationId: Long,
-      toTimestamp: CantonTimestamp,
+      from: TimestampWithMigrationId,
+      to: TimestampWithMigrationId,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       tc: TraceContext,
@@ -193,10 +187,8 @@ object UpdateHistorySegmentBulkStorage {
       config,
       updateHistory,
       s3Connection,
-      fromMigrationId,
-      fromTimestamp,
-      toMigrationId,
-      toTimestamp,
+      from,
+      to,
       loggerFactory,
     ).getSource
 
