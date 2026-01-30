@@ -70,7 +70,7 @@ class OtlpGrpcServer(protected val loggerFactory: NamedLoggerFactory)
       lock.exclusive(
         traceSpans.addAll(
           request.getResourceSpansList.asScala
-            .flatMap(_.getScopeSpansList.asScala)
+            .flatMap(_.getInstrumentationLibrarySpansList.asScala)
             .flatMap(_.getSpansList.asScala)
         )
       )

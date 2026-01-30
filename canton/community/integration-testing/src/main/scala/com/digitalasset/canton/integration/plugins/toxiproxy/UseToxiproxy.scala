@@ -15,6 +15,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig.BftSequencer
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.P2PNetworkConfig
 import com.digitalasset.canton.{BaseTest, SequencerAlias, UniquePortGenerator}
+import com.digitalasset.canton.environment.CantonEnvironment
 import eu.rekawek.toxiproxy.ToxiproxyClient
 import monocle.macros.GenLens
 import monocle.macros.syntax.lens.*

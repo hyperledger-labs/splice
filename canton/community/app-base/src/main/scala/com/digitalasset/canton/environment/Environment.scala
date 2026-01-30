@@ -61,8 +61,8 @@ import scala.util.control.NonFatal
 
 /** Holds all significant resources held by this process.
   */
-class Environment(
-    initialConfig: CantonConfig,
+abstract class Environment[Config <: SharedCantonConfig[Config]](
+    initialConfig: Config,
     val testingConfig: TestingConfigInternal,
     participantNodeFactory: ParticipantNodeBootstrapFactory,
     sequencerNodeFactory: SequencerNodeBootstrapFactory,
@@ -134,17 +134,6 @@ class Environment(
     baseFilter,
     loggerFactory,
   )
-
-  def createConsole(
-      consoleOutput: ConsoleOutput = StandardConsoleOutput
-  ): ConsoleEnvironment = {
-    val console =
-      new ConsoleEnvironment(this, consoleOutput)
-    healthDumpGenerator
-      .putIfAbsent(createHealthDumpGenerator(console.grpcAdminCommandRunner))
-      .discard
-    console
-  }
 
   @VisibleForTesting
   protected def createHealthDumpGenerator(
@@ -612,7 +601,6 @@ trait EnvironmentFactory[C <: SharedCantonConfig[C], E <: Environment[C]] {
 
 final class CantonEnvironment(
     override val config: CantonConfig,
-    edition: CantonEdition,
     override val testingConfig: TestingConfigInternal,
     participantNodeFactory: ParticipantNodeBootstrapFactory,
     sequencerNodeFactory: SequencerNodeBootstrapFactory,
@@ -620,7 +608,6 @@ final class CantonEnvironment(
     override val loggerFactory: NamedLoggerFactory,
 ) extends Environment[CantonConfig](
       config,
-      edition,
       testingConfig,
       participantNodeFactory,
       sequencerNodeFactory,

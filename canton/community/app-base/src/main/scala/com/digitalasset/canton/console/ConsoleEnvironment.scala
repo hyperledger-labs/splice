@@ -323,7 +323,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
           Help.Summary("Help with console commands"),
           Help.Description("Type help(\"<command>\") for detailed help for <command>."),
           Help.Topic(Help.defaultTopLevelTopic),
-        ),
+        )
       ) :+
       (Help.Item(
         "exit",

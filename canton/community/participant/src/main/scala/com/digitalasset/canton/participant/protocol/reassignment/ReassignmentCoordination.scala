@@ -281,8 +281,9 @@ class ReassignmentCoordination(
 
   import cats.implicits.*
 
-  private def getRecentTopologyTimestamp[T[X] <: ReassignmentTag[X]
-    : SameReassignmentType: SingletonTraverse](
+  private def getRecentTopologyTimestamp[T[X] <: ReassignmentTag[
+    X
+  ]: SameReassignmentType: SingletonTraverse](
       psid: T[PhysicalSynchronizerId]
   )(implicit
       traceContext: TraceContext

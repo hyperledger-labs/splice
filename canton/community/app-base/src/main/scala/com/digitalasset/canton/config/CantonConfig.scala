@@ -204,12 +204,15 @@ object ConsoleCommandTimeout {
     config.NonNegativeDuration.tryFromDuration(30.seconds)
   val defaultTestingBongTimeout: config.NonNegativeDuration =
     config.NonNegativeDuration.tryFromDuration(1.minute)
+  val defaultRequestTimeout: NonNegativeDuration =
+    config.NonNegativeDuration.tryFromDuration(20.seconds)
 }
 
 /** Timeout settings configuration */
 final case class TimeoutSettings(
     console: ConsoleCommandTimeout = ConsoleCommandTimeout(),
     processing: ProcessingTimeout = ProcessingTimeout(),
+    requestTimeout: NonNegativeDuration = NonNegativeDuration.tryFromDuration(40.seconds),
 )
 
 sealed trait ClockConfig extends Product with Serializable
@@ -322,44 +325,27 @@ final case class CantonFeatures(
     enableRepairCommands: Boolean = false,
 ) {
   def featureFlags: Set[FeatureFlag] =
-    (Seq(FeatureFlag.Stable)
-      ++ (if (enableTestingCommands) Seq(FeatureFlag.Testing) else Seq())
-      ++ (if (enablePreviewCommands) Seq(FeatureFlag.Preview) else Seq())
-      ++ (if (enableRepairCommands) Seq(FeatureFlag.Repair) else Seq())).toSet
+    (Seq(FeatureFlag.Stable) ++ (if (enableTestingCommands) Seq(FeatureFlag.Testing)
+                                 else Seq()) ++ (if (enablePreviewCommands) Seq(FeatureFlag.Preview)
+                                                 else Seq()) ++ (if (enableRepairCommands)
+                                                                   Seq(
+                                                                     FeatureFlag.Repair
+                                                                   )
+                                                                 else Seq())).toSet
 }
 
-/** Root configuration parameters for a single Canton process.
-  *
-  * @param participants
-  *   All locally running participants that this Canton process can connect and operate on.
-  * @param remoteParticipants
-  *   All remotely running participants to which the console can connect and operate on.
-  * @param sequencers
-  *   All locally running sequencers that this Canton process can connect and operate on.
-  * @param remoteSequencers
-  *   All remotely running sequencers that this Canton process can connect and operate on.
-  * @param mediators
-  *   All locally running mediators that this Canton process can connect and operate on.
-  * @param remoteMediators
-  *   All remotely running mediators that this Canton process can connect and operate on.
-  * @param monitoring
-  *   determines how this Canton process can be monitored
-  * @param parameters
-  *   per-environment parameters to control enabled features and set testing parameters
-  * @param features
-  *   control which features are enabled
-  */
-final case class CantonConfig(
-    sequencers: Map[InstanceName, SequencerNodeConfig] = Map.empty,
-    mediators: Map[InstanceName, MediatorNodeConfig] = Map.empty,
-    participants: Map[InstanceName, ParticipantNodeConfig] = Map.empty,
-    remoteSequencers: Map[InstanceName, RemoteSequencerConfig] = Map.empty,
-    remoteMediators: Map[InstanceName, RemoteMediatorConfig] = Map.empty,
-    remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty,
-    monitoring: MonitoringConfig = MonitoringConfig(),
-    parameters: CantonParameters = CantonParameters(),
-    features: CantonFeatures = CantonFeatures(),
-) extends ConfigDefaults[Option[DefaultPorts], CantonConfig] {
+trait SharedCantonConfig[Self] extends ConfigDefaults[Option[DefaultPorts], Self] { self: Self =>
+  def name: Option[String]
+  def portDescription: String
+  def sequencers: Map[InstanceName, SequencerNodeConfig]
+  def mediators: Map[InstanceName, MediatorNodeConfig]
+  def participants: Map[InstanceName, ParticipantNodeConfig]
+  def remoteSequencers: Map[InstanceName, RemoteSequencerConfig]
+  def remoteMediators: Map[InstanceName, RemoteMediatorConfig]
+  def remoteParticipants: Map[InstanceName, RemoteParticipantConfig]
+  def monitoring: MonitoringConfig
+  def parameters: CantonParameters
+  def features: CantonFeatures
 
   /** Names of local nodes in order: sequencers, mediators, participants. Order within each group
     * may be different between runs, but the list may serve as a single reference order in case we
@@ -409,16 +395,6 @@ final case class CantonConfig(
     case (n, c) =>
       n.unwrap -> c
   }
-
-  /** dump config to string (without sensitive data) */
-  /** renders the config as a string (used for dumping config for diagnostic purposes) */
-  def dumpString: String = CantonConfig.makeConfidentialString(this)
-
-  /** run a validation on the current config and return possible warning messages */
-  private def validate(
-      ensurePortsSet: Boolean
-  ): Validated[NonEmpty[Seq[String]], Unit] =
-    ConfigValidations.validate(this, ensurePortsSet = ensurePortsSet)
 
   private lazy val participantNodeParameters_ : Map[InstanceName, ParticipantNodeParameters] =
     participants.fmap { participantConfig =>
@@ -577,9 +553,7 @@ final case class CantonConfig(
     monitoring: MonitoringConfig = MonitoringConfig(),
     parameters: CantonParameters = CantonParameters(),
     features: CantonFeatures = CantonFeatures(),
-) extends UniformCantonConfigValidation
-    with ConfigDefaults[Option[DefaultPorts], CantonConfig]
-    with SharedCantonConfig[CantonConfig] {
+) extends SharedCantonConfig[CantonConfig] {
 
   /** dump config to string (without sensitive data) */
   /** renders the config as a string (used for dumping config for diagnostic purposes) */
@@ -587,10 +561,9 @@ final case class CantonConfig(
 
   /** run a validation on the current config and return possible warning messages */
   private def validate(
-      edition: CantonEdition,
-      ensurePortsSet: Boolean,
+      ensurePortsSet: Boolean
   ): Validated[NonEmpty[Seq[String]], Unit] = {
-    CommunityConfigValidations.validate(this, edition, ensurePortsSet = ensurePortsSet)
+    ConfigValidations.validate(this, ensurePortsSet = ensurePortsSet)
   }
 
   /** Produces a message in the structure

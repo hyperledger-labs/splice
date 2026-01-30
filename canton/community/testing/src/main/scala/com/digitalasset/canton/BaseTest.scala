@@ -516,6 +516,8 @@ trait BaseTest
 }
 
 object BaseTest {
+  val DefaultEventuallyTimeUntilSuccess: FiniteDuration = 20.seconds
+
   implicit class RichSynchronizerIdO(val id: SynchronizerId) {
     def toPhysical: PhysicalSynchronizerId =
       PhysicalSynchronizerId(id, NonNegativeInt.zero, testedProtocolVersion)

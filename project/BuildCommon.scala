@@ -15,11 +15,10 @@ import wartremover.WartRemover.autoImport.*
 import sbtprotoc.ProtocPlugin.autoImport.PB
 import DamlPlugin.autoImport.*
 import Wartremover.spliceWarts
-import protocbridge.ProtocRunner
 import sbt.internal.util.ManagedLogger
 import xsbti.compile.CompileAnalysis
 import de.heikoseeberger.sbtheader.HeaderPlugin.autoImport.{headerResources, headerSources}
-import CantonDependencies.daml_ledger_api_value_proto
+import CantonDependencies.{daml_ledger_api_value_proto, excludeTranscodeConflictingDependencies}
 
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -62,10 +61,11 @@ object BuildCommon {
   )
 
   lazy val sharedSettings: Seq[Def.Setting[_]] = Seq(
+    resolvers += ("Canton snapshots" at "artifactregistry://europe-maven.pkg.dev/da-images/public-maven-unstable"),
     libraryDependencies ++= Seq(
       scalatest % Test
-    )
-  ) ++ sharedProtocSettings ++ Headers.NoHeaderSettings
+    ),
+  ) ++ sharedProtocSettings ++ Headers.NoHeaderSettings ++ excludeTranscodeConflictingDependencies
 
   val pbTsDirectory = SettingKey[File]("output directory for ts protobuf definitions")
 
@@ -110,7 +110,10 @@ object BuildCommon {
               "org.lfdecentralizedtrust.splice.codegen",
             )
           )
-        }
+        },
+        libraryDependencies ++= Seq(
+          CantonDependencies.canton_java_bindings
+        ),
       )
 
   lazy val copyDarResources: Seq[Def.Setting[_]] = {
@@ -450,6 +453,9 @@ object BuildCommon {
           scalatest % Test,
           scalaz_core,
           slf4j_api,
+          circe_core,
+          circe_generic,
+          circe_parser,
         ),
       )
   }
@@ -536,6 +542,7 @@ object BuildCommon {
       )
       .enablePlugins(DamlPlugin)
       .settings(
+        excludeTranscodeConflictingDependencies,
         sharedCantonSettings,
         // commented out from Canton OS repo as settings don't apply to us
         //      sharedAppSettings,
@@ -594,6 +601,7 @@ object BuildCommon {
         `canton-community-participant`,
       )
       .settings(
+        excludeTranscodeConflictingDependencies,
         removeTestSources,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
@@ -623,7 +631,6 @@ object BuildCommon {
         `canton-daml-jwt`,
         `canton-daml-tls`,
         `canton-ledger-common`,
-        `canton-bindings-java`,
         `canton-community-admin-api`,
         `canton-kms-driver-api`,
         `canton-scalatest-addon` % "compile->test",
@@ -639,6 +646,7 @@ object BuildCommon {
         // commented out from Canton OS repo as settings don't apply to us (yet)
         // JvmRulesPlugin.damlRepoHeaderSettings,
         libraryDependencies ++= Seq(
+          apache_commons_compress,
           better_files,
           bouncycastle_bcpkix_jdk15on,
           bouncycastle_bcprov_jdk15on,
@@ -661,6 +669,7 @@ object BuildCommon {
           slick_hikaricp,
           CantonDependencies.opentelemetry_instrumentation_runtime_metrics,
           CantonDependencies.opentelemetry_instrumentation_hikari,
+          CantonDependencies.canton_java_bindings,
         ),
         Compile / PB.targets := Seq(
           scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
@@ -746,6 +755,7 @@ object BuildCommon {
         `canton-community-reference-driver`,
       )
       .settings(
+        excludeTranscodeConflictingDependencies,
         sharedCantonSettings,
 
         // The dependency override is needed because `community-testing` depends transitively on
@@ -978,6 +988,7 @@ object BuildCommon {
       .settings(
         removeTestSources,
         sharedCantonSettings,
+        excludeTranscodeConflictingDependencies,
         libraryDependencies ++= Seq(
           scala_logging,
           scalatest % Test,
@@ -1182,7 +1193,6 @@ object BuildCommon {
       .dependsOn(
         `canton-util-external`,
         `canton-daml-errors` % "compile->compile;test->test",
-        `canton-bindings-java` % "compile->compile;test->test",
         `canton-daml-grpc-utils`,
         `canton-daml-jwt`,
         `canton-util-observability`,
@@ -1204,6 +1214,8 @@ object BuildCommon {
           daml_contextualized_logging,
           daml_lf_engine,
           daml_lf_archive_reader,
+          CantonDependencies.canton_java_bindings,
+          CantonDependencies.canton_ledger_api_scala,
           daml_tracing,
           apache_commons_codec,
           apache_commons_io,
@@ -1272,6 +1284,7 @@ object BuildCommon {
           scalapb.gen(flatPackage = false) -> (Compile / sourceManaged).value / "protobuf"
         ),
         libraryDependencies ++= Seq(
+          CantonDependencies.canton_ledger_api_scala,
           auth0_java,
           auth0_jwks,
           circe_core,
@@ -1412,39 +1425,6 @@ object BuildCommon {
       )
   }
 
-  lazy val `canton-bindings-java` = {
-    import CantonDependencies._
-    sbt.Project
-      .apply("canton-bindings-java", file("canton/community/bindings-java"))
-      .dependsOn(
-        `canton-ledger-api`
-      )
-      .settings(
-        removeTestSources,
-        Test / managedSources := Seq(
-          (Test / sourceDirectory).value / "scala/com/daml/ledger/javaapi/data/Generators.scala"
-        ),
-        sharedCantonSettings,
-        Test / unmanagedSources :=
-          (Test / unmanagedSources).value.filter(_.getName == "Generators.scala"),
-        disableTests,
-        sharedSettings,
-        compileOrder := CompileOrder.JavaThenScala,
-        libraryDependencies ++= Seq(
-          fasterjackson_core,
-          junit_jupiter_api % Test,
-          junit_jupiter_engine % Test,
-          junit_platform_runner % Test,
-          jupiter_interface % Test,
-          scalatest,
-          scalacheck,
-          scalatestScalacheck,
-          slf4j_api,
-          daml_ledger_api_value_java,
-        ),
-      )
-  }
-
   lazy val `canton-ledger-json-api` = {
     import CantonDependencies._
     sbt.Project
@@ -1473,6 +1453,9 @@ object BuildCommon {
           .map(cat => s"cat=$cat:silent")
           .mkString(",", ",", ""),
         libraryDependencies ++= Seq(
+          CantonDependencies.canton_transcode_json,
+          CantonDependencies.canton_transcode_proto_scala,
+          CantonDependencies.canton_transcode_daml_lf,
           pekko_http,
           pekko_http_core,
           daml_pekko_http_metrics,
@@ -1492,9 +1475,13 @@ object BuildCommon {
           ujson_circe,
           upickle,
           fastparse % Runtime, // transcode dependency
-          transcode_daml_lf,
-          transcode_codec_json,
-          transcode_codec_proto_scala,
+        ),
+        // replace transcode Scala 3 dependencies with Scala 2 versions
+        // some downstream projects depend on those libs transitively
+        libraryDependencies ++= Seq(
+          fastparse % Runtime,
+          os_lib % Runtime,
+          sourcecode % Runtime,
         ),
         Test / damlCodeGeneration := Seq(
           (
@@ -1503,6 +1490,7 @@ object BuildCommon {
             "com.digitalasset.canton.http.json.encoding",
           )
         ),
+        excludeTranscodeConflictingDependencies,
       )
   }
 

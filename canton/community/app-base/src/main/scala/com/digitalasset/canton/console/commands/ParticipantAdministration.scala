@@ -82,7 +82,8 @@ import com.digitalasset.canton.topology.{
 }
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.*
-import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias, config}
+import com.digitalasset.canton.{config, SequencerAlias, SynchronizerAlias}
+import com.google.protobuf.ByteString
 import io.grpc.Context
 
 import java.time.Instant

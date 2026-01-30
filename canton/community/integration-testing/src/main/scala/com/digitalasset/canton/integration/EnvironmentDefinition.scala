@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration
@@ -21,12 +21,12 @@ import com.digitalasset.canton.config.{
   TestingConfigInternal,
 }
 import com.digitalasset.canton.console.{
-  ConsoleEnvironment,
+  CantonConsoleEnvironment,
   InstanceReference,
   SequencerReference,
   TestConsoleOutput,
 }
-import com.digitalasset.canton.environment.Environment
+import com.digitalasset.canton.environment.{CantonEnvironment, CommunityEnvironmentFactory}
 import com.digitalasset.canton.integration.bootstrap.{
   InitializedSynchronizer,
   NetworkBootstrapper,
@@ -457,7 +457,7 @@ object EnvironmentDefinition extends LazyLogging {
       numMediators = 2,
     )
 
-  lazy val P1S1M1_Config: EnvironmentDefinition = buildBaseEnvironmentDefinition(
+  lazy val P1S1M1_Config = buildBaseEnvironmentDefinition(
     numParticipants = 1,
     numSequencers = 1,
     numMediators = 1,
@@ -467,12 +467,6 @@ object EnvironmentDefinition extends LazyLogging {
     numParticipants = 1,
     numSequencers = 4,
     numMediators = 4,
-  )
-
-  lazy val P1S5M5_Config = buildBaseEnvironmentDefinition(
-    numParticipants = 1,
-    numSequencers = 5,
-    numMediators = 5,
   )
 
   /**   - 1 participant '''not''' connected to any synchronizer
@@ -711,7 +705,7 @@ object EnvironmentDefinition extends LazyLogging {
         )
     }
 
-  lazy val P3S1M1_Config: EnvironmentDefinition =
+  lazy val P3_S1M1_Config: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
       numParticipants = 3,
       numSequencers = 1,
@@ -722,7 +716,7 @@ object EnvironmentDefinition extends LazyLogging {
     *   - 1 synchronizer with 1 sequencer and 1 mediator
     */
   lazy val P3_S1M1: EnvironmentDefinition =
-    P3S1M1_Config.withNetworkBootstrap { implicit env =>
+    P3_S1M1_Config.withNetworkBootstrap { implicit env =>
       new NetworkBootstrapper(S1M1)
     }
 
@@ -730,8 +724,8 @@ object EnvironmentDefinition extends LazyLogging {
     *   - 1 synchronizer with 1 sequencer and 1 mediator
     *   - no initialized synchronizer
     */
-  lazy val P3S1M1_Manual: EnvironmentDefinition =
-    P3S1M1_Config.withManualStart
+  lazy val P3_S1M1_Manual: EnvironmentDefinition =
+    P3_S1M1_Config.withManualStart
 
   lazy val P3S2M2_Config: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
@@ -802,10 +796,9 @@ object EnvironmentDefinition extends LazyLogging {
     }
 
   /**   - 4 participants '''not''' connected to any synchronizer
-    *   - 2 sequencers
-    *   - 2 mediators
+    *   - 2 synchronizers with 1 sequencer and 1 mediator each
     */
-  lazy val P4S2M2Manual: EnvironmentDefinition =
+  lazy val P4_S1M1_S1M1_Manual: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
       numParticipants = 4,
       numSequencers = 2,
@@ -825,10 +818,9 @@ object EnvironmentDefinition extends LazyLogging {
     }
 
   /**   - 5 participants '''not''' connected to the synchronizer
-    *   - 2 sequencers
-    *   - 2 mediators
+    *   - 2 synchronizers with 1 sequencer and 1 mediator each
     */
-  lazy val P5S2M2_Config: EnvironmentDefinition =
+  lazy val P5_S1M1_S1M1_Config: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
       numParticipants = 5,
       numSequencers = 2,
@@ -839,12 +831,12 @@ object EnvironmentDefinition extends LazyLogging {
     *   - 2 synchronizers with 1 sequencer and 1 mediator each
     */
   lazy val P5_S1M1_S1M1: EnvironmentDefinition =
-    P5S2M2_Config.withNetworkBootstrap { implicit env =>
+    P5_S1M1_S1M1_Config.withNetworkBootstrap { implicit env =>
       NetworkBootstrapper(S1M1_S1M1)
     }
 
   lazy val P5_S1M1_S1M1_Manual: EnvironmentDefinition =
-    P5S2M2_Config.withManualStart
+    P5_S1M1_S1M1_Config.withManualStart
 
   /**   - 5 participants
     *   - 4 sequencers
@@ -863,7 +855,7 @@ object EnvironmentDefinition extends LazyLogging {
     *   - 1 mediators
     *   - no initialized synchronizer
     */
-  lazy val P1S2M1_Manual: EnvironmentDefinition =
+  lazy val P1_S2M1_Manual: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
       numParticipants = 1,
       numSequencers = 2,
@@ -908,7 +900,16 @@ object EnvironmentDefinition extends LazyLogging {
   /**   - 3 participants '''not''' connected to any synchronizer
     *   - 2 synchronizers with 1 sequencer and 1 mediator each
     */
-  lazy val P3_S1M1_S1M1: EnvironmentDefinition = P3S2M2_Config
+  lazy val P3_S1M1_S1M1_Config: EnvironmentDefinition = buildBaseEnvironmentDefinition(
+    numParticipants = 3,
+    numSequencers = 2,
+    numMediators = 2,
+  )
+
+  /**   - 3 participants '''not''' connected to any synchronizer
+    *   - 2 synchronizers with 1 sequencer and 1 mediator each
+    */
+  lazy val P3_S1M1_S1M1: EnvironmentDefinition = P3_S1M1_S1M1_Config
     .withNetworkBootstrap { implicit env =>
       NetworkBootstrapper(S1M1_S1M1)
     }

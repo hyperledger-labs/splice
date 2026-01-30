@@ -13,6 +13,7 @@ import com.digitalasset.canton.console.commands.ParticipantCommands
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
+import com.google.protobuf.ByteString
 
 class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(implicit
     override val consoleEnvironment: ConsoleEnvironment

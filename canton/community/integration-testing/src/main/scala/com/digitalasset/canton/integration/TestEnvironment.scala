@@ -15,11 +15,10 @@ import com.digitalasset.canton.concurrent.{
 import com.digitalasset.canton.config.{
   BatchingConfig,
   CachingConfigs,
-  CantonConfig,
   CryptoConfig,
   SessionEncryptionKeyCacheConfig,
+  SharedCantonConfig,
 }
-import com.digitalasset.canton.console.commands.GlobalSecretKeyAdministration
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
   ConsoleEnvironmentTestHelpers,
@@ -27,6 +26,7 @@ import com.digitalasset.canton.console.{
   InstanceReference,
   LocalInstanceReference,
 }
+import com.digitalasset.canton.console.commands.GlobalSecretKeyAdministration
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.integration.bootstrap.InitializedSynchronizer
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown

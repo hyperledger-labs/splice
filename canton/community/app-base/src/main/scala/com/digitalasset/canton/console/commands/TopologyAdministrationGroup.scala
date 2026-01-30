@@ -14,8 +14,8 @@ import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.W
 import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, TopologyAdminCommands}
 import com.digitalasset.canton.admin.api.client.data.topology.*
 import com.digitalasset.canton.admin.api.client.data.{
-  DynamicSynchronizerParameters as ConsoleDynamicSynchronizerParameters,
   TopologyQueueStatus,
+  DynamicSynchronizerParameters as ConsoleDynamicSynchronizerParameters,
 }
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
@@ -66,7 +66,7 @@ import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidati
 import com.digitalasset.canton.{config, networking}
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.google.protobuf.ByteString
-import io.grpc.Context
+import io.grpc.{Context, Status}
 
 import java.net.URI
 import java.time.Duration

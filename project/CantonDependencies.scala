@@ -6,10 +6,10 @@ import sbt.*
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.5.0-snapshot.20251121.14446.0.vb91b8238"
+  val version: String = "3.5.0-snapshot.20260108.14534.0.vc8a0078c"
+  val canton_library_version = "3.5.0-snapshot.20260130.17907.0.vfe6ad80f"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
-  val transcode_version = "0.1.1-main.20251112.144.829.v5cc568a"
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
   // the non-sbt based docker build.
   val daml_compiler_version = sys.env("DAML_COMPILER_VERSION")
@@ -71,7 +71,7 @@ object CantonDependencies {
   lazy val hikaricp = "com.zaxxer" % "HikariCP" % "3.2.0"
   lazy val h2 = "com.h2database" % "h2" % "2.1.210"
   lazy val postgres = "org.postgresql" % "postgresql" % "42.7.3"
-  private val flyway_version = "10.12.0"
+  private val flyway_version = "10.22.0"
   lazy val flyway = "org.flywaydb" % "flyway-core" % flyway_version
   lazy val flyway_postgresql = "org.flywaydb" % "flyway-database-postgresql" % flyway_version
   lazy val oracle = "com.oracle.database.jdbc" % "ojdbc8" % "19.13.0.0.1"
@@ -100,21 +100,26 @@ object CantonDependencies {
   lazy val daml_libs_scala_grpc_test_utils =
     "com.daml" %% "grpc-test-utils" % daml_libraries_version
 
+  lazy val canton_java_bindings = "com.daml" % "bindings-java" % canton_library_version
+  lazy val canton_ledger_api_scala = "com.daml" %% "ledger-api-scala" % canton_library_version
+
+  lazy val canton_transcode_json = "com.daml" % "transcode-codec-json_3" % canton_library_version
+  lazy val canton_transcode_proto_scala =
+    "com.daml" % "transcode-codec-proto-scala_3" % canton_library_version
+  lazy val canton_transcode_daml_lf = "com.daml" % "transcode-daml-lf_3" % canton_library_version
+  // Transcode is written in Scala 3 and it depends on Scala 3 libraries
+  // For a 2.13 project to depend on transcode it needs to resolve the conflicting Scala 2.13/3 dependencies
+  lazy val excludeTranscodeConflictingDependencies = Keys.excludeDependencies ++= Seq(
+    ExclusionRule("com.lihaoyi", "fastparse_3"),
+    ExclusionRule("com.lihaoyi", "os-lib_3"),
+    ExclusionRule("com.lihaoyi", "sourcecode_3"),
+    ExclusionRule("com.lihaoyi", "ujson_3"),
+    ExclusionRule("com.lihaoyi", "upickle-core_3"),
+  )
+
   lazy val fastparse = "com.lihaoyi" %% "fastparse" % "3.1.1"
-  lazy val transcode_daml_lf =
-    ("com.daml" %% "transcode-daml-lf-daml3.5" % transcode_version)
-      .cross(CrossVersion.for2_13Use3)
-      .exclude("com.lihaoyi", "fastparse_3")
-  lazy val transcode_codec_json =
-    ("com.daml" %% "transcode-codec-json" % transcode_version)
-      .cross(CrossVersion.for2_13Use3)
-      .exclude("com.lihaoyi", "ujson_3")
-      .exclude("com.lihaoyi", "upickle-core_3")
-      .exclude("com.lihaoyi", "fastparse_3")
-  lazy val transcode_codec_proto_scala =
-    ("com.daml" %% "transcode-codec-proto-scala-daml3.5" % transcode_version)
-      .cross(CrossVersion.for2_13Use3)
-      .exclude("com.lihaoyi", "fastparse_3")
+  lazy val os_lib = "com.lihaoyi" %% "os-lib" % "0.10.3"
+  lazy val sourcecode = "com.lihaoyi" %% "sourcecode" % "0.4.2"
 
   lazy val daml_nonempty = "com.daml" %% "nonempty" % daml_libraries_version
   lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version
@@ -194,6 +199,7 @@ object CantonDependencies {
 
   lazy val apache_commons_codec = "commons-codec" % "commons-codec" % "1.11"
   lazy val apache_commons_io = "commons-io" % "commons-io" % "2.11.0"
+  lazy val apache_commons_compress = "org.apache.commons" % "commons-compress" % "1.27.1"
   lazy val log4j_core = "org.apache.logging.log4j" % "log4j-core" % log4j_version
   lazy val log4j_api = "org.apache.logging.log4j" % "log4j-api" % log4j_version
 
@@ -213,6 +219,7 @@ object CantonDependencies {
 
   lazy val circe_core = "io.circe" %% "circe-core" % circe_version
   lazy val circe_generic = "io.circe" %% "circe-generic" % circe_version
+  lazy val circe_parser = "io.circe" %% "circe-parser" % circe_version
   lazy val circe_generic_extras = "io.circe" %% "circe-generic-extras" % circe_version
 
   lazy val guava = "com.google.guava" % "guava" % "33.3.0-jre"

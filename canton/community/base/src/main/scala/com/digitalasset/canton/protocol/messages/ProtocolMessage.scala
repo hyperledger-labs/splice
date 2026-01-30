@@ -227,12 +227,7 @@ object SignedProtocolMessage
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[FutureUnlessShutdown, SyncCryptoError, SignedProtocolMessage[M]] = {
-    val typedMessage = TypedSignedProtocolMessageContent(message)
-    for {
-      signature <- mkSignature(typedMessage, cryptoApi, approximateTimestampOverride)
-    } yield SignedProtocolMessage(typedMessage, NonEmpty(Seq, signature))
-  }
+  ): EitherT[FutureUnlessShutdown, SyncCryptoError, SignedProtocolMessage[M]] = ???
 
   /** @param approximateTimestampOverride
     *   optional timestamp to use for signing. Should only be set when signing submission requests,

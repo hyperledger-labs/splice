@@ -174,6 +174,7 @@ class SubmitRequestValidator(
       errorLoggingContext: ErrorLoggingContext
   ): Either[RpcError, HashingSchemeVersion] = protoVersion match {
     case iss.HashingSchemeVersion.HASHING_SCHEME_VERSION_V2 => Right(V2)
+    case iss.HashingSchemeVersion.HASHING_SCHEME_VERSION_V3 => ???
     case iss.HashingSchemeVersion.HASHING_SCHEME_VERSION_UNSPECIFIED =>
       Left(
         RequestValidationErrors.InvalidField

@@ -27,12 +27,14 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.{
   CantonGrpcUtil,
   ClientChannelBuilder,
+  GrpcError,
   GrpcManagedChannel,
 }
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.Mutex
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{ExecutionContextExecutor, Future}

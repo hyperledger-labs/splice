@@ -28,6 +28,7 @@ import io.opentelemetry.instrumentation.runtimemetrics.java8.internal.Experiment
 import io.opentelemetry.sdk.metrics.SdkMeterProviderBuilder
 import io.opentelemetry.sdk.metrics.`export`.{MetricExporter, MetricReader, PeriodicMetricReader}
 import io.opentelemetry.sdk.metrics.internal.state.MetricStorage
+import org.slf4j.helpers.NOPLogger
 
 import java.io.File
 import java.util.concurrent.ScheduledExecutorService
