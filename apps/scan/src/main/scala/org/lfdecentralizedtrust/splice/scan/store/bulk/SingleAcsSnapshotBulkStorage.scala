@@ -15,7 +15,7 @@ import org.apache.pekko.stream.scaladsl.{Flow, Keep, Source}
 import org.apache.pekko.util.ByteString
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
-import org.lfdecentralizedtrust.splice.store.HardLimit
+import org.lfdecentralizedtrust.splice.store.{HardLimit, TimestampWithMigrationId}
 
 import scala.concurrent.Future
 import io.circe.syntax.*
@@ -39,8 +39,7 @@ object Position {
 }
 
 class SingleAcsSnapshotBulkStorage(
-    val migrationId: Long,
-    val timestamp: CantonTimestamp,
+    val timestamp: TimestampWithMigrationId,
     val config: ScanStorageConfig,
     val acsSnapshotStore: AcsSnapshotStore,
     val s3Connection: S3BucketConnection,
@@ -49,14 +48,13 @@ class SingleAcsSnapshotBulkStorage(
     extends NamedLogging {
 
   private def getAcsSnapshotChunk(
-      migrationId: Long,
-      timestamp: CantonTimestamp,
+      timestamp: TimestampWithMigrationId,
       after: Option[Long],
   ): Future[(Position, ByteString)] = {
     for {
       snapshot <- acsSnapshotStore.queryAcsSnapshot(
-        migrationId,
-        snapshot = timestamp,
+        timestamp.migrationId,
+        snapshot = timestamp.timestamp,
         after,
         HardLimit.tryCreate(config.bulkDbReadChunkSize),
         Seq.empty,
@@ -76,12 +74,12 @@ class SingleAcsSnapshotBulkStorage(
 
   }
 
-  private def getSource: Source[(Long, CantonTimestamp), NotUsed] = {
+  private def getSource: Source[TimestampWithMigrationId, NotUsed] = {
     val idx = new AtomicInteger(0)
     Source
       .unfoldAsync(Start: Position) {
-        case Start => getAcsSnapshotChunk(migrationId, timestamp, None).map(Some(_))
-        case Index(i) => getAcsSnapshotChunk(migrationId, timestamp, Some(i)).map(Some(_))
+        case Start => getAcsSnapshotChunk(timestamp, None).map(Some(_))
+        case Index(i) => getAcsSnapshotChunk(timestamp, Some(i)).map(Some(_))
         case End => Future.successful(None)
       }
       .via(ZstdGroupedWeight(config.bulkMaxFileSize))
@@ -92,7 +90,7 @@ class SingleAcsSnapshotBulkStorage(
       )
       .mapAsync(1) { case ByteStringWithTermination(zstdObj, isLast) =>
         // TODO(#3429): use actual prefixes for segments, for now we just use the snapshot
-        val objectKeyPrefix = s"${timestamp.toInstant.toString}"
+        val objectKeyPrefix = s"${timestamp.timestamp.toInstant.toString}"
         val objectKey =
           if (isLast) s"$objectKeyPrefix/snapshot_${idx}_last.zstd"
           else s"$objectKeyPrefix/snapshot_$idx.zstd"
@@ -109,8 +107,8 @@ class SingleAcsSnapshotBulkStorage(
       }
       // emit a Unit upon completion of the write to s3
       .fold(()) { case ((), _) => () }
-      // emit back the (migration, timestamp) upon completion
-      .map(_ => (migrationId, timestamp))
+      // emit back the timestamp w. migrationId upon completion
+      .map(_ => timestamp)
 
   }
 
@@ -118,7 +116,7 @@ class SingleAcsSnapshotBulkStorage(
   //  we probably want to just rely on the of the full stream of ACS snapshot dumps (in AcsSnapshotBulkStorage),
   //  but keeping it for now (and the corresponding unit test) until that is fully resolved
   private def getRetryingSource
-      : Source[WithKillSwitch[(Long, CantonTimestamp)], (KillSwitch, Future[Done])] = {
+      : Source[WithKillSwitch[TimestampWithMigrationId], (KillSwitch, Future[Done])] = {
 
     def mksrc = {
       val base = getSource
@@ -128,7 +126,7 @@ class SingleAcsSnapshotBulkStorage(
           ks: KillSwitch,
           done.map { done =>
             logger.debug(
-              s"Finished dumping to bulk storage the ACS snapshot for migration $migrationId, timestamp $timestamp"
+              s"Finished dumping to bulk storage the ACS snapshot for migration ${timestamp.migrationId}, timestamp ${timestamp.timestamp}"
             )
             done
           },
@@ -138,10 +136,10 @@ class SingleAcsSnapshotBulkStorage(
 
     // TODO(#3429): tweak the retry parameters here
     val delay = FiniteDuration(5, "seconds")
-    val policy = new RetrySourcePolicy[Unit, (Long, CantonTimestamp)] {
+    val policy = new RetrySourcePolicy[Unit, TimestampWithMigrationId] {
       override def shouldRetry(
           lastState: Unit,
-          lastEmittedElement: Option[(Long, CantonTimestamp)],
+          lastEmittedElement: Option[TimestampWithMigrationId],
           lastFailure: Option[Throwable],
       ): Option[(scala.concurrent.duration.FiniteDuration, Unit)] = {
         lastFailure.map { t =>
@@ -178,12 +176,10 @@ object SingleAcsSnapshotBulkStorage {
       actorSystem: ActorSystem,
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Flow[(Long, CantonTimestamp), (Long, CantonTimestamp), NotUsed] =
-    Flow[(Long, CantonTimestamp)].flatMapConcat {
-      case (migrationId: Long, timestamp: CantonTimestamp) =>
+  ): Flow[TimestampWithMigrationId, TimestampWithMigrationId, NotUsed] =
+    Flow[TimestampWithMigrationId].flatMapConcat {
         new SingleAcsSnapshotBulkStorage(
-          migrationId,
-          timestamp,
+          _,
           config,
           acsSnapshotStore,
           s3Connection,
@@ -194,8 +190,7 @@ object SingleAcsSnapshotBulkStorage {
   /** The same flow as a source, currently used only for unit testing.
     */
   def asSource(
-      migrationId: Long,
-      timestamp: CantonTimestamp,
+      timestamp: TimestampWithMigrationId,
       config: ScanStorageConfig,
       acsSnapshotStore: AcsSnapshotStore,
       s3Connection: S3BucketConnection,
@@ -204,9 +199,8 @@ object SingleAcsSnapshotBulkStorage {
       actorSystem: ActorSystem,
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Source[WithKillSwitch[(Long, CantonTimestamp)], (KillSwitch, Future[Done])] =
+  ): Source[WithKillSwitch[TimestampWithMigrationId], (KillSwitch, Future[Done])] =
     new SingleAcsSnapshotBulkStorage(
-      migrationId,
       timestamp,
       config,
       acsSnapshotStore,

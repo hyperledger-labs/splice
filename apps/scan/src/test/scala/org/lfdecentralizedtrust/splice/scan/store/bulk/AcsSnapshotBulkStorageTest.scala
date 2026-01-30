@@ -14,15 +14,11 @@ import org.apache.pekko.stream.scaladsl.{Keep, Sink}
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
-import org.lfdecentralizedtrust.splice.scan.store.{
-  AcsSnapshotStore,
-  ScanKeyValueProvider,
-  ScanKeyValueStore,
-}
+import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider, ScanKeyValueStore}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
-import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest, TimestampWithMigrationId}
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito
@@ -58,8 +54,7 @@ class AcsSnapshotBulkStorageTest
         for {
           _ <- SingleAcsSnapshotBulkStorage
             .asSource(
-              0,
-              MockAcsSnapshotStore.initialSnapshotTimestamp,
+              TimestampWithMigrationId(MockAcsSnapshotStore.initialSnapshotTimestamp, 0),
               bulkStorageTestConfig,
               store,
               s3BucketConnection,
@@ -118,7 +113,7 @@ class AcsSnapshotBulkStorageTest
             kvProvider,
             loggerFactory,
           ).getSource()
-            .toMat(TestSink.probe[(Long, CantonTimestamp)])(Keep.both)
+            .toMat(TestSink.probe[TimestampWithMigrationId])(Keep.both)
             .run()
 
           _ = clue("Initially, a single snapshot is dumped") {
