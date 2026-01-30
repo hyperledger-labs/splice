@@ -2,6 +2,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 /** Note: to execute this locally, you might need to first `export GCLOUD_PROJECT=$CLOUDSDK_CORE_PROJECT` * */
 
+import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.*
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
@@ -23,6 +24,7 @@ import scala.concurrent.duration.*
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.DurationConverters.*
+import scala.jdk.OptionConverters.*
 import scala.sys.process.Process
 import java.time.temporal.ChronoUnit
 
@@ -295,6 +297,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def createTestData(bobParty: PartyId)(implicit
       env: FixtureParam
   ): Unit = {
+    val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
     forAll(
       Table(
         ("round", "expected balance"),
@@ -312,11 +315,25 @@ class ScanTotalSupplyBigQueryIntegrationTest
         },
       )(
         s"alice validator receives rewards up to round $expectRound",
-        _ => aliceValidatorWalletClient.balance().unlockedQty should be >= expectedBalance,
+        { _ =>
+          // aliceValidatorWalletClient.listValidatorFaucetCoupons() is always empty here
+          val vls = aliceValidatorBackend.participantClient.ledger_api_extensions.acs
+            .filterJava(ValidatorLicense.COMPANION)(
+              aliceValidatorParty,
+              _.data.validator == aliceValidatorParty.toProtoPrimitive,
+            )
+          val lastReceived: Long =
+            vls.loneElement.data.faucetState.toScala.value.lastReceivedFor.number
+          // special case that consistently holds on successful runs
+          val expectReceived: Long = if (expectRound == 2) 2 else expectRound.toLong - 1
+          lastReceived should be >= expectReceived withClue s"alice liveness ack'd in round $expectRound"
+          aliceValidatorWalletClient
+            .balance()
+            .unlockedQty should be >= expectedBalance withClue s"claimed as of round $expectRound"
+        },
       )
     }
 
-    val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
     val (lockingParty, lockingClient) = (aliceValidatorParty, aliceValidatorWalletClient)
     actAndCheck(
       "Lock amulet",
