@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "@actions/core": "^1.11.1",
-    "fast-xml-parser": "^4.5.1"
+    "fast-xml-parser": "^5.3.4"
   },
   "devDependencies": {
     "@types/node": "^22.13.2",
