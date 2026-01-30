@@ -14,6 +14,7 @@ import Splice.AmuletRules
 import Splice.Types
 import Splice.Wallet.Payment
 import Splice.Wallet.Subscriptions
+import Splice.Testing.Registries.AmuletRegistry (convertAllFeaturedAppActivityMarkers)
 
 import Splice.Scripts.Util
 
@@ -166,6 +167,7 @@ testUSDSubscription = script do
   let transferConfigAmulet = transferConfigAmuletFromOpenRound round
       expectedAppRewardInLockLeg = transferConfigAmulet.extraFeaturedAppRewardAmount
       expectedAppRewardInUnlockLeg = transferConfigAmulet.extraFeaturedAppRewardAmount
+  convertAllFeaturedAppActivityMarkers app.dso
   [(_, reward)] <- query @Splice.Amulet.AppRewardCoupon validator
   reward.amount === expectedAppRewardInLockLeg
   reward.featured === True
@@ -173,6 +175,7 @@ testUSDSubscription = script do
   amulets0 <- query @Amulet pizzeria.primaryParty
   (_subscriptionCid, subscriptionStateCid, _pizzeriasAmulet) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
 
+  convertAllFeaturedAppActivityMarkers app.dso
   [(_, reward)] <- query @Splice.Amulet.AppRewardCoupon provider.primaryParty
   reward.amount === expectedAppRewardInUnlockLeg
 
@@ -196,6 +199,7 @@ testUSDSubscription = script do
 
   payment2Cid <- makeSubscriptionPayment app alice validator None subscriptionStateCid
   (subscriptionState2Cid, _pizzeriasAmulet2) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment2Cid
+  convertAllFeaturedAppActivityMarkers app.dso
 
   rewards <- query @Splice.Amulet.AppRewardCoupon validator
   let amounts = map (._2.amount) rewards

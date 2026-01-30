@@ -141,7 +141,8 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
     amuletConfig.packageConfig,
     amuletConfig.transferPreapprovalFee,
     amuletConfig.featuredAppActivityMarkerAmount,
-    java.util.Optional.empty(),
+    amuletConfig.optDevelopmentFundManager,
+    amuletConfig.externalPartyConfigStateTickDuration,
   )
 
 }

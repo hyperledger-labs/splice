@@ -174,6 +174,8 @@ class HttpTokenStandardTransferInstructionHandler(
               .asRuntimeException()
           )
         )
+      // TODO(#3630) Don't include amulet rules and newest open round when informees all have vetted the newest version.
+      externalPartyConfigStateO <- store.lookupLatestExternalPartyConfigState()
     } yield {
       val choiceContextBuilder = new ChoiceContextBuilder(
         AmuletConfigSchedule(amuletRules.payload.configSchedule)
@@ -184,10 +186,12 @@ class HttpTokenStandardTransferInstructionHandler(
       )
 
       (
-        choiceContextBuilder.addContracts(
-          "amulet-rules" -> amuletRules,
-          "open-round" -> newestOpenRound.contract,
-        ),
+        choiceContextBuilder
+          .addContracts(
+            "amulet-rules" -> amuletRules,
+            "open-round" -> newestOpenRound.contract,
+          )
+          .addOptionalContract("external-party-config-state" -> externalPartyConfigStateO),
         newestOpenRound.contract.payload,
       )
     }

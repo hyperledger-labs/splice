@@ -25,6 +25,7 @@ import Splice.ValidatorLicense
 
 import Splice.Scripts.Util
 import Splice.Testing.Registries.AmuletRegistry.Parameters
+import Splice.Testing.Registries.AmuletRegistry (advanceToNextRoundChange)
 
 import Splice.CometBft
 import Splice.DsoRules
@@ -203,7 +204,7 @@ onboardValidator app sponsor validatorName validator = do
 -- | Run the next issuance.
 runNextIssuanceD : AmuletApp -> Decimal -> Script ()
 runNextIssuanceD app amuletPrice = do
-    advanceToNextRoundChange app
+    advanceToNextRoundChange app.dso
     -- expire rewards for closed rounds
     closedRounds <- query @ClosedMiningRound app.dso
     [(amuletRulesCid, _)] <- query @AmuletRules app.dso

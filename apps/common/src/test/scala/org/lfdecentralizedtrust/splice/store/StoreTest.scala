@@ -158,6 +158,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       dsoParty.toProtoPrimitive,
       schedule(initialTickDuration),
       false,
+      java.util.Optional.empty(), // contractStateSchemaVersion
     )
     contract(
       identifier = templateId,

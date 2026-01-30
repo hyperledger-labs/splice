@@ -326,7 +326,9 @@ class ScanClient:
         return json
 
     async def get_amulet_token_metadata(self):
-        response = await self.session.get(f"{self.url}/registry/metadata/v1/instruments/Amulet")
+        response = await self.session.get(
+            f"{self.url}/registry/metadata/v1/instruments/Amulet"
+        )
         try:
             response.raise_for_status()
         except Exception as e:
@@ -336,7 +338,6 @@ class ScanClient:
 
         json = await response.json()
         return json
-
 
 
 # Daml Decimals have a precision of 38 and a scale of 10, i.e., 10 digits after the decimal point.
@@ -844,14 +845,6 @@ class LfValue:
 
     # data AmuletRules_MintResult -> amuletSum
     def get_mint_result_amulet_sum(self):
-        return self.__get_record_field("amuletSum")
-
-    # data LockedAmulet_UnlockResult -> amuletSum
-    def get_locked_amulet_unlock_result_amulet_sum(self):
-        return self.__get_record_field("amuletSum")
-
-    # data LockedAmulet_OwnerExpireLock -> amuletSum
-    def get_locked_amulet_owner_expire_lock_result_amulet_sum(self):
         return self.__get_record_field("amuletSum")
 
     # data AmuletCreateSummary -> amulet
@@ -1428,7 +1421,9 @@ class TransferInputs:
         return (output, effective_inputs, total_cc, all_inputs)
 
     def summary(self, exercised_event):
-        subtract_holding_fees_per_round = KnownPackageIds.deducts_holding_fees(exercised_event.template_id.package_id)
+        subtract_holding_fees_per_round = KnownPackageIds.deducts_holding_fees(
+            exercised_event.template_id.package_id
+        )
         output = []
         effective_inputs = []
         unfeatured_app_rewards = {}
@@ -1583,7 +1578,8 @@ class EffectiveAmount:
         # kept for backwards-compatibility (important for compatibility tests)
         if subtract_holding_fees_per_round:
             effective_amount = max(
-                initial_amount - DamlDecimal(round_diff) * rate_per_round, DamlDecimal("0")
+                initial_amount - DamlDecimal(round_diff) * rate_per_round,
+                DamlDecimal("0"),
             )
         else:
             effective_amount = initial_amount
@@ -3002,9 +2998,8 @@ class State:
         return HandleTransactionResult.empty()
 
     def handle_locked_amulet_unlock(self, transaction, event, log_prefix="Unlock"):
-        summary = event.exercise_result.get_locked_amulet_unlock_result_amulet_sum()
-        amulet_cid = summary.get_amulet_summary_amulet()
-        round_number = summary.get_amulet_summary_round()
+        assert len(event.child_event_ids) == 1
+        amulet_cid = transaction.events_by_id[event.child_event_ids[0]].contract_id
         amulet = transaction.by_contract_id[amulet_cid]
         owner = amulet.payload.get_amulet_owner()
         del self.active_contracts[event.contract_id]
@@ -3016,16 +3011,13 @@ class State:
             f"Amulet {formatted_amulet} was unlocked",
             parties=[owner],
         )
-        return HandleTransactionResult.for_open_round(round_number)
+        return HandleTransactionResult.empty()
 
     def handle_locked_owner_expire_lock(
         self, transaction, event, log_prefix="ExpireUnlock"
     ):
-        summary = (
-            event.exercise_result.get_locked_amulet_owner_expire_lock_result_amulet_sum()
-        )
-        amulet_cid = summary.get_amulet_summary_amulet()
-        round_number = summary.get_amulet_summary_round()
+        assert len(event.child_event_ids) == 1
+        amulet_cid = transaction.events_by_id[event.child_event_ids[0]].contract_id
         amulet = transaction.by_contract_id[amulet_cid]
         del self.active_contracts[event.contract_id]
         self.active_contracts[amulet_cid] = amulet
@@ -3035,7 +3027,7 @@ class State:
             log_prefix,
             f"Amulet {formatted_amulet} was unlocked because lock expired",
         )
-        return HandleTransactionResult.for_open_round(round_number)
+        return HandleTransactionResult.empty()
 
     def handle_dso_rules_amulet_expire(self, transaction, event):
         contract_id = event.exercise_argument.get_dso_rules_amulet_expire_cid()
@@ -3185,14 +3177,13 @@ class State:
             assert event.choice_name == "SubscriptionInitialPayment_Collect"
         for event_id in event.child_event_ids:
             event = transaction.events_by_id[event_id]
-            if (
-                isinstance(event, ExercisedEvent)
-                and event.choice_name == "LockedAmulet_Unlock"
+            if isinstance(event, ExercisedEvent) and (
+                event.choice_name == "LockedAmulet_Unlock"
+                or event.choice_name == "LockedAmulet_UnlockV2"
             ):
                 del self.active_contracts[event.contract_id]
-                cid = (
-                    event.exercise_result.get_locked_amulet_unlock_result_amulet_sum().get_amulet_summary_amulet()
-                )
+                assert len(event.child_event_ids) == 1
+                cid = transaction.events_by_id[event.child_event_ids[0]].contract_id
                 amulet = transaction.by_contract_id[cid]
                 # Not adding amulet to active_contracts because it gets archived immediately again.
             if (
@@ -3310,9 +3301,9 @@ class State:
                         )
                     case "ANSRARC_RejectEntryInitialPayment":
                         for event_id, unlock_event in transaction.events_by_id.items():
-                            if (
-                                isinstance(unlock_event, ExercisedEvent)
-                                and unlock_event.choice_name == "LockedAmulet_Unlock"
+                            if isinstance(unlock_event, ExercisedEvent) and (
+                                unlock_event.choice_name == "LockedAmulet_Unlock"
+                                or unlock_event.choice_name == "LockedAmulet_UnlockV2"
                             ):
                                 return self.handle_locked_amulet_unlock(
                                     transaction,
@@ -3627,9 +3618,9 @@ class State:
     def handle_transfer_instruction_accept(self, transaction, event):
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
-            if (
-                isinstance(child_event, ExercisedEvent)
-                and child_event.choice_name == "LockedAmulet_Unlock"
+            if isinstance(child_event, ExercisedEvent) and (
+                child_event.choice_name == "LockedAmulet_Unlock"
+                or child_event.choice_name == "LockedAmulet_UnlockV2"
             ):
                 self.handle_locked_amulet_unlock(
                     transaction,
@@ -3652,9 +3643,9 @@ class State:
     def handle_transfer_instruction_reject(self, transaction, event):
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
-            if (
-                isinstance(child_event, ExercisedEvent)
-                and child_event.choice_name == "LockedAmulet_Unlock"
+            if isinstance(child_event, ExercisedEvent) and (
+                child_event.choice_name == "LockedAmulet_Unlock"
+                or child_event.choice_name == "LockedAmulet_UnlockV2"
             ):
                 return self.handle_locked_amulet_unlock(
                     transaction,
@@ -3667,9 +3658,9 @@ class State:
     def handle_transfer_instruction_withdraw(self, transaction, event):
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
-            if (
-                isinstance(child_event, ExercisedEvent)
-                and child_event.choice_name == "LockedAmulet_Unlock"
+            if isinstance(child_event, ExercisedEvent) and (
+                child_event.choice_name == "LockedAmulet_Unlock"
+                or child_event.choice_name == "LockedAmulet_UnlockV2"
             ):
                 return self.handle_locked_amulet_unlock(
                     transaction,
@@ -3699,9 +3690,9 @@ class State:
     def handle_allocation_execute_transfer(self, transaction, event):
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
-            if (
-                isinstance(child_event, ExercisedEvent)
-                and child_event.choice_name == "LockedAmulet_Unlock"
+            if isinstance(child_event, ExercisedEvent) and (
+                child_event.choice_name == "LockedAmulet_Unlock"
+                or child_event.choice_name == "LockedAmulet_UnlockV2"
             ):
                 self.handle_locked_amulet_unlock(
                     transaction,
@@ -3724,9 +3715,9 @@ class State:
     def handle_allocation_withdraw(self, transaction, event):
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
-            if (
-                isinstance(child_event, ExercisedEvent)
-                and child_event.choice_name == "LockedAmulet_Unlock"
+            if isinstance(child_event, ExercisedEvent) and (
+                child_event.choice_name == "LockedAmulet_Unlock"
+                or child_event.choice_name == "LockedAmulet_UnlockV2"
             ):
                 return self.handle_locked_amulet_unlock(
                     transaction,
@@ -3739,9 +3730,9 @@ class State:
     def handle_allocation_cancel(self, transaction, event):
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
-            if (
-                    isinstance(child_event, ExercisedEvent)
-                    and child_event.choice_name == "LockedAmulet_Unlock"
+            if isinstance(child_event, ExercisedEvent) and (
+                child_event.choice_name == "LockedAmulet_Unlock"
+                or child_event.choice_name == "LockedAmulet_UnlockV2"
             ):
                 return self.handle_locked_amulet_unlock(
                     transaction,
@@ -3794,11 +3785,19 @@ class State:
                 return self.handle_transfer_command_send(transaction, event)
             case "LockedAmulet_Unlock":
                 return self.handle_locked_amulet_unlock(transaction, event)
+            case "LockedAmulet_UnlockV2":
+                return self.handle_locked_amulet_unlock(transaction, event)
             case "LockedAmulet_OwnerExpireLock":
+                return self.handle_locked_owner_expire_lock(transaction, event)
+            case "LockedAmulet_OwnerExpireLockV2":
                 return self.handle_locked_owner_expire_lock(transaction, event)
             case "DsoRules_Amulet_Expire":
                 return self.handle_dso_rules_amulet_expire(transaction, event)
+            case "DsoRules_Amulet_ExpireV2":
+                return self.handle_dso_rules_amulet_expire(transaction, event)
             case "DsoRules_LockedAmulet_ExpireAmulet":
+                return self.handle_dso_rules_locked_amulet_expire(transaction, event)
+            case "DsoRules_LockedAmulet_ExpireAmuletV2":
                 return self.handle_dso_rules_locked_amulet_expire(transaction, event)
             case "AnsRules_RequestEntry":
                 return self.handle_request_entry(transaction, event)
@@ -3917,6 +3916,8 @@ class State:
                 return self.handle_convert_featured_app_activity_markers(
                     transaction, event
                 )
+            case "DsoRules_UpdateExternalPartyConfigStates":
+                return HandleTransactionResult.empty()
             case "TransferFactory_Transfer":
                 return self.handle_transfer_factory_transfer(transaction, event)
             case "TransferFactory_PublicFetch":
@@ -4008,7 +4009,9 @@ class PerPartyBalance:
     def sum_amounts(self):
         total = DamlDecimal("0")
         for amulet in self.amulets:
-            total += amulet.payload.get_amulet_amount().get_expiring_amount_initial_amount()
+            total += (
+                amulet.payload.get_amulet_amount().get_expiring_amount_initial_amount()
+            )
         for locked_amulet in self.locked_amulets:
             amulet = locked_amulet.payload.get_locked_amulet_amulet()
             total += amulet.get_amulet_amount().get_expiring_amount_initial_amount()
@@ -4284,7 +4287,9 @@ async def main():
                     TransactionTree.parse(tx)
                     for tx in json_batch
                     if (stop_at_record_time is None)
-                    or (datetime.fromisoformat(tx["record_time"]) <= stop_at_record_time)
+                    or (
+                        datetime.fromisoformat(tx["record_time"]) <= stop_at_record_time
+                    )
                 ]
                 LOG.debug(
                     f"Processing batch of size {len(batch)} starting at {app_state.pagination_key}"
@@ -4344,12 +4349,18 @@ async def main():
                 if args.compare_balances_with_total_supply:
                     # this will only work if a snapshot was taken, which is guaranteed by compare_acs_with_snapshot=True
                     token_metadata = await scan_client.get_amulet_token_metadata()
-                    latest_per_party_balances = app_state.state.get_per_party_balances().values()
+                    latest_per_party_balances = (
+                        app_state.state.get_per_party_balances().values()
+                    )
                     # sum up all balances
-                    total_balance = sum([p.sum_amounts() for p in latest_per_party_balances], DamlDecimal(0))
-                    if DamlDecimal(token_metadata['totalSupply']) != total_balance:
-                        LOG.error(f"Total supply mismatch: {token_metadata['totalSupply']} in metadata (as of {token_metadata['totalSupplyAsOf']}), {total_balance} in computed balances (as of {app_state.state.record_time})")
-
+                    total_balance = sum(
+                        [p.sum_amounts() for p in latest_per_party_balances],
+                        DamlDecimal(0),
+                    )
+                    if DamlDecimal(token_metadata["totalSupply"]) != total_balance:
+                        LOG.error(
+                            f"Total supply mismatch: {token_metadata['totalSupply']} in metadata (as of {token_metadata['totalSupplyAsOf']}), {total_balance} in computed balances (as of {app_state.state.record_time})"
+                        )
 
         duration = time.time() - begin_t
         LOG.info(

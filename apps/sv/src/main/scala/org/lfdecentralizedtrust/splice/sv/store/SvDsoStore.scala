@@ -64,6 +64,7 @@ trait SvDsoStore
     with PackageIdResolver.HasAmuletRules
     with DsoRulesStore
     with MiningRoundsStore
+    with ExternalPartyConfigStateStore
     with ActiveVotesStore {
   protected val outerLoggerFactory: NamedLoggerFactory
   protected def templateJsonDecoder: TemplateJsonDecoder
@@ -1361,6 +1362,13 @@ object SvDsoStore {
         )
       },
       mkFilter(splice.amulet.UnclaimedDevelopmentFundCoupon.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract
+        )
+      },
+      mkFilter(splice.externalpartyconfigstate.ExternalPartyConfigState.COMPANION)(co =>
         co.payload.dso == dso
       ) { contract =>
         DsoAcsStoreRowData(
