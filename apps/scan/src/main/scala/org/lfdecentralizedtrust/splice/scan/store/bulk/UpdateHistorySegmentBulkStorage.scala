@@ -27,7 +27,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
-import scala.math.Ordering.Implicits._
+import scala.math.Ordering.Implicits.*
 
 // TODO(#3429): some duplication between this and SingleAcsSnapshotBulkStorage, see if we can more nicely reuse stuff
 
@@ -70,10 +70,12 @@ class UpdateHistorySegmentBulkStorage(
               Some(TimestampWithMigrationId(last.update.update.recordTime, last.migrationId))
             )
             Future.successful(
-              Some((
-                TimestampWithMigrationId(last.update.update.recordTime, last.migrationId),
-                updatesBytes,
-              ))
+              Some(
+                (
+                  TimestampWithMigrationId(last.update.update.recordTime, last.migrationId),
+                  updatesBytes,
+                )
+              )
             )
           } else {
             // All updates are outside the segment, so we're done
@@ -138,9 +140,7 @@ class UpdateHistorySegmentBulkStorage(
       // emit a Unit upon completion of the write to s3
       .fold(()) { case ((), _) => () }
       // emit the timestamp of the last update dumped upon completion.
-      .map(_ =>
-        lastEmitted.get().getOrElse(fromTimestamp)
-      )
+      .map(_ => lastEmitted.get().getOrElse(fromTimestamp))
 
   }
 }
