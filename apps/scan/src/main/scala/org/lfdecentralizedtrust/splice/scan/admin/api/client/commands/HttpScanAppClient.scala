@@ -10,7 +10,10 @@ import cats.syntax.traverse.*
 import com.daml.ledger.api.v2.CommandsOuterClass
 import com.digitalasset.canton.config.{RequireTypes, TlsClientConfig}
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  FeaturedAppRight,
+  UnclaimedDevelopmentFundCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   AppTransferContext,
@@ -37,8 +40,8 @@ import org.lfdecentralizedtrust.tokenstandard.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.{
   ForceAcsSnapshotNowResponse,
-  GetDateOfMostRecentSnapshotBeforeResponse,
   GetDateOfFirstSnapshotAfterResponse,
+  GetDateOfMostRecentSnapshotBeforeResponse,
 }
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   CompactJsonScanHttpEncodings,
@@ -82,6 +85,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
 }
+
 import java.util.Base64
 import java.time.Instant
 import scala.concurrent.Future
@@ -2438,6 +2442,35 @@ object HttpScanAppClient {
             ProtobufJsonScanHttpEncodings.httpToLapiUpdate(http).update
           )
         )
+    }
+  }
+
+  case class ListUnclaimedDevelopmentFundCoupons()
+      extends InternalBaseCommand[
+        http.ListUnclaimedDevelopmentFundCouponsResponse,
+        Seq[ContractWithState[
+          UnclaimedDevelopmentFundCoupon.ContractId,
+          UnclaimedDevelopmentFundCoupon,
+        ]],
+      ] {
+
+    override def submitRequest(
+        client: ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListUnclaimedDevelopmentFundCouponsResponse] =
+      client.listUnclaimedDevelopmentFundCoupons(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListUnclaimedDevelopmentFundCouponsResponse.OK(response) =>
+      response.unclaimedDevelopmentFundCoupons
+        .traverse(coupon =>
+          ContractWithState.fromHttp(UnclaimedDevelopmentFundCoupon.COMPANION)(coupon)
+        )
+        .leftMap(_.toString)
     }
   }
 }

@@ -18,6 +18,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
+          token: '${{ secrets.GH_CREATE_PRS_TOKEN }}' # need to checkout with a stronger token to be able to push later
 
       - name: Setup
         shell: bash
@@ -29,6 +30,7 @@ jobs:
           cache_version: 7
           artifactory_user: dummy
           artifactory_password: dummy
+          target: default
       
       - name: Check for the latest version and create a PR to splice
         uses: ./.github/actions/nix/run_bash_command_in_nix
@@ -39,10 +41,10 @@ jobs:
             ./scripts/bump-gha-runner-version.sh
           additional_nix_args: "--keep GH_TOKEN"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: '${{ secrets.GH_CREATE_PRS_TOKEN }}' # need a stronger token to create a PR
 
       - name: Report Failures on Slack & Github
-        if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+        if: failure() && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
         uses: ./.github/actions/tests/failure_notifications
         with:
           workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'

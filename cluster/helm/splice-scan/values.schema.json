@@ -95,6 +95,12 @@
           "secretName": {
             "type": "string"
           }
+        },
+        "acsStoreDescriptorUserVersion": {
+          "type": "integer"
+        },
+        "txLogStoreDescriptorUserVersion": {
+          "type": "integer"
         }
       }
     },

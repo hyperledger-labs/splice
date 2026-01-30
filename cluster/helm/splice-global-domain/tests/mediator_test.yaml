@@ -79,3 +79,76 @@ tests:
           content:
             name: ADDITIONAL_MEDIATOR_ENV_VAR_NAME
             value: ADDITIONAL_MEDIATOR_ENV_VAR_VALUE
+  - it: "uses resources when only resources is set"
+    set:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources
+          value:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+  - it: "uses mediator.resources when only mediator.resources is set"
+    set:
+      mediator:
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources
+          value:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+  - it: "merges resources with mediator.resources taking precedence"
+    set:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+      mediator:
+        resources:
+          requests:
+            cpu: 500m
+          limits:
+            memory: 1Gi
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources
+          value:
+            requests:
+              cpu: 500m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 1Gi

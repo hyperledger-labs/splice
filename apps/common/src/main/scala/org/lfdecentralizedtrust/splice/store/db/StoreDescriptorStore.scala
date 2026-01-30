@@ -34,15 +34,21 @@ case class StoreDescriptor(
     party: PartyId,
     participant: ParticipantId,
     key: Map[String, String],
+    userVersion: Option[Long] = None,
 ) {
   def toJson: io.circe.Json = {
-    Json.obj(
+    val base = Json.obj(
       "version" -> Json.fromInt(version),
       "name" -> Json.fromString(name),
       "party" -> Json.fromString(party.toProtoPrimitive),
       "participant" -> Json.fromString(participant.toProtoPrimitive),
       "key" -> Json.obj(key.map { case (k, v) => k -> Json.fromString(v) }.toSeq*),
     )
+
+    userVersion match {
+      case Some(uv) => base.deepMerge(Json.obj("userVersion" -> Json.fromLong(uv)))
+      case None => base
+    }
   }
 }
 

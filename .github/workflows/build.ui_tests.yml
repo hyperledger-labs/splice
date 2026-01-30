@@ -38,7 +38,7 @@ jobs:
         uses: ./.github/actions/tests/common_test_setup
         with:
           test_name: ui_tests
-          oss_only: true
+          target: 'oss'
 
       - name: Run UI tests
         if: steps.skip.outputs.skip != 'true'

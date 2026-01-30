@@ -1090,6 +1090,7 @@ lazy val `apps-scan` =
         scalapb_runtime,
         zstd,
         aws_s3,
+        s3mock_testcontainers,
       ),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
@@ -1428,7 +1429,7 @@ lazy val `apps-splitwell-frontend` = {
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "splitwell-frontend",
+      frontendWorkspace := "@lfdecentralizedtrust/splice-splitwell-frontend",
       sharedFrontendSettings,
     )
 }

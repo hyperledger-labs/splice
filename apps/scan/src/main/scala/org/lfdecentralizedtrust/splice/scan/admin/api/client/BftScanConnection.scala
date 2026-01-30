@@ -6,7 +6,10 @@ package org.lfdecentralizedtrust.splice.scan.admin.api.client
 import cats.data.{NonEmptyList, OptionT}
 import cats.implicits.*
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  FeaturedAppRight,
+  UnclaimedDevelopmentFundCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   TransferPreapproval,
@@ -676,6 +679,13 @@ class BftScanConnection(
         SyncCloseable("scan_list", scanList.close())
       )
   }
+
+  override def listUnclaimedDevelopmentFundCoupons()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[
+    ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
+  ]] = bftCall(_.listUnclaimedDevelopmentFundCoupons())
 }
 trait HasUrl {
   def url: Uri

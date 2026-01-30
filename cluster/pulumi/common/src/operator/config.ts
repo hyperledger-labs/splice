@@ -4,6 +4,7 @@ import {
   config,
   DeploySvRunbook,
   GitReferenceSchema,
+  K8sResourceSchema,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   mustInstallSplitwell,
@@ -15,6 +16,7 @@ import { z } from 'zod';
 
 export const StackConfigSchema = z.object({
   parallelism: z.number().optional(),
+  resources: K8sResourceSchema,
 });
 
 const ProjectFilterSchema = z.union([

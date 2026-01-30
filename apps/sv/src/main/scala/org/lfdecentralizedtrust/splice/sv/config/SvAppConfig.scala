@@ -103,6 +103,7 @@ object SvOnboardingConfig {
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
       initialRound: Long = 0L,
       developmentFundPercentage: Option[BigDecimal] = None,
+      developmentFundManager: Option[PartyId] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -366,6 +367,8 @@ case class SvAppBackendConfig(
     validateTopologyAfterMigration: Boolean = false,
     // The threshold above which unclaimed development fund coupons will be merged.
     unclaimedDevelopmentFundCouponsThreshold: Int = 10,
+    svAcsStoreDescriptorUserVersion: Option[Long] = None,
+    dsoAcsStoreDescriptorUserVersion: Option[Long] = None,
 ) extends SpliceBackendConfig {
 
   def shouldSkipSynchronizerInitialization =

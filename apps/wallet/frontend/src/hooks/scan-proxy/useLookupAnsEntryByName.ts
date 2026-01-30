@@ -11,7 +11,7 @@ const useLookupAnsEntryByName = (
   enabled: boolean = true,
   retryWhenNotFound: boolean = false,
   retry: number = 3
-): UseQueryResult<AnsEntry> => {
+): UseQueryResult<AnsEntry | null> => {
   const scanClient = useValidatorScanProxyClient();
 
   return useLookupAnsEntryByNameFromResponse(

@@ -106,18 +106,18 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 # docker pattern rules
 #########
 
-%/$(docker-local-image-tag): force-update-version
-	mkdir -p $(@D)
+cluster/images/%/target:
+	mkdir -p $@
+
+%/$(docker-local-image-tag): force-update-version | %/target
 	overwrite-if-changed $$(basename $$(dirname $(@D))):$(shell get-snapshot-version) $@
 
-%/$(docker-image-tag): force-update-version
-	mkdir -p $(@D)
+%/$(docker-image-tag): force-update-version | %/target
 	get-docker-image-reference $$(basename $$(dirname $(@D))) > $@
 
-%/$(docker-build): %/$(docker-local-image-tag) %/Dockerfile
+%/$(docker-build): %/$(docker-local-image-tag) %/Dockerfile | %/target
 	docker-check-multi-arch
 	docker-check-env-vars
-	mkdir -pv $(@D)
 	@echo docker build triggered because these files changed: $?
 	docker buildx build $(platform_opt) \
 		--label "org.opencontainers.image.ref.name=$$(basename $$(dirname $(@D)))" \

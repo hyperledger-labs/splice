@@ -47,8 +47,18 @@ pulumiProjectConfig:
 pulumiStacks:
   default:
     parallelism: 64
+    resources:
+      requests:
+        memory: '2Gi'
+  canton-network:
+    resources:
+      requests:
+        memory: '4Gi'
   multi-validator:
     parallelism: 10
+    resources:
+      requests:
+        memory: '6Gi'
 validator1:
   logging:
     level: DEBUG

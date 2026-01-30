@@ -38,12 +38,11 @@ class UpdateHistoryBulkStorageTest
   "UpdateHistoryBulkStorage" should {
 
     "work" in {
-      withS3Mock {
+      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
         val initialStoreSize = 1500
         val segmentSize = 2200L
         val segmentFromTimestamp = 100L
         val mockStore = new MockUpdateHistoryStore(initialStoreSize)
-        val bucketConnection = getS3BucketConnection(loggerFactory)
         val fromTimestamp =
           CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp))
         val toTimestamp =

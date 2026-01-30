@@ -7,10 +7,14 @@ inputs:
   artifactory_password:
     description: "The Artifactory password"
     required: true
-  oss_only:
-    description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)"
-    default: "false"
-    required: false
+  target:
+    description: "Choose nix target: oss - restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts), static_tests - for static tests, default - for enterprise dependencies"
+    type: choice
+    options:
+      - oss
+      - default
+      - static_tests
+    required: true
   cache_version:
     description: "The cache version"
     required: true
@@ -46,10 +50,10 @@ runs:
         echo "gh_cache_version: ${{ inputs.cache_version }}" >> /tmp/nix-cache-key # Add cache version to the cache key
         echo "home: $HOME" >> /tmp/nix-cache-key # important when restoring simlinks from cache, apparently
         echo "nix binary version: $NIX_BINARY_VERSION" >> /tmp/nix-cache-key # different nix versions might behave differently and corrupt the caches
-        if [ "${{ inputs.oss_only }}" == true ]; then
+        echo ${{ inputs.target }} > /tmp/nix_target # Create a file to indicate which target are we using (so we don't need to re-specifify target to run_bash_command_in_nix)
+        echo "target: ${{ inputs.target }}" >> /tmp/nix-cache-key
+        if [ "${{ inputs.target }}" != 'default' ]; then
           echo "Using OSS only dependencies"
-          echo "oss_only: ${{ inputs.oss_only }}" >> /tmp/nix-cache-key
-          touch /tmp/oss-only # Create a file to indicate that we are using OSS only dependencies (so we don't need to re-specifify oss_only to run_bash_command_in_nix)
         fi
         cat /tmp/nix-cache-key
         cache_key=($(md5sum "/tmp/nix-cache-key"))
@@ -61,7 +65,7 @@ runs:
       run: |
         set -euxo pipefail
 
-        if [ ${{ inputs.oss_only }} != 'true' ]; then
+        if [[ ${{ inputs.target }} == 'default' ]]; then
           echo "Must use OSS only dependencies in GitHub-hosted runners"
           exit 1
         fi
@@ -138,7 +142,7 @@ runs:
           sh <(curl -fsSL --retry 8 "https://releases.nixos.org/nix/nix-$NIX_BINARY_VERSION/install") --no-daemon
           sudo mkdir -p /etc/nix
           sudo chmod a+rw /etc/nix
-          if [[ "${{ inputs.oss_only }}" == true ]]; then
+          if [[ "${{ inputs.target }}" != 'default' ]]; then
             echo "Using OSS only dependencies, not setting up Artifactory credentials"
           else
             cat <<EOF > /etc/nix/netrc
@@ -150,12 +154,7 @@ runs:
           export USER=$(whoami)
           echo "Running nix.sh"
           . ~/.nix-profile/etc/profile.d/nix.sh
-          if [[ "${{ inputs.oss_only }}" == true ]]; then
-            target="oss"
-          else
-            target="default"
-          fi
-          nix develop path:nix#${target} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
+          nix develop path:nix#${{ inputs.target }} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
         fi
 
     - name: Invoke nix before saving cache

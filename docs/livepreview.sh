@@ -10,7 +10,7 @@ if [[ $# -eq 1 ]] && [[ "$1" == "--skip-daml" ]]; then
   echo "Skipping generation of DAML docs as requested."
 else
   # Generate DAML docs
-  (cd "$SPLICE_ROOT"; sbt --client --batch damlBuild)
+  (cd "$SPLICE_ROOT"; sbt --batch damlBuild)
   ./gen-daml-docs.sh
 fi
 
