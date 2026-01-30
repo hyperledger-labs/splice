@@ -9,15 +9,14 @@ import com.daml.grpc.adapter.client.pekko.ClientAdapter
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.*
 import com.daml.ledger.api.v2.admin.{user_management_service as v1User, *}
-import com.daml.ledger.api.v2.admin.package_management_service.{
-  PackageManagementServiceGrpc,
-  UploadDarFileRequest,
-}
 import com.daml.ledger.api.v2.admin.party_management_service.{
   GetPartiesRequest,
   PartyManagementServiceGrpc,
 }
-import com.daml.ledger.api.v2.interactive.interactive_submission_service.InteractiveSubmissionServiceGrpc
+import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
+  ExecuteSubmissionRequest,
+  InteractiveSubmissionServiceGrpc,
+}
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc
 import com.daml.ledger.api.v2.offset_checkpoint.OffsetCheckpoint.toJavaProto
 import com.daml.ledger.api.v2.package_reference.PackageReference
@@ -135,9 +134,6 @@ private[environment] class LedgerClient(
     CommandServiceGrpc.stub(channel)
   private val packageServiceStub: PackageServiceGrpc.PackageServiceStub =
     PackageServiceGrpc.stub(channel)
-  private val packageManagementServiceStub
-      : PackageManagementServiceGrpc.PackageManagementServiceStub =
-    PackageManagementServiceGrpc.stub(channel)
   private val partyManagementServiceStub: PartyManagementServiceGrpc.PartyManagementServiceStub =
     PartyManagementServiceGrpc.stub(channel)
   private val userManagementServiceStub
@@ -264,7 +260,9 @@ private[environment] class LedgerClient(
                       )
                     )
                   )
-                  .toMap
+                  .toMap,
+                filtersForAnyParty = None,
+                verbose = false,
               )
             ),
             transactionShape = transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
@@ -312,6 +310,11 @@ private[environment] class LedgerClient(
           actAs = actAs,
           readAs = readAs,
           verboseHashing = verboseHashing,
+          minLedgerTime = None,
+          maxRecordTime = None,
+          packageIdSelectionPreference = Seq.empty,
+          prefetchContractKeys = Seq.empty,
+          estimateTrafficCost = None,
         )
       )
     } yield result
@@ -351,6 +354,8 @@ private[environment] class LedgerClient(
           submissionId = submissionId,
           hashingSchemeVersion =
             lapi.interactive.interactive_submission_service.HashingSchemeVersion.HASHING_SCHEME_VERSION_V2,
+          minLedgerTime = None,
+          deduplicationPeriod = ExecuteSubmissionRequest.DeduplicationPeriod.Empty,
         )
       )
     } yield result
@@ -362,16 +367,6 @@ private[environment] class LedgerClient(
       res <- stub
         .listPackages(request)
         .map(_.packageIds)
-    } yield res
-  }
-
-  def uploadDarFile(
-      darFile: ByteString
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
-    val request = UploadDarFileRequest(darFile)
-    for {
-      stub <- withCredentialsAndTraceContext(packageManagementServiceStub)
-      res <- stub.uploadDarFile(request).map(_ => ())
     } yield res
   }
 
@@ -456,7 +451,7 @@ private[environment] class LedgerClient(
   def getParties(
       parties: Seq[PartyId]
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Seq[PartyDetails]] = {
-    val request = GetPartiesRequest(parties.map(_.toProtoPrimitive))
+    val request = GetPartiesRequest(parties.map(_.toProtoPrimitive), "")
     for {
       stub <- withCredentialsAndTraceContext(partyManagementServiceStub)
       res <- stub
@@ -577,6 +572,7 @@ private[environment] class LedgerClient(
       val request = v1User.GrantUserRightsRequest(
         userId,
         rights.map(javaRightToV1Right),
+        "",
       )
 
       for {
@@ -596,6 +592,7 @@ private[environment] class LedgerClient(
       val request = v1User.RevokeUserRightsRequest(
         userId,
         rights.map(javaRightToV1Right),
+        "",
       )
       for {
         stub <- withCredentialsAndTraceContext(userManagementServiceStub)
@@ -650,7 +647,9 @@ private[environment] class LedgerClient(
       party: PartyId
   )(implicit tc: TraceContext): Future[Map[SynchronizerAlias, SynchronizerId]] = {
     val req = lapi.state_service.GetConnectedSynchronizersRequest(
-      party = party.toProtoPrimitive
+      party = party.toProtoPrimitive,
+      "",
+      "",
     )
     for {
       stub <- withCredentialsAndTraceContext(stateServiceStub)
@@ -772,6 +771,7 @@ object LedgerClient {
               )
             ),
             includeReassignments = Some(eventFormat),
+            includeTopologyEvents = None,
           )
         ),
       )
@@ -967,6 +967,7 @@ object LedgerClient {
               )
           }
         ),
+        workflowId = "",
       )
       lapi.command_submission_service.SubmitReassignmentRequest(
         Some(commands)

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant
@@ -60,6 +60,7 @@ import com.digitalasset.canton.participant.synchronizer.grpc.GrpcSynchronizerReg
 import com.digitalasset.canton.participant.topology.*
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.platform.apiserver.services.admin.PackageUpgradeValidator
+import com.digitalasset.canton.platform.store.LedgerApiContractStoreImpl
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.resource.*
@@ -219,6 +220,8 @@ class ParticipantNodeBootstrap(
       nodeId,
       clock,
       crypto,
+      parameters.batchingConfig.topologyCacheAggregator,
+      config.topology,
       authorizedStore,
       exitOnFatalFailures = parameters.exitOnFatalFailures,
       bootstrapStageCallback.timeouts,
@@ -509,7 +512,11 @@ class ParticipantNodeBootstrap(
                 commandProgressTracker = commandProgressTracker,
                 ledgerApiStore = persistentState.map(_.ledgerApiStore),
                 contractStore = persistentState.map(state =>
-                  LedgerApiContractStoreImpl(state.contractStore, loggerFactory)
+                  LedgerApiContractStoreImpl(
+                    state.contractStore,
+                    loggerFactory,
+                    metrics.ledgerApiServer,
+                  )
                 ),
                 ledgerApiIndexerConfig = LedgerApiIndexerConfig(
                   storageConfig = config.storage,
@@ -527,7 +534,7 @@ class ParticipantNodeBootstrap(
                 postProcessor = inFlightSubmissionTracker
                   .processPublications(_)(_)
                   .failOnShutdownTo(
-                    // This will be throw in the Indexer pekko-stream pipeline, and handled gracefully there
+                    // This will be thrown in the Indexer pekko-stream pipeline, and handled gracefully there
                     new RuntimeException("Post processing aborted due to shutdown")
                   ),
                 sequentialPostProcessor = sequentialPostProcessor,
@@ -546,15 +553,7 @@ class ParticipantNodeBootstrap(
           }
         }
 
-        ephemeralState = ParticipantNodeEphemeralState(
-          ledgerApiIndexerContainer.asEval,
-          inFlightSubmissionTracker,
-          clock,
-          exitOnFatalFailures = parameters.exitOnFatalFailures,
-          timeouts = parameters.processingTimeouts,
-          futureSupervisor,
-          loggerFactory,
-        )
+        ephemeralState = ParticipantNodeEphemeralState(inFlightSubmissionTracker)
 
         packageService = PackageService(
           clock = clock,
@@ -752,6 +751,7 @@ class ParticipantNodeBootstrap(
             clock,
             adminServerRegistry,
             adminTokenDispenser,
+            storage,
             futureSupervisor,
             loggerFactory,
             tracerProvider,
@@ -843,7 +843,6 @@ class ParticipantNodeBootstrap(
         persistentState.map(addCloseable).discard
         addCloseable(packageService)
         addCloseable(indexedStringStore)
-        addCloseable(ephemeralState.participantEventPublisher)
         addCloseable(topologyDispatcher)
         addCloseable(schedulers)
         addCloseable(ledgerApiServerContainer.currentAutoCloseable())

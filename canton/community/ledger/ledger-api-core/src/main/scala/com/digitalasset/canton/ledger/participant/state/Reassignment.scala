@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.participant.state
@@ -50,6 +50,8 @@ object Reassignment {
     *   unassignment can initiate the assignment. Defined for reassigning participants.
     * @param reassignmentCounter
     *   The reassignment counter of the underlying contract.
+    * @param nodeId
+    *   The node ID of the unassign node.
     */
   final case class Unassign(
       contractId: Value.ContractId,
@@ -71,6 +73,10 @@ object Reassignment {
     *   The authentication data provided at creation of the underlying contract.
     * @param reassignmentCounter
     *   The reassignment counter of the underlying contract.
+    * @param nodeId
+    *   The node ID of the create node.
+    * @param internalContractId
+    *   The internal contract id of the contract
     */
   final case class Assign(
       ledgerEffectiveTime: Timestamp,
@@ -78,6 +84,7 @@ object Reassignment {
       contractAuthenticationData: Bytes,
       reassignmentCounter: Long,
       nodeId: Int,
+      internalContractId: Long,
   ) extends Reassignment {
     def templateId: Ref.Identifier = createNode.templateId
     def packageName: Ref.PackageName = createNode.packageName
@@ -85,7 +92,7 @@ object Reassignment {
   }
 }
 
-/** The common information for all reassigments. Except from the hosted and reassigning
+/** The common information for all reassignments. Except from the hosted and reassigning
   * stakeholders, all fields are the same for reassign and assign updates, which belong to the same
   * reassignment.
   *
@@ -97,6 +104,8 @@ object Reassignment {
   *   Submitter of the command, unless the operation is performed offline.
   * @param reassignmentId
   *   The ID of the unassign event. This should be used for the assign command.
+  * @param isReassigningParticipant
+  *   Whether the participant is reassigning for the reassignment.
   */
 final case class ReassignmentInfo(
     sourceSynchronizer: Source[SynchronizerId],

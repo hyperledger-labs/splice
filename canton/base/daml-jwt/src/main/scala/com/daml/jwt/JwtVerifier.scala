@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.daml.jwt
@@ -118,6 +118,7 @@ object ECDSAVerifier extends Leeway with WithExecuteUnsafe {
 }
 
 // RSA256 validator factory
+@SuppressWarnings(Array("org.wartremover.warts.Null"))
 object RSA256Verifier extends Leeway with WithExecuteUnsafe {
   def apply(
       publicKey: RSAPublicKey,

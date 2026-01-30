@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -159,14 +159,18 @@ object CantonTimestamp {
 
   private val isoFormat = DateTimeFormatter.ISO_INSTANT.withZone(ZoneId.of("Z"))
 
+  def fromString(str: String): Either[String, CantonTimestamp] = Either
+    .catchOnly[DateTimeParseException](isoFormat.parse(str, Instant.from(_)))
+    .leftMap(_.getMessage)
+    .flatMap(CantonTimestamp.fromInstant)
+    .leftMap(err => s"Unable to parse $str as CantonTimestamp: $err")
+
+  def assertFromString(str: String): CantonTimestamp =
+    fromString(str).valueOr(err => throw new IllegalArgumentException(err))
+
   implicit val cantonTimestampReader: ConfigReader[CantonTimestamp] =
     ConfigReader.fromNonEmptyString { str =>
-      Either
-        .catchOnly[DateTimeParseException](
-          isoFormat.parse(str, Instant.from(_))
-        )
-        .leftMap(_.getMessage)
-        .flatMap(CantonTimestamp.fromInstant)
+      fromString(str)
         .leftMap[FailureReason](error =>
           CannotConvert(str, classOf[CantonTimestamp].getName, error)
         )

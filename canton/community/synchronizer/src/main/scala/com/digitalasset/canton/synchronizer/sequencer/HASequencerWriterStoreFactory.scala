@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -13,7 +13,12 @@ import com.digitalasset.canton.config.{
   QueryCostMonitoringConfig,
 }
 import com.digitalasset.canton.crypto.PseudoRandom
-import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
+import com.digitalasset.canton.lifecycle.{
+  CloseContext,
+  FlagCloseable,
+  FutureUnlessShutdown,
+  HasCloseContext,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.resource.*
 import com.digitalasset.canton.resource.DbLockedConnectionPool.NoActiveConnectionAvailable
@@ -124,6 +129,7 @@ class HASequencerWriterStoreFactory(
           withMainConnection = false,
         )
 
+      unusedSessionContext = CloseContext(FlagCloseable(logger, timeouts))
       multiStorage <- DbStorageMulti
         .create(
           storage.dbConfig,
@@ -133,7 +139,7 @@ class HASequencerWriterStoreFactory(
           DbLockCounters.SEQUENCER_WRITERS_MAIN(instanceIndex),
           DbLockCounters.SEQUENCER_WRITERS_POOL(instanceIndex),
           () => FutureUnlessShutdown.unit,
-          () => FutureUnlessShutdown.pure(None),
+          () => FutureUnlessShutdown.unit,
           storage.metrics,
           logQueryCost,
           None,
@@ -142,6 +148,7 @@ class HASequencerWriterStoreFactory(
           exitOnFatalFailures = exitOnFatalFailures,
           futureSupervisor,
           loggerFactory.append("writerId", PseudoRandom.randomAlphaNumericString(4)),
+          () => unusedSessionContext,
         )
         .leftMap(WriterStartupError.FailedToCreateExclusiveStorage.apply)
         .mapK(FutureUnlessShutdown.liftK)

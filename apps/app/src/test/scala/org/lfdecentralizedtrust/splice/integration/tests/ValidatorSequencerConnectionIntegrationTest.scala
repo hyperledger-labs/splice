@@ -2,8 +2,8 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import cats.data.NonEmptyList
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.admin.api.client.data.GrpcSequencerConnection
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.{ParticipantClientReference, SvAppBackendReference}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition

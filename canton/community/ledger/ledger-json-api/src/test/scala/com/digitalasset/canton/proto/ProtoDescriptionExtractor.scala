@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.proto
@@ -25,6 +25,11 @@ object ProtoDescriptionExtractor {
     val fileCommentsMap = protos
       .map { proto =>
         val fileName = proto.getFilename
+        val normalizedFileName =
+          if (fileName.startsWith(s"${ProtoParser.ledgerApiProtoLocation}/")) {
+            fileName.stripPrefix(s"${ProtoParser.ledgerApiProtoLocation}/")
+          } else fileName
+
         val messages = proto.getMessages.asScala.map { msg =>
           msg.getName -> MessageInfo(toFieldData(msg))
         }.toMap
@@ -43,7 +48,7 @@ object ProtoDescriptionExtractor {
           }.toSeq
         }.toMap
 
-        fileName -> ExtractedProtoFileComments(
+        normalizedFileName -> ExtractedProtoFileComments(
           SortedMap.from(messages),
           SortedMap.from(oneOfs),
           services,

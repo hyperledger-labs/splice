@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset
@@ -24,6 +24,8 @@ package object canton {
   // in Canton.
   type LfPartyId = Ref.Party
   val LfPartyId: Ref.Party.type = Ref.Party
+
+  type InternedPartyId = Int
 
   // Ledger participant id
   type LedgerParticipantId = Ref.ParticipantId

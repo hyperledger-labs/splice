@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.party
@@ -57,7 +57,7 @@ object PartyReplicationSourceParticipantMessage
             )
         } yield AcsBatch(nonEmptyContracts)
       case v30.PartyReplicationSourceParticipantMessage.DataOrStatus
-            .EndOfAcs(v30.PartyReplicationSourceParticipantMessage.EndOfACS()) =>
+            .EndOfAcs(v30.PartyReplicationSourceParticipantMessage.EndOfAcs()) =>
         Right(EndOfACS)
     }
   } yield PartyReplicationSourceParticipantMessage(dataOrStatus)(rpv)
@@ -77,7 +77,7 @@ object PartyReplicationSourceParticipantMessage
   object EndOfACS extends DataOrStatus {
     override def toProtoV30: v30.PartyReplicationSourceParticipantMessage.DataOrStatus =
       v30.PartyReplicationSourceParticipantMessage.DataOrStatus.EndOfAcs(
-        v30.PartyReplicationSourceParticipantMessage.EndOfACS()
+        v30.PartyReplicationSourceParticipantMessage.EndOfAcs()
       )
   }
 

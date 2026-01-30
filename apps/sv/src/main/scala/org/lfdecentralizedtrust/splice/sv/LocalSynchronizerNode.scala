@@ -4,17 +4,20 @@
 package org.lfdecentralizedtrust.splice.sv
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.admin.api.client.data.NodeStatus
+import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
+import com.digitalasset.canton.admin.api.client.data.{NodeStatus, SubmissionRequestAmplification}
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
-import com.digitalasset.canton.logging.pretty.PrettyInstances.prettyPrettyPrinting
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.pretty.PrettyInstances.prettyPrettyPrinting
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
-import com.digitalasset.canton.sequencing.{
-  GrpcSequencerConnection,
-  SequencerConnection,
-  SubmissionRequestAmplification,
+import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnection}
+import com.digitalasset.canton.topology.{
+  ForceFlag,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+  UniqueIdentifier,
 }
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
@@ -22,15 +25,8 @@ import com.digitalasset.canton.topology.transaction.TopologyMapping.Code.{
   NamespaceDelegation,
   OwnerToKeyMapping,
 }
-import com.digitalasset.canton.topology.{
-  ForceFlag,
-  PhysicalSynchronizerId,
-  SynchronizerId,
-  UniqueIdentifier,
-}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import io.grpc.Status
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.stream.Materializer
@@ -290,7 +286,7 @@ final class LocalSynchronizerNode(
             mediatorAdminConnection.initialize(
               synchronizerId,
               sequencerConnection,
-              mediatorSequencerAmplification,
+              mediatorSequencerAmplification.toInternal,
             )
           case NodeStatus.Success(_) =>
             logger.info("Mediator is already initialized")
@@ -475,7 +471,7 @@ final class LocalSynchronizerNode(
       } yield connections match {
         case Seq(connection) =>
           if (
-            sequencerConnections.submissionRequestAmplification == mediatorSequencerAmplification
+            sequencerConnections.submissionRequestAmplification == mediatorSequencerAmplification.toInternal
           ) {
             Right(())
           } else {
@@ -491,7 +487,7 @@ final class LocalSynchronizerNode(
       (sequencerConnection: SequencerConnection) =>
         mediatorAdminConnection.setSequencerConnection(
           sequencerConnection,
-          mediatorSequencerAmplification,
+          mediatorSequencerAmplification.toInternal,
         ),
       logger,
     )

@@ -1,11 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.RequireTypes.{PositiveInt, PositiveNumeric}
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLogging, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
@@ -53,6 +52,10 @@ import scala.jdk.CollectionConverters.*
   * @param migrateAndStart
   *   if true, db migrations will be applied to the database (default is to abort start if db
   *   migrates are pending to force an explicit upgrade)
+  * @param repeatableMigrationsPaths
+  *   Additional locations to scan for migrations. The goal is to be able to provide additional
+  *   database table settings under this path, i.e. vacuum/analyze settings for Postgres. The paths
+  *   should only contain repeatable migrations (files like `R__table_settings.sql`).
   */
 final case class DbParametersConfig(
     maxConnections: Option[PositiveInt] = None,
@@ -67,8 +70,10 @@ final case class DbParametersConfig(
     unsafeCleanOnValidationError: Boolean = false,
     unsafeBaselineOnMigrate: Boolean = false,
     migrateAndStart: Boolean = false,
-) extends PrettyPrinting
-    with UniformCantonConfigValidation {
+
+    // Make the default settings a part of repeatable migrations
+    repeatableMigrationsPaths: Seq[String] = Seq.empty,
+) extends PrettyPrinting {
   override protected def pretty: Pretty[DbParametersConfig] =
     prettyOfClass(
       paramIfDefined(
@@ -76,6 +81,13 @@ final case class DbParametersConfig(
         x =>
           if (x.migrationsPaths.nonEmpty)
             Some(x.migrationsPaths.map(_.doubleQuoted))
+          else None,
+      ),
+      paramIfDefined(
+        "repeatableMigrationsPaths",
+        x =>
+          if (x.repeatableMigrationsPaths.nonEmpty)
+            Some(x.repeatableMigrationsPaths.map(_.doubleQuoted))
           else None,
       ),
       paramIfDefined("maxConnections", _.maxConnections),
@@ -132,13 +144,10 @@ final case class BatchingConfig(
     maxPruningBatchSize: PositiveNumeric[Int] = BatchingConfig.defaultMaxPruningBatchSize,
     maxPruningTimeInterval: PositiveFiniteDuration = BatchingConfig.defaultMaxPruningTimeInterval,
     pruningParallelism: PositiveNumeric[Int] = BatchingConfig.defaultPruningParallelism,
-) extends UniformCantonConfigValidation
+    topologyCacheAggregator: BatchAggregatorConfig = BatchingConfig.defaultAggregator,
+)
 
 object BatchingConfig {
-  implicit val batchingConfigCantonConfigValidator: CantonConfigValidator[BatchingConfig] = {
-    import CantonConfigValidatorInstances.*
-    CantonConfigValidatorDerivation[BatchingConfig]
-  }
 
   private val defaultMaxItemsBatch: PositiveInt = PositiveNumeric.tryCreate(100)
   private val defaultMaxTopologyWriteBatchSize: PositiveInt = PositiveNumeric.tryCreate(1000)
@@ -146,10 +155,10 @@ object BatchingConfig {
   private val defaultBatchingParallelism: PositiveInt = PositiveNumeric.tryCreate(8)
   private val defaultLedgerApiPruningBatchSize: PositiveInt = PositiveNumeric.tryCreate(50000)
   private val defaultMaxAcsImportBatchSize: PositiveNumeric[Int] = PositiveNumeric.tryCreate(1000)
-  private val defaultAggregator: BatchAggregatorConfig.AutoBatching =
-    BatchAggregatorConfig.AutoBatching()
-  private val defaultContractStoreAggregator: BatchAggregatorConfig.AutoBatching =
-    BatchAggregatorConfig.AutoBatching(
+  private val defaultAggregator: BatchAggregatorConfig.Batching =
+    BatchAggregatorConfig.Batching()
+  private val defaultContractStoreAggregator: BatchAggregatorConfig.Batching =
+    BatchAggregatorConfig.Batching(
       maximumInFlight = PositiveNumeric.tryCreate(5),
       maximumBatchSize = PositiveNumeric.tryCreate(50),
     )
@@ -164,8 +173,7 @@ final case class ConnectionAllocation(
     numReads: Option[PositiveInt] = None,
     numWrites: Option[PositiveInt] = None,
     numLedgerApi: Option[PositiveInt] = None,
-) extends PrettyPrinting
-    with UniformCantonConfigValidation {
+) extends PrettyPrinting {
   override protected def pretty: Pretty[ConnectionAllocation] =
     prettyOfClass(
       paramIfDefined("numReads", _.numReads),
@@ -174,19 +182,7 @@ final case class ConnectionAllocation(
     )
 }
 
-object ConnectionAllocation {
-  implicit val connectionAllocationCantonConfigValidator
-      : CantonConfigValidator[ConnectionAllocation] = {
-    import CantonConfigValidatorInstances.*
-    CantonConfigValidatorDerivation[ConnectionAllocation]
-  }
-}
-
 object DbParametersConfig {
-  import CantonConfigValidatorInstances.*
-
-  implicit val dbParametersConfigCantonConfigValidator: CantonConfigValidator[DbParametersConfig] =
-    CantonConfigValidatorDerivation[DbParametersConfig]
 
   private val defaultWarnOnSlowQueryInterval: PositiveFiniteDuration =
     PositiveFiniteDuration.ofSeconds(5)
@@ -194,7 +190,7 @@ object DbParametersConfig {
 
 /** Determines how a node stores persistent data.
   */
-sealed trait StorageConfig extends UniformCantonConfigValidation {
+sealed trait StorageConfig {
   type Self <: StorageConfig
 
   /** Database specific configuration parameters used by Slick. Also available for in-memory storage
@@ -325,9 +321,6 @@ sealed trait StorageConfig extends UniformCantonConfigValidation {
 
 object StorageConfig {
 
-  implicit val storageConfigCantonConfigValidator: CantonConfigValidator[StorageConfig] =
-    CantonConfigValidatorDerivation[StorageConfig]
-
   /** Dictates that persistent data is stored in memory. So in fact, the data is not persistent. It
     * is deleted whenever the node is stopped.
     *
@@ -340,15 +333,6 @@ object StorageConfig {
       override val parameters: DbParametersConfig = DbParametersConfig(),
   ) extends StorageConfig {
     override type Self = Memory
-
-  }
-
-  object Memory {
-    implicit val memoryCantonConfigValidator: CantonConfigValidator[Memory] = {
-      implicit val configCantonConfigValidator: CantonConfigValidator[Config] =
-        CantonConfigValidator.validateAll
-      CantonConfigValidatorDerivation[Memory]
-    }
   }
 }
 
@@ -361,11 +345,15 @@ sealed trait DbConfig extends StorageConfig with PrettyPrinting {
     if (parameters.migrationsPaths.nonEmpty)
       parameters.migrationsPaths
     else if (alphaVersionSupport)
-      Seq(stableMigrationPath, devMigrationPath)
-    else Seq(stableMigrationPath)
+      Seq(stableMigrationPath, devMigrationPath, defaultTableSettingsPath) ++
+        parameters.repeatableMigrationsPaths
+    else
+      Seq(stableMigrationPath, defaultTableSettingsPath) ++
+        parameters.repeatableMigrationsPaths
 
   protected def devMigrationPath: String
   protected def stableMigrationPath: String
+  protected def defaultTableSettingsPath: String
 
   override protected def pretty: Pretty[DbConfig] =
     prettyOfClass(
@@ -399,18 +387,13 @@ object DbConfig {
 
     protected val devMigrationPath: String = DbConfig.h2MigrationsPathDev
     protected val stableMigrationPath: String = DbConfig.h2MigrationsPathStable
+    protected val defaultTableSettingsPath: String = DbConfig.h2DefaultTableSettingsPath
 
     def modify(config: Config = this.config, parameters: DbParametersConfig = this.parameters): H2 =
       H2(config, parameters)
   }
 
   object H2 {
-    implicit val h2CantonConfigValidator: CantonConfigValidator[H2] = {
-      implicit val configCantonConfigValidator: CantonConfigValidator[Config] =
-        CantonConfigValidator.validateAll
-      CantonConfigValidatorDerivation[H2]
-    }
-
     private val defaultDriver: String = "org.h2.Driver"
     val defaultConfig: Config = DbConfig.toConfig(Map("driver" -> defaultDriver))
   }
@@ -421,6 +404,7 @@ object DbConfig {
   ) extends ModifiableDbConfig[Postgres] {
     protected def devMigrationPath: String = DbConfig.postgresMigrationsPathDev
     protected val stableMigrationPath: String = DbConfig.postgresMigrationsPathStable
+    protected val defaultTableSettingsPath: String = DbConfig.postgresDefaultTableSettingsPath
 
     def modify(
         config: Config = this.config,
@@ -430,11 +414,6 @@ object DbConfig {
   }
 
   object Postgres {
-    implicit val postgresCantonConfigValidator: CantonConfigValidator[Postgres] = {
-      implicit val configCantonConfigValidator: CantonConfigValidator[Config] =
-        CantonConfigValidator.validateAll
-      CantonConfigValidatorDerivation[Postgres]
-    }
 
     // We enable `tcpKeepAlive` in the Postgres JDBC driver in order to improve detection of
     // failed connections in the Hikari connection pool.
@@ -447,12 +426,15 @@ object DbConfig {
 
   private val stableDir = "stable"
   private val devDir = "dev"
+  private val tableSettingsDir = "table_settings"
   private val basePostgresMigrationsPath: String = "classpath:db/migration/canton-network/postgres/"
   private val baseH2MigrationsPath: String = "classpath:db/migration/canton/h2/"
   val postgresMigrationsPathStable: String = basePostgresMigrationsPath + stableDir
   val h2MigrationsPathStable: String = baseH2MigrationsPath + stableDir
   val postgresMigrationsPathDev: String = basePostgresMigrationsPath + devDir
   val h2MigrationsPathDev: String = baseH2MigrationsPath + devDir
+  val postgresDefaultTableSettingsPath: String = basePostgresMigrationsPath + tableSettingsDir
+  val h2DefaultTableSettingsPath: String = baseH2MigrationsPath + tableSettingsDir
 
   def postgresUrl(host: String, port: Int, dbName: String): String =
     s"jdbc:postgresql://$host:$port/$dbName"

@@ -15,7 +15,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   SequencerAdminConnection,
 }
 import org.lfdecentralizedtrust.splice.sv.config.{SvCometBftConfig, SvSynchronizerNodeConfig}
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
+import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplification
 
 import java.time.Duration
 import scala.concurrent.ExecutionContextExecutor

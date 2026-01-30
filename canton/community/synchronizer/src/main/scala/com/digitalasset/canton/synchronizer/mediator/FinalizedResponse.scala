@@ -1,8 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
 
+import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggingContext
@@ -36,6 +37,7 @@ final case class FinalizedResponse(
       rootHash: RootHash,
       sender: ParticipantId,
       topologySnapshot: TopologySnapshot,
+      batchingConfig: BatchingConfig,
   )(implicit
       loggingContext: NamedLoggingContext,
       ec: ExecutionContext,
@@ -56,6 +58,7 @@ final case class FinalizedResponse(
           localVerdict,
           topologySnapshot,
           confirmingParties,
+          batchingConfig,
         )
       } yield {
         loggingContext.debug(

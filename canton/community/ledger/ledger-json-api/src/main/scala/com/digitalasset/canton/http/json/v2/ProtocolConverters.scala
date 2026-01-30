@@ -1,9 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
 
-import cats.implicits.toTraverseOps
+import cats.implicits.{catsSyntaxParallelTraverse1, toTraverseOps}
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   ExecuteSubmissionRequest,
@@ -26,6 +26,7 @@ import com.digitalasset.canton.http.json.v2.JsSchema.{
 }
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Ref
 import com.google.protobuf.ByteString
@@ -1001,8 +1002,7 @@ class ProtocolConverters(
         traceContext: TraceContext
     ): Future[JsReassignment] =
       for {
-        events <- v.events
-          .traverse(e => ReassignmentEvent.toJson(e.event))
+        events <- v.events.parTraverse(e => ReassignmentEvent.toJson(e.event))
       } yield {
         v.into[JsReassignment]
           .withFieldConst(_.events, events)
@@ -1013,8 +1013,7 @@ class ProtocolConverters(
         traceContext: TraceContext
     ): Future[lapi.reassignment.Reassignment] =
       for {
-        events <- value.events
-          .traverse(e => ReassignmentEvent.fromJson(e))
+        events <- value.events.parTraverse(e => ReassignmentEvent.fromJson(e))
       } yield value
         .into[lapi.reassignment.Reassignment]
         .withFieldConst(_.events, events.map(lapi.reassignment.ReassignmentEvent(_)))
@@ -1241,6 +1240,10 @@ class ProtocolConverters(
         lapi.interactive.interactive_submission_service.PrepareSubmissionResponse,
         JsPrepareSubmissionResponse,
       ] {
+
+    // No need to go through Canton's version wrappers here as this is a Ledger API payload, not
+    // a Canton protocol payload.
+    @SuppressWarnings(Array("com.digitalasset.canton.ProtobufToByteString"))
     def toJson(
         obj: lapi.interactive.interactive_submission_service.PrepareSubmissionResponse
     )(implicit traceContext: TraceContext): Future[JsPrepareSubmissionResponse] =
@@ -1276,26 +1279,37 @@ class ProtocolConverters(
         traceContext: TraceContext
     ): Future[lapi.interactive.interactive_submission_service.ExecuteSubmissionRequest] =
       Future {
-        val preparedTransaction = obj.preparedTransaction.map { proto =>
+        val preparedTransaction =
           ProtoConverter
             .protoParser(
               lapi.interactive.interactive_submission_service.PreparedTransaction.parseFrom
-            )(proto)
+            )(obj.preparedTransaction)
             .getOrElse(jsFail("Cannot parse prepared_transaction"))
-        }
+
         obj
           .into[lapi.interactive.interactive_submission_service.ExecuteSubmissionRequest]
-          .withFieldConst(_.preparedTransaction, preparedTransaction)
+          .withFieldConst(_.preparedTransaction, Some(preparedTransaction))
           .transform
-
       }
 
+    // No need to go through Canton's version wrappers here as this is a Ledger API payload, not
+    // a Canton protocol payload.
+    @SuppressWarnings(Array("com.digitalasset.canton.ProtobufToByteString"))
     override def toJson(
         lapi: ExecuteSubmissionRequest
     )(implicit traceContext: TraceContext): Future[JsExecuteSubmissionRequest] = Future.successful(
       lapi
         .into[JsExecuteSubmissionRequest]
-        .withFieldConst(_.preparedTransaction, lapi.preparedTransaction.map(_.toByteString))
+        .withFieldConst(
+          _.preparedTransaction,
+          lapi.preparedTransaction
+            .map(_.toByteString)
+            .getOrElse(jsFail("preparedTransaction is required")),
+        )
+        .withFieldConst(
+          _.partySignatures,
+          lapi.partySignatures.getOrElse(jsFail("partySignatures are required")),
+        )
         .transform
     )
   }
@@ -1391,27 +1405,6 @@ class ProtocolConverters(
         .ExecuteSubmissionAndWaitForTransactionResponse(Some(transaction))
   }
 
-  object AllocatePartyRequest
-      extends ProtocolConverter[
-        lapi.admin.party_management_service.AllocatePartyRequest,
-        js.AllocatePartyRequest,
-      ] {
-    def fromJson(
-        obj: js.AllocatePartyRequest
-    )(implicit
-        traceContext: TraceContext
-    ): Future[lapi.admin.party_management_service.AllocatePartyRequest] =
-      Future.successful(
-        obj.into[lapi.admin.party_management_service.AllocatePartyRequest].transform
-      )
-
-    def toJson(
-        obj: lapi.admin.party_management_service.AllocatePartyRequest
-    )(implicit traceContext: TraceContext): Future[js.AllocatePartyRequest] = Future.successful(
-      obj.into[js.AllocatePartyRequest].transform
-    )
-  }
-
   object PrefetchContractKey
       extends ProtocolConverter[
         lapi.commands.PrefetchContractKey,
@@ -1420,13 +1413,14 @@ class ProtocolConverters(
     def fromJson(obj: js.PrefetchContractKey)(implicit
         traceContext: TraceContext
     ): Future[lapi.commands.PrefetchContractKey] =
-      for {
-        contractKey <- obj.templateId
-          .traverse(template => schemaProcessors.keyArgFromJsonToProto(template, obj.contractKey))
-      } yield obj
-        .into[lapi.commands.PrefetchContractKey]
-        .withFieldConst(_.contractKey, contractKey)
-        .transform
+      schemaProcessors
+        .keyArgFromJsonToProto(obj.templateId, obj.contractKey)
+        .map(contractKey =>
+          obj
+            .into[lapi.commands.PrefetchContractKey]
+            .withFieldConst(_.contractKey, Some(contractKey))
+            .transform
+        )
 
     def toJson(
         obj: lapi.commands.PrefetchContractKey
@@ -1443,6 +1437,27 @@ class ProtocolConverters(
       .into[js.PrefetchContractKey]
       .withFieldConst(_.contractKey, toCirce(contractKey.getOrElse(ujson.Null)))
       .transform
+  }
+
+  object GetContractResponse
+      extends ProtocolConverter[
+        lapi.contract_service.GetContractResponse,
+        JsContractService.GetContractResponse,
+      ] {
+    def toJson(response: lapi.contract_service.GetContractResponse)(implicit
+        traceContext: TraceContext
+    ): Future[JsContractService.GetContractResponse] =
+      CreatedEvent
+        .toJson(response.createdEvent.getOrElse(invalidArgument("empty", "non-empty transaction")))
+        .map(JsContractService.GetContractResponse(_))
+
+    def fromJson(response: JsContractService.GetContractResponse)(implicit
+        traceContext: TraceContext
+    ): Future[lapi.contract_service.GetContractResponse] =
+      CreatedEvent
+        .fromJson(response.createdEvent)
+        .map(Some(_))
+        .map(lapi.contract_service.GetContractResponse(_))
   }
 }
 

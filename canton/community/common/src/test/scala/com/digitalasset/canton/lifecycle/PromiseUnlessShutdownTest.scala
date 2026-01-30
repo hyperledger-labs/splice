@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.lifecycle
@@ -69,8 +69,11 @@ class PromiseUnlessShutdownTest extends AsyncWordSpec with BaseTest with HasExec
         entries => {
           assert(entries.nonEmpty)
           forEvery(entries)(
-            _.warningMessage should include(
-              "supervised-promise-out-of-time has not completed after"
+            _.warningMessage should (
+              include("supervised-promise-out-of-time has not completed after") or
+                include(
+                  "Supervised futures for the following trace IDs have not completed with alert log level"
+                )
             )
           )
         },

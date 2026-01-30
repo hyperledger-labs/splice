@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
@@ -83,9 +83,12 @@ object CreatedContract {
     } yield createdContract
   }
 
+  /** DO NOT USE IN PRODUCTION, as it does not necessarily check object invariants. */
   @VisibleForTesting
-  val contractUnsafe: Lens[CreatedContract, NewContractInstance] =
-    GenLens[CreatedContract](_.contract)
+  object Optics {
+    val contractUnsafe: Lens[CreatedContract, NewContractInstance] =
+      GenLens[CreatedContract](_.contract)
+  }
 }
 
 /** @param consumedInView

@@ -1,1 +1,0 @@
-participant2.synchronizers.connect_local(sequencer1, alias = "synchronizer0")

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.store
@@ -9,15 +9,13 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.order.*
-import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.NonEmptyReturningOps.*
-import com.daml.nonempty.catsinstances.*
-import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
+import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.sequencing.protocol.{Batch, ClosedEnvelope}
 import com.digitalasset.canton.synchronizer.block.UninitializedBlockHeight
@@ -25,7 +23,7 @@ import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.*
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{BytesUnit, EitherTUtil, ErrorUtil, retry}
+import com.digitalasset.canton.util.{BytesUnit, EitherTUtil, ErrorUtil, MonadUtil, retry}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
@@ -49,10 +47,12 @@ class InMemorySequencerStore(
     override val sequencerMember: Member,
     override val blockSequencerMode: Boolean,
     protected val loggerFactory: NamedLoggerFactory,
+    protected override val timeouts: ProcessingTimeout,
     override protected val sequencerMetrics: SequencerMetrics,
 )(implicit
     protected val executionContext: ExecutionContext
-) extends SequencerStore {
+) extends SequencerStore
+    with FlagCloseable {
 
   override protected val batchingConfig: BatchingConfig = BatchingConfig()
 
@@ -114,23 +114,27 @@ class InMemorySequencerStore(
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SavePayloadsError, Unit] =
-    payloadsToInsert.toNEF.parTraverse { case BytesPayload(id, content) =>
-      Option(payloads.putIfAbsent(id.unwrap, StoredPayload(instanceDiscriminator, content)))
-        .flatMap { existingPayload =>
-          // if we found an existing payload it must have a matching instance discriminator
-          if (existingPayload.instanceDiscriminator == instanceDiscriminator) None // no error
-          else {
-            if (blockSequencerMode) {
-              None
-            } else {
-              SavePayloadsError.ConflictingPayloadId(id, existingPayload.instanceDiscriminator).some
+    MonadUtil
+      .sequentialTraverse(payloadsToInsert.toNEF) { case BytesPayload(id, content) =>
+        Option(payloads.putIfAbsent(id.unwrap, StoredPayload(instanceDiscriminator, content)))
+          .flatMap { existingPayload =>
+            // if we found an existing payload it must have a matching instance discriminator
+            if (existingPayload.instanceDiscriminator == instanceDiscriminator) None // no error
+            else {
+              if (blockSequencerMode) {
+                None
+              } else {
+                SavePayloadsError
+                  .ConflictingPayloadId(id, existingPayload.instanceDiscriminator)
+                  .some
+              }
             }
           }
-        }
-        .toLeft(())
-        .leftWiden[SavePayloadsError]
-        .toEitherT[FutureUnlessShutdown]
-    }.void
+          .toLeft(())
+          .leftWiden[SavePayloadsError]
+          .toEitherT[FutureUnlessShutdown]
+      }
+      .void
 
   override def saveEvents(instanceIndex: Int, eventsToInsert: NonEmpty[Seq[Sequenced[PayloadId]]])(
       implicit traceContext: TraceContext
@@ -449,8 +453,6 @@ class InMemorySequencerStore(
         payloads.size.toLong,
       )
     )
-
-  override def close(): Unit = ()
 
   override def readStateAtTimestamp(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -496,7 +496,7 @@ class GenTransactionTreeTest
         tvt.tree.mapUnblindedRootViews(_.replace(tvt.viewHash, viewWithBlindedSubviews))
 
       val dummyViewHash = ViewHash(
-        factory.cryptoOps.build(HashPurpose.MerkleTreeInnerNode).add("hummous").finish()
+        factory.cryptoOps.build(HashPurpose.MerkleTreeInnerNode).addString("hummous").finish()
       )
       val mangledSubviewHashes =
         if (tvt.subviewHashes.isEmpty) Seq(dummyViewHash)

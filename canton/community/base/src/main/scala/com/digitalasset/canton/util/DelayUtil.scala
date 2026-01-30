@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -87,11 +87,16 @@ object DelayUtil extends NamedLogging {
     val cancelToken = hasRunOnClosing.runOnOrAfterClose(new RunOnClosing() {
       val name = s"$parentName-shutdown"
       def done = promise.isCompleted
-      def run()(implicit traceContext: TraceContext): Unit =
+      def run()(implicit traceContext: TraceContext): Unit = {
+        logger.trace(s"Aborting $parentName after $delay due to shutdown")
         promise.trySuccess(UnlessShutdown.AbortedDueToShutdown).discard
+      }
     })
 
     val trySuccess: Runnable = { () =>
+      logger.trace(
+        s"Completing successfully $parentName after $delay and cancelling the cancel token"
+      )
       promise.trySuccess(UnlessShutdown.Outcome(())).discard
       // No need to complete the promise on shutdown with an AbortedDueToShutdown since we succeeded, and also
       // keeps the list of shutdown tasks from growing indefinitely with each retry

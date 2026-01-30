@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.participant.state
@@ -9,7 +9,7 @@ import com.digitalasset.canton.RepairCounter
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
 import com.digitalasset.canton.ledger.participant.state.Update.CommandRejected.RejectionReasonTemplate
-import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccepted.RepresentativePackageIds
+import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccepted.RepresentativePackageId
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.{LfHash, UpdateId}
 import com.digitalasset.canton.topology.SynchronizerId
@@ -51,27 +51,17 @@ import scala.concurrent.Promise
   * earlier's [[Update.TransactionAccepted]]. A [[Update.CommandRejected]] completion does not
   * trigger deduplication and implementations SHOULD process such resubmissions normally.
   */
-sealed trait Update extends Product with Serializable with PrettyPrinting with HasTraceContext {
+sealed trait Update extends Product with Serializable with PrettyPrinting with HasTraceContext
+
+/** Update which defines a recordTime, synchronizerId and SynchronizerIndex.
+  */
+sealed trait SynchronizerUpdate extends Update {
 
   /** The record time at which the state change was committed. */
   def recordTime: CantonTimestamp
-}
 
-// TODO(i25076) this will be removed later as Topology Event project progresses
-sealed trait ParticipantUpdate extends Update {
-  def withRecordTime(recordTime: CantonTimestamp): Update
-
-  def persisted: Promise[Unit]
-}
-
-sealed trait SynchronizerUpdate extends Update {
   def synchronizerId: SynchronizerId
-}
 
-/** Update which defines a SynchronizerIndex, and therefore contribute to SynchronizerIndex moving
-  * ahead.
-  */
-sealed trait SynchronizerIndexUpdate extends SynchronizerUpdate {
   def repairCounterO: Option[RepairCounter]
 
   def sequencerIndexO: Option[SequencerIndex]
@@ -84,19 +74,19 @@ sealed trait SynchronizerIndexUpdate extends SynchronizerUpdate {
     )
 }
 
-sealed trait SequencedUpdate extends SynchronizerIndexUpdate {
+sealed trait SequencedUpdate extends SynchronizerUpdate {
   final override def sequencerIndexO: Option[SequencerIndex] = Some(SequencerIndex(recordTime))
 
   final override def repairCounterO: Option[RepairCounter] = None
 }
 
-sealed trait FloatingUpdate extends SynchronizerIndexUpdate {
+sealed trait FloatingUpdate extends SynchronizerUpdate {
   final override def sequencerIndexO: Option[SequencerIndex] = None
 
   final override def repairCounterO: Option[RepairCounter] = None
 }
 
-sealed trait RepairUpdate extends SynchronizerIndexUpdate {
+sealed trait RepairUpdate extends SynchronizerUpdate {
   def repairCounter: RepairCounter
 
   final override def repairCounterO: Option[RepairCounter] = Some(repairCounter)
@@ -112,62 +102,6 @@ object Update {
     */
   def noOpSeed: LfHash =
     LfHash.assertFromString("00" * LfHash.underlyingHashLength)
-
-  /** Signal that a party is hosted at a participant.
-    *
-    * Repeated `PartyAddedToParticipant` updates are interpreted in the order of their offsets as
-    * follows:
-    *   - set-union semantics for `participantId`; i.e., parties can only be added to, but not
-    *     removed from a participant The `recordTime` and `submissionId` are always metadata for
-    *     their specific `PartyAddedToParticipant` update.
-    *
-    * @param party
-    *   The party identifier.
-    * @param participantId
-    *   The participant that this party was added to.
-    * @param recordTime
-    *   The ledger-provided timestamp at which the party was allocated.
-    * @param submissionId
-    *   The submissionId of the command which requested party to be added.
-    */
-  final case class PartyAddedToParticipant(
-      party: Ref.Party,
-      participantId: Ref.ParticipantId,
-      recordTime: CantonTimestamp,
-      submissionId: Option[Ref.SubmissionId],
-      persisted: Promise[Unit] = Promise(),
-  )(implicit override val traceContext: TraceContext)
-      extends ParticipantUpdate {
-    override protected def pretty: Pretty[PartyAddedToParticipant] =
-      prettyOfClass(
-        param("recordTime", _.recordTime),
-        param("party", _.party),
-        param("participantId", _.participantId),
-        indicateOmittedFields,
-      )
-
-    override def withRecordTime(recordTime: CantonTimestamp): Update =
-      this.copy(recordTime = recordTime)
-  }
-
-  object PartyAddedToParticipant {
-    implicit val `PartyAddedToParticipant to LoggingValue`
-        : ToLoggingValue[PartyAddedToParticipant] = {
-      case PartyAddedToParticipant(
-            party,
-            participantId,
-            recordTime,
-            submissionId,
-            _,
-          ) =>
-        LoggingValue.Nested.fromEntries(
-          Logging.recordTime(recordTime.toLf),
-          Logging.submissionIdOpt(submissionId),
-          Logging.participantId(participantId),
-          Logging.party(party),
-        )
-    }
-  }
 
   final case class TopologyTransactionEffective(
       updateId: UpdateId,
@@ -230,13 +164,13 @@ object Update {
     }
   }
 
-  sealed trait AcsChangeSequencedUpdate extends SynchronizerIndexUpdate {
+  sealed trait AcsChangeSequencedUpdate extends SynchronizerUpdate {
     def acsChangeFactory: AcsChangeFactory
   }
 
   /** Signal the acceptance of a transaction.
     */
-  trait TransactionAccepted extends SynchronizerIndexUpdate {
+  trait TransactionAccepted extends SynchronizerUpdate {
 
     /** The information provided by the submitter of the command that created this transaction. It
       * must be provided if this participant hosts one of the [[SubmitterInfo.actAs]] parties and
@@ -264,28 +198,14 @@ object Update {
 
     def updateId: UpdateId
 
-    /** For each contract created in this transaction, this map may contain contract authentication
-      * data assigned by the ledger implementation. This data is opaque and can only be used in
-      * [[com.digitalasset.daml.lf.transaction.FatContractInstance]]s when submitting transactions
-      * trough the [[SyncService]]. If a contract created by this transaction is not element of this
-      * map, its authentication data is equal to the empty byte array.
-      */
-    def contractAuthenticationData: Map[Value.ContractId, Bytes]
-
-    /** The representative package-ids for the contracts created in this transaction See
-      * [[TransactionAccepted.RepresentativePackageIds]] for more details.
-      */
-    def representativePackageIds: RepresentativePackageIds
-
     def externalTransactionHash: Option[Hash]
 
     def isAcsDelta(contractId: Value.ContractId): Boolean
 
     /** Maps each contract id (of created or archived events of the transaction) to the
-      * corresponding internal contract id in order to have the internal contract id persisted in
-      * the index db for the corresponding events.
+      * corresponding [[ContractInfo]].
       */
-    def internalContractIds: Map[Value.ContractId, Long]
+    def contractInfos: Map[Value.ContractId, ContractInfo]
 
     lazy val blindingInfo: BlindingInfo = Blinding.blind(transaction)
 
@@ -321,35 +241,47 @@ object Update {
       * package-id guarantee is required for ensuring correct rendering of contract create values on
       * the gRPC/JSON Ledger API read queries.
       */
-    sealed trait RepresentativePackageIds extends Product with Serializable
-    object RepresentativePackageIds {
-      def from(
-          representativePackageIds: Map[Value.ContractId, Ref.PackageId]
-      ): DedicatedRepresentativePackageIds =
-        DedicatedRepresentativePackageIds(representativePackageIds)
+    sealed trait RepresentativePackageId extends Product with Serializable
+    object RepresentativePackageId {
 
-      /** Signals that the representative package-id of the created contracts referenced in this
+      /** Signals that the representative package-id of the created contract referenced in this
         * transaction are the same as the contract's creation package-id.
         */
-      case object SameAsContractPackageId extends RepresentativePackageIds
+      case object SameAsContractPackageId extends RepresentativePackageId
 
-      final case class DedicatedRepresentativePackageIds(
-          representativePackageIds: Map[Value.ContractId, Ref.PackageId]
-      ) extends RepresentativePackageIds
-      val Empty: DedicatedRepresentativePackageIds = DedicatedRepresentativePackageIds(Map.empty)
+      final case class DedicatedRepresentativePackageId(
+          representativePackageId: Ref.PackageId
+      ) extends RepresentativePackageId
     }
   }
+
+  /** Information about a contract needed for indexing.
+    *
+    * @param internalContractId
+    *   The internal contract id assigned to the contract.
+    * @param contractAuthenticationData
+    *   Contract authentication data assigned by the ledger implementation. This data is opaque and
+    *   can only be used in [[com.digitalasset.daml.lf.transaction.FatContractInstance]]s when
+    *   submitting transactions through the [[SyncService]].
+    * @param representativePackageId
+    *   The representative package-id for the contract, if the contract is created in this
+    *   transaction. See [[TransactionAccepted.RepresentativePackageId]] for more details.
+    */
+  final case class ContractInfo(
+      internalContractId: Long,
+      contractAuthenticationData: Bytes,
+      representativePackageId: RepresentativePackageId,
+  )
 
   final case class SequencedTransactionAccepted(
       completionInfoO: Option[CompletionInfo],
       transactionMeta: TransactionMeta,
       transaction: CommittedTransaction,
       updateId: UpdateId,
-      contractAuthenticationData: Map[Value.ContractId, Bytes],
       synchronizerId: SynchronizerId,
       recordTime: CantonTimestamp,
       acsChangeFactory: AcsChangeFactory,
-      internalContractIds: Map[Value.ContractId, Long],
+      contractInfos: Map[Value.ContractId, ContractInfo],
       externalTransactionHash: Option[Hash] = None,
   )(implicit override val traceContext: TraceContext)
       extends TransactionAccepted
@@ -357,21 +289,16 @@ object Update {
       with AcsChangeSequencedUpdate {
     override def isAcsDelta(contractId: Value.ContractId): Boolean =
       acsChangeFactory.contractActivenessChanged(contractId)
-
-    override val representativePackageIds: RepresentativePackageIds.SameAsContractPackageId.type =
-      RepresentativePackageIds.SameAsContractPackageId
   }
 
   final case class RepairTransactionAccepted(
       transactionMeta: TransactionMeta,
       transaction: CommittedTransaction,
       updateId: UpdateId,
-      contractAuthenticationData: Map[Value.ContractId, Bytes],
-      representativePackageIds: RepresentativePackageIds,
       synchronizerId: SynchronizerId,
       repairCounter: RepairCounter,
       recordTime: CantonTimestamp,
-      internalContractIds: Map[Value.ContractId, Long],
+      contractInfos: Map[Value.ContractId, ContractInfo],
   )(implicit override val traceContext: TraceContext)
       extends TransactionAccepted
       with RepairUpdate {
@@ -383,7 +310,7 @@ object Update {
     override def isAcsDelta(contractId: Value.ContractId): Boolean = true
   }
 
-  trait ReassignmentAccepted extends SynchronizerIndexUpdate {
+  trait ReassignmentAccepted extends SynchronizerUpdate {
 
     /** The information provided by the submitter of the command that created this reassignment. It
       * must be provided if this participant hosts the submitter and shall output a completion event
@@ -406,11 +333,6 @@ object Update {
     def reassignmentInfo: ReassignmentInfo
 
     def reassignment: Reassignment.Batch
-
-    /** Maps each contract id to the corresponding internal contract id in order to have the
-      * internal contract id persisted in the index db for the corresponding events.
-      */
-    def internalContractIds: Map[Value.ContractId, Long]
 
     def kind: String = if (reassignmentInfo.sourceSynchronizer.unwrap == synchronizerId)
       "unassignment"
@@ -438,7 +360,6 @@ object Update {
       recordTime: CantonTimestamp,
       override val synchronizerId: SynchronizerId,
       acsChangeFactory: AcsChangeFactory,
-      internalContractIds: Map[Value.ContractId, Long],
   )(implicit override val traceContext: TraceContext)
       extends ReassignmentAccepted
       with SequencedUpdate
@@ -452,7 +373,6 @@ object Update {
       repairCounter: RepairCounter,
       recordTime: CantonTimestamp,
       override val synchronizerId: SynchronizerId,
-      internalContractIds: Map[Value.ContractId, Long],
   )(implicit override val traceContext: TraceContext)
       extends ReassignmentAccepted
       with RepairUpdate {
@@ -468,7 +388,6 @@ object Update {
       recordTime: CantonTimestamp,
       override val synchronizerId: SynchronizerId,
       acsChangeFactory: AcsChangeFactory,
-      internalContractIds: Map[Value.ContractId, Long],
   )(implicit override val traceContext: TraceContext)
       extends ReassignmentAccepted
       with RepairUpdate
@@ -490,7 +409,7 @@ object Update {
 
   /** Signal that a command submitted via [[SyncService]] was rejected.
     */
-  sealed trait CommandRejected extends SynchronizerIndexUpdate {
+  sealed trait CommandRejected extends SynchronizerUpdate {
 
     /** The completion information for the submission
       */
@@ -660,13 +579,9 @@ object Update {
     val persisted: Promise[Unit] = Promise()
 
     override protected def pretty: Pretty[CommitRepair] = prettyOfClass()
-
-    override val recordTime: CantonTimestamp = CantonTimestamp.now()
   }
 
   implicit val `Update to LoggingValue`: ToLoggingValue[Update] = {
-    case update: PartyAddedToParticipant =>
-      PartyAddedToParticipant.`PartyAddedToParticipant to LoggingValue`.toLoggingValue(update)
     case update: TopologyTransactionEffective =>
       TopologyTransactionEffective.`TopologyTransactionEffective to LoggingValue`.toLoggingValue(
         update

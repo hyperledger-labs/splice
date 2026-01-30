@@ -1,12 +1,13 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.block.update
 
 import cats.syntax.functorFilter.*
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.crypto.{SyncCryptoApi, SynchronizerCryptoClient}
-import com.digitalasset.canton.data.{CantonTimestamp, LogicalUpgradeTime}
+import com.digitalasset.canton.data.{CantonTimestamp, LogicalUpgradeTime, SequencingTimeBound}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -92,12 +93,11 @@ object BlockUpdateGenerator {
       chunkIndex: Int,
       events: NonEmpty[Seq[Traced[LedgerBlockEvent]]],
   ) extends BlockChunk
-  final case class TopologyTickChunk(
+  final case class MaybeTopologyTickChunk(
       blockHeight: Long,
-      tickAtLeastAt: CantonTimestamp,
-      groupRecipient: Either[AllMembersOfSynchronizer.type, SequencersOfSynchronizer.type],
+      baseBlockSequencingTime: CantonTimestamp,
+      tickTopology: Option[TickTopology],
   ) extends BlockChunk
-  final case class MaybeTopologyTickChunk(blockHeight: Long) extends BlockChunk
   final case class EndOfBlock(blockHeight: Long) extends BlockChunk
 }
 
@@ -107,9 +107,10 @@ class BlockUpdateGeneratorImpl(
     sequencerId: SequencerId,
     rateLimitManager: SequencerRateLimitManager,
     orderingTimeFixMode: OrderingTimeFixMode,
-    sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
-    useTimeProofsToObserveEffectiveTime: Boolean,
+    sequencingTimeLowerBoundExclusive: SequencingTimeBound,
+    producePostOrderingTopologyTicks: Boolean,
     metrics: SequencerMetrics,
+    batchingConfig: BatchingConfig,
     protected val loggerFactory: NamedLoggerFactory,
     memberValidator: SequencerMemberValidator,
 )(implicit val closeContext: CloseContext, tracer: Tracer)
@@ -128,6 +129,7 @@ class BlockUpdateGeneratorImpl(
       sequencerId,
       rateLimitManager,
       orderingTimeFixMode,
+      batchingConfig,
       loggerFactory,
       metrics,
       memberValidator = memberValidator,
@@ -139,6 +141,8 @@ class BlockUpdateGeneratorImpl(
     lastBlockTs = state.latestBlock.lastTs,
     lastChunkTs = state.latestBlock.lastTs,
     latestSequencerEventTimestamp = state.latestBlock.latestSequencerEventTimestamp,
+    latestPendingTopologyTransactionTimestamp =
+      state.latestBlock.latestPendingTopologyTransactionTimestamp,
     inFlightAggregations = state.inFlightAggregations,
   )
 
@@ -159,7 +163,7 @@ class BlockUpdateGeneratorImpl(
               None
 
             case Right(event) =>
-              sequencingTimeLowerBoundExclusive match {
+              sequencingTimeLowerBoundExclusive.get match {
                 case Some(boundExclusive)
                     if !LogicalUpgradeTime.canProcessKnowingPastUpgrade(
                       upgradeTime = Some(boundExclusive),
@@ -198,12 +202,11 @@ class BlockUpdateGeneratorImpl(
     val blockHeight = blockEvents.height
     metrics.block.height.updateValue(blockHeight)
 
-    val tickChunk =
-      if (useTimeProofsToObserveEffectiveTime)
-        blockEvents.tickTopology.map { case TickTopology(micros, recipient) =>
-          TopologyTickChunk(blockHeight, micros, recipient)
-        }
-      else Some(MaybeTopologyTickChunk(blockHeight))
+    val tick = MaybeTopologyTickChunk(
+      blockHeight,
+      blockEvents.baseBlockSequencingTime,
+      blockEvents.tickTopology,
+    )
 
     // We must start a new chunk whenever the chunk processing advances lastSequencerEventTimestamp,
     //  otherwise the logic for retrieving a topology snapshot or traffic state could deadlock.
@@ -213,10 +216,10 @@ class BlockUpdateGeneratorImpl(
       .zipWithIndex
       .map { case (events, index) =>
         NextChunk(blockHeight, index, events)
-      } ++ tickChunk ++ Seq(EndOfBlock(blockHeight))
+      } ++ Seq(tick) ++ Seq(EndOfBlock(blockHeight))
 
     logger.debug(
-      s"Chunked block $blockHeight into ${chunks.size} data chunks and ${tickChunk.toList.size} topology tick chunks"
+      s"Chunked block $blockHeight into ${chunks.size} data chunks and 1 topology tick chunk"
     )
 
     chunks
@@ -240,30 +243,62 @@ class BlockUpdateGeneratorImpl(
       case EndOfBlock(height) =>
         val newState = state.copy(lastBlockTs = state.lastChunkTs)
         val update = CompleteBlockUpdate(
-          BlockInfo(height, state.lastChunkTs, state.latestSequencerEventTimestamp)
+          BlockInfo(
+            height,
+            state.lastChunkTs,
+            state.latestSequencerEventTimestamp,
+            state.latestPendingTopologyTransactionTimestamp,
+          )
         )
         logger.debug(s"Block $height completed with update $update")
         FutureUnlessShutdown.pure(newState -> update)
       case NextChunk(height, index, chunksEvents) =>
         blockChunkProcessor.processDataChunk(state, height, index, chunksEvents)
-      case TopologyTickChunk(blockHeight, tickAtLeastAt, groupRecipient) =>
-        blockChunkProcessor.emitTick(state, blockHeight, tickAtLeastAt, groupRecipient)
-      case MaybeTopologyTickChunk(blockHeight) =>
-        val (activeTopologyTimestamps, pendingTopologyTimestamps) = state.pendingTopologyTimestamps
-          .partition(_ + epsilon < state.lastBlockTs.immediateSuccessor)
-        val newState = state.copy(pendingTopologyTimestamps = pendingTopologyTimestamps)
+      case MaybeTopologyTickChunk(blockHeight, baseBlockSequencingTime, tickTopology) =>
+        lazy val createTick = state.latestPendingTopologyTransactionTimestamp.exists { ts =>
+          // If the latest topology transaction becomes effective between the end of the previous block and the end of
+          // the current block, we will broadcast a tick at the end of the current block so all sequencer clients can
+          // notice that enough time has passed for the topology state to be effective.
+          //
+          // We only keep track of the latest topology transaction instead of all currently non-effective transactions.
+          // Reasoning: let's say we get 2 consecutive topology transactions T1 and T2, so either:
+          // - T1 becomes effective in block B1, and T2 comes in a later block B2, in that case a tick is created in block B1.
+          // - T1 becomes effective in block B1, and T2 comes in the same block after T1's effective time.
+          //    We stop keeping track of T1's timestamp, but that's ok, because T2 acts as a tick for T1.
+          // - T2 comes before T1 becomes effective. In that case, we stop keeping track of T1's timestamp, in favor of T2's.
+          //    If T2 becomes effective on the same block as T1, then it makes no difference.
+          //    If T2 becomes effective on the next block from where T1 becomes effective, then it means T1's tick will get
+          //    delayed by one block and that, in general, fewer ticks are potentially created, which is a desirable outcome.
+          val latestTopologyTransactionEffectiveTime = ts + epsilon
+          val blockEnd = state.lastChunkTs.immediateSuccessor.max(baseBlockSequencingTime)
+          state.lastBlockTs < latestTopologyTransactionEffectiveTime && latestTopologyTransactionEffectiveTime < blockEnd
+        }
 
-        activeTopologyTimestamps.maxOption match {
-          // if there is a pending potential topology transaction whose sequencing timestamp is after the activation time of the
-          // most recent newly active topology transaction in this block, it acts as a tick too, so no need for a dedicated tick event
-          case Some(timestamp) if !pendingTopologyTimestamps.exists(_ > timestamp + epsilon) =>
-            blockChunkProcessor.emitTick(
-              newState,
-              blockHeight,
-              timestamp,
-              Left(AllMembersOfSynchronizer),
-            )
-          case _ => FutureUnlessShutdown.pure((newState, ChunkUpdate.noop))
+        // Starting with protocol version 35, topology ticks can be deterministically injected post-ordering
+        // by sequencers, making time proofs unnecessary for observing topology transactions becoming effective.
+        if (
+          protocolVersion >= ProtocolVersion.v35 && producePostOrderingTopologyTicks && createTick
+        ) {
+          blockChunkProcessor.emitTick(
+            state.copy(
+              // important to do this update from here instead of from inside emitTick,
+              // because if a tick is created using other currently supported methods such as time proof requests,
+              // we would lose track of this timestamp prematurely.
+              latestPendingTopologyTransactionTimestamp = None
+            ),
+            blockHeight,
+            state.lastChunkTs.max(baseBlockSequencingTime),
+            Left(AllMembersOfSynchronizer),
+          )
+        } else {
+          tickTopology match {
+            // The pre-protocol version 35 topology ticks is also still supported and
+            // only the BFT sequencer can request to inject these topology ticks
+            case Some(TickTopology(tickAtLeastAt, groupRecipient)) =>
+              blockChunkProcessor.emitTick(state, blockHeight, tickAtLeastAt, groupRecipient)
+            case None =>
+              FutureUnlessShutdown.pure((state, ChunkUpdate.noop))
+          }
         }
     }
 }
@@ -274,9 +309,8 @@ object BlockUpdateGeneratorImpl {
       lastBlockTs: CantonTimestamp,
       lastChunkTs: CantonTimestamp,
       latestSequencerEventTimestamp: Option[CantonTimestamp],
+      latestPendingTopologyTransactionTimestamp: Option[CantonTimestamp],
       inFlightAggregations: InFlightAggregations,
-      // The sequencing times of potential topology transactions that are not yet effective
-      pendingTopologyTimestamps: Vector[CantonTimestamp] = Vector.empty,
   )
 
   private[update] final case class SequencedValidatedSubmission(

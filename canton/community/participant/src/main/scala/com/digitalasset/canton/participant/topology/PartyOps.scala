@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.topology
@@ -81,6 +81,7 @@ class PartyOps(
                   threshold = PositiveInt.one,
                   participants =
                     Seq(HostingParticipant(participantId, ParticipantPermission.Submission)),
+                  partySigningKeysWithThreshold = None,
                 )
             )
             .bimap(
@@ -104,6 +105,7 @@ class PartyOps(
                   participantId,
                   ParticipantPermission.Submission,
                 ),
+                partySigningKeysWithThreshold = None,
               )
             )
             .bimap(

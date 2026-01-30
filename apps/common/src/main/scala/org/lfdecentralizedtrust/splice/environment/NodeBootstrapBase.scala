@@ -172,6 +172,7 @@ abstract class NodeBootstrapBase[
     }
   }
 
+  @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
   override def onClosed(): Unit = blocking {
     synchronized {
       if (isRunningVar.getAndSet(false)) {

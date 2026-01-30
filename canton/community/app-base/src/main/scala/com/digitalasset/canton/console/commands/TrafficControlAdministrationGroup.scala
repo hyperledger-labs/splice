@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console.commands
@@ -24,7 +24,9 @@ class TrafficControlAdministrationGroup(
 
   @Help.Summary("Return the traffic state of the node")
   @Help.Description(
-    """Use this command to get the traffic state of the node at a given time for a specific synchronizer id."""
+    """Use this command to get the traffic state of the node at a given time for a specific
+      |synchronizer ID.
+      """
   )
   def traffic_state(
       synchronizerId: SynchronizerId

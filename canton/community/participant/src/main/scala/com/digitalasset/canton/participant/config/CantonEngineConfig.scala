@@ -1,9 +1,8 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.config
 
-import com.digitalasset.canton.config.CantonConfigValidator
 import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
 
 /** Configure the behaviour of the Daml Engine
@@ -31,7 +30,3 @@ final case class CantonEngineConfig(
     validationPhaseLogging: EngineLoggingConfig = EngineLoggingConfig(enabled = false),
     enableAdditionalConsistencyChecks: Boolean = false,
 )
-object CantonEngineConfig {
-  implicit val cantonEngineConfigCantonConfigValidator: CantonConfigValidator[CantonEngineConfig] =
-    CantonConfigValidator.validateAll // there are no enterprise features in here
-}

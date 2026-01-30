@@ -67,8 +67,8 @@ async function toPrettyTransactions(
   ledgerClient: LedgerJsonApi,
 ): Promise<PrettyTransactions> {
   const offsetCheckpoints: number[] = updates
-    .filter((update) => update.update.OffsetCheckpoint)
-    .map((update) => update.update.OffsetCheckpoint.value.offset);
+    .filter((update) => update.update!.OffsetCheckpoint)
+    .map((update) => update.update!.OffsetCheckpoint!.value!.offset);
   const latestCheckpointOffset = Math.max(...offsetCheckpoints);
 
   const transactions: Transaction[] = await Promise.all(
@@ -76,7 +76,7 @@ async function toPrettyTransactions(
       // exclude OffsetCheckpoint, Reassignment, TopologyTransaction
       .filter((update) => !!update.update?.Transaction?.value)
       .map(async (update) => {
-        const tx = update.update.Transaction.value;
+        const tx = update.update!.Transaction.value!;
         const parser = new TransactionParser(tx, ledgerClient, partyId);
 
         return await parser.parseTransaction();

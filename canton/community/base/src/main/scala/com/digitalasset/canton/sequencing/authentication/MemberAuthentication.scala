@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.authentication
@@ -203,5 +203,5 @@ object MemberAuthentication extends MemberAuthentication {
       .addWithoutLengthPrefix(
         nonce.getCryptographicEvidence
       ) // Nonces have a fixed length so it's fine to not add a length prefix
-      .add(synchronizerId.toProtoPrimitive)
+      .addString(synchronizerId.toProtoPrimitive)
 }

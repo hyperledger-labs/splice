@@ -1,9 +1,8 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.google.common.annotations.VisibleForTesting
 
 import scala.concurrent.duration.*
@@ -72,12 +71,7 @@ final case class ProcessingTimeout(
     sequencedEventProcessingBound: NonNegativeDuration =
       DefaultProcessingTimeouts.sequencedEventProcessingBound,
     dynamicStateConsistencyTimeout: NonNegativeDuration = NonNegativeDuration.ofSeconds(60),
-) extends UniformCantonConfigValidation
-
-object ProcessingTimeout {
-  implicit val processingTimeoutCantonConfigValidator: CantonConfigValidator[ProcessingTimeout] =
-    CantonConfigValidatorDerivation[ProcessingTimeout]
-}
+)
 
 /** Reasonable default timeouts */
 object DefaultProcessingTimeouts {

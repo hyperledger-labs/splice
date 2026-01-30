@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.kms.driver.v1
@@ -83,17 +83,21 @@ class DriverKms(
 
     val requestF =
       try {
-        futureSupervisor.supervised(s"KMS Driver: $operation") {
-          driverMethod(traceContext.context)
+        synchronizeWithClosing(functionFullName) {
+          FutureUnlessShutdown.recoverFromAbortException {
+            futureSupervisor.supervised(s"KMS Driver: $operation") {
+              driverMethod(traceContext.context)
+            }
+          }
         }
       } catch {
         case NonFatal(e) =>
           // Catch any exception thrown by the driver outside of a failed future and return a failed future
-          Future.failed(e)
+          FutureUnlessShutdown.failed(e)
       }
 
     EitherTUtil
-      .fromFuture(FutureUnlessShutdown.recoverFromAbortException(requestF), mapErr)
+      .fromFuture(requestF, mapErr)
       .thereafter {
         case Success(Outcome(Right(_))) =>
           logger.trace(s"KMS driver operation $operation succeeded")

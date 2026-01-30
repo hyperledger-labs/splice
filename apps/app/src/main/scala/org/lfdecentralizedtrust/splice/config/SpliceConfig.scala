@@ -54,7 +54,7 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.config.{ParticipantNodeConfig, RemoteParticipantConfig}
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
+import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplification
 import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.typesafe.config.ConfigException.UnresolvedSubstitution
@@ -107,7 +107,7 @@ case class SpliceConfig(
 ) extends ConfigDefaults[Option[DefaultPorts], SpliceConfig]
     with SharedCantonConfig[SpliceConfig] {
 
-  override def withDefaults(defaults: Option[DefaultPorts], edition: CantonEdition): SpliceConfig =
+  override def withDefaults(defaults: Option[DefaultPorts]): SpliceConfig =
     this
 
   // TODO(DACH-NY/canton-network-node#736): we want to remove all of the configurations options below:
@@ -330,7 +330,7 @@ object SpliceConfig {
         loadRawConfig(resolvedConfig)
           .flatMap { conf =>
             val confWithDefaults =
-              conf.withDefaults(Some(DefaultPorts.create()), CommunityCantonEdition)
+              conf.withDefaults(Some(DefaultPorts.create()))
             confWithDefaults.validate.toEither
               .map(_ => confWithDefaults)
               .leftMap(causes => ConfigErrors.ValidationError.Error(causes.toList))

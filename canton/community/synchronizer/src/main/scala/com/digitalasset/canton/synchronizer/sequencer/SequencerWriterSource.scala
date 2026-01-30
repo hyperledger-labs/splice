@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -7,12 +7,11 @@ import cats.data.{EitherT, Validated}
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
-import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.data.{CantonTimestamp, LogicalUpgradeTime}
+import com.digitalasset.canton.data.{CantonTimestamp, LogicalUpgradeTime, SequencingTimeBound}
 import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.*
@@ -204,7 +203,7 @@ object SequencerWriterSource {
       protocolVersion: ProtocolVersion,
       metrics: SequencerMetrics,
       blockSequencerMode: Boolean,
-      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
+      sequencingTimeLowerBoundExclusive: SequencingTimeBound,
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
@@ -350,20 +349,22 @@ class SendEventGenerator(
       )
 
     def validateRecipient(
-        member: Member
-    ): FutureUnlessShutdown[Validated[Member, SequencerMemberId]] =
-      for {
-        registeredMember <- store.lookupMember(member)
-        memberIdO = registeredMember.map(_.memberId)
-      } yield memberIdO.toRight(member).toValidated
+        member: Member,
+        registeredMember: Option[RegisteredMember],
+    ): Validated[Member, SequencerMemberId] = {
+      val memberIdO = registeredMember.map(_.memberId)
+      memberIdO.toRight(member).toValidated
+    }
 
     def validateRecipients(
         recipients: Set[Member]
     ): FutureUnlessShutdown[Validated[NonEmpty[Seq[Member]], Set[SequencerMemberId]]] =
       for {
         // TODO(#12363) Support group addresses in the DB Sequencer
-        validatedSeq <- recipients.toSeq
-          .parTraverse(validateRecipient)
+        registeredMembers <- store.lookupMembers(recipients.toSeq)
+        validatedSeq = registeredMembers.map { case (member, registeredMember) =>
+          validateRecipient(member, registeredMember)
+        }.toSeq
         validated = validatedSeq.traverse(_.leftMap(NonEmpty(Seq, _)))
       } yield validated.map(_.toSet)
 
@@ -513,7 +514,7 @@ object SequenceWritesFlow {
       writerConfig: SequencerWriterConfig,
       store: SequencerWriterStore,
       eventTimestampGenerator: PartitionedTimestampGenerator,
-      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
+      sequencingTimeLowerBoundExclusive: SequencingTimeBound,
       loggerFactory: NamedLoggerFactory,
       protocolVersion: ProtocolVersion,
       blockSequencerMode: Boolean,
@@ -605,7 +606,7 @@ object SequenceWritesFlow {
       def checkSequencingTimeLowerBound(
           event: Presequenced[StoreEvent[BytesPayload]]
       ): Either[CantonBaseError, Unit] =
-        sequencingTimeLowerBoundExclusive match {
+        sequencingTimeLowerBoundExclusive.get match {
           case Some(bound) =>
             Either.cond(
               LogicalUpgradeTime.canProcessKnowingPastUpgrade(

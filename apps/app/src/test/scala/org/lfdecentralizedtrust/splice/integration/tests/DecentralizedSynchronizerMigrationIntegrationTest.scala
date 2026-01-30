@@ -5,6 +5,7 @@ import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{User, UserRights}
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.{FullClientConfig, NonNegativeFiniteDuration}
@@ -13,7 +14,6 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api.IdentityProviderConfig
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
@@ -33,8 +33,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.balanceupda
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.ReceiverAmuletAmount
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  ConfigurableApp,
   updateAutomationConfig,
+  ConfigurableApp,
 }
 import org.lfdecentralizedtrust.splice.config.{
   ConfigTransforms,
@@ -1192,7 +1192,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     (for {
       conn <- sequencerConnections.aliasToConnection.values
       endpoint <- conn match {
-        case GrpcSequencerConnection(endpoints, _, _, _, _) => endpoints
+        case connection: data.GrpcSequencerConnection =>
+          connection.endpoints
       }
     } yield endpoint.toString).toSet
   }

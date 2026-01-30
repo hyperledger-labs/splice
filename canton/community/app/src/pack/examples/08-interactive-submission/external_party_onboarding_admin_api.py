@@ -1,4 +1,4 @@
-# Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
 # [Imports start]
@@ -373,7 +373,7 @@ def build_party_to_key_transaction(
         topology_manager_read_service_pb2.ListPartyToKeyMappingResponse
     ) = topology_read_client.ListPartyToKeyMapping(list_party_to_key_request)
     if len(party_to_key_response.results) == 0:
-        current_serial = 1
+        current_serial = 0
         current_keys_list = []
     else:
         # Sort the results by serial in descending order and take the first one

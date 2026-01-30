@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.block
@@ -162,7 +162,8 @@ class BlockSequencerStateAsyncWriterTest
     Chain.one(sender2),
   )
 
-  private lazy val block1 = BlockInfo(10L, CantonTimestamp.Epoch, Some(CantonTimestamp.Epoch))
+  private lazy val block1 =
+    BlockInfo(10L, CantonTimestamp.Epoch, Some(CantonTimestamp.Epoch), Some(CantonTimestamp.Epoch))
   private def unwrap(t: EitherT[FutureUnlessShutdown, String, Assertion]): Future[Assertion] =
     t.failOnShutdown.value.map(_.valueOrFail("EitherT returned left"))
 

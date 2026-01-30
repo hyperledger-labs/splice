@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
@@ -111,6 +111,7 @@ final class AssignmentValidationTest
     identityFactory
       .forOwnerAndSynchronizer(submittingParticipant, sourceSynchronizer.unwrap)
       .currentSnapshotApproximation
+      .futureValueUS
 
   private val pureCrypto = new SymbolicPureCrypto
 
@@ -131,7 +132,7 @@ final class AssignmentValidationTest
       recipients: Recipients = RecipientsTest.testInstance,
   ): ParsedReassignmentRequest[FullAssignmentTree] = {
     val signature = cryptoSnapshot
-      .sign(view.rootHash.unwrap, SigningKeyUsage.ProtocolOnly)
+      .sign(view.rootHash.unwrap, SigningKeyUsage.ProtocolOnly, None)
       .futureValueUS
       .toOption
 
@@ -410,7 +411,12 @@ final class AssignmentValidationTest
         seed,
         reassignmentId,
         submitterInfo(submitter),
-        ContractsReassignmentBatch(contract, reassignmentCounter),
+        ContractsReassignmentBatch(
+          contract,
+          Source(contract.templateId.packageId),
+          Target(contract.templateId.packageId),
+          reassignmentCounter,
+        ),
         sourceSynchronizer,
         targetSynchronizer,
         targetMediator,

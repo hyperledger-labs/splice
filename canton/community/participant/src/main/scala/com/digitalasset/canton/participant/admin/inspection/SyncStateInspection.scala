@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin.inspection
@@ -1088,16 +1088,18 @@ final class SyncStateInspection(
     MonadUtil
       .sequentialTraverse(filteredSynchronizerIds) { synchronizerId =>
         val synchronizerTopoClient = syncCrypto.ips.tryForSynchronizer(synchronizerId)
-        val ipsSnapshot = synchronizerTopoClient.currentSnapshotApproximation
+        val ipsSnapshotFUS = synchronizerTopoClient.currentSnapshotApproximation
 
-        ipsSnapshot
-          .allMembers()
-          .map(
-            _.collect {
-              case id: ParticipantId if participantFilter.fold(true)(_.contains(id)) => id
-            }
+        ipsSnapshotFUS
+          .flatMap(
+            _.allMembers()
+              .map(
+                _.collect {
+                  case id: ParticipantId if participantFilter.fold(true)(_.contains(id)) => id
+                }
+              )
+              .map(synchronizerId -> _)
           )
-          .map(synchronizerId -> _)
       }
       .map(_.toMap)
   }

@@ -52,7 +52,7 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
 
   override def run(paused: Boolean): Unit = blocking {
     // Using synchronized here, as we otherwise have to write cleanup code for recovering from a concurrent call
-    synchronized {
+    mutex.exclusive {
       withNewTrace("run processing loop")(implicit tc =>
         _ => {
           def go(task: T): Future[Unit] = processTaskWithRetry(task).map(_ =>
@@ -114,7 +114,7 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
     withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
       logger.info("Pausing trigger.")
       blocking {
-        synchronized {
+        mutex.exclusive {
           if (waitForResumePromise.isCompleted) {
             waitForResumePromise = Promise()
           }
@@ -128,7 +128,7 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
     withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
       logger.info("Resuming trigger.")
       blocking {
-        synchronized {
+        mutex.exclusive {
           val _ = waitForResumePromise.trySuccess(())
         }
       }

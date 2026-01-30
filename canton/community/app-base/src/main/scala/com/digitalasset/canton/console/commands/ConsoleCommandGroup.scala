@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console.commands
@@ -19,7 +19,8 @@ trait ConsoleCommandGroup extends Helpful with FeatureFlagFilter with NamedLoggi
 
 object ConsoleCommandGroup {
   class Impl(parent: ConsoleCommandGroup) extends ConsoleCommandGroup {
-    override protected def consoleEnvironment: ConsoleEnvironment = parent.consoleEnvironment
+    implicit override protected def consoleEnvironment: ConsoleEnvironment =
+      parent.consoleEnvironment
     override protected def runner: AdminCommandRunner = parent.runner
     override protected def loggerFactory: NamedLoggerFactory = parent.myLoggerFactory
   }

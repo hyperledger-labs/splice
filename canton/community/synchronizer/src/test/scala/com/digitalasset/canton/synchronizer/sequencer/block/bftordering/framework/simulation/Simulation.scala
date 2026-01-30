@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation
@@ -334,7 +334,9 @@ class Simulation[OnboardingDataT, SystemNetworkMessageT, SystemInputMessageT, Cl
       clock.advanceTo(whatToDo.at, logAdvancementAtInfo = false)(TraceContext.empty)
       local.tick(clock.now)
       network.tick()
-      val _ = currentHistory.addOne(whatToDo.command)
+      if (simSettings.shouldRecordHistory) {
+        val _ = currentHistory.addOne(whatToDo.command)
+      }
 
       logger.trace(s"Simulation will run ${whatToDo.command}")(TraceContext.empty)
 

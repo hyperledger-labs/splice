@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.sync
@@ -12,8 +12,6 @@ import com.daml.ledger.api.v2.admin.command_inspection_service.{
 import com.daml.ledger.api.v2.commands.Command
 import com.daml.ledger.api.v2.value.Identifier
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.config.semiauto.CantonConfigValidatorDerivation
-import com.digitalasset.canton.config.{CantonConfigValidator, UniformCantonConfigValidation}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.api.util.LfEngineToApi
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -28,10 +26,12 @@ import com.digitalasset.canton.platform.apiserver.execution.{
   CommandStatus,
 }
 import com.digitalasset.canton.platform.store.CompletionFromTransaction
+import com.digitalasset.canton.platform.store.CompletionFromTransaction.CommonCompletionProperties
 import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate
 import com.digitalasset.canton.protocol.LfSubmittedTransaction
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.Mutex
 import com.digitalasset.daml.lf.data.Ref.TypeConId
 import com.digitalasset.daml.lf.transaction.Node.LeafOnlyAction
 import com.digitalasset.daml.lf.transaction.Transaction.ChildrenRecursion
@@ -48,15 +48,9 @@ final case class CommandProgressTrackerConfig(
     maxFailed: NonNegativeInt = defaultMaxFailed,
     maxPending: NonNegativeInt = defaultMaxPending,
     maxSucceeded: NonNegativeInt = defaultMaxSucceeded,
-) extends UniformCantonConfigValidation
+)
 
 object CommandProgressTrackerConfig {
-  implicit val commandProgressTrackerConfigCantonConfigValidator
-      : CantonConfigValidator[CommandProgressTrackerConfig] = {
-    import com.digitalasset.canton.config.CantonConfigValidatorInstances.*
-    CantonConfigValidatorDerivation[CommandProgressTrackerConfig]
-  }
-
   lazy val defaultMaxFailed: NonNegativeInt = NonNegativeInt.tryCreate(100)
   lazy val defaultMaxPending: NonNegativeInt = NonNegativeInt.tryCreate(1000)
   lazy val defaultMaxSucceeded: NonNegativeInt = NonNegativeInt.tryCreate(100)
@@ -90,7 +84,7 @@ class CommandProgressTrackerImpl(
 
     private def processSyncErr(err: com.google.rpc.status.Status): Unit =
       // remove from pending
-      lock.synchronized(pending.remove(key)).foreach { cur =>
+      lock.exclusive(pending.remove(key)).foreach { cur =>
         if (config.maxFailed.value > 0) {
           updateWithStatus(err, CommandState.COMMAND_STATE_FAILED)
           addToCollection(cur.ref.get(), failed, config.maxFailed.value)
@@ -210,14 +204,14 @@ class CommandProgressTrackerImpl(
   private val pending = new mutable.LinkedHashMap[CommandKey, MyCommandResultHandle]()
   private val failed = new mutable.ArrayDeque[CommandStatus](config.maxFailed.value)
   private val succeeded = new mutable.ArrayDeque[CommandStatus](config.maxSucceeded.value)
-  private val lock = new Object()
+  private val lock = new Mutex()
 
   private def findCommands(
       commandIdPrefix: String,
       limit: Int,
       collection: => Iterable[CommandStatus],
   ): Seq[CommandStatus] =
-    lock.synchronized {
+    lock.exclusive {
       collection.filter(_.completion.commandId.startsWith(commandIdPrefix)).take(limit).toSeq
     }
 
@@ -256,18 +250,20 @@ class CommandProgressTrackerImpl(
       started = clock.now,
       completed = None,
       completion = CompletionFromTransaction.toApiCompletion(
-        submitters = Set.empty,
-        commandId = commandId,
+        CommonCompletionProperties(
+          submitters = Set.empty,
+          commandId = commandId,
+          userId = userId,
+          submissionId = submissionId,
+          completionOffset = 0L,
+          synchronizerTime = None,
+          traceContext = traceContext,
+          deduplicationOffset = None,
+          deduplicationDurationSeconds = None,
+          deduplicationDurationNanos = None,
+        ),
         updateId = "",
-        userId = userId,
-        traceContext = traceContext,
         optStatus = None,
-        optSubmissionId = submissionId,
-        optDeduplicationOffset = None,
-        optDeduplicationDurationSeconds = None,
-        optDeduplicationDurationNanos = None,
-        offset = 0L,
-        synchronizerTime = None,
       ),
       state = CommandState.COMMAND_STATE_PENDING,
       commands = commands,
@@ -275,7 +271,7 @@ class CommandProgressTrackerImpl(
       updates = CommandUpdates.defaultInstance,
     )
     val handle = MyCommandResultHandle(key, status)
-    val existing = lock.synchronized {
+    val existing = lock.exclusive {
       pending.put(key, handle)
     }
     existing.foreach { prev =>
@@ -292,7 +288,7 @@ class CommandProgressTrackerImpl(
       actAs: Seq[String],
       submissionId: Option[String],
   ): CommandResultHandle =
-    lock.synchronized {
+    lock.exclusive {
       pending.getOrElse(
         (commandId, userId, actAs.toSet, submissionId),
         CommandResultHandle.NoOp,
@@ -304,7 +300,7 @@ class CommandProgressTrackerImpl(
       collection: mutable.ArrayDeque[CommandStatus],
       maxSize: Int,
   ): Unit =
-    lock.synchronized {
+    lock.exclusive {
       collection.prepend(commandStatus)
       if (collection.sizeIs > maxSize) {
         collection.removeLast().discard
@@ -322,7 +318,7 @@ class CommandProgressTrackerImpl(
             Option.when(completionInfo.submissionId.nonEmpty)(completionInfo.submissionId),
           )
           // remove from pending
-          lock.synchronized(pending.remove(key)).foreach { cur =>
+          lock.exclusive(pending.remove(key)).foreach { cur =>
             if (config.maxFailed.value > 0) {
               cur.failedAsync(completionInfo.status)
               addToCollection(cur.ref.get(), failed, config.maxFailed.value)
@@ -341,7 +337,7 @@ class CommandProgressTrackerImpl(
               Option.when(completion.submissionId.nonEmpty)(completion.submissionId),
             )
             // remove from pending
-            lock.synchronized(pending.remove(key)).foreach { cur =>
+            lock.exclusive(pending.remove(key)).foreach { cur =>
               // mark as done
               cur.succeeded()
               addToCollection(cur.ref.get(), succeeded, config.maxSucceeded.value)

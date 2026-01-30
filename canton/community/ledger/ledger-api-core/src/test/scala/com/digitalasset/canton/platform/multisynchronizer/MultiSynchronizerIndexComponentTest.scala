@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.multisynchronizer
@@ -114,14 +114,14 @@ class MultiSynchronizerIndexComponentTest extends AnyFlatSpec with IndexComponen
             contractAuthenticationData = Bytes.Empty,
             reassignmentCounter = 15L,
             nodeId = 0,
+            internalContractId =
+              -1, // will be filled when contracts are stored in the participant contract store
           )
         ),
         repairCounter = RepairCounter.Genesis,
         recordTime = CantonTimestamp(recordTime),
         synchronizerId = synchronizer2,
         acsChangeFactory = TestAcsChangeFactory(),
-        internalContractIds =
-          Map.empty, // will be filled when contracts are stored in the participant contract store
       )
     else
       Update.RepairReassignmentAccepted(
@@ -141,13 +141,13 @@ class MultiSynchronizerIndexComponentTest extends AnyFlatSpec with IndexComponen
             contractAuthenticationData = Bytes.Empty,
             reassignmentCounter = 15L,
             nodeId = 0,
+            internalContractId =
+              -1, // will be filled when contracts are stored in the participant contract store
           )
         ),
         repairCounter = RepairCounter.Genesis,
         recordTime = CantonTimestamp(recordTime),
         synchronizerId = synchronizer2,
-        internalContractIds =
-          Map.empty, // will be filled when contracts are stored in the participant contract store
       )
   }
 }

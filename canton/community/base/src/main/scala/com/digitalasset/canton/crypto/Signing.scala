@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
@@ -12,13 +12,8 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
+import com.digitalasset.canton.config.PositiveFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
-import com.digitalasset.canton.config.{
-  CantonConfigValidator,
-  PositiveFiniteDuration,
-  UniformCantonConfigValidation,
-}
 import com.digitalasset.canton.crypto.CryptoPureApiError.KeyParseAndValidateError
 import com.digitalasset.canton.crypto.SigningKeyUsage.encodeUsageForHash
 import com.digitalasset.canton.crypto.SigningPublicKey.getDataForFingerprint
@@ -42,10 +37,10 @@ import com.digitalasset.canton.util.EitherUtil
 import com.digitalasset.canton.version.*
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
+import org.bouncycastle.asn1.ASN1OctetString
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.asn1.x509.{AlgorithmIdentifier, SubjectPublicKeyInfo}
-import org.bouncycastle.asn1.{ASN1OctetString, DEROctetString}
 import slick.jdbc.GetResult
 
 import java.time.Duration
@@ -403,8 +398,18 @@ final case class SignatureDelegationValidityPeriod(
         DeterministicEncoding.encodeLong(periodLength.duration.toSeconds)
       )
 
-  def computeCutOffTimestamp(cutOffDuration: Duration): CantonTimestamp =
-    this.toExclusive.minus(cutOffDuration)
+  /** If we know the timestamp is fixed (aka not an approximation) there's no reason to apply the
+    * cutoff at either end because there is no clock uncertainty. Otherwise, we apply the cutoff to
+    * both ends of the interval to account for any possible clock drifts, and thus only use the
+    * session signing key if its validity falls within those bounds and is therefore safe to use.
+    */
+  def computeCutOffTimestamp(
+      cutOffDuration: Duration,
+      approximateTimestamp: Boolean,
+  ): (CantonTimestamp, CantonTimestamp) =
+    if (approximateTimestamp)
+      (this.fromInclusive.add(cutOffDuration), this.toExclusive.minus(cutOffDuration))
+    else (this.fromInclusive, this.toExclusive)
 }
 
 /** An extension to the signature to accommodate the necessary information to be able to use session
@@ -524,12 +529,12 @@ object SignatureDelegation {
     val hashBuilder =
       HashBuilderFromMessageDigest(HashAlgorithm.Sha256, HashPurpose.SessionKeyDelegation)
     hashBuilder
-      .add(sessionKey.id.unwrap)
-      .add(sessionKey.keySpec.toProtoEnum.value)
-      .add(sessionKey.format.toProtoEnum.value)
-      .add(encodeUsageForHash(sessionKey.usage))
-      .add(validityPeriod.getCryptographicEvidence)
-      .add(synchronizerId.toProtoPrimitive)
+      .addString(sessionKey.id.unwrap)
+      .addInt(sessionKey.keySpec.toProtoEnum.value)
+      .addInt(sessionKey.format.toProtoEnum.value)
+      .addByteString(encodeUsageForHash(sessionKey.usage))
+      .addByteString(validityPeriod.getCryptographicEvidence)
+      .addString(synchronizerId.toProtoPrimitive)
       .finish()
   }
 
@@ -871,11 +876,7 @@ object SigningKeyUsage {
 }
 
 /** A signing key specification. */
-sealed trait SigningKeySpec
-    extends Product
-    with Serializable
-    with PrettyPrinting
-    with UniformCantonConfigValidation {
+sealed trait SigningKeySpec extends Product with Serializable with PrettyPrinting {
   def name: String
   def toProtoEnum: v30.SigningKeySpec
   override val pretty: Pretty[this.type] = prettyOfString(_.name)
@@ -885,9 +886,6 @@ object SigningKeySpec {
 
   implicit val signingKeySpecOrder: Order[SigningKeySpec] =
     Order.by[SigningKeySpec, String](_.name)
-
-  implicit val signingKeySpecCantonConfigValidation: CantonConfigValidator[SigningKeySpec] =
-    CantonConfigValidatorDerivation[SigningKeySpec]
 
   /** Elliptic Curve Key from the Curve25519 curve as defined in http://ed25519.cr.yp.to/
     */
@@ -906,7 +904,6 @@ object SigningKeySpec {
     override val name: String = "EC-P256"
     override def toProtoEnum: v30.SigningKeySpec =
       v30.SigningKeySpec.SIGNING_KEY_SPEC_EC_P256
-    // Name of the elliptic curve as expected by Java's ECGenParameterSpec (JCA standard name)
     override val jcaCurveName: String = "secp256r1"
   }
 
@@ -917,7 +914,6 @@ object SigningKeySpec {
     override val name: String = "EC-P384"
     override def toProtoEnum: v30.SigningKeySpec =
       v30.SigningKeySpec.SIGNING_KEY_SPEC_EC_P384
-    // Name of the elliptic curve as expected by Java's ECGenParameterSpec (JCA standard name)
     override val jcaCurveName: String = "secp384r1"
   }
 
@@ -928,7 +924,6 @@ object SigningKeySpec {
     override val name: String = "EC-Secp256k1"
     override def toProtoEnum: v30.SigningKeySpec =
       v30.SigningKeySpec.SIGNING_KEY_SPEC_EC_SECP256K1
-    // Name of the elliptic curve as expected by Java's ECGenParameterSpec (JCA standard name)
     override val jcaCurveName: String = "secp256k1"
   }
 
@@ -990,11 +985,7 @@ object SigningKeySpec {
 }
 
 /** Algorithm schemes for signing. */
-sealed trait SigningAlgorithmSpec
-    extends Product
-    with Serializable
-    with PrettyPrinting
-    with UniformCantonConfigValidation {
+sealed trait SigningAlgorithmSpec extends Product with Serializable with PrettyPrinting {
   def name: String
   def supportedSigningKeySpecs: NonEmpty[Set[SigningKeySpec]]
   def supportedSignatureFormats: NonEmpty[Set[SignatureFormat]]
@@ -1004,6 +995,9 @@ sealed trait SigningAlgorithmSpec
     */
   // TODO(i28366): Add a test
   def approximateSignatureSize: Int
+
+  /** Name of the signing algorithm as expected by Java's getInstance (JCA standard name) */
+  def jcaAlgorithmName: String
   override val pretty: Pretty[this.type] = prettyOfString(_.name)
 }
 
@@ -1011,10 +1005,6 @@ object SigningAlgorithmSpec {
 
   implicit val signingAlgorithmSpecOrder: Order[SigningAlgorithmSpec] =
     Order.by[SigningAlgorithmSpec, String](_.name)
-
-  implicit val signingAlgorithmSpecCantonConfigValidator
-      : CantonConfigValidator[SigningAlgorithmSpec] =
-    CantonConfigValidatorDerivation[SigningAlgorithmSpec]
 
   /** EdDSA signature scheme based on Curve25519 and SHA512 as defined in http://ed25519.cr.yp.to/
     */
@@ -1027,6 +1017,7 @@ object SigningAlgorithmSpec {
     override def toProtoEnum: v30.SigningAlgorithmSpec =
       v30.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_ED25519
     override def approximateSignatureSize: Int = 64
+    override def jcaAlgorithmName: String = "Ed25519"
   }
 
   /** Elliptic Curve Digital Signature Algorithm with SHA256 as defined in
@@ -1041,6 +1032,7 @@ object SigningAlgorithmSpec {
     override def toProtoEnum: v30.SigningAlgorithmSpec =
       v30.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_EC_DSA_SHA_256
     override def approximateSignatureSize: Int = 64
+    override def jcaAlgorithmName: String = "SHA256withECDSA"
   }
 
   /** Elliptic Curve Digital Signature Algorithm with SHA384 as defined in
@@ -1055,6 +1047,7 @@ object SigningAlgorithmSpec {
     override def toProtoEnum: v30.SigningAlgorithmSpec =
       v30.SigningAlgorithmSpec.SIGNING_ALGORITHM_SPEC_EC_DSA_SHA_384
     override def approximateSignatureSize: Int = 96
+    override def jcaAlgorithmName: String = "SHA384withECDSA"
   }
 
   def toProtoEnumOption(
@@ -1537,7 +1530,7 @@ final case class SigningPrivateKey private (
     v30.PrivateKey.Key.SigningPrivateKey(toProtoV30)
 
   @nowarn("msg=Der in object CryptoKeyFormat is deprecated")
-  private[crypto] def migrate(): Option[SigningPrivateKey] = {
+  private[crypto] def migrate(): Either[String, Option[SigningPrivateKey]] = {
     def mkNewKeyO(newKey: ByteString): Option[SigningPrivateKey] = {
       val newFormat = CryptoKeyFormat.DerPkcs8Pki
       Some(SigningPrivateKey(id, newFormat, newKey, keySpec, usage)(migrated = true))
@@ -1545,20 +1538,13 @@ final case class SigningPrivateKey private (
 
     (keySpec, format) match {
       case (SigningKeySpec.EcCurve25519, CryptoKeyFormat.Raw) =>
-        // The key is stored as pure bytes; we need to convert it to a PrivateKeyInfo structure
-        val algoId = new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519)
-        val privateKeyInfo = new PrivateKeyInfo(
-          algoId,
-          new DEROctetString(key.toByteArray),
-        ).getEncoded
-
-        mkNewKeyO(ByteString.copyFrom(privateKeyInfo))
-
+        // Encode the private key with a PKCS#8 DER-encoded PrivateKeyInfo structure
+        JcePrivateCrypto.encodeEd25519PrivateKey(key).map(mkNewKeyO)
       case (SigningKeySpec.EcP256, CryptoKeyFormat.Der) |
           (SigningKeySpec.EcP384, CryptoKeyFormat.Der) =>
-        mkNewKeyO(key)
+        Right(mkNewKeyO(key))
 
-      case _ => None
+      case _ => Right(None)
     }
   }
 
@@ -1637,7 +1623,10 @@ object SigningPrivateKey extends HasVersionedMessageCompanion[SigningPrivateKey]
         // prove ownership for OwnerToKeyMapping and PartyToKeyMapping requests.
         SigningKeyUsage.addProofOfOwnership(usage),
       )()
-      keyAfterMigration = keyBeforeMigration.migrate().getOrElse(keyBeforeMigration)
+      keyAfterMigrationO <- keyBeforeMigration
+        .migrate()
+        .leftMap(SigningKeyCreationError.CreatePrivateKeyError.apply)
+      keyAfterMigration = keyAfterMigrationO.getOrElse(keyBeforeMigration)
       validatedKey <- keyAfterMigration.validated
     } yield validatedKey
 
@@ -1771,7 +1760,7 @@ object SigningKeyGenerationError extends CantonErrorGroups.CommandErrorGroup {
         extends CantonBaseError.Impl(cause = "Unable to create signing key")
   }
 
-  final case class GeneralError(error: Exception) extends SigningKeyGenerationError {
+  final case class GeneralError(error: Throwable) extends SigningKeyGenerationError {
     override protected def pretty: Pretty[GeneralError] = prettyOfClass(unnamedParam(_.error))
   }
 
@@ -1844,6 +1833,11 @@ object SigningKeyCreationError extends CantonErrorGroups.CommandErrorGroup {
   }
   final case class KeyParseAndValidateError(error: String) extends SigningKeyCreationError {
     override protected def pretty: Pretty[KeyParseAndValidateError] = prettyOfClass(
+      unnamedParam(_.error.unquoted)
+    )
+  }
+  final case class CreatePrivateKeyError(error: String) extends SigningKeyCreationError {
+    override protected def pretty: Pretty[CreatePrivateKeyError] = prettyOfClass(
       unnamedParam(_.error.unquoted)
     )
   }

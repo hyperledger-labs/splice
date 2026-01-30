@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.kms
@@ -13,6 +13,7 @@ import com.digitalasset.canton.config.{
   CryptoProvider,
   CryptoSchemeConfig,
   EncryptionSchemeConfig,
+  SessionEncryptionKeyCacheConfig,
   SigningSchemeConfig,
 }
 import com.digitalasset.canton.crypto.kms.KmsError.{
@@ -90,7 +91,7 @@ trait KmsTest extends BaseTest with BeforeAndAfterAll {
   lazy val pureCrypto: CryptoPureApi = JcePureCrypto
     .create(
       config,
-      CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+      SessionEncryptionKeyCacheConfig(),
       CachingConfigs.defaultPublicKeyConversionCache,
       CryptoSchemes.tryFromConfig(config),
       loggerFactory,

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -39,11 +39,6 @@ sealed trait SequencerConnection extends PrettyPrinting {
   def addEndpoints(
       connection: URI,
       additionalConnections: URI*
-  ): Either[String, SequencerConnection]
-
-  def addEndpoints(
-      connection: SequencerConnection,
-      additionalConnections: SequencerConnection*
   ): Either[String, SequencerConnection]
 
   def sequencerAlias: SequencerAlias
@@ -105,13 +100,6 @@ final case class GrpcSequencerConnection(
         .fromUris(NonEmpty(Seq, connection, additionalConnections*))
     } yield copy(endpoints = endpoints ++ newEndpoints._1)
 
-  override def addEndpoints(
-      connection: SequencerConnection,
-      additionalConnections: SequencerConnection*
-  ): Either[String, SequencerConnection] =
-    SequencerConnection
-      .merge(this +: connection +: additionalConnections)
-
   override def withCertificates(certificates: ByteString): SequencerConnection =
     copy(customTrustCertificates = Some(certificates))
 
@@ -139,16 +127,6 @@ object GrpcSequencerConnection {
       sequencerAlias,
       sequencerId,
     )
-
-  def tryCreate(
-      connection: String,
-      customTrustCertificates: Option[ByteString] = None,
-      sequencerAlias: SequencerAlias = SequencerAlias.Default,
-  ): GrpcSequencerConnection =
-    create(connection, customTrustCertificates, sequencerAlias) match {
-      case Left(err) => throw new IllegalArgumentException(s"Invalid connection $connection : $err")
-      case Right(es) => es
-    }
 }
 
 object SequencerConnection {

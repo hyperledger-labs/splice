@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability
@@ -14,7 +14,10 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
   ProgrammableUnitTestContext,
   ProgrammableUnitTestEnv,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.EpochNumber
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
+  BlockNumber,
+  EpochNumber,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.availability.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.{
   OrderingRequest,
@@ -64,7 +67,7 @@ class AvailabilityModuleDisseminationTest
         )
 
         disseminationProtocolState.disseminationProgress should be(empty)
-        disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+        disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
         disseminationProtocolState.batchesReadyForOrdering should be(empty)
         verify(availabilityStore, times(1)).addBatch(ABatchId, ABatch)
       }
@@ -141,7 +144,7 @@ class AvailabilityModuleDisseminationTest
                     ) =>
               }
           }
-          disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+          disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
         }
     }
 
@@ -175,7 +178,7 @@ class AvailabilityModuleDisseminationTest
         disseminationProtocolState.disseminationProgress should
           contain only ABatchDisseminationProgressNode0To3WithNode0Vote
         disseminationProtocolState.batchesReadyForOrdering should be(empty)
-        disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+        disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
       }
     }
 
@@ -188,7 +191,7 @@ class AvailabilityModuleDisseminationTest
             : ProgrammableUnitTestContext[Availability.Message[ProgrammableUnitTestEnv]] =
           new ProgrammableUnitTestContext()
         val disseminationProtocolState = new DisseminationProtocolState()
-        disseminationProtocolState.toBeProvidedToConsensus.addOne(AToBeProvidedToConsensus)
+        disseminationProtocolState.nextToBeProvidedToConsensus = ANextToBeProvidedToConsensus
         val consensusCell = new AtomicReference[Option[Consensus.ProtocolMessage]](None)
         val cryptoProvider = newMockCrypto
         val me = Node0
@@ -207,7 +210,7 @@ class AvailabilityModuleDisseminationTest
         )
 
         disseminationProtocolState.disseminationProgress should be(empty)
-        disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+        disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
         disseminationProtocolState.batchesReadyForOrdering should not be empty
 
         consensusCell.get() should contain(ABatchProposalNode0VoteNode0InTopology)
@@ -224,7 +227,7 @@ class AvailabilityModuleDisseminationTest
       "send proposal to local consensus and " +
         "broadcast Dissemination.RemoteBatch" in {
           val disseminationProtocolState = new DisseminationProtocolState()
-          disseminationProtocolState.toBeProvidedToConsensus.addOne(AToBeProvidedToConsensus)
+          disseminationProtocolState.nextToBeProvidedToConsensus = ANextToBeProvidedToConsensus
           val consensusCell = new AtomicReference[Option[Consensus.ProtocolMessage]](None)
           val p2pNetworkOutCell = new AtomicReference[Option[P2PNetworkOut.Message]](None)
           val me = Node0
@@ -257,7 +260,7 @@ class AvailabilityModuleDisseminationTest
           )
 
           disseminationProtocolState.disseminationProgress should be(empty)
-          disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+          disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
 
           disseminationProtocolState.batchesReadyForOrdering should not be empty
           consensusCell.get() should contain(ABatchProposalNode0VoteNodes0To2InTopology)
@@ -292,7 +295,7 @@ class AvailabilityModuleDisseminationTest
       "update dissemination progress and " +
         "broadcast Dissemination.RemoteBatch" in {
           val disseminationProtocolState = new DisseminationProtocolState()
-          disseminationProtocolState.toBeProvidedToConsensus.addOne(AToBeProvidedToConsensus)
+          disseminationProtocolState.nextToBeProvidedToConsensus = ANextToBeProvidedToConsensus
           val p2pNetworkOutCell = new AtomicReference[Option[P2PNetworkOut.Message]](None)
           val me = Node0
           val cryptoProvider = spy(ProgrammableUnitTestEnv.noSignatureCryptoProvider)
@@ -324,7 +327,7 @@ class AvailabilityModuleDisseminationTest
           disseminationProtocolState.disseminationProgress should
             contain only ABatchDisseminationProgressNode0To3WithNode0Vote
           disseminationProtocolState.batchesReadyForOrdering should be(empty)
-          disseminationProtocolState.toBeProvidedToConsensus should contain only AToBeProvidedToConsensus
+          disseminationProtocolState.nextToBeProvidedToConsensus shouldBe ANextToBeProvidedToConsensus
           p2pNetworkOutCell.get() shouldBe None
           val remoteBatch = RemoteDissemination.RemoteBatch.create(ABatchId, ABatch, Node0)
           verify(cryptoProvider).signMessage(
@@ -361,7 +364,7 @@ class AvailabilityModuleDisseminationTest
 
       disseminationProtocolState.disseminationProgress should be(empty)
       disseminationProtocolState.batchesReadyForOrdering should be(empty)
-      disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+      disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
       verify(availabilityStore, times(1)).addBatch(ABatchId, ABatch)
     }
 
@@ -385,7 +388,7 @@ class AvailabilityModuleDisseminationTest
 
       disseminationProtocolState.disseminationProgress should be(empty)
       disseminationProtocolState.batchesReadyForOrdering should be(empty)
-      disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+      disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
       verifyZeroInteractions(availabilityStore)
     }
 
@@ -411,7 +414,7 @@ class AvailabilityModuleDisseminationTest
 
       disseminationProtocolState.disseminationProgress should be(empty)
       disseminationProtocolState.batchesReadyForOrdering should be(empty)
-      disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+      disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
       verifyZeroInteractions(availabilityStore)
     }
 
@@ -439,7 +442,7 @@ class AvailabilityModuleDisseminationTest
 
       disseminationProtocolState.disseminationProgress should be(empty)
       disseminationProtocolState.batchesReadyForOrdering should be(empty)
-      disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+      disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
       verifyZeroInteractions(availabilityStore)
     }
 
@@ -466,7 +469,7 @@ class AvailabilityModuleDisseminationTest
 
       disseminationProtocolState.disseminationProgress should be(empty)
       disseminationProtocolState.batchesReadyForOrdering should be(empty)
-      disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+      disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
       verifyZeroInteractions(availabilityStore)
     }
 
@@ -511,7 +514,7 @@ class AvailabilityModuleDisseminationTest
 
       disseminationProtocolState.disseminationProgress should be(empty)
       disseminationProtocolState.batchesReadyForOrdering should be(empty)
-      disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+      disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
       verifyZeroInteractions(availabilityStore)
     }
 
@@ -592,10 +595,16 @@ class AvailabilityModuleDisseminationTest
         EpochNumber(anEpochNumber + OrderingRequestBatch.BatchValidityDurationEpochs)
       availability.receive(
         Availability.Consensus
-          .CreateProposal(OrderingTopologyNode0, failingCryptoProvider, expiringEpochNumber)
+          .CreateProposal(
+            BlockNumber.First,
+            expiringEpochNumber,
+            OrderingTopologyNode0,
+            failingCryptoProvider,
+          )
       )
       canAcceptBatch(AnotherBatchId) shouldBe true
     }
+
     "evict batches that are being tracked of after some epochs" in {
       implicit val ctx: ProgrammableUnitTestContext[Availability.Message[ProgrammableUnitTestEnv]] =
         new ProgrammableUnitTestContext()
@@ -623,7 +632,12 @@ class AvailabilityModuleDisseminationTest
         EpochNumber(anEpochNumber + OrderingRequestBatch.BatchValidityDurationEpochs)
       availability.receive(
         Availability.Consensus
-          .CreateProposal(OrderingTopologyNode0, failingCryptoProvider, expiringEpochNumber)
+          .CreateProposal(
+            BlockNumber.First,
+            expiringEpochNumber,
+            OrderingTopologyNode0,
+            failingCryptoProvider,
+          )
       )
       verifyZeroInteractions(availabilityStore)
 
@@ -632,7 +646,12 @@ class AvailabilityModuleDisseminationTest
         EpochNumber(anEpochNumber + 2 * OrderingRequestBatch.BatchValidityDurationEpochs)
       availability.receive(
         Availability.Consensus
-          .CreateProposal(OrderingTopologyNode0, failingCryptoProvider, evictionEpochNumber)
+          .CreateProposal(
+            BlockNumber(1),
+            evictionEpochNumber,
+            OrderingTopologyNode0,
+            failingCryptoProvider,
+          )
       )
 
       // the batch got evicted
@@ -658,7 +677,7 @@ class AvailabilityModuleDisseminationTest
 
       disseminationProtocolState.disseminationProgress should be(empty)
       disseminationProtocolState.batchesReadyForOrdering should be(empty)
-      disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+      disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
       verify(cryptoProvider).signHash(
         AvailabilityAck.hashFor(ABatchId, anEpochNumber, myId, metrics),
         operationId = "availability-sign-remote-batchId",
@@ -718,7 +737,7 @@ class AvailabilityModuleDisseminationTest
 
         disseminationProtocolState.disseminationProgress should be(empty)
         disseminationProtocolState.batchesReadyForOrdering should be(empty)
-        disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+        disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
         verifyZeroInteractions(cryptoProvider)
       }
     }
@@ -771,7 +790,7 @@ class AvailabilityModuleDisseminationTest
                 ) =>
           }
         }
-        disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+        disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
       }
     }
 
@@ -831,7 +850,7 @@ class AvailabilityModuleDisseminationTest
                   ) =>
             }
           }
-          disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+          disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
         }
     }
 
@@ -876,7 +895,7 @@ class AvailabilityModuleDisseminationTest
         disseminationProtocolState.disseminationProgress should
           contain only ABatchDisseminationProgressNode0To6WithNonQuorumVotes
         disseminationProtocolState.batchesReadyForOrdering should be(empty)
-        disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+        disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
       }
     }
 
@@ -891,7 +910,7 @@ class AvailabilityModuleDisseminationTest
           disseminationProtocolState.disseminationProgress.addOne(
             ABatchDisseminationProgressNode0And1WithNode0Vote
           )
-          disseminationProtocolState.toBeProvidedToConsensus.addOne(AToBeProvidedToConsensus)
+          disseminationProtocolState.nextToBeProvidedToConsensus = ANextToBeProvidedToConsensus
           val consensusCell = new AtomicReference[Option[Consensus.ProtocolMessage]](None)
           val cryptoProvider = mock[CryptoProvider[IgnoringUnitTestEnv]]
           val availability = createAvailability[IgnoringUnitTestEnv](
@@ -916,7 +935,7 @@ class AvailabilityModuleDisseminationTest
           consensusCell.get() should contain(ABatchProposalNode0And1Votes)
           disseminationProtocolState.batchesReadyForOrdering should not be empty
           disseminationProtocolState.disseminationProgress should be(empty)
-          disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+          disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
 
           availability.receive(Availability.Consensus.Ordered(Seq(ABatchId)))
           disseminationProtocolState.batchesReadyForOrdering should be(empty)
@@ -935,7 +954,7 @@ class AvailabilityModuleDisseminationTest
           disseminationProtocolState.disseminationProgress.addOne(
             ABatchDisseminationProgressNode0To3WithNode0Vote
           )
-          disseminationProtocolState.toBeProvidedToConsensus.addOne(AToBeProvidedToConsensus)
+          disseminationProtocolState.nextToBeProvidedToConsensus = ANextToBeProvidedToConsensus
           val consensusCell = new AtomicReference[Option[Consensus.ProtocolMessage]](None)
           val cryptoProvider = mock[CryptoProvider[IgnoringUnitTestEnv]]
           val availability = createAvailability[IgnoringUnitTestEnv](
@@ -964,7 +983,7 @@ class AvailabilityModuleDisseminationTest
           consensusCell.get() should contain(ABatchProposal4NodesQuorumVotes)
           disseminationProtocolState.batchesReadyForOrdering should not be empty
           disseminationProtocolState.disseminationProgress should be(empty)
-          disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+          disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
 
           availability.receive(Availability.Consensus.Ordered(Seq(ABatchId)))
           disseminationProtocolState.batchesReadyForOrdering should be(empty)
@@ -982,7 +1001,7 @@ class AvailabilityModuleDisseminationTest
         disseminationProtocolState.disseminationProgress.addOne(
           ABatchDisseminationProgressNode0To6WithNode0Vote
         )
-        disseminationProtocolState.toBeProvidedToConsensus.addOne(AToBeProvidedToConsensus)
+        disseminationProtocolState.nextToBeProvidedToConsensus = ANextToBeProvidedToConsensus
         val cryptoProvider = mock[CryptoProvider[IgnoringUnitTestEnv]]
         val availability = createAvailability[IgnoringUnitTestEnv](
           otherNodes = Node1To6,
@@ -1011,7 +1030,7 @@ class AvailabilityModuleDisseminationTest
         disseminationProtocolState.disseminationProgress should
           contain only ABatchDisseminationProgressNode0To6WithNonQuorumVotes
         disseminationProtocolState.batchesReadyForOrdering should be(empty)
-        disseminationProtocolState.toBeProvidedToConsensus should contain only AToBeProvidedToConsensus
+        disseminationProtocolState.nextToBeProvidedToConsensus shouldBe ANextToBeProvidedToConsensus
       }
     }
 
@@ -1026,7 +1045,7 @@ class AvailabilityModuleDisseminationTest
         disseminationProtocolState.disseminationProgress.addOne(
           ABatchDisseminationProgressNode0To6WithNode0Vote
         )
-        disseminationProtocolState.toBeProvidedToConsensus.addOne(AToBeProvidedToConsensus)
+        disseminationProtocolState.nextToBeProvidedToConsensus = ANextToBeProvidedToConsensus
         val cryptoProvider = mock[CryptoProvider[IgnoringUnitTestEnv]]
         val availability = createAvailability[IgnoringUnitTestEnv](
           otherNodes = Node1To6,
@@ -1056,7 +1075,7 @@ class AvailabilityModuleDisseminationTest
         disseminationProtocolState.disseminationProgress should
           contain only ABatchDisseminationProgressNode0To6WithNode0And1Votes
         disseminationProtocolState.batchesReadyForOrdering should be(empty)
-        disseminationProtocolState.toBeProvidedToConsensus should contain only AToBeProvidedToConsensus
+        disseminationProtocolState.nextToBeProvidedToConsensus shouldBe ANextToBeProvidedToConsensus
 
         // Second time receiving node1Ack: deduplicated before cryptoProvider.verify
         availability.receive(node1Ack)
@@ -1064,7 +1083,7 @@ class AvailabilityModuleDisseminationTest
         disseminationProtocolState.disseminationProgress should
           contain only ABatchDisseminationProgressNode0To6WithNode0And1Votes
         disseminationProtocolState.batchesReadyForOrdering should be(empty)
-        disseminationProtocolState.toBeProvidedToConsensus should contain only AToBeProvidedToConsensus
+        disseminationProtocolState.nextToBeProvidedToConsensus shouldBe ANextToBeProvidedToConsensus
       }
     }
 }

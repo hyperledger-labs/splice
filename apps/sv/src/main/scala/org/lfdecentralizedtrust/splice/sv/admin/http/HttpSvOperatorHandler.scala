@@ -15,7 +15,7 @@ import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, 
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.digitalasset.canton.util.ErrorUtil
+import com.digitalasset.canton.util.{ErrorUtil, Mutex}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice as spliceCodegen
@@ -43,7 +43,7 @@ import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{Codec, Contract, TemplateJsonDecoder}
 
 import java.util.Optional
-import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
+import scala.concurrent.{blocking, ExecutionContextExecutor, Future}
 
 class HttpSvOperatorHandler(
     svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
@@ -77,6 +77,7 @@ class HttpSvOperatorHandler(
   override protected val workflowId: String = this.getClass.getSimpleName
   private val svStore = svStoreWithIngestion.store
   private val dsoStore = dsoStoreWithIngestion.store
+  private val mutex = Mutex()
   override protected val votesStore: ActiveVotesStore = dsoStore
   override protected val validatorLicensesStore: AppStore = dsoStore
 
@@ -97,7 +98,7 @@ class HttpSvOperatorHandler(
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var scanConnectionV: Option[Future[ScanConnection]] = None
   private def scanConnectionF: Future[ScanConnection] = blocking {
-    this.synchronized {
+    mutex.exclusive {
       scanConnectionV match {
         case Some(f) => f
         case None =>
@@ -472,7 +473,7 @@ class HttpSvOperatorHandler(
     } { call }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = blocking {
-    this.synchronized {
+    mutex.exclusive {
       Seq[AsyncOrSyncCloseable](
         AsyncCloseable(
           "scanConnection",

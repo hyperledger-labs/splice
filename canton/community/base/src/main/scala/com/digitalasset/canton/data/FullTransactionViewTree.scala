@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -7,6 +7,9 @@ import cats.syntax.either.*
 import com.digitalasset.canton.data.TransactionViewTree.InvalidTransactionViewTree
 import com.digitalasset.canton.data.ViewPosition.MerklePathElement
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.google.common.annotations.VisibleForTesting
+import monocle.Lens
+import monocle.macros.GenLens
 
 import scala.annotation.tailrec
 
@@ -56,5 +59,12 @@ object FullTransactionViewTree {
 
   def create(tree: GenTransactionTree): Either[String, FullTransactionViewTree] =
     FullTransactionViewTree(tree).validated
+
+  /** DO NOT USE IN PRODUCTION, as it does not necessarily check object invariants. */
+  @VisibleForTesting
+  object Optics {
+    val tree: Lens[FullTransactionViewTree, GenTransactionTree] =
+      GenLens[FullTransactionViewTree](_.tree)
+  }
 
 }

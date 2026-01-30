@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.interfaces
@@ -17,7 +17,6 @@ import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Ref.{PackageName, Party}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
-import com.digitalasset.daml.lf.transaction.GlobalKey
 import com.digitalasset.daml.lf.value.Value as LfValue
 
 /** Generic ledger update event.
@@ -137,7 +136,6 @@ object TransactionLogUpdate {
       createSignatories: Set[Party],
       createObservers: Set[Party],
       createKeyHash: Option[Hash],
-      createKey: Option[GlobalKey],
       createKeyMaintainers: Option[Set[Party]],
       authenticationData: Bytes,
   ) extends Event {

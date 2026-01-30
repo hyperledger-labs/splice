@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
@@ -21,6 +21,15 @@ object ValidationErrors {
   ): StatusRuntimeException =
     RequestValidationErrors.InvalidArgument
       .Reject(message)
+      .asGrpcError
+
+  def disclosedContractsConflictingPayloads(
+      contractConflictingPayloads: List[(String, Long, String)]
+  )(implicit
+      errorLoggingContext: ErrorLoggingContext
+  ): StatusRuntimeException =
+    RequestValidationErrors.DisclosedContractsConflictingPayloads
+      .Reject(contractConflictingPayloads)
       .asGrpcError
 
   def invalidField(

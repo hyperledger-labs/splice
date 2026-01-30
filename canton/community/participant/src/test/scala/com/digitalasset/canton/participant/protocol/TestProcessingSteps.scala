@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -22,12 +22,7 @@ import com.digitalasset.canton.ledger.participant.state.SequencedUpdate
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.participant.protocol.EngineController.EngineAbortStatus
-import com.digitalasset.canton.participant.protocol.ProcessingSteps.{
-  ParsedRequest,
-  PendingRequestData,
-  RequestType,
-  WrapsProcessorError,
-}
+import com.digitalasset.canton.participant.protocol.ProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.ProtocolProcessor.NoMediatorError
 import com.digitalasset.canton.participant.protocol.TestProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.conflictdetection.{
@@ -165,7 +160,7 @@ class TestProcessingSteps(
       sessionKeyStore: ConfirmationRequestSessionKeyStore,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, TestProcessingError, DecryptedViews] = {
+  ): EitherT[FutureUnlessShutdown, TestProcessingError, DecryptedViews[DecryptedView]] = {
     def treeFor(viewHash: ViewHash, hash: Hash): TestViewTree = {
       val rootHash = RootHash(hash)
       val informees = informeesOfView(viewHash)

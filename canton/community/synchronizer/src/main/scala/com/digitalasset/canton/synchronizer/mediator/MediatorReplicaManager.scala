@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
@@ -10,7 +10,6 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.health.admin.data.TopologyQueueStatus
 import com.digitalasset.canton.lifecycle.{
   AsyncOrSyncCloseable,
-  CloseContext,
   FlagCloseableAsync,
   FutureUnlessShutdown,
   SyncCloseable,
@@ -133,13 +132,13 @@ class MediatorReplicaManager(
    * Override the default setPassive behavior to only actually transition to passive after the mediator replica manager
    * has been properly initialized.
    */
-  override def setPassive(): FutureUnlessShutdown[Option[CloseContext]] =
+  override def setPassive(): FutureUnlessShutdown[Unit] =
     if (isInitialized) super.setPassive()
     else {
       TraceContext.withNewTraceContext("passive") { implicit traceContext =>
         logger.info("Not transitioning to passive, because the mediator is not yet initialized.")
       }
-      FutureUnlessShutdown.pure(None)
+      FutureUnlessShutdown.unit
     }
 
   override protected def transitionToActive()(implicit

@@ -609,19 +609,25 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             val getUpdatesPayload = JsUpdateServiceCodecs.getUpdatesRequestRW(
               GetUpdatesRequest(
                 updateFormat = Some(
-                  UpdateFormat(includeTransactions =
-                    Some(
+                  UpdateFormat(
+                    includeTransactions = Some(
                       TransactionFormat(
                         transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
                         eventFormat = Some(
                           EventFormat(
-                            filtersByParty(alice.partyId, interfaces, includeWildcard = true)
+                            filtersByParty(alice.partyId, interfaces, includeWildcard = true),
+                            filtersForAnyParty = None,
+                            verbose = false,
                           )
                         ),
                       )
-                    )
+                    ),
+                    includeReassignments = None,
+                    includeTopologyEvents = None,
                   )
-                )
+                ),
+                beginExclusive = 0,
+                endInclusive = None,
               )
             )
 
@@ -862,7 +868,9 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                       transferinstructionv1.TransferInstruction.TEMPLATE_ID,
                     ),
                     includeWildcard = true,
-                  )
+                  ),
+                  filtersForAnyParty = None,
+                  verbose = false,
                 )
               ),
             )
@@ -958,17 +966,20 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             filtersByParty = Map(
               party.partyId.toProtoPrimitive -> Filters(
                 Seq(
-                  CumulativeFilter().withInterfaceFilter(
+                  CumulativeFilter.defaultInstance.withInterfaceFilter(
                     InterfaceFilter(
                       Some(
                         com.daml.ledger.api.v2.value.Identifier.fromJavaProto(interface.toProto)
                       ),
                       includeInterfaceView = true,
+                      includeCreatedEventBlob = false,
                     )
                   )
                 )
               )
-            )
+            ),
+            filtersForAnyParty = None,
+            verbose = false,
           )
         ),
         activeAtOffset =

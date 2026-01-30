@@ -172,7 +172,7 @@ case class ValidatorAppBackendConfig(
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,
     enableWallet: Boolean = true,
     sequencerRequestAmplificationPatience: NonNegativeFiniteDuration =
-      ValidatorAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION_PATIENCE,
+      ValidatorAppBackendConfig.DefaultSequencerRequestAmplificationPatience,
     /** The configuration for sweeping funds periodically to other validator's wallet
       */
     walletSweep: Map[String, WalletSweepConfig] = Map.empty,
@@ -217,7 +217,7 @@ case class ValidatorAppBackendConfig(
 }
 
 object ValidatorAppBackendConfig {
-  val DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION_PATIENCE = NonNegativeFiniteDuration.ofSeconds(10)
+  val DefaultSequencerRequestAmplificationPatience = NonNegativeFiniteDuration.ofSeconds(10)
 }
 
 case class ValidatorAppClientConfig(

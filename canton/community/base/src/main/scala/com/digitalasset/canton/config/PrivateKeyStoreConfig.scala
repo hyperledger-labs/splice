@@ -1,9 +1,7 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
-
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 
 /** Stores the configuration for a private store
   *
@@ -13,10 +11,4 @@ import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
   */
 final case class PrivateKeyStoreConfig(
     encryption: Option[EncryptedPrivateStoreConfig] = None
-) extends UniformCantonConfigValidation
-
-object PrivateKeyStoreConfig {
-  implicit val privateKeyStoreConfigCantonConfigValidator
-      : CantonConfigValidator[PrivateKeyStoreConfig] =
-    CantonConfigValidatorDerivation[PrivateKeyStoreConfig]
-}
+)

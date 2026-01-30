@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block
@@ -14,7 +14,7 @@ import com.digitalasset.canton.config.{
   TopologyConfig,
 }
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.logging.pretty.CantonPrettyPrinter
@@ -155,6 +155,7 @@ class BlockSequencerTest
       sequencer1,
       blockSequencerMode = true,
       loggerFactory,
+      timeouts = timeouts,
       sequencerMetrics = sequencerMetrics,
     )
     private val storage = new MemoryStorage(loggerFactory, timeouts)
@@ -165,6 +166,7 @@ class BlockSequencerTest
           sequencer1,
           blockSequencerMode = true,
           loggerFactory,
+          timeouts = timeouts,
           sequencerMetrics = sequencerMetrics,
         ),
         loggerFactory,
@@ -179,7 +181,7 @@ class BlockSequencerTest
         store,
         dbSequencerStore = fakeDbSequencerStore,
         BlockSequencerConfig(),
-        useTimeProofsToObserveEffectiveTime = true,
+        producePostOrderingTopologyTicks = false,
         balanceStore,
         storage,
         FutureSupervisor.Noop,
@@ -187,8 +189,7 @@ class BlockSequencerTest
         clock = new SimClock(loggerFactory = loggerFactory),
         blockRateLimitManager = defaultRateLimiter,
         orderingTimeFixMode = OrderingTimeFixMode.MakeStrictlyIncreasing,
-        sequencingTimeLowerBoundExclusive =
-          SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
+        SequencingTimeBound(SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive),
         processingTimeouts = BlockSequencerTest.this.timeouts,
         logEventDetails = true,
         prettyPrinter = new CantonPrettyPrinter(
@@ -196,6 +197,7 @@ class BlockSequencerTest
           ApiLoggingConfig.defaultMaxMessageLines,
         ),
         metrics = SequencerMetrics.noop(this.getClass.getName),
+        batchingConfig = BatchingConfig(),
         loggerFactory = loggerFactory,
         exitOnFatalFailures = true,
         runtimeReady = FutureUnlessShutdown.unit,

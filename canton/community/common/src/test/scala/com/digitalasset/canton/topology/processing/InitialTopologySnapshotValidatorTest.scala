@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.processing
@@ -6,6 +6,7 @@ package com.digitalasset.canton.topology.processing
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.{BatchAggregatorConfig, TopologyConfig}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SynchronizerCryptoPureApi}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.store.db.{DbTest, PostgresTest}
@@ -23,13 +24,14 @@ import com.digitalasset.canton.topology.transaction.{
   DecentralizedNamespaceDefinition,
   SignedTopologyTransaction,
 }
-import com.digitalasset.canton.version.ProtocolVersionValidation
+import com.digitalasset.canton.version.{HasTestCloseContext, ProtocolVersionValidation}
 import com.digitalasset.canton.{FailOnShutdown, HasActorSystem}
 
 abstract class InitialTopologySnapshotValidatorTest
     extends TopologyTransactionHandlingBase
     with HasActorSystem
-    with FailOnShutdown {
+    with FailOnShutdown
+    with HasTestCloseContext {
 
   import Factory.*
 
@@ -47,8 +49,10 @@ abstract class InitialTopologySnapshotValidatorTest
     val validator = new InitialTopologySnapshotValidator(
       new SynchronizerCryptoPureApi(defaultStaticSynchronizerParameters, crypto),
       store,
+      BatchAggregatorConfig.defaultsForTesting,
+      TopologyConfig.forTesting.copy(validateInitialTopologySnapshot = true),
       staticSynchronizerParameters = Some(defaultStaticSynchronizerParameters),
-      validateInitialSnapshot = true,
+      timeouts,
       loggerFactory,
       cleanupTopologySnapshot = true,
     )

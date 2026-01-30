@@ -1,9 +1,7 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
-
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 
 /** Configuration of a DB lock
   *
@@ -16,11 +14,9 @@ import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 final case class DbLockConfig(
     healthCheckPeriod: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(5),
     healthCheckTimeout: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(15),
-) extends UniformCantonConfigValidation
+)
 
 object DbLockConfig {
-  implicit val dbLockConfigCanontConfigValidator: CantonConfigValidator[DbLockConfig] =
-    CantonConfigValidatorDerivation[DbLockConfig]
 
   /** For locks to be supported we must be using an [[DbConfig]] with it set to Postgres. */
   private[canton] def isSupportedConfig(config: StorageConfig): Boolean =
@@ -67,19 +63,13 @@ final case class DbLockedConnectionConfig(
     healthCheckPeriod: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(5),
     healthCheckTimeout: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(15),
     connectionTimeout: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(10),
-    keepAliveIdle: Option[PositiveFiniteDuration] = None,
-    keepAliveInterval: Option[PositiveFiniteDuration] = None,
-    keepAliveCount: Option[Int] = None,
+    keepAliveIdle: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(10),
+    keepAliveInterval: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(1),
+    keepAliveCount: Int = 5,
     initialAcquisitionMaxRetries: Int = 5,
     initialAcquisitionInterval: PositiveFiniteDuration = PositiveFiniteDuration.ofMillis(200),
     lock: DbLockConfig = DbLockConfig(),
-) extends UniformCantonConfigValidation
-
-object DbLockedConnectionConfig {
-  implicit val dbLockedConnectionConfigCantonConfigValidator
-      : CantonConfigValidator[DbLockedConnectionConfig] =
-    CantonConfigValidatorDerivation[DbLockedConnectionConfig]
-}
+)
 
 /** Configuration for the connection pool using DB locks.
   *
@@ -94,10 +84,4 @@ final case class DbLockedConnectionPoolConfig(
     healthCheckPeriod: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(5),
     connection: DbLockedConnectionConfig = DbLockedConnectionConfig(),
     activeTimeout: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(15),
-) extends UniformCantonConfigValidation
-
-object DbLockedConnectionPoolConfig {
-  implicit val dbLockedConnectionPoolConfigCantonConfigValidator
-      : CantonConfigValidator[DbLockedConnectionPoolConfig] =
-    CantonConfigValidatorDerivation[DbLockedConnectionPoolConfig]
-}
+)

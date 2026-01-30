@@ -1,11 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
 
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
 
 /** Client configured options for how to connect to a sequencer
@@ -87,12 +86,4 @@ final case class SequencerClientConfig(
     useNewConnectionPool: Boolean = true,
     timeReadingsRetention: PositiveFiniteDuration = PositiveFiniteDuration.ofMinutes(5),
     enableAmplificationImprovements: Boolean = false,
-) extends UniformCantonConfigValidation
-
-object SequencerClientConfig {
-  implicit val sequencerClientConfigCantonConfigValidator
-      : CantonConfigValidator[SequencerClientConfig] = {
-    import CantonConfigValidatorInstances.*
-    CantonConfigValidatorDerivation[SequencerClientConfig]
-  }
-}
+)

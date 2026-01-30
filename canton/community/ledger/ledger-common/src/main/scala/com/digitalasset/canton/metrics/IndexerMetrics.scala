@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -37,6 +37,12 @@ class IndexerHistograms(val prefix: MetricName)(implicit
     qualification = MetricQualification.Debug,
   )
 
+  private[metrics] val deactivationDistances: Item = Item(
+    prefix :+ "deactivation_distances",
+    summary = "Event sequence id distances between activations and deactivations.",
+    description = "Histogram to collect the statistics of how long individual contracts lived.",
+    qualification = MetricQualification.Debug,
+  )
 }
 
 class IndexerMetrics(
@@ -65,6 +71,8 @@ class IndexerMetrics(
       qualification = MetricQualification.Traffic,
     )
   )
+
+  val deactivationDistances: Histogram = factory.histogram(histograms.deactivationDistances.info)
 
   val outputBatchedBufferLength: Counter =
     factory.counter(

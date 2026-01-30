@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.sync
@@ -97,8 +97,8 @@ class SyncEphemeralStateFactoryImpl(
       point in time and re-process the synchronizer announcement. This will update the record order publisher with the value
       of the successor a second time.
        */
-      synchronizerSuccessorO <- synchronizerCrypto.ips.currentSnapshotApproximation
-        .synchronizerUpgradeOngoing()
+      approximateSnapshot <- synchronizerCrypto.ips.currentSnapshotApproximation
+      synchronizerSuccessorO <- approximateSnapshot.synchronizerUpgradeOngoing()
 
       recordOrderPublisher = RecordOrderPublisher(
         persistentState.psid,

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client.transports
@@ -31,7 +31,6 @@ import com.digitalasset.canton.networking.grpc.{
 }
 import com.digitalasset.canton.sequencer.api.v30
 import com.digitalasset.canton.sequencer.api.v30.SequencerServiceGrpc.SequencerServiceStub
-import com.digitalasset.canton.sequencer.api.v30.SubscriptionResponse
 import com.digitalasset.canton.sequencing.client.SendAsyncClientError.SendAsyncClientResponseError
 import com.digitalasset.canton.sequencing.client.{
   SendAsyncClientError,
@@ -375,7 +374,7 @@ class GrpcSequencerClientTransport(
     def mkSubscription(
         context: CancellableContext,
         hasRunOnClosing: HasRunOnClosing,
-    ): ConsumesCancellableGrpcStreamObserver[E, SubscriptionResponse] =
+    ): ConsumesCancellableGrpcStreamObserver[E, v30.SubscriptionRequest, v30.SubscriptionResponse] =
       GrpcSequencerSubscription.fromSubscriptionResponse(
         context,
         handler,

@@ -88,6 +88,7 @@ class RecoverExternalPartyIntegrationTest
               ParticipantPermission.Confirmation,
             )
           ),
+          partySigningKeysWithThreshold = None,
         )
         .value
 

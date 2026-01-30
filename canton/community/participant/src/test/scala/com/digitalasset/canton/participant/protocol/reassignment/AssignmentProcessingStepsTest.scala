@@ -1,20 +1,18 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
 
 import cats.Eval
 import cats.data.EitherT
-import cats.implicits.catsSyntaxEitherId
 import cats.syntax.functor.*
-import com.daml.logging.LoggingContext
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
-  CachingConfigs,
   DefaultProcessingTimeouts,
   SessionEncryptionKeyCacheConfig,
+  TopologyConfig,
 }
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.{SymbolicCrypto, SymbolicPureCrypto}
@@ -36,9 +34,10 @@ import com.digitalasset.canton.participant.protocol.reassignment.AssignmentProce
 import com.digitalasset.canton.participant.protocol.reassignment.AssignmentValidation.*
 import com.digitalasset.canton.participant.protocol.reassignment.AssignmentValidationError.UnassignmentDataNotFound
 import com.digitalasset.canton.participant.protocol.reassignment.AssignmentValidationResult.ReassigningParticipantValidationResult
+import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentDataHelpers.TestValidator
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentValidationError.{
-  ContractAuthenticationFailure,
+  ContractValidationError,
   NotHostedOnParticipant,
   StakeholdersMismatch,
   SubmitterMustBeStakeholder,
@@ -84,18 +83,16 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.Confirmation
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
-import com.digitalasset.canton.util.{ContractValidator, ResourceUtil}
+import com.digitalasset.canton.util.{ContractValidator, ReassignmentTag, ResourceUtil}
 import com.digitalasset.canton.version.HasTestCloseContext
-import com.digitalasset.daml.lf.data.Ref.PackageId
-import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance}
+import com.digitalasset.daml.lf.transaction.CreationTime
 import monocle.macros.syntax.lens.*
-import org.apache.commons.lang3.NotImplementedException
+import org.scalatest
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.util.UUID
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 final class AssignmentProcessingStepsTest
     extends AsyncWordSpec
@@ -134,6 +131,12 @@ final class AssignmentProcessingStepsTest
     stakeholders = Set(party1),
   )
 
+  private lazy val sourceValidationPackageId =
+    Source(LfPackageId.assertFromString("source-validation-package-id"))
+
+  private lazy val targetValidationPackageId =
+    Target(LfPackageId.assertFromString("target-validation-package-id"))
+
   private lazy val initialReassignmentCounter: ReassignmentCounter = ReassignmentCounter.One
 
   private def submitterInfo(submitter: LfPartyId): ReassignmentSubmitterMetadata =
@@ -168,7 +171,7 @@ final class AssignmentProcessingStepsTest
   private lazy val cryptoClient =
     identityFactory.forOwnerAndSynchronizer(participant, targetPSId.unwrap)
 
-  private lazy val cryptoSnapshot = cryptoClient.currentSnapshotApproximation
+  private lazy val cryptoSnapshot = cryptoClient.currentSnapshotApproximation.futureValueUS
 
   private lazy val assignmentProcessingSteps = testInstance(targetPSId, cryptoClient, None)
 
@@ -199,6 +202,7 @@ final class AssignmentProcessingStepsTest
       logicalSyncPersistentState = logical,
       loggerFactory = loggerFactory,
       parameters = ParticipantNodeParameters.forTestingOnly(testedProtocolVersion),
+      topologyConfig = TopologyConfig.forTesting,
       timeouts = timeouts,
       futureSupervisor = futureSupervisor,
     )
@@ -255,7 +259,7 @@ final class AssignmentProcessingStepsTest
       recipients: Recipients = RecipientsTest.testInstance,
   ): ParsedReassignmentRequest[FullAssignmentTree] = {
     val signature = cryptoSnapshot
-      .sign(view.rootHash.unwrap, SigningKeyUsage.ProtocolOnly)
+      .sign(view.rootHash.unwrap, SigningKeyUsage.ProtocolOnly, None)
       .futureValueUS
       .value
 
@@ -487,7 +491,7 @@ final class AssignmentProcessingStepsTest
     "succeed without errors" in {
       ResourceUtil.withResourceM(
         new SessionKeyStoreWithInMemoryCache(
-          CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+          SessionEncryptionKeyCacheConfig(),
           timeouts,
           loggerFactory,
         )
@@ -622,26 +626,15 @@ final class AssignmentProcessingStepsTest
       }
     }
 
-    "fail when an invalid contract is given" in {
-
+    def shouldFailWithInvalidPackage(
+        invalidRpId: ReassignmentTag[LfPackageId]
+    ): Future[scalatest.Assertion] = {
       val testContract = ExampleContractFactory.build()
 
       val expected = "bad-contract"
 
-      val contractValidator = new ContractValidator {
-        override def authenticate(contract: FatContractInstance, targetPackageId: PackageId)(
-            implicit
-            ec: ExecutionContext,
-            traceContext: TraceContext,
-            loggingContext: LoggingContext,
-        ): EitherT[FutureUnlessShutdown, String, Unit] =
-          EitherT.fromEither[FutureUnlessShutdown](expected.asLeft[Unit])
-
-        override def authenticateHash(
-            contract: FatContractInstance,
-            contractHash: LfHash,
-        ): Either[String, Unit] = throw new NotImplementedException()
-      }
+      val contractValidator =
+        new TestValidator(Map((testContract.contractId, invalidRpId.unwrap) -> expected))
 
       val assignmentProcessingSteps =
         testInstance(targetPSId, cryptoClient, None, contractValidator)
@@ -657,6 +650,14 @@ final class AssignmentProcessingStepsTest
         fullAssignmentTree = makeFullAssignmentTree(
           party1,
           testContract,
+          invalidRpId match {
+            case source: Source[?] => source
+            case _ => Source(testContract.templateId.packageId)
+          },
+          invalidRpId match {
+            case target: Target[?] => target
+            case _ => Target(testContract.templateId.packageId)
+          },
           targetPSId,
           targetMediator,
           reassigningParticipants = Set(participant),
@@ -684,7 +685,7 @@ final class AssignmentProcessingStepsTest
           assignmentValidationResult.commonValidationResult.contractAuthenticationResultF.value.futureValueUS
 
         modelConformanceError.left.value match {
-          case ContractAuthenticationFailure(ref, reason, contractId) =>
+          case ContractValidationError(ref, contractId, rpId, reason) =>
             ref shouldBe fullAssignmentTree.reassignmentRef
             contractId shouldBe testContract.contractId
             reason should include(expected)
@@ -695,7 +696,16 @@ final class AssignmentProcessingStepsTest
           UnassignmentDataNotFound(fullAssignmentTree.reassignmentId)
         )
       }
+    }
 
+    "fail when an invalid source validation package is given" in {
+      val invalidRepresentativePackageId = LfPackageId.assertFromString("invalid-upgrade-package")
+      shouldFailWithInvalidPackage(Source(invalidRepresentativePackageId))
+    }
+
+    "fail when an invalid target validation package is given" in {
+      val invalidRepresentativePackageId = LfPackageId.assertFromString("invalid-upgrade-package")
+      shouldFailWithInvalidPackage(Target(invalidRepresentativePackageId))
     }
 
     "fail when inconsistent stakeholders are given" in {
@@ -778,7 +788,12 @@ final class AssignmentProcessingStepsTest
       SequencerCounter(1),
       assignmentValidationResult = AssignmentValidationResult(
         rootHash,
-        ContractsReassignmentBatch(contract, initialReassignmentCounter),
+        ContractsReassignmentBatch(
+          contract,
+          sourceValidationPackageId,
+          targetValidationPackageId,
+          initialReassignmentCounter,
+        ),
         submitterInfo(submitter),
         reassignmentId,
         sourcePSId,
@@ -793,6 +808,7 @@ final class AssignmentProcessingStepsTest
         ),
         reassigningParticipantValidationResult =
           ReassigningParticipantValidationResult(errors = Seq.empty),
+        loggerFactory = loggerFactory,
       ),
       MediatorGroupRecipient(MediatorGroupIndex.zero),
       locallyRejectedF = FutureUnlessShutdown.pure(false),
@@ -865,7 +881,7 @@ final class AssignmentProcessingStepsTest
     "succeed when the signature is correct" in {
       for {
         signature <- cryptoSnapshot
-          .sign(assignmentTree.rootHash.unwrap, SigningKeyUsage.ProtocolOnly)
+          .sign(assignmentTree.rootHash.unwrap, SigningKeyUsage.ProtocolOnly, None)
           .valueOrFailShutdown("signing failed")
 
         parsed = mkParsedRequest(
@@ -891,7 +907,7 @@ final class AssignmentProcessingStepsTest
     "fail when the signature is incorrect" in {
       for {
         signature <- cryptoSnapshot
-          .sign(TestHash.digest("wrong signature"), SigningKeyUsage.ProtocolOnly)
+          .sign(TestHash.digest("wrong signature"), SigningKeyUsage.ProtocolOnly, None)
           .valueOrFailShutdown("signing failed")
 
         parsed = mkParsedRequest(
@@ -924,7 +940,7 @@ final class AssignmentProcessingStepsTest
       TestReassignmentCoordination.apply(
         Set(),
         CantonTimestamp.Epoch,
-        Some(snapshotOverride.currentSnapshotApproximation),
+        Some(snapshotOverride.currentSnapshotApproximation.futureValueUS),
         Some(awaitTimestampOverride),
         loggerFactory,
       ),
@@ -932,6 +948,7 @@ final class AssignmentProcessingStepsTest
       seedGenerator,
       contractValidator,
       Target(defaultStaticSynchronizerParameters),
+      clock,
       Target(testedProtocolVersion),
       loggerFactory = loggerFactory,
     )
@@ -940,6 +957,8 @@ final class AssignmentProcessingStepsTest
   private def makeFullAssignmentTree(
       submitter: LfPartyId = party1,
       contract: ContractInstance = contract,
+      sourceValidationPackageId: Source[LfPackageId] = Source(contract.templateId.packageId),
+      targetValidationPackageId: Target[LfPackageId] = Target(contract.templateId.packageId),
       targetSynchronizer: Target[PhysicalSynchronizerId] = targetPSId,
       targetMediator: MediatorGroupRecipient = targetMediator,
       uuid: UUID = new UUID(4L, 5L),
@@ -962,7 +981,12 @@ final class AssignmentProcessingStepsTest
         seed,
         reassignmentId,
         submitterInfo(submitter),
-        ContractsReassignmentBatch(contract, initialReassignmentCounter),
+        ContractsReassignmentBatch(
+          contract,
+          sourceValidationPackageId,
+          targetValidationPackageId,
+          initialReassignmentCounter,
+        ),
         sourcePSId,
         targetSynchronizer,
         targetMediator,
@@ -1021,6 +1045,7 @@ final class AssignmentProcessingStepsTest
           tree,
           (viewKey, viewKeyMap),
           cryptoSnapshot,
+          None,
           testedProtocolVersion,
         )
         .valueOrFailShutdown("cannot encrypt assignment request")

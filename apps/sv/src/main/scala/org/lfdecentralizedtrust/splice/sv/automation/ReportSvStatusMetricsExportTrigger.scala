@@ -61,7 +61,7 @@ class ReportSvStatusMetricsExportTrigger(
       // We must synchronize here to avoid allocating the metrics for the same sv multiple times, which would lead to
       // duplicate metric labels being reported by OpenTelemetry.
       blocking {
-        synchronized {
+        mutex.exclusive {
           perSvStatusMetrics.getOrElseUpdate(svId, SvStatusMetrics(svId, context.metricsFactory))
         }
       },
@@ -74,7 +74,7 @@ class ReportSvStatusMetricsExportTrigger(
     val svIdsToClose = perSvStatusMetrics.keySet.toSet -- svIdsFromDsoRules
     perSvStatusMetrics.view.filterKeys(svIdsToClose.contains).foreach(_._2.close())
     blocking {
-      synchronized {
+      mutex.exclusive {
         perSvStatusMetrics --= svIdsToClose: Unit
       }
     }

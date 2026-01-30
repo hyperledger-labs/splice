@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
@@ -53,8 +53,8 @@ private[backend] trait StorageBackendTestsPartyToParticipant
   private val multipleDtos = Vector(
     dtoPartyToParticipant(offset(1), 1L),
     dtoPartyToParticipant(offset(2), 2L, someParty2),
-    dtoPartyToParticipant(offset(3), 3L, someParty, otherParticipantId.toString),
-    dtoPartyToParticipant(offset(4), 4L, someParty, someParticipantId.toString, Revoked),
+    dtoPartyToParticipant(offset(3), 3L, someParty, otherParticipantId),
+    dtoPartyToParticipant(offset(4), 4L, someParty, someParticipantId, Revoked),
   )
 
   private val authorizationEvents: Vector[AuthorizationEvent] = Vector(

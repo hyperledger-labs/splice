@@ -1,10 +1,11 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.provider.kms
 
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.{
+  BatchingConfig,
   CachingConfigs,
   CryptoConfig,
   CryptoProvider,
@@ -12,6 +13,7 @@ import com.digitalasset.canton.config.{
   EncryptionSchemeConfig,
   KmsConfig,
   PrivateKeyStoreConfig,
+  SessionEncryptionKeyCacheConfig,
   SigningSchemeConfig,
 }
 import com.digitalasset.canton.crypto.*
@@ -76,7 +78,7 @@ trait KmsCryptoTest
       .create(
         config,
         CachingConfigs.defaultKmsMetadataCache,
-        CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+        SessionEncryptionKeyCacheConfig(),
         CachingConfigs.defaultPublicKeyConversionCache,
         new MemoryStorage(loggerFactory, timeouts),
         Option.empty[ReplicaManager],
@@ -85,6 +87,7 @@ trait KmsCryptoTest
         wallClock,
         executorService,
         timeouts,
+        BatchingConfig(),
         loggerFactory,
         NoReportingTracerProvider,
       )

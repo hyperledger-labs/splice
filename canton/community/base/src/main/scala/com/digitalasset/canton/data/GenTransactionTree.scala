@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -110,7 +110,7 @@ final case class GenTransactionTree private (
     * @throws java.lang.UnsupportedOperationException
     *   if the path does not lead to a view
     */
-  private[data] def tryBlindForTransactionViewTree(
+  private[canton] def tryBlindForTransactionViewTree(
       viewPos: ViewPositionFromRoot
   ): GenTransactionTree =
     viewPos.position match {

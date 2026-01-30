@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.logging.pretty
@@ -17,7 +17,6 @@ import com.digitalasset.canton.util.{ErrorUtil, HexString}
 import com.digitalasset.canton.{LedgerUserId, LfPartyId, LfTimestamp, LfVersioned, Uninhabited}
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.data.Ref.{DottedName, PackageId, QualifiedName}
-import com.digitalasset.daml.lf.transaction.ContractStateMachine.ActiveLedgerState
 import com.digitalasset.daml.lf.transaction.TransactionErrors.*
 import com.digitalasset.daml.lf.transaction.{CreationTime, Versioned}
 import com.digitalasset.daml.lf.value.Value
@@ -300,13 +299,6 @@ trait PrettyInstances {
     case DuplicateContractIdKIError(e: DuplicateContractId) =>
       prettyOfClass[DuplicateContractId](unnamedParam(_.contractId)).treeOf(e)
   }
-
-  implicit def prettyActiveLedgerState[T: Pretty]: Pretty[ActiveLedgerState[T]] =
-    prettyOfClass[ActiveLedgerState[T]](
-      param("locallyCreatedThisTimeline", _.locallyCreatedThisTimeline),
-      param("consumedBy", _.consumedBy),
-      param("localActiveKeys", _.localActiveKeys),
-    )
 
   implicit val prettyPort: Pretty[Port] = prettyOfString(_.unwrap.toString)
 

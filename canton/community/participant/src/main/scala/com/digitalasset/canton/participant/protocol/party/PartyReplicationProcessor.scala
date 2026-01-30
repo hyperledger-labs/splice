@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.party
@@ -8,6 +8,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.participant.admin.party.PartyReplicationTestInterceptor
+import com.digitalasset.canton.participant.store.AcsReplicationProgress
 import com.digitalasset.canton.sequencing.client.channel.SequencerChannelProtocolProcessor
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{FutureUnlessShutdownUtil, SimpleExecutionQueue}
@@ -41,7 +42,7 @@ trait PartyReplicationProcessor extends SequencerChannelProtocolProcessor {
 
   protected def testOnlyInterceptor: PartyReplicationTestInterceptor
 
-  protected def onAcsFullyReplicated: TraceContext => Unit
+  protected def replicationProgressState: AcsReplicationProgress
   protected def onError: String => Unit
   protected def onDisconnect: (String, TraceContext) => Unit
 

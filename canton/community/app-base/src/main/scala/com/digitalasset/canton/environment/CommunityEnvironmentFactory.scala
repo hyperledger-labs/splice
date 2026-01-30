@@ -1,9 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
 
-import com.digitalasset.canton.config.{CantonConfig, CommunityCantonEdition, TestingConfigInternal}
+import com.digitalasset.canton.config.{CantonConfig, TestingConfigInternal}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNodeBootstrapFactoryImpl
 import com.digitalasset.canton.synchronizer.mediator.MediatorNodeBootstrapFactoryImpl
@@ -18,7 +18,6 @@ object CommunityEnvironmentFactory extends EnvironmentFactory[CantonConfig, Cant
   ): CantonEnvironment =
     new CantonEnvironment(
       config,
-      CommunityCantonEdition,
       testingConfigInternal,
       ParticipantNodeBootstrapFactoryImpl,
       SequencerNodeBootstrapFactoryImpl,

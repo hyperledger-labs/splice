@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.util
@@ -245,9 +245,10 @@ class TestSubmissionService(
       meta: TransactionMeta,
       transaction: SubmittedTransaction,
       keyMapping: Map[LfGlobalKey, Option[LfContractId]],
-  )(implicit traceContext: TraceContext): Future[SubmissionResult] = {
-    val routingSynchronizerState = syncService.getRoutingSynchronizerState
+  )(implicit traceContext: TraceContext): Future[SubmissionResult] =
     for {
+      routingSynchronizerState <- syncService.getRoutingSynchronizerState
+        .failOnShutdownToAbortException("test submit transaction")
       synchronizerRank <- syncService
         .selectRoutingSynchronizer(
           submitterInfo = submitterInfo,
@@ -274,7 +275,6 @@ class TestSubmissionService(
         )
         .toScalaUnwrapped
     } yield submissionResult
-  }
 
   def interpret(commands: CommandsWithMetadata)(implicit
       traceContext: TraceContext

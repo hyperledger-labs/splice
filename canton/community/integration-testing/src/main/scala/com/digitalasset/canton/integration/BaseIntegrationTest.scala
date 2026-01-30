@@ -1,21 +1,20 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration
 
 import com.daml.ledger.javaapi.data.Event
-import com.daml.metrics.Timed
-import com.digitalasset.canton.config.SharedCantonConfig
-import com.digitalasset.canton.console.{CommandFailure, ParticipantReference}
-import com.digitalasset.canton.environment.Environment
+import com.digitalasset.canton.console.{BufferedProcessLogger, CommandFailure, ParticipantReference}
 import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.{
+  config,
   BaseTest,
   RepeatableTestSuiteTest,
   TestPredicateFiltersFixtureAnyWordSpec,
-  config,
 }
+import com.digitalasset.canton.config.SharedCantonConfig
+import com.digitalasset.canton.environment.Environment
 import org.scalactic.source
 import org.scalactic.source.Position
 import org.scalatest.wordspec.FixtureAnyWordSpec
@@ -61,23 +60,27 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
     extends FixtureAnyWordSpec
     with BaseTest
     with RepeatableTestSuiteTest
-    with TestPredicateFiltersFixtureAnyWordSpec
-    with IntegrationTestMetrics {
+    with PartyTopologyUtils
+    with TestPredicateFiltersFixtureAnyWordSpec {
   this: EnvironmentSetup[C, E] =>
 
   type FixtureParam = TestConsoleEnvironment[C, E]
 
   override protected def withFixture(test: OneArgTest): Outcome = {
-    val integrationTestPackage = "com.digitalasset.canton.integration.tests"
-    val integrationTestPackageSplice = "org.lfdecentralizedtrust.splice.integration.tests"
-    getClass.getName should (startWith(
-      integrationTestPackage
-    ) or startWith(
-      integrationTestPackageSplice
-    )) withClue s"\nAll integration tests must be located in $integrationTestPackage, $integrationTestPackageSplice or a subpackage thereof."
-
     super[RepeatableTestSuiteTest].withFixture(new TestWithSetup(test))
   }
+
+  protected def mkProcessLogger(logErrors: Boolean = true): BufferedProcessLogger =
+    new BufferedProcessLogger {
+      override def out(s: => String): Unit = {
+        logger.info(s)
+        super.out(s)
+      }
+      override def err(s: => String): Unit = {
+        if (logErrors) logger.error(s)
+        super.err(s)
+      }
+    }
 
   /** Version of [[com.digitalasset.canton.logging.SuppressingLogger.assertThrowsAndLogs]] that is
     * specifically tailored to [[com.digitalasset.canton.console.CommandFailure]].
@@ -150,23 +153,10 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
     override val pos: Option[Position] = test.pos
 
     override def apply(): Outcome = {
-      val metrics = testInfrastructureTestMetrics(test.name)
-      val environment = Timed.value(
-        metrics.testProvideEnvironment,
-        provideEnvironment(test.name),
-      )
-      val testOutcome = {
-        try
-          Timed.value(
-            metrics.testExecution,
-            test.toNoArgTest(environment)(),
-          )
-        finally
-          Timed.value(
-            metrics.testFinished,
-            testFinished(test.name, environment),
-          )
-      }
+      val environment = provideEnvironment(test.name)
+      val testOutcome =
+        try test.toNoArgTest(environment)()
+        finally testFinished(test.name, environment)
       testOutcome
     }
   }

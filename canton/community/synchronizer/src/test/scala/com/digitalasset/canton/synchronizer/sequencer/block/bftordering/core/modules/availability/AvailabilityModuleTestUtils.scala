@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability
@@ -23,6 +23,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftKeyId,
   BftNodeId,
+  BlockNumber,
   EpochNumber,
   ViewNumber,
 }
@@ -80,13 +81,13 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
   protected val AnotherBatchId = BatchId.createForTesting("AnotherBatchId")
   protected val anEpochNumber = EpochNumber.First
   protected val anOrderingRequest: Traced[OrderingRequest] = Traced(
-    OrderingRequest(BlockFormat.SendTag, ByteString.EMPTY)
+    OrderingRequest(BlockFormat.SendTag, messageId = "", ByteString.EMPTY)
   )
   protected val anOrderingRequestWithInvalidTag: Traced[OrderingRequest] = Traced(
-    OrderingRequest("invalidTag", ByteString.EMPTY)
+    OrderingRequest("invalidTag", messageId = "", ByteString.EMPTY)
   )
   protected val aNonEmptyOrderingRequest: Traced[OrderingRequest] = Traced(
-    OrderingRequest(BlockFormat.SendTag, ByteString.copyFromUtf8("request"))
+    OrderingRequest(BlockFormat.SendTag, messageId = "", ByteString.copyFromUtf8("request"))
   )
   protected val ABatch = OrderingRequestBatch.create(
     Seq(anOrderingRequest),
@@ -244,17 +245,17 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
     ).complete(ProofOfAvailabilityNode0AckNode0InTopology.acks)
   protected val ABatchProposalNode0VoteNode0InTopology =
     Consensus.LocalAvailability.ProposalCreated(
+      BlockNumber.First,
       OrderingBlock(
         Seq(ProofOfAvailabilityNode0AckNode0InTopology)
       ),
-      EpochNumber.First,
     )
   protected val ABatchProposalNode0VoteNodes0To2InTopology =
     Consensus.LocalAvailability.ProposalCreated(
+      BlockNumber.First,
       OrderingBlock(
         Seq(ProofOfAvailabilityNode0AckNode0To2InTopology)
       ),
-      EpochNumber.First,
     )
   protected val ProofOfAvailabilityNode0And1VotesNodes0And1InTopology = ProofOfAvailability(
     ABatchId,
@@ -281,16 +282,16 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
     AnotherBatchId -> InProgressBatchMetadata(Traced(AnotherBatchId), anEpochNumber, ABatch.stats)
       .complete(ProofOfAvailability6NodesQuorumVotesNodes0And4To6InTopology.acks)
   protected val ABatchProposalNode0And1Votes = Consensus.LocalAvailability.ProposalCreated(
+    BlockNumber.First,
     OrderingBlock(
       Seq(ProofOfAvailabilityNode0And1VotesNodes0And1InTopology)
     ),
-    EpochNumber.First,
   )
   protected val ABatchProposal4NodesQuorumVotes = Consensus.LocalAvailability.ProposalCreated(
+    BlockNumber.First,
     OrderingBlock(
       Seq(ProofOfAvailability4NodesQuorumVotesNodes0To3InTopology)
     ),
-    EpochNumber.First,
   )
   protected val AMissingBatchStatusNode1And2AcksWithNode1ToTry =
     MissingBatchStatus(
@@ -314,10 +315,10 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
   protected val AMissingBatchStatusFromStateTransferWithNoAttemptsLeft =
     AMissingBatchStatusNode1And2AcksWithNoAttemptsLeft
       .copy(mode = OrderedBlockForOutput.Mode.FromStateTransfer)
-  protected val AToBeProvidedToConsensus =
-    ToBeProvidedToConsensus(
-      BftBlockOrdererConfig.DefaultMaxBatchesPerProposal,
-      EpochNumber.First,
+  protected val ANextToBeProvidedToConsensus =
+    NextToBeProvidedToConsensus(
+      BlockNumber.First,
+      Some(BftBlockOrdererConfig.DefaultMaxBatchesPerProposal),
     )
   protected val Node0To6 = (0 to 6).map(node).toSet
   protected val OrderingTopologyNodes0To6 = OrderingTopology.forTesting(Node0To6)

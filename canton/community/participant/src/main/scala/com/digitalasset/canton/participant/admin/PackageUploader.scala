@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin
@@ -196,7 +196,8 @@ class PackageUploader(
     EitherT.fromEither[FutureUnlessShutdown](
       engine.validateDar(dar).left.flatMap {
         case err: EngineError.Package.DarSelfConsistency
-            if (!enableStrictDarValidation || dar.main._2.languageVersion < LV.Features.explicitPkgImports) && err.logReportingEnabled =>
+            if (!enableStrictDarValidation || (!LV.featurePackageImports
+              .enabledIn(dar.main._2.languageVersion))) && err.logReportingEnabled =>
           logger.warn(err.message)
           Right(())
         case err: EngineError.Package.Error =>

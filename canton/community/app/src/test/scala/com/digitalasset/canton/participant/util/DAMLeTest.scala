@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.util
@@ -106,7 +106,7 @@ class DAMLeTest
       val (tx, meta) = testEngine.submitAndConsume(
         command = contractId.exerciseRepeat().commands().loneElement,
         actAs = contract.signatories.head,
-        storedContracts = Seq(contract.inst),
+        contracts = Seq(contract.inst),
       )
       val rootId = tx.roots.toSeq.loneElement
       val exerciseNode = tx.nodes.get(rootId).value

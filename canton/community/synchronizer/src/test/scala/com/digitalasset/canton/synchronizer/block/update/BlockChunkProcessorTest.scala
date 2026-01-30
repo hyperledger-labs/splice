@@ -1,10 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.block.update
 
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
 import com.digitalasset.canton.sequencing.protocol.{
@@ -64,6 +64,7 @@ class BlockChunkProcessorTest extends AsyncWordSpec with BaseTest {
             sequencerId,
             rateLimitManagerMock,
             OrderingTimeFixMode.ValidateOnly,
+            BatchingConfig(),
             loggerFactory,
             SequencerTestMetrics,
             memberValidatorMock,
@@ -79,6 +80,7 @@ class BlockChunkProcessorTest extends AsyncWordSpec with BaseTest {
                 lastChunkTs = aTimestamp,
                 latestSequencerEventTimestamp = None,
                 inFlightAggregations = Map.empty,
+                latestPendingTopologyTransactionTimestamp = None,
               ),
               height = aHeight,
               tickAtLeastAt = tickSequencingTimestamp,

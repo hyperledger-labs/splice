@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.admin
@@ -50,6 +50,7 @@ import com.digitalasset.canton.topology.{
   DefaultTestIdentities,
   ExternalPartyOnboardingDetails,
   ParticipantId,
+  PartyId,
   PhysicalSynchronizerId,
   SynchronizerId,
 }
@@ -237,7 +238,7 @@ object ApiPackageManagementServiceSpec {
       throw new UnsupportedOperationException()
 
     override def allocateParty(
-        hint: Party,
+        partyId: PartyId,
         submissionId: SubmissionId,
         synchronizerIdO: Option[SynchronizerId],
         externalPartyOnboardingDetails: Option[ExternalPartyOnboardingDetails],
@@ -288,7 +289,7 @@ object ApiPackageManagementServiceSpec {
 
     override def getRoutingSynchronizerState(implicit
         traceContext: TraceContext
-    ): RoutingSynchronizerState =
+    ): FutureUnlessShutdown[RoutingSynchronizerState] =
       throw new UnsupportedOperationException()
 
     override def estimateTrafficCost(

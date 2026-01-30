@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -287,7 +287,7 @@ trait FutureHelpers extends Assertions with ScalaFuturesWithPatience { self =>
     def failOnShutdown(clue: String)(implicit ec: ExecutionContext, pos: Position): Future[A] =
       fut.onShutdown(fail(s"Shutdown during $clue"))
     def failOnShutdown(implicit ec: ExecutionContext, pos: Position): Future[A] =
-      fut.onShutdown(fail(s"Unexpected shutdown"))
+      fut.onShutdown(fail("Unexpected shutdown"))
     def futureValueUS(implicit pos: Position): A =
       futureValueUS(PatienceConfiguration.Timeout(defaultPatience.timeout))(pos)
     def futureValueUS(timeout: PatienceConfiguration.Timeout)(implicit pos: Position): A =
@@ -499,10 +499,15 @@ trait BaseTest
   lazy val VettingMainCompatPath: String = BaseTest.VettingMainCompatPath
   lazy val VettingMainIncompatPath: String = BaseTest.VettingMainIncompatPath
   lazy val VettingMainSubstitutionPath: String = BaseTest.VettingMainSubstitutionPath
+  lazy val ModelTestsPath: String = BaseTest.ModelTestsPath
+  lazy val SubViewsIfaceV1Path: String = BaseTest.SubViewsIfaceV1Path
+  lazy val SubViewsAssetV1Path: String = BaseTest.SubViewsAssetV1Path
+  lazy val SubViewsAssetV2Path: String = BaseTest.SubViewsAssetV2Path
+  lazy val SubViewsMainV1Path: String = BaseTest.SubViewsMainV1Path
 
   implicit class RichSynchronizerId(val id: SynchronizerId) {
     def toPhysical: PhysicalSynchronizerId =
-      PhysicalSynchronizerId(id, testedProtocolVersion, NonNegativeInt.zero)
+      PhysicalSynchronizerId(id, NonNegativeInt.zero, testedProtocolVersion)
   }
 
   implicit def toSynchronizerId(id: PhysicalSynchronizerId): SynchronizerId = id.logical
@@ -515,7 +520,7 @@ object BaseTest {
 
   implicit class RichSynchronizerIdO(val id: SynchronizerId) {
     def toPhysical: PhysicalSynchronizerId =
-      PhysicalSynchronizerId(id, testedProtocolVersion, NonNegativeInt.zero)
+      PhysicalSynchronizerId(id, NonNegativeInt.zero, testedProtocolVersion)
   }
 
   /** Keeps evaluating `testCode` until it fails or a timeout occurs.
@@ -627,6 +632,10 @@ object BaseTest {
   object UnsupportedExternalPartyTest {
     // TODO(i27461): Support multi party submissions for external parties
     case object MultiPartySubmission extends UnsupportedExternalPartyTest
+    // TODO(i29530): Support multi root node submissions for external parties
+    case object MultiRootNodeSubmission extends UnsupportedExternalPartyTest
+    // TODO(i30256): Synchronizer routing for external parties
+    case object MultiSynchronizerParties extends UnsupportedExternalPartyTest
   }
 
   lazy val testedProtocolVersion: ProtocolVersion = ProtocolVersion.forSynchronizer
@@ -667,6 +676,11 @@ object BaseTest {
   lazy val VettingMainCompatPath: String = getResourcePath("VettingMain-2.0.0.dar")
   lazy val VettingMainIncompatPath: String = getResourcePath("VettingMain-3.0.0.dar")
   lazy val VettingMainSubstitutionPath: String = getResourcePath("VettingMain-4.0.0.dar")
+  lazy val ModelTestsPath: String = getResourcePath("model-tests-1.0.0.dar")
+  lazy val SubViewsIfaceV1Path: String = getResourcePath("sub-views-iface-1.0.0.dar")
+  lazy val SubViewsAssetV1Path: String = getResourcePath("sub-views-asset-1.0.0.dar")
+  lazy val SubViewsAssetV2Path: String = getResourcePath("sub-views-asset-2.0.0.dar")
+  lazy val SubViewsMainV1Path: String = getResourcePath("sub-views-main-1.0.0.dar")
 
   def getResourcePath(name: String): String =
     Option(getClass.getClassLoader.getResource(name))

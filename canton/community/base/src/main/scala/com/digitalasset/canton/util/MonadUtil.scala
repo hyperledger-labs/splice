@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -146,6 +146,13 @@ object MonadUtil {
         _.parTraverse(processElement)
       )(M.monad)
     )
+
+  def parTraverseFilterWithLimit[X, M[_], S](parallelism: PositiveInt)(
+      xs: Seq[X]
+  )(processElement: X => M[Option[S]])(implicit M: Parallel[M]): M[Seq[S]] =
+    M.monad.map(
+      parTraverseWithLimit(parallelism)(xs)(processElement)
+    )(_.flatten)
 
   def batchedSequentialTraverse_[X, M[_]](parallelism: PositiveInt, chunkSize: PositiveInt)(
       xs: Seq[X]

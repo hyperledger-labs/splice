@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
@@ -26,7 +26,7 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
   it should "start with an empty index" in {
     val identity = executeSql(backend.parameter.ledgerIdentity)
     val end = executeSql(backend.parameter.ledgerEnd)
-    val parties = executeSql(backend.party.knownParties(None, 10))
+    val parties = executeSql(backend.party.knownParties(None, None, 10))
     val stringInterningEntries = executeSql(
       backend.stringInterning.loadStringInterningEntries(0, 1000)
     )
@@ -39,7 +39,7 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
 
   it should "not see any data after advancing the ledger end" in {
     advanceLedgerEndToMakeOldDataVisible()
-    val parties = executeSql(backend.party.knownParties(None, 10))
+    val parties = executeSql(backend.party.knownParties(None, None, 10))
 
     parties shouldBe empty
   }
@@ -123,7 +123,7 @@ private[backend] trait StorageBackendTestsReset extends Matchers with StorageBac
           )
         )
 
-    def parties = executeSql(backend.party.knownParties(None, 10))
+    def parties = executeSql(backend.party.knownParties(None, None, 10))
 
     def stringInterningEntries = executeSql(
       backend.stringInterning.loadStringInterningEntries(0, 1000)

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.plugins
@@ -99,7 +99,7 @@ class UseExternalProcess(
       case _ =>
         Seq(
           "java"
-        ) ++ classpathProps ++ threadingProps ++ loggingProps :+ "com.digitalasset.canton.CantonEnterpriseApp"
+        ) ++ classpathProps ++ threadingProps ++ loggingProps :+ "com.digitalasset.canton.CantonCommunityApp"
     }
     command ++ cantonInvocationArgs(
       logFile(name, config).toString,

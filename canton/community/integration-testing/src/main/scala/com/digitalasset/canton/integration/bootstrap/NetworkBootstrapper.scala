@@ -1,11 +1,13 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration.bootstrap
 
-import com.digitalasset.canton.admin.api.client.data.StaticSynchronizerParameters
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.CantonConfig
+import com.digitalasset.canton.admin.api.client.data.{
+  StaticSynchronizerParameters,
+  SubmissionRequestAmplification,
+}
+import com.digitalasset.canton.config.{CantonConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.console.{
   InstanceReference,
@@ -13,11 +15,10 @@ import com.digitalasset.canton.console.{
   MediatorReference,
   SequencerReference,
 }
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{EnvironmentDefinition, TestConsoleEnvironment}
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
-import com.digitalasset.canton.{SynchronizerAlias, protocol}
+import com.digitalasset.canton.{protocol, SynchronizerAlias}
+import com.digitalasset.canton.environment.CantonEnvironment
 import monocle.syntax.all.*
 
 /** Bootstraps synchronizers given topology descriptions and stores information in
@@ -113,6 +114,7 @@ object NetworkTopologyDescription {
       overrideMediatorToSequencers: Option[
         Map[MediatorReference, (Seq[SequencerReference], PositiveInt, NonNegativeInt)]
       ] = None,
+      overrideStaticSynchronizerParameters: Option[StaticSynchronizerParameters] = None,
       mediatorThreshold: PositiveInt = PositiveInt.one,
   )(implicit
       env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
@@ -123,7 +125,9 @@ object NetworkTopologyDescription {
       synchronizerThreshold,
       sequencers,
       mediators,
-      EnvironmentDefinition.defaultStaticSynchronizerParameters,
+      overrideStaticSynchronizerParameters.getOrElse(
+        EnvironmentDefinition.defaultStaticSynchronizerParameters
+      ),
       mediatorRequestAmplification,
       overrideMediatorToSequencers,
       mediatorThreshold,

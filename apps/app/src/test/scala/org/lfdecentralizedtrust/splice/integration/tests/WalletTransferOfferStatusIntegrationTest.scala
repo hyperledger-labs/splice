@@ -114,7 +114,9 @@ class WalletTransferOfferStatusIntegrationTest
                   Some(eventFormat),
                   transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
                 )
-              )
+              ),
+              None,
+              None,
             ),
           )
           .getOrElse(fail("Expected to see the transaction tree in the ledger."))

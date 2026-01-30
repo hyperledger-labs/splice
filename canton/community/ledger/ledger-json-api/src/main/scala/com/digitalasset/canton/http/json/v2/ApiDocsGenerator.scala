@@ -1,12 +1,14 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
 
+import com.digitalasset.canton.http.json.JsHealthService
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.apiserver.services.VersionFile
 import com.softwaremill.quicklens.*
 import monocle.macros.syntax.lens.*
+import org.semver4j.Semver
 import sttp.apispec
 import sttp.apispec.asyncapi.{AsyncAPI, ChannelItem, ReferenceOr}
 import sttp.apispec.openapi.{OpenAPI, Operation, PathItem}
@@ -19,6 +21,12 @@ import scala.collection.immutable.ListMap
 
 class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
     extends NamedLogging {
+
+  private val releaseNote = """
+    |This specification version fixes the API inconsistencies where certain fields marked as required in the spec are in fact optional.
+    |If you use code generation tool based on this file, you might need to adjust the existing application code to handle those fields as optional.
+    |If you do not want to change your client code, continue using the OpenAPI specification for the latest Canton 3.4 patch release.
+    |""".stripMargin.trim
 
   /** Endpoints used for static documents generation - should match with the live endpoints
     * @see
@@ -37,21 +45,30 @@ class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
         JsUserManagementService,
         JsIdentityProviderService,
         JsInteractiveSubmissionService,
+        JsHealthService,
+        JsContractService,
       )
     services.flatMap(service => service.documentation)
   }
 
-  private def supplyProtoDocs(initial: openapi.OpenAPI, proto: ProtoInfo): openapi.OpenAPI = {
+  private def supplyProtoDocs(
+      initial: openapi.OpenAPI,
+      proto: ProtoInfo,
+      minimalCantonVersion: String,
+  ): openapi.OpenAPI = {
 
     val updatedComponents = initial.components.map(component => supplyComponents(component, proto))
     val updatedPaths =
       initial.paths.pathItems.map { case (path, pathItem) =>
         (path, supplyPathItem(pathItem, proto))
       }
-    initial.copy(
-      components = updatedComponents,
-      paths = initial.paths.copy(pathItems = updatedPaths),
-    )
+    initial
+      .focus(_.components)
+      .replace(updatedComponents)
+      .focus(_.paths.pathItems)
+      .replace(updatedPaths)
+      .focus(_.info.description)
+      .replace(Some(s"$releaseNote\nMINIMUM_CANTON_VERSION=$minimalCantonVersion"))
   }
   private def supplyPathItem(pathItem: PathItem, proto: ProtoInfo) =
     pathItem.copy(
@@ -82,12 +99,22 @@ class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
   private def withSuppliedServiceDescription(operation: Operation, proto: ProtoInfo) =
     operation.focus(_.description).some.modify(supplyServiceDescriptions(_, proto))
 
-  private def supplyProtoDocs(initial: asyncapi.AsyncAPI, proto: ProtoInfo): asyncapi.AsyncAPI = {
+  private def supplyProtoDocs(
+      initial: asyncapi.AsyncAPI,
+      proto: ProtoInfo,
+      minimalCantonVersion: String,
+  ): asyncapi.AsyncAPI = {
     val updatedComponents = initial.components.map(component => supplyComponents(component, proto))
     val updateChannels = initial.channels.map { case (channelName, channel) =>
       (channelName, updateChannel(channel, proto))
     }
-    initial.copy(components = updatedComponents, channels = updateChannels)
+    initial
+      .focus(_.components)
+      .replace(updatedComponents)
+      .focus(_.channels)
+      .replace(updateChannels)
+      .focus(_.info.description)
+      .replace(Some(s"$releaseNote\nMINIMUM_CANTON_VERSION=$minimalCantonVersion"))
   }
 
   private def updateChannel(
@@ -176,6 +203,17 @@ class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
     proto
       .findMessageInfo(componentName, parentComponent)
       .map { message =>
+        val required = componentSchema.required.filter { fieldName =>
+          message.isFieldRequired(fieldName)
+        }
+
+        val requiredFieldsWronglyAssumedOptional = componentSchema.properties.keys.filter {
+          propertyName =>
+            message.isFieldRequired(propertyName) &&
+            !componentSchema.required.contains(propertyName)
+        }
+        val allRequired = (required ++ requiredFieldsWronglyAssumedOptional).toList.distinct
+
         val properties = componentSchema.properties.map { case (propertyName, propertySchema) =>
           message
             .getFieldComment(propertyName)
@@ -195,7 +233,11 @@ class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
         }
         (
           componentName,
-          componentSchema.copy(description = message.getComments(), properties = properties),
+          componentSchema.copy(
+            description = message.getComments(),
+            properties = properties,
+            required = allRequired,
+          ),
         )
       }
       .getOrElse((componentName, componentSchema))
@@ -203,12 +245,6 @@ class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
   def loadProtoData(): ProtoInfo =
     ProtoInfo
       .loadData()
-      .fold(
-        error => {
-          throw new IllegalStateException(s"Cannot load proto data for documentation $error")
-        },
-        identity,
-      )
 
   def createDocs(
       lapiVersion: String,
@@ -223,7 +259,8 @@ class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
       )
       .openapi("3.0.3")
 
-    val supplementedOpenApi = supplyProtoDocs(openApiDocs, protoData)
+    val cantonVersion = new Semver(lapiVersion).withClearedPreReleaseAndBuild().toString
+    val supplementedOpenApi = supplyProtoDocs(openApiDocs, protoData, cantonVersion)
     import sttp.apispec.openapi.circe.yaml.*
 
     val asyncApiDocs: AsyncAPI = AsyncAPIInterpreter().toAsyncAPI(
@@ -231,7 +268,7 @@ class ApiDocsGenerator(override protected val loggerFactory: NamedLoggerFactory)
       "JSON Ledger API WebSocket endpoints",
       lapiVersion,
     )
-    val supplementedAsyncApi = supplyProtoDocs(asyncApiDocs, protoData)
+    val supplementedAsyncApi = supplyProtoDocs(asyncApiDocs, protoData, cantonVersion)
     import sttp.apispec.asyncapi.circe.yaml.*
 
     val fixed3_0_3Api: OpenAPI = OpenAPI3_0_3Fix.fixTupleDefinition(supplementedOpenApi)

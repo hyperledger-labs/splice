@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
@@ -46,23 +46,23 @@ class EventProjectionPropertiesSpec extends AnyFlatSpec with Matchers {
       interfaceImplementedBy = noInterface,
       resolveTypeConRef = noTemplatesForPackageName,
     )
-      .render(Set.empty, id) shouldBe Projection(Set.empty, false)
+      .render(Set(party), id) shouldBe Projection(Set.empty, false)
   }
 
-  it should "project nothing in case of empty witnesses" in new Scope {
+  it should "project nothing in case of not matching template filter" in new Scope {
     EventProjectionProperties(
       eventFormat = templateWildcardFilter(),
       interfaceImplementedBy = interfaceImpl,
       resolveTypeConRef = noTemplatesForPackageName,
     )
-      .render(Set.empty, id) shouldBe Projection(Set.empty, false)
+      .render(Set(party), id) shouldBe Projection(Set.empty, false)
 
     EventProjectionProperties(
       eventFormat = templateWildcardPartyWildcardFilter(),
       interfaceImplementedBy = interfaceImpl,
       resolveTypeConRef = noTemplatesForPackageName,
     )
-      .render(Set.empty, id) shouldBe Projection(Set.empty, false)
+      .render(Set(party), id) shouldBe Projection(Set.empty, false)
   }
 
   behavior of "projecting interfaces"

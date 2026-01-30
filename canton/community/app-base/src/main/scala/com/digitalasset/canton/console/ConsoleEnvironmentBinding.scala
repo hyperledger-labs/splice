@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
@@ -34,11 +34,13 @@ object ConsoleEnvironmentBinding {
        |import com.digitalasset.canton.crypto._
        |import com.digitalasset.canton.config._
        |import com.digitalasset.canton.admin.api.client.data._
+       |import com.digitalasset.canton.admin.api.client.data.SequencerConnectionValidation._
        |import com.digitalasset.canton.participant.admin.workflows.java.canton.internal.ping.Ping
        |$consoleMacrosImport
        |import ${classOf[com.digitalasset.canton.console.BootstrapScriptException].getName}
        |import ${classOf[com.digitalasset.canton.SynchronizerAlias].getName}
        |import com.digitalasset.canton.config.RequireTypes._
+       |import com.daml.nonempty.NonEmpty
        |import com.digitalasset.canton.participant.admin.ResourceLimits
        |import ch.qos.logback.classic.Level
        |implicit val consoleEnvironment = ${ConsoleEnvironmentBinding.BindingName}
@@ -51,7 +53,6 @@ object ConsoleEnvironmentBinding {
     val importsSynchronizer =
       """
         |import com.digitalasset.canton.version.ProtocolVersion
-        |import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
         |import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
         |import com.digitalasset.canton.console.commands.SynchronizerChoice
         |""".stripMargin
@@ -79,11 +80,6 @@ object ConsoleEnvironmentBinding {
     val importsSequencing =
       """
          |import com.digitalasset.canton.SequencerAlias
-         |import com.digitalasset.canton.sequencing.SequencerConnection
-         |import com.digitalasset.canton.sequencing.SequencerConnections
-         |import com.digitalasset.canton.sequencing.SequencerConnectionValidation._
-         |import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
-         |import com.digitalasset.canton.sequencing.GrpcSequencerConnection
          |""".stripMargin
 
     addToBuilder(builder, importStandard)

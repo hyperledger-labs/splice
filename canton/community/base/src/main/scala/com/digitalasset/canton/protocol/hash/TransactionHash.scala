@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.hash
@@ -48,7 +48,7 @@ object TransactionHash {
       HashPurpose.PreparedSubmission,
       hashTracer,
       enforceNodeSeedForCreateNodes = true,
-    ).addPurpose
+    ).addPurpose()
       .addHashingSchemeVersion(HashingSchemeVersion.V2)
       .addHash(
         TransactionHash
@@ -77,9 +77,9 @@ object TransactionHash {
       HashPurpose.PreparedSubmission,
       hashTracer,
       enforceNodeSeedForCreateNodes = true,
-    ).addPurpose
+    ).addPurpose()
       .withContext("Serialization Version")(
-        _.add(SerializationVersion.toProtoValue(versionedTransaction.version))
+        _.addString(SerializationVersion.toProtoValue(versionedTransaction.version))
       )
       .withContext("Root Nodes")(
         _.addNodesFromNodeIds(versionedTransaction.roots, versionedTransaction.nodes, nodeSeeds)

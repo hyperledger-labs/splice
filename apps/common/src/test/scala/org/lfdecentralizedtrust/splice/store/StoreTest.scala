@@ -891,6 +891,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   private var offsetCounter: Long = 0L
 
+  @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
   protected def nextOffset(): Long = blocking {
     synchronized {
       val offset = offsetCounter
@@ -1291,6 +1292,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       recordTime,
+      ByteString.EMPTY,
     )
   }
 
@@ -1325,6 +1327,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       effectiveAt, // we equate record time and effectiveAt for simplicity
+      ByteString.EMPTY,
     )
   }
 

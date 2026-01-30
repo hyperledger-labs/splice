@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform
@@ -86,10 +86,10 @@ class PackagePreferenceBackend(
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Either[String, (Seq[PackageReference], PhysicalSynchronizerId)]] = {
-    val routingSynchronizerState = syncService.getRoutingSynchronizerState
     val packageMetadataSnapshot = syncService.getPackageMetadataSnapshot
 
     for {
+      routingSynchronizerState <- syncService.getRoutingSynchronizerState
       _ <- ensurePackageNamesKnown(packageVettingRequirements, packageMetadataSnapshot)
       packageMapForRequest <- syncService.computePartyVettingMap(
         submitters = Set.empty,

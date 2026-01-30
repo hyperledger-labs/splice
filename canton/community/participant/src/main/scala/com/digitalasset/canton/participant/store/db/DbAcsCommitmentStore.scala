@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store.db
@@ -9,7 +9,6 @@ import cats.syntax.traverse.*
 import com.daml.nameof.NameOf
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.data.{BufferedAcsCommitment, CantonTimestamp, CantonTimestampSecond}
@@ -46,6 +45,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.collection.IterableUtil.Ops
 import com.digitalasset.canton.version.ProtocolVersionValidation
+import com.digitalasset.canton.{InternedPartyId, LfPartyId}
 import com.google.protobuf.ByteString
 import slick.jdbc.TransactionIsolation.Serializable
 import slick.jdbc.canton.SQLActionBuilder
@@ -141,8 +141,8 @@ class DbAcsCommitmentStore(
             using (
               select cast(? as int) synchronizer_idx, cast(? as varchar) counter_participant, cast(? as bigint) from_exclusive,
               cast(? as bigint) to_inclusive, cast(? as binary large object) commitment from dual)
-            excluded on (cs.synchronizer_idx = excluded.synchronizer_idx and cs.counter_participant = excluded.counter_participant and
-            cs.from_exclusive = excluded.from_exclusive and cs.to_inclusive = excluded.to_inclusive)
+            excluded on (cs.synchronizer_idx = excluded.synchronizer_idx and cs.counter_participant = excluded.counter_participant
+               and cs.from_exclusive = excluded.from_exclusive and cs.to_inclusive = excluded.to_inclusive)
             when matched and cs.commitment = excluded.commitment
               then update set cs.commitment = excluded.commitment
             when not matched then
@@ -355,7 +355,11 @@ class DbAcsCommitmentStore(
     // we completely prune the outstanding table, the matching is "best effort" and the assumption is that we achieved unison with all counter-participants somewhere after pruning time.
     // we might lose old mismatches and outstanding, but we are not able to validate anything received before pruning time anyway (we cant recomputed, and we don't have it in the computed table).
     val query3 =
-      sqlu"delete from par_outstanding_acs_commitments where synchronizer_idx=$indexedSynchronizer and to_inclusive < $before"
+      // The filter on `fromExclusive` is logically redundant as `fromExclusive <= toInclusive`, but it ensures
+      // that the index `idx_par_outstanding_acs_commitments` can be used instead of a sequential scan.
+      // With this trick, we don't need a separate by-time index for `par_outstanding_acs_commitment`
+      // because `idx_par_outstanding_acs_commitments` should work for all queries.
+      sqlu"delete from par_outstanding_acs_commitments where synchronizer_idx=$indexedSynchronizer and from_exclusive < $before and to_inclusive < $before"
     storage
       .queryAndUpdate(
         query1.zip(query2.zip(query3)),
@@ -397,8 +401,7 @@ class DbAcsCommitmentStore(
           (sql"""select from_exclusive, to_inclusive from par_outstanding_acs_commitments
                where synchronizer_idx=$indexedSynchronizer
                and from_exclusive < $ts
-               and matching_state != ${CommitmentPeriodState.Matched}
-               and multi_hosted_cleared = false""" ++ participantFilter).toActionBuilder
+               and matching_state != ${CommitmentPeriodState.Matched}""" ++ participantFilter).toActionBuilder
         storage.query(
           query
             .as[(CantonTimestamp, CantonTimestamp)]
@@ -470,18 +473,6 @@ class DbAcsCommitmentStore(
       queue,
     )(logger)
 
-  override def markMultiHostedCleared(period: CommitmentPeriod)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Unit] =
-    storage.update_(
-      sqlu"""update par_outstanding_acs_commitments
-                set multi_hosted_cleared = true
-                where synchronizer_idx = $indexedSynchronizer
-                and from_exclusive = ${period.fromExclusive}
-                and to_inclusive = ${period.toInclusive}""",
-      "markMultiHostedCleared",
-    )
-
 }
 
 class DbIncrementalCommitmentStore(
@@ -497,7 +488,7 @@ class DbIncrementalCommitmentStore(
   import storage.api.*
   import storage.converters.*
 
-  private implicit val getLfPartyIdSortedSet: GetResult[Vector[Int]] =
+  private implicit val getInternedPartyIdSortedSet: GetResult[Vector[Int]] =
     DbParameterUtils.getIntArrayResultsDb.andThen(_.toVector)
 
   private implicit val setParameterPartyIdSortedSet: SetParameter[Vector[Int]] =
@@ -505,7 +496,9 @@ class DbIncrementalCommitmentStore(
 
   override def get()(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[(RecordTime, Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType])] =
+  ): FutureUnlessShutdown[
+    (RecordTime, Map[SortedSet[InternedPartyId], AcsCommitment.CommitmentType])
+  ] =
     for {
       res <- storage.query(
         (for {
@@ -516,11 +509,8 @@ class DbIncrementalCommitmentStore(
           snapshotWithInternedIds <-
             sql"""select stakeholders, commitment from par_commitment_checkpoint_snapshot where synchronizer_idx = $indexedSynchronizer"""
               .as[(Vector[Int], AcsCommitment.CommitmentType)]
-          stringInterning = stringInterningEval.value
           snapshot = snapshotWithInternedIds.map { case (internedParties, commitmentType) =>
-            SortedSet.from(
-              internedParties.view.map(stringInterning.party.externalize)
-            ) -> commitmentType
+            SortedSet.from(internedParties) -> commitmentType
           }
         } yield (tsWithTieBreaker, snapshot)).transactionally
           .withTransactionIsolation(Serializable),
@@ -529,7 +519,7 @@ class DbIncrementalCommitmentStore(
     } yield {
       val (optTsWithTieBreaker, snapshot) = res
       optTsWithTieBreaker.fold(
-        RecordTime.MinValue -> Map.empty[SortedSet[LfPartyId], AcsCommitment.CommitmentType]
+        RecordTime.MinValue -> Map.empty[SortedSet[InternedPartyId], AcsCommitment.CommitmentType]
       ) { case (ts, tieBreaker) =>
         RecordTime(ts, tieBreaker) -> snapshot.toMap
       }
@@ -548,8 +538,8 @@ class DbIncrementalCommitmentStore(
   @SuppressWarnings(Array("org.wartremover.warts.AnyVal"))
   def update(
       rt: RecordTime,
-      updates: Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType],
-      deletes: Set[SortedSet[LfPartyId]],
+      updates: Map[SortedSet[InternedPartyId], AcsCommitment.CommitmentType],
+      deletes: Set[SortedSet[InternedPartyId]],
       updateMode: UpdateMode,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
 
@@ -576,7 +566,11 @@ class DbIncrementalCommitmentStore(
         )
         .getCryptographicEvidence
 
-    def deleteCommitments(stakeholders: List[SortedSet[LfPartyId]]): Seq[DbAction.All[Unit]] = {
+    def deleteCommitments(
+        stakeholders: List[SortedSet[InternedPartyId]]
+    ): Seq[DbAction.All[Unit]] = {
+      val stringInterning = stringInterningEval.value
+
       val deleteStatements = tablesToUpdate.map { table =>
         s"delete from $table where synchronizer_idx = ? and stakeholders_hash = ?"
       }
@@ -584,23 +578,23 @@ class DbIncrementalCommitmentStore(
       deleteStatements.map { deleteStatement =>
         DbStorage.bulkOperation_(deleteStatement, stakeholders, storage.profile) { pp => stkhs =>
           pp >> indexedSynchronizer
-          pp >> pp.setBytes(partySetHash(stkhs).toByteArray)
+          pp >> pp.setBytes(partySetHash(stkhs.map(stringInterning.party.externalize)).toByteArray)
         }
       }
     }
 
     def storeUpdates(
-        updates: List[(SortedSet[LfPartyId], AcsCommitment.CommitmentType)]
+        updates: List[(SortedSet[InternedPartyId], AcsCommitment.CommitmentType)]
     ): Seq[DbAction.All[Unit]] = {
       val stringInterning = stringInterningEval.value
 
       def setParams(
           pp: PositionedParameters
-      ): ((SortedSet[LfPartyId], AcsCommitment.CommitmentType)) => Unit = {
+      ): ((SortedSet[InternedPartyId], AcsCommitment.CommitmentType)) => Unit = {
         case (stkhs, commitment) =>
           pp >> indexedSynchronizer
-          pp >> pp.setBytes(partySetHash(stkhs).toByteArray)
-          pp >> stkhs.view.map(stringInterning.party.internalize).toVector
+          pp >> pp.setBytes(partySetHash(stkhs.map(stringInterning.party.externalize)).toByteArray)
+          pp >> stkhs.view.toVector
           pp >> commitment
       }
 

@@ -22,7 +22,7 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnections,
   SubmissionRequestAmplification,
 }
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil

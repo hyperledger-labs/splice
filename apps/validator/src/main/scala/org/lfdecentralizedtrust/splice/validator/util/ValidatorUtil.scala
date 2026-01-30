@@ -259,6 +259,7 @@ private[validator] object ValidatorUtil {
           participants = Seq(
             HostingParticipant(participantId, ParticipantPermission.Confirmation)
           ),
+          partySigningKeysWithThreshold = None,
         )
         .valueOr(error =>
           throw Status.INVALID_ARGUMENT
