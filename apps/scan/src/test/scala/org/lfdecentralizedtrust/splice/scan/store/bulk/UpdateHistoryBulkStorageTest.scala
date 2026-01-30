@@ -14,7 +14,6 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.store.*
-import org.scalatest.concurrent.PatienceConfiguration
 import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
 import java.time.Instant
@@ -37,7 +36,7 @@ class UpdateHistoryBulkStorageTest
 
   "UpdateHistoryBulkStorage" should {
 
-    "work" in {
+    "successfully dump a single segment of updates to an s3 bucket" in {
       withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
         val initialStoreSize = 1500
         val segmentSize = 2200L
@@ -54,8 +53,7 @@ class UpdateHistoryBulkStorageTest
           }
         }
 
-
-        val probe = UpdateHistorySegmentBulkStorageNew
+        val probe = UpdateHistorySegmentBulkStorage
           .asSource(
             bulkStorageTestConfig,
             mockStore.store,
