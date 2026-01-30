@@ -49,7 +49,9 @@ class UpdateHistoryBulkStorageTest
 
         clue("Wait for the store to be ready by getting the first update from it") {
           eventually(2.minutes) {
-            mockStore.store.getUpdatesWithoutImportUpdates(None, HardLimit.tryCreate(1)).futureValue should not be Seq.empty
+            mockStore.store
+              .getUpdatesWithoutImportUpdates(None, HardLimit.tryCreate(1))
+              .futureValue should not be Seq.empty
           }
         }
 
@@ -69,11 +71,15 @@ class UpdateHistoryBulkStorageTest
 
         probe.request(2)
 
-        clue("Initially, 1000 updates will be ready, but the segment will not be complete, so no output is expected") {
+        clue(
+          "Initially, 1000 updates will be ready, but the segment will not be complete, so no output is expected"
+        ) {
           probe.expectNoMessage(20.seconds)
         }
 
-        clue("Ingest 1000 more events. Now the last timestamp will be beyond of the segment, so the source will complete and emit the last timestamp") {
+        clue(
+          "Ingest 1000 more events. Now the last timestamp will be beyond of the segment, so the source will complete and emit the last timestamp"
+        ) {
           mockStore.mockIngestion(1000)
           probe.expectNext(20.seconds) should be((0, toTimestamp))
         }

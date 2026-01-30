@@ -78,10 +78,12 @@ class UpdateHistorySegmentBulkStorage(
             lastEmitted.set(
               Some((last.migrationId, last.update.update.recordTime))
             )
-            Future.successful((
-              TS(last.migrationId, last.update.update.recordTime),
-              updatesBytes,
-            ))
+            Future.successful(
+              (
+                TS(last.migrationId, last.update.update.recordTime),
+                updatesBytes,
+              )
+            )
           } else {
             // All updates are outside the segment, so we're done
             Future.successful((End, ByteString.empty))
@@ -118,7 +120,9 @@ class UpdateHistorySegmentBulkStorage(
   private val s3ObjIdx = new AtomicInteger(0)
   private val lastEmitted = new AtomicReference[Option[(Long, CantonTimestamp)]](None)
 
-  private def getSource(implicit actorSystem: ActorSystem): Source[(Long, CantonTimestamp), NotUsed] = {
+  private def getSource(implicit
+      actorSystem: ActorSystem
+  ): Source[(Long, CantonTimestamp), NotUsed] = {
     Source
       .unfoldAsync(Start: UpdatesPosition) {
         case Start => getUpdatesChunk(fromMigrationId, fromTimestamp).map(Some(_))
