@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 
-// TODO: some duplication between this and SingleAcsSnapshotBulkStorage, see if we can more nicely reuse stuff
+// TODO(#3429): some duplication between this and SingleAcsSnapshotBulkStorage, see if we can more nicely reuse stuff
 
 object UpdatesPosition {
   sealed trait UpdatesPosition
