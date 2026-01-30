@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.admin.api.client.data.GrpcSequencerConnection
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
@@ -8,7 +9,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
-import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
 import scala.jdk.OptionConverters.*
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient.SvOnboardingStatus

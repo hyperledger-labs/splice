@@ -196,7 +196,7 @@ class SV1Initializer(
             PositiveInt.one,
             // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
-            config.participantClient.sequencerRequestAmplification,
+            config.participantClient.sequencerRequestAmplification.toInternal,
             // TODO(#2666) Make the delays configurable.
             sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
           ),
@@ -570,7 +570,7 @@ class SV1Initializer(
             synchronizerNode.mediatorAdminConnection.initialize(
               physicalSynchronizerId,
               synchronizerNode.sequencerConnection,
-              synchronizerNode.mediatorSequencerAmplification,
+              synchronizerNode.mediatorSequencerAmplification.toInternal,
             ),
             logger,
           )

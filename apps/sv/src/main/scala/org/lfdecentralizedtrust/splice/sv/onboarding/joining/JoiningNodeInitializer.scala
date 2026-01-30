@@ -144,11 +144,21 @@ class JoiningNodeInitializer(
       SynchronizerConnectionConfig(
         config.domains.global.alias,
         SequencerConnections.tryMany(
-          Seq(GrpcSequencerConnection.tryCreate(url)),
+          Seq(
+            GrpcSequencerConnection
+              .create(url)
+              .fold(
+                error =>
+                  throw Status.INVALID_ARGUMENT
+                    .withDescription(s"Invalid synchronizer url $url: $error")
+                    .asRuntimeException(),
+                identity,
+              )
+          ),
           PositiveInt.one,
           // We only have a single connection here.
           sequencerLivenessMargin = NonNegativeInt.zero,
-          config.participantClient.sequencerRequestAmplification,
+          config.participantClient.sequencerRequestAmplification.toInternal,
           // TODO(#2666) Make the delays configurable.
           sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
         ),

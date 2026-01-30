@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv
 
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
+import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplification
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.sv.config.{SvCometBftConfig, SvSequencerConfig}
 

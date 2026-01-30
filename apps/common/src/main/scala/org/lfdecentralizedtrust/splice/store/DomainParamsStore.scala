@@ -7,14 +7,15 @@ import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory}
 import com.daml.metrics.api.MetricQualification.Traffic
 import org.lfdecentralizedtrust.splice.environment.{
-  SpliceMetrics,
   RetryProvider,
+  SpliceMetrics,
   TopologyAdminConnection,
 }
 import org.lfdecentralizedtrust.splice.util.SynchronizerMigrationUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.transaction.SynchronizerParametersState
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.Mutex
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
@@ -45,6 +46,7 @@ final class DomainParamsStore(
 
   private val metrics: DomainParamsStore.Metrics =
     new DomainParamsStore.Metrics(retryProvider.metricsFactory)
+  private val mutex = Mutex()
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   @volatile
@@ -71,7 +73,7 @@ final class DomainParamsStore(
   }
 
   private def checkDomainUnpaused()(implicit tc: TraceContext): Option[Promise[Unit]] = blocking {
-    synchronized {
+    mutex.exclusive {
       state.lastParams match {
         // If we are just starting up, try to submit something to not delay startup.
         // We'll block on the next update if the domain is actually paused.
@@ -113,7 +115,7 @@ final class DomainParamsStore(
       params.mapping.parameters.confirmationResponseTimeout.toScala.toMillis
     )
     blocking {
-      synchronized {
+      mutex.exclusive {
         val newState = state.copy(lastParams = Some(params))
         state.domainUnpausedPromise match {
           case None =>

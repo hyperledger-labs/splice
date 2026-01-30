@@ -942,7 +942,7 @@ class ValidatorApp(
         config.ingestFromParticipantBegin,
         config.ingestUpdateHistoryFromParticipantBegin,
         config.svValidator,
-        config.sequencerRequestAmplificationPatience,
+        config.sequencerRequestAmplificationPatience.toInternal,
         config.contactPoint,
         initialSynchronizerTime,
         config.maxVettingDelay,
