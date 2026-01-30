@@ -32,6 +32,7 @@ import Splice.Ans
 import Splice.SvOnboarding
 import Splice.DSO.AmuletPrice
 import Splice.DSO.DecentralizedSynchronizer
+import Splice.DSO.ResponseReimbursement
 import Splice.DSO.SvState
 import Splice.Schedule
 import Splice.Util
@@ -114,6 +115,12 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
     -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract.
+  | SRARC_StartResponseTrafficReimbursement DsoRules_StartResponseTrafficReimbursement
+    -- ^ Automated action to start reimbursing responses for a given interval.
+  | SRARC_AddResponseTrafficReimbursementInterval DsoRules_AddResponseTrafficReimbursementInterval
+    -- ^ Automated action to add a new confirmation response traffic reimbursement interval.
+  | SRARC_ConfirmResponseTrafficReimbursement DsoRules_ConfirmResponseTrafficReimbursement
+    -- ^ Automated action to confirm the response traffic reimbursement data for a reimbursement interval.
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -300,6 +307,20 @@ data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUn
 data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult with
     unclaimedRewardCid : ContractId UnclaimedReward
 
+data DsoRules_StartResponseTrafficReimbursementResult = DsoRules_StartResponseTrafficReimbursementResult with
+  workflowStateCid : ContractId ReimbursementWorkflowState
+
+data DsoRules_AddResponseTrafficReimbursementIntervalResult = DsoRules_AddResponseTrafficReimbursementIntervalResult with
+  result : ReimbursementWorkflowState_AddReimbursementIntervalResult
+
+data DsoRules_ConfirmResponseTrafficReimbursementResult = DsoRules_ConfirmResponseTrafficReimbursementResult with
+  result : ReimbursementIntervalState_ConfirmReimbursementResult
+
+data DsoRules_ReimburseResponsesResult = DsoRules_ReimburseResponsesResult with
+    result : ReimbursementIntervalState_ReimburseResponsesResult
+
+data DsoRules_RecordCompletedResponseTrafficReimbursementIntervalResult = DsoRules_RecordCompletedResponseTrafficReimbursementIntervalResult with
+  result : ReimbursementWorkflowState_RecordCompletedIntervalResult
 
 -- Workflow templates
 ---------------------
@@ -1533,6 +1554,72 @@ template DsoRules with
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
 
 
+    -- confirmation response traffic reimbursement
+    ----------------------------------------------
+
+    nonconsuming choice DsoRules_StartResponseTrafficReimbursement : DsoRules_StartResponseTrafficReimbursementResult
+      controller dso
+      do
+        now <- getTime
+        workflowStateCid <- create ReimbursementWorkflowState with
+          dso
+          earliestIntervalStart = now
+          nextIntervalStart = now
+        pure DsoRules_StartResponseTrafficReimbursementResult with
+          workflowStateCid = workflowStateCid
+
+    nonconsuming choice DsoRules_AddResponseTrafficReimbursementInterval
+      : DsoRules_AddResponseTrafficReimbursementIntervalResult
+      with
+        workflowStateCid : ContractId ReimbursementWorkflowState
+        nextIntervalEnd : Time
+      controller dso
+      do
+        _ <- fetchChecked (ForDso with dso) workflowStateCid
+        result <- exercise workflowStateCid ReimbursementWorkflowState_AddReimbursementInterval with
+          minIntervalDuration = hours 1   -- FIXME: config.responseReimbursementMinIntervalDuration
+          nextIntervalEnd
+        pure DsoRules_AddResponseTrafficReimbursementIntervalResult with result
+
+    nonconsuming choice DsoRules_ConfirmResponseTrafficReimbursement
+      : DsoRules_ConfirmResponseTrafficReimbursementResult
+      with
+        intervalStateCid : ContractId ReimbursementIntervalState
+        reimbursementConfirmation : ReimbursementConfirmation
+      controller dso
+      do
+        result <- exercise intervalStateCid ReimbursementIntervalState_ConfirmReimbursement with
+          reimbursementConfirmation
+        pure DsoRules_ConfirmResponseTrafficReimbursementResult with result
+
+    nonconsuming choice DsoRules_ReimburseResponseTraffic : DsoRules_ReimburseResponsesResult
+      with
+        intervalStateCid : ContractId ReimbursementIntervalState
+        responseTrafficData : ResponseTrafficData
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        -- FIXME: avoid this exercise as it leads to a full copy of the response traffic totals
+        -- in the Ledger API server
+        result <- exercise intervalStateCid ReimbursementIntervalState_ReimburseResponses with
+          responseTrafficData
+        pure DsoRules_ReimburseResponsesResult with result
+
+    nonconsuming choice DsoRules_RecordCompletedResponseTrafficReimbursement
+      : DsoRules_RecordCompletedResponseTrafficReimbursementIntervalResult
+      with
+        workflowStateCid : ContractId ReimbursementWorkflowState
+        intervalStateCid : ContractId ReimbursementIntervalState
+        sv : Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this (Some sv)
+        result <- exercise workflowStateCid ReimbursementWorkflowState_RecordCompletedInterval with
+          intervalStateCid
+        pure DsoRules_RecordCompletedResponseTrafficReimbursementIntervalResult with result
+
+
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =
    case reverse past of
@@ -1591,6 +1678,9 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_StartResponseTrafficReimbursement choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_AddResponseTrafficReimbursementInterval choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_ConfirmResponseTrafficReimbursement choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. -> do
     void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
