@@ -67,6 +67,7 @@ inThisBuild(
     // slows down just the non integration tests which is a really small subset
     // this helps us get actual realistic times for how long a test takes to run
     Test / parallelExecution := false,
+    resolvers += ("Canton snapshots" at "artifactregistry://europe-maven.pkg.dev/da-images/public-maven-unstable"),
   )
 )
 
