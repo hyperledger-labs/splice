@@ -91,7 +91,9 @@
       "id": 4,
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -978,8 +980,12 @@
       {
         "allValue": ".*",
         "current": {
-          "text": ["sv-1"],
-          "value": ["sv-1"]
+          "text": [
+            "sv-1"
+          ],
+          "value": [
+            "sv-1"
+          ]
         },
         "definition": "label_values(splice_store_last_ingested_record_time_ms,namespace)",
         "includeAll": true,
@@ -999,7 +1005,9 @@
         "allValue": ".*",
         "current": {
           "text": "All",
-          "value": ["$__all"]
+          "value": [
+            "$__all"
+          ]
         },
         "definition": "label_values(splice_store_last_ingested_record_time_ms,node_name)",
         "includeAll": true,
@@ -1019,7 +1027,9 @@
         "allValue": ".*",
         "current": {
           "text": "All",
-          "value": ["$__all"]
+          "value": [
+            "$__all"
+          ]
         },
         "definition": "label_values(splice_store_last_ingested_record_time_ms,store_name)",
         "description": "The name of the store",
@@ -1040,7 +1050,9 @@
         "allValue": ".*",
         "current": {
           "text": "All",
-          "value": ["$__all"]
+          "value": [
+            "$__all"
+          ]
         },
         "definition": "label_values(splice_store_last_ingested_record_time_ms,store_party)",
         "description": "The party that the store is ingesting data for",
@@ -1064,7 +1076,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Splice Stores Ingestion",
   "uid": "dec17fpqzdwcge",
   "version": 10
