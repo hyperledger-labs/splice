@@ -1328,7 +1328,10 @@
             "memory": "2Gi"
           }
         },
-        "scanAddress": "http://scan-app.sv:5012",
+        "scanClient": {
+          "scanAddress": "http://scan-app.sv:5012",
+          "scanType": "trust-single"
+        },
         "spliceInstanceNames": {
           "amuletName": "Amulet",
           "amuletNameAcronym": "AMT",
