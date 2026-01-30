@@ -54,7 +54,7 @@ class UpdateHistorySegmentBulkStorage(
         HardLimit.tryCreate(config.bulkDbReadChunkSize),
       )
       updatesInSegment = updates.filter(update =>
-        TimestampWithMigrationId(update.update.update.recordTime, update.migrationId) < toTimestamp
+        TimestampWithMigrationId(update.update.update.recordTime, update.migrationId) <= toTimestamp
       )
       result <-
         if (
