@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
