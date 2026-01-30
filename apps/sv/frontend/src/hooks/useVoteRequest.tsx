@@ -15,11 +15,10 @@ export const useVoteRequest = (
   const { lookupDsoRulesVoteRequest } = useSvAdminClient();
   return useQuery({
     queryKey: ['listDsoRulesVoteRequests', contractId],
-    queryFn: async () =>
-      Contract.decodeOpenAPI(
-        (await lookupDsoRulesVoteRequest(contractId)).dso_rules_vote_request,
-        VoteRequest
-      ),
+    queryFn: async () => {
+      const request = await lookupDsoRulesVoteRequest(contractId);
+      return Contract.decodeOpenAPI(request.dso_rules_vote_request, VoteRequest);
+    },
     retry,
   });
 };

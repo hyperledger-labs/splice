@@ -177,4 +177,5 @@ function _update_cluster_config() {
   tmp_file=$(mktemp)
   echo "$yaml_content" > "$tmp_file"
   yq eval-all --inplace ".${field} = load(\"${tmp_file}\")" "$file"
+  "${SPLICE_ROOT}/cluster/scripts/resolve-config.sh"
 }

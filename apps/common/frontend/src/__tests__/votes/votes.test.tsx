@@ -45,8 +45,8 @@ const provider: VotesHooks = {
         return {
           svUser: dsoInfo.sv_user,
           svPartyId: dsoInfo.sv_party_id,
-          dsoPartiId: dsoInfo.dso_party_id,
-          votingThreshold: dsoInfo.voting_threshold,
+          dsoPartyId: dsoInfo.dso_party_id,
+          votingThreshold: BigInt(dsoInfo.voting_threshold),
           amuletRules: Contract.decodeOpenAPI(dsoInfo.amulet_rules.contract, AmuletRules),
           dsoRules: Contract.decodeOpenAPI(dsoInfo.dso_rules.contract, DsoRules),
           nodeStates: [],

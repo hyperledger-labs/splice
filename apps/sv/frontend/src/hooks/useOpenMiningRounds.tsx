@@ -13,7 +13,7 @@ export const useOpenMiningRounds = (): UseQueryResult<Contract<OpenMiningRound>[
     queryKey: ['listOpenMiningRounds'],
     queryFn: async () => {
       const { open_mining_rounds } = await listOpenMiningRounds();
-      return open_mining_rounds;
+      return open_mining_rounds.map(r => Contract.decodeOpenAPI(r, OpenMiningRound));
     },
   });
 };
