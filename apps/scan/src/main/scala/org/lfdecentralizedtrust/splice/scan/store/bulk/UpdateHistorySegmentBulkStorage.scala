@@ -9,7 +9,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.{Flow, Source}
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
-import UpdatesPosition.*
 import org.apache.pekko.stream.OverflowStrategy
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.pattern.after
@@ -32,15 +31,6 @@ import scala.concurrent.duration.*
 
 // TODO(#3429): some duplication between this and SingleAcsSnapshotBulkStorage, see if we can more nicely reuse stuff
 
-object UpdatesPosition {
-  sealed trait UpdatesPosition
-
-  case object Start extends UpdatesPosition
-
-  case object End extends UpdatesPosition
-
-  final case class TS(ts: TimestampWithMigrationId) extends UpdatesPosition
-}
 class UpdateHistorySegmentBulkStorage(
     val config: ScanStorageConfig,
     val updateHistory: UpdateHistory,
@@ -59,7 +49,7 @@ class UpdateHistorySegmentBulkStorage(
 
   private def getUpdatesChunk(
       afterTs: TimestampWithMigrationId
-  )(implicit actorSystem: ActorSystem): Future[(UpdatesPosition, ByteString)] = {
+  )(implicit actorSystem: ActorSystem): Future[Option[(TimestampWithMigrationId, ByteString)]] = {
     for {
       updates <- updateHistory.getUpdatesWithoutImportUpdates(
         Some((afterTs.migrationId, afterTs.timestamp)),
@@ -69,7 +59,7 @@ class UpdateHistorySegmentBulkStorage(
         update.migrationId < toMigrationId ||
           update.migrationId == toMigrationId && update.update.update.recordTime <= toTimestamp
       )
-      result: (UpdatesPosition.UpdatesPosition, ByteString) <-
+      result <-
         if (
           updatesInSegment.length < updates.length || updates.length == config.bulkDbReadChunkSize
         ) {
@@ -83,22 +73,22 @@ class UpdateHistorySegmentBulkStorage(
               Some(TimestampWithMigrationId(last.update.update.recordTime, last.migrationId))
             )
             Future.successful(
-              (
-                TS(TimestampWithMigrationId(last.update.update.recordTime, last.migrationId)),
+              Some((
+                TimestampWithMigrationId(last.update.update.recordTime, last.migrationId),
                 updatesBytes,
-              )
+              ))
             )
           } else {
             // All updates are outside the segment, so we're done
-            Future.successful((End, ByteString.empty))
+            Future.successful(None)
           }
         } else {
           logger.debug(
             s"Not enough updates yet (queried for ${config.bulkDbReadChunkSize}, found ${updates.length}), sleeping..."
           )
           after(updatesPollingInterval, actorSystem.scheduler) {
-            Future.successful((TS(afterTs), ByteString.empty))
-          }: Future[(UpdatesPosition.UpdatesPosition, ByteString)]
+            Future.successful(Some((afterTs, ByteString.empty)))
+          }
         }
     } yield {
       result
@@ -128,12 +118,7 @@ class UpdateHistorySegmentBulkStorage(
       actorSystem: ActorSystem
   ): Source[TimestampWithMigrationId, NotUsed] = {
     Source
-      .unfoldAsync(Start: UpdatesPosition) {
-        case Start =>
-          getUpdatesChunk(TimestampWithMigrationId(fromTimestamp, fromMigrationId)).map(Some(_))
-        case ts: TS => getUpdatesChunk(ts.ts).map(Some(_))
-        case End => Future.successful(None)
-      }
+      .unfoldAsync(TimestampWithMigrationId(fromTimestamp, fromMigrationId))(ts => getUpdatesChunk(ts))
       .via(ZstdGroupedWeight(config.bulkMaxFileSize))
       // Add a buffer so that the next object continues accumulating while we write the previous one
       .buffer(
