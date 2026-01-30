@@ -566,8 +566,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "pvc": {
           "name": "party-allocator-keys",
-          "size": "100Gi",
-          "storageClassName": "standard-rwo"
+          "volumeStorageClass": "standard-rwo"
         },
         "tolerations": [
           {
@@ -754,7 +753,7 @@
             "prefix": "mock/validator"
           }
         },
-        "participantPruningConfig": {
+        "participantPruningSchedule": {
           "cron": "0 /10 * * * ?",
           "maxDuration": "5m",
           "retention": "30d"

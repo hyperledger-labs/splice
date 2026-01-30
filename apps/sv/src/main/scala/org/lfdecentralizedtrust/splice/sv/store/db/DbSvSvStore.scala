@@ -34,6 +34,7 @@ class DbSvSvStore(
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     ingestionConfig: IngestionConfig,
+    acsStoreDescriptorUserVersion: Option[Long] = None,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -53,6 +54,7 @@ class DbSvSvStore(
           "svParty" -> key.svParty.toProtoPrimitive,
           "dsoParty" -> key.dsoParty.toProtoPrimitive,
         ),
+        userVersion = acsStoreDescriptorUserVersion,
       ),
       domainMigrationInfo = domainMigrationInfo,
       ingestionConfig,

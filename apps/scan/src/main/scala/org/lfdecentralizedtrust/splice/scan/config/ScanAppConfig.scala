@@ -46,7 +46,6 @@ case class ScanAppBackendConfig(
     ingestFromParticipantBegin: Boolean = true,
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
-    acsSnapshotPeriodHours: Int = 3,
     enableForcedAcsSnapshots: Boolean = false,
     // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
@@ -59,6 +58,8 @@ case class ScanAppBackendConfig(
     txLogBackfillBatchSize: Int = 100,
     bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
     cache: ScanCacheConfig = ScanCacheConfig(),
+    acsStoreDescriptorUserVersion: Option[Long] = None,
+    txLogStoreDescriptorUserVersion: Option[Long] = None,
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {

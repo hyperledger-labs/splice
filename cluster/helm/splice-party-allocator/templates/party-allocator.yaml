@@ -37,7 +37,7 @@ spec:
       volumes:
         - name: party-allocator-keys-volume
           persistentVolumeClaim:
-            claimName: party-allocator-keys
+            claimName: {{ .Values.pvc.name }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

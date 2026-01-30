@@ -1,51 +1,54 @@
-package org.lfdecentralizedtrust.splice.scan.store
+package org.lfdecentralizedtrust.splice.scan.store.bulk
 
-import com.digitalasset.canton.{BaseTest, FutureHelpers}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.{BaseTest, FutureHelpers}
 import com.github.luben.zstd.ZstdDirectBufferDecompressingStream
-import io.netty.buffer.PooledByteBufAllocator
+import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
-import org.lfdecentralizedtrust.splice.scan.store.bulk.{S3BucketConnection, S3Config}
 import org.scalatest.EitherValues
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.model.S3Object
+import com.adobe.testing.s3mock.testcontainers.S3MockContainer
 
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import scala.concurrent.{ExecutionContext, Future}
-import scala.sys.process.*
 import scala.util.Using
+import scala.jdk.CollectionConverters.*
 
 trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with BaseTest {
 
-  // TODO(#3429): consider running s3Mock container as a service in GHA instead of starting it here. Alternatively, use TestContainers to manage the container
-  def withS3Mock[A](test: => Future[A])(implicit ec: ExecutionContext): Future[A] = {
-    // start s3Mock in a contaner
-    "docker run -p 9090:9090 -e COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS=bucket -e debug=true -d --rm --name s3mock adobe/s3mock".!
+  // TODO(#3429): consider running s3Mock container as a service in GHA instead of starting it here.
+  def withS3Mock[A](
+      loggerFactory: NamedLoggerFactory
+  )(test: S3BucketConnection => Future[A])(implicit ec: ExecutionContext): Future[A] = {
 
-    eventually() {
-      // wait for S3Mock to be ready
-      "curl --output /dev/null --silent --head --fail -H \"Accept: application/json\" http://localhost:9090/actuator/health".! shouldBe 0
+    val container = new S3MockContainer("4.11.0")
+      .withInitialBuckets("bucket")
+      .withEnv(
+        Map(
+          "debug" -> "true"
+        ).asJava
+      )
+
+    container.start()
+
+    container.followOutput { frame =>
+      logger.debug(s"[s3Mock] ${frame.getUtf8String}")
     }
 
-    // Redirect s3Mock container logs into our log
-    val loggerProcess = "docker logs s3mock -f".run(
-      ProcessLogger(
-        line => logger.debug(s"[s3Mock] $line"),
-        line => logger.warn(s"[s3Mock] $line"),
-      )
-    )
-
-    test.andThen({ case _ =>
-      Seq("docker", "stop", "s3mock").!
-      loggerProcess.destroy()
+    test(getS3BucketConnection(loggerFactory, container)).andThen({ case _ =>
+      container.stop()
     })
   }
 
-  def getS3BucketConnection(loggerFactory: NamedLoggerFactory): S3BucketConnection = {
+  private def getS3BucketConnection(
+      loggerFactory: NamedLoggerFactory,
+      container: S3MockContainer,
+  ): S3BucketConnection = {
     val s3Config = S3Config(
-      URI.create("http://localhost:9090"),
+      URI.create(container.getHttpEndpoint),
       "bucket",
       Region.US_EAST_1,
       AwsBasicCredentials.create("mock_id", "mock_key"),

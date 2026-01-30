@@ -16,9 +16,13 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
 import org.lfdecentralizedtrust.splice.environment.SpliceConsoleEnvironment
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AllocateAmuletResponse,
+  AllocateDevelopmentFundCouponResponse,
   GetBuyTrafficRequestStatusResponse,
   GetTransferOfferStatusResponse,
+  ListMintingDelegationProposalsResponse,
+  ListMintingDelegationsResponse,
   TransferInstructionResultResponse,
+  WithdrawDevelopmentFundCouponResponse,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState}
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
@@ -600,6 +604,107 @@ abstract class WalletAppReference(
       httpCommand(HttpWalletAppClient.TokenStandard.RejectAllocationRequest(id))
     }
   }
+
+  @Help.Summary("Allocate a DevelopmentFundCoupon")
+  @Help.Description(
+    "Allocate development-fund resources by consuming UnclaimedDevelopmentFundCoupons and creating a new " +
+      "DevelopmentFundCoupon for the specified beneficiary and amount."
+  )
+  def allocateDevelopmentFundCoupon(
+      beneficiary: PartyId,
+      amount: BigDecimal,
+      expiresAt: CantonTimestamp,
+      reason: String,
+  ): AllocateDevelopmentFundCouponResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient.AllocateDevelopmentFundCoupon(
+          beneficiary,
+          amount,
+          expiresAt,
+          reason,
+        )
+      )
+    }
+
+  @Help.Summary("List active development fund coupons")
+  @Help.Description(
+    "List all active development fund coupons for the configured user acting as a beneficiary or development fund manager."
+  )
+  def listActiveDevelopmentFundCoupons(): Seq[
+    Contract[
+      amuletCodegen.DevelopmentFundCoupon.ContractId,
+      amuletCodegen.DevelopmentFundCoupon,
+    ]
+  ] =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.ListActiveDevelopmentFundCoupons)
+    }
+
+  @Help.Summary("Withdraw a DevelopmentFundCoupon")
+  @Help.Description(
+    "Withdraw a DevelopmentFundCoupon where the configured user acts as the development fund manager."
+  )
+  def withdrawDevelopmentFundCoupon(
+      developmentFundCouponContractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+      reason: String,
+  ): WithdrawDevelopmentFundCouponResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient.WithdrawDevelopmentFundCoupon(developmentFundCouponContractId, reason)
+      )
+    }
+
+  @Help.Summary("List MintingDelegationProposals")
+  @Help.Description(
+    "List all MintingDelegationProposal contracts where the user is the delegate."
+  )
+  def listMintingDelegationProposals(
+      after: Option[Long] = None,
+      limit: Option[Int] = None,
+  ): ListMintingDelegationProposalsResponse =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.ListMintingDelegationProposals(after, limit))
+    }
+
+  @Help.Summary("Accept MintingDelegationProposal")
+  @Help.Description(
+    "Accept a MintingDelegationProposal, creating a MintingDelegation contract and archiving an existing contract."
+  )
+  def acceptMintingDelegationProposal(contractId: String): String =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.AcceptMintingDelegationProposal(contractId))
+    }
+
+  @Help.Summary("Reject MintingDelegationProposal")
+  @Help.Description(
+    "Reject a MintingDelegationProposal."
+  )
+  def rejectMintingDelegationProposal(contractId: String): Unit =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.RejectMintingDelegationProposal(contractId))
+    }
+
+  @Help.Summary("List MintingDelegations")
+  @Help.Description(
+    "List all MintingDelegation contracts where the user is the delegate."
+  )
+  def listMintingDelegations(
+      after: Option[Long] = None,
+      limit: Option[Int] = None,
+  ): ListMintingDelegationsResponse =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.ListMintingDelegations(after, limit))
+    }
+
+  @Help.Summary("Reject MintingDelegation")
+  @Help.Description(
+    "Reject/terminate a MintingDelegation contract."
+  )
+  def rejectMintingDelegation(contractId: String): Unit =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.RejectMintingDelegation(contractId))
+    }
 }
 
 /** Client (aka remote) reference to a wallet app in the style of ParticipantClientReference, i.e.,

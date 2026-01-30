@@ -2245,6 +2245,9 @@ class State:
                 case "InputUnclaimedActivityRecord":
                     cid = value.get_contract_id()
                     del self.active_contracts[cid]
+                case "InputDevelopmentFundCoupon":
+                    cid = value.get_contract_id()
+                    del self.active_contracts[cid]
                 case _:
                     self._fail(transaction, f"Unexpected transfer input: {tag}")
         return TransferInputs(
@@ -3893,6 +3896,12 @@ class State:
             case "DsoRules_MergeValidatorLicense":
                 return HandleTransactionResult.empty()
             case "DsoRules_MergeUnclaimedDevelopmentFundCoupons":
+                return HandleTransactionResult.empty()
+            case "DsoRules_ExpireDevelopmentFundCoupon":
+                return HandleTransactionResult.empty()
+            case "AmuletRules_AllocateDevelopmentFundCoupon":
+                return HandleTransactionResult.empty()
+            case "DevelopmentFundCoupon_Withdraw":
                 return HandleTransactionResult.empty()
             case "ExternalPartyAmuletRules_CreateTransferCommand":
                 return HandleTransactionResult.empty()

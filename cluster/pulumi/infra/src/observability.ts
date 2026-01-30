@@ -209,6 +209,9 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             logFormat: 'json',
             storage: {
               volumeClaimTemplate: {
+                ...(hyperdiskSupportConfig.hyperdiskSupport.enabledForInfra
+                  ? { metadata: { name: 'alertmanager-hd-pvc' } }
+                  : {}),
                 spec: {
                   storageClassName: infraStandardStorageClassName,
                   accessModes: ['ReadWriteOnce'],
@@ -271,6 +274,9 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             additionalArgs: [{ name: 'storage.tsdb.max-block-duration', value: '1d' }],
             storageSpec: {
               volumeClaimTemplate: {
+                ...(hyperdiskSupportConfig.hyperdiskSupport.enabledForInfra
+                  ? { metadata: { name: 'prometheus-hd-pvc' } }
+                  : {}),
                 spec: {
                   storageClassName: infraPremiumStorageClassName,
                   accessModes: ['ReadWriteOnce'],
@@ -409,7 +415,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             type: 'pvc',
             accessModes: ['ReadWriteOnce'],
             size: '5Gi',
-            storageClassName: 'standard-rwo',
+            storageClassName: infraStandardStorageClassName,
           },
           adminUser: 'cn-admin',
           adminPassword: adminPassword,
@@ -1074,7 +1080,10 @@ function installPostgres(namespace: ExactNamespace): SplicePostgres {
 }
 
 function getVolumeSnapshotsForHyperdiskMigration() {
-  if (hyperdiskSupportConfig.hyperdiskSupport.migratingInfra) {
+  if (
+    hyperdiskSupportConfig.hyperdiskSupport.enabledForInfra &&
+    hyperdiskSupportConfig.hyperdiskSupport.migratingInfra
+  ) {
     const { dataSource: prometheusDataSource } = createVolumeSnapshot({
       resourceName: `prometheus-hd-migration-snapshot`,
       snapshotName: `prometheus-migration-snapshot`,

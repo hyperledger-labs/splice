@@ -17,6 +17,14 @@ import {
   nameServiceEntries,
   userLogin,
 } from './mocks/constants';
+import {
+  mockMintingDelegations,
+  mockMintingDelegationsSorted,
+  mockMintingDelegationProposals,
+  mockDelegationHostedStatusSorted,
+  mockProposalHostedStatusSorted,
+  mockMintingDelegationProposalsSorted,
+} from './mocks/delegation-constants';
 import { requestMocks } from './mocks/handlers/transfers-api';
 import { server } from './setup/setup';
 import {
@@ -30,6 +38,7 @@ import {
 import { AllocationRequest } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
 import { mkContract } from './mocks/contract';
 import { openApiRequestFromTransferLeg } from '../components/ListAllocationRequests';
+import { shortenPartyId } from '../utils/partyId';
 import * as damlTypes from '@daml/types';
 import { ContractId } from '@daml/types';
 import { AnyContract } from '@daml.js/splice-api-token-metadata/lib/Splice/Api/Token/MetadataV1/module';
@@ -491,6 +500,316 @@ describe('Wallet user can', () => {
     expect(await screen.findByText('(Transfer offer 009a97ffdf… withdrawn)')).toBeDefined();
     // The withdraw has a dummy conversion rate of 0 so no amulet conversion rate is displayed
     expect(await screen.findAllByText('@')).toHaveLength(3);
+  });
+
+  test('navigate to delegations tab and see proposals and delegations tables sorted by expiration', async () => {
+    server.use(featureSupportHandler(true, true));
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+
+    expect(await screen.findByText('Delegations')).toBeDefined();
+
+    const delegationsLink = screen.getByRole('link', { name: 'Delegations' });
+    await user.click(delegationsLink);
+
+    // Verify both headings are present
+    expect(document.getElementById('proposals-label')).toBeDefined();
+    expect(document.getElementById('delegations-label')).toBeDefined();
+
+    // Verify both tables exist
+    expect(screen.getByRole('table', { name: 'proposals table' })).toBeDefined();
+    expect(screen.getByRole('table', { name: 'delegations table' })).toBeDefined();
+
+    // ---- Verify Proposals table (should be sorted by expiration, earliest first) ----
+    const proposalRows = document.querySelectorAll('.proposal-row');
+    expect(proposalRows.length).toBe(mockMintingDelegationProposals.length);
+
+    // Verify proposal beneficiary values are in sorted order (by expiration date)
+    const proposalBeneficiaries = document.querySelectorAll('.proposal-beneficiary');
+    expect(proposalBeneficiaries.length).toBe(mockMintingDelegationProposalsSorted.length);
+    mockMintingDelegationProposalsSorted.forEach((proposal, index) => {
+      expect(proposalBeneficiaries[index].textContent).toBe(
+        shortenPartyId(proposal.delegation.beneficiary)
+      );
+    });
+
+    // Verify warning icons are shown for proposals where beneficiary is not hosted
+    const proposalWarnings = document.querySelectorAll('.proposal-not-hosted-warning');
+    const expectedProposalWarnings = mockProposalHostedStatusSorted.filter(s => !s).length;
+    expect(proposalWarnings.length).toBe(expectedProposalWarnings);
+
+    // Verify proposal max amulets values are in sorted order
+    const proposalMaxAmulets = document.querySelectorAll('.proposal-max-amulets');
+    expect(proposalMaxAmulets.length).toBe(mockMintingDelegationProposalsSorted.length);
+    mockMintingDelegationProposalsSorted.forEach((proposal, index) => {
+      expect(proposalMaxAmulets[index].textContent).toBe(proposal.delegation.amuletMergeLimit);
+    });
+
+    // Verify proposal expiration values (formatted by DateDisplay)
+    const proposalExpirations = document.querySelectorAll('.proposal-expiration');
+    expect(proposalExpirations.length).toBe(mockMintingDelegationProposalsSorted.length);
+    proposalExpirations.forEach(expiration => {
+      // DateDisplay formats the date, so just check it contains the year
+      expect(expiration.textContent).toContain('2050');
+    });
+
+    // Verify Accept buttons are present for each proposal
+    // Accept button should be disabled when beneficiary is not hosted (in sorted order)
+    const acceptButtons = document.querySelectorAll('.proposal-accept');
+    expect(acceptButtons.length).toBe(mockMintingDelegationProposals.length);
+    mockProposalHostedStatusSorted.forEach((isHosted, index) => {
+      expect(acceptButtons[index].textContent).toBe('Accept');
+      if (isHosted) {
+        expect(acceptButtons[index]).not.toBeDisabled();
+      } else {
+        expect(acceptButtons[index]).toBeDisabled();
+      }
+    });
+
+    expect(acceptButtons.length).toBe(mockMintingDelegationProposalsSorted.length);
+    acceptButtons.forEach(button => {
+      expect(button.textContent).toBe('Accept');
+    });
+
+    // ---- Verify Delegations table (should be sorted by expiration, earliest first) ----
+    const delegationRows = document.querySelectorAll('.delegation-row');
+    expect(delegationRows.length).toBe(mockMintingDelegations.length);
+
+    // Verify beneficiary values are in sorted order (by expiration date)
+    const beneficiaries = document.querySelectorAll('.delegation-beneficiary');
+    expect(beneficiaries.length).toBe(mockMintingDelegationsSorted.length);
+    mockMintingDelegationsSorted.forEach((delegation, index) => {
+      expect(beneficiaries[index].textContent).toBe(shortenPartyId(delegation.beneficiary));
+    });
+
+    // Verify warning icons are shown for delegations where beneficiary is not hosted
+    const delegationWarnings = document.querySelectorAll('.delegation-not-hosted-warning');
+    const expectedDelegationWarnings = mockDelegationHostedStatusSorted.filter(s => !s).length;
+    expect(delegationWarnings.length).toBe(expectedDelegationWarnings);
+
+    // Verify max amulets values are in sorted order
+    const maxAmulets = document.querySelectorAll('.delegation-max-amulets');
+    expect(maxAmulets.length).toBe(mockMintingDelegationsSorted.length);
+    mockMintingDelegationsSorted.forEach((delegation, index) => {
+      expect(maxAmulets[index].textContent).toBe(delegation.amuletMergeLimit);
+    });
+
+    // Verify expiration values are displayed (formatted by DateDisplay)
+    const expirations = document.querySelectorAll('.delegation-expiration');
+    expect(expirations.length).toBe(mockMintingDelegationsSorted.length);
+    expirations.forEach(expiration => {
+      // DateDisplay formats the date, so just check it contains the year
+      expect(expiration.textContent).toContain('2050');
+    });
+
+    // Verify withdraw buttons are present for each delegation
+    const withdrawButtons = document.querySelectorAll('.delegation-withdraw');
+    expect(withdrawButtons.length).toBe(mockMintingDelegationsSorted.length);
+    withdrawButtons.forEach(button => {
+      expect(button.textContent).toBe('Withdraw');
+    });
+  });
+
+  test('navigate to delegations tab and see empty state when no proposals or delegations', async () => {
+    server.use(featureSupportHandler(true, true));
+    // Override endpoints to return empty lists
+    server.use(
+      rest.get(`${walletUrl}/v0/wallet/minting-delegations`, (_, res, ctx) => {
+        return res(ctx.json({ delegations: [] }));
+      }),
+      rest.get(`${walletUrl}/v0/wallet/minting-delegation-proposals`, (_, res, ctx) => {
+        return res(ctx.json({ proposals: [] }));
+      })
+    );
+
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+
+    expect(await screen.findByText('Delegations')).toBeDefined();
+
+    const delegationsLink = screen.getByRole('link', { name: 'Delegations' });
+    await user.click(delegationsLink);
+
+    // Verify both headings are present
+    expect(document.getElementById('proposals-label')).toBeDefined();
+    expect(document.getElementById('delegations-label')).toBeDefined();
+
+    // Verify the empty state messages are displayed
+    expect(await screen.findByText('No proposals')).toBeDefined();
+    expect(await screen.findByText('None active')).toBeDefined();
+
+    // Verify the tables are NOT rendered
+    expect(screen.queryByRole('table', { name: 'proposals table' })).toBeNull();
+    expect(screen.queryByRole('table', { name: 'delegations table' })).toBeNull();
+  });
+
+  test('can withdraw a minting delegation', async () => {
+    server.use(featureSupportHandler(true, true));
+
+    // Track the withdraw API call
+    const calledWithdrawArgs: string[] = [];
+    server.use(
+      rest.post(`${walletUrl}/v0/wallet/minting-delegations/:cid/reject`, (req, res, ctx) => {
+        calledWithdrawArgs.push(req.params.cid.toString());
+        return res(ctx.status(200));
+      })
+    );
+
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+
+    // Navigate to delegations tab
+    const delegationsLink = await screen.findByRole('link', { name: 'Delegations' });
+    await user.click(delegationsLink);
+
+    // Find and click the first Withdraw button
+    const withdrawButtons = await screen.findAllByRole('button', { name: 'Withdraw' });
+    expect(withdrawButtons.length).toBe(mockMintingDelegations.length);
+
+    await user.click(withdrawButtons[0]);
+
+    // Confirm the withdrawal in the confirmation dialog
+    const proceedButton = await screen.findByRole('button', { name: 'Proceed' });
+    await user.click(proceedButton);
+
+    // Assert the withdraw API was called once
+    expect(calledWithdrawArgs).toHaveLength(1);
+  });
+
+  test("can 'accept' a minting delegation proposal", async () => {
+    server.use(featureSupportHandler(true, true));
+
+    const calledArgs: string[] = [];
+    server.use(
+      rest.post(
+        `${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/accept`,
+        (req, res, ctx) => {
+          calledArgs.push(req.params.cid.toString());
+          return res(ctx.status(200));
+        }
+      )
+    );
+
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+
+    const delegationsLink = await screen.findByRole('link', { name: 'Delegations' });
+    await user.click(delegationsLink);
+
+    const buttons = await screen.findAllByRole('button', { name: 'Accept' });
+    expect(buttons.length).toBe(mockMintingDelegationProposals.length);
+
+    await user.click(buttons[0]);
+
+    // Confirm the acceptance in the confirmation dialog
+    const proceedButton = await screen.findByRole('button', { name: 'Proceed' });
+    await user.click(proceedButton);
+
+    expect(calledArgs).toHaveLength(1);
+  });
+
+  test("can 'reject' a minting delegation proposal", async () => {
+    server.use(featureSupportHandler(true, true));
+
+    const calledArgs: string[] = [];
+    server.use(
+      rest.post(
+        `${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/reject`,
+        (req, res, ctx) => {
+          calledArgs.push(req.params.cid.toString());
+          return res(ctx.status(200));
+        }
+      )
+    );
+
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+
+    const delegationsLink = await screen.findByRole('link', { name: 'Delegations' });
+    await user.click(delegationsLink);
+
+    const buttons = await screen.findAllByRole('button', { name: 'Reject' });
+    expect(buttons.length).toBe(mockMintingDelegationProposals.length);
+
+    await user.click(buttons[0]);
+
+    // Confirm the rejection in the confirmation dialog
+    const proceedButton = await screen.findByRole('button', { name: 'Proceed' });
+    await user.click(proceedButton);
+
+    expect(calledArgs).toHaveLength(1);
+  });
+
+  test('shows replacement dialog when accepting proposal for beneficiary with existing delegation', async () => {
+    server.use(featureSupportHandler(true, true));
+
+    const calledAcceptArgs: string[] = [];
+    server.use(
+      rest.post(
+        `${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/accept`,
+        (req, res, ctx) => {
+          calledAcceptArgs.push(req.params.cid.toString());
+          return res(ctx.status(200));
+        }
+      )
+    );
+
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+
+    const delegationsLink = await screen.findByRole('link', { name: 'Delegations' });
+    await user.click(delegationsLink);
+
+    // Wait for proposals to load - eve's proposal is first (sorted by expiration, current date first)
+    // Eve has both a delegation (amuletMergeLimit=15) and a proposal (amuletMergeLimit=25)
+    const acceptButtons = await screen.findAllByRole('button', { name: 'Accept' });
+    expect(acceptButtons.length).toBe(mockMintingDelegationProposals.length);
+
+    // Click Accept on eve's proposal (first one after sorting)
+    await user.click(acceptButtons[0]);
+
+    // Verify replacement dialog title appears
+    const dialogTitle = await screen.findByText('Replace Minting Delegation');
+    expect(dialogTitle).toBeInTheDocument();
+
+    // Verify comparison values are shown
+    // Eve's existing delegation: amuletMergeLimit=15
+    // Eve's proposal: amuletMergeLimit=25
+    const existingMaxAmulets = document.querySelector('.existing-max-amulets');
+    const newMaxAmulets = document.querySelector('.new-max-amulets');
+    expect(existingMaxAmulets?.textContent).toBe('15');
+    expect(newMaxAmulets?.textContent).toBe('25');
+
+    // Click proceed
+    const proceedButton = await screen.findByRole('button', { name: 'Proceed' });
+    await user.click(proceedButton);
+
+    // Verify accept was called (backend handles replacement automatically)
+    expect(calledAcceptArgs).toHaveLength(1);
   });
 
   test('transfer preapproval (without token standard) does not show nor send description if not supported', async () => {

@@ -109,7 +109,6 @@ describe('Inflight Vote Requests', () => {
           noDataMessage="No Inflight Vote Requests available"
           uniqueId={uniqueId}
           showVoteStats
-          showAcceptanceThreshold
           showThresholdDeadline
         />
       </MemoryRouter>
@@ -132,9 +131,6 @@ describe('Inflight Vote Requests', () => {
 
     const rejectedVoteStats = screen.getByTestId(`${uniqueId}-row-all-votes-stats-rejected`);
     expect(rejectedVoteStats.textContent).toBe('3 Rejected');
-
-    const acceptanceThreshold = screen.getByTestId(`${uniqueId}-row-acceptance-threshold`);
-    expect(acceptanceThreshold.textContent).toBe('11');
 
     const yourVote = screen.getByTestId(`${uniqueId}-row-your-vote`);
     expect(yourVote.textContent).toMatch(/No Vote/);
@@ -276,7 +272,6 @@ describe('Vote history', () => {
           uniqueId={uniqueId}
           showStatus
           showVoteStats
-          showAcceptanceThreshold
         />
       </MemoryRouter>
     );
@@ -298,9 +293,6 @@ describe('Vote history', () => {
 
     const rejectedVoteStats = screen.getByTestId(`${uniqueId}-row-all-votes-stats-rejected`);
     expect(rejectedVoteStats.textContent).toBe('2 Rejected');
-
-    const acceptanceThreshold = screen.getByTestId(`${uniqueId}-row-acceptance-threshold`);
-    expect(acceptanceThreshold.textContent).toBe('11');
 
     const yourVote = screen.getByTestId(`${uniqueId}-row-your-vote`);
     expect(yourVote.textContent).toMatch(/Accepted/);

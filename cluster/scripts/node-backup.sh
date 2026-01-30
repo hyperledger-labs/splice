@@ -11,7 +11,6 @@ source "${TOOLS_LIB}/libcli.source"
 source "${SPLICE_ROOT}/cluster/scripts/utils.source"
 
 RUN_ID=$(date +%s)
-WAIT_FOR_BACKUP_RETRIES=450
 
 ##### PVC Backup & Restore
 
@@ -55,8 +54,10 @@ function wait_for_pvc_backup() {
       _info "Backup of $description PVC ready!"
       break
     else
-      (( i++ )) && (( i > WAIT_FOR_BACKUP_RETRIES )) && {
-        # kubectl delete volumesnapshot -n "$namespace" "$backupName";
+      (( i++ )) && (( i > 300 )) && {
+        # remove the finalizers to allow fully deleting them
+        kubectl patch -n "$namespace" volumesnapshot "$pvc_name" -p '{"metadata":{"finalizers": []}}' --type=merge
+        kubectl delete volumesnapshot -n "$namespace" "$backupName";
         _error "Timed out waiting for backup of $description PVC";
       }
       sleep 5
@@ -152,10 +153,7 @@ function wait_for_cloudsql_backup() {
       _info "Backup of $description ready! Backup ID: $id "
       break
     else
-      (( i++ ))&& (( i > WAIT_FOR_BACKUP_RETRIES )) && {
-        # gcloud sql backups delete "$id" --instance "$db_id" --quiet;
-        _error "Timed out waiting for backup of $description db";
-      }
+      (( i++ ))&& (( i > 300 )) &&_error "Timed out waiting for backup of $description db"
       sleep 5
       _info "still waiting..."
     fi

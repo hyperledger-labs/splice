@@ -650,6 +650,14 @@ trait SvDsoStore
       splice.amulet.UnclaimedActivityRecord.COMPANION
     )
 
+  def listExpiredDevelopmentFundCoupons: ListExpiredContracts[
+    splice.amulet.DevelopmentFundCoupon.ContractId,
+    splice.amulet.DevelopmentFundCoupon,
+  ] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(
+      splice.amulet.DevelopmentFundCoupon.COMPANION
+    )
+
   def listSvOnboardingConfirmed(
       limit: Limit = Limit.DefaultLimit
   )(implicit tc: TraceContext): Future[
@@ -1008,6 +1016,7 @@ object SvDsoStore {
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       ingestionConfig: IngestionConfig,
+      acsStoreDescriptorUserVersion: Option[Long] = None,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -1021,6 +1030,7 @@ object SvDsoStore {
       domainMigrationInfo,
       participantId,
       ingestionConfig,
+      acsStoreDescriptorUserVersion,
     )
   }
 
@@ -1364,6 +1374,13 @@ object SvDsoStore {
         DsoAcsStoreRowData(
           contract
         )
+      },
+      mkFilter(splice.amulet.DevelopmentFundCoupon.COMPANION)(co => co.payload.dso == dso) {
+        contract =>
+          DsoAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          )
       },
     )
 

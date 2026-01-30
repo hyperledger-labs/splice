@@ -1,0 +1,49 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+suite: "scan values"
+templates:
+  - scan.yaml
+release:
+  # Set for testing labels
+  name: scan
+chart:
+  # Override for testing labels
+  version: 0.1.1
+  appVersion: 0.1.0
+tests:
+  - it: "sets the scan tx log and acs store versions"
+    set:
+      # Things we need just to pass the schema
+      spliceInstanceNames:
+        networkName: MockNet
+        networkFaviconUrl: https://mock.net/favicon.ico
+        amuletName: Mocklet
+        amuletNameAcronym: MCK
+        nameServiceName: Mock Name Service
+        nameServiceNameAcronym: MNS
+      sequencerAddress: "sequencer-address"
+      mediatorAddress: "mediator-address"
+      participantAddress: "mock-address"
+      persistence:
+        host: mock-pg-host
+        schema: scan
+        # set for this test
+        acsStoreDescriptorUserVersion: 2
+        txLogStoreDescriptorUserVersion: 3
+      auth:
+        jwksUrl: "https://mock.com/.well-known/jwks.json"
+        targetAudience: "mock_audience"
+      maxDarVersion: 1.0.0
+    documentIndex: 0
+    asserts:
+      # Sanity check
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: scan-app
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='ADDITIONAL_CONFIG_ACS_STORE_DESCRIPTOR_USER_VERSION')].value
+          pattern: 'canton\.scan-apps\.scan-app\.acs-store-descriptor-user-version = 2'
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name=='ADDITIONAL_CONFIG_TX_LOG_STORE_DESCRIPTOR_USER_VERSION')].value
+          pattern: 'canton\.scan-apps\.scan-app\.tx-log-store-descriptor-user-version = 3'

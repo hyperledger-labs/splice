@@ -1351,4 +1351,210 @@ object HttpWalletAppClient {
     }
   }
 
+  final case class AllocateDevelopmentFundCoupon(
+      beneficiary: PartyId,
+      amount: BigDecimal,
+      expiresAt: CantonTimestamp,
+      reason: String,
+  ) extends InternalBaseCommand[
+        http.AllocateDevelopmentFundCouponResponse,
+        definitions.AllocateDevelopmentFundCouponResponse,
+      ] {
+    override def submitRequest(
+        client: WalletClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.AllocateDevelopmentFundCouponResponse] = client.allocateDevelopmentFundCoupon(
+      body = definitions.AllocateDevelopmentFundCouponRequest(
+        Codec.encode(beneficiary),
+        Codec.encode(amount),
+        Codec.encode(expiresAt),
+        reason,
+      ),
+      headers = headers,
+    )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[http.AllocateDevelopmentFundCouponResponse, Either[
+      String,
+      definitions.AllocateDevelopmentFundCouponResponse,
+    ]] = { case http.AllocateDevelopmentFundCouponResponse.OK(value) =>
+      Right(value)
+    }
+  }
+
+  case object ListActiveDevelopmentFundCoupons
+      extends InternalBaseCommand[
+        http.ListActiveDevelopmentFundCouponsResponse,
+        Seq[
+          Contract[
+            amuletCodegen.DevelopmentFundCoupon.ContractId,
+            amuletCodegen.DevelopmentFundCoupon,
+          ]
+        ],
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListActiveDevelopmentFundCouponsResponse] =
+      client.listActiveDevelopmentFundCoupons(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListActiveDevelopmentFundCouponsResponse.OK(response) =>
+      response.activeDevelopmentFundCoupons
+        .traverse(req => Contract.fromHttp(amuletCodegen.DevelopmentFundCoupon.COMPANION)(req))
+        .leftMap(_.toString)
+    }
+  }
+
+  final case class WithdrawDevelopmentFundCoupon(
+      developmentFundCouponContractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
+      reason: String,
+  ) extends InternalBaseCommand[
+        http.WithdrawDevelopmentFundCouponResponse,
+        definitions.WithdrawDevelopmentFundCouponResponse,
+      ] {
+    override def submitRequest(
+        client: WalletClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.WithdrawDevelopmentFundCouponResponse] = client.withdrawDevelopmentFundCoupon(
+      developmentFundCouponContractId.contractId,
+      body = definitions.WithdrawDevelopmentFundCouponRequest(reason),
+      headers = headers,
+    )
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[http.WithdrawDevelopmentFundCouponResponse, Either[
+      String,
+      definitions.WithdrawDevelopmentFundCouponResponse,
+    ]] = { case http.WithdrawDevelopmentFundCouponResponse.OK(value) =>
+      Right(value)
+    }
+  }
+
+  case class ListMintingDelegationProposals(
+      after: Option[Long] = None,
+      limit: Option[Int] = None,
+  ) extends InternalBaseCommand[
+        http.ListMintingDelegationProposalsResponse,
+        definitions.ListMintingDelegationProposalsResponse,
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[
+      Future,
+      Either[Throwable, HttpResponse],
+      http.ListMintingDelegationProposalsResponse,
+    ] =
+      client.listMintingDelegationProposals(after, limit, headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListMintingDelegationProposalsResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
+  case class AcceptMintingDelegationProposal(contractId: String)
+      extends InternalBaseCommand[
+        http.AcceptMintingDelegationProposalResponse,
+        String,
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[
+      Future,
+      Either[Throwable, HttpResponse],
+      http.AcceptMintingDelegationProposalResponse,
+    ] =
+      client.acceptMintingDelegationProposal(contractId, headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.AcceptMintingDelegationProposalResponse.OK(response) =>
+      Right(response.contractId)
+    }
+  }
+
+  case class RejectMintingDelegationProposal(contractId: String)
+      extends InternalBaseCommand[
+        http.RejectMintingDelegationProposalResponse,
+        Unit,
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[
+      Future,
+      Either[Throwable, HttpResponse],
+      http.RejectMintingDelegationProposalResponse,
+    ] =
+      client.rejectMintingDelegationProposal(contractId, headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.RejectMintingDelegationProposalResponse.OK =>
+      Right(())
+    }
+  }
+
+  case class ListMintingDelegations(
+      after: Option[Long] = None,
+      limit: Option[Int] = None,
+  ) extends InternalBaseCommand[
+        http.ListMintingDelegationsResponse,
+        definitions.ListMintingDelegationsResponse,
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[
+      Future,
+      Either[Throwable, HttpResponse],
+      http.ListMintingDelegationsResponse,
+    ] =
+      client.listMintingDelegations(after, limit, headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListMintingDelegationsResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
+  case class RejectMintingDelegation(contractId: String)
+      extends InternalBaseCommand[
+        http.RejectMintingDelegationResponse,
+        Unit,
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[
+      Future,
+      Either[Throwable, HttpResponse],
+      http.RejectMintingDelegationResponse,
+    ] =
+      client.rejectMintingDelegation(contractId, headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.RejectMintingDelegationResponse.OK =>
+      Right(())
+    }
+  }
+
 }

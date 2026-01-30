@@ -37,7 +37,7 @@ interface BaseAnsFieldProps extends AnsFieldProps {
   userInput: UserInput;
   updateUserInput: (userInput: UserInput) => void;
   ansEntries: UseQueryResult<AnsEntry[]>;
-  ansEntry: UseQueryResult<AnsEntry>;
+  ansEntry: UseQueryResult<AnsEntry | null>;
 }
 
 export const BaseAnsField: React.FC<BaseAnsFieldProps> = propas => {

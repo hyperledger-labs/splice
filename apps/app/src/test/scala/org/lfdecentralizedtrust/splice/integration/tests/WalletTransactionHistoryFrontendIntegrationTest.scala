@@ -181,32 +181,14 @@ class WalletTransactionHistoryFrontendIntegrationTest
             )
         }
 
-        txs.map(row => {
-          val updateId = readTransactionFromRow(row).updateId
-          updateId should not be empty
-          updateId
-        })
-      }
-
-      withFrontEnd("scan") { implicit webDriver =>
-        actAndCheck(
-          "Go to Scan",
-          go to s"http://localhost:${scanUIPort}",
-        )(
-          "All transactions appear also in scan UI, with the same update ID",
-          _ => {
-            updateIds.foreach(updateId => {
-              val scanActivities = findAll(className("activity-row")).toSeq
-              // Activities do not map 1:1 to updates, a single update may be broken into more than one
-              // activity in Scan, so we check for "at least 1" instead of "exactly 1"
-              forAtLeast(1, scanActivities) { activity =>
-                activity.findChildElement(className("update-id")).map(seleniumText) should be(
-                  Some(updateId)
-                )
-              }
-            })
-          },
-        )
+        txs
+          .map(row => {
+            val updateId = readTransactionFromRow(row).updateId
+            updateId should not be empty
+            updateId
+          })
+          // remove the balance change tx for scan comparison
+          .init
       }
 
       clue("update IDs from the UI can be used for querying scan") {

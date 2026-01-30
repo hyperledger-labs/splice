@@ -1090,6 +1090,7 @@ lazy val `apps-scan` =
         scalapb_runtime,
         zstd,
         aws_s3,
+        s3mock_testcontainers,
       ),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
@@ -1428,7 +1429,7 @@ lazy val `apps-splitwell-frontend` = {
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "splitwell-frontend",
+      frontendWorkspace := "@lfdecentralizedtrust/splice-splitwell-frontend",
       sharedFrontendSettings,
     )
 }
@@ -1966,8 +1967,7 @@ lazy val `apps-app`: Project =
         CantonDependencies.opentelemetry_zipkin,
         CantonDependencies.opentelemetry_instrumentation_grpc,
         CantonDependencies.opentelemetry_instrumentation_runtime_metrics,
-      ) ++ Seq("netty-handler-proxy", "netty-codec-socks")
-        .map("io.netty" % _ % CantonDependencies.netty_version % "test"),
+      ),
       BuildCommon.sharedAppSettings,
       BuildCommon.cantonWarts,
       bundleTask,
