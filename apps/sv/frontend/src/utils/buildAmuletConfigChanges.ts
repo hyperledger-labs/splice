@@ -171,14 +171,12 @@ function buildTransferFeeStepsChanges(
             label: `Transfer Fee Step ${idx}`,
             currentValue: b._1,
             newValue: a?._1,
-            disabled: idx <= 3,
           },
           {
             fieldName: `transferFeeSteps${idx}_2`,
             label: `Transfer Fee Step ${idx}`,
             currentValue: b._2,
             newValue: a?._2,
-            disabled: idx <= 3,
           },
         ] as ConfigChange[];
       })
