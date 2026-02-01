@@ -1389,12 +1389,15 @@ class SvFrontendIntegrationTest
     }
 
     "NEW UI: Grant and Revoke Featured App Right" in { implicit env =>
+      // Use a real party ID that exists on the network so the async validator passes
+      val providerPartyId = sv1Backend.getDsoInfo().svParty.toProtoPrimitive
+
       // First, create a Grant proposal and capture the contract ID
       val grantProposalContractId = assertCreateProposal(
         "SRARC_GrantFeaturedAppRight",
         "grant-featured-app",
       ) { implicit webDriver =>
-        fillOutTextField("grant-featured-app-idValue", "test-provider-party-id")
+        fillOutTextField("grant-featured-app-idValue", providerPartyId)
       }
 
       // Now create a Revoke proposal using the Grant proposal's contract ID

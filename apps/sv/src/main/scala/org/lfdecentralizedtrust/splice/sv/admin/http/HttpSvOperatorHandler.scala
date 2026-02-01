@@ -14,8 +14,11 @@ import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ErrorUtil
+import io.grpc.Status
+import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice as spliceCodegen
@@ -405,6 +408,38 @@ class HttpSvOperatorHandler(
       withMediatorConnectionOrNotFound(respond.NotFound)(
         _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
       )
+    }
+  }
+
+  override def getPartyToParticipant(
+      respond: r0.GetPartyToParticipantResponse.type
+  )(partyId: String)(
+      extracted: ActAsKnownUserRequest
+  ): Future[r0.GetPartyToParticipantResponse] = {
+    implicit val ActAsKnownUserRequest(traceContext) = extracted
+    withSpan(s"$workflowId.getPartyToParticipant") { _ => _ =>
+      withSequencerConnectionOrNotFound(respond.NotFound) { sequencerConnection =>
+        for {
+          dsoRules <- dsoStore.getDsoRules()
+          partyToParticipant <- sequencerConnection
+            .getPartyToParticipant(
+              dsoRules.domain,
+              PartyId.tryFromProtoPrimitive(partyId),
+            )
+        } yield {
+          val participantId = partyToParticipant.mapping.participants.headOption
+            .map(_.participantId.toProtoPrimitive)
+            .getOrElse("")
+          r0.GetPartyToParticipantResponse.OK(
+            definitions.GetPartyToParticipantResponse(participantId)
+          )
+        }
+      }.recoverWith {
+        case e: StatusRuntimeException if e.getStatus.getCode == Status.NOT_FOUND.getCode =>
+          Future.successful(
+            respond.NotFound(definitions.ErrorResponse(s"Party not found: $partyId"))
+          )
+      }
     }
   }
 

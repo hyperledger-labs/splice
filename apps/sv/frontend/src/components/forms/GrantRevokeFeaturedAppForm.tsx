@@ -17,6 +17,7 @@ import {
   validateExpiration,
   validateExpiryEffectiveDate,
   validateGrantRevokeFeaturedAppRight,
+  validatePartyId,
   validateSummary,
   validateUrl,
 } from './formValidators';
@@ -26,6 +27,7 @@ import { useState } from 'react';
 import { ProposalSummary } from '../governance/ProposalSummary';
 import { ProposalSubmissionError } from '../form-components/ProposalSubmissionError';
 import { useProposalMutation } from '../../hooks/useProposalMutation';
+import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 
 type ProviderId = string;
 type FeaturedAppRightId = string;
@@ -47,6 +49,7 @@ export type GrantRevokeFeaturedAppActions = Extract<
 
 export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProps> = props => {
   const { selectedAction } = props;
+  const svAdminClient = useSvAdminClient();
   const dsoInfosQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
@@ -214,12 +217,34 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
             <form.AppField
               name="idValue"
               validators={{
-                onBlur: ({ value }) => validateGrantRevokeFeaturedAppRight(value),
-                onChange: ({ value }) => validateGrantRevokeFeaturedAppRight(value),
+                onBlur: ({ value }) =>
+                  formAction === 'SRARC_GrantFeaturedAppRight'
+                    ? validatePartyId(value)
+                    : validateGrantRevokeFeaturedAppRight(value),
+                onChange: ({ value }) =>
+                  formAction === 'SRARC_GrantFeaturedAppRight'
+                    ? validatePartyId(value)
+                    : validateGrantRevokeFeaturedAppRight(value),
+                onSubmitAsync:
+                  formAction === 'SRARC_GrantFeaturedAppRight'
+                    ? async ({ value }) => {
+                        if (!value) return undefined;
+                        try {
+                          await svAdminClient.getPartyToParticipant(value);
+                          return undefined;
+                        } catch {
+                          return 'Provider party not found on ledger';
+                        }
+                      }
+                    : undefined,
               }}
             >
               {field => (
-                <field.TextField title={idValueFieldTitle} id={`${testIdPrefix}-idValue`} />
+                <field.TextField
+                  title={idValueFieldTitle}
+                  id={`${testIdPrefix}-idValue`}
+                  subtitle={field.state.meta.isValidating ? 'Validating provider...' : undefined}
+                />
               )}
             </form.AppField>
           </>
