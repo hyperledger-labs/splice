@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{amulet, amuletrules,
 import org.lfdecentralizedtrust.splice.util.Contract
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
@@ -21,6 +22,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 import FeaturedAppActivityMarkerTrigger.Task
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
@@ -160,6 +162,14 @@ class FeaturedAppActivityMarkerTrigger(
       amuletRules <- store.getAmuletRules()
       now = context.clock.now
       openMiningRound <- store.getLatestUsableOpenMiningRound(now)
+      informees = (dsoRules.payload.dso +: task.markers.flatMap(m =>
+        Seq(m.payload.provider, m.payload.beneficiary)
+      )).toSet
+      convertFeaturedAppActivityMarkerObservers <- svTaskContext.packageVersionSupport
+        .supportsConvertFeaturedAppActivityMarkerObservers(
+          informees.map(PartyId.tryFromProtoPrimitive(_)).toSeq,
+          context.clock.now,
+        )
       // Note that we don't group by provider or beneficiary. There is no strong need to do so
       // as we want to
       update = dsoRules.exercise(
@@ -168,6 +178,11 @@ class FeaturedAppActivityMarkerTrigger(
           new amuletrules.AmuletRules_ConvertFeaturedAppActivityMarkers(
             task.markers.map(_.contractId).asJava,
             openMiningRound.contractId,
+            Option
+              .when(
+                svConfig.convertFeaturedAppActivityMarkerObservers && convertFeaturedAppActivityMarkerObservers.supported
+              )(informees.toSeq.asJava)
+              .toJava,
           ),
           Optional.of(controller),
         )
