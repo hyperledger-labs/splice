@@ -4,7 +4,6 @@ import * as postgres from '@lfdecentralizedtrust/splice-pulumi-common/src/postgr
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import {
-  activeVersion,
   ansDomainPrefix,
   appsAffinityAndTolerations,
   BackupConfig,
@@ -220,7 +219,7 @@ export async function installSvNode(
         xns,
         'postgres',
         'postgres',
-        activeVersion,
+        config.version,
         spliceConfig.pulumiProjectConfig.cloudSql,
         false,
         {
@@ -234,7 +233,7 @@ export async function installSvNode(
       xns,
       `cn-apps-pg`,
       `cn-apps-pg`,
-      activeVersion,
+      config.version,
       spliceConfig.pulumiProjectConfig.cloudSql,
       true,
       {
@@ -282,7 +281,8 @@ export async function installSvNode(
     'cluster-ingress/cn-http-gateway',
     decentralizedSynchronizerUpgradeConfig,
     `http://scan-app.${config.nodeName}:5012`,
-    scan
+    scan,
+    config.version
   );
 
   if (baseConfig.scanBigQuery && appsPostgres instanceof postgres.CloudPostgres) {
@@ -327,7 +327,7 @@ export async function installSvNode(
         },
       },
     },
-    activeVersion,
+    config.version,
     { dependsOn: [xns.ns] }
   );
 
@@ -397,6 +397,7 @@ async function installValidator(
     logAsync: svConfig.logging?.appsAsync,
     additionalJvmOptions: svConfig.validatorApp?.additionalJvmOptions || '',
     resources: svConfig.validatorApp?.resources,
+    version: svConfig.version,
   });
 }
 
@@ -510,7 +511,7 @@ function installSvApp(
     'sv-app',
     'splice-sv-node',
     svValues,
-    activeVersion,
+    config.version,
     {
       dependsOn: dependsOn
         .concat([postgres])
@@ -574,7 +575,7 @@ function installScan(
     installRateLimits(xns.logicalName, 'scan-app', 5012, svsConfig.scan.externalRateLimits);
   }
 
-  return installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {
+  return installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, config.version, {
     // TODO(#893) if possible, don't require parallel start of sv app and scan when using CantonBft
     dependsOn: dependsOn
       .concat(decentralizedSynchronizerNode.dependencies)
