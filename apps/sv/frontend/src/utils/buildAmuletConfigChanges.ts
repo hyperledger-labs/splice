@@ -30,7 +30,8 @@ export function buildAmuletConfigChanges(
     },
     {
       fieldName: 'featuredAppActivityMarkerAmount',
-      label: 'Amount of the AppRewardCoupon Contract that a FeaturedAppActivityMarker is Converted To',
+      label:
+        'Amount of the AppRewardCoupon Contract that a FeaturedAppActivityMarker is Converted To',
       currentValue: before?.featuredAppActivityMarkerAmount || '',
       newValue: after?.featuredAppActivityMarkerAmount || '',
     },
