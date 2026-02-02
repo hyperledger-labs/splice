@@ -1,4 +1,7 @@
 -- Incremental ACS snapshot for ingestion
+-- This table stores all contracts from the ACS at a given record time.
+-- It is updated incrementally by moving the record time forward, and once the record time
+-- reaches a target record time, the data is copied to the main `acs_snapshot_data` table.
 create table acs_incremental_snapshot_data_next
 (
     -- In production, we have a separate table for each scan instance so this
@@ -12,8 +15,8 @@ create table acs_incremental_snapshot_data_next
     -- Contract data included to avoid joining with UpdateHistory tables
     -- during the expensive operation of saving incremental ACS snapshots.
     created_at   bigint      not null,
-    unlocked_amulet_balance  numeric not null,
-    locked_amulet_balance    numeric not null,
+    unlocked_amulet_balance  numeric not null, -- zero for non-amulet contracts
+    locked_amulet_balance    numeric not null, -- zero for non-amulet contracts
     template_id  text        not null,
     stakeholders text[]      not null
 );
@@ -27,22 +30,10 @@ alter table acs_incremental_snapshot_data_next
 create index acs_incremental_snapshot_data_next_ca_ci
     on acs_incremental_snapshot_data_next (history_id, created_at, contract_id);
 
--- Incremental ACS snapshot for backfilling
+-- Same as `acs_incremental_snapshot_data_next`, but used for backfilling ACS snapshots
 create table acs_incremental_snapshot_data_backfill
 (
-    -- In production, we have a separate table for each scan instance so this
-    -- column will be the same for all rows. However, in tests we can have multiple
-    -- scan instances writing to the same table, so we need to include it.
-    history_id   bigint      not null references update_history_descriptors (id),
-
-    create_id    bigint      not null,
-    contract_id  text        not null,
-
-    created_at   bigint      not null,
-    unlocked_amulet_balance  numeric not null,
-    locked_amulet_balance    numeric not null,
-    template_id  text        not null,
-    stakeholders text[]      not null
+    like acs_incremental_snapshot_data_next
 );
 
 alter table acs_incremental_snapshot_data_backfill
