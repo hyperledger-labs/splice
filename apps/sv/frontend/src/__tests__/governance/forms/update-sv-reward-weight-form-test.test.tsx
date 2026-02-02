@@ -119,7 +119,7 @@ describe('Update SV Reward Weight Form', () => {
 
     const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
     expect(weightInput).toBeInTheDocument();
-    await user.type(weightInput, '1000');
+    await user.type(weightInput, '1000_0000');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
@@ -231,8 +231,8 @@ describe('Update SV Reward Weight Form', () => {
       });
     };
 
-    await validateCurrentWeightFor('Digital-Asset-2', '10');
-    await validateCurrentWeightFor('Digital-Asset-Eng-2', '12345');
+    await validateCurrentWeightFor('Digital-Asset-2', '0_0010');
+    await validateCurrentWeightFor('Digital-Asset-Eng-2', '1_2345');
   });
 
   test('Weight is reset when sv changes', async () => {
@@ -249,8 +249,8 @@ describe('Update SV Reward Weight Form', () => {
     expect(weightInput.getAttribute('value')).toBe('');
 
     // set the weight before changing sv
-    await user.type(weightInput, '10999');
-    expect(weightInput.getAttribute('value')).toBe('10999');
+    await user.type(weightInput, '10999_0000');
+    expect(weightInput.getAttribute('value')).toBe('10999_0000');
 
     const memberDropdown = screen.getByTestId('update-sv-reward-weight-member-dropdown');
     expect(memberDropdown).toBeInTheDocument();
@@ -266,7 +266,7 @@ describe('Update SV Reward Weight Form', () => {
     expect(weightInput.getAttribute('value')).toBe('');
   });
 
-  test('Weight must be a valid number', async () => {
+  test('Weight must be in basis points notation', async () => {
     const user = userEvent.setup();
     render(
       <Wrapper>
@@ -274,12 +274,15 @@ describe('Update SV Reward Weight Form', () => {
       </Wrapper>
     );
 
+    const errorMessage =
+      'Weight must be expressed in basis points using fixed point notation, XX...X_XXXX';
+
     const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
     expect(weightInput).toBeInTheDocument();
     await user.type(weightInput, '123abc');
 
     await waitFor(() => {
-      expect(screen.getByText('Weight must be a valid number')).toBeInTheDocument();
+      expect(screen.getByText(errorMessage)).toBeInTheDocument();
     });
 
     await user.clear(weightInput);
@@ -287,7 +290,15 @@ describe('Update SV Reward Weight Form', () => {
     await user.click(screen.getByTestId('update-sv-reward-weight-action'));
 
     await waitFor(() => {
-      expect(screen.queryByText('Weight must be a valid number')).toBeNull();
+      expect(screen.getByText(errorMessage)).toBeInTheDocument();
+    });
+
+    await user.clear(weightInput);
+    await user.type(weightInput, '1001_0000');
+    await user.click(screen.getByTestId('update-sv-reward-weight-action'));
+
+    await waitFor(() => {
+      expect(screen.queryByText(errorMessage)).toBeNull();
     });
   });
 
@@ -331,7 +342,7 @@ describe('Update SV Reward Weight Form', () => {
 
     const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
     expect(weightInput).toBeInTheDocument();
-    await user.type(weightInput, '1000');
+    await user.type(weightInput, '1000_0000');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
@@ -380,7 +391,7 @@ describe('Update SV Reward Weight Form', () => {
 
     const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
     expect(weightInput.getAttribute('value')).toBe('');
-    await user.type(weightInput, '1000');
+    await user.type(weightInput, '1000_0000');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
@@ -390,8 +401,8 @@ describe('Update SV Reward Weight Form', () => {
     await user.click(submitButton); //review proposal
 
     await waitFor(() => {
-      expect(screen.getByTestId('config-change-current-value').textContent).toBe('12345');
-      expect(screen.getByTestId('config-change-new-value').textContent).toBe('1000');
+      expect(screen.getByTestId('config-change-current-value').textContent).toBe('1_2345');
+      expect(screen.getByTestId('config-change-new-value').textContent).toBe('1000_0000');
     });
   });
 
@@ -435,7 +446,7 @@ describe('Update SV Reward Weight Form', () => {
 
     const weightInput = screen.getByTestId('update-sv-reward-weight-weight');
     expect(weightInput).toBeInTheDocument();
-    await user.type(weightInput, '1000');
+    await user.type(weightInput, '1000_0000');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
