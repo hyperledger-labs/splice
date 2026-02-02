@@ -51,13 +51,13 @@ abstract class AcsSnapshotTriggerBase(
           targetRecordTime = nextAt,
         )
         .map(_ => TaskSuccess(s"Initialized incremental snapshot from $from"))
-    case AcsSnapshotTriggerBase.InitializeEmptyIncrementalSnapshotTask(
+    case AcsSnapshotTriggerBase.InitializeIncrementalSnapshotFromImportUpdatesTask(
           recordTime,
           migration,
           nextAt,
         ) =>
       store
-        .initializeEmptyIncrementalSnapshot(
+        .initializeIncrementalSnapshotFromImportUpdates(
           table = snapshotTable,
           recordTime = recordTime,
           targetRecordTime = nextAt,
@@ -102,7 +102,7 @@ abstract class AcsSnapshotTriggerBase(
       !currentSnapshot.contains(snapshot)
     case AcsSnapshotTriggerBase.SaveIncrementalSnapshotTask(snapshot, _) =>
       !currentSnapshot.contains(snapshot)
-    case AcsSnapshotTriggerBase.InitializeEmptyIncrementalSnapshotTask(_, _, _) =>
+    case AcsSnapshotTriggerBase.InitializeIncrementalSnapshotFromImportUpdatesTask(_, _, _) =>
       currentSnapshot.isDefined
     case AcsSnapshotTriggerBase.InitializeIncrementalSnapshotTask(_, _) =>
       currentSnapshot.isDefined
@@ -147,7 +147,8 @@ abstract class AcsSnapshotTriggerBase(
               )
             )
           case None =>
-            // No full snapshot exists either, start an empty incremental snapshot right before the
+            // No full snapshot exists either, initialize an incremental snapshot from
+            // import updates and set the snapshot time to right before the
             // first real (non-import) update of the current migration.
             firstUpdateRecordTimeForMigration(migrationId).map {
               case Some(firstUpdateRecordTime) =>
@@ -156,8 +157,11 @@ abstract class AcsSnapshotTriggerBase(
                   firstUpdateRecordTime,
                   storageConfig.dbAcsSnapshotPeriodHours,
                 )
+                // Note: since there is a non-import update, we know that we have finished
+                // ingesting import updates for this migration. It's safe to initialize
+                // the snapshot from import updates now.
                 Some(
-                  AcsSnapshotTriggerBase.InitializeEmptyIncrementalSnapshotTask(
+                  AcsSnapshotTriggerBase.InitializeIncrementalSnapshotFromImportUpdatesTask(
                     recordTime = emptySnapshotRecordTime,
                     migration = migrationId,
                     nextAt = nextSnapshotTime,
@@ -261,7 +265,7 @@ object AcsSnapshotTriggerBase {
         param("nextAt", _.nextAt),
       )
   }
-  case class InitializeEmptyIncrementalSnapshotTask(
+  case class InitializeIncrementalSnapshotFromImportUpdatesTask(
       recordTime: CantonTimestamp,
       migration: Long,
       nextAt: CantonTimestamp,
