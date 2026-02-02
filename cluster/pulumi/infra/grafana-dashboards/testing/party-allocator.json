@@ -339,7 +339,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Party Allocator",
   "uid": "4af7d0da-0ee5-4a13-858f-67725fdff28b",
   "version": 1

@@ -679,7 +679,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Global Synchronizer Utilization",
   "uid": "fe8wt04z620aof",
   "version": 3

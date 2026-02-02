@@ -75,13 +75,16 @@ export function installCantonComponents(
   if (!migrationInfo) {
     throw new Error(`Migration ${migrationId} not found in migration config`);
   }
+  const version = isActiveMigration
+    ? (svConfig.versionOverride ?? migrationInfo.version)
+    : migrationInfo.version;
   const participantPg =
     dbs?.participant ||
     installPostgres(
       xns,
       `participant-${migrationId}-pg`,
       `participant-pg`,
-      migrationInfo.version,
+      version,
       svConfig.participant?.cloudSql || spliceConfig.pulumiProjectConfig.cloudSql,
       true,
       { isActive: migrationStillRunning, migrationId, disableProtection }
@@ -92,7 +95,7 @@ export function installCantonComponents(
       xns,
       `mediator-${migrationId}-pg`,
       `mediator-pg`,
-      migrationInfo.version,
+      version,
       svConfig.mediator?.cloudSql || spliceConfig.pulumiProjectConfig.cloudSql,
       true,
       {
@@ -107,7 +110,7 @@ export function installCantonComponents(
       xns,
       `sequencer-${migrationId}-pg`,
       `sequencer-pg`,
-      migrationInfo.version,
+      version,
       svConfig.sequencer?.cloudSql || spliceConfig.pulumiProjectConfig.cloudSql,
       true,
       { isActive: migrationStillRunning, migrationId, disableProtection }
@@ -119,7 +122,7 @@ export function installCantonComponents(
       migrationId,
       auth0Config,
       participantPg,
-      migrationInfo.version,
+      version,
       ledgerApiUserSecretSource,
       imagePullServiceAccountName,
       withAddedDependencies(opts, ledgerApiUserSecret ? [ledgerApiUserSecret] : [])
@@ -135,7 +138,7 @@ export function installCantonComponents(
             mediatorPostgres: mediatorPostgres,
             setCoreDbNames: svConfig.isCoreSv,
           },
-          migrationInfo.version,
+          version,
           imagePullServiceAccountName,
           opts
         )
@@ -152,7 +155,7 @@ export function installCantonComponents(
           isActiveMigration,
           migrationConfig.isRunningMigration(),
           svConfig.onboardingName,
-          migrationInfo.version,
+          version,
           imagePullServiceAccountName,
           disableProtection,
           opts

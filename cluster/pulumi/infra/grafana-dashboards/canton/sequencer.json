@@ -249,7 +249,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Sequencer Subscriptions",
   "uid": "685922ac-4aca-4b28-a1a1-4375a93a514c",
   "version": 3

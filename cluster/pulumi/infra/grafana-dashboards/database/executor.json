@@ -101,7 +101,10 @@
           "id": 7,
           "options": {
             "legend": {
-              "calcs": ["lastNotNull", "max"],
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ],
               "displayMode": "table",
               "placement": "right",
               "showLegend": true
@@ -206,7 +209,10 @@
           "id": 8,
           "options": {
             "legend": {
-              "calcs": ["lastNotNull", "max"],
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ],
               "displayMode": "table",
               "placement": "right",
               "showLegend": true
@@ -311,7 +317,10 @@
           "id": 9,
           "options": {
             "legend": {
-              "calcs": ["lastNotNull", "max"],
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ],
               "displayMode": "table",
               "placement": "right",
               "showLegend": true
@@ -416,7 +425,10 @@
           "id": 10,
           "options": {
             "legend": {
-              "calcs": ["lastNotNull", "max"],
+              "calcs": [
+                "lastNotNull",
+                "max"
+              ],
               "displayMode": "table",
               "placement": "right",
               "showLegend": true
@@ -539,7 +551,10 @@
       "id": 1,
       "options": {
         "legend": {
-          "calcs": ["lastNotNull", "max"],
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -674,7 +689,10 @@
       "id": 5,
       "options": {
         "legend": {
-          "calcs": ["lastNotNull", "max"],
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -779,7 +797,10 @@
       "id": 5,
       "options": {
         "legend": {
-          "calcs": ["lastNotNull", "max"],
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -1024,8 +1045,12 @@
       {
         "allValue": ".*",
         "current": {
-          "text": ["sv-1"],
-          "value": ["sv-1"]
+          "text": [
+            "sv-1"
+          ],
+          "value": [
+            "sv-1"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -1048,8 +1073,12 @@
       {
         "allValue": ".*",
         "current": {
-          "text": ["participant-1"],
-          "value": ["participant-1"]
+          "text": [
+            "participant-1"
+          ],
+          "value": [
+            "participant-1"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -1071,8 +1100,12 @@
       },
       {
         "current": {
-          "text": ["daml"],
-          "value": ["daml"]
+          "text": [
+            "daml"
+          ],
+          "value": [
+            "daml"
+          ]
         },
         "includeAll": false,
         "multi": true,
@@ -1094,8 +1127,12 @@
       },
       {
         "current": {
-          "text": ["general"],
-          "value": ["general"]
+          "text": [
+            "general"
+          ],
+          "value": [
+            "general"
+          ]
         },
         "includeAll": false,
         "multi": true,
@@ -1125,7 +1162,9 @@
         "allowCustomValue": false,
         "current": {
           "text": "All",
-          "value": ["$__all"]
+          "value": [
+            "$__all"
+          ]
         },
         "definition": "label_values({job=~\"$job\", namespace=~\"$namespace\"},query)",
         "includeAll": true,
