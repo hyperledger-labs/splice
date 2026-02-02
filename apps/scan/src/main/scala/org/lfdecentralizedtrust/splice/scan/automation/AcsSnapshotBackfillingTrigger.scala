@@ -14,7 +14,7 @@ import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotBackfillingTrigger.State
 import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerBase.{
   DeleteIncrementalSnapshotTask,
-  InitializeEmptyIncrementalSnapshotTask,
+  InitializeIncrementalSnapshotFromImportUpdatesTask,
   InitializeIncrementalSnapshotTask,
   SaveIncrementalSnapshotTask,
   UpdateIncrementalSnapshotTask,
@@ -150,7 +150,7 @@ class AcsSnapshotBackfillingTrigger(
       // For backfilling however, we need to check when we have reached the end of the current migration.
       // We do this by aborting any task that would start work on a snapshot with a target record time
       // after the last update record time.
-      case Some(task @ InitializeEmptyIncrementalSnapshotTask(_, _, nextAt)) =>
+      case Some(task @ InitializeIncrementalSnapshotFromImportUpdatesTask(_, _, nextAt)) =>
         // If we reach the end here, it means the migration was too short for a single snapshot.
         checkForMigrationEnd(task, migrationIdToBackfill, nextAt)
       case Some(task @ InitializeIncrementalSnapshotTask(_, nextAt)) =>
