@@ -2,4 +2,6 @@
 
 Sets up infrastructure for running GitHub Actions self-hosted runners in the way expected by the Splice CI.
 
-Deployed primarily via an [operator](../operator). Use `cncluster pulumi gha up` for manual deployment.
+Deployed automatically on the `splice` cluster via an [operator](../operator) which tracks the main branch in the
+[DACH-NY/canton-network-internal](https://github.com/DACH-NY/canton-network-internal) repository.
+Use `cncluster pulumi gha up` for manual deployment, but be cautious as it may conflict with operator's actions.
