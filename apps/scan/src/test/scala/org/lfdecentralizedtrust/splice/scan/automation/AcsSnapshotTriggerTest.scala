@@ -29,7 +29,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTriggerBase.{
-  InitializeEmptyIncrementalSnapshotTask,
+  InitializeIncrementalSnapshotFromImportUpdatesTask,
   InitializeIncrementalSnapshotTask,
 }
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
@@ -77,7 +77,7 @@ class AcsSnapshotTriggerTest
         // with a targetRecordTime of the next full hour.
         trigger.retrieveTasks().futureValue should be(
           Seq(
-            InitializeEmptyIncrementalSnapshotTask(
+            InitializeIncrementalSnapshotFromImportUpdatesTask(
               recordTime = now.minusSeconds(61L),
               migration = currentMigrationId,
               nextAt = cantonTimestamp("2007-12-03T11:00:00.00Z"),
@@ -242,7 +242,7 @@ class AcsSnapshotTriggerTest
         // There is no backfilled data at all, start from an empty snapshot in the previous migration.
         backfillingTrigger.retrieveTasks().futureValue should be(
           Seq(
-            InitializeEmptyIncrementalSnapshotTask(
+            InitializeIncrementalSnapshotFromImportUpdatesTask(
               recordTime = now.minusSeconds(4601L),
               migration = currentMigrationId - 1L,
               nextAt = cantonTimestamp("2007-12-03T09:00:00.00Z"),
@@ -282,7 +282,7 @@ class AcsSnapshotTriggerTest
         backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 2L)
         backfillingTrigger.retrieveTasks().futureValue should be(
           Seq(
-            InitializeEmptyIncrementalSnapshotTask(
+            InitializeIncrementalSnapshotFromImportUpdatesTask(
               recordTime = now.minusSeconds(6001L),
               migration = currentMigrationId - 2L,
               nextAt = cantonTimestamp("2007-12-03T09:00:00.00Z"),
@@ -306,7 +306,7 @@ class AcsSnapshotTriggerTest
         backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 2L)
         backfillingTrigger.retrieveTasks().futureValue should be(
           Seq(
-            InitializeEmptyIncrementalSnapshotTask(
+            InitializeIncrementalSnapshotFromImportUpdatesTask(
               recordTime = now.minusSeconds(6001L),
               migration = currentMigrationId - 2L,
               nextAt = cantonTimestamp("2007-12-03T09:00:00.00Z"),

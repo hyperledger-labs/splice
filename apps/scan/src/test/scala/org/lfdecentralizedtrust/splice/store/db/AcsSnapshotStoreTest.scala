@@ -1083,36 +1083,48 @@ class AcsSnapshotStoreTest
         }
       }
 
-      "initialize from empty snapshot" in {
+      "initialize from import updates" in {
+        val c1 = amulet(providerParty(1), 1, 1, 0.1)
+        val c2 = amulet(providerParty(1), 2, 2, 0.2)
+        val c3 = amulet(providerParty(1), 3, 3, 0.3)
         for {
           updateHistory <- mkUpdateHistory()
           store = mkStore(updateHistory)
 
-          _ <- store.initializeEmptyIncrementalSnapshot(
+          _ <- ingestCreate(updateHistory, c1, CantonTimestamp.MinValue)
+          _ <- ingestCreate(updateHistory, c2, CantonTimestamp.MinValue)
+          _ <- ingestCreate(updateHistory, c3, timestamp1)
+
+          snapshotRecordTime = timestamp1.minusSeconds(1L)
+          _ <- store.initializeIncrementalSnapshotFromImportUpdates(
             AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
+            snapshotRecordTime,
             timestamp2,
-            timestamp3,
             DefaultMigrationId,
           )
-
           incrementalSnapshotN <- store.getIncrementalSnapshot(
             AcsSnapshotStore.IncrementalAcsSnapshotTable.Next
           )
           incrementalSnapshotB <- store.getIncrementalSnapshot(
             AcsSnapshotStore.IncrementalAcsSnapshotTable.Backfill
           )
+
         } yield {
           incrementalSnapshotB shouldBe None
 
           incrementalSnapshotN should not be empty
-          incrementalSnapshotN.value.recordTime shouldBe timestamp2
+          incrementalSnapshotN.value.recordTime shouldBe snapshotRecordTime
           incrementalSnapshotN.value.migrationId shouldBe DefaultMigrationId
-          incrementalSnapshotN.value.targetRecordTime shouldBe timestamp3
+          incrementalSnapshotN.value.targetRecordTime shouldBe timestamp2
         }
       }
 
       "calculate two snapshots in a row" in {
         val party = providerParty(1)
+        val c01 = amulet(party, 1, 1, 0.1)
+        val c02 = amulet(party, 2, 2, 0.2)
+        val cid01 = c01.contractId.contractId
+        val cid02 = c01.contractId.contractId
 
         // Generate some artificial history with a mix of
         // creates, archives, and non-consuming exercises
@@ -1138,8 +1150,13 @@ class AcsSnapshotStoreTest
           updateHistoryM1 <- mkUpdateHistory(migrationId = 1L)
           storeM1 = mkStore(updateHistoryM1)
 
-          _ <- clueF(s"Snapshot A: start empty at T0")(
-            storeM1.initializeEmptyIncrementalSnapshot(
+          _ <- clueF(s"Ingest some import updates")(for {
+            _ <- ingestCreate(updateHistoryM1, c01, CantonTimestamp.MinValue)
+            _ <- ingestCreate(updateHistoryM1, c02, CantonTimestamp.MinValue)
+          } yield ())
+
+          _ <- clueF(s"Snapshot A: start from import updates at T0")(
+            storeM1.initializeIncrementalSnapshotFromImportUpdates(
               AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
               recordTime = timestamp1,
               targetRecordTime = timestamp1.plusSeconds(9L),
@@ -1185,7 +1202,8 @@ class AcsSnapshotStoreTest
               Seq.empty,
               Seq.empty,
             )
-            _ = result.createdEventsInPage.map(_.event.getContractId) shouldBe Seq(cid1)
+            _ = result.createdEventsInPage
+              .map(_.event.getContractId) shouldBe Seq(cid01, cid02, cid1)
           } yield ())
 
           cid2 <- clueF(
@@ -1224,7 +1242,8 @@ class AcsSnapshotStoreTest
               Seq.empty,
               Seq.empty,
             )
-            _ = result.createdEventsInPage.map(_.event.getContractId) shouldBe Seq(cid1, cid2)
+            _ = result.createdEventsInPage
+              .map(_.event.getContractId) shouldBe Seq(cid01, cid02, cid1, cid2)
           } yield ())
 
         } yield {
@@ -1237,7 +1256,7 @@ class AcsSnapshotStoreTest
           updateHistory <- mkUpdateHistory()
           store = mkStore(updateHistory)
 
-          _ <- store.initializeEmptyIncrementalSnapshot(
+          _ <- store.initializeIncrementalSnapshotFromImportUpdates(
             AcsSnapshotStore.IncrementalAcsSnapshotTable.Next,
             timestamp2,
             timestamp3,
