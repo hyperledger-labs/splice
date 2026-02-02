@@ -182,9 +182,10 @@ abstract class AcsSnapshotTriggerBase(
             Some(AcsSnapshotTriggerBase.DeleteIncrementalSnapshotTask(snapshot))
           )
         } else {
+          // Note: the code below makes sure that `recordTime` never moves past `targetRecordTime`.
           assert(!snapshot.recordTime.isAfter(snapshot.targetRecordTime))
           if (snapshot.recordTime == snapshot.targetRecordTime) {
-            // Incremental snapshot is complete, copy it to historical storage
+            // Incremental snapshot is complete, copy it to historical storage.
             val nextSnapshotTime = storageConfig.nextSnapshotTime(snapshot)
             Future.successful(
               Some(AcsSnapshotTriggerBase.SaveIncrementalSnapshotTask(snapshot, nextSnapshotTime))

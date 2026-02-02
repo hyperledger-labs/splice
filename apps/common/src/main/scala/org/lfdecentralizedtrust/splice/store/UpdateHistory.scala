@@ -1872,27 +1872,6 @@ class UpdateHistory(
     }
   }
 
-  /** Returns the record time of the first non-import update (if any) on the given migration. */
-  def getMinUpdateRecordTime(
-      migrationId: Long
-  )(implicit tc: TraceContext): Future[Option[CantonTimestamp]] = {
-    storage.query(
-      sql"""
-        select min(record_time) overall_min from (
-          select min(record_time) as record_time from update_history_transactions
-          where history_id = $historyId and migration_id = $migrationId and record_time > ${CantonTimestamp.MinValue}
-          union all
-          select min(record_time) as record_time from update_history_assignments
-          where history_id = $historyId and migration_id = $migrationId and record_time > ${CantonTimestamp.MinValue}
-          union all
-          select min(record_time) as record_time from update_history_unassignments
-          where history_id = $historyId and migration_id = $migrationId and record_time > ${CantonTimestamp.MinValue}
-        ) t;
-     """.as[Option[CantonTimestamp]].head,
-      "getMinEventRecordTime",
-    )
-  }
-
   def getLastImportUpdateId(
       migrationId: Long
   )(implicit tc: TraceContext): Future[Option[String]] = {
