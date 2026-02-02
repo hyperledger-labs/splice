@@ -28,7 +28,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
 }
 
 import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.RichOptional
 
 // TODO (#916): Replace with usage of com.digitalasset.transcode
 object ContractCompanions {
@@ -80,8 +79,13 @@ object ContractCompanions {
     val qualifiedName = QualifiedName(templateId)
 
     val companion = allDecoders
-      .flatMap(_.getContractCompanion(templateId).toScala)
-      .headOption
+      .collectFirst(
+        Function.unlift(
+          _.companions.asScala
+            .find { case (id, _) => templatesMatch(id, qualifiedName) }
+            .map(_._2)
+        )
+      )
 
     // The cast should not be necessary
     companion
