@@ -402,9 +402,6 @@ object BuildCommon {
       .settings(
         sharedCantonSettings,
         libraryDependencies ++= Seq(
-          grpc_netty_shaded,
-          netty_handler,
-          netty_boring_ssl, // This should be a Runtime dep, but needs to be declared at Compile scope due to https://github.com/sbt/sbt/issues/5568
           scopt,
           apache_commons_io % "test",
         ),
@@ -1228,8 +1225,6 @@ object BuildCommon {
           grpc_api,
           reflections,
           grpc_netty_shaded,
-          netty_boring_ssl, // This should be a Runtime dep, but needs to be declared at Compile scope due to https://github.com/sbt/sbt/issues/5568
-          netty_handler,
           caffeine,
           scalapb_runtime,
           scalapb_runtime_grpc,
@@ -1291,8 +1286,6 @@ object BuildCommon {
           daml_libs_scala_grpc_test_utils,
           daml_ports,
           daml_struct_spray_json,
-          netty_boring_ssl,
-          netty_handler,
           hikaricp,
           guava,
           bouncycastle_bcprov_jdk15on % Test,

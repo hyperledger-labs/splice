@@ -6,10 +6,6 @@ import Dependencies.*
 import DamlPlugin.autoImport.*
 import BuildCommon.defs.*
 
-import java.io.ByteArrayInputStream
-import scala.reflect.io.Streamable
-import java.nio
-import scala.jdk.CollectionConverters.*
 import sbtassembly.{MergeStrategy, PathList}
 import CantonDependencies.excludeTranscodeConflictingDependencies
 
@@ -1683,6 +1679,7 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     // Don't really care about the notice file so just take any.
     case "META-INF/FastDoubleParser-NOTICE" => MergeStrategy.first
     case "META-INF/license/LICENSE.boringssl.txt" => MergeStrategy.first
+    case path if path.endsWith("/OSGI-INF/MANIFEST.MF") => MergeStrategy.first
     case x =>
       oldStrategy(x)
   }
@@ -1940,8 +1937,7 @@ lazy val `apps-app`: Project =
         CantonDependencies.opentelemetry_zipkin,
         CantonDependencies.opentelemetry_instrumentation_grpc,
         CantonDependencies.opentelemetry_instrumentation_runtime_metrics,
-      ) ++ Seq("netty-handler-proxy", "netty-codec-socks")
-        .map("io.netty" % _ % CantonDependencies.netty_version % "test"),
+      ),
       BuildCommon.sharedAppSettings,
       BuildCommon.cantonWarts,
       bundleTask,

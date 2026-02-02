@@ -30,7 +30,7 @@ object CantonDependencies {
   lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
   lazy val auth0_jwks = "com.auth0" % "jwks-rsa" % "0.21.2"
   lazy val awaitility = "org.awaitility" % "awaitility" % "4.2.0"
-  lazy val grpc_version = "1.75.0"
+  lazy val grpc_version = "1.77.0"
   lazy val logback_version = "1.5.3"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
@@ -38,7 +38,7 @@ object CantonDependencies {
   lazy val pprint_version = "0.7.1"
   // if you update the slick version, please also update our forked code in common/slick.util.*
   lazy val slick_version = "3.5.2"
-  lazy val bouncy_castle_version = "1.70"
+  lazy val bouncy_castle_version = "1.83"
 
   lazy val pureconfig_version = "0.14.0"
 
@@ -48,8 +48,6 @@ object CantonDependencies {
   lazy val scalacheck_version = "1.15.4"
   lazy val scalaz_version = "7.2.33"
   lazy val mockito_scala_version = "1.16.3"
-
-  lazy val netty_version = "4.1.124.Final"
 
   lazy val reflections = "org.reflections" % "reflections" % "0.10.2"
   lazy val pureconfig = "com.github.pureconfig" %% "pureconfig" % pureconfig_version
@@ -149,18 +147,14 @@ object CantonDependencies {
   lazy val daml_testing_utils = "com.daml" %% "testing-utils" % daml_libraries_version
 
   lazy val bouncycastle_bcprov_jdk15on =
-    "org.bouncycastle" % "bcprov-jdk15on" % bouncy_castle_version
+    "org.bouncycastle" % "bcprov-jdk18on" % bouncy_castle_version
   lazy val bouncycastle_bcpkix_jdk15on =
-    "org.bouncycastle" % "bcpkix-jdk15on" % bouncy_castle_version
+    "org.bouncycastle" % "bcpkix-jdk18on" % bouncy_castle_version
 
   lazy val grpc_api = "io.grpc" % "grpc-api" % grpc_version
   lazy val grpc_protobuf = "io.grpc" % "grpc-protobuf" % grpc_version
   lazy val grpc_netty_shaded = "io.grpc" % "grpc-netty-shaded" % grpc_version
   lazy val grpc_stub = "io.grpc" % "grpc-stub" % grpc_version
-  // pick the version of boring ssl from this table: https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty
-  // required for ALPN (which is required for TLS+HTTP/2) when running on Java 8. JSSE will be used on Java 9+.
-  lazy val netty_boring_ssl = "io.netty" % "netty-tcnative-boringssl-static" % "2.0.72.Final"
-  lazy val netty_handler = "io.netty" % "netty-handler" % netty_version
   lazy val grpc_services = "io.grpc" % "grpc-services" % grpc_version
   lazy val google_common_protos = "com.google.api.grpc" % "proto-google-common-protos" % "2.41.0"
 
