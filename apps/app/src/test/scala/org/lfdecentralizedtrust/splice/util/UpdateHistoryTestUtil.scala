@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.util
 
+import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.console.{
   ParticipantClientReference,
   ScanAppBackendReference,
@@ -320,6 +321,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       t.getSynchronizerId,
       t.getTraceContext,
       t.getRecordTime,
+      ByteString.EMPTY,
     )
 
   def dropTrailingNones(r: Reassignment[ReassignmentEvent]): Reassignment[ReassignmentEvent] =

@@ -1551,6 +1551,7 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
+          /*externalTransactionHash = */ ByteString.EMPTY, // TODO(#3408): Revisit when ingesting to DB
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
@@ -1615,6 +1616,7 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
+          /*externalTransactionHash = */ ByteString.EMPTY, // TODO(#3408): Revisit when ingesting to DB
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
