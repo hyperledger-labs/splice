@@ -671,6 +671,17 @@ lazy val `splice-featured-app-api-v1-daml` =
       `canton-bindings-java`
     )
 
+lazy val `splice-featured-app-api-v2-daml` =
+  project
+    .in(file("daml/splice-api-featured-app-v2"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings
+    )
+    .dependsOn(
+      `canton-bindings-java`
+    )
+
 lazy val `splice-amulet-daml` =
   project
     .in(file("daml/splice-amulet"))
@@ -685,7 +696,8 @@ lazy val `splice-amulet-daml` =
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
+          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
+          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -796,7 +808,8 @@ lazy val `splice-util-featured-app-proxies-daml` =
         (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
+          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
+          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -810,7 +823,8 @@ lazy val `splice-util-token-standard-wallet-daml` =
         (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
-          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
+          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value ++
+          (`splice-featured-app-api-v2-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -923,6 +937,7 @@ lazy val `apps-common` =
       `splice-token-test-dummy-holding-daml`,
       `splice-token-test-trading-app-daml`,
       `splice-featured-app-api-v1-daml`,
+      `splice-featured-app-api-v2-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
     .settings(

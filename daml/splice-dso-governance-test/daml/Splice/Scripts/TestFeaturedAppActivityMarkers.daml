@@ -11,7 +11,7 @@ import Splice.Amulet
 import Splice.AmuletRules
 import Splice.DsoRules
 import qualified Splice.Api.FeaturedAppRightV1
-import Splice.Api.FeaturedAppRightV1 (FeaturedAppRight_CreateActivityMarkerResult(..))
+import qualified Splice.Api.FeaturedAppRightV2
 
 import Splice.Scripts.Util
 import Splice.Scripts.DsoTestUtils
@@ -59,6 +59,7 @@ testFeaturedAppActivityMarkers = do
 
   [(featuredAppRightCid1, _)] <- queryInterface @Splice.Api.FeaturedAppRightV1.FeaturedAppRight provider1
   [(featuredAppRightCid2, _)] <- queryInterface @Splice.Api.FeaturedAppRightV1.FeaturedAppRight provider2
+  [(featuredAppRightCid2V2, _)] <- queryInterface @Splice.Api.FeaturedAppRightV2.FeaturedAppRight provider2
 
   -- Fails if weights do not add up to 1.0
   submitMustFail provider1 $ exerciseCmd featuredAppRightCid1 Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
@@ -70,25 +71,31 @@ testFeaturedAppActivityMarkers = do
     with
       beneficiaries = Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary provider1 0.8 :: replicate 20 (Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary provider1 0.01)
 
-  FeaturedAppRight_CreateActivityMarkerResult [marker1Iface, marker2Iface] <- submit provider1 $ exerciseCmd featuredAppRightCid1 Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
+  Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarkerResult [marker1Iface, marker2Iface] <- submit provider1 $ exerciseCmd featuredAppRightCid1 Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
     with
       beneficiaries = [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary provider1 0.3, Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary beneficiary 0.6, Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary beneficiary 0.1]
-  FeaturedAppRight_CreateActivityMarkerResult [marker3Iface] <- submit provider1 $ exerciseCmd featuredAppRightCid1 Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
+  Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarkerResult [marker3Iface] <- submit provider1 $ exerciseCmd featuredAppRightCid1 Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
     with
       beneficiaries = [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary provider1 1.0]
-  FeaturedAppRight_CreateActivityMarkerResult [marker4Iface] <- submit provider2 $ exerciseCmd featuredAppRightCid2 Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
+  Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarkerResult [marker4Iface] <- submit provider2 $ exerciseCmd featuredAppRightCid2 Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
     with
       beneficiaries = [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary provider2 1.0]
 
-  let [marker1, marker2, marker3, marker4] = map fromInterfaceContractId [marker1Iface, marker2Iface, marker3Iface, marker4Iface]
+  Splice.Api.FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarkerResult [marker5Iface] <- submit provider2 $ exerciseCmd featuredAppRightCid2V2 Splice.Api.FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarker
+    with
+      beneficiaries = [Splice.Api.FeaturedAppRightV2.AppRewardBeneficiary provider2 1.0]
+      weight = Some 100.0
+
+  let [marker1, marker2, marker3, marker4, marker5] = map fromInterfaceContractId [marker1Iface, marker2Iface, marker3Iface, marker4Iface] ++ [fromInterfaceContractId marker5Iface]
 
   (openMiningRoundCid, openMiningRound) <- getLatestOpenRound app
 
   DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult (AmuletRules_ConvertFeaturedAppActivityMarkersResult couponCids) <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkers with
     amuletRulesCid
     argument = AmuletRules_ConvertFeaturedAppActivityMarkers with
-      markerCids = [marker1, marker3, marker2, marker4] -- interleave different providers to test grouping
+      markerCids = [marker1, marker3, marker2, marker4, marker5] -- interleave different providers to test grouping
       openMiningRoundCid
+      observers = None
     sv = Some sv1
 
   -- markers are archived
@@ -115,7 +122,7 @@ testFeaturedAppActivityMarkers = do
       beneficiary = Some provider2
       featured = True
       round = openMiningRound.round
-      amount = defaultFeaturedAppActivityMarkerAmount / amuletPrice
+      amount = 101.0 *defaultFeaturedAppActivityMarkerAmount / amuletPrice
 
   -- ensure that the round is in issuing phase
   runNextIssuanceD app amuletPrice
@@ -134,7 +141,7 @@ testFeaturedAppActivityMarkersConfigDisabled : Script ()
 testFeaturedAppActivityMarkersConfigDisabled = do
   DefaultAppWithUsers{app, alice} <- setupDefaultAppWithUsers
   featuredAppRightCid <- featureApp app alice
-  FeaturedAppRight_CreateActivityMarkerResult [markerIface] <- submit alice.primaryParty $ exerciseCmd (toInterfaceContractId @Splice.Api.FeaturedAppRightV1.FeaturedAppRight featuredAppRightCid) Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
+  Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarkerResult [markerIface] <- submit alice.primaryParty $ exerciseCmd (toInterfaceContractId @Splice.Api.FeaturedAppRightV1.FeaturedAppRight featuredAppRightCid) Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
     with
       beneficiaries = [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary alice.primaryParty 1.0]
 
@@ -151,6 +158,7 @@ testFeaturedAppActivityMarkersConfigDisabled = do
   AmuletRules_ConvertFeaturedAppActivityMarkersResult couponCids <- submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_ConvertFeaturedAppActivityMarkers with
       markerCids = [fromInterfaceContractId markerIface]
       openMiningRoundCid
+      observers = None
   couponCids === []
   None <- queryInterfaceContractId app.dso markerIface
 
@@ -160,13 +168,14 @@ testFeaturedAppActivityMarkersConfigDisabled = do
     createCmd amuletRules with
       configSchedule.initialValue.featuredAppActivityMarkerAmount = Some 0.0
 
-  FeaturedAppRight_CreateActivityMarkerResult [markerIface] <- submit alice.primaryParty $ exerciseCmd (toInterfaceContractId @Splice.Api.FeaturedAppRightV1.FeaturedAppRight featuredAppRightCid) Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
+  Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarkerResult [markerIface] <- submit alice.primaryParty $ exerciseCmd (toInterfaceContractId @Splice.Api.FeaturedAppRightV1.FeaturedAppRight featuredAppRightCid) Splice.Api.FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker
     with
       beneficiaries = [Splice.Api.FeaturedAppRightV1.AppRewardBeneficiary alice.primaryParty 1.0]
 
   AmuletRules_ConvertFeaturedAppActivityMarkersResult couponCids <- submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_ConvertFeaturedAppActivityMarkers with
       markerCids = [fromInterfaceContractId markerIface]
       openMiningRoundCid
+      observers = None
   couponCids === []
   None <- queryInterfaceContractId app.dso markerIface
 

@@ -1,14 +1,11 @@
 sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
-name: splitwell
+name: splice-api-featured-app-v2
 source: daml
-version: 0.1.17
+version: 1.0.0
 dependencies:
   - daml-prim
   - daml-stdlib
 data-dependencies:
-  - ../splice-amulet/.daml/dist/splice-amulet-current.dar
-  - ../splice-util/.daml/dist/splice-util-current.dar
-  - ../splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
@@ -16,5 +13,5 @@ build-options:
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java
-    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSplitwell
+    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceFeaturedAppsInterfaces
     output-directory: target/daml-codegen-java
