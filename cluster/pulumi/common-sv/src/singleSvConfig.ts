@@ -22,6 +22,13 @@ const SvCometbftConfigSchema = z
     // defaults to {svName}-cometbft-keys if not set
     keysGcpSecret: z.string().optional(),
     resources: K8sResourceSchema,
+    mempool: z
+      .object({
+        size: z.number().optional(),
+        deduplicationCacheSize: z.number().optional(),
+        ttlSeconds: z.number().optional(),
+      })
+      .optional(),
   })
   .strict();
 const EnvVarConfigSchema = z.object({
