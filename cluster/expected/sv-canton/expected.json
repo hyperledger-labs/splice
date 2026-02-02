@@ -1414,6 +1414,9 @@
           "port": 26316
         },
         "logLevel": "debug",
+        "mempool": {
+          "size": 4000
+        },
         "metrics": {
           "enable": true,
           "labels": [
@@ -1513,6 +1516,9 @@
           "port": 26416
         },
         "logLevel": "debug",
+        "mempool": {
+          "size": 4000
+        },
         "metrics": {
           "enable": true,
           "labels": [
@@ -3376,6 +3382,9 @@
           "port": 26306
         },
         "logLevel": "debug",
+        "mempool": {
+          "size": 4000
+        },
         "metrics": {
           "enable": true,
           "labels": [
@@ -3472,6 +3481,9 @@
           "port": 26406
         },
         "logLevel": "debug",
+        "mempool": {
+          "size": 4000
+        },
         "metrics": {
           "enable": true,
           "labels": [
@@ -3568,6 +3580,9 @@
           "port": 26326
         },
         "logLevel": "debug",
+        "mempool": {
+          "size": 4000
+        },
         "metrics": {
           "enable": true,
           "labels": [
@@ -3667,6 +3682,9 @@
           "port": 26426
         },
         "logLevel": "debug",
+        "mempool": {
+          "size": 4000
+        },
         "metrics": {
           "enable": true,
           "labels": [
