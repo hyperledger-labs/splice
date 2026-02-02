@@ -540,34 +540,53 @@ class AcsSnapshotStore(
     *                          to a historical snapshot.
     * @param migrationId       The migration id of the snapshot.
     */
-  def initializeEmptyIncrementalSnapshot(
+  def initializeIncrementalSnapshotFromImportUpdates(
       table: IncrementalAcsSnapshotTable,
       recordTime: CantonTimestamp,
       targetRecordTime: CantonTimestamp,
       migrationId: Long,
   )(implicit tc: TraceContext): Future[Unit] = {
     assert(targetRecordTime.isAfter(recordTime))
-    val statement = sql"""
-        insert into acs_incremental_snapshot (
-          history_id,
-          table_name,
-          record_time,
-          migration_id,
-          target_record_time
-        )
-        values (
-          ${historyId},
-          ${table.tableName},
-          ${recordTime},
-          ${migrationId},
-          ${targetRecordTime}
-        )
-        returning snapshot_id
-      """.as[Long].head
+    val statement = for {
+      snapshotId <- sql"""
+          insert into acs_incremental_snapshot (
+            history_id,
+            table_name,
+            record_time,
+            migration_id,
+            target_record_time
+          )
+          values (
+            ${historyId},
+            ${table.tableName},
+            ${recordTime},
+            ${migrationId},
+            ${targetRecordTime}
+          )
+          returning snapshot_id
+        """.as[Long].head
+      insertedRows <-
+        (sql"""
+          insert into #${table.tableName} (
+            """ ++ copyFromUpdateHistoryTargetColumns ++ sql"""
+          )
+          select
+            """ ++ copyFromUpdateHistorySourceColumns ++ sql"""
+          from update_history_creates c
+          where history_id = $historyId
+            and migration_id = ${migrationId}
+            and record_time = ${CantonTimestamp.MinValue}
+        """).toActionBuilder.asUpdate
+    } yield {
+      logger.debug(
+        s"Initialized incremental snapshot $snapshotId at $recordTime from import updates. ACS: $insertedRows."
+      )
+      ()
+    }
 
     storage.queryAndUpdate(
       withIncrementalSnapshotIdempotencyCheck(table, statement, None),
-      "initializeEmptyIncrementalSnapshot",
+      "initializeIncrementalSnapshotFromImportUpdates",
     )
   }
 
@@ -659,7 +678,13 @@ class AcsSnapshotStore(
       ()
     }
     storage.queryAndUpdate(
-      withIncrementalSnapshotIdempotencyCheck(table, statement, Some(snapshot)),
+      withExclusiveSnapshotDataLock(
+        withIncrementalSnapshotIdempotencyCheck(
+          table,
+          statement,
+          Some(snapshot),
+        )
+      ),
       "saveIncrementalSnapshot",
     )
   }
