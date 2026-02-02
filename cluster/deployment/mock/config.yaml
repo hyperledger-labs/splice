@@ -137,6 +137,9 @@ svs:
         cron: "0 0 * * *"
         maxDuration: "30m"
         retentionPeriod: "7d"
+    cometbft:
+      mempool:
+        size: 4000
     scanApp:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME

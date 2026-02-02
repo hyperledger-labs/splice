@@ -127,6 +127,7 @@ export function installCometBftNode(
       chainId: getChainId(migrationId),
       chainIdSuffix: getChainIdSuffix(),
     },
+    mempool: svConfiguration.cometbft?.mempool,
     metrics: {
       enable: true,
       migration: {
