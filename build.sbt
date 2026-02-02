@@ -67,7 +67,6 @@ inThisBuild(
     // slows down just the non integration tests which is a really small subset
     // this helps us get actual realistic times for how long a test takes to run
     Test / parallelExecution := false,
-    resolvers += ("Canton snapshots" at "artifactregistry://europe-maven.pkg.dev/da-images/public-maven-unstable"),
   )
 )
 
@@ -179,6 +178,8 @@ lazy val root: Project = (project in file("."))
           .toTask(" check" + damlDarsLockCheckerFileArg.value)
       }.value,
     Headers.OtherHeaderSettings,
+    // Disable assembly for all submodules as we want to assemble just the splice-node jar from the apps module
+    assembly / aggregate := false,
   )
 
 val damlDarsLockFileCheck = taskKey[Unit]("Check the daml/dars.lock file")
@@ -1640,6 +1641,7 @@ def getCommittedDarFiles = {
 def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy = {
   {
     case PathList("buf.yaml") => MergeStrategy.discard
+    case PathList("com", "digitalasset", _*) => MergeStrategy.first
     case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.first
     case "reflect.properties" => MergeStrategy.first
     case PathList("scala", "reflect", "Selectable.class" | "Selectable$.class") =>
@@ -1648,8 +1650,6 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case PathList("google", "protobuf", _*) => MergeStrategy.first
     case PathList("org", "apache", "logging", _*) => MergeStrategy.first
     case PathList("ch", "qos", "logback", _*) => MergeStrategy.first
-    case PathList("com", "digitalasset", "canton", "config", "LocalNodeParametersConfig.class") =>
-      MergeStrategy.first
     case PathList("META-INF", "okio.kotlin_module") => MergeStrategy.last
     case PathList(
           "META-INF",
@@ -1672,6 +1672,7 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     // Dedup between ledger-api-java-proto (pulled in via Scala bindings)
     // and the copy of that inlined into bindings-java.
     case PathList("com", "daml", "ledger", "api", "v1" | "v2", _*) => MergeStrategy.first
+    case PathList("com", "daml", "ledger", "api", "scalapb", "package.proto") => MergeStrategy.first
     // Hack for not getting trouble with different versions of generated classes of common openapi
     case x @ PathList("org", "lfdecentralizedtrust", "splice", "http", "v0" | "commonAdmin", _*) =>
       MergeStrategy.first
@@ -1681,7 +1682,9 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case path if path.endsWith("scala-collection-compat.properties") => MergeStrategy.first
     // Don't really care about the notice file so just take any.
     case "META-INF/FastDoubleParser-NOTICE" => MergeStrategy.first
-    case x => oldStrategy(x)
+    case "META-INF/license/LICENSE.boringssl.txt" => MergeStrategy.first
+    case x =>
+      oldStrategy(x)
   }
 }
 

@@ -69,7 +69,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
             synchronizerConfig.timeTracker.observationLatency shouldBe observationLatency
             val sequencerConnections = synchronizerConfig.sequencerConnections
             val connections = sequencerConnections.connections.forgetNE
-            sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
+            sequencerConnections.submissionRequestAmplification.toInternal shouldBe SubmissionRequestAmplification(
               PositiveInt.tryCreate(2),
               time.NonNegativeFiniteDuration.tryOfSeconds(10),
             )

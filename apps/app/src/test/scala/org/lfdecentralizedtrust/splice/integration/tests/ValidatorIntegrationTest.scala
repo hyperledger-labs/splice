@@ -153,7 +153,7 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
       sequencerConnections.connections.size shouldBe 4
       sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(2)
       sequencerConnections.sequencerLivenessMargin shouldBe NonNegativeInt.one
-      sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
+      sequencerConnections.submissionRequestAmplification.toInternal shouldBe SubmissionRequestAmplification(
         PositiveInt.tryCreate(2),
         ValidatorAppBackendConfig.DefaultSequencerRequestAmplificationPatience.toInternal,
       )
