@@ -366,6 +366,16 @@ function configureGatewayService(
             'cloud.google.com/neg': JSON.stringify({ exposed_ports: { '80': {} } }),
           },*/
         };
+  const deploymentValues =
+    gatewayVariant.type === 'ClusterIP'
+      ? {
+          podAnnotations: {
+            'proxy.istio.io/config': JSON.stringify({
+              gatewayTopology: { numTrustedProxies: 2 },
+            }),
+          },
+        }
+      : {};
 
   const gateway = new k8s.helm.v3.Release(
     `istio-ingress${suffix}`,
@@ -394,6 +404,7 @@ function configureGatewayService(
         podDisruptionBudget: {
           maxUnavailable: 1,
         },
+        ...deploymentValues,
         service: {
           ...serviceValues,
           ports: [
@@ -411,7 +422,12 @@ function configureGatewayService(
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
-      replaceOnChanges: ['values.annotations', 'values.service.annotations', 'values.service.type'],
+      replaceOnChanges: [
+        'values.annotations',
+        'values.service.annotations',
+        'values.service.type',
+        'values.podAnnotations',
+      ],
       deleteBeforeReplace: true,
       dependsOn: istioPolicies
         ? istioPolicies.apply(policies => {
@@ -471,7 +487,8 @@ function configureGateway(
       metadata: {
         name: 'cn-http-gateway',
         namespace: ingressNs.ns.metadata.name,
-        ...(withSeparateGcpGateway
+        // TODO (#2723) remove?
+        /*...(withSeparateGcpGateway
           ? {
               annotations: {
                 'proxy.istio.io/config': JSON.stringify({
@@ -479,7 +496,7 @@ function configureGateway(
                 }),
               },
             }
-          : {}),
+          : {}),*/
       },
       spec: {
         selector: {
