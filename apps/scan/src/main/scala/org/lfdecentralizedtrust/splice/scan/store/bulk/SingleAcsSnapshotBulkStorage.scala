@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.scan.store.bulk
 
 import scala.concurrent.ExecutionContext
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, PekkoUtil}

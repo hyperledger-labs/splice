@@ -39,7 +39,7 @@ class AcsSnapshotBulkStorage(
       start: TimestampWithMigrationId
   ): Source[TimestampWithMigrationId, NotUsed] = {
     Source
-      .unfoldAsync(start) { last: TimestampWithMigrationId =>
+      .unfoldAsync(start) { (last: TimestampWithMigrationId) =>
         acsSnapshotStore.lookupSnapshotAfter(last.migrationId, last.timestamp).flatMap {
           case Some(snapshot) =>
             logger.info(
@@ -89,7 +89,7 @@ class AcsSnapshotBulkStorage(
           loggerFactory,
         )
       )
-      .mapAsync(1) { ts: TimestampWithMigrationId =>
+      .mapAsync(1) { (ts: TimestampWithMigrationId) =>
         for {
           _ <- kvProvider.setLatestAcsSnapshotsInBulkStorage(ts)
         } yield {
