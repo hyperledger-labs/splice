@@ -728,10 +728,10 @@ class AcsSnapshotStore(
           delete
           from #${table.tableName} as s
           using update_history_exercises as e
-          where s.contract_id = e.contract_id
+          where s.history_id = $historyId
+            and s.contract_id = e.contract_id
             and e.history_id = $historyId
-            and s.history_id = $historyId
-            and migration_id = ${snapshot.migrationId}
+            and e.migration_id = ${snapshot.migrationId}
             and e.record_time > ${snapshot.recordTime}
             and e.record_time <= $targetRecordTime
             and e.consuming
@@ -769,10 +769,14 @@ class AcsSnapshotStore(
 
 object AcsSnapshotStore {
 
-  final case class IncrementalAcsSnapshotTable(val tableName: String)
+  sealed trait IncrementalAcsSnapshotTable { def tableName: String }
   object IncrementalAcsSnapshotTable {
-    val Next = IncrementalAcsSnapshotTable("acs_incremental_snapshot_data_next")
-    val Backfill = IncrementalAcsSnapshotTable("acs_incremental_snapshot_data_backfill")
+    case object Next extends IncrementalAcsSnapshotTable {
+      val tableName: String = "acs_incremental_snapshot_data_next"
+    }
+    case object Backfill extends IncrementalAcsSnapshotTable {
+      val tableName: String = "acs_incremental_snapshot_data_backfill"
+    }
   }
 
   // Only relevant for tests, in production this is already guaranteed.
