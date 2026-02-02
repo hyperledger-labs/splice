@@ -149,6 +149,8 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
   )(implicit env: SpliceTestConsoleEnvironment): OnboardingResult = {
     val onboarding = onboardExternalParty(validatorBackend, partyHint)
     eventuallySucceeds() {
+      // While there is a server-side retry on this, it is not always sufficiently long in our tests,
+      // so we wrap it here in an eventuallySucceeds()
       createAndAcceptExternalPartySetupProposal(validatorBackend, onboarding)
     }
     onboarding
