@@ -14,7 +14,9 @@ RUN sudo apt-get update && \
     sudo apt-get install -y sudo git curl xz-utils pigz rsync jq unzip python3-pip moreutils && \
     sudo rm -rf /var/lib/apt/lists/*
 
-RUN sudo pip3 install GitPython gql humanize marshmallow-dataclass requests requests_toolbelt prometheus_client
+RUN sudo pip3 install \
+    --break-system-packages \
+    GitPython gql humanize marshmallow-dataclass requests requests_toolbelt prometheus_client
 
 RUN sudo ln -s /usr/bin/python3 /usr/bin/python
 
