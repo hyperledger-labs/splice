@@ -682,9 +682,12 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           "targetClosesAt",
           "value", // due to BurnMint using `AV_Time` for the expiresAt field of the locked output
         )
+
+      val amuletRulesId =
+        eventuallySucceeds()(sv1ScanBackend.getAmuletRules().contractId.contractId)
+
       def replaceStringsInJson(viewValue: Json) = {
         val current = viewValue.spaces2SortKeys
-        val amuletRulesId = sv1ScanBackend.getAmuletRules().contractId.contractId
         val allContracts =
           "\"([0-9a-fA-F]{138})\"".r.findAllIn(current).matchData.map(_.group(1)).toSeq
 
