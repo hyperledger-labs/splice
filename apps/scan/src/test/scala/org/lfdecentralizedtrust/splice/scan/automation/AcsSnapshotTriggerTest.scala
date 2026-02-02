@@ -68,7 +68,7 @@ class AcsSnapshotTriggerTest
         trigger.retrieveTasks().futureValue shouldBe empty
       }
 
-      "initialize empty if there is no existing snapshot" in new AcsSnapshotTriggerTestScope() {
+      "initialize from import updates if there is no existing snapshot" in new AcsSnapshotTriggerTestScope() {
         noPreviousIncrementalSnapshot()
         noPreviousSnapshot()
         updatesBetween(currentMigrationId, now.minusSeconds(60L), now.minusSeconds(1L))
@@ -122,10 +122,31 @@ class AcsSnapshotTriggerTest
 
         trigger.retrieveTasks().futureValue shouldBe empty
       }
+
+      "delete snapshot from previous migration" in new AcsSnapshotTriggerTestScope() {
+        val snapshot = IncrementalAcsSnapshot(
+          snapshotId = 1L,
+          historyId = 1L,
+          tableName = AcsSnapshotStore.IncrementalAcsSnapshotTable.Next.tableName,
+          recordTime = now.minusSeconds(1800L),
+          migrationId = currentMigrationId - 1L,
+          targetRecordTime = now.plusSeconds(1800L),
+        )
+        previousIncrementalSnapshot(snapshot)
+
+        // Incremental snapshot was from a previous migration, delete it.
+        trigger.retrieveTasks().futureValue should be(
+          Seq(
+            AcsSnapshotTriggerBase.DeleteIncrementalSnapshotTask(
+              snapshot = snapshot
+            )
+          )
+        )
+      }
     }
 
     "updating" should {
-      "update an incremental snapshot that is old" in new AcsSnapshotTriggerTestScope() {
+      "update an incremental snapshot that is not near its target time" in new AcsSnapshotTriggerTestScope() {
         val snapshot = IncrementalAcsSnapshot(
           snapshotId = 1L,
           historyId = 1L,

@@ -1124,7 +1124,7 @@ class AcsSnapshotStoreTest
         val c01 = amulet(party, 1, 1, 0.1)
         val c02 = amulet(party, 2, 2, 0.2)
         val cid01 = c01.contractId.contractId
-        val cid02 = c01.contractId.contractId
+        val cid02 = c02.contractId.contractId
 
         // Generate some artificial history with a mix of
         // creates, archives, and non-consuming exercises
@@ -1203,7 +1203,11 @@ class AcsSnapshotStoreTest
               Seq.empty,
             )
             _ = result.createdEventsInPage
-              .map(_.event.getContractId) shouldBe Seq(cid01, cid02, cid1)
+              .map(_.event.getContractId) should contain theSameElementsInOrderAs Seq(
+              cid01,
+              cid02,
+              cid1,
+            )
           } yield ())
 
           cid2 <- clueF(
@@ -1243,7 +1247,12 @@ class AcsSnapshotStoreTest
               Seq.empty,
             )
             _ = result.createdEventsInPage
-              .map(_.event.getContractId) shouldBe Seq(cid01, cid02, cid1, cid2)
+              .map(_.event.getContractId) should contain theSameElementsInOrderAs Seq(
+              cid01,
+              cid02,
+              cid1,
+              cid2,
+            )
           } yield ())
 
         } yield {
