@@ -44,6 +44,7 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.metrics.MetricValue
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem
 import org.scalatest.Assertion
 
@@ -320,6 +321,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       t.getSynchronizerId,
       t.getTraceContext,
       t.getRecordTime,
+      ByteString.EMPTY,
     )
 
   def dropTrailingNones(r: Reassignment[ReassignmentEvent]): Reassignment[ReassignmentEvent] =

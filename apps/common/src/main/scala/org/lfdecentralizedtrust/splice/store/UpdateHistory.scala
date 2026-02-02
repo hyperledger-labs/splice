@@ -597,12 +597,12 @@ class UpdateHistory(
       insert into update_history_transactions(
         history_id, update_id, record_time,
         participant_offset, domain_id, migration_id,
-        effective_at, root_event_ids, workflow_id, command_id
+        effective_at, root_event_ids, workflow_id, command_id,
       )
       values (
         $historyId, $safeUpdateId, $safeRecordTime,
         $safeParticipantOffset, $safeSynchronizerId, $migrationId,
-        $safeEffectiveAt, $safeRootEventIds, $safeWorkflowId, $safeCommandId
+        $safeEffectiveAt, $safeRootEventIds, $safeWorkflowId, $safeCommandId,
       )
       returning row_id
     """.asUpdateReturning[Long].head)
@@ -1551,6 +1551,7 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
+          /*externalTransactionHash = */ ByteString.EMPTY,
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
@@ -1615,6 +1616,7 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
+          /*externalTransactionHash = */ ByteString.EMPTY,
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),

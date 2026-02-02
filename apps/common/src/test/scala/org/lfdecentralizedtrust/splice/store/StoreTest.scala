@@ -1295,6 +1295,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       recordTime,
+      ByteString.EMPTY,
     )
   }
 
@@ -1329,6 +1330,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       effectiveAt, // we equate record time and effectiveAt for simplicity
+      ByteString.EMPTY
     )
   }
 

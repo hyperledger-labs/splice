@@ -372,6 +372,7 @@ object UpdateHistoryTestBase {
       /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance, // Not preserved
 
       /*recordTime = */ tree.getRecordTime,
+      ByteString.EMPTY,
     )
   }
 
