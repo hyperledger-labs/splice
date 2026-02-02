@@ -102,7 +102,7 @@ You can refer to https://github.com/DACH-NY/canton-network-node/pull/446/commits
 
 ## Patching Our Canton fork
 When we want to patch our Canton fork with a fix or improvement from a stable release of Canton,
-we cherry-pick the relevant commit(s) from the Canton repo to our local branch:
+we cherry-pick the relevant commit(s) from the Canton repo:
 ```
     git cherry-pick COMMIT_HASH # you may sign-off the cherry-pick if original DCO is missing
 ```
