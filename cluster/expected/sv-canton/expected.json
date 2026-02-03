@@ -1996,6 +1996,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -2063,6 +2067,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -2130,6 +2138,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -2197,6 +2209,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -2264,6 +2280,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -2331,6 +2351,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -2398,6 +2422,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -2565,6 +2593,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -2732,6 +2764,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -2799,6 +2835,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -2866,6 +2906,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -2933,6 +2977,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -4218,6 +4266,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -4285,6 +4337,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -4352,6 +4408,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -4419,6 +4479,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -4486,6 +4550,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -4553,6 +4621,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -4620,6 +4692,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -4812,6 +4888,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -5004,6 +5084,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -5071,6 +5155,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -5138,6 +5226,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -5205,6 +5297,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": true,
@@ -5904,6 +6000,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": false,
@@ -5971,6 +6071,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": false,
@@ -6038,6 +6142,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": false,
@@ -6105,6 +6213,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": false,
@@ -6172,6 +6284,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": false,
@@ -6239,6 +6355,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": false,
@@ -6306,6 +6426,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": false,
@@ -6473,6 +6597,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": false,
@@ -6640,6 +6768,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": false,
@@ -6707,6 +6839,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": false,
@@ -6774,6 +6910,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": false,
@@ -6841,6 +6981,10 @@
           {
             "name": "temp_file_limit",
             "value": "2147483647"
+          },
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
           }
         ],
         "deletionProtectionEnabled": false,
