@@ -3,7 +3,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import {
   appsAffinityAndTolerations,
-  CloudPostgres,
   DOCKER_REPO,
   ExactNamespace,
   HELM_MAX_HISTORY_SIZE,
@@ -20,7 +19,7 @@ import yaml from 'js-yaml';
 
 import { createCachePvc } from './cache';
 import { ghaConfig } from './config';
-import { createCloudSQLInstanceForPerformanceTests } from './performanceTests';
+import { createCloudSQLInstanceForPerformanceTests, PerformanceTestDb } from './performanceTests';
 
 type ResourcesSpec = {
   requests?: {
@@ -407,7 +406,7 @@ function installK8sRunnerScaleSet(
   resources: ResourcesSpec,
   serviceAccountName: string,
   dependsOn: Resource[],
-  performanceTestsDb: CloudPostgres
+  performanceTestsDb: PerformanceTestDb
 ): Release {
   const podConfigMapName = `${name}-pod-config`;
   // A configMap that will be mounted to runner pods and provide additional pod spec for the workflow pods
@@ -723,9 +722,9 @@ function installK8sRunnerScaleSets(
   tokenSecret: Secret,
   cachePvcName: string,
   serviceAccountName: string,
-  performanceTestsDb: CloudPostgres
+  performanceTestsDb: PerformanceTestDb
 ): void {
-  const dependsOn = [controller, runnersNamespace, tokenSecret, performanceTestsDb];
+  const dependsOn = [controller, runnersNamespace, tokenSecret, performanceTestsDb.db];
 
   runnerSpecs
     .filter(spec => spec.k8s)

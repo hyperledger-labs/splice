@@ -4,6 +4,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { expect, jest, test } from '@jest/globals';
 import { collectResources } from '@lfdecentralizedtrust/splice-pulumi-common/src/test';
+import { z } from 'zod';
 
 import { installRunnerScaleSets } from './runners';
 
@@ -15,16 +16,18 @@ jest.mock('./config', () => ({
     runnerHookVersion: '1.1',
   },
 }));
-class FakeCloudPostgres extends pulumi.Resource {}
 jest.mock('@lfdecentralizedtrust/splice-pulumi-common', () => ({
   __esModule: true,
   appsAffinityAndTolerations: {},
   DOCKER_REPO: 'https://dummy-docker-repo.com',
   HELM_MAX_HISTORY_SIZE: 42,
+  GCP_REGION: 'us-central123',
+  GCP_ZONE: 'some-wonderful-place',
   imagePullSecretByNamespaceNameForServiceAccount: () => [],
   infraAffinityAndTolerations: {},
-  CloudPostgres: function CloudPostgres() {
-    return new FakeCloudPostgres('CloudPostgres', 'cloud-postgres', true);
+  CloudSqlConfigSchema: z.object({ flags: z.record(z.string()).default({}) }),
+  installPostgresPasswordSecret: () => {
+    return { metadata: { name: 'secret' } };
   },
 }));
 jest.mock('@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig', () => ({
