@@ -53,6 +53,10 @@ export interface ConfigChange {
    * If the field is an id, e.g a party id.
    */
   isId?: boolean;
+  /**
+   * If the field should be disabled for editing.
+   */
+  disabled?: boolean;
 }
 
 export interface UpdateSvRewardWeightProposal {
