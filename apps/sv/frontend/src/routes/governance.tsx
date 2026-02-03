@@ -161,20 +161,6 @@ export const Governance: React.FC = () => {
     } as ProposalListingData;
   });
 
-  // TODO: Remove — manual test data for verifying column alignment with long text
-  voteHistory.unshift({
-    contractId: 'contract-id-001' as ContractId<VoteRequest>,
-    actionName: 'Set Canton Coin Rules Configuration',
-    description:
-      'Per CIP-0096, Validator liveness rewards should be set to 3.33 from 570 with an effective at threshold vote. Therefore...',
-    votingThresholdDeadline: '2025-09-25 11:00',
-    voteTakesEffect: '2025-12-01 00:00',
-    yourVote: 'accepted',
-    status: 'Implemented',
-    voteStats: { accepted: 9, rejected: 2, 'no-vote': 0 },
-    acceptanceThreshold: votingThreshold,
-  } as ProposalListingData);
-
   return (
     <Box sx={{ p: 4 }}>
       <PageHeader
