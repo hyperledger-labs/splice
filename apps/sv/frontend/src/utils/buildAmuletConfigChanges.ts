@@ -332,7 +332,7 @@ function buildDecentralizedSynchronizerChanges(
     label: `Decentralized Synchronizer (Required Synchronizer ${idx + 1})`,
     currentValue: beforeRequiredSynchronizers.includes(sync) ? sync : '',
     newValue: afterRequiredSynchronizers.includes(sync) ? sync : '',
-    disabled: idx + 1 === 1,
+    disabled: true,
   }));
 
   return [
