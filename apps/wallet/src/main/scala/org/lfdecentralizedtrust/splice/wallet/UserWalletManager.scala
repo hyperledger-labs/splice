@@ -35,12 +35,13 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.Mutex
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{blocking, ExecutionContext, Future}
 
 /** Manages all services comprising an end-user wallets. */
 class UserWalletManager(
@@ -84,12 +85,13 @@ class UserWalletManager(
   private[this] val endUserPartyWalletsMap
       : scala.collection.concurrent.Map[PartyId, (RetryProvider, UserWalletService)] =
     TrieMap.empty
+  private val mutex = Mutex()
 
   private[this] def removeEndUserPartyWallet(
       endUserParty: PartyId
   ): Option[(RetryProvider, UserWalletService)] =
     blocking {
-      this.synchronized {
+      mutex.exclusive {
         endUserPartyWalletsMap.remove(endUserParty)
       }
     }
@@ -102,7 +104,7 @@ class UserWalletManager(
       endUserParty: PartyId,
       createWallet: PartyId => (RetryProvider, UserWalletService),
   ): Option[(RetryProvider, UserWalletService)] = blocking {
-    this.synchronized {
+    mutex.exclusive {
       if (endUserPartyWalletsMap.contains(endUserParty)) {
         logger.debug(
           show"Wallet for user party ${endUserParty} already exists, not creating a new one."

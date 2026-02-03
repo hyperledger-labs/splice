@@ -1,10 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant
 
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveNumeric}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt, PositiveNumeric}
 import com.digitalasset.canton.config.StartupMemoryCheckConfig.ReportingLevel
 import com.digitalasset.canton.environment.{CantonNodeParameters, HasGeneralCantonNodeParameters}
 import com.digitalasset.canton.participant.admin.AdminWorkflowConfig
@@ -35,7 +35,11 @@ final case class ParticipantNodeParameters(
     doNotAwaitOnCheckingIncomingCommitments: Boolean,
     disableOptionalTopologyChecks: Boolean,
     commitmentCheckpointInterval: PositiveDurationSeconds,
+    commitmentMismatchDebugging: Boolean,
+    commitmentProcessorNrAcsChangesBehindToTriggerCatchUp: Option[PositiveInt],
+    commitmentReduceParallelism: NonNegativeInt,
     autoSyncProtocolFeatureFlags: Boolean,
+    alphaMultiSynchronizerSupport: Boolean,
 ) extends CantonNodeParameters
     with HasGeneralCantonNodeParameters {
   override def dontWarnOnDeprecatedPV: Boolean = protocolConfig.dontWarnOnDeprecatedPV
@@ -92,6 +96,10 @@ object ParticipantNodeParameters {
     doNotAwaitOnCheckingIncomingCommitments = false,
     disableOptionalTopologyChecks = false,
     commitmentCheckpointInterval = PositiveDurationSeconds.ofMinutes(1),
+    commitmentMismatchDebugging = false,
+    commitmentProcessorNrAcsChangesBehindToTriggerCatchUp = None,
+    commitmentReduceParallelism = NonNegativeInt.zero,
     autoSyncProtocolFeatureFlags = true,
+    alphaMultiSynchronizerSupport = false,
   )
 }

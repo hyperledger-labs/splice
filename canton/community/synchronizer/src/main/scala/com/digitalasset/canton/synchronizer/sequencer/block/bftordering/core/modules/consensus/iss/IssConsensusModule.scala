@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
@@ -481,6 +481,9 @@ final class IssConsensusModule[E <: Env[E]](
           // Note that (hopefully) the below message is the only block-level INFO log in the BFT Orderer.
           //  We intend to minimize the number of logs on the hot path.
           logger.info(s"Block ${orderedBlock.metadata} has been ordered")
+          logger.debug(
+            s"The newly ordered block ${orderedBlock.metadata} contains batch IDs ${orderedBlock.batchRefs.map(_.batchId).mkString(", ")}"
+          )
           emitConsensusLatencyStats(metrics)
 
           if (hasCompletedLedSegment)

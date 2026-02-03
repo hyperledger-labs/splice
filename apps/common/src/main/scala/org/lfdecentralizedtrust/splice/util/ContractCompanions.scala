@@ -10,12 +10,6 @@ import com.daml.ledger.javaapi.data.codegen.{
   DamlRecord,
   Contract as JavaGenContract,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.featuredapprightv1
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.{
   DecoderSpliceAmulet,
   DecoderSpliceAmuletNameService,
@@ -23,6 +17,14 @@ import org.lfdecentralizedtrust.splice.codegen.java.{
   DecoderSpliceValidatorLifecycle,
   DecoderSpliceWallet,
   DecoderSpliceWalletPayments,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.featuredapprightv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  allocationinstructionv1,
+  allocationrequestv1,
+  allocationv1,
+  holdingv1,
+  transferinstructionv1,
 }
 
 import scala.jdk.CollectionConverters.*

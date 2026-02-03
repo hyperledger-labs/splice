@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.store
@@ -240,6 +240,8 @@ trait ReassignmentStoreTest extends AsyncWordSpec with FailOnShutdown with BaseT
             val newCid = ExampleContractFactory.buildContractId(77)
             (
               ExampleContractFactory.modify(reassign.contract, contractId = Some(newCid)),
+              reassign.sourceValidationPackageId,
+              reassign.targetValidationPackageId,
               reassign.counter,
             )
           })

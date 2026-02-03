@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer
@@ -9,12 +9,7 @@ import com.daml.timer.RetryStrategy
 import com.daml.timer.RetryStrategy.UnhandledFailureException
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.participant.state.Update.CommitRepair
-import com.digitalasset.canton.ledger.participant.state.{
-  ParticipantUpdate,
-  RepairUpdate,
-  SynchronizerUpdate,
-  Update,
-}
+import com.digitalasset.canton.ledger.participant.state.{RepairUpdate, SynchronizerUpdate, Update}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.lifecycle.UnlessShutdown.AbortedDueToShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -22,11 +17,11 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.PekkoUtil.{FutureQueue, RecoveringFutureQueue}
 import com.digitalasset.canton.util.Thereafter.syntax.*
-import com.digitalasset.canton.util.{PekkoUtil, TryUtil}
+import com.digitalasset.canton.util.{Mutex, PekkoUtil, TryUtil}
 import org.apache.pekko.Done
 
 import scala.concurrent.duration.Duration
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NoStackTrace
 import scala.util.{Failure, Success, Try}
 
@@ -40,6 +35,8 @@ class IndexerState(
   import IndexerState.*
 
   private var state: State = Normal(recoveringIndexerFactory(), shutdownInitiated = false)
+  private val lock = new Mutex()
+
   private implicit val traceContext: TraceContext = TraceContext.empty
 
   // Requesting a Repair Indexer turns off normal indexing, therefore it needs to be ensured, before calling:
@@ -202,22 +199,7 @@ class IndexerState(
           shutdownInitiated = true,
         )
       }
-      queue.done.transform { doneResult =>
-        queue.uncommittedQueueSnapshot
-          .collect { case (_, participantUpdate: ParticipantUpdate) =>
-            participantUpdate
-          }
-          .foreach(
-            _.persisted
-              .tryFailure(
-                new IllegalStateException(
-                  "Indexer is shutting down, this Update won't be persisted."
-                )
-              )
-              .discard
-          )
-        handleShutdownDoneResult(doneResult)
-      }
+      queue.done.transform(handleShutdownDoneResult)
 
     case Repair(queueF, repairDone, shutdownInitiated) =>
       if (!shutdownInitiated) {
@@ -243,7 +225,6 @@ class IndexerState(
                 recoveringQueue.uncommittedQueueSnapshot.iterator.map(_._2).exists {
                   case u: SynchronizerUpdate => u.synchronizerId == synchronizerId
                   case _: Update.CommitRepair => false
-                  case _: Update.PartyAddedToParticipant => false
                 }
               )
                 Future.failed(
@@ -263,8 +244,28 @@ class IndexerState(
         Future.failed(new RepairInProgress(repairDone))
     }
 
+  def waitForFirstSuccessfulIndexerInitialization: Future[Unit] =
+    withStateUnlessShutdown {
+      case Normal(recoveringQueue, _) =>
+        logger.info("Waiting for first successful initialization of the indexer")
+        recoveringQueue.firstSuccessfulConsumerInitialization
+          .transform(
+            _ => logger.info("Indexer initialized"),
+            failure => {
+              logger.info(
+                "Waiting for first successful initialization of the indexer failed",
+                failure,
+              )
+              failure
+            },
+          )
+
+      case Repair(_, repairDone, _) =>
+        Future.failed(new RepairInProgress(repairDone))
+    }
+
   private def withState[T](f: State => T): T =
-    blocking(synchronized(f(state)))
+    (lock.exclusive(f(state)))
 
   def withStateUnlessShutdown[T](f: State => Future[T]): Future[T] =
     withState(s =>

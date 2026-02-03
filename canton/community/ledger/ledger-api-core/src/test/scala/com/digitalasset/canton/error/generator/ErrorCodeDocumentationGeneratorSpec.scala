@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.error.generator
@@ -104,6 +104,37 @@ class ErrorCodeDocumentationGeneratorSpec extends AnyFlatSpec with Matchers {
     actualGroupDocItems should have length (2)
     actualGroupDocItems(0) shouldBe expectedGroupDocItems(0)
     actualGroupDocItems(1) shouldBe expectedGroupDocItems(1)
+  }
+
+  it should "exclude errors and groups from specific packages" in {
+    val searchPackages = Array("com.digitalasset.canton.error.testpackage")
+    // We want to exclude the 'subpackage' which contains MildErrorsParent
+    val excludePackages = Array("com.digitalasset.canton.error.testpackage.subpackage")
+
+    val actualErrorDocItems = ErrorCodeDocumentationGenerator.getErrorCodeItems(
+      searchPackagePrefixes = searchPackages,
+      excludePackagePrefixes = excludePackages,
+    )
+
+    val actualGroupDocItems = ErrorCodeDocumentationGenerator.getErrorGroupItems(
+      searchPackagePrefixes = searchPackages,
+      excludePackagePrefixes = excludePackages,
+    )
+
+    // Verify Error Items
+    // We expect 2 items: "SeriousError" and "DeprecatedError" (from the root testpackage)
+    // We expect "MildErrorsParent" (from subpackage) to be missing
+    actualErrorDocItems should have length 2
+
+    // Check presence of retained errors
+    actualErrorDocItems.map(_.code) should contain allOf ("BLUE_SCREEN", "DEPRECATED_ERROR")
+
+    // Check absence of excluded error
+    actualErrorDocItems.map(_.code) should not contain "TEST_ROUTINE_FAILURE_PLEASE_IGNORE"
+
+    // Verify Group Items
+    // MildErrorsParent is defined entirely within the excluded subpackage, so groups should be empty
+    actualGroupDocItems shouldBe empty
   }
 
   it should "parse annotations of an error category" in {

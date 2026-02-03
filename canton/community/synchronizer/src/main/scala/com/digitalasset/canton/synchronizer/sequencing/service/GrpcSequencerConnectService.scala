@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.service
@@ -8,7 +8,7 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError.ProtoDeserializationFailure
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.SequencingTimeBound
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
@@ -51,7 +51,7 @@ class GrpcSequencerConnectService(
     synchronizerTopologyManager: SynchronizerTopologyManager,
     cryptoApi: SynchronizerCryptoClient,
     clock: Clock,
-    sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
+    sequencingTimeLowerBoundExclusive: SequencingTimeBound,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends proto.SequencerConnectServiceGrpc.SequencerConnectService
@@ -90,8 +90,11 @@ class GrpcSequencerConnectService(
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     val resultF = for {
       participant <- EitherT.fromEither[FutureUnlessShutdown](getParticipantFromGrpcContext())
-      isActive <- EitherT(
+      topologySnapshot <- EitherT.liftF(
         cryptoApi.ips.currentSnapshotApproximation
+      )
+      isActive <- EitherT(
+        topologySnapshot
           .isParticipantActive(participant)
           .map(_.asRight[String])
       )
@@ -146,7 +149,7 @@ class GrpcSequencerConnectService(
       - unnecessary warnings in the logs
       - unnecessary delay for the participant to figure out that onboarding has failed
        */
-      _ <- sequencingTimeLowerBoundExclusive match {
+      _ <- sequencingTimeLowerBoundExclusive.get match {
         case Some(boundExclusive) if now <= boundExclusive =>
           EitherT.leftT[Future, Unit](
             failedPrecondition(

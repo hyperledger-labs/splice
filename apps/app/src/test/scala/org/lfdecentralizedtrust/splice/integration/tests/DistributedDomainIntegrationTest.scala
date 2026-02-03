@@ -7,16 +7,13 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.Integration
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.{time, SynchronizerAlias}
+import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port, PositiveInt}
 import com.digitalasset.canton.networking.Endpoint
-import com.digitalasset.canton.sequencing.{
-  GrpcSequencerConnection,
-  SequencerConnection,
-  SubmissionRequestAmplification,
-}
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.*
 
@@ -71,15 +68,13 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
               .value
             synchronizerConfig.timeTracker.observationLatency shouldBe observationLatency
             val sequencerConnections = synchronizerConfig.sequencerConnections
-            val connections: Seq[SequencerConnection] = sequencerConnections.connections.forgetNE
-            sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
+            val connections = sequencerConnections.connections.forgetNE
+            sequencerConnections.submissionRequestAmplification.toInternal shouldBe SubmissionRequestAmplification(
               PositiveInt.tryCreate(2),
-              NonNegativeFiniteDuration.ofSeconds(10),
+              time.NonNegativeFiniteDuration.tryOfSeconds(10),
             )
             val endpoints = connections.map { s =>
-              inside(s) { case GrpcSequencerConnection(endpoint, _, _, _, _) =>
-                endpoint
-              }
+              inside(s) { case connection: data.GrpcSequencerConnection => connection.endpoints }
             }
             endpoints.toSet shouldBe Seq(5108, 5208, 5308, 5408)
               .map(port =>

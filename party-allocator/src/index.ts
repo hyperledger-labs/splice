@@ -108,11 +108,11 @@ async function setupTopology(
   );
   const signature = crypto.sign(
     null,
-    Buffer.from(generateTopologyResponse.multiHash, "base64"),
+    Buffer.from(generateTopologyResponse.multiHash ?? "", "base64"),
     keyPair.privateKey,
   );
   await client.allocateExternalParty(
-    generateTopologyResponse.partyId,
+    generateTopologyResponse.partyId ?? "",
     synchronizerId,
     generateTopologyResponse.topologyTransactions!.map((t) => ({
       transaction: t,
@@ -122,7 +122,7 @@ async function setupTopology(
       {
         format: "SIGNATURE_FORMAT_RAW",
         signature: signature.toString("base64"),
-        signedBy: generateTopologyResponse.partyId.split("::")[1],
+        signedBy: generateTopologyResponse.partyId!.split("::")[1],
         signingAlgorithmSpec: "SIGNING_ALGORITHM_SPEC_ED25519",
       },
     ],
@@ -231,13 +231,13 @@ async function setupParty(
   );
 
   await timed(metrics.tapLatencyMs, () =>
-    tap(client, synchronizerId, partyId, keyPair),
+    tap(client, synchronizerId, partyId!, keyPair),
   );
   await timed(metrics.preapprovalLatencyMs, () =>
     setupPreapproval(
       client,
       synchronizerId,
-      partyId,
+      partyId!,
       validatorPartyId,
       keyPair,
     ),

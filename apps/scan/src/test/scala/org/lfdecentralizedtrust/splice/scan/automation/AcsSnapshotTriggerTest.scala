@@ -24,6 +24,7 @@ import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
+import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j.event.Level
 
@@ -589,6 +590,7 @@ class AcsSnapshotTriggerTest
           dummyDomain.toProtoPrimitive,
           TraceContextOuterClass.TraceContext.getDefaultInstance,
           recordTime.toInstant,
+          ByteString.EMPTY,
         )
       )
     }

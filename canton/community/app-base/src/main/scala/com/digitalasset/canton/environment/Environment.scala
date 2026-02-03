@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -45,7 +45,7 @@ import com.digitalasset.canton.time.*
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider}
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
-import com.digitalasset.canton.util.{MonadUtil, PekkoUtil, SingleUseCell}
+import com.digitalasset.canton.util.{MonadUtil, Mutex, PekkoUtil, SingleUseCell}
 import com.google.common.annotations.VisibleForTesting
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
@@ -55,15 +55,14 @@ import org.slf4j.bridge.SLF4JBridgeHandler
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Future, blocking}
 import scala.util.control.NonFatal
 
 /** Holds all significant resources held by this process.
   */
 abstract class Environment[Config <: SharedCantonConfig[Config]](
     initialConfig: Config,
-    edition: CantonEdition,
     val testingConfig: TestingConfigInternal,
     participantNodeFactory: ParticipantNodeBootstrapFactory,
     sequencerNodeFactory: SequencerNodeBootstrapFactory,
@@ -136,8 +135,6 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
     loggerFactory,
   )
 
-  def isEnterprise: Boolean = edition == EnterpriseCantonEdition
-
   @VisibleForTesting
   protected def createHealthDumpGenerator(
       commandRunner: GrpcAdminCommandRunner
@@ -195,6 +192,8 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
 
   private val deadlockConfig = config.monitoring.deadlockDetection
   protected def timeouts: ProcessingTimeout = config.parameters.timeouts.processing
+
+  private val lock = new Mutex()
 
   protected val futureSupervisor =
     if (config.monitoring.logging.logSlowFutures)
@@ -554,7 +553,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
 
   def addUserCloseable(closeable: AutoCloseable): Unit = userCloseables.append(closeable)
 
-  override def close(): Unit = blocking(this.synchronized {
+  override def close(): Unit = (lock.exclusive {
     val closeActorSystem: AutoCloseable =
       LifeCycle.toCloseableActorSystem(actorSystem, logger, timeouts)
 
@@ -602,7 +601,6 @@ trait EnvironmentFactory[C <: SharedCantonConfig[C], E <: Environment[C]] {
 
 final class CantonEnvironment(
     override val config: CantonConfig,
-    edition: CantonEdition,
     override val testingConfig: TestingConfigInternal,
     participantNodeFactory: ParticipantNodeBootstrapFactory,
     sequencerNodeFactory: SequencerNodeBootstrapFactory,
@@ -610,7 +608,6 @@ final class CantonEnvironment(
     override val loggerFactory: NamedLoggerFactory,
 ) extends Environment[CantonConfig](
       config,
-      edition,
       testingConfig,
       participantNodeFactory,
       sequencerNodeFactory,

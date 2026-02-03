@@ -1,27 +1,20 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.KmsConfig.RetryConfig
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.util.retry
 import com.typesafe.config.ConfigValue
 
 sealed trait KmsConfig {
-
-  /** Session signing keys configuration for KMS (by default session signing keys are enabled). */
-  def sessionSigningKeys: SessionSigningKeysConfig
 
   /** Retry configuration for KMS operations */
   def retries: RetryConfig
 }
 
 object KmsConfig {
-
-  implicit val kmsConfigCantonConfigValidator: CantonConfigValidator[KmsConfig] =
-    CantonConfigValidatorDerivation[KmsConfig]
 
   /** Exponential backoff configuration for retries of network failures
     *
@@ -36,13 +29,7 @@ object KmsConfig {
       initialDelay: config.NonNegativeFiniteDuration,
       maxDelay: config.NonNegativeDuration,
       maxRetries: Int,
-  ) extends UniformCantonConfigValidation
-
-  object ExponentialBackoffConfig {
-    implicit val exponentialBackoffConfigCantonConfigValidator
-        : CantonConfigValidator[ExponentialBackoffConfig] =
-      CantonConfigValidatorDerivation[ExponentialBackoffConfig]
-  }
+  )
 
   /** Retry configuration for KMS operations
     *
@@ -63,12 +50,7 @@ object KmsConfig {
         maxDelay = config.NonNegativeDuration.ofSeconds(10),
         maxRetries = 20,
       ),
-  ) extends UniformCantonConfigValidation
-
-  object RetryConfig {
-    implicit val retryConfigCantonConfigValidator: CantonConfigValidator[RetryConfig] =
-      CantonConfigValidatorDerivation[RetryConfig]
-  }
+  )
 
   /** A KMS configuration for an external KMS driver.
     *
@@ -87,19 +69,8 @@ object KmsConfig {
       name: String,
       config: ConfigValue,
       healthCheckPeriod: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(10),
-      // TODO(#27529): Enable after the topology snapshot problem has been fixed
-      override val sessionSigningKeys: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
       override val retries: RetryConfig = RetryConfig(),
   ) extends KmsConfig
-      with UniformCantonConfigValidation
-
-  object Driver {
-    // Don't try to validate anything inside the config value of the driver
-    private implicit def configValueCantonConfigValidator: CantonConfigValidator[ConfigValue] =
-      CantonConfigValidator.validateAll
-    implicit val driverCantonConfigValidator: CantonConfigValidator[Driver] =
-      CantonConfigValidatorDerivation[Driver]
-  }
 
   /** Stores the configuration for AWS KMS. This configuration is mandatory if we want to protect
     * Canton's private keys using an AWS KMS.
@@ -124,13 +95,10 @@ object KmsConfig {
       region: String,
       multiRegionKey: Boolean = false,
       auditLogging: Boolean = false,
-      // TODO(#27529): Enable after the topology snapshot problem has been fixed
-      override val sessionSigningKeys: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
       override val retries: RetryConfig = RetryConfig(),
       disableSslVerification: Boolean = false,
       endpointOverride: Option[String] = None,
   ) extends KmsConfig
-      with UniformCantonConfigValidation
 
   object Aws {
     val defaultTestConfig: Aws = Aws(region = "us-east-1")
@@ -150,8 +118,6 @@ object KmsConfig {
     *   key-ring, which enables multi-region keys
     * @param auditLogging
     *   when enabled, all calls to KMS will be logged. Defaults to false.
-    * @param sessionSigningKeys
-    *   session signing keys' configuration
     * @param retries
     *   retry configuration
     * @param endpointOverride
@@ -162,12 +128,9 @@ object KmsConfig {
       projectId: String,
       keyRingId: String,
       auditLogging: Boolean = false,
-      // TODO(#27529): Enable after the topology snapshot problem has been fixed
-      override val sessionSigningKeys: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
       override val retries: RetryConfig = RetryConfig(),
       endpointOverride: Option[String] = None,
   ) extends KmsConfig
-      with UniformCantonConfigValidation
 
   object Gcp {
     val defaultTestConfig: Gcp = Gcp(

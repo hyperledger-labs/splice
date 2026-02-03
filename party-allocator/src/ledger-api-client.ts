@@ -134,7 +134,7 @@ export class LedgerApiClient {
     deduplicationPeriod.Empty = {};
     const signature = crypto.sign(
       null,
-      Buffer.from(preparedTransaction.preparedTransactionHash, "base64"),
+      Buffer.from(preparedTransaction.preparedTransactionHash!, "base64"),
       privateKey,
     );
 
@@ -144,8 +144,8 @@ export class LedgerApiClient {
           deduplicationPeriod,
           submissionId: crypto.randomUUID(),
           userId: "",
-          hashingSchemeVersion: preparedTransaction.hashingSchemeVersion,
-          preparedTransaction: preparedTransaction.preparedTransaction,
+          hashingSchemeVersion: preparedTransaction.hashingSchemeVersion!,
+          preparedTransaction: preparedTransaction.preparedTransaction!,
           partySignatures: {
             signatures: [
               {
@@ -189,7 +189,7 @@ export class LedgerApiClient {
     };
     const request: GetActiveContractsRequest = {
       verbose: false,
-      activeAtOffset: ledgerEnd,
+      activeAtOffset: ledgerEnd!,
       eventFormat: {
         verbose: false,
         filtersByParty: Object.fromEntries(parties.map((p) => [p, filters])),
@@ -199,8 +199,8 @@ export class LedgerApiClient {
       this.api.postV2StateActiveContracts(request),
     );
     return responses.flatMap((r) =>
-      r.contractEntry.JsActiveContract.createdEvent
-        ? [r.contractEntry.JsActiveContract.createdEvent]
+      r.contractEntry!.JsActiveContract.createdEvent
+        ? [r.contractEntry!.JsActiveContract.createdEvent]
         : [],
     );
   }

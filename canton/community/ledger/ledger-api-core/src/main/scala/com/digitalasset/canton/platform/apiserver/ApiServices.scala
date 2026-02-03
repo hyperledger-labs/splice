@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver
@@ -121,6 +121,7 @@ object ApiServices {
       interactiveSubmissionEnricher: InteractiveSubmissionEnricher,
       logger: TracedLogger,
       packagePreferenceBackend: PackagePreferenceBackend,
+      apiContractService: ApiContractService,
   )(implicit
       materializer: Materializer,
       esf: ExecutionSequencerFactory,
@@ -206,6 +207,7 @@ object ApiServices {
             new PackageServiceAuthorization(apiPackageService, authorizer),
             new UpdateServiceAuthorization(apiUpdateService, authorizer),
             new StateServiceAuthorization(apiStateService, authorizer),
+            new ContractServiceAuthorization(apiContractService, authorizer),
             apiVersionService,
           )
 
@@ -225,7 +227,6 @@ object ApiServices {
               submissionIdGenerator = SubmissionIdGenerator.Random,
               identityProviderExists = new IdentityProviderExists(identityProviderConfigStore),
               partyRecordExist = new PartyRecordsExist(partyRecordStore),
-              indexPartyManagementService = partyManagementService,
               telemetry = telemetry,
               loggerFactory = loggerFactory,
             )

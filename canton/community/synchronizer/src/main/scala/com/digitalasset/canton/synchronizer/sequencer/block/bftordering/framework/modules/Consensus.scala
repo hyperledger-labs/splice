@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules
@@ -52,8 +52,10 @@ object Consensus {
   sealed trait LocalAvailability extends ProtocolMessage
   object LocalAvailability {
     final case object NoProposalAvailableYet extends LocalAvailability
-    final case class ProposalCreated(orderingBlock: OrderingBlock, epochNumber: EpochNumber)
-        extends LocalAvailability
+    final case class ProposalCreated(
+        forBlock: BlockNumber,
+        orderingBlock: OrderingBlock,
+    ) extends LocalAvailability
   }
 
   /** The networked consensus protocol for ISS running on top of PBFT
@@ -225,7 +227,7 @@ object Consensus {
           Some(originalByteString),
         )
 
-      override def versioningTable: VersioningTable =
+      override val versioningTable: VersioningTable =
         VersioningTable(
           SupportedVersions.ProtoData ->
             VersionedProtoCodec(SupportedVersions.CantonProtocol)(v30.StateTransferMessage)(
@@ -300,7 +302,7 @@ object Consensus {
           rpv <- protocolVersionRepresentativeFor(SupportedVersions.ProtoData)
         } yield BlockTransferResponse(commitCert, from)(rpv, Some(originalByteString))
 
-      override def versioningTable: VersioningTable = VersioningTable(
+      override val versioningTable: VersioningTable = VersioningTable(
         SupportedVersions.ProtoData ->
           VersionedProtoCodec(SupportedVersions.CantonProtocol)(v30.StateTransferMessage)(
             supportedProtoVersionMemoized(_)(fromProtoStateTransferMessage),

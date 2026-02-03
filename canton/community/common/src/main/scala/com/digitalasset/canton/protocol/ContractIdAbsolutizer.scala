@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
@@ -216,9 +216,9 @@ object ContractIdAbsolutizer {
         } yield {
           val hash = hashOps
             .build(HashPurpose.ContractIdAbsolutization)
-            .add(v2.suffix.toByteString)
-            .add(updateId.getCryptographicEvidence)
-            .add(ledgerTime.toProtoPrimitive)
+            .addByteString(v2.suffix.toByteString)
+            .addByteString(updateId.getCryptographicEvidence)
+            .addLong(ledgerTime.toProtoPrimitive)
             .finish()
           val suffix = version.versionPrefixBytesAbsolute.toByteString.concat(hash.unwrap)
           RelativeContractIdSuffixV2(version, v2.suffix) ->

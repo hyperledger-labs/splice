@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.daml.jwt
@@ -31,6 +31,7 @@ object JwtSigner extends WithExecuteUnsafe {
       )
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   object RSA256 {
     def sign(jwt: DecodedJwt[String], privateKey: RSAPrivateKey): Either[Error, Jwt] =
       for {

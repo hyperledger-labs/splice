@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -11,7 +11,7 @@ import com.daml.metrics.api.{HistogramInventory, MetricName}
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.{CantonConfig, CommunityCantonEdition, TestingConfigInternal}
+import com.digitalasset.canton.config.{CantonConfig, TestingConfigInternal}
 import com.digitalasset.canton.integration.ConfigTransforms
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.participant.config.*
@@ -126,11 +126,10 @@ class CommunityEnvironmentTest extends AnyWordSpec with BaseTest with HasExecuti
 
     val environment = new CantonEnvironment(
       config,
-      CommunityCantonEdition,
       TestingConfigInternal(initializeGlobalOpenTelemetry = false),
       new ParticipantNodeBootstrapFactory {
         override protected def createLedgerApiBootstrapUtils(
-            arguments: this.Arguments,
+            arguments: Arguments,
             engine: Engine,
             testingTimeService: TestingTimeService,
         )(implicit

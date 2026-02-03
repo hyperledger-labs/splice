@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.client.services.pkg
@@ -19,6 +19,7 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.Future
 
+@SuppressWarnings(Array("com.digitalasset.canton.DirectGrpcServiceInvocation"))
 final class PackageClient(
     service: PackageServiceStub,
     getDefaultToken: () => Option[String] = () => None,

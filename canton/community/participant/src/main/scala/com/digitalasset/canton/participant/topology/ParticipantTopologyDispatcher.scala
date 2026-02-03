@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.topology
@@ -100,7 +100,7 @@ class ParticipantTopologyDispatcher(
     synchronizers.remove(synchronizerId) match {
       case Some(outboxes) =>
         disconnectOutboxes(synchronizerId)
-        outboxes.foreach(_.close())
+        LifeCycle.close(outboxes*)(logger)
       case None =>
         logger.debug(s"Topology pusher already disconnected from $synchronizerId")
     }
