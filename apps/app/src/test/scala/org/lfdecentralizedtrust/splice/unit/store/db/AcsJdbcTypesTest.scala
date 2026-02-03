@@ -115,6 +115,26 @@ class AcsJdbcTypesTest
         )
       } yield result.toSeq should contain theSameElementsAs value
     }
+
+    "set and get long arrays" in {
+      val value = Seq(1L, 2L, 3L, Long.MaxValue, Long.MinValue)
+      for {
+        result <- storage.querySingle(
+          sql"select ${value}".as[Array[Long]].headOption,
+          "long array",
+        )
+      } yield result.toSeq should contain theSameElementsAs value
+    }
+
+    "set and get empty long arrays" in {
+      val value = Seq.empty[Long]
+      for {
+        result <- storage.querySingle(
+          sql"select ${value}".as[Array[Long]].headOption,
+          "empty long array",
+        )
+      } yield result.toSeq shouldBe empty
+    }
   }
 
   case class TestRow(
