@@ -100,6 +100,14 @@ Current Canton commit: `50ef182732c8285cf1bdaeeceac8943b6784e304`
 
 You can refer to https://github.com/DACH-NY/canton-network-node/pull/446/commits for an example of how the update PR should look like.
 
+## Patching Our Canton fork
+When we want to patch our Canton fork with a fix or improvement from a stable release of Canton,
+we cherry-pick the relevant commit(s) from the Canton repo:
+```
+    git remote add canton-upstream https://github.com/DACH-NY/canton.git
+    git fetch canton-upstream
+    git cherry-pick COMMIT_HASH # you may sign-off the cherry-pick if original DCO is missing
+```
 
 ### Updating Canton build dependencies
 

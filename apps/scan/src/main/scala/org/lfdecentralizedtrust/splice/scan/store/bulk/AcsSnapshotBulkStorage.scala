@@ -55,8 +55,8 @@ class AcsSnapshotBulkStorage(
                 )
               )
             case None =>
+              logger.debug("No new snapshot available, sleeping...")
               after(snapshotPollingInterval, actorSystem.scheduler) {
-                logger.debug("No new snapshot available, sleeping...")
                 Future.successful(Some(((lastMigrationId, lastTimestamp), None)))
               }
           }

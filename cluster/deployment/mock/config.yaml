@@ -137,6 +137,9 @@ svs:
         cron: "0 0 * * *"
         maxDuration: "30m"
         retentionPeriod: "7d"
+    cometbft:
+      mempool:
+        size: 4000
     scanApp:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
@@ -285,6 +288,10 @@ cluster:
   nodePools:
     apps:
       nodeType: n2-standard-16
+    hyperdiskApps:
+      nodeType: c4-standard-16
+      minNodes: 0
+      maxNodes: 1
 networkWide:
   maxVettingDelay: 1m
 validators:

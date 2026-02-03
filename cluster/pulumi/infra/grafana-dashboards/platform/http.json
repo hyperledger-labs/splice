@@ -572,7 +572,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Http Server",
   "uid": "aerbb811lwveod",
   "version": 4

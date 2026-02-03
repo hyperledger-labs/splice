@@ -39,7 +39,7 @@
         "x": 0,
         "y": 0
       },
-      "panels": [ ],
+      "panels": [],
       "repeat": null,
       "repeatIteration": null,
       "repeatRowId": null,
@@ -50,7 +50,6 @@
       "type": "row"
     },
     {
-
       "datasource": {
         "uid": "$datasource"
       },
@@ -1454,7 +1453,7 @@
       "30d"
     ]
   },
-  "timezone": "browser",
+  "timezone": "",
   "title": "Postgres Overview",
   "uid": "wGgaPlciz",
   "version": 39,

@@ -1,5 +1,5 @@
-ARG RUNNER_VERSION=2.330.0
-ARG RUNNER_DIGEST=sha256:ee54ad8776606f29434f159196529b7b9c83c0cb9195c1ff5a7817e7e570dcfe
+ARG RUNNER_VERSION=2.331.0
+ARG RUNNER_DIGEST=sha256:dced476aa42703ebd9aafc295ce52f160989c4528e831fc3be2aef83a1b3f6da
 
 # Note that we don't currently support arm64 runners, so we build this only for amd64
 FROM --platform=$BUILDPLATFORM ghcr.io/actions/actions-runner:${RUNNER_VERSION}@${RUNNER_DIGEST}
@@ -14,7 +14,9 @@ RUN sudo apt-get update && \
     sudo apt-get install -y sudo git curl xz-utils pigz rsync jq unzip python3-pip moreutils && \
     sudo rm -rf /var/lib/apt/lists/*
 
-RUN sudo pip3 install GitPython gql humanize marshmallow-dataclass requests requests_toolbelt prometheus_client
+RUN sudo pip3 install \
+    --break-system-packages \
+    GitPython gql humanize marshmallow-dataclass requests requests_toolbelt prometheus_client
 
 RUN sudo ln -s /usr/bin/python3 /usr/bin/python
 

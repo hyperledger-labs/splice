@@ -1551,6 +1551,7 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
+          /*externalTransactionHash = */ ByteString.EMPTY, // TODO(#3408): Revisit when ingesting to DB
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
@@ -1615,6 +1616,7 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
+          /*externalTransactionHash = */ ByteString.EMPTY, // TODO(#3408): Revisit when ingesting to DB
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
@@ -2589,6 +2591,16 @@ object UpdateHistory {
   // so we read them back as an arbitrary value.
   private def missingString: String = ""
   private def missingStringSeq: Seq[String] = Seq.empty
+}
+
+final case class TimestampWithMigrationId(
+    timestamp: CantonTimestamp,
+    migrationId: Long,
+)
+
+object TimestampWithMigrationId {
+  implicit val ordering: Ordering[TimestampWithMigrationId] =
+    Ordering.by(x => (x.migrationId, x.timestamp))
 }
 
 final case class TreeUpdateWithMigrationId(

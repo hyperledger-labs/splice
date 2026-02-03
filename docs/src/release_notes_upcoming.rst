@@ -9,3 +9,10 @@
 
 .. release-notes:: Upcoming
 
+   - Deployment
+
+    - postgres-exporter: disabled exporting the settings table, to workaround `an issue of postgres-exporter <https://github.com/prometheus-community/postgres_exporter/issues/1240>`__.
+
+   - SV app
+
+    - Add a new trigger, ``ExpiredDevelopmentFundCouponTrigger`` for expiring development fund coupons.
