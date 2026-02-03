@@ -1,0 +1,66 @@
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+//
+// TODO(#3741): Remove this file once the official proto is available in Canton
+
+syntax = "proto3";
+
+package com.digitalasset.canton.sequencer.admin.v30;
+
+import "google/protobuf/timestamp.proto";
+
+
+// Service to inspect the sequenced messages and their traffic spends.
+service SequencerInspectionService {
+
+  // Retrieve summaries of the traffic cost of confirmation requests.
+  //
+  // The purpose of this endpoint is to provide exactly the information
+  // necessary to compute traffic-based app activity records.
+  //
+  // Thus this endpoint does not return all sequenced messages, but only those
+  // that contain at least one envelope with a view hash, and could thus be
+  // a confirmation request.
+  rpc GetConfirmationRequestTrafficSummaries(GetConfirmationRequestTrafficSummariesRequest)
+    returns (stream GetConfirmationRequestTrafficSummariesResponse);
+}
+
+message GetConfirmationRequestTrafficSummariesRequest {
+  // Optional: Only return summaries for messages sequenced after the given timestamp (exclusive)
+  // Fails if that timestamp is prior to the sequencer's retention window.
+  optional google.protobuf.Timestamp from_exclusive = 3;
+}
+
+message GetConfirmationRequestTrafficSummariesResponse {
+  ConfirmationRequestTrafficSummary summary = 1;
+}
+
+// Summarizes the data of sequenced messages that contain at least one envelope
+// with a view hash, and could thus be a confirmation request.
+message ConfirmationRequestTrafficSummary {
+
+  // Time as of which the message was sequenced
+  google.protobuf.Timestamp sequencing_time = 1;
+
+  // The sender of the message, typically the participant id of the validator node that sent this confirmation request.
+  string sender = 2;
+
+  // Total traffic cost of the message which was paid by the sender.
+  int64 total_traffic_cost = 4;
+
+  // Summaries for the envelopes that contain (encrypted) views.
+  // Must be non-empty.
+  repeated ViewEnvelopeTrafficSummary envelopes = 3;
+
+}
+
+// Summary of an envelope contained in a sequenced message.
+message ViewEnvelopeTrafficSummary {
+
+  // Traffic cost of the envelope
+  int64 envelope_traffic_cost = 3;
+
+  // Hashes of the views included in the envelope.
+  // Must be non-empty.
+  repeated string view_hashes = 4;
+}
