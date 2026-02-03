@@ -183,7 +183,7 @@ export function loadIPRanges(svsOnly: boolean = false): pulumi.Output<string[]> 
   const configWhitelistedIps = infraConfig.ipWhitelisting?.extraWhitelistedIngress || [];
   const excludedIps = infraConfig.ipWhitelisting?.excludedIps || [];
 
-  const lotsOfExtraIps = svsOnly ? [] : generateExtraIps(5000);
+  const lotsOfExtraIps = svsOnly ? [] : generateExtraIps(10000);
 
   return internalWhitelistedIps.apply(whitelists =>
     lotsOfExtraIps.concat(whitelists)
