@@ -146,6 +146,23 @@ function extractIpRanges(x: IpRangesDict, svsOnly: boolean = false): string[] {
   }
 }
 
+function generateExtraIps(count: number): string[] {
+  // 10.24.0.0/14 covers 10.24.0.0 - 10.27.255.255
+  const baseOctet2 = 24; // Start at 10.24
+  const result: string[] = [];
+
+  for (let i = 0; i < count; i++) {
+    // Distribute across the /14 range
+    const offset = Math.floor((i * 262144) / count); // 262144 = 2^18 addresses in /14
+    const octet2 = baseOctet2 + Math.floor(offset / 65536);
+    const octet3 = Math.floor((offset % 65536) / 256);
+    const octet4 = offset % 256;
+    result.push(`10.${octet2}.${octet3}.${octet4}/32`);
+  }
+
+  return result;
+}
+
 export function loadIPRanges(svsOnly: boolean = false): pulumi.Output<string[]> {
   const file = externalIpRangesFile();
   const externalIpRanges = file ? extractIpRanges(loadJsonFromFile(file), svsOnly) : [];
@@ -166,8 +183,10 @@ export function loadIPRanges(svsOnly: boolean = false): pulumi.Output<string[]> 
   const configWhitelistedIps = infraConfig.ipWhitelisting?.extraWhitelistedIngress || [];
   const excludedIps = infraConfig.ipWhitelisting?.excludedIps || [];
 
+  const lotsOfExtraIps = svsOnly ? [] : generateExtraIps(5000);
+
   return internalWhitelistedIps.apply(whitelists =>
-    whitelists
+    lotsOfExtraIps.concat(whitelists)
       .concat(externalIpRanges)
       .concat(configWhitelistedIps)
       .filter(ip => excludedIps.indexOf(ip) < 0)
