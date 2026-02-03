@@ -288,6 +288,10 @@ cluster:
   nodePools:
     apps:
       nodeType: n2-standard-16
+    hyperdiskApps:
+      nodeType: c4-standard-16
+      minNodes: 0
+      maxNodes: 1
 networkWide:
   maxVettingDelay: 1m
 validators:
