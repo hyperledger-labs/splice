@@ -13,7 +13,6 @@ export function installNodePools(): void {
     : clusterName;
 
   const nodepoolLocation = config.optionalEnv('CLOUDSDK_HYPERDISK_NODEPOOL_COMPUTE_ZONE');
-  console.error(`LOCATION: ${nodepoolLocation}`);
 
   if (gkeClusterConfig.nodePools.hyperdiskApps) {
     hyperdiskNodePool(cluster, gkeClusterConfig.nodePools.hyperdiskApps, nodepoolLocation);
@@ -96,7 +95,7 @@ function hyperdiskNodePool(cluster: string, config: GkeNodePoolConfig, location?
       },
       loggingVariant: 'DEFAULT',
     },
-    location: location,
+    nodeLocations: location ? [location] : undefined,
     initialNodeCount: 0,
     autoscaling: {
       minNodeCount: config.minNodes,
@@ -104,7 +103,7 @@ function hyperdiskNodePool(cluster: string, config: GkeNodePoolConfig, location?
     },
   });
 }
-function appsNodePool(cluster: string, appsNodePoolConfig: GkeNodePoolConfig, location?: string) {
+function appsNodePool(cluster: string, appsNodePoolConfig: GkeNodePoolConfig) {
   new gcp.container.NodePool('cn-apps-node-pool', {
     cluster,
     nodeConfig: {
@@ -121,7 +120,6 @@ function appsNodePool(cluster: string, appsNodePoolConfig: GkeNodePoolConfig, lo
       },
       loggingVariant: 'DEFAULT',
     },
-    location: location,
     initialNodeCount: 0,
     autoscaling: {
       minNodeCount: appsNodePoolConfig.minNodes,
