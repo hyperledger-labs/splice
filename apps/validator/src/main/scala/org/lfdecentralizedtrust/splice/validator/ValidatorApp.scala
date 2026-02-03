@@ -800,6 +800,7 @@ class ValidatorApp(
         domainMigrationInfo,
         participantId,
         config.automation.ingestion,
+        config.acsStoreDescriptorUserVersion,
       )
       validatorUpdateHistory = new UpdateHistory(
         storage,
@@ -873,6 +874,7 @@ class ValidatorApp(
             config.ingestFromParticipantBegin,
             config.ingestUpdateHistoryFromParticipantBegin,
             config.parameters,
+            scanConnection,
           )
           val walletManager = new UserWalletManager(
             ledgerClient,

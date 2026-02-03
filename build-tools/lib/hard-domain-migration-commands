@@ -79,6 +79,7 @@ function subcmd_update_config_to_migrate() {
   yq e 'with(.synchronizerMigration; .legacy = .active | .active = .upgrade | del(.upgrade))' -i $configFile
   yq e '.synchronizerMigration.active.migratingFrom = 0' -i $configFile
   yq e 'del(.synchronizerMigration.legacy.releaseReference)' -i $configFile
+  "${SPLICE_ROOT}/cluster/scripts/resolve-config.sh"
 }
 
 subcommand_whitelist[update_config_to_archive_legacy_migration]='Upgrade the cluster config.yaml to archive legacy migration'
@@ -92,6 +93,7 @@ function subcmd_update_config_to_archive_legacy_migration() {
   fi
 
   yq e '.synchronizerMigration.archived = [ .synchronizerMigration.legacy ] | del(.synchronizerMigration.legacy)' -i $configFile
+  "${SPLICE_ROOT}/cluster/scripts/resolve-config.sh"
 }
 
 subcommand_whitelist[update_config_to_remove_migrating_from]='Upgrade the cluster config.yaml to remove migratingFrom field from active migration'
@@ -105,4 +107,5 @@ function subcmd_update_config_to_remove_migrating_from() {
   fi
 
   yq e 'del(.synchronizerMigration.active.migratingFrom)' -i $configFile
+  "${SPLICE_ROOT}/cluster/scripts/resolve-config.sh"
 }

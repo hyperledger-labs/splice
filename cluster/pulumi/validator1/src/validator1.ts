@@ -128,6 +128,7 @@ export async function installValidator1(
     participantPruningConfig,
     deduplicationDuration: validator1Config?.deduplicationDuration,
     disableAuth: validator1Config?.disableAuth,
+    version: activeVersion,
   });
   installIngress(xns, installSplitwell, decentralizedSynchronizerMigrationConfig);
 

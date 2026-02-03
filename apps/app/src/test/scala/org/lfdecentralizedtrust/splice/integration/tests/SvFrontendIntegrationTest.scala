@@ -1489,7 +1489,7 @@ class SvFrontendIntegrationTest
   }
 
   def getActionRequiredElems()(implicit webDriver: WebDriverType) = {
-    webDriver.findElements(By.cssSelector("[data-testid='action-required-card']"))
+    webDriver.findElements(By.cssSelector("[data-testid='action-required-view-details']"))
   }
 
   def getVoteRequestsRejectedSize()(implicit webDriver: WebDriverType) = {

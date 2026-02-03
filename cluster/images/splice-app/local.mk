@@ -13,13 +13,11 @@ include ${SPLICE_ROOT}/cluster/images/common/entrypoint-image.mk
 
 $(dir)/$(docker-build): $(dir)/target/entrypoint.sh $(dir)/target/LICENSE $(target-bundle) $(target-logback)
 
-$(dir)/target/LICENSE: ${SPLICE_ROOT}/cluster/images/LICENSE
-	mkdir -p $(@D)
+$(dir)/target/LICENSE: ${SPLICE_ROOT}/cluster/images/LICENSE | $(dir)/target
 	cp $< $@
 
-$(target-bundle): $(app-bundle)
-	mkdir -p $(@D)
+$(target-bundle): $(app-bundle) | $(dir)/target
 	cp $< $@
 
-$(target-logback): ${SPLICE_ROOT}/scripts/canton-logback.xml
+$(target-logback): ${SPLICE_ROOT}/scripts/canton-logback.xml | $(dir)/target
 	cp $< $@

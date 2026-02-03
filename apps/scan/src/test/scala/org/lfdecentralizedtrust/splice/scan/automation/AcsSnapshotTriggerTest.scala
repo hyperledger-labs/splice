@@ -3,6 +3,7 @@ package org.lfdecentralizedtrust.splice.scan.automation
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.Transaction
 import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.automation.{TriggerContext, TriggerEnabledSynchronization}
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
@@ -24,7 +25,7 @@ import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
-import com.google.protobuf.ByteString
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j.event.Level
 
@@ -568,6 +569,11 @@ class AcsSnapshotTriggerTest
       updateHistoryBackfillEnabled: Boolean,
       val currentMigrationId: Long = 5L,
   ) {
+    final def storageConfig = ScanStorageConfig(
+      dbAcsSnapshotPeriodHours = 1,
+      0, // ignored in this test
+      0L, // ignored in this test
+    )
     final def snapshotPeriodHours: Int = 1
 
     val clock = new SimClock(loggerFactory = loggerFactory)
@@ -635,7 +641,7 @@ class AcsSnapshotTriggerTest
     val trigger = new AcsSnapshotTrigger(
       store,
       updateHistory,
-      snapshotPeriodHours,
+      storageConfig,
       updateHistoryBackfillEnabled = updateHistoryBackfillEnabled,
       triggerContext,
     )

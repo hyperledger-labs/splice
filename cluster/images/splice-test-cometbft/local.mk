@@ -14,5 +14,5 @@ $(dir)/clean-configs: $(dir)/configs
 $(dir)/configs: ${SPLICE_ROOT}/apps/sv/src/test/resources/cometbft
 	${SPLICE_ROOT}/cluster/images/splice-test-cometbft/copy-configs.sh $< $@
 
-$(dir)/target/LICENSE: ${SPLICE_ROOT}/cluster/images/LICENSE
+$(dir)/target/LICENSE: ${SPLICE_ROOT}/cluster/images/LICENSE | $(dir)/target
 	cp $< $@

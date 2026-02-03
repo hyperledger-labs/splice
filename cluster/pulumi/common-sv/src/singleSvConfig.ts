@@ -9,6 +9,7 @@ import {
 import { ValidatorAppConfigSchema } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/config';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
+import { CnChartVersionSchema } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/versionSchema';
 import { merge } from 'lodash';
 import util from 'node:util';
 import { z } from 'zod';
@@ -22,6 +23,13 @@ const SvCometbftConfigSchema = z
     // defaults to {svName}-cometbft-keys if not set
     keysGcpSecret: z.string().optional(),
     resources: K8sResourceSchema,
+    mempool: z
+      .object({
+        size: z.number().optional(),
+        deduplicationCacheSize: z.number().optional(),
+        ttlSeconds: z.number().optional(),
+      })
+      .optional(),
   })
   .strict();
 const EnvVarConfigSchema = z.object({
@@ -154,6 +162,7 @@ const SingleSvConfigSchema = z
       })
       .optional(),
     periodicSnapshots: z.object({ topology: GCPBucketSchema.optional() }).optional(),
+    versionOverride: CnChartVersionSchema.optional(),
   })
   .strict();
 const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema).and(

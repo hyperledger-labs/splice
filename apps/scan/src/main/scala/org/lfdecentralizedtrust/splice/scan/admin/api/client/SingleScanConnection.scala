@@ -5,7 +5,10 @@ package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import cats.data.OptionT
 import cats.syntax.either.*
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  FeaturedAppRight,
+  UnclaimedDevelopmentFundCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   TransferPreapproval,
@@ -517,6 +520,19 @@ class SingleScanConnection private[client] (
     ),
   )
 
+  override def listUnclaimedDevelopmentFundCoupons()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[
+    Seq[
+      ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
+    ]
+  ] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListUnclaimedDevelopmentFundCoupons(),
+    )
+
   def getTransferInstructionAcceptContext(
       instructionCid: TransferInstruction.ContractId
   )(implicit
@@ -846,8 +862,7 @@ object ScanRoundAggregatesDecoder {
     } yield {
       // changeToInitialAmountAsOfRoundZero, changeToHoldingFeesRate, cumulativeChangeToInitialAmountAsOfRoundZero,
       // cumulativeChangeToHoldingFeesRate and totalAmuletBalance are intentionally left out
-      // since these do not match up anymore because amulet expires are attributed to the closed round at a later stage
-      // in scan_txlog_store, at a time that can easily differ between SVs.
+      // since these are not calculated anymore.
       ScanAggregator.RoundTotals(
         closedRound = rt.closedRound,
         closedRoundEffectiveAt = closedRoundEffectiveAt,
@@ -872,8 +887,7 @@ object ScanRoundAggregatesDecoder {
         .decode(Codec.BigDecimal)(rt.cumulativeTrafficPurchasedCcSpent)
     } yield {
       // cumulativeChangeToInitialAmountAsOfRoundZero and cumulativeChangeToHoldingFeesRate are intentionally left out
-      // since these do not match up anymore because amulet expires are attributed to the closed round at a later stage
-      // in scan_txlog_store, at a time that can easily differ between SVs.
+      // since these are not calculated anymore.
       ScanAggregator.RoundPartyTotals(
         closedRound = rt.closedRound,
         party = rt.party,

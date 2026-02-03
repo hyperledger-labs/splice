@@ -585,7 +585,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       expiry: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600L),
       effectiveAt: Optional[Instant] = Optional.empty(),
       action: ActionRequiringConfirmation = addUser666Action,
-  ) = {
+  ): Contract[VoteRequest.ContractId, VoteRequest] = {
     val cid = new VoteRequest.ContractId(nextCid())
     val template = new VoteRequest(
       dsoParty.toProtoPrimitive,

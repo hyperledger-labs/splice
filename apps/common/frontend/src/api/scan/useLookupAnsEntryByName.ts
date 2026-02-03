@@ -15,7 +15,7 @@ const useLookupAnsEntryByName = (
   enabled: boolean = true,
   retryWhenNotFound: boolean = false,
   retry: number = 3
-): UseQueryResult<AnsEntry> => {
+): UseQueryResult<AnsEntry | null> => {
   const scanClient = useScanClient();
 
   return useLookupAnsEntryByNameFromResponse(
@@ -33,7 +33,7 @@ export function useLookupAnsEntryByNameFromResponse(
   enabled: boolean = true,
   retryWhenNotFound: boolean = false,
   retry: number = 3
-): UseQueryResult<AnsEntry> {
+): UseQueryResult<AnsEntry | null> {
   return useQuery({
     refetchInterval: PollingStrategy.NONE,
     queryKey: ['scan-api', 'lookupAnsEntryByName', AnsEntry, name],

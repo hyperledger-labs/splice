@@ -309,6 +309,8 @@ object ScanStore {
       metrics: DbScanStoreMetrics,
       ingestionConfig: IngestionConfig,
       initialRound: Long,
+      acsStoreDescriptorUserVersion: Option[Long] = None,
+      txLogStoreDescriptorUserVersion: Option[Long] = None,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -329,6 +331,8 @@ object ScanStore {
         ingestionConfig,
         metrics,
         initialRound,
+        acsStoreDescriptorUserVersion,
+        txLogStoreDescriptorUserVersion,
       ),
       cacheConfigs,
       metrics,
@@ -410,6 +414,11 @@ object ScanStore {
               amount = Some(contract.payload.amulet.amount.initialAmount),
             )
         },
+        mkFilter(splice.amulet.UnclaimedDevelopmentFundCoupon.COMPANION)(co =>
+          co.payload.dso == dso
+        )(
+          ScanAcsStoreRowData(_)
+        ),
         mkFilter(splice.ans.AnsEntry.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,

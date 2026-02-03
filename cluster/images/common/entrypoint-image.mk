@@ -11,9 +11,6 @@ $(dir)/$(docker-build): \
 	$(dir)/target/storage.conf \
 	$(dir)/target/parameters.conf
 
-$(dir)/target:
-	mkdir -p $@
-
 $(dir)/target/entrypoint.sh: $(dir)/../common/entrypoint.sh | $(dir)/target
 	cp $< $@
 

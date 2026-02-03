@@ -1,5 +1,6 @@
-{ pkgs, x86Pkgs, npmPkgs, use_enterprise }:
+{ pkgs, x86Pkgs, npmPkgs, variant }:
 let
+  use_enterprise = if variant == "enterprise" then true else false;
   inherit (pkgs) stdenv fetchzip;
   sources = builtins.fromJSON (builtins.readFile ./canton-sources.json);
   cometbftDriverSources = builtins.fromJSON (builtins.readFile ./cometbft-driver-sources.json);
@@ -8,10 +9,7 @@ let
   # No macOS support for firefox
   linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 rust-parallel util-linux ];
 
-in pkgs.mkShell {
-  PULUMI_SKIP_UPDATE_CHECK = 1;
-  SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-  packages = with pkgs; [
+  standard_packages = with pkgs; [
 
     # NOTE: please keep this list sorted for an easy overview and to avoid merge noise.
     istioctl
@@ -112,6 +110,31 @@ in pkgs.mkShell {
     # Package required to install daml studio
     yq-go
   ] ++ linuxOnly;
+
+  packages_for_static_tests = with pkgs; [
+    # NOTE: please keep this list sorted for an easy overview and to avoid merge noise.
+    actionlint
+    ammonite
+    curl
+    git
+    hub # Github CLI for todo checker
+    jq
+    nodejs
+    npmPkgs.syncpack
+    openapi-generator-cli
+    pre-commit
+    python3
+    python3Packages.dockerfile-parse
+    ripgrep
+    sbt
+    scala_2_13
+    shellcheck
+  ] ++ linuxOnly;
+
+in pkgs.mkShell {
+  PULUMI_SKIP_UPDATE_CHECK = 1;
+  SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+  packages = if variant == "static_tests" then packages_for_static_tests else standard_packages;
 
   CANTON = "${pkgs.canton}";
   CANTON_VERSION = "${sources.version}";

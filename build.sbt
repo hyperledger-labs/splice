@@ -45,7 +45,6 @@ lazy val `canton-daml-jwt` = BuildCommon.`canton-daml-jwt`
 lazy val `canton-daml-grpc-utils` = BuildCommon.`canton-daml-grpc-utils`
 lazy val `canton-daml-tls` = BuildCommon.`canton-daml-tls`
 lazy val `canton-base-errors` = BuildCommon.`canton-base-errors`
-lazy val `canton-ledger-api` = BuildCommon.`canton-ledger-api`
 lazy val `canton-google-common-protos-scala` = BuildCommon.`canton-google-common-protos-scala`
 lazy val `canton-sequencer-driver-api` = BuildCommon.`canton-sequencer-driver-api`
 lazy val `canton-kms-driver-api` = BuildCommon.`canton-kms-driver-api`
@@ -135,7 +134,6 @@ lazy val root: Project = (project in file("."))
     `canton-ledger-common`,
     `canton-ledger-api-core`,
     `canton-ledger-api-value`,
-    `canton-ledger-api`,
     `canton-google-common-protos-scala`,
     pulumi,
     `load-tester`,
@@ -1055,6 +1053,7 @@ lazy val `apps-scan` =
         scalapb_runtime,
         zstd,
         aws_s3,
+        s3mock_testcontainers,
       ),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
@@ -1394,7 +1393,7 @@ lazy val `apps-splitwell-frontend` = {
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "splitwell-frontend",
+      frontendWorkspace := "@lfdecentralizedtrust/splice-splitwell-frontend",
       sharedFrontendSettings,
     )
 }

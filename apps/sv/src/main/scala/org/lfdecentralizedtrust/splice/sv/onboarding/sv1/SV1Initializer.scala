@@ -121,6 +121,8 @@ class SV1Initializer(
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     enabledFeatures: EnabledFeaturesConfig,
+    svAcsStoreDescriptorUserVersion: Option[Long],
+    dsoAcsStoreDescriptorUserVersion: Option[Long],
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
@@ -281,8 +283,13 @@ class SV1Initializer(
           currentMigrationId = config.domainMigrationId, // Note: not guaranteed to be 0 for sv1
           migrationTimeInfo = None, // No previous migration, we're starting the network
         )
-      svStore = newSvStore(storeKey, migrationInfo, participantId)
-      dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
+      svStore = newSvStore(storeKey, migrationInfo, participantId, svAcsStoreDescriptorUserVersion)
+      dsoStore = newDsoStore(
+        svStore.key,
+        migrationInfo,
+        participantId,
+        dsoAcsStoreDescriptorUserVersion,
+      )
       svAutomation = newSvSvAutomationService(
         svStore,
         dsoStore,
@@ -692,6 +699,7 @@ class SV1Initializer(
                     sv1Config.initialFeaturedAppActivityMarkerAmount,
                     developmentFundPercentage =
                       if (developmentFund.supported) sv1Config.developmentFundPercentage else None,
+                    developmentFundManager = sv1Config.developmentFundManager,
                   )
                   sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(
                     cometBftNode,
