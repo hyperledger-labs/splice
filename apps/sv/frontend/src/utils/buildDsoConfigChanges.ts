@@ -173,7 +173,7 @@ export function buildDsoConfigChanges(
     },
     {
       fieldName: 'voteCooldownTime',
-      label: 'The Minimum Time Between Two Votes By The Same SV',
+      label: 'The Minimum Time Between Two Votes (or Vote Changes) By The Same SV',
       currentValue: before?.voteCooldownTime?.microseconds || '',
       newValue: after?.voteCooldownTime?.microseconds || '',
     },

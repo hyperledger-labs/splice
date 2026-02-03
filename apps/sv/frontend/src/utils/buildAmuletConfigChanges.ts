@@ -31,7 +31,7 @@ export function buildAmuletConfigChanges(
     {
       fieldName: 'featuredAppActivityMarkerAmount',
       label:
-        'Amount of the AppRewardCoupon Contract that a FeaturedAppActivityMarker is Converted To',
+        'Amount of the AppRewardCoupon Contract that a FeaturedAppActivityMarker is Converted To (in USD)',
       currentValue: before?.featuredAppActivityMarkerAmount || '',
       newValue: after?.featuredAppActivityMarkerAmount || '',
     },
@@ -91,7 +91,7 @@ export function buildAmuletConfigChanges(
     },
     {
       fieldName: 'transferConfigMaxNumLockHolders',
-      label: 'Max Number Of Lock Holders In A Transfer',
+      label: 'Max Number Of Lock Holders Per Locked Coin Created In A Transfer',
       currentValue: before?.transferConfig.maxNumLockHolders || '',
       newValue: after?.transferConfig.maxNumLockHolders || '',
     },
@@ -330,7 +330,7 @@ function buildDecentralizedSynchronizerChanges(
   ].sort();
   const requiredSynchronizersChanges = allSynchronizers.map((sync, idx) => ({
     fieldName: `decentralizedSynchronizerRequiredSynchronizers${idx + 1}`,
-    label: `All Synchronizers That Amulet and ANS Users Should Be Connected To (index ${idx + 1})`,
+    label: `(unused) Decentralized Synchronizer (Required Synchronizer ${idx + 1})`,
     currentValue: beforeRequiredSynchronizers.includes(sync) ? sync : '',
     newValue: afterRequiredSynchronizers.includes(sync) ? sync : '',
   }));
