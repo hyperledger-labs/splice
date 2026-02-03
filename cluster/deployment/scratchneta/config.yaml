@@ -1,1 +1,1 @@
-!include(../../configs/shared/scratchnet.yaml)
+!include(../../configs/shared/scratchnet.yaml) {}
