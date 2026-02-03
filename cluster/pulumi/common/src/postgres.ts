@@ -81,7 +81,6 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     this.instanceName = instanceName;
     this.namespace = xns;
     this.zone = GCP_ZONE || config.requireEnv('DB_CLOUDSDK_COMPUTE_ZONE');
-    const randomPageCost = cloudSqlConfig.flags['random_page_cost'] || '1.1';
 
     this.databaseInstance = this.pgSvc = new gcp.sql.DatabaseInstance(
       instanceLogicalName,
@@ -93,8 +92,9 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
           deletionProtectionEnabled: deletionProtection,
           activationPolicy: active ? 'ALWAYS' : 'NEVER',
           databaseFlags: [
-            { name: 'temp_file_limit', value: '2147483647' },
-            { name: 'random_page_cost', value: randomPageCost },
+            ...Object.keys(cloudSqlConfig.flags).map(name => {
+              return { name, value: cloudSqlConfig.flags[name] };
+            }),
             ...(opts.logicalDecoding ? [{ name: 'cloudsql.logical_decoding', value: 'on' }] : []),
           ],
           backupConfiguration: {
