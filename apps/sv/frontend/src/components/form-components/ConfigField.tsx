@@ -137,6 +137,7 @@ export const PendingConfigDisplay: React.FC<PendingConfigDisplayProps> = ({ pend
         to={`/governance-beta/proposals/${proposalCid}`}
         target="_blank"
         rel="noopener noreferrer"
+        style={{ color: 'inherit' }}
       >
         pending configuration
       </RouterLink>{' '}
