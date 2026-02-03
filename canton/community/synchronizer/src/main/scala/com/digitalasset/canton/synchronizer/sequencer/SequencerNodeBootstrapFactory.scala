@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -52,11 +52,12 @@ object SequencerNodeBootstrapFactoryImpl extends SequencerNodeBootstrapFactory {
       exitOnFatalFailures = arguments.parameters.exitOnFatalFailures,
       arguments.config.replication,
       () => FutureUnlessShutdown.unit,
-      () => FutureUnlessShutdown.pure(None),
+      () => FutureUnlessShutdown.unit,
       DbLockCounters.SEQUENCER_INIT,
       DbLockCounters.SEQUENCER_INIT_WORKER,
       arguments.futureSupervisor,
       arguments.loggerFactory,
+      None,
     )
 
     toNodeCommonArguments(arguments, storageFactory)

@@ -8,6 +8,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.util.Mutex
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -17,6 +18,7 @@ trait Trigger extends FlagCloseable with NamedLogging with Spanning with HasHeal
 
   implicit def ec: ExecutionContext
   implicit def tracer: Tracer
+  protected val mutex = Mutex()
 
   protected def context: TriggerContext
 

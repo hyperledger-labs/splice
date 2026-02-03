@@ -11,7 +11,7 @@ import com.digitalasset.canton.config.RequireTypes.{
   PositiveInt,
   PositiveNumeric,
 }
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
+import com.digitalasset.canton.admin.api.client.data.SubmissionRequestAmplification
 import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
 import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig

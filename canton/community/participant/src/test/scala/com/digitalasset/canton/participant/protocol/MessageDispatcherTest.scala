@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -320,7 +320,7 @@ trait MessageDispatcherTest {
     EncryptedViewMessage(
       None,
       ViewHash(TestHash.digest(9000)),
-      sessionKeys = sessionKeyMapTest,
+      viewEncryptionKeyRandomness = sessionKeyMapTest,
       encryptedTestView,
       psid,
       SymmetricKeyScheme.Aes128Gcm,
@@ -332,7 +332,7 @@ trait MessageDispatcherTest {
     EncryptedViewMessage(
       submittingParticipantSignature = None,
       viewHash = ViewHash(TestHash.digest(9001)),
-      sessionKeys = sessionKeyMapTest,
+      viewEncryptionKeyRandomness = sessionKeyMapTest,
       encryptedView = encryptedOtherTestView,
       synchronizerId = psid,
       viewEncryptionScheme = SymmetricKeyScheme.Aes128Gcm,
@@ -783,7 +783,7 @@ trait MessageDispatcherTest {
         EncryptedViewMessage(
           None,
           ViewHash(TestHash.digest(9002)),
-          sessionKeys = sessionKeyMapTest,
+          viewEncryptionKeyRandomness = sessionKeyMapTest,
           encryptedUnknownTestView,
           psid,
           SymmetricKeyScheme.Aes128Gcm,

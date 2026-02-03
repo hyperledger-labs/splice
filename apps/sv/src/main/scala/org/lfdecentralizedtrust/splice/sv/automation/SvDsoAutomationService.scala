@@ -429,7 +429,7 @@ class SvDsoAutomationService(
           internalClientConfig.decentralizedSynchronizerAlias,
           dsoStore,
           internalClientConfig.sequencerInternalConfig,
-          config.participantClient.sequencerRequestAmplification,
+          config.participantClient.sequencerRequestAmplification.toInternal,
           config.domainMigrationId,
           newSequencerConnectionPool = enabledFeatures.newSequencerConnectionPool,
         )

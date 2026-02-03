@@ -31,3 +31,6 @@ addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.3.1")
 addSbtPlugin("dev.guardrail" % "sbt-guardrail" % "1.0.0-M1")
 
 addDependencyTreePlugin
+
+// support for GAR
+addSbtPlugin("org.latestbit" % "sbt-gcs-plugin" % "1.16.1")

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.error.groups
@@ -103,6 +103,29 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
       final case class Reject(contractId: ContractId)(implicit
           loggingContext: ErrorLoggingContext
       ) extends DamlErrorWithDefiniteAnswer(cause = "Contract events not found, or not visible.") {
+        override def resources: Seq[(ErrorResource, String)] = Seq(
+          (ErrorResource.ContractId, contractId.coid)
+        )
+      }
+    }
+
+    @Explanation(
+      """This error occurs if the contract cannot be found for the referenced contract. This
+        |can be caused by either the contract not being known to the participant, or not being known to
+        |the requesting parties."""
+    )
+    @Resolution(
+      "Check the contract ID and verify that the requesting parties have intersection with the contract stakeholders."
+    )
+    object ContractPayload
+        extends ErrorCode(
+          id = "CONTRACT_PAYLOAD_NOT_FOUND",
+          ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
+        ) {
+
+      final case class Reject(contractId: ContractId)(implicit
+          loggingContext: ErrorLoggingContext
+      ) extends DamlErrorWithDefiniteAnswer(cause = "Contract payload not found, or not visible.") {
         override def resources: Seq[(ErrorResource, String)] = Seq(
           (ErrorResource.ContractId, contractId.coid)
         )
@@ -322,6 +345,28 @@ object RequestValidationErrors extends RequestValidationErrorGroup {
         loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"The submitted request has invalid arguments: $reason"
+        )
+  }
+
+  @Explanation(
+    """This error is emitted when a submitted ledger API command contains disclosed contracts with conflicting payloads for the same contract ID."""
+  )
+  @Resolution(
+    "This may be considered a security incident or a defect on the server. Please contact support or the providers of the disclosed contract payloads."
+  )
+  object DisclosedContractsConflictingPayloads
+      extends ErrorCode(
+        id = "DISCLOSED_CONTRACTS_CONFLICTING_PAYLOADS",
+        ErrorCategory.SecurityAlert,
+      ) {
+    final case class Reject(conflictingContractPayloads: List[(String, Long, String)])(implicit
+        loggingContext: ErrorLoggingContext
+    ) extends DamlErrorWithDefiniteAnswer(
+          cause = conflictingContractPayloads
+            .map { case (contractId, payloadCounts, payloads) =>
+              s"The contractId $contractId for submitted request has conflicting $payloadCounts payloads for disclosed contracts: $payloads"
+            }
+            .mkString("\n")
         )
   }
 

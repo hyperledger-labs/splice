@@ -22,7 +22,7 @@ export async function listContractsByInterface(
         filtersByParty: filtersByParty(partyId, [interfaceId], false),
       },
       verbose: false,
-      activeAtOffset: ledgerEnd.offset,
+      activeAtOffset: ledgerEnd.offset!,
     });
     const prettyContracts = responses.map((response) =>
       toPrettyContract(interfaceId, response),
@@ -45,7 +45,7 @@ export function toPrettyContract(
   contractId: string;
   payload: any;
 } {
-  const createdEvent = response.contractEntry.JsActiveContract.createdEvent;
+  const createdEvent = response.contractEntry!.JsActiveContract.createdEvent;
   return {
     contractId: createdEvent.contractId,
     payload: ensureInterfaceViewIsPresent(createdEvent, interfaceId).viewValue,

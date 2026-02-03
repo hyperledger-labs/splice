@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.config
@@ -6,8 +6,7 @@ package com.digitalasset.canton.synchronizer.config
 import com.daml.jwt.JwtTimestampLeeway
 import com.digitalasset.canton.config
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port, PositiveInt}
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext
 
@@ -24,6 +23,9 @@ import scala.concurrent.duration.Duration
   *   Expiration time interval for authentication tokens. Tokens are used to authenticate
   *   participants. Choose a shorter interval for better security and a longer interval for better
   *   performance.
+  * @param maxAuthTokensPerMember
+  *   How many auth tokens can a member have concurrently. Older ones are being dropped. Generally,
+  *   members should only have one or two (during renewal or restart)
   * @param useExponentialRandomTokenExpiration
   *   If enabled, the token expiration interval will be exponentially distributed with the following
   *   parameters:
@@ -46,15 +48,17 @@ final case class PublicServerConfig(
     override val keepAliveServer: Option[BasicKeepAliveServerConfig] = Some(
       BasicKeepAliveServerConfig()
     ),
-    nonceExpirationInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(1),
-    maxTokenExpirationInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
+    nonceExpirationInterval: NonNegativeFiniteDuration =
+      PublicServerConfig.defaultNonceExpirationInterval,
+    maxTokenExpirationInterval: NonNegativeFiniteDuration =
+      PublicServerConfig.defaultMaxTokenExpirationInterval,
+    maxAuthTokensPerMember: PositiveInt = PublicServerConfig.defaultMaxAuthTokensPerMember,
     useExponentialRandomTokenExpiration: Boolean = false,
     overrideMaxRequestSize: Option[NonNegativeInt] = None,
     override val maxTokenLifetime: NonNegativeDuration = config.NonNegativeDuration(Duration.Inf),
     override val jwksCacheConfig: JwksCacheConfig = JwksCacheConfig(),
     limits: Option[ActiveRequestLimitsConfig] = None,
-) extends ServerConfig
-    with UniformCantonConfigValidation {
+) extends ServerConfig {
 
   override val name: String = "sequencer-api"
 
@@ -84,9 +88,9 @@ final case class PublicServerConfig(
 }
 
 object PublicServerConfig {
-  implicit val publicServerConfigCantonConfigValidator
-      : CantonConfigValidator[PublicServerConfig] = {
-    import CantonConfigValidatorInstances.*
-    CantonConfigValidatorDerivation[PublicServerConfig]
-  }
+  private val defaultMaxAuthTokensPerMember: PositiveInt = PositiveInt.tryCreate(25)
+  private val defaultNonceExpirationInterval: NonNegativeFiniteDuration =
+    NonNegativeFiniteDuration.ofMinutes(1)
+  private val defaultMaxTokenExpirationInterval: NonNegativeFiniteDuration =
+    NonNegativeFiniteDuration.ofHours(1)
 }

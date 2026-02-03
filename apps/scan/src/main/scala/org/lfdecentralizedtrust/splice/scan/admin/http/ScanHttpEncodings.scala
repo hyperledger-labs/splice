@@ -254,6 +254,7 @@ sealed trait ScanHttpEncodings {
             http.synchronizerId,
             TraceContextOuterClass.TraceContext.getDefaultInstance,
             Instant.parse(http.recordTime),
+            ByteString.EMPTY,
           )
         ),
         synchronizerId = SynchronizerId.tryFromString(http.synchronizerId),
@@ -668,6 +669,7 @@ object ScanHttpEncodings {
       tree.getSynchronizerId,
       tree.getTraceContext,
       tree.getRecordTime,
+      ByteString.EMPTY,
     )
   }
 }

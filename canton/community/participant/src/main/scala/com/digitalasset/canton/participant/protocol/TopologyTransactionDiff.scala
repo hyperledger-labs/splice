@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -100,13 +100,13 @@ private[protocol] object TopologyTransactionDiff {
       stateTransactions
         .map(_.hashOfSignatures(synchronizerId.protocolVersion).toHexString)
         .sorted // for not relying on retrieval order
-        .foreach(builder.add)
+        .foreach(builder.addString)
 
-    builder.add(synchronizerId.toProtoPrimitive)
-    builder.add("old-relevant-state")
+    builder.addString(synchronizerId.toProtoPrimitive)
+    builder.addString("old-relevant-state")
     addToBuilder(oldRelevantState)
     // the same state-tx can be either current or old, but these hashes should be different
-    builder.add("new-relevant-state")
+    builder.addString("new-relevant-state")
     addToBuilder(currentRelevantState)
 
     val hash = builder.finish()

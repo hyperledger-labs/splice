@@ -1,9 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.mediator
 
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
@@ -133,6 +134,7 @@ class MediatorStateTest
           requestId.unwrap.plusSeconds(300),
           requestId.unwrap.plusSeconds(600),
           mockTopologySnapshot,
+          BatchingConfig(),
           participantResponseDeadlineTick = None,
         )(traceContext, executorService)
         .futureValueUS // without explicit ec it deadlocks on AnyTestSuite.serialExecutionContext

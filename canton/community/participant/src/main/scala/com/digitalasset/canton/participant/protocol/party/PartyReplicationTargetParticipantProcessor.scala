@@ -1,41 +1,35 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.party
 
 import cats.Eval
 import cats.data.EitherT
-import cats.implicits.toTraverseOps
 import cats.syntax.either.*
-import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.RepairCounter
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.crypto.{CryptoPureApi, HashPurpose}
-import com.digitalasset.canton.data.{CantonTimestamp, ContractReassignment}
-import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.ledger.participant.state.{Reassignment, ReassignmentInfo, Update}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.admin.data.{ActiveContract, RepairContract}
-import com.digitalasset.canton.participant.admin.party.PartyReplicationTestInterceptor
 import com.digitalasset.canton.participant.admin.party.PartyReplicator.AddPartyRequestId
-import com.digitalasset.canton.participant.event.{AcsChangeSupport, RecordOrderPublisher}
-import com.digitalasset.canton.participant.protocol.conflictdetection.{CommitSet, RequestTracker}
-import com.digitalasset.canton.participant.protocol.party.PartyReplicationTargetParticipantProcessor.{
-  GetInternalContractIds,
-  PersistContracts,
-  contractsToRequestEachTime,
+import com.digitalasset.canton.participant.admin.party.{
+  PartyReplicationStatus,
+  PartyReplicationTestInterceptor,
 }
-import com.digitalasset.canton.participant.store.ParticipantNodePersistentState
+import com.digitalasset.canton.participant.event.RecordOrderPublisher
+import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker
+import com.digitalasset.canton.participant.protocol.party.TargetParticipantAcsPersistence.contractsToRequestEachTime
+import com.digitalasset.canton.participant.store.{
+  AcsReplicationProgress,
+  ParticipantNodePersistentState,
+}
 import com.digitalasset.canton.participant.sync.ConnectedSynchronizer
-import com.digitalasset.canton.participant.util.TimeOfChange
-import com.digitalasset.canton.protocol.{ContractInstance, LfContractId, ReassignmentId, UpdateId}
+import com.digitalasset.canton.topology.processing.EffectiveTime
 import com.digitalasset.canton.topology.{PartyId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{EitherTUtil, ReassignmentTag}
+import com.digitalasset.canton.util.EitherTUtil
 import com.google.protobuf.ByteString
 
 import scala.concurrent.ExecutionContext
@@ -58,10 +52,10 @@ import scala.concurrent.ExecutionContext
   *   The "add party" request id that this replication is associated with.
   * @param psid
   *   The physical id of the synchronizer to replicate active contracts in.
-  * @param partyToParticipantEffectiveAt
+  * @param partyOnboardingAt
   *   The timestamp immediately on which the ACS snapshot is based.
-  * @param onAcsFullyReplicated
-  *   Callback notification that the target participant has received the entire ACS.
+  * @param replicationProgressState
+  *   Interface for processor to read and update ACS replication progress.
   * @param onError
   *   Callback notification that the target participant has encountered an error.
   * @param onDisconnect
@@ -73,12 +67,11 @@ class PartyReplicationTargetParticipantProcessor(
     partyId: PartyId,
     requestId: AddPartyRequestId,
     protected val psid: PhysicalSynchronizerId,
-    partyToParticipantEffectiveAt: CantonTimestamp,
-    protected val onAcsFullyReplicated: TraceContext => Unit,
+    partyOnboardingAt: EffectiveTime,
+    protected val replicationProgressState: AcsReplicationProgress,
     protected val onError: String => Unit,
     protected val onDisconnect: (String, TraceContext) => Unit,
-    persistContracts: PersistContracts,
-    getInternalContractIds: GetInternalContractIds,
+    persistsContracts: TargetParticipantAcsPersistence.PersistsContracts,
     recordOrderPublisher: RecordOrderPublisher,
     requestTracker: RequestTracker,
     pureCrypto: CryptoPureApi,
@@ -88,17 +81,20 @@ class PartyReplicationTargetParticipantProcessor(
     protected val loggerFactory: NamedLoggerFactory,
     protected val testOnlyInterceptor: PartyReplicationTestInterceptor,
 )(implicit override val executionContext: ExecutionContext)
-    extends PartyReplicationProcessor {
+    extends TargetParticipantAcsPersistence(
+      partyId,
+      requestId,
+      psid,
+      partyOnboardingAt,
+      replicationProgressState,
+      persistsContracts,
+      recordOrderPublisher,
+      requestTracker,
+      pureCrypto,
+    )
+    with PartyReplicationProcessor {
 
   protected val processorStore: TargetParticipantStore = InMemoryProcessorStore.targetParticipant()
-
-  // The base hash for all indexer UpdateIds to avoid repeating this for all ACS batches.
-  private lazy val indexerUpdateIdBaseHash = pureCrypto
-    .build(HashPurpose.OnlinePartyReplicationId)
-    .add(partyId.toProtoPrimitive)
-    .add(psid.toProtoPrimitive)
-    .add(partyToParticipantEffectiveAt.toProtoPrimitive)
-    .finish()
 
   override def replicatedContractsCount: NonNegativeInt = processorStore.processedContractsCount
 
@@ -115,6 +111,9 @@ class PartyReplicationTargetParticipantProcessor(
   }
 
   /** Consume status updates and ACS batches from the source participant.
+    *
+    * Note: Assigning the internal contract ids to the contracts requires that all the contracts are
+    * already persisted in the contract store.
     */
   override def handlePayload(payload: ByteString)(implicit
       traceContext: TraceContext
@@ -131,9 +130,15 @@ class PartyReplicationTargetParticipantProcessor(
         processorStore.initialContractOrdinalInclusiveO.isDefined,
         s"Received unexpected message from SP before initialized by TP: ${messageFromSP.dataOrStatus}",
       )
+      replicationProgress <- EitherT.fromEither[FutureUnlessShutdown](
+        replicationProgressState
+          .getAcsReplicationProgress(requestId)
+          .toRight(s"Party replication $requestId not found in progress state")
+      )
+      replicatedContractCount = replicationProgress.processedContractCount
       _ <- messageFromSP.dataOrStatus match {
         case PartyReplicationSourceParticipantMessage.AcsBatch(contracts) =>
-          val firstContractOrdinal = processorStore.processedContractsCount
+          val firstContractOrdinal = replicatedContractCount
           logger.debug(
             s"Received batch beginning at contract ordinal $firstContractOrdinal with contracts ${contracts.forgetNE
                 .flatMap(_.contract.createdEvent.map(_.contractId))
@@ -141,78 +146,34 @@ class PartyReplicationTargetParticipantProcessor(
           )
           for {
             _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-              !processorStore.hasEndOfACSBeenReached,
+              !replicationProgress.fullyProcessedAcs,
               s"Received ACS batch from SP after EndOfACS at $firstContractOrdinal",
             )
             _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-              processorStore.processedContractsCount.unwrap + contracts.size <= processorStore.requestedContractsCount.unwrap,
-              s"Received too many contracts from SP: processed ${processorStore.processedContractsCount.unwrap} + received ${contracts.size} > requested ${processorStore.requestedContractsCount.unwrap}",
+              replicatedContractCount.unwrap + contracts.size <= processorStore.requestedContractsCount.unwrap,
+              s"Received too many contracts from SP: processed ${replicatedContractCount.unwrap} + received ${contracts.size} > requested ${processorStore.requestedContractsCount.unwrap}",
             )
-            validatedActivations <- validateContracts(contracts)
-            _ <- persistContracts(validatedActivations.map(_.contract))(executionContext)(
-              traceContext
-            ).leftMap(err => s"Failed to persist contracts: $err")
-            repairCounter = processorStore.getAndIncrementRepairCounter()
-            toc = TimeOfChange(partyToParticipantEffectiveAt, Some(repairCounter))
-            replicatedContracts = validatedActivations.map {
-              case ContractReassignment(contract, reassignmentCounter) =>
-                (
-                  contract.contractId,
-                  ReassignmentTag.Source(psid.logical),
-                  reassignmentCounter,
-                  toc,
-                )
-            }
-            _ <- requestTracker
-              .addReplicatedContracts(requestId, partyToParticipantEffectiveAt, replicatedContracts)
-              .leftMap(e =>
-                s"Failed to add contracts $replicatedContracts to ActiveContractStore: $e"
-              )
-            internalContractIdsForActiveContracts <- EitherT.right[String](
-              getInternalContractIds(validatedActivations.map(_.contract.contractId))(
-                traceContext
-              )
-            )
-            _ <- EitherT.rightT[FutureUnlessShutdown, String](
-              recordOrderPublisher.schedulePublishAddContracts(
-                repairEventFromSerializedContract(
-                  repairCounter = repairCounter,
-                  activeContracts = validatedActivations,
-                  internalContractIds = internalContractIdsForActiveContracts,
-                )
-              )
-            )
-            _ = processorStore
-              .increaseProcessedContractsCount(PositiveInt.size(contracts))
-              .discard
+            updatedProcessedContractsCount <- importContracts(contracts)
+            _ = processorStore.setProcessedContractsCount(updatedProcessedContractsCount)
           } yield ()
         case PartyReplicationSourceParticipantMessage.EndOfACS =>
           logger.info(
-            s"Target participant has received end of data after ${processorStore.processedContractsCount.unwrap} contracts"
+            s"Target participant has received end of data after ${replicatedContractCount.unwrap} contracts"
           )
-          processorStore.setHasEndOfACSBeenReached()
-          EitherT.rightT[FutureUnlessShutdown, String](())
+          replicationProgressState
+            .updateAcsReplicationProgress(
+              requestId,
+              PartyReplicationStatus.EphemeralSequencerChannelProgress(
+                replicationProgress.processedContractCount,
+                replicationProgress.nextPersistenceCounter,
+                fullyProcessedAcs = true,
+                this,
+              ),
+            )
+            .map(_ => processorStore.setHasEndOfACSBeenReached())
       }
     } yield ()).map(_ => progressPartyReplication())
   }
-
-  private def validateContracts(
-      contracts: NonEmpty[Seq[ActiveContract]]
-  ): EitherT[FutureUnlessShutdown, String, NonEmpty[Seq[ContractReassignment]]] =
-    EitherT.fromEither[FutureUnlessShutdown](
-      contracts.toNEF
-        .traverse(activeContract =>
-          for {
-            repairContract <- RepairContract.toRepairContract(activeContract.contract)
-            _ <- Either.cond(
-              repairContract.synchronizerId == psid.logical,
-              (),
-              s"Received contract ${repairContract.contractId} has unexpected synchronizer ${repairContract.synchronizerId}",
-            )
-            contractInstance <- ContractInstance.create(repairContract.contract)
-          } yield ContractReassignment(contractInstance, repairContract.reassignmentCounter)
-        )
-    )
 
   override def progressPartyReplication()(implicit traceContext: TraceContext): Unit =
     // Skip progress check if more than one other task is already queued that performs this same progress check or
@@ -221,52 +182,66 @@ class PartyReplicationTargetParticipantProcessor(
       executeAsync(s"Respond to source participant if needed")(
         EitherTUtil.ifThenET(
           isChannelOpenForCommunication &&
-            testOnlyInterceptor.onTargetParticipantProgress(
-              processorStore
-            ) == PartyReplicationTestInterceptor.Proceed
+            replicationProgressState
+              .getAcsReplicationProgress(requestId)
+              .exists(progress =>
+                testOnlyInterceptor.onTargetParticipantProgress(
+                  progress
+                ) == PartyReplicationTestInterceptor.Proceed
+              )
         )(respondToSourceParticipant())
       )
     }
 
   private def respondToSourceParticipant()(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, Unit] = if (hasEndOfACSBeenReached) {
-    onAcsFullyReplicated(traceContext)
-    EitherT(
-      FutureUnlessShutdown
-        .lift(
-          recordOrderPublisher.publishBufferedEvents()
+  ): EitherT[FutureUnlessShutdown, String, Unit] = for {
+    replicationProgress <- EitherT.fromEither[FutureUnlessShutdown](
+      replicationProgressState
+        .getAcsReplicationProgress(requestId)
+        .toRight(s"Party replication $requestId not found in progress state")
+    )
+    replicatedContractCount = replicationProgress.processedContractCount
+    _ <-
+      if (replicationProgress.fullyProcessedAcs) {
+        EitherT(
+          FutureUnlessShutdown
+            .lift(recordOrderPublisher.publishBufferedEvents())
+            .flatMap(_ =>
+              sendCompleted(
+                "completing in response to source participant notification of end of data"
+              ).value
+            )
         )
-        .flatMap(_ =>
-          sendCompleted(
-            "completing in response to source participant notification of end of data"
-          ).value
+      } else if (processorStore.initialContractOrdinalInclusiveO.isEmpty) {
+        val initialContractOrdinalInclusive = replicatedContractCount
+        logger.info(
+          s"Connected. Requesting contracts from ${initialContractOrdinalInclusive.unwrap}"
         )
-    )
-  } else if (processorStore.initialContractOrdinalInclusiveO.isEmpty) {
-    val initialContractOrdinalInclusive = processorStore.processedContractsCount
-    logger.info(s"Connected. Requesting contracts from ${initialContractOrdinalInclusive.unwrap}")
-    val initializeSP = PartyReplicationTargetParticipantMessage(
-      PartyReplicationTargetParticipantMessage.Initialize(initialContractOrdinalInclusive)
-    )(
-      PartyReplicationTargetParticipantMessage.protocolVersionRepresentativeFor(protocolVersion)
-    )
-    sendPayload("initialize source participant", initializeSP.toByteString).map { _ =>
-      // Once the SP initialize message has been sent, set the initial contract ordinal
-      // and reset the requested contracts count to the processed contracts count.
-      processorStore.setInitialContractOrdinalInclusive(initialContractOrdinalInclusive)
-      processorStore.setRequestedContractsCount(processorStore.processedContractsCount)
-      progressPartyReplication()
-    }
-  } else if (processorStore.processedContractsCount == processorStore.requestedContractsCount) {
-    logger.debug(
-      s"Target participant has received all the contracts requested before ordinal ${processorStore.processedContractsCount.unwrap}. " +
-        s"Requesting ${contractsToRequestEachTime.unwrap} more contracts from source participant"
-    )
-    requestNextSetOfContracts()
-  } else {
-    EitherT.rightT[FutureUnlessShutdown, String](())
-  }
+        val initializeSP = PartyReplicationTargetParticipantMessage(
+          PartyReplicationTargetParticipantMessage.Initialize(initialContractOrdinalInclusive)
+        )(
+          PartyReplicationTargetParticipantMessage.protocolVersionRepresentativeFor(
+            protocolVersion
+          )
+        )
+        sendPayload("initialize source participant", initializeSP.toByteString).map { _ =>
+          // Once the SP initialize message has been sent, set the initial contract ordinal
+          // and reset the requested contracts count to the processed contracts count.
+          processorStore.setInitialContractOrdinalInclusive(initialContractOrdinalInclusive)
+          processorStore.setRequestedContractsCount(replicatedContractCount)
+          progressPartyReplication()
+        }
+      } else if (replicatedContractCount == processorStore.requestedContractsCount) {
+        logger.debug(
+          s"Target participant has received all the contracts requested before ordinal ${replicatedContractCount.unwrap}. " +
+            s"Requesting ${contractsToRequestEachTime.unwrap} more contracts from source participant"
+        )
+        requestNextSetOfContracts()
+      } else {
+        EitherT.rightT[FutureUnlessShutdown, String](())
+      }
+  } yield ()
 
   private def requestNextSetOfContracts()(implicit
       traceContext: TraceContext
@@ -289,84 +264,24 @@ class PartyReplicationTargetParticipantProcessor(
 
   override protected def hasEndOfACSBeenReached: Boolean = processorStore.hasEndOfACSBeenReached
 
-  private def repairEventFromSerializedContract(
-      repairCounter: RepairCounter,
-      activeContracts: NonEmpty[Seq[ContractReassignment]],
-      internalContractIds: Map[LfContractId, Long],
-  )(
-      timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): Update.OnPRReassignmentAccepted = {
-    val uniqueUpdateId = {
-      // Add the repairCounter and contract-id to the hash to arrive at unique per-OPR updateIds.
-      val hash = activeContracts
-        .foldLeft {
-          pureCrypto
-            .build(HashPurpose.OnlinePartyReplicationId)
-            .add(indexerUpdateIdBaseHash.unwrap)
-            .add(repairCounter.unwrap)
-        } { case (builder, ContractReassignment(contract, reassignmentCounter)) =>
-          builder
-            .add(reassignmentCounter.v)
-            .add(contract.contractId.coid)
-        }
-        .finish()
-      UpdateId(hash)
-    }
-
-    val contractIdCounters = activeContracts.map {
-      case ContractReassignment(contract, reassignmentCounter) =>
-        (contract.contractId, reassignmentCounter)
-    }
-
-    val artificialReassignmentInfo = ReassignmentInfo(
-      sourceSynchronizer = ReassignmentTag.Source(psid.logical),
-      targetSynchronizer = ReassignmentTag.Target(psid.logical),
-      submitter = None,
-      reassignmentId = ReassignmentId(
-        ReassignmentTag.Source(psid.logical),
-        ReassignmentTag.Target(psid.logical),
-        timestamp, // artificial unassign has same timestamp as
-        contractIdCounters,
-      ),
-      isReassigningParticipant = false,
+  override protected def newProgress(
+      updatedProcessedContractsCount: NonNegativeInt,
+      usedRepairCounter: RepairCounter,
+  ): PartyReplicationStatus.AcsReplicationProgress =
+    PartyReplicationStatus.EphemeralSequencerChannelProgress(
+      updatedProcessedContractsCount,
+      usedRepairCounter + 1,
+      fullyProcessedAcs = false,
+      this,
     )
-    val commitSet = CommitSet.createForAssignment(
-      artificialReassignmentInfo.reassignmentId,
-      activeContracts,
-      artificialReassignmentInfo.sourceSynchronizer,
-    )
-    val acsChangeFactory = AcsChangeSupport.fromCommitSet(commitSet)
-    Update.OnPRReassignmentAccepted(
-      workflowId = None,
-      updateId = uniqueUpdateId,
-      reassignmentInfo = artificialReassignmentInfo,
-      reassignment = Reassignment.Batch(
-        activeContracts.zipWithIndex.map {
-          case (ContractReassignment(contract, reassignmentCounter), idx) =>
-            Reassignment.Assign(
-              ledgerEffectiveTime = contract.inst.createdAt.time,
-              createNode = contract.toLf,
-              contractAuthenticationData = contract.inst.authenticationData,
-              reassignmentCounter = reassignmentCounter.v,
-              nodeId = idx,
-            )
-        }
-      ),
-      repairCounter = repairCounter,
-      recordTime = timestamp,
-      synchronizerId = psid.logical,
-      acsChangeFactory = acsChangeFactory,
-      internalContractIds = internalContractIds,
-    )
-  }
 }
 
 object PartyReplicationTargetParticipantProcessor {
   def apply(
       partyId: PartyId,
       requestId: AddPartyRequestId,
-      partyToParticipantEffectiveAt: CantonTimestamp,
-      onComplete: TraceContext => Unit,
+      partyOnboardingAt: EffectiveTime,
+      replicationProgressState: AcsReplicationProgress,
       onError: String => Unit,
       onDisconnect: (String, TraceContext) => Unit,
       participantNodePersistentState: Eval[ParticipantNodePersistentState],
@@ -382,12 +297,11 @@ object PartyReplicationTargetParticipantProcessor {
       partyId,
       requestId,
       connectedSynchronizer.psid,
-      partyToParticipantEffectiveAt,
-      onComplete,
+      partyOnboardingAt,
+      replicationProgressState,
       onError,
       onDisconnect,
-      persistContracts(participantNodePersistentState),
-      getInternalContractIds(participantNodePersistentState),
+      new TargetParticipantAcsPersistence.PersistsContractsImpl(participantNodePersistentState),
       connectedSynchronizer.ephemeral.recordOrderPublisher,
       connectedSynchronizer.ephemeral.requestTracker,
       connectedSynchronizer.synchronizerHandle.syncPersistentState.pureCryptoApi,
@@ -400,35 +314,4 @@ object PartyReplicationTargetParticipantProcessor {
         .append("requestId", requestId.toHexString),
       testInterceptor,
     )
-
-  // TODO(#22251): Make this configurable.
-  private[party] val contractsToRequestEachTime = PositiveInt.tryCreate(10)
-
-  private[party] type PersistContracts =
-    Seq[ContractInstance] => ExecutionContext => TraceContext => EitherT[
-      FutureUnlessShutdown,
-      String,
-      Unit,
-    ]
-
-  private def persistContracts(
-      participantNodePersistentState: Eval[ParticipantNodePersistentState]
-  ): PersistContracts = contracts =>
-    implicit ec =>
-      implicit tc =>
-        EitherT.right[String](
-          participantNodePersistentState.value.contractStore.storeContracts(contracts)
-        )
-
-  private[party] type GetInternalContractIds =
-    NonEmpty[Seq[LfContractId]] => TraceContext => FutureUnlessShutdown[
-      Map[LfContractId, Long]
-    ]
-
-  private def getInternalContractIds(
-      participantNodePersistentState: Eval[ParticipantNodePersistentState]
-  ): GetInternalContractIds = contracts =>
-    implicit tc =>
-      participantNodePersistentState.value.contractStore
-        .lookupBatchedNonCachedInternalIds(contracts.forgetNE)
 }

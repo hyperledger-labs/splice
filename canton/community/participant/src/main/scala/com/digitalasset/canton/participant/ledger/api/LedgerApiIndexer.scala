@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.ledger.api
@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.ledger.api
 import cats.Eval
 import cats.data.EitherT
 import com.daml.ledger.resources.ResourceOwner
+import com.daml.timer.FutureCheck.*
 import com.digitalasset.canton.LedgerParticipantId
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
@@ -13,9 +14,9 @@ import com.digitalasset.canton.ledger.api.health.{HealthStatus, Healthy, Reports
 import com.digitalasset.canton.ledger.participant.state.{RepairUpdate, Update}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.NoLogging.logger
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.participant.config.LedgerApiServerConfig
-import com.digitalasset.canton.participant.store.LedgerApiContractStore
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.platform.indexer.ha.HaConfig
 import com.digitalasset.canton.platform.indexer.parallel.{
@@ -28,8 +29,8 @@ import com.digitalasset.canton.platform.indexer.{
   IndexerState,
   JdbcIndexer,
 }
-import com.digitalasset.canton.platform.store.DbSupport
 import com.digitalasset.canton.platform.store.cache.OnlyForTestingTransactionInMemoryStore
+import com.digitalasset.canton.platform.store.{DbSupport, LedgerApiContractStore}
 import com.digitalasset.canton.platform.{
   InMemoryState,
   LedgerApiServerInternals,
@@ -51,6 +52,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
 import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Success
 
@@ -96,6 +98,16 @@ final case class LedgerApiIndexerConfig(
 )
 
 object LedgerApiIndexer {
+
+  private object FirstSuccessfulIndexerStartupDeadlines {
+    val InfoInitialDelay = Duration(20, "seconds")
+    val InfoPeriod = Duration(10, "seconds")
+    val WarnDelay = Duration(60, "seconds")
+    val indexerInitializing = "Indexer initialization still in progress"
+    val deadlineExceededWarnMessage =
+      s"Indexer initialization did not finished in $WarnDelay. Initialization still in progress."
+  }
+
   def initialize(
       metrics: LedgerApiServerMetrics,
       clock: Clock,
@@ -152,7 +164,7 @@ object LedgerApiIndexer {
               connectionTimeout =
                 ledgerApiIndexerConfig.serverConfig.databaseConnectionTimeout.underlying,
             ),
-          postgres = ledgerApiIndexerConfig.serverConfig.postgresDataSource,
+          postgres = ledgerApiIndexerConfig.indexerConfig.postgresDataSource,
         ),
         ledgerApiIndexerConfig.indexerHaConfig,
         Some(ledgerApiStore.value.ledgerApiDbSupport.dbDispatcher),
@@ -206,6 +218,20 @@ object LedgerApiIndexer {
         recoveringIndexerFactory = recoveringQueueFactory,
         repairIndexerFactory = () => repairIndexerCreateFunction().map(new IndexingFutureQueue(_)),
         loggerFactory = loggerFactory,
+      )
+      _ <- ResourceOwner.forFuture(() =>
+        indexerState.waitForFirstSuccessfulIndexerInitialization
+          .checkIfComplete(
+            delay = FirstSuccessfulIndexerStartupDeadlines.InfoInitialDelay,
+            period = FirstSuccessfulIndexerStartupDeadlines.InfoPeriod,
+          )(
+            logger.info(FirstSuccessfulIndexerStartupDeadlines.indexerInitializing)
+          )
+          .checkIfComplete(
+            delay = FirstSuccessfulIndexerStartupDeadlines.WarnDelay
+          )(
+            logger.warn(FirstSuccessfulIndexerStartupDeadlines.deadlineExceededWarnMessage)
+          )
       )
       _ <- ResourceOwner.forReleasable(() => indexerState)(_.shutdown())
     } yield {

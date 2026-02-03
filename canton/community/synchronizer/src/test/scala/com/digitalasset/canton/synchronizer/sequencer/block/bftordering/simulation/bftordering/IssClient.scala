@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulation.bftordering
@@ -66,6 +66,7 @@ class IssClient[E <: Env[E]](
         Traced(
           OrderingRequest(
             BlockFormat.SendTag,
+            s"$name-submission-$submissionNumber",
             ByteString.copyFromUtf8(s"$name-submission-$submissionNumber").concat(additionalPayload),
           )
         )

@@ -181,6 +181,8 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   options.setCapability("webSocketUrl", true: Any);
 
   protected val webDrivers: mutable.Map[String, WebDriverType] = mutable.Map.empty
+
+  @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
   private def registerWebDriver(name: String, webDriver: WebDriverType): Unit = blocking {
     synchronized {
       webDrivers += (name -> webDriver)

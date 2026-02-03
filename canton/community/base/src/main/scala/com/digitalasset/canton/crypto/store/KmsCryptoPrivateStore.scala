@@ -1,10 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.store
 
 import cats.data.{EitherT, OptionT}
-import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.config.{CacheConfig, ProcessingTimeout}
@@ -37,6 +36,13 @@ class KmsCryptoPrivateStore(
       traceContext: TraceContext
   ): OptionT[FutureUnlessShutdown, KmsMetadata] =
     OptionT(metadataStore.get(keyId))
+
+  private def getKeysMetadataInternal(
+      keyIds: Seq[Fingerprint]
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[Fingerprint, Option[KmsMetadata]]] =
+    metadataStore.getAll(keyIds)
 
   protected[crypto] def getKeyMetadata(
       keyId: Fingerprint
@@ -116,11 +122,15 @@ class KmsCryptoPrivateStore(
   ): EitherT[FutureUnlessShutdown, CryptoPrivateStoreError, Seq[Fingerprint]] =
     for {
       signingKeys <- EitherT.right {
-        signingKeyIds.forgetNE.parTraverseFilter(signingKeyId =>
-          lock.withReadLock {
-            getKeyMetadataInternal(signingKeyId).value
+        lock
+          .withReadLock {
+            getKeysMetadataInternal(signingKeyIds)
           }
-        )
+          .map { results =>
+            signingKeyIds.forgetNE.flatMap { keyId =>
+              results.get(keyId).flatten
+            }
+          }
       }
       filteredSigningKeys =
         signingKeys

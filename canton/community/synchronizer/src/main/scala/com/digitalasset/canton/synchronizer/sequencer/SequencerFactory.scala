@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer
@@ -6,6 +6,7 @@ package com.digitalasset.canton.synchronizer.sequencer
 import cats.data.EitherT
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
+import com.digitalasset.canton.data.SequencingTimeBound
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
@@ -25,7 +26,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
 import java.util.concurrent.ScheduledExecutorService
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
 trait SequencerFactory extends FlagCloseable with HasCloseContext {
 
@@ -43,6 +44,7 @@ trait SequencerFactory extends FlagCloseable with HasCloseContext {
       synchronizerSyncCryptoApi: SynchronizerCryptoClient,
       futureSupervisor: FutureSupervisor,
       trafficConfig: SequencerTrafficConfig,
+      sequencingTimeLowerBoundExclusive: SequencingTimeBound,
       runtimeReady: FutureUnlessShutdown[Unit],
       sequencerSnapshot: Option[SequencerSnapshot],
       authenticationServices: Option[AuthenticationServices],
@@ -68,8 +70,8 @@ object SequencerMetaFactory {
       loggerFactory: NamedLoggerFactory,
   )(
       sequencerConfig: SequencerConfig,
-      useTimeProofsToObserveEffectiveTime: Boolean,
-  )(implicit executionContext: ExecutionContext): SequencerFactory =
+      producePostOrderingTopologyTicks: Boolean,
+  )(implicit executionContext: ExecutionContextExecutor): SequencerFactory =
     sequencerConfig match {
       case databaseConfig: SequencerConfig.Database =>
         // if we're configured for high availability switch to using a writer storage factory that will
@@ -149,7 +151,7 @@ object SequencerMetaFactory {
         new BftSequencerFactory(
           config,
           blockSequencerConfig,
-          useTimeProofsToObserveEffectiveTime,
+          producePostOrderingTopologyTicks,
           health,
           storage,
           protocolVersion,
@@ -166,7 +168,7 @@ object SequencerMetaFactory {
           SequencerDriver.DriverApiVersion,
           rawConfig,
           blockSequencerConfig,
-          useTimeProofsToObserveEffectiveTime,
+          producePostOrderingTopologyTicks,
           health,
           storage,
           protocolVersion,

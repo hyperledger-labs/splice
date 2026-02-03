@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.admin.grpc
@@ -46,7 +46,13 @@ class GrpcTopologyAggregationService(
       asOf: CantonTimestamp,
       store: TopologyStore[TopologyStoreId.SynchronizerStore],
   ): TopologySnapshotLoader =
-    new StoreBasedTopologySnapshot(asOf, store, NoPackageDependencies, loggerFactory)
+    new StoreBasedTopologySnapshot(
+      store.storeId.psid,
+      asOf,
+      store,
+      NoPackageDependencies,
+      loggerFactory,
+    )
 
   private def snapshots(
       synchronizerIds: Set[SynchronizerId],

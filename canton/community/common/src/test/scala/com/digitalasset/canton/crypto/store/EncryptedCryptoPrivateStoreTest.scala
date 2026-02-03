@@ -1,8 +1,9 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto.store
 
+import com.digitalasset.canton.config.BatchingConfig
 import com.digitalasset.canton.crypto.KeyPurpose.Encryption
 import com.digitalasset.canton.crypto.kms.{KmsKeyId, SymbolicKms}
 import com.digitalasset.canton.crypto.store.db.DbCryptoPrivateStore
@@ -48,7 +49,13 @@ trait EncryptedCryptoPrivateStoreTest extends AsyncWordSpec with CryptoPrivateSt
       .futureValue
 
   lazy val dbStore =
-    new DbCryptoPrivateStore(storage, testedReleaseProtocolVersion, timeouts, loggerFactory)
+    new DbCryptoPrivateStore(
+      storage,
+      testedReleaseProtocolVersion,
+      timeouts,
+      BatchingConfig(),
+      loggerFactory,
+    )
 
   lazy val encryptedStore = new EncryptedCryptoPrivateStore(
     dbStore,
@@ -56,6 +63,7 @@ trait EncryptedCryptoPrivateStoreTest extends AsyncWordSpec with CryptoPrivateSt
     keyId,
     testedReleaseProtocolVersion,
     timeouts,
+    BatchingConfig(),
     loggerFactory,
   )
 

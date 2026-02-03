@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console.commands
@@ -15,11 +15,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
   TopologyAdminCommands,
 }
-import com.digitalasset.canton.admin.api.client.data.{
-  AddPartyStatus,
-  ListPartiesResult,
-  PartyOnboardingFlagStatus,
-}
+import com.digitalasset.canton.admin.api.client.data.{ListPartiesResult, PartyOnboardingFlagStatus}
 import com.digitalasset.canton.admin.participant.v30.ExportPartyAcsResponse
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
@@ -39,6 +35,7 @@ import com.digitalasset.canton.grpc.FileStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
   ContractImportMode,
+  PartyReplicationStatus,
   RepresentativePackageIdOverride,
 }
 import com.digitalasset.canton.serialization.ProtoConverter
@@ -64,21 +61,24 @@ class PartiesAdministrationGroup(
   import runner.*
 
   @Help.Summary(
-    "List active parties, their active participants, and the participants' permissions on synchronizers."
+    "List active parties, their active participants, and the participants' permissions on synchronizers"
   )
   @Help.Description(
     """Inspect the parties known by this participant as used for synchronisation.
-      |The response is built from the timestamped topology transactions of each synchronizer, excluding the
-      |authorized store of the given node. For each known party, the list of active
-      |participants and their permission on the synchronizer for that party is given.
+      |The response is built from the timestamped topology transactions of each synchronizer,
+      |excluding the authorized store of the given node. For each known party, the list of
+      |active participants and their permission on the synchronizer for that party is given.
       |
-      filterParty: Filter by parties starting with the given string.
-      filterParticipant: Filter for parties that are hosted by a participant with an id starting with the given string
-      filterSynchronizerId: Filter by synchronizers whose id starts with the given string.
-      asOf: Optional timestamp to inspect the topology state at a given point in time.
-      limit: Limit on the number of parties fetched (defaults to canton.parameters.console.default-limit).
-
-      Example: participant1.parties.list(filterParty="alice")
+      |Parameters:
+      |- filterParty: Filter by parties starting with the given string.
+      |- filterParticipant: Filter for parties that are hosted by a participant with an ID
+      |  starting with the given string.
+      |- filterSynchronizerId: Filter by synchronizers whose id starts with the given string.
+      |- asOf: Optional timestamp to inspect the topology state at a given point in time.
+      |- limit: Limit on the number of parties fetched (defaults to
+      |  canton.parameters.console.default-limit).
+      |
+      |Example: participant1.parties.list(filterParty="alice")
       """
   )
   def list(
@@ -112,17 +112,22 @@ class ParticipantPartiesAdministrationGroup(
   private def timeouts: ConsoleCommandTimeout = consoleEnvironment.commandTimeouts
 
   @Help.Summary("List parties hosted by this participant")
-  @Help.Description("""Inspect the parties hosted by this participant as used for synchronisation.
-      |The response is built from the timestamped topology transactions of each synchronizer, excluding the
-      |authorized store of the given node. The search will include all hosted parties and is equivalent
-      |to running the `list` method using the participant id of the invoking participant.
+  @Help.Description(
+    """Inspect the parties hosted by this participant as used for synchronisation.
+      |The response is built from the timestamped topology transactions of each synchronizer,
+      |excluding the authorized store of the given node. The search will include all hosted
+      |parties and is equivalent to running the `list` method using the participant id of the
+      |invoking participant.
       |
-      filterParty: Filter by parties starting with the given string.
-      filterSynchronizerId: Filter by synchronizers whose id starts with the given string.
-      asOf: Optional timestamp to inspect the topology state at a given point in time.
-      limit: How many items to return (defaults to canton.parameters.console.default-limit)
-
-      Example: participant1.parties.hosted(filterParty="alice")""")
+      |Parameters:
+      |- filterParty: Filter by parties starting with the given string.
+      |- filterSynchronizerId: Filter by synchronizers whose id starts with the given string.
+      |- asOf: Optional timestamp to inspect the topology state at a given point in time.
+      |- limit: How many items to return (defaults to canton.parameters.console.default-limit)
+      |
+      |Example: participant1.parties.hosted(filterParty="alice")
+      """
+  )
   def hosted(
       filterParty: String = "",
       synchronizerIds: Set[SynchronizerId] = Set.empty,
@@ -139,8 +144,9 @@ class ParticipantPartiesAdministrationGroup(
 
   @Help.Summary("Find a party from a filter string")
   @Help.Description(
-    """Will search for all parties that match this filter string. If it finds exactly one party, it
-      |will return that one. Otherwise, the function will throw."""
+    """Will search for all parties that match this filter string. If it finds exactly one party,
+      |it will return that one. Otherwise, the function will throw.
+      """
   )
   def find(filterParty: String): PartyId =
     list(filterParty).map(_.party).distinct.toList match {
@@ -151,15 +157,23 @@ class ParticipantPartiesAdministrationGroup(
     }
 
   @Help.Summary("Enable/add party to participant")
-  @Help.Description("""This function registers a new party on a synchronizer with the current participant within the
-      |participants namespace. The function fails if the participant does not have appropriate signing keys
-      |to issue the corresponding PartyToParticipant topology transaction, or if the participant is not connected to any
-      |synchronizers.
-      |The synchronizer parameter does not have to be specified if the participant is connected only to one synchronizer.
-      |If the participant is connected to multiple synchronizers, the party needs to be enabled on each synchronizer explicitly.
+  @Help.Description(
+    """This function registers a new party on a synchronizer with the current participant within
+      |the participants namespace.
+      |
+      |The function fails if the participant does not have appropriate signing keys to issue the
+      |corresponding PartyToParticipant topology transaction, or if the participant is not
+      |connected to any synchronizers.
+      |
+      |The synchronizer parameter does not have to be specified if the participant is connected
+      |only to one synchronizer.
+      |If the participant is connected to multiple synchronizers, the party needs to be enabled
+      |on each synchronizer explicitly.
       |Additionally, a sequence of additional participants can be added to be synchronized to
-      |ensure that the party is known to these participants as well before the function terminates.
-      |""")
+      |ensure that the party is known to these participants as well before the function
+      |terminates.
+      """
+  )
   def enable(
       name: String,
       namespace: Namespace = participantId.namespace,
@@ -220,21 +234,24 @@ class ParticipantPartiesAdministrationGroup(
       }
 
     @Help.Summary(
-      "List active parties, their active participants, and the participants' permissions on synchronizers."
+      "List active parties, their active participants, and the participants' permissions on synchronizers"
     )
     @Help.Description(
       """Inspect the parties known by this participant as used for synchronisation.
-      |The response is built from the timestamped topology transactions of each synchronizer, excluding the
-      |authorized store of the given node. For each known party, the list of active
-      |participants and their permission on the synchronizer for that party is given.
+      |The response is built from the timestamped topology transactions of each synchronizer,
+      |excluding the authorized store of the given node. For each known party, the list of
+      |active participants and their permission on the synchronizer for that party is given.
       |
-      filterParty: Filter by parties starting with the given string.
-      filterParticipant: Filter for parties that are hosted by a participant with an id starting with the given string
-      filterSynchronizerId: Filter by synchronizers whose id starts with the given string.
-      asOf: Optional timestamp to inspect the topology state at a given point in time.
-      limit: Limit on the number of parties fetched (defaults to canton.parameters.console.default-limit).
-
-      Example: participant1.parties.list(filterParty="alice")
+      |Parameters:
+      |- filterParty: Filter by parties starting with the given string.
+      |- filterParticipant: Filter for parties that are hosted by a participant with an ID
+      |  starting with the given string
+      |- filterSynchronizerId: Filter by synchronizers whose id starts with the given string.
+      |- asOf: Optional timestamp to inspect the topology state at a given point in time.
+      |- limit: Limit on the number of parties fetched (defaults to
+      |  canton.parameters.console.default-limit).
+      |
+      |Example: participant1.parties.list(filterParty="alice")
       """
     )
     @VisibleForTesting
@@ -354,9 +371,10 @@ class ParticipantPartiesAdministrationGroup(
       synchronize: Option[config.NonNegativeDuration],
   ): ConsoleCommandResult[SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant]] = {
     // determine the next serial
-    val nextSerial = reference.topology.party_to_participant_mappings
+    val currentTransaction = reference.topology.party_to_participant_mappings
       .list(synchronizerId, filterParty = partyId.filterString)
       .maxByOption(_.context.serial)
+    val nextSerial = currentTransaction
       .map(_.context.serial.increment)
 
     reference
@@ -371,6 +389,8 @@ class ParticipantPartiesAdministrationGroup(
                 ParticipantPermission.Submission,
               )
             ),
+            partySigningKeysWithThreshold =
+              currentTransaction.flatMap(_.item.partySigningKeysWithThreshold),
           ),
           // let the topology service determine the appropriate keys to use
           signedBy = Seq.empty,
@@ -401,11 +421,15 @@ class ParticipantPartiesAdministrationGroup(
       .discard
   }
 
-  @Help.Summary("Add a previously existing party to the local participant", FeatureFlag.Preview)
+  @Help.Summary("Add an already hosted party to the participant", FeatureFlag.Preview)
   @Help.Description(
-    """Initiate adding a previously existing party to this participant on the specified synchronizer.
-      |Performs some checks synchronously and then initiates party replication asynchronously. The returned `addPartyRequestId`
-      |parameter allows identifying asynchronous progress and errors."""
+    """Initiate adding a party that is already hosted on other participants to this
+      |participant on the specified synchronizer.
+      |
+      |Performs some checks synchronously and then initiates party replication asynchronously.
+      |The returned `addPartyRequestId` parameter allows identifying asynchronous progress or
+      |errors and is stable across each retry with the same request parameters.
+      """
   )
   def add_party_async(
       party: PartyId,
@@ -427,20 +451,59 @@ class ParticipantPartiesAdministrationGroup(
     }
   }
 
-  @Help.Summary("Obtain status on a pending `add_party_async` call", FeatureFlag.Preview)
-  @Help.Description(
-    """Retrieve status information on a party previously added via the `add_party_async` endpoint
-      |by specifying the previously returned `addPartyRequestId` parameter."""
+  @Help.Summary(
+    "Add an already hosted party to the participant using an ACS snapshot file",
+    FeatureFlag.Preview,
   )
-  def get_add_party_status(addPartyRequestId: String): AddPartyStatus = check(FeatureFlag.Preview) {
+  @Help.Description(
+    """Add a party that is already hosted on other participants to this participant on the
+      |specified synchronizer using the Active Contract Set (ACS) provided in the specified
+      |file.
+      |
+      |Performs some checks and imports the ACS synchronously and then completes party
+      |replication asynchronously. The returned `addPartyRequestId` parameter allows tracking
+      |progress or identifying errors and is stable across each retry with the same request
+      |parameters.
+      """
+  )
+  def add_party_with_acs_async(
+      importFilePath: String = "canton-acs-export.gz",
+      party: PartyId,
+      synchronizerId: SynchronizerId,
+      sourceParticipant: ParticipantId,
+      serial: PositiveInt,
+      participantPermission: ParticipantPermission,
+  ): String = check(FeatureFlag.Preview) {
     consoleEnvironment.run {
       reference.adminCommand(
-        ParticipantAdminCommands.PartyManagement.GetAddPartyStatus(addPartyRequestId)
+        ParticipantAdminCommands.PartyManagement.AddPartyWithAcsAsync(
+          new java.io.File(importFilePath),
+          party,
+          synchronizerId,
+          sourceParticipant,
+          serial,
+          participantPermission,
+        )
       )
     }
   }
 
-  @Help.Summary("Finds a party's highest activation offset.")
+  @Help.Summary("Obtain status on a pending `add_party_async` call", FeatureFlag.Preview)
+  @Help.Description(
+    """Retrieve status information on a party previously added via the `add_party_async`
+      |endpoint by specifying the previously returned `addPartyRequestId` parameter.
+      """
+  )
+  def get_add_party_status(addPartyRequestId: String): PartyReplicationStatus =
+    check(FeatureFlag.Preview) {
+      consoleEnvironment.run {
+        reference.adminCommand(
+          ParticipantAdminCommands.PartyManagement.GetAddPartyStatus(addPartyRequestId)
+        )
+      }
+    }
+
+  @Help.Summary("Finds a party's highest activation offset")
   @Help.Description(
     """This command locates the highest ledger offset where a party's activation matches
       |specified criteria.
@@ -466,7 +529,7 @@ class ParticipantPartiesAdministrationGroup(
       |party activation ledger offset.
       |
       |
-      |The arguments are:
+      |Parameters:
       |- partyId: The party to find activations for.
       |- participantId: The participant hosting the new party.
       |- synchronizerId: The synchronizer sequencing the activations.
@@ -475,7 +538,7 @@ class ParticipantPartiesAdministrationGroup(
       |- endOffsetInclusive: Ending ledger offset (default: None = trailing search).
       |- completeAfter: Number of transactions to find (default: Maximum = no limit).
       |- timeout: Search timeout (default: 1 minute).
-      |"""
+      """
   )
   def find_party_max_activation_offset(
       partyId: PartyId,
@@ -505,7 +568,7 @@ class ParticipantPartiesAdministrationGroup(
     )
   }
 
-  @Help.Summary("Finds a party's highest deactivation offset.")
+  @Help.Summary("Finds a party's highest deactivation offset")
   @Help.Description(
     """This command locates the highest ledger offset where a party's deactivation matches
       |specified criteria.
@@ -531,7 +594,7 @@ class ParticipantPartiesAdministrationGroup(
       |has been off-boarded from a participant.
       |
       |
-      |The arguments are:
+      |Parameters:
       |- partyId: The party to find deactivations for.
       |- participantId: The participant hosting the new party.
       |- synchronizerId: The synchronizer sequencing the deactivations.
@@ -540,7 +603,7 @@ class ParticipantPartiesAdministrationGroup(
       |- endOffsetInclusive: Ending ledger offset (default: None = trailing search).
       |- completeAfter: Number of transactions to find (default: Maximum = no limit).
       |- timeout: Search timeout (default: 1 minute).
-      |"""
+      """
   )
   def find_party_max_deactivation_offset(
       partyId: PartyId,
@@ -603,10 +666,10 @@ class ParticipantPartiesAdministrationGroup(
       )
   }
 
-  @Help.Summary("Find highest ledger offset by timestamp.")
+  @Help.Summary("Find highest ledger offset by timestamp")
   @Help.Description(
-    """This command attempts to find the highest ledger offset among all events belonging
-      |to a synchronizer that have a record time before or at the given timestamp.
+    """This command attempts to find the highest ledger offset among all events belonging to a
+      |synchronizer that have a record time before or at the given timestamp.
       |
       |Returns the highest ledger offset, or an error.
       |
@@ -620,12 +683,12 @@ class ParticipantPartiesAdministrationGroup(
       |For example, if not all events have been processed fully and/or published to the
       |Ledger API DB, a retry makes sense.
       |
-      |The arguments are:
+      |Parameters:
       |- synchronizerId: Restricts the query to a particular synchronizer.
       |- timestamp: A point in time.
       |- force: Defaults to false. If true, returns the highest currently known ledger offset
       |  with a record time before or at the given timestamp.
-      |"""
+      """
   )
   def find_highest_offset_by_timestamp(
       synchronizerId: SynchronizerId,
@@ -639,37 +702,35 @@ class ParticipantPartiesAdministrationGroup(
   }
 
   @Help.Summary(
-    "Export active contracts for a given party to replicate it."
+    "Export active contracts for a given party to replicate it"
   )
   @Help.Description(
-    """This command exports the current Active Contract Set (ACS) for a given
-      |party to facilitate its replication from a source to a target participant.
+    """This command exports the current Active Contract Set (ACS) for a given party to
+      |facilitate its replication from a source to a target participant.
       |
-      |It uses the party's most recent activation on the target participant to
-      |determine the precise historical state of the ACS to export from the
-      |source participant.
+      |It uses the party's most recent activation on the target participant to determine the
+      |precise historical state of the ACS to export from the source participant.
       |
-      |"Activation" on the target participant means the new hosting arrangement
-      |has been authorized by both the party itself and the target participant
-      |via party-to-participant topology transactions.
+      |"Activation" on the target participant means the new hosting arrangement has been
+      |authorized by both the party itself and the target participant via party-to-participant
+      |topology transactions.
       |
-      |This command will fail if the party has not yet been activated on the
-      |target participant.
+      |This command will fail if the party has not yet been activated on the target participant.
       |
-      |Upon successful completion, the command writes a GZIP-compressed ACS
-      |snapshot file. This file should then be imported into the target participant's
-      |ACS using the `import_party_acs` command.
+      |Upon successful completion, the command writes a GZIP-compressed ACS snapshot file. This
+      |file should then be imported into the target participant's ACS using the
+      |`import_party_acs` command.
       |
-      |The arguments are:
+      |Parameters:
       |- party: The party being replicated, it must already be active on the target participant.
       |- synchronizerId: Restricts the export to the given synchronizer.
-      |- targetParticipantId: Unique identifier of the target participant where the party
-      |                       will be replicated.
-      |- beginOffsetExclusive: Exclusive ledger offset used as starting point fo find the party's
-      |                        activation on the target participant.
+      |- targetParticipantId: Unique identifier of the target participant where the party will
+      |  be replicated.
+      |- beginOffsetExclusive: Exclusive ledger offset used as starting point fo find the
+      |  party's activation on the target participant.
       |- exportFilePath: The path denoting the file where the ACS snapshot will be stored.
-      |- waitForActivationTimeout: The maximum duration the service will wait to find the topology
-      |                            transaction that activates the party on the target participant.
+      |- waitForActivationTimeout: The maximum duration the service will wait to find the
+      |  topology transaction that activates the party on the target participant.
       |- timeout: A timeout for this operation to complete.
       """
   )
@@ -710,24 +771,24 @@ class ParticipantPartiesAdministrationGroup(
     }
 
   @Help.Summary(
-    "Import active contracts from a snapshot file to replicate a party."
+    "Import active contracts from a snapshot file to replicate a party"
   )
   @Help.Description(
     """This command imports contracts from an Active Contract Set (ACS) snapshot
       |file into the participant's ACS. It expects the given ACS snapshot file to
       |be the result of a previous `export_party_acs` command invocation.
       |
-      |The argument is:
+      |Parameters:
       |- importFilePath: The path denoting the file from where the ACS snapshot will be read.
-      |                  Defaults to "canton-acs-export.gz" when undefined.
+      |  Defaults to "canton-acs-export.gz" when undefined.
       |- workflowIdPrefix: Sets a custom prefix for the workflow ID to easily identify all
-      |                  transactions generated by this import.
-      |                  Defaults to "import-<random_UUID>" when unspecified.
-      |- contractImportMode: Governs contract authentication processing on import. Options include
-      |                      Validation (default), [Accept].
+      |  transactions generated by this import. Defaults to "import-<random_UUID>" when
+      |  unspecified.
+      |- contractImportMode: Governs contract authentication processing on import. Options
+      |  include Validation (default), [Accept].
       |- representativePackageIdOverride: Defines override mappings for assigning
-      |                                   representative package IDs to contracts upon ACS import.
-      |                                   Defaults to NoOverride when undefined.
+      |  representative package IDs to contracts upon ACS import. Defaults to NoOverride when
+      |  undefined.
    """
   )
   def import_party_acs(
@@ -748,8 +809,51 @@ class ParticipantPartiesAdministrationGroup(
       )
     }
 
+  @Help.Summary("Import active contracts from a snapshot file to replicate a party")
+  @Help.Description(
+    """This command imports contracts from an Active Contract Set (ACS) snapshot
+      |file into the participant's ACS. It expects the given ACS snapshot file to
+      |be the result of a previous `export_party_acs` command invocation.
+      |
+      |Unlike `import_party_acs` above it does not read the full snapshot into memory.
+      |
+      |The argument is:
+      |- importFilePath: The path denoting the file from where the ACS snapshot will be read.
+      |                  Defaults to "canton-acs-export.gz" when undefined.
+      |- synchronizerId: The identifier of the synchronizer managing the contract to be
+      |                  imported. If a contract has a different synchronizer, import will fail.
+      |- workflowIdPrefix: Sets a custom prefix for the workflow ID to easily identify all
+      |                  transactions generated by this import.
+      |                  Defaults to "import-<random_UUID>" when unspecified.
+      |- contractImportMode: Governs contract authentication processing on import. Options
+      |                      include Validation (default), [Accept].
+      |- representativePackageIdOverride: Defines override mappings for assigning representative
+      |                                   package IDs to contracts upon ACS import.
+      |                                   Defaults to NoOverride when undefined.
+   """
+  )
+  def import_party_acsV2(
+      importFilePath: String = "canton-acs-export.gz",
+      synchronizerId: SynchronizerId,
+      workflowIdPrefix: String = "",
+      contractImportMode: ContractImportMode = ContractImportMode.Validation,
+      representativePackageIdOverride: RepresentativePackageIdOverride =
+        RepresentativePackageIdOverride.NoOverride,
+  ): Unit =
+    consoleEnvironment.run {
+      reference.adminCommand(
+        ParticipantAdminCommands.PartyManagement.ImportPartyAcsV2(
+          new java.io.File(importFilePath),
+          synchronizerId,
+          workflowIdPrefix = workflowIdPrefix,
+          contractImportMode,
+          representativePackageIdOverride,
+        )
+      )
+    }
+
   @Help.Summary(
-    "Clears the onboarding flag for a party."
+    "Clears the onboarding flag for a party"
   )
   @Help.Description(
     """Instructs the participant to unilaterally clear the 'onboarding' flag on the
@@ -774,15 +878,15 @@ class ParticipantPartiesAdministrationGroup(
       |Returns the current the current status as `PartyOnboardingFlagStatus`:
       |- `FlagNotSet`: The flag is successfully cleared (or was already clear).
       |- `FlagSet`: The flag is still set. A clearance task is pending and scheduled
-      |             to run at or after the given timestamp.
+      |  to run at or after the given timestamp.
       |
-      |The arguments are:
+      |Parameters:
       |- party: The party being onboarded. It must already be active on the participant.
       |- synchronizerId: Restricts the operation to the given synchronizer.
       |- beginOffsetExclusive: Exclusive ledger offset used as a starting point to find the
-      |                        party's activation.
+      |  party's activation.
       |- waitForActivationTimeout: Max duration to wait to find the party's activation
-      |                            topology transaction.
+      |  topology transaction.
     """
   )
   def clear_party_onboarding_flag(

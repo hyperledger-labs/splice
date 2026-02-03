@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
@@ -41,6 +41,7 @@ import sttp.tapir.{AnyEndpoint, Endpoint, Schema, stringToPath}
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
+@SuppressWarnings(Array("com.digitalasset.canton.DirectGrpcServiceInvocation"))
 class JsInteractiveSubmissionService(
     ledgerClient: LedgerClient,
     protocolConverters: ProtocolConverters,
@@ -106,7 +107,9 @@ class JsInteractiveSubmissionService(
     implicit val tc: TraceContext = callerContext.traceContext()
     for {
       grpcReq <- protocolConverters.ExecuteSubmissionRequest.fromJson(req.in)
-      grpcResp <- interactiveSubmissionServiceClient(token).executeSubmission(grpcReq).resultToRight
+      grpcResp <- interactiveSubmissionServiceClient(token)
+        .executeSubmission(grpcReq)
+        .resultToRight
     } yield grpcResp
   }
 
@@ -200,8 +203,8 @@ final case class JsPrepareSubmissionResponse(
 )
 
 final case class JsExecuteSubmissionRequest(
-    preparedTransaction: Option[protobuf.ByteString],
-    partySignatures: Option[interactive_submission_service.PartySignatures],
+    preparedTransaction: protobuf.ByteString,
+    partySignatures: interactive_submission_service.PartySignatures,
     deduplicationPeriod: interactive_submission_service.ExecuteSubmissionRequest.DeduplicationPeriod,
     submissionId: String,
     userId: String = "",
@@ -210,8 +213,8 @@ final case class JsExecuteSubmissionRequest(
 )
 
 final case class JsExecuteSubmissionAndWaitRequest(
-    preparedTransaction: Option[protobuf.ByteString],
-    partySignatures: Option[interactive_submission_service.PartySignatures],
+    preparedTransaction: protobuf.ByteString,
+    partySignatures: interactive_submission_service.PartySignatures,
     deduplicationPeriod: interactive_submission_service.ExecuteSubmissionRequest.DeduplicationPeriod,
     submissionId: String,
     userId: String = "",
@@ -220,8 +223,8 @@ final case class JsExecuteSubmissionAndWaitRequest(
 )
 
 final case class JsExecuteSubmissionAndWaitForTransactionRequest(
-    preparedTransaction: Option[protobuf.ByteString],
-    partySignatures: Option[interactive_submission_service.PartySignatures],
+    preparedTransaction: protobuf.ByteString,
+    partySignatures: interactive_submission_service.PartySignatures,
     deduplicationPeriod: interactive_submission_service.ExecuteSubmissionRequest.DeduplicationPeriod,
     submissionId: String,
     userId: String = "",

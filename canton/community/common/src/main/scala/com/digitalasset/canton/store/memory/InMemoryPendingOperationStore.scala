@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.store.memory
@@ -67,6 +67,22 @@ class InMemoryPendingOperationStore[Op <: HasProtocolVersionedWrapper[Op]](
 
     }
 
+  override def updateOperation(
+      operation: Op,
+      synchronizerId: SynchronizerId,
+      name: NonEmptyString,
+      key: String,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Unit] = {
+    store
+      .updateWith(compositeKey(synchronizerId, key, name))(
+        _.map(_.copy(serializedOperation = operation.toByteString))
+      )
+      .discard
+    FutureUnlessShutdown.unit
+  }
+
   override def delete(
       synchronizerId: SynchronizerId,
       operationKey: String,
@@ -87,6 +103,14 @@ class InMemoryPendingOperationStore[Op <: HasProtocolVersionedWrapper[Op]](
         .map(_.tryToPendingOperation(opCompanion))
     })
     OptionT(resultF)
+  }
+
+  override def getAll(operationName: NonEmptyString)(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Set[PendingOperation[Op]]] = FutureUnlessShutdown.pure {
+    store.iterator.collect { case ((_, _, `operationName`), op) =>
+      op.tryToPendingOperation(opCompanion)
+    }.toSet
   }
 }
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao.events
@@ -19,8 +19,8 @@ import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTr
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
-import com.digitalasset.canton.participant.store.LedgerApiContractStore
 import com.digitalasset.canton.platform.config.ActiveContractsServiceStreamsConfig
+import com.digitalasset.canton.platform.store.LedgerApiContractStore
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.SequentialIdBatch.Ids
 import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
@@ -253,9 +253,10 @@ class ACSReader(
     ): Future[Vector[Long]] =
       globalIdQueriesLimiter.execute(
         dispatcher.executeSql(metrics.index.db.getAssingIdsForOffsets) { connection =>
+          // all activations for an incomplete offset should be assignments
           val ids =
             eventStorageBackend
-              .lookupAssignSequentialIdByOffset(offsets.map(_.unwrap))(connection)
+              .lookupActivationSequentialIdByOffset(offsets.map(_.unwrap))(connection)
           logger.debug(
             s"Assign Ids for offsets returned #${ids.size} (from ${offsets.size}) ${ids.lastOption
                 .map(last => s"until $last")
@@ -270,9 +271,10 @@ class ACSReader(
     ): Future[Vector[Long]] =
       globalIdQueriesLimiter.execute(
         dispatcher.executeSql(metrics.index.db.getUnassingIdsForOffsets) { connection =>
+          // all deactivations for an incomplete offset should be assignments
           val ids =
             eventStorageBackend
-              .lookupUnassignSequentialIdByOffset(offsets.map(_.unwrap))(connection)
+              .lookupDeactivationSequentialIdByOffset(offsets.map(_.unwrap))(connection)
           logger.debug(
             s"Unassign Ids for offsets returned #${ids.size} (from ${offsets.size}) ${ids.lastOption
                 .map(last => s"until $last")

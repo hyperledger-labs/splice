@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.leaders
@@ -170,7 +170,7 @@ object BlacklistLeaderSelectionPolicyState
     },
   )(rpv)
 
-  override def versioningTable: VersioningTable =
+  override val versioningTable: VersioningTable =
     VersioningTable(
       ProtoVersion(30) ->
         VersionedProtoCodec(

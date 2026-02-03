@@ -221,7 +221,7 @@ export async function submitExerciseCommand(
   const signed = signTransaction(
     publicKeyPath,
     privateKeyPath,
-    prepared.preparedTransactionHash,
+    prepared.preparedTransactionHash!,
   );
   const partySignatures: PartySignatures = {
     signatures: [
@@ -247,15 +247,15 @@ export async function submitExerciseCommand(
   await ledgerClient.postV2InteractiveSubmissionExecute({
     userId,
     submissionId,
-    preparedTransaction: prepared.preparedTransaction,
-    hashingSchemeVersion: prepared.hashingSchemeVersion,
+    preparedTransaction: prepared.preparedTransaction!,
+    hashingSchemeVersion: prepared.hashingSchemeVersion!,
     partySignatures,
     deduplicationPeriod,
   });
 
   const completionPromise = awaitCompletion(
     ledgerClient,
-    ledgerEnd.offset,
+    ledgerEnd.offset!,
     partyId,
     userId,
     commandId,
@@ -374,39 +374,41 @@ async function awaitCompletion(
     COMPLETIONS_STREAM_IDLE_TIMEOUT_MS,
   );
   const completions = responses.filter(
-    (response) => !!response.completionResponse.Completion,
+    (response) => !!response.completionResponse!.Completion,
   );
 
   const wantedCompletion = completions.find((response) => {
-    const completion = response.completionResponse.Completion;
+    const completion = response.completionResponse!.Completion;
     return (
-      completion.value.userId === userId &&
-      completion.value.commandId === commandId &&
-      completion.value.submissionId === submissionId
+      completion.value!.userId === userId &&
+      completion.value!.commandId === commandId &&
+      completion.value!.submissionId === submissionId
     );
   });
 
   if (wantedCompletion) {
-    const status = wantedCompletion.completionResponse.Completion.value.status;
+    const status =
+      wantedCompletion.completionResponse?.Completion.value?.status;
     if (status && status.code !== 0) {
       // status.code is 0 for success
       throw new Error(
-        `Command failed with status: ${JSON.stringify(wantedCompletion.completionResponse.Completion.value.status)}`,
+        `Command failed with status: ${JSON.stringify(wantedCompletion.completionResponse?.Completion.value?.status)}`,
       );
     }
     return {
       synchronizerId:
-        wantedCompletion.completionResponse.Completion.value.synchronizerTime
+        wantedCompletion.completionResponse?.Completion.value?.synchronizerTime
           ?.synchronizerId,
       recordTime:
-        wantedCompletion.completionResponse.Completion.value.synchronizerTime
+        wantedCompletion.completionResponse?.Completion.value?.synchronizerTime
           ?.recordTime,
-      updateId: wantedCompletion.completionResponse.Completion.value.updateId,
+      updateId:
+        wantedCompletion.completionResponse?.Completion.value?.updateId ?? "",
     };
   } else {
     const lastCompletion = completions[completions.length - 1];
     const newLedgerEnd =
-      lastCompletion?.completionResponse.Completion.value.offset;
+      lastCompletion?.completionResponse?.Completion.value?.offset;
     return awaitCompletion(
       ledgerClient,
       newLedgerEnd || ledgerEnd, // !newLedgerEnd implies response was empty

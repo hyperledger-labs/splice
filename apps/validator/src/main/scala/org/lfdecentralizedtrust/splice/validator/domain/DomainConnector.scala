@@ -91,16 +91,38 @@ class DomainConnector(
       case Some(url) =>
         Map(
           config.domains.global.alias -> SequencerConnections
-            .single(GrpcSequencerConnection.tryCreate(url))
+            .single(
+              GrpcSequencerConnection
+                .create(url)
+                .fold(
+                  error =>
+                    throw Status.INVALID_ARGUMENT
+                      .withDescription(s"Invalid synchronizer url $url: $error")
+                      .asRuntimeException(),
+                  identity,
+                )
+            )
         ).pure[Future]
     }
   }
 
   def ensureExtraDomainsRegistered()(implicit tc: TraceContext): Future[Unit] =
-    MonadUtil.sequentialTraverse_(config.domains.extra)(domain =>
+    MonadUtil.sequentialTraverse_(config.domains.extra)(synchronizer =>
       ensureDomainRegistered(
-        domain.alias,
-        SequencerConnections.single(GrpcSequencerConnection.tryCreate(domain.url)),
+        synchronizer.alias,
+        SequencerConnections.single(
+          GrpcSequencerConnection
+            .create(synchronizer.url)
+            .fold(
+              error =>
+                throw Status.INVALID_ARGUMENT
+                  .withDescription(
+                    s"Invalid synchronizer url for synchronizer $synchronizer: $error"
+                  )
+                  .asRuntimeException(),
+              identity,
+            )
+        ),
       )
     )
 
@@ -178,7 +200,7 @@ class DomainConnector(
                     threshold,
                     submissionRequestAmplification = SubmissionRequestAmplification(
                       amplificationFactor,
-                      config.sequencerRequestAmplificationPatience,
+                      config.sequencerRequestAmplificationPatience.toInternal,
                     ),
                     sequencerLivenessMargin =
                       Thresholds.sequencerConnectionsLivenessMargin(nonEmptyConnections.size),

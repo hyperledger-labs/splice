@@ -3,22 +3,16 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import cats.syntax.parallel.*
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.noop.NoOpMetricsFactory
-import com.daml.metrics.api.testing.InMemoryMetricsFactory
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.config.{
-  CantonEdition,
-  CommunityCantonEdition,
   NonNegativeDuration,
   NonNegativeFiniteDuration,
   ProcessingTimeout,
 }
 import com.digitalasset.canton.environment.EnvironmentFactory
-
-import java.time.Duration
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.networking.grpc.GrpcError
@@ -51,14 +45,15 @@ import org.lfdecentralizedtrust.splice.integration.plugins.{
 import org.lfdecentralizedtrust.splice.sv.config.{SvOnboardingConfig, SynchronizerFeesConfig}
 import org.lfdecentralizedtrust.splice.util.CommonAppInstanceReferences
 import org.scalactic.source
-import org.scalatest.exceptions.TestFailedException
-import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatest.{AppendedClues, BeforeAndAfterEach}
+import org.scalatest.exceptions.TestFailedException
+import org.scalatest.matchers.{Matcher, MatchResult}
 
+import java.time.Duration
 import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.*
 import scala.language.implicitConversions
 import scala.math.BigDecimal.RoundingMode
 import scala.util.{Failure, Success, Try}
@@ -102,14 +97,8 @@ object SpliceTests extends LazyLogging {
     override def environmentFactory: EnvironmentFactory[SpliceConfig, SpliceEnvironment] =
       SpliceEnvironmentFactory
 
-    override val edition: CantonEdition = CommunityCantonEdition
-
     type SpliceEnvironmentDefinition =
       BaseEnvironmentDefinition[SpliceConfig, SpliceEnvironment]
-
-    override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
-      new InMemoryMetricsFactory
-    }
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
 
@@ -178,8 +167,6 @@ object SpliceTests extends LazyLogging {
     override def environmentFactory: EnvironmentFactory[SpliceConfig, SpliceEnvironment] =
       SpliceEnvironmentFactory
 
-    override val edition: CantonEdition = CommunityCantonEdition
-
     type SpliceEnvironmentDefinition =
       BaseEnvironmentDefinition[SpliceConfig, SpliceEnvironment]
 
@@ -204,10 +191,6 @@ object SpliceTests extends LazyLogging {
     }
 
     protected val migrationId: Long = sys.env.getOrElse("MIGRATION_ID", "0").toLong
-
-    override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
-      new InMemoryMetricsFactory
-    }
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
 

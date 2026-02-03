@@ -7,9 +7,9 @@ import sbt.*
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
   val version: String = "3.5.0-snapshot.20260108.14534.0.vc8a0078c"
+  val canton_library_version = "3.5.0-snapshot.20260202.17922.0.v4fee2ef8"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
-  val transcode_version = "3.5.0-snapshot.20251205.150.903.vc31b0a4"
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
   // the non-sbt based docker build.
   val daml_compiler_version = sys.env("DAML_COMPILER_VERSION")
@@ -30,7 +30,7 @@ object CantonDependencies {
   lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
   lazy val auth0_jwks = "com.auth0" % "jwks-rsa" % "0.21.2"
   lazy val awaitility = "org.awaitility" % "awaitility" % "4.2.0"
-  lazy val grpc_version = "1.75.0"
+  lazy val grpc_version = "1.77.0"
   lazy val logback_version = "1.5.3"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
@@ -38,7 +38,7 @@ object CantonDependencies {
   lazy val pprint_version = "0.7.1"
   // if you update the slick version, please also update our forked code in common/slick.util.*
   lazy val slick_version = "3.5.2"
-  lazy val bouncy_castle_version = "1.70"
+  lazy val bouncy_castle_version = "1.83"
 
   lazy val pureconfig_version = "0.14.0"
 
@@ -48,8 +48,6 @@ object CantonDependencies {
   lazy val scalacheck_version = "1.15.4"
   lazy val scalaz_version = "7.2.33"
   lazy val mockito_scala_version = "1.16.3"
-
-  lazy val netty_version = "4.1.124.Final"
 
   lazy val reflections = "org.reflections" % "reflections" % "0.10.2"
   lazy val pureconfig = "com.github.pureconfig" %% "pureconfig" % pureconfig_version
@@ -100,21 +98,26 @@ object CantonDependencies {
   lazy val daml_libs_scala_grpc_test_utils =
     "com.daml" %% "grpc-test-utils" % daml_libraries_version
 
+  lazy val canton_java_bindings = "com.daml" % "bindings-java" % canton_library_version
+  lazy val canton_ledger_api_scala = "com.daml" %% "ledger-api-scala" % canton_library_version
+
+  lazy val canton_transcode_json = "com.daml" % "transcode-codec-json_3" % canton_library_version
+  lazy val canton_transcode_proto_scala =
+    "com.daml" % "transcode-codec-proto-scala_3" % canton_library_version
+  lazy val canton_transcode_daml_lf = "com.daml" % "transcode-daml-lf_3" % canton_library_version
+  // Transcode is written in Scala 3 and it depends on Scala 3 libraries
+  // For a 2.13 project to depend on transcode it needs to resolve the conflicting Scala 2.13/3 dependencies
+  lazy val excludeTranscodeConflictingDependencies = Keys.excludeDependencies ++= Seq(
+    ExclusionRule("com.lihaoyi", "fastparse_3"),
+    ExclusionRule("com.lihaoyi", "os-lib_3"),
+    ExclusionRule("com.lihaoyi", "sourcecode_3"),
+    ExclusionRule("com.lihaoyi", "ujson_3"),
+    ExclusionRule("com.lihaoyi", "upickle-core_3"),
+  )
+
   lazy val fastparse = "com.lihaoyi" %% "fastparse" % "3.1.1"
-  lazy val transcode_daml_lf =
-    ("com.daml" %% "transcode-daml-lf-daml3.5" % transcode_version)
-      .cross(CrossVersion.for2_13Use3)
-      .exclude("com.lihaoyi", "fastparse_3")
-  lazy val transcode_codec_json =
-    ("com.daml" %% "transcode-codec-json" % transcode_version)
-      .cross(CrossVersion.for2_13Use3)
-      .exclude("com.lihaoyi", "ujson_3")
-      .exclude("com.lihaoyi", "upickle-core_3")
-      .exclude("com.lihaoyi", "fastparse_3")
-  lazy val transcode_codec_proto_scala =
-    ("com.daml" %% "transcode-codec-proto-scala-daml3.5" % transcode_version)
-      .cross(CrossVersion.for2_13Use3)
-      .exclude("com.lihaoyi", "fastparse_3")
+  lazy val os_lib = "com.lihaoyi" %% "os-lib" % "0.10.3"
+  lazy val sourcecode = "com.lihaoyi" %% "sourcecode" % "0.4.2"
 
   lazy val daml_nonempty = "com.daml" %% "nonempty" % daml_libraries_version
   lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version
@@ -144,18 +147,14 @@ object CantonDependencies {
   lazy val daml_testing_utils = "com.daml" %% "testing-utils" % daml_libraries_version
 
   lazy val bouncycastle_bcprov_jdk15on =
-    "org.bouncycastle" % "bcprov-jdk15on" % bouncy_castle_version
+    "org.bouncycastle" % "bcprov-jdk18on" % bouncy_castle_version
   lazy val bouncycastle_bcpkix_jdk15on =
-    "org.bouncycastle" % "bcpkix-jdk15on" % bouncy_castle_version
+    "org.bouncycastle" % "bcpkix-jdk18on" % bouncy_castle_version
 
   lazy val grpc_api = "io.grpc" % "grpc-api" % grpc_version
   lazy val grpc_protobuf = "io.grpc" % "grpc-protobuf" % grpc_version
   lazy val grpc_netty_shaded = "io.grpc" % "grpc-netty-shaded" % grpc_version
   lazy val grpc_stub = "io.grpc" % "grpc-stub" % grpc_version
-  // pick the version of boring ssl from this table: https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty
-  // required for ALPN (which is required for TLS+HTTP/2) when running on Java 8. JSSE will be used on Java 9+.
-  lazy val netty_boring_ssl = "io.netty" % "netty-tcnative-boringssl-static" % "2.0.72.Final"
-  lazy val netty_handler = "io.netty" % "netty-handler" % netty_version
   lazy val grpc_services = "io.grpc" % "grpc-services" % grpc_version
   lazy val google_common_protos = "com.google.api.grpc" % "proto-google-common-protos" % "2.41.0"
 
@@ -194,6 +193,7 @@ object CantonDependencies {
 
   lazy val apache_commons_codec = "commons-codec" % "commons-codec" % "1.11"
   lazy val apache_commons_io = "commons-io" % "commons-io" % "2.11.0"
+  lazy val apache_commons_compress = "org.apache.commons" % "commons-compress" % "1.27.1"
   lazy val log4j_core = "org.apache.logging.log4j" % "log4j-core" % log4j_version
   lazy val log4j_api = "org.apache.logging.log4j" % "log4j-api" % log4j_version
 
@@ -213,6 +213,7 @@ object CantonDependencies {
 
   lazy val circe_core = "io.circe" %% "circe-core" % circe_version
   lazy val circe_generic = "io.circe" %% "circe-generic" % circe_version
+  lazy val circe_parser = "io.circe" %% "circe-parser" % circe_version
   lazy val circe_generic_extras = "io.circe" %% "circe-generic-extras" % circe_version
 
   lazy val guava = "com.google.guava" % "guava" % "33.3.0-jre"
