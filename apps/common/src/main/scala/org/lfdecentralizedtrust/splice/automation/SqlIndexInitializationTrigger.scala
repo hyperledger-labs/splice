@@ -245,6 +245,15 @@ object SqlIndexInitializationTrigger {
           on round_party_totals (store_id, party, closed_round desc)
         """,
       ),
+    IndexAction
+      .Create(
+        indexName = "updt_hist_tran_hi_eth",
+        createAction = sqlu"""
+          create index concurrently if not exists updt_hist_tran_hi_eth
+          on update_history_transactions (history_id, external_transaction_hash)
+          where external_transaction_hash is not null
+        """,
+      ),
   )
 
   sealed trait Task extends Product with Serializable with PrettyPrinting
