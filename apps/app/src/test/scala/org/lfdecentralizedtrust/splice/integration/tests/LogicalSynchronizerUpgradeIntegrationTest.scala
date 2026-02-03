@@ -3,6 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import better.files.File.apply
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
+import com.digitalasset.canton.admin.api.client.data
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
@@ -317,10 +318,12 @@ class LogicalSynchronizerUpgradeIntegrationTest
                     decentralizedSynchronizerId,
                     newStaticSyncParams.toInternal,
                   ),
-                  GrpcSequencerConnection.tryCreate(
-                    newBackend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
-                  ),
-                  newBackend.config.localSynchronizerNode.value.mediator.sequencerRequestAmplification,
+                  GrpcSequencerConnection
+                    .create(
+                      newBackend.config.localSynchronizerNode.value.sequencer.externalPublicApiUrl
+                    )
+                    .value,
+                  newBackend.config.localSynchronizerNode.value.mediator.sequencerRequestAmplification.toInternal,
                 )
                 .futureValue
               eventually(2.minutes) {
@@ -335,24 +338,18 @@ class LogicalSynchronizerUpgradeIntegrationTest
         }
       }
 
-      // stop old backend as the topology trigger will push crazy stuff when the participant connect to the new sync but the topology was not sycned yet
-      // https://github.com/DACH-NY/canton/issues/29819
-      clue("Stop old backends") {
-        stopAllAsync(
-          sv1ValidatorBackend,
-          sv2ValidatorBackend,
-          sv3ValidatorBackend,
-          sv4ValidatorBackend,
-        ).futureValue
-        allBackends.par.map { backend =>
-          backend.stop()
-        }
-      }
-
-      aliceValidatorBackend.validatorAutomation
-        .trigger[ReconcileSequencerConnectionsTrigger]
-        .pause()
-        .futureValue
+      Seq(
+        sv1ValidatorBackend,
+        sv2ValidatorBackend,
+        sv3ValidatorBackend,
+        sv4ValidatorBackend,
+        aliceValidatorBackend,
+      ).par.foreach(
+        _.validatorAutomation
+          .trigger[ReconcileSequencerConnectionsTrigger]
+          .pause()
+          .futureValue
+      )
 
       clue("Announce new sequencer urls") {
         allBackends.zip(allNewBackends).par.map { case (oldBackend, newBackend) =>
@@ -494,7 +491,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
     (for {
       conn <- sequencerConnections.aliasToConnection.values
       endpoint <- conn match {
-        case GrpcSequencerConnection(endpoints, _, _, _, _) => endpoints
+        case data.GrpcSequencerConnection(endpoints, _, _, _, _) => endpoints
       }
     } yield endpoint.toString).toSet
   }
