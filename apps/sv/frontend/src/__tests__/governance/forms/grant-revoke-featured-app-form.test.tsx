@@ -89,7 +89,7 @@ describe('Grant Featured App Form', () => {
 
     await user.click(submitButton);
     expect(submitButton.getAttribute('disabled')).toBeDefined();
-    expect(async () => await user.click(submitButton)).rejects.toThrowError(
+    await expect(async () => await user.click(submitButton)).rejects.toThrowError(
       /Unable to perform pointer interaction/
     );
 
@@ -108,7 +108,7 @@ describe('Grant Featured App Form', () => {
 
     const providerInput = screen.getByTestId('grant-featured-app-idValue');
     expect(providerInput).toBeInTheDocument();
-    await user.type(providerInput, 'abcde12345');
+    await user.type(providerInput, 'a-party-id::1014912492');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
@@ -194,7 +194,7 @@ describe('Grant Featured App Form', () => {
     await user.type(urlInput, 'https://example.com');
 
     const providerInput = screen.getByTestId('grant-featured-app-idValue');
-    await user.type(providerInput, 'abcde12345');
+    await user.type(providerInput, 'a-party-id::1014912492');
 
     expect(screen.getByText('Review Proposal')).toBeInTheDocument();
     const submitButton = screen.getByTestId('submit-button');
