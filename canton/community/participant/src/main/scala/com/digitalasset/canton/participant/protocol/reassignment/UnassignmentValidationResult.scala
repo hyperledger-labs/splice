@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.reassignment
@@ -93,7 +93,7 @@ final case class UnassignmentValidationResult(
         )
       )
     (acsChangeFactory: AcsChangeFactory) =>
-      (internalContractIds: InternalContractIds) =>
+      (_: InternalContractIds) =>
         Update.SequencedReassignmentAccepted(
           optCompletionInfo = completionInfo,
           workflowId = submitterMetadata.workflowId,
@@ -120,7 +120,6 @@ final case class UnassignmentValidationResult(
           recordTime = recordTime,
           synchronizerId = sourceSynchronizer.unwrap.logical,
           acsChangeFactory = acsChangeFactory,
-          internalContractIds = internalContractIds,
         )
   }
 }

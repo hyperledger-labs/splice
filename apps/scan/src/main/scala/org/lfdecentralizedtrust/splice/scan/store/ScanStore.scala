@@ -156,16 +156,8 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[ContractWithState[splice.ans.AnsRules.ContractId, splice.ans.AnsRules]]]
 
-  def getTotalAmuletBalance(asOfEndOfRound: Long)(implicit
-      tc: TraceContext
-  ): Future[Option[BigDecimal]]
-
   def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal]
   def getRewardsCollectedInRound(round: Long)(implicit tc: TraceContext): Future[BigDecimal]
-
-  def getWalletBalance(partyId: PartyId, asOfEndOfRound: Long)(implicit
-      tc: TraceContext
-  ): Future[BigDecimal]
 
   def getAmuletConfigForRound(round: Long)(implicit
       tc: TraceContext
@@ -317,6 +309,8 @@ object ScanStore {
       metrics: DbScanStoreMetrics,
       ingestionConfig: IngestionConfig,
       initialRound: Long,
+      acsStoreDescriptorUserVersion: Option[Long] = None,
+      txLogStoreDescriptorUserVersion: Option[Long] = None,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -337,6 +331,8 @@ object ScanStore {
         ingestionConfig,
         metrics,
         initialRound,
+        acsStoreDescriptorUserVersion,
+        txLogStoreDescriptorUserVersion,
       ),
       cacheConfigs,
       metrics,
@@ -418,6 +414,11 @@ object ScanStore {
               amount = Some(contract.payload.amulet.amount.initialAmount),
             )
         },
+        mkFilter(splice.amulet.UnclaimedDevelopmentFundCoupon.COMPANION)(co =>
+          co.payload.dso == dso
+        )(
+          ScanAcsStoreRowData(_)
+        ),
         mkFilter(splice.ans.AnsEntry.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,

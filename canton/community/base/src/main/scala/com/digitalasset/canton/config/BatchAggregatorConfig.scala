@@ -1,33 +1,24 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
 import com.digitalasset.canton.config.RequireTypes.PositiveNumeric
-import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 
 /** Parameters for that batcher that batches queries (e.g., to a DB).
   */
-sealed trait BatchAggregatorConfig
-    extends Product
-    with Serializable
-    with UniformCantonConfigValidation {
+sealed trait BatchAggregatorConfig extends Product with Serializable {
 
   def maximumBatchSize: PositiveNumeric[Int]
 }
 
 object BatchAggregatorConfig {
-  implicit val batchAggregatorConfigCantonConfigValidator
-      : CantonConfigValidator[BatchAggregatorConfig] = {
-    import CantonConfigValidatorInstances.*
-    CantonConfigValidatorDerivation[BatchAggregatorConfig]
-  }
 
   val defaultMaximumInFlight: PositiveNumeric[Int] = PositiveNumeric.tryCreate(2)
   val defaultMaximumBatchSize: PositiveNumeric[Int] = PositiveNumeric.tryCreate(500)
 
   def defaultsForTesting: BatchAggregatorConfig =
-    AutoBatching(
+    Batching(
       maximumInFlight = PositiveNumeric.tryCreate(2),
       maximumBatchSize = PositiveNumeric.tryCreate(5),
     )
@@ -35,8 +26,8 @@ object BatchAggregatorConfig {
   def apply(
       maximumInFlight: PositiveNumeric[Int] = BatchAggregatorConfig.defaultMaximumInFlight,
       maximumBatchSize: PositiveNumeric[Int] = BatchAggregatorConfig.defaultMaximumBatchSize,
-  ): AutoBatching =
-    AutoBatching(
+  ): Batching =
+    Batching(
       maximumInFlight = maximumInFlight,
       maximumBatchSize = maximumBatchSize,
     )
@@ -46,14 +37,20 @@ object BatchAggregatorConfig {
     * @param maximumBatchSize
     *   Maximum number of queries in a batch.
     */
-  final case class AutoBatching(
+  final case class Batching(
       maximumInFlight: PositiveNumeric[Int] = BatchAggregatorConfig.defaultMaximumInFlight,
       override val maximumBatchSize: PositiveNumeric[Int] =
         BatchAggregatorConfig.defaultMaximumBatchSize,
   ) extends BatchAggregatorConfig
 
-  final case class NoAutoBatching(
+  /** @param maxParallelBatches
+    *   Maximum number of batches to execute in parallel when using runMany.
+    * @param maximumBatchSize
+    *   Maximum number of queries in a batch.
+    */
+  final case class NoBatching(
+      maxParallelBatches: PositiveNumeric[Int] = BatchAggregatorConfig.defaultMaximumInFlight,
       override val maximumBatchSize: PositiveNumeric[Int] =
-        BatchAggregatorConfig.defaultMaximumBatchSize
+        BatchAggregatorConfig.defaultMaximumBatchSize,
   ) extends BatchAggregatorConfig
 }

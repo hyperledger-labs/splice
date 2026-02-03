@@ -316,6 +316,8 @@ class SvApp(
           loggerFactory,
           retryProvider,
           config.spliceInstanceNames,
+          config.svAcsStoreDescriptorUserVersion,
+          config.dsoAcsStoreDescriptorUserVersion,
         )
       // Ensure DSO party, DsoRules, AmuletRules, Mediator, and Sequencer nodes are setup
       // -------------------------------------------------------------------------------
@@ -360,6 +362,8 @@ class SvApp(
                 config.spliceInstanceNames,
                 loggerFactory,
                 config.parameters.enabledFeatures,
+                config.svAcsStoreDescriptorUserVersion,
+                config.dsoAcsStoreDescriptorUserVersion,
               )
               initializer.bootstrapDso()
             }
@@ -403,6 +407,8 @@ class SvApp(
               config.spliceInstanceNames,
               newJoiningNodeInitializer,
               config.parameters.enabledFeatures,
+              config.svAcsStoreDescriptorUserVersion,
+              config.dsoAcsStoreDescriptorUserVersion,
             ).migrateDomain()
           }
         case None =>
@@ -634,7 +640,7 @@ class SvApp(
             val errorHandler = new HttpErrorHandler(loggerFactory)
             def buildOperation(service: String, operation: String) = {
               metrics.httpServerMetrics
-                .withMetrics(service)(operation)
+                .withMetrics(service)(operation)(traceContext)
                 .tflatMap(_ => {
                   httpRateLimiter.withRateLimit(service)(operation).tflatMap { _ =>
                     config.parameters.customTimeouts.get(operation) match {

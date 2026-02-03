@@ -46,7 +46,6 @@ case class ScanAppBackendConfig(
     ingestFromParticipantBegin: Boolean = true,
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
-    acsSnapshotPeriodHours: Int = 3,
     enableForcedAcsSnapshots: Boolean = false,
     // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
@@ -59,6 +58,8 @@ case class ScanAppBackendConfig(
     txLogBackfillBatchSize: Int = 100,
     bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
     cache: ScanCacheConfig = ScanCacheConfig(),
+    acsStoreDescriptorUserVersion: Option[Long] = None,
+    txLogStoreDescriptorUserVersion: Option[Long] = None,
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
@@ -71,10 +72,6 @@ final case class ScanCacheConfig(
     svNodeState: CacheConfig = CacheConfig(
       ttl = NonNegativeFiniteDuration.ofSeconds(30),
       maxSize = 100,
-    ),
-    totalAmuletBalance: CacheConfig = CacheConfig(
-      ttl = NonNegativeFiniteDuration.ofMinutes(2),
-      maxSize = 1000,
     ),
     openMiningRounds: CacheConfig = CacheConfig(
       ttl = NonNegativeFiniteDuration.ofSeconds(30),
@@ -95,10 +92,6 @@ final case class ScanCacheConfig(
     rewardsCollectedInRound: CacheConfig = CacheConfig(
       ttl = NonNegativeFiniteDuration.ofMinutes(1),
       maxSize = 1000,
-    ),
-    walletBalance: CacheConfig = CacheConfig(
-      ttl = NonNegativeFiniteDuration.ofMinutes(1),
-      maxSize = 2000,
     ),
     amuletConfigForRound: CacheConfig = CacheConfig(
       ttl = NonNegativeFiniteDuration.ofMinutes(1),

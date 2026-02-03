@@ -118,7 +118,7 @@ spec:
               {{- else if eq .Values.scanClient.scanType "bft-custom"}}
             canton.validator-apps.validator_backend.scan-client.type = "bft-custom"
             canton.validator-apps.validator_backend.scan-client.seed-urls = {{ .Values.scanClient.seedUrls | toJson }}
-            canton.validator-apps.validator_backend.scan-client.trusted-svs = {{ .Values.scanClient.trustedSvs | toJson }}
+            canton.validator-apps.validator_backend.scan-client.sv-names = {{ .Values.scanClient.svNames | toJson }}
             canton.validator-apps.validator_backend.scan-client.threshold = {{ .Values.scanClient.threshold }}
               {{- else }}
             canton.validator-apps.validator_backend.scan-client.type = "bft"
@@ -129,9 +129,19 @@ spec:
             canton.validator-apps.validator_backend.scan-client.seed-urls = [ ${_scan.admin-api.address} ]
             {{- end }}
         {{ end }}
-        {{ if not .Values.useSequencerConnectionsFromScan }}
+        {{ if not .Values.useSequencerConnectionsFromScan -}}
         - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
           value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.decentralizedSynchronizerUrl | quote }}
+        {{ else if .Values.synchronizer -}}
+            {{- if eq .Values.synchronizer.connectionType "trust-single" }}
+        - name: ADDITIONAL_CONFIG_SYNCHRONIZER_URL
+          value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.synchronizer.url | quote }}
+            {{- else if eq .Values.synchronizer.connectionType "bft-custom" }}
+        - name: ADDITIONAL_CONFIG_SYNCHRONIZER_TRUSTED
+          value: |
+            canton.validator-apps.validator_backend.domains.global.trusted-synchronizer-config.sv-names = {{ .Values.synchronizer.svNames | toJson}}
+            canton.validator-apps.validator_backend.domains.global.trusted-synchronizer-config.threshold = {{ .Values.synchronizer.threshold }}
+            {{- end }}
         {{ end }}
         {{- range $ii, $domain := .Values.extraDomains }}
         - name: ADDITIONAL_CONFIG_EXTRA_DOMAIN_{{ $ii }}

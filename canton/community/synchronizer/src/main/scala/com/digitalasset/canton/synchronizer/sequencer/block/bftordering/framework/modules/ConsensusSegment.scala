@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules
@@ -213,7 +213,7 @@ object ConsensusSegment {
       lazy val hash: Hash = {
         val builder = Hash
           .build(HashPurpose.BftOrderingPbftBlock, HashAlgorithm.Sha256)
-          .add(getCryptographicEvidence)
+          .addByteString(getCryptographicEvidence)
         builder.finish()
       }
 
@@ -302,7 +302,7 @@ object ConsensusSegment {
           actualSender,
         )(rpv, Some(originalByteString))
 
-      override def versioningTable: VersioningTable = VersioningTable(
+      override val versioningTable: VersioningTable = VersioningTable(
         SupportedVersions.ProtoData ->
           VersionedProtoCodec(SupportedVersions.CantonProtocol)(v30.ConsensusMessage)(
             supportedProtoVersionMemoized(_)(PrePrepare.fromProtoConsensusMessage),
@@ -394,7 +394,7 @@ object ConsensusSegment {
           actualSender,
         )(rpv, Some(originalByteString))
 
-      override def versioningTable: VersioningTable = VersioningTable(
+      override val versioningTable: VersioningTable = VersioningTable(
         SupportedVersions.ProtoData ->
           VersionedProtoCodec(SupportedVersions.CantonProtocol)(v30.ConsensusMessage)(
             supportedProtoVersionMemoized(_)(Prepare.fromProtoConsensusMessage),
@@ -487,7 +487,7 @@ object ConsensusSegment {
           actualSender,
         )(rpv, Some(originalByteString))
 
-      override def versioningTable: VersioningTable = VersioningTable(
+      override val versioningTable: VersioningTable = VersioningTable(
         SupportedVersions.ProtoData ->
           VersionedProtoCodec(SupportedVersions.CantonProtocol)(v30.ConsensusMessage)(
             supportedProtoVersionMemoized(_)(Commit.fromProtoConsensusMessage),
@@ -584,7 +584,7 @@ object ConsensusSegment {
           actualSender,
         )(rpv, Some(originalByteString))
 
-      override def versioningTable: VersioningTable = VersioningTable(
+      override val versioningTable: VersioningTable = VersioningTable(
         SupportedVersions.ProtoData ->
           VersionedProtoCodec(SupportedVersions.CantonProtocol)(v30.ConsensusMessage)(
             supportedProtoVersionMemoized(_)(ViewChange.fromProtoConsensusMessage),
@@ -704,7 +704,7 @@ object ConsensusSegment {
           actualSender,
         )(rpv, Some(originalByteString))
 
-      override def versioningTable: VersioningTable = VersioningTable(
+      override val versioningTable: VersioningTable = VersioningTable(
         SupportedVersions.ProtoData ->
           VersionedProtoCodec(SupportedVersions.CantonProtocol)(v30.ConsensusMessage)(
             supportedProtoVersionMemoized(_)(NewView.fromProtoConsensusMessage),

@@ -3,9 +3,9 @@
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { East } from '@mui/icons-material';
-import { Alert, Box, Grid, Stack, Typography } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
-import { MemberIdentifier, PageSectionHeader } from '../../components/beta';
+import { Alert, Box, Stack, Typography } from '@mui/material';
+import { Link as RouterLink } from 'react-router';
+import { CopyableIdentifier, MemberIdentifier, PageSectionHeader } from '../../components/beta';
 import React from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -15,6 +15,7 @@ dayjs.extend(relativeTime);
 export interface ActionRequiredData {
   contractId: ContractId<VoteRequest>;
   actionName: string;
+  description: string;
   votingCloses: string;
   createdAt: string;
   requester: string;
@@ -30,24 +31,30 @@ export const ActionRequiredSection: React.FC<ActionRequiredProps> = (
 ) => {
   const { actionRequiredRequests } = props;
 
+  // Sort by voting closes date ascending (closest deadline first)
+  const sortedRequests = actionRequiredRequests.toSorted((a, b) =>
+    dayjs(a.votingCloses).isBefore(dayjs(b.votingCloses)) ? -1 : 1
+  );
+
   return (
     <Box sx={{ mb: 4 }} data-testid="action-required-section">
       <PageSectionHeader
         title="Action Required"
-        badgeCount={actionRequiredRequests.length}
+        badgeCount={sortedRequests.length}
         data-testid="action-required"
       />
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mb: 3 }}>
-        {actionRequiredRequests.length === 0 ? (
+        {sortedRequests.length === 0 ? (
           <Alert severity="info" data-testid={'action-required-section-no-items'}>
             No Action Required items available
           </Alert>
         ) : (
-          actionRequiredRequests.map((ar, index) => (
+          sortedRequests.map((ar, index) => (
             <ActionCard
               key={index}
               action={ar.actionName}
+              description={ar.description}
               createdAt={ar.createdAt}
               contractId={ar.contractId}
               votingEnds={ar.votingCloses}
@@ -63,19 +70,24 @@ export const ActionRequiredSection: React.FC<ActionRequiredProps> = (
 
 interface ActionCardProps {
   action: string;
-  contractId: ContractId<VoteRequest>;
+  description: string;
   createdAt: string;
+  contractId: ContractId<VoteRequest>;
   votingEnds: string;
   requester: string;
   isYou?: boolean;
 }
 
 const ActionCard = (props: ActionCardProps) => {
-  const { action, createdAt, contractId, votingEnds, requester, isYou } = props;
+  const { action, description, createdAt, contractId, votingEnds, requester, isYou } = props;
   const remainingTime = dayjs(votingEnds).fromNow(true);
 
   return (
-    <RouterLink to={`/governance-beta/proposals/${contractId}`} style={{ textDecoration: 'none' }}>
+    <RouterLink
+      to={`/governance-beta/proposals/${contractId}`}
+      style={{ textDecoration: 'none' }}
+      data-testid="action-required-card-link"
+    >
       <Box
         sx={{
           bgcolor: 'colors.neutral.10',
@@ -86,58 +98,93 @@ const ActionCard = (props: ActionCardProps) => {
         className="action-required-card"
         data-testid="action-required-card"
       >
-        <Grid flexGrow={1} container spacing={1}>
-          <Grid size={2}>
+        <Stack direction="row" gap={5} alignItems="flex-start">
+          <Box sx={{ flexShrink: 0 }}>
             <ActionCardSegment
               title="ACTION"
               content={action}
               data-testid="action-required-action"
             />
-          </Grid>
-          <Grid size={2}>
+          </Box>
+          <Box sx={{ flexShrink: 1, minWidth: 0, maxWidth: 200 }}>
+            <ActionCardSegment
+              title="DESCRIPTION"
+              content={
+                <Typography
+                  variant="body1"
+                  color="text.light"
+                  fontWeight="medium"
+                  fontSize={14}
+                  lineHeight={1.4}
+                  sx={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                  data-testid="action-required-description-content"
+                >
+                  {description}
+                </Typography>
+              }
+              data-testid="action-required-description"
+            />
+          </Box>
+          <Box sx={{ flexShrink: 1, minWidth: 0, maxWidth: 300 }}>
+            <ActionCardSegment
+              title="CONTRACT ID"
+              content={
+                <CopyableIdentifier
+                  value={contractId}
+                  size="small"
+                  data-testid="action-required-contract-id"
+                />
+              }
+              data-testid="action-required-contract-id-segment"
+            />
+          </Box>
+          <Box sx={{ flexShrink: 0 }}>
             <ActionCardSegment
               title="CREATED AT"
               content={createdAt}
               data-testid="action-required-created-at"
             />
-          </Grid>
-          <Grid size={2}>
+          </Box>
+          <Box sx={{ flexShrink: 0 }}>
             <ActionCardSegment
               title="REMAINING TIME"
               content={remainingTime}
               data-testid="action-required-voting-closes"
             />
-          </Grid>
-          <Grid size={4}>
-            <Box>
-              <ActionCardSegment
-                title="REQUESTER"
-                content={
-                  <MemberIdentifier
-                    partyId={requester}
-                    isYou={isYou ?? false}
-                    size="small"
-                    data-testid="action-required-requester-identifier"
-                  />
-                }
-                data-testid="action-required-requester"
-              />
-            </Box>
-          </Grid>
-          <Grid size={2} display="flex" justifyContent="flex-end" alignItems="center">
-            <Stack
-              direction="row"
-              alignItems="center"
-              gap={1}
-              data-testid="action-required-view-details"
-            >
-              <Typography fontWeight={500} color="text.light">
-                View Details
-              </Typography>
-              <East fontSize="small" color="secondary" />
-            </Stack>
-          </Grid>
-        </Grid>
+          </Box>
+          <Box sx={{ flexShrink: 1, minWidth: 0, maxWidth: 300 }}>
+            <ActionCardSegment
+              title="REQUESTER"
+              content={
+                <MemberIdentifier
+                  partyId={requester}
+                  isYou={isYou ?? false}
+                  size="small"
+                  data-testid="action-required-requester-identifier"
+                />
+              }
+              data-testid="action-required-requester"
+            />
+          </Box>
+          <Stack
+            direction="row"
+            alignItems="center"
+            gap={1}
+            sx={{ ml: 'auto', flexShrink: 0, alignSelf: 'center' }}
+            data-testid="action-required-view-details"
+          >
+            <Typography fontWeight={500} color="text.light">
+              View Details
+            </Typography>
+            <East fontSize="small" color="secondary" />
+          </Stack>
+        </Stack>
       </Box>
     </RouterLink>
   );

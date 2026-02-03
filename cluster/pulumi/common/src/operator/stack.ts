@@ -142,6 +142,7 @@ export function createStackCR(
   // required because the docker images are broken
   // TODO(#15978): remove this once pulumi is upgraded
   const minimumPulumiVersionRequired = '3.147.0';
+  const stackConfig = configForStack(name);
   return new k8s.apiextensions.CustomResource(
     name,
     {
@@ -210,7 +211,7 @@ export function createStackCR(
           retryOnUpdateConflict: true,
           updateTemplate: {
             spec: {
-              parallel: configForStack(name).parallelism || 64,
+              parallel: stackConfig.parallelism || 64,
             },
           },
           // https://github.com/pulumi/pulumi-kubernetes-operator/blob/v2.2.0/docs/stacks.md#stackspecworkspacetemplatespec
@@ -264,6 +265,7 @@ export function createStackCR(
                   },
                 },
               ],
+              resources: stackConfig.resources,
               podTemplate: {
                 spec: {
                   ...infraAffinityAndTolerations,

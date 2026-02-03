@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -69,7 +69,7 @@ object UnassignmentData
     with ProtocolVersionedCompanionDbHelpers[UnassignmentData] {
 
   override def name: String = "UnassignmentData"
-  override def versioningTable: VersioningTable = VersioningTable(
+  override val versioningTable: VersioningTable = VersioningTable(
     ProtoVersion(30) -> VersionedProtoCodec
       .storage(ReleaseProtocolVersion(ProtocolVersion.v34), v30.UnassignmentData)(
         supportedProtoVersion(_)(fromProtoV30),
@@ -103,7 +103,14 @@ object UnassignmentData
           ContractInstance
             .decodeWithCreatedAt(contractP)
             .leftMap(err => ContractDeserializationError(err))
-            .map(_ -> ReassignmentCounter(reassignmentCounterP))
+            .map(c =>
+              (
+                c,
+                Source(c.templateId.packageId),
+                Target(c.templateId.packageId),
+                ReassignmentCounter(reassignmentCounterP),
+              )
+            )
       }
       .flatMap(
         ContractsReassignmentBatch

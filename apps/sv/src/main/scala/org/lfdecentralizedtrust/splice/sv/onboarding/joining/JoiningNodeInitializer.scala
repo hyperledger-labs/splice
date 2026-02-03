@@ -100,6 +100,8 @@ class JoiningNodeInitializer(
     override val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
+    svAcsStoreDescriptorUserVersion: Option[Long],
+    dsoAcsStoreDescriptorUserVersion: Option[Long],
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
@@ -144,11 +146,21 @@ class JoiningNodeInitializer(
       SynchronizerConnectionConfig(
         config.domains.global.alias,
         SequencerConnections.tryMany(
-          Seq(GrpcSequencerConnection.tryCreate(url)),
+          Seq(
+            GrpcSequencerConnection
+              .create(url)
+              .fold(
+                error =>
+                  throw Status.INVALID_ARGUMENT
+                    .withDescription(s"Invalid synchronizer url $url: $error")
+                    .asRuntimeException(),
+                identity,
+              )
+          ),
           PositiveInt.one,
           // We only have a single connection here.
           sequencerLivenessMargin = NonNegativeInt.zero,
-          config.participantClient.sequencerRequestAmplification,
+          config.participantClient.sequencerRequestAmplification.toInternal,
           // TODO(#2666) Make the delays configurable.
           sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
         ),
@@ -191,8 +203,13 @@ class JoiningNodeInitializer(
           currentMigrationId = config.domainMigrationId,
           migrationTimeInfo = None, // This SV doesn't know about any migrations
         )
-      svStore = newSvStore(storeKey, migrationInfo, participantId)
-      dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
+      svStore = newSvStore(storeKey, migrationInfo, participantId, svAcsStoreDescriptorUserVersion)
+      dsoStore = newDsoStore(
+        svStore.key,
+        migrationInfo,
+        participantId,
+        dsoAcsStoreDescriptorUserVersion,
+      )
       svAutomation = newSvSvAutomationService(
         svStore,
         dsoStore,

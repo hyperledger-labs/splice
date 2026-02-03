@@ -5,7 +5,10 @@ package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import cats.data.OptionT
 import cats.syntax.either.*
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  FeaturedAppRight,
+  UnclaimedDevelopmentFundCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
   TransferPreapproval,
@@ -28,10 +31,11 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  HoldingsSummaryResponse,
   LookupTransferCommandStatusResponse,
   MigrationSchedule,
 }
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.{HttpScanAppClient}
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
@@ -71,6 +75,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferins
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.Allocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
+import org.lfdecentralizedtrust.splice.http.v0.definitions.HoldingsSummaryRequest.RecordTimeMatch
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BftSequencer
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.TransferFactoryWithChoiceContext
 
@@ -129,6 +134,25 @@ class SingleScanConnection private[client] (
       tc: TraceContext,
   ): Future[org.lfdecentralizedtrust.splice.http.v0.definitions.GetDsoInfoResponse] = {
     runHttpCmd(config.adminApi.url, HttpScanAppClient.GetDsoInfo(List()))
+  }
+
+  override def getHoldingsSummaryAt(
+      at: CantonTimestamp,
+      migrationId: Long,
+      ownerPartyIds: Vector[PartyId],
+      recordTimeMatch: Option[RecordTimeMatch],
+      asOfRound: Option[Long],
+  )(implicit tc: TraceContext): Future[Option[HoldingsSummaryResponse]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetHoldingsSummaryAt(
+        at.toInstant.atOffset(java.time.ZoneOffset.UTC),
+        migrationId,
+        ownerPartyIds,
+        recordTimeMatch,
+        asOfRound,
+      ),
+    )
   }
 
   override def getAmuletRulesWithState()(implicit
@@ -496,6 +520,19 @@ class SingleScanConnection private[client] (
     ),
   )
 
+  override def listUnclaimedDevelopmentFundCoupons()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[
+    Seq[
+      ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
+    ]
+  ] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListUnclaimedDevelopmentFundCoupons(),
+    )
+
   def getTransferInstructionAcceptContext(
       instructionCid: TransferInstruction.ContractId
   )(implicit
@@ -825,8 +862,7 @@ object ScanRoundAggregatesDecoder {
     } yield {
       // changeToInitialAmountAsOfRoundZero, changeToHoldingFeesRate, cumulativeChangeToInitialAmountAsOfRoundZero,
       // cumulativeChangeToHoldingFeesRate and totalAmuletBalance are intentionally left out
-      // since these do not match up anymore because amulet expires are attributed to the closed round at a later stage
-      // in scan_txlog_store, at a time that can easily differ between SVs.
+      // since these are not calculated anymore.
       ScanAggregator.RoundTotals(
         closedRound = rt.closedRound,
         closedRoundEffectiveAt = closedRoundEffectiveAt,
@@ -851,8 +887,7 @@ object ScanRoundAggregatesDecoder {
         .decode(Codec.BigDecimal)(rt.cumulativeTrafficPurchasedCcSpent)
     } yield {
       // cumulativeChangeToInitialAmountAsOfRoundZero and cumulativeChangeToHoldingFeesRate are intentionally left out
-      // since these do not match up anymore because amulet expires are attributed to the closed round at a later stage
-      // in scan_txlog_store, at a time that can easily differ between SVs.
+      // since these are not calculated anymore.
       ScanAggregator.RoundPartyTotals(
         closedRound = rt.closedRound,
         party = rt.party,

@@ -1,9 +1,10 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend
 
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
+import com.digitalasset.canton.config.CantonRequireTypes.String185
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.api.ParticipantId
 import com.digitalasset.canton.ledger.participant.state.SynchronizerIndex
@@ -176,7 +177,7 @@ object ParameterStorageBackend {
 
 trait PartyStorageBackend {
   def parties(parties: Seq[Party])(connection: Connection): List[IndexerPartyDetails]
-  def knownParties(fromExcl: Option[Party], maxResults: Int)(
+  def knownParties(fromExcl: Option[Party], filterString: Option[String185], maxResults: Int)(
       connection: Connection
   ): List[IndexerPartyDetails]
 }
@@ -251,11 +252,11 @@ trait EventStorageBackend {
       allFilterParties: Option[Set[Party]],
   )(connection: Connection): Vector[RawThinActiveContract]
 
-  def lookupAssignSequentialIdByOffset(
+  def lookupActivationSequentialIdByOffset(
       offsets: Iterable[Long]
   )(connection: Connection): Vector[Long]
 
-  def lookupUnassignSequentialIdByOffset(
+  def lookupDeactivationSequentialIdByOffset(
       offsets: Iterable[Long]
   )(connection: Connection): Vector[Long]
 
@@ -287,7 +288,7 @@ trait EventStorageBackend {
   def lastSynchronizerOffsetBeforeOrAtRecordTime(
       synchronizerId: SynchronizerId,
       beforeOrAtRecordTimeInclusive: Timestamp,
-  )(connection: Connection): Option[SynchronizerOffset]
+  )(connection: Connection)(implicit traceContext: TraceContext): Option[SynchronizerOffset]
 
   /** The contracts which were archived or participant-divulged in the specified range. These are
     * the contracts in the ContractStore, which can be pruned in a single-synchronizer setup.
@@ -593,12 +594,6 @@ object EventStorageBackend {
       recordTime: Timestamp,
       synchronizerId: String,
       traceContext: Option[Array[Byte]],
-  )
-
-  final case class UnassignProperties(
-      contractId: ContractId,
-      synchronizerId: String,
-      sequentialId: Long,
   )
 
   sealed trait SequentialIdBatch

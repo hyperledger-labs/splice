@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -74,6 +74,7 @@ final class LedgerApiServerMetrics(
     inventory.index,
     openTelemetryMetricsFactory,
   )
+  val contractStore = new ContractStoreMetrics(inventory.contractStore, openTelemetryMetricsFactory)
 
   val indexer = new IndexerMetrics(inventory.indexer, openTelemetryMetricsFactory)
 
@@ -100,6 +101,7 @@ final class LedgerApiServerHistograms(val prefix: MetricName)(implicit
   private[metrics] val execution = new ExecutionHistograms(prefix :+ "execution")
   private[metrics] val index = new IndexHistograms(prefix :+ "index")
   private[metrics] val indexer = new IndexerHistograms(prefix :+ "indexer")
+  private[metrics] val contractStore = new ContractStoreHistograms(prefix :+ "contract_store")
 
   @unused
   private val _grpc = new DamlGrpcServerHistograms()

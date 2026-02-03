@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant
@@ -141,7 +141,7 @@ object ParticipantNodeBootstrapFactoryImpl extends ParticipantNodeBootstrapFacto
       DbLockCounters.PARTICIPANT_WRITERS,
       arguments.futureSupervisor,
       arguments.loggerFactory,
-      Some(replicaManager.getSessionContext),
+      Some(() => replicaManager.getSessionContext),
     )
     arguments
       .toCantonNodeBootstrapCommonArguments(

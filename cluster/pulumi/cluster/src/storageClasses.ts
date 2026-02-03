@@ -10,10 +10,23 @@ export function installStorageClasses(): void {
     },
     provisioner: 'pd.csi.storage.gke.io',
     volumeBindingMode: 'WaitForFirstConsumer',
+    allowVolumeExpansion: true,
     parameters: {
       type: 'hyperdisk-balanced',
       'provisioned-throughput-on-create': '250Mi',
       'provisioned-iops-on-create': '7000',
+    },
+  });
+  new k8s.storage.v1.StorageClass('hyperdisk-standard-rwo', {
+    metadata: {
+      name: 'hyperdisk-standard-rwo',
+    },
+    provisioner: 'pd.csi.storage.gke.io',
+    volumeBindingMode: 'WaitForFirstConsumer',
+    allowVolumeExpansion: true,
+    parameters: {
+      type: 'hyperdisk-balanced',
+      // use default iops/throughput for lower cost
     },
   });
 }

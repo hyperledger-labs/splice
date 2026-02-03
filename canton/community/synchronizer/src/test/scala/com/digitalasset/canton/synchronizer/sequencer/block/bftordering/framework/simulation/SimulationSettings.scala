@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation
@@ -55,7 +55,7 @@ object BrokenLink {
     }
 }
 
-sealed trait PartitionMode {
+sealed trait PartitionMode extends Product with Serializable {
   def makePartition(
       nodes: Set[BftNodeId],
       partitionSymmetry: PartitionSymmetry,
@@ -120,7 +120,7 @@ object PartitionMode {
   }
 }
 
-sealed trait PartitionSymmetry
+sealed trait PartitionSymmetry extends Product with Serializable
 
 object PartitionSymmetry {
   final case object Symmetric extends PartitionSymmetry
@@ -191,6 +191,7 @@ final case class SimulationSettings(
     durationOfSecondPhaseWithoutFaults: FiniteDuration = 30.seconds,
     clientSettings: ClientSettings = ClientSettings(),
     livenessCheckInterval: FiniteDuration = 25.seconds,
+    shouldRecordHistory: Boolean = false,
 ) {
   def totalSimulationTime: FiniteDuration =
     durationOfFirstPhaseWithFaults.plus(durationOfSecondPhaseWithoutFaults)

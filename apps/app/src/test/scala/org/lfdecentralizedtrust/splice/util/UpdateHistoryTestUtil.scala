@@ -64,6 +64,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
         transaction_filter.EventFormat(
           filtersByParty = Seq(partyId.toLf -> transaction_filter.Filters(Nil)).toMap,
           filtersForAnyParty = None,
+          verbose = false,
         )
       ),
       transactionShape = transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
@@ -208,7 +209,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
         ),
         encoding = CompactJson,
       )
-      .map(CompactJsonScanHttpEncodings.httpToLapiUpdate)
+      .map(CompactJsonScanHttpEncodings().httpToLapiUpdate)
       .map(_.update)
       .map(dropTrailingNones)
 
@@ -233,7 +234,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     updatesFromScanApi.headOption.foreach(fromHistory => {
       val fromPointwiseLookup =
-        CompactJsonScanHttpEncodings.httpToLapiUpdate(
+        CompactJsonScanHttpEncodings().httpToLapiUpdate(
           scanClient.getUpdate(fromHistory.update.updateId, encoding = CompactJson)
         )
       fromPointwiseLookup.update shouldBe fromHistory
@@ -320,6 +321,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       t.getSynchronizerId,
       t.getTraceContext,
       t.getRecordTime,
+      t.getExternalTransactionHash,
     )
 
   def dropTrailingNones(r: Reassignment[ReassignmentEvent]): Reassignment[ReassignmentEvent] =

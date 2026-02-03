@@ -115,6 +115,17 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
     // dso info is available on the scan proxy
     aliceValidatorBackend.scanProxy.getDsoInfo() shouldBe sv1ScanBackend.getDsoInfo()
 
+    val now = env.environment.clock.now
+    aliceValidatorBackend.scanProxy.getHoldingsSummaryAt(
+      now,
+      0L,
+      Vector(aliceValidatorParty),
+    ) shouldBe sv1ScanBackend.getHoldingsSummaryAt(
+      now,
+      0L,
+      Vector(aliceValidatorParty),
+    )
+
     // check that the dsoGovernance are not vetted
     aliceValidatorBackend.participantClient.topology.vetted_packages
       .list(filterParticipant = aliceValidatorBackend.participantClient.id.toProtoPrimitive)
@@ -153,9 +164,9 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
       sequencerConnections.connections.size shouldBe 4
       sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(2)
       sequencerConnections.sequencerLivenessMargin shouldBe NonNegativeInt.one
-      sequencerConnections.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
+      sequencerConnections.submissionRequestAmplification.toInternal shouldBe SubmissionRequestAmplification(
         PositiveInt.tryCreate(2),
-        ValidatorAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION_PATIENCE,
+        ValidatorAppBackendConfig.DefaultSequencerRequestAmplificationPatience.toInternal,
       )
     }
   }

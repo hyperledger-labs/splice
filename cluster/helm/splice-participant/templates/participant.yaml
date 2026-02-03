@@ -196,9 +196,9 @@ spec:
           {{- end }}
         {{- end }}
         {{- if .Values.pvc }}
-          - name: participant-volume
-            persistentVolumeClaim:
-              claimName: {{ .Release.Name }}-participant-pvc
+        - name: participant-volume
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-participant-pvc
         {{- end }}
       {{- end }}
 ---

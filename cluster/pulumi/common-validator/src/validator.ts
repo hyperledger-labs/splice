@@ -3,11 +3,11 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import {
-  activeVersion,
   Auth0Client,
   BackupConfig,
   BootstrappingDumpConfig,
   CLUSTER_BASENAME,
+  CnChartVersion,
   CnInput,
   config,
   daContactPoint,
@@ -27,7 +27,9 @@ import {
   participantBootstrapDumpSecretName,
   ParticipantPruningConfig,
   PersistenceConfig,
+  pvcSuffix,
   spliceInstanceNames,
+  standardStorageClassName,
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
@@ -45,14 +47,6 @@ export type ValidatorBackupConfig = {
   // If not set the secret will be created.
   secret?: pulumi.Resource;
   config: BackupConfig;
-};
-
-export type ValidatorSecrets = {
-  validatorSecret: Secret;
-  legacyValidatorSecret?: Secret;
-  wallet: Secret;
-  cns: Secret;
-  auth0Client: Auth0Client;
 };
 
 type BasicValidatorConfig = {
@@ -84,6 +78,7 @@ type BasicValidatorConfig = {
   logLevel?: LogLevel;
   logAsync?: boolean;
   resources?: K8sResourceSchema;
+  version: CnChartVersion;
 };
 
 export type ValidatorInstallConfig = BasicValidatorConfig & {
@@ -178,8 +173,6 @@ export async function installValidatorApp(
     },
   };
 
-  const chartVersion = activeVersion;
-
   return installSpliceHelmChart(
     config.xns,
     `validator-${config.xns.logicalName}`,
@@ -247,8 +240,12 @@ export async function installValidatorApp(
       logAsyncFlush: config.logAsync,
       resources: baseConfig.svValidator ? config.resources : {},
       ...spliceInstanceNames,
+      pvc: {
+        volumeStorageClass: standardStorageClassName,
+        volumeName: `domain-migration-validator-${pvcSuffix}`,
+      },
     },
-    chartVersion,
+    config.version,
     { dependsOn }
   );
 }

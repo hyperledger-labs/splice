@@ -6,7 +6,10 @@ package org.lfdecentralizedtrust.splice.sv.store
 import cats.implicits.toTraverseOps
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedReward
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  UnclaimedDevelopmentFundCoupon,
+  UnclaimedReward,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules_MiningRound_Archive,
   AppTransferContext,
@@ -647,6 +650,14 @@ trait SvDsoStore
       splice.amulet.UnclaimedActivityRecord.COMPANION
     )
 
+  def listExpiredDevelopmentFundCoupons: ListExpiredContracts[
+    splice.amulet.DevelopmentFundCoupon.ContractId,
+    splice.amulet.DevelopmentFundCoupon,
+  ] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(
+      splice.amulet.DevelopmentFundCoupon.COMPANION
+    )
+
   def listSvOnboardingConfirmed(
       limit: Limit = Limit.DefaultLimit
   )(implicit tc: TraceContext): Future[
@@ -958,6 +969,21 @@ trait SvDsoStore
       .listContracts(splice.amulet.FeaturedAppActivityMarker.COMPANION, PageLimit.tryCreate(limit))
       .map(_.map(_.contract))
 
+  final def listUnclaimedDevelopmentFundCoupons(
+      limit: Limit
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[
+    UnclaimedDevelopmentFundCoupon.ContractId,
+    splice.amulet.UnclaimedDevelopmentFundCoupon,
+  ]]] =
+    for {
+      unclaimedDevelopmentFundCoupon <- multiDomainAcsStore.listContracts(
+        splice.amulet.UnclaimedDevelopmentFundCoupon.COMPANION,
+        limit = limit,
+      )
+    } yield unclaimedDevelopmentFundCoupon map (_.contract)
+
   /** Whether there are more than the given number of featured app activity markers. */
   def featuredAppActivityMarkerCountAboveOrEqualTo(threshold: Int)(implicit
       tc: TraceContext
@@ -990,6 +1016,7 @@ object SvDsoStore {
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       ingestionConfig: IngestionConfig,
+      acsStoreDescriptorUserVersion: Option[Long] = None,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -1003,6 +1030,7 @@ object SvDsoStore {
       domainMigrationInfo,
       participantId,
       ingestionConfig,
+      acsStoreDescriptorUserVersion,
     )
   }
 
@@ -1339,6 +1367,20 @@ object SvDsoStore {
           conversionRateFeedPublisher =
             Some(PartyId.tryFromProtoPrimitive(contract.payload.publisher)),
         )
+      },
+      mkFilter(splice.amulet.UnclaimedDevelopmentFundCoupon.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract
+        )
+      },
+      mkFilter(splice.amulet.DevelopmentFundCoupon.COMPANION)(co => co.payload.dso == dso) {
+        contract =>
+          DsoAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          )
       },
     )
 

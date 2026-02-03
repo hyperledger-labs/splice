@@ -11,8 +11,15 @@ import com.digitalasset.canton.admin.api.client.data.{
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.auto.genCantonConfigValidator
+import com.digitalasset.canton.config.{
+  ApiLoggingConfig,
+  CantonConfig,
+  CantonFeatures,
+  DefaultPorts,
+  LoggingConfig,
+  MonitoringConfig,
+  TestingConfigInternal,
+}
 import com.digitalasset.canton.console.{
   CantonConsoleEnvironment,
   InstanceReference,
@@ -233,17 +240,8 @@ object EnvironmentDefinition extends LazyLogging {
       }
       else Map.empty
 
-    EnvironmentDefinition(
-      configWithDefaults
-        .validate(EnterpriseCantonEdition)
-        .fold(
-          err =>
-            throw new IllegalArgumentException(
-              s"Error while validating the config: ${err.mkString(",")}"
-            ),
-          _ => configWithDefaults,
-        )
-    ).addConfigTransforms(ConfigTransforms.defaultsForNodes*)
+    EnvironmentDefinition(configWithDefaults)
+      .addConfigTransforms(ConfigTransforms.defaultsForNodes*)
       .addConfigTransform(c =>
         c.focus(_.remoteParticipants)
           .replace(toRemote(c.participants)(_.toRemoteConfig))
@@ -752,16 +750,6 @@ object EnvironmentDefinition extends LazyLogging {
       new NetworkBootstrapper(S2M2)
     }
 
-  /**   - 3 participants '''not''' connected to any synchronizer
-    *   - 2 synchronizers with 1 sequencer and 1 mediator each
-    */
-  lazy val P3_S1M1_S1M1_Manual: EnvironmentDefinition =
-    buildBaseEnvironmentDefinition(
-      numParticipants = 3,
-      numSequencers = 2,
-      numMediators = 2,
-    ).withManualStart
-
   /**   - 4 participants '''not''' connected to any synchronizer
     *   - 1 sequencer
     *   - 1 mediator
@@ -956,7 +944,7 @@ object EnvironmentDefinition extends LazyLogging {
   private def loadConfigFromResource(path: String): CantonConfig = {
     val rawConfig = ConfigFactory.parseString(Resource.getAsString(path))
     CantonConfig
-      .loadAndValidate(rawConfig, EnterpriseCantonEdition, Some(DefaultPorts.create()))
+      .loadAndValidate(rawConfig, Some(DefaultPorts.create()))
       .valueOr { err =>
         // print a useful error message such that the developer can figure out which file failed
         logger.error(s"Failed to load file $path: $err", new Exception("location"))
@@ -967,7 +955,6 @@ object EnvironmentDefinition extends LazyLogging {
   def fromFiles(files: File*): EnvironmentDefinition = {
     val config = CantonConfig.parseAndLoadOrExit(
       files.map(_.toJava),
-      EnterpriseCantonEdition,
       Some(DefaultPorts.create()),
     )
     EnvironmentDefinition(baseConfig = config)

@@ -7,12 +7,12 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.AnyContract
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
+import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract, ContractWithState}
 
 import java.time.Instant
@@ -140,6 +140,7 @@ object ChoiceContextBuilder {
       requireLockedAmulet: Boolean,
       featuredProvider: Option[PartyId],
       store: ScanStore,
+      fetcher: ChoiceContextContractFetcher,
       clock: Clock,
       newBuilder: String => Builder,
   )(implicit
@@ -147,7 +148,7 @@ object ChoiceContextBuilder {
       tc: TraceContext,
   ): Future[ChoiceContext] = {
     for {
-      optLockedAmulet <- store.multiDomainAcsStore.lookupContractById(
+      optLockedAmulet <- fetcher.lookupContractById(
         amulet.LockedAmulet.COMPANION
       )(lockedAmuletId)
       (choiceContextBuilder, _) <- getAmuletRulesTransferContext[
@@ -182,7 +183,7 @@ object ChoiceContextBuilder {
             .build()
         }
       } else {
-        optLockedAmulet.foreach(co => choiceContextBuilder.disclose(co.contract))
+        optLockedAmulet.foreach(contract => choiceContextBuilder.disclose(contract))
         choiceContextBuilder
           // the choice implementation should only attempt to expire the lock if it exists
           .addBool("expire-lock", optLockedAmulet.isDefined)

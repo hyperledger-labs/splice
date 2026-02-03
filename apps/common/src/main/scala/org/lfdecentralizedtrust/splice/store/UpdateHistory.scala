@@ -1032,15 +1032,15 @@ class UpdateHistory(
       afterO: Option[(Long, CantonTimestamp)],
       includeImportUpdates: Boolean,
   ): NonEmptyList[SQLActionBuilder] = {
-    val gt = if (includeImportUpdates) ">=" else ">"
+    val gtMin = if (includeImportUpdates) ">=" else ">"
     afterO match {
       case None =>
-        NonEmptyList.of(sql"migration_id >= 0 and record_time #$gt ${CantonTimestamp.MinValue}")
+        NonEmptyList.of(sql"migration_id >= 0 and record_time #$gtMin ${CantonTimestamp.MinValue}")
       case Some((afterMigrationId, afterRecordTime)) =>
         // This makes it so that the two queries use updt_hist_tran_hi_mi_rt_di,
         NonEmptyList.of(
           sql"migration_id = ${afterMigrationId} and record_time > ${afterRecordTime} ",
-          sql"migration_id > ${afterMigrationId} and record_time #$gt ${CantonTimestamp.MinValue}",
+          sql"migration_id > ${afterMigrationId} and record_time #$gtMin ${CantonTimestamp.MinValue}",
         )
     }
   }
@@ -1075,7 +1075,7 @@ class UpdateHistory(
   private def updatesQuery(
       filters: NonEmptyList[SQLActionBuilder],
       orderBy: SQLActionBuilder,
-      limit: PageLimit,
+      limit: Limit,
       makeSubQuery: SQLActionBuilder => SQLActionBuilderChain,
   ) = {
     if (filters.size == 1) {
@@ -1094,7 +1094,7 @@ class UpdateHistory(
   private def getTxUpdates(
       filters: NonEmptyList[SQLActionBuilder],
       orderBy: SQLActionBuilder,
-      limit: PageLimit,
+      limit: Limit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
     def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
       sql"""
@@ -1141,7 +1141,7 @@ class UpdateHistory(
   private def getAssignmentUpdates(
       filters: NonEmptyList[SQLActionBuilder],
       orderBy: SQLActionBuilder,
-      limit: PageLimit,
+      limit: Limit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
 
     def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
@@ -1188,7 +1188,7 @@ class UpdateHistory(
   private def getUnassignmentUpdates(
       filters: NonEmptyList[SQLActionBuilder],
       orderBy: SQLActionBuilder,
-      limit: PageLimit,
+      limit: Limit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
 
     def makeSubQuery(afterFilter: SQLActionBuilder): SQLActionBuilderChain = {
@@ -1224,7 +1224,7 @@ class UpdateHistory(
 
   def getUpdatesWithoutImportUpdates(
       afterO: Option[(Long, CantonTimestamp)],
-      limit: PageLimit,
+      limit: Limit,
   )(implicit tc: TraceContext): Future[Seq[TreeUpdateWithMigrationId]] = {
     val filters = afterFilters(afterO, includeImportUpdates = false)
     val orderBy = sql"migration_id, record_time, domain_id"
@@ -1551,6 +1551,7 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
+          /*externalTransactionHash = */ ByteString.EMPTY, // TODO(#3408): Revisit when ingesting to DB
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
@@ -1615,6 +1616,7 @@ class UpdateHistory(
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,
+          /*externalTransactionHash = */ ByteString.EMPTY, // TODO(#3408): Revisit when ingesting to DB
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
@@ -2589,6 +2591,16 @@ object UpdateHistory {
   // so we read them back as an arbitrary value.
   private def missingString: String = ""
   private def missingStringSeq: Seq[String] = Seq.empty
+}
+
+final case class TimestampWithMigrationId(
+    timestamp: CantonTimestamp,
+    migrationId: Long,
+)
+
+object TimestampWithMigrationId {
+  implicit val ordering: Ordering[TimestampWithMigrationId] =
+    Ordering.by(x => (x.migrationId, x.timestamp))
 }
 
 final case class TreeUpdateWithMigrationId(

@@ -1,12 +1,11 @@
 package org.lfdecentralizedtrust.splice.util
 
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  TestCommon,
-  SpliceTestConsoleEnvironment,
-}
-import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
+import com.daml.nonempty.*
+import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.admin.api.client.data.GrpcSequencerConnection
+import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell as splitwellCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.{
   AcceptedAppPayment,
   ReceiverAmuletAmount,
@@ -16,10 +15,11 @@ import org.lfdecentralizedtrust.splice.console.{
   SplitwellAppClientReference,
   WalletAppClientReference,
 }
-import com.daml.nonempty.*
-import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  SpliceTestConsoleEnvironment,
+  TestCommon,
+}
+import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 
 import scala.concurrent.duration.DurationInt
 

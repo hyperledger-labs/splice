@@ -25,7 +25,7 @@ import {
   getVoteResultStatus,
 } from '../utils/governance';
 import { SupportedActionTag, ProposalListingData } from '../utils/types';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router';
 import { InfoOutlined, WarningAmberOutlined } from '@mui/icons-material';
 
 function getAction(action: ActionRequiringConfirmation): string {
@@ -102,6 +102,7 @@ export const Governance: React.FC = () => {
         contractId: vr.payload.trackingCid || vr.contractId,
         actionName:
           actionTagToTitle(amuletName)[getAction(vr.payload.action) as SupportedActionTag],
+        description: vr.payload.reason.body,
         votingCloses: dayjs(vr.payload.voteBefore).format(dateTimeFormatISO),
         createdAt: dayjs(vr.createdAt).format(dateTimeFormatISO),
         requester: vr.payload.requester,
@@ -121,6 +122,7 @@ export const Governance: React.FC = () => {
       return {
         contractId: v.payload.trackingCid || v.contractId,
         actionName: actionTagToTitle(amuletName)[getAction(v.payload.action) as SupportedActionTag],
+        description: v.payload.reason.body,
         votingThresholdDeadline: dayjs(v.payload.voteBefore).format(dateTimeFormatISO),
         voteTakesEffect: effectiveAt,
         yourVote: computeYourVote(votes, svPartyId),
@@ -140,33 +142,36 @@ export const Governance: React.FC = () => {
 
   const allRequests = [...acceptedRequests, ...notAcceptedRequests];
 
-  const voteHistory = allRequests
-    .map(vr => {
-      const votes = vr.request.votes.entriesArray().map(e => e[1]);
+  const voteHistory = allRequests.map(vr => {
+    const votes = vr.request.votes.entriesArray().map(e => e[1]);
 
-      return {
-        contractId: vr.request.trackingCid,
-        actionName:
-          actionTagToTitle(amuletName)[getAction(vr.request.action) as SupportedActionTag],
-        votingThresholdDeadline: dayjs(vr.request.voteBefore).format(dateTimeFormatISO),
-        voteTakesEffect:
-          (vr.outcome.tag === 'VRO_Accepted' &&
-            dayjs(vr.outcome.value.effectiveAt).format(dateTimeFormatISO)) ||
-          dayjs(vr.completedAt).format(dateTimeFormatISO),
-        yourVote: computeYourVote(votes, svPartyId),
-        status: getVoteResultStatus(vr.outcome),
-        voteStats: computeVoteStats(votes),
-        acceptanceThreshold: votingThreshold,
-      } as ProposalListingData;
-    })
-    .sort((a, b) => (dayjs(a.voteTakesEffect).isAfter(dayjs(b.voteTakesEffect)) ? -1 : 1));
+    return {
+      contractId: vr.request.trackingCid,
+      actionName: actionTagToTitle(amuletName)[getAction(vr.request.action) as SupportedActionTag],
+      description: vr.request.reason.body,
+      votingThresholdDeadline: dayjs(vr.request.voteBefore).format(dateTimeFormatISO),
+      voteTakesEffect:
+        (vr.outcome.tag === 'VRO_Accepted' &&
+          dayjs(vr.outcome.value.effectiveAt).format(dateTimeFormatISO)) ||
+        dayjs(vr.completedAt).format(dateTimeFormatISO),
+      yourVote: computeYourVote(votes, svPartyId),
+      status: getVoteResultStatus(vr.outcome),
+      voteStats: computeVoteStats(votes),
+      acceptanceThreshold: votingThreshold,
+    } as ProposalListingData;
+  });
 
   return (
     <Box sx={{ p: 4 }}>
       <PageHeader
         title="Governance"
         actionElement={
-          <Button variant="pill" component={RouterLink} to={`/governance-beta/proposals/create`}>
+          <Button
+            id="initiate-proposal-button"
+            variant="pill"
+            component={RouterLink}
+            to={`/governance-beta/proposals/create`}
+          >
             Initiate Proposal
           </Button>
         }
@@ -185,10 +190,10 @@ export const Governance: React.FC = () => {
             sectionTitle="Inflight Votes"
             data={inflightRequests}
             noDataMessage="No proposals are currently in flight. Proposals you have voted on will appear here while awaiting the voting threshold or deadline."
-            uniqueId="inflight-vote-requests"
+            uniqueId="inflight-proposals"
             showVoteStats
-            showAcceptanceThreshold
             showThresholdDeadline
+            sortOrder="effectiveAtAsc"
           />
 
           <ProposalListingSection
@@ -198,7 +203,7 @@ export const Governance: React.FC = () => {
             uniqueId="vote-history"
             showStatus
             showVoteStats
-            showAcceptanceThreshold
+            sortOrder="effectiveAtDesc"
           />
         </>
       )}

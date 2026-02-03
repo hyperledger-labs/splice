@@ -121,6 +121,8 @@ class SV1Initializer(
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     enabledFeatures: EnabledFeaturesConfig,
+    svAcsStoreDescriptorUserVersion: Option[Long],
+    dsoAcsStoreDescriptorUserVersion: Option[Long],
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
@@ -196,7 +198,7 @@ class SV1Initializer(
             PositiveInt.one,
             // We only have a single connection here.
             sequencerLivenessMargin = NonNegativeInt.zero,
-            config.participantClient.sequencerRequestAmplification,
+            config.participantClient.sequencerRequestAmplification.toInternal,
             // TODO(#2666) Make the delays configurable.
             sequencerConnectionPoolDelays = SequencerConnectionPoolDelays.default,
           ),
@@ -281,8 +283,13 @@ class SV1Initializer(
           currentMigrationId = config.domainMigrationId, // Note: not guaranteed to be 0 for sv1
           migrationTimeInfo = None, // No previous migration, we're starting the network
         )
-      svStore = newSvStore(storeKey, migrationInfo, participantId)
-      dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
+      svStore = newSvStore(storeKey, migrationInfo, participantId, svAcsStoreDescriptorUserVersion)
+      dsoStore = newDsoStore(
+        svStore.key,
+        migrationInfo,
+        participantId,
+        dsoAcsStoreDescriptorUserVersion,
+      )
       svAutomation = newSvSvAutomationService(
         svStore,
         dsoStore,
@@ -570,7 +577,7 @@ class SV1Initializer(
             synchronizerNode.mediatorAdminConnection.initialize(
               physicalSynchronizerId,
               synchronizerNode.sequencerConnection,
-              synchronizerNode.mediatorSequencerAmplification,
+              synchronizerNode.mediatorSequencerAmplification.toInternal,
             ),
             logger,
           )
@@ -671,22 +678,29 @@ class SV1Initializer(
                     show"This should never happen.\nAmuletRules: $amuletRules"
                 )
               case None =>
-                val amuletConfig = defaultAmuletConfig(
-                  sv1Config.initialTickDuration,
-                  sv1Config.initialMaxNumInputs,
-                  synchronizerId,
-                  sv1Config.initialSynchronizerFeesConfig.extraTrafficPrice.value,
-                  sv1Config.initialSynchronizerFeesConfig.minTopupAmount.value,
-                  sv1Config.initialSynchronizerFeesConfig.baseRateBurstAmount.value,
-                  sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow,
-                  sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor.value,
-                  sv1Config.initialPackageConfig.toPackageConfig,
-                  sv1Config.initialHoldingFee,
-                  sv1Config.zeroTransferFees,
-                  sv1Config.initialTransferPreapprovalFee,
-                  sv1Config.initialFeaturedAppActivityMarkerAmount,
-                )
                 for {
+                  developmentFund <- packageVersionSupport.supportDevelopmentFund(
+                    Seq(svParty),
+                    clock.now,
+                  )
+                  amuletConfig = defaultAmuletConfig(
+                    sv1Config.initialTickDuration,
+                    sv1Config.initialMaxNumInputs,
+                    synchronizerId,
+                    sv1Config.initialSynchronizerFeesConfig.extraTrafficPrice.value,
+                    sv1Config.initialSynchronizerFeesConfig.minTopupAmount.value,
+                    sv1Config.initialSynchronizerFeesConfig.baseRateBurstAmount.value,
+                    sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow,
+                    sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor.value,
+                    sv1Config.initialPackageConfig.toPackageConfig,
+                    sv1Config.initialHoldingFee,
+                    sv1Config.zeroTransferFees,
+                    sv1Config.initialTransferPreapprovalFee,
+                    sv1Config.initialFeaturedAppActivityMarkerAmount,
+                    developmentFundPercentage =
+                      if (developmentFund.supported) sv1Config.developmentFundPercentage else None,
+                    developmentFundManager = sv1Config.developmentFundManager,
+                  )
                   sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(
                     cometBftNode,
                     localSynchronizerNode,

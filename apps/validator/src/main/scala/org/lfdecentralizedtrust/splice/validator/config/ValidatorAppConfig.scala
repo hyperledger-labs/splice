@@ -98,13 +98,7 @@ case class ValidatorDecentralizedSynchronizerConfig(
       */
     trafficBalanceCacheTimeToLive: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(1),
-
-    /** An optional, static list of trusted sequencer names to connect to.
-      * sequencerNames is mutually exclusive with `url`.
-      */
-    sequencerNames: Option[NonEmptyList[String]] = None,
-
-    // TODO(#3059): Add a threshold parameter to configure the number of sequencers that must be connected
+    trustedSynchronizerConfig: Option[ValidatorTrustedSynchronizerConfig] = None,
 ) {
 
   /** Converts the reservedTraffic into an Option that is set to None if the validator is not
@@ -113,6 +107,18 @@ case class ValidatorDecentralizedSynchronizerConfig(
   lazy val reservedTrafficO: Option[NonNegativeLong] =
     if (buyExtraTraffic.targetThroughput.value <= 0L) None else Some(reservedTraffic)
 }
+
+case class ValidatorTrustedSynchronizerConfig(
+    /** static list of trusted sequencer names to connect to.
+      * svNames is mutually exclusive with `url`.
+      */
+    svNames: NonEmptyList[String],
+
+    /** parameter to specify the BFT threshold for the domain connections.
+      * If not specified, f +1 will be used.
+      */
+    threshold: Int,
+)
 
 // Validators are responsible for establishing connections to domains and so need more information than just a `SynchronizerConfig`
 case class ValidatorExtraSynchronizerConfig(
@@ -172,7 +178,7 @@ case class ValidatorAppBackendConfig(
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,
     enableWallet: Boolean = true,
     sequencerRequestAmplificationPatience: NonNegativeFiniteDuration =
-      ValidatorAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION_PATIENCE,
+      ValidatorAppBackendConfig.DefaultSequencerRequestAmplificationPatience,
     /** The configuration for sweeping funds periodically to other validator's wallet
       */
     walletSweep: Map[String, WalletSweepConfig] = Map.empty,
@@ -208,6 +214,7 @@ case class ValidatorAppBackendConfig(
     maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(24),
     // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
     latestPackagesOnly: Boolean = false,
+    acsStoreDescriptorUserVersion: Option[Long] = None,
 ) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"
@@ -217,7 +224,7 @@ case class ValidatorAppBackendConfig(
 }
 
 object ValidatorAppBackendConfig {
-  val DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION_PATIENCE = NonNegativeFiniteDuration.ofSeconds(10)
+  val DefaultSequencerRequestAmplificationPatience = NonNegativeFiniteDuration.ofSeconds(10)
 }
 
 case class ValidatorAppClientConfig(

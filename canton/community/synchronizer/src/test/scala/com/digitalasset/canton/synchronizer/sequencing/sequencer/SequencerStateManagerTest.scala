@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencing.sequencer
@@ -13,7 +13,7 @@ import com.digitalasset.canton.config.{
   TopologyConfig,
 }
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SequencingTimeBound}
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.protocol.TestSynchronizerParameters
@@ -297,7 +297,10 @@ class SequencerStateManagerTest
 
     val initialSynchronizerParametersMapping =
       SynchronizerParametersState(synchronizerId.logical, TestSynchronizerParameters.defaultDynamic)
-
+    val syncParamTx = topologyTransactionFactory.mkAdd[SynchronizerParametersState](
+      initialSynchronizerParametersMapping,
+      topologyTransactionFactory.SigningKeys.key1,
+    )
     topologyStore
       .update(
         SequencedTime(CantonTimestamp.Epoch),
@@ -307,10 +310,7 @@ class SequencerStateManagerTest
           topologyTransactionFactory.ns1k1_k1,
           topologyTransactionFactory.okmS1k7_k1,
           topologyTransactionFactory.dtcp1_k1,
-          topologyTransactionFactory.mkAdd(
-            initialSynchronizerParametersMapping,
-            topologyTransactionFactory.SigningKeys.key1,
-          )(executorService),
+          syncParamTx,
           topologyTransactionFactory.okm1bk5k1E_k1, // this one to allow verification of the sender's signature
         ).map(ValidatedTopologyTransaction(_, rejectionReason = None)),
       )
@@ -350,6 +350,7 @@ class SequencerStateManagerTest
         sequencer1,
         blockSequencerMode = true,
         loggerFactory,
+        timeouts = timeouts,
         sequencerMetrics = SequencerMetrics.noop("sequencer-state-manager-test"),
       ),
       loggerFactory,
@@ -368,15 +369,19 @@ class SequencerStateManagerTest
       sequencer1,
       defaultRateLimiter,
       orderingTimeFixMode = OrderingTimeFixMode.MakeStrictlyIncreasing,
-      sequencingTimeLowerBoundExclusive =
-        SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
-      useTimeProofsToObserveEffectiveTime = true,
+      SequencingTimeBound(SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive),
+      producePostOrderingTopologyTicks = false,
       SequencerTestMetrics,
+      BatchingConfig(),
       loggerFactory,
       memberValidator = new SequencerMemberValidator {
         override def isMemberRegisteredAt(member: Member, time: CantonTimestamp)(implicit
             tc: TraceContext
         ): FutureUnlessShutdown[Boolean] = ???
+
+        override def areMembersRegisteredAt(members: Seq[Member], time: CantonTimestamp)(implicit
+            tc: TraceContext
+        ): FutureUnlessShutdown[Map[Member, Boolean]] = ???
       },
     )(closeContext, NoReportingTracerProvider.tracer)
 

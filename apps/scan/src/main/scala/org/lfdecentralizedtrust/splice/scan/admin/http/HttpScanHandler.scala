@@ -46,8 +46,10 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   HoldingsSummaryRequest,
   ListVoteResultsRequest,
   MaybeCachedContractWithState,
+  UpdateHistoryItem,
   UpdateHistoryItemV2,
   UpdateHistoryRequestV2,
+  UpdateHistoryTransactionV2,
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
@@ -419,52 +421,6 @@ class HttpScanHandler(
       } yield {
         definitions.LookupFeaturedAppRightResponse(right.map(_.contract.toHttp))
       }
-    }
-  }
-
-  def getTotalAmuletBalance(
-      response: v0.ScanResource.GetTotalAmuletBalanceResponse.type
-  )(
-      asOfEndOfRound: Long
-  )(extracted: TraceContext): Future[v0.ScanResource.GetTotalAmuletBalanceResponse] = {
-    implicit val tc = extracted
-    withSpan(s"$workflowId.getTotalAmuletBalance") { _ => _ =>
-      for {
-        total <- store
-          .getTotalAmuletBalance(asOfEndOfRound)
-          .transform(
-            HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
-          )
-      } yield {
-        total.fold(
-          v0.ScanResource.GetTotalAmuletBalanceResponse
-            .NotFound(ErrorResponse(s"No total amulet balance found for round $asOfEndOfRound"))
-        )(total =>
-          v0.ScanResource.GetTotalAmuletBalanceResponse.OK(
-            definitions.GetTotalAmuletBalanceResponse(
-              Codec.encode(total)
-            )
-          )
-        )
-      }
-    }
-  }
-
-  override def getWalletBalance(
-      respond: v0.ScanResource.GetWalletBalanceResponse.type
-  )(
-      partyId: String,
-      asOfEndOfRound: Long,
-  )(extracted: TraceContext): Future[v0.ScanResource.GetWalletBalanceResponse] = {
-    implicit val tc = extracted
-    withSpan(s"$workflowId.getWalletBalance") { _ => _ =>
-      for {
-        total <- store
-          .getWalletBalance(PartyId tryFromProtoPrimitive partyId, asOfEndOfRound)
-          .transform(
-            HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
-          )
-      } yield definitions.GetWalletBalanceResponse(Codec.encode(total))
     }
   }
 
@@ -967,15 +923,15 @@ class HttpScanHandler(
     }
   }
 
-  private def toUpdateV2(update: definitions.UpdateHistoryItem): definitions.UpdateHistoryItemV2 =
+  private def toUpdateV2(update: UpdateHistoryItem): UpdateHistoryItemV2 =
     update match {
-      case definitions.UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
+      case UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
         UpdateHistoryItemV2(
-          definitions.UpdateHistoryItemV2.members.UpdateHistoryReassignment(r)
+          UpdateHistoryItemV2.members.UpdateHistoryReassignment(r)
         )
-      case definitions.UpdateHistoryItem.members.UpdateHistoryTransaction(t) =>
+      case UpdateHistoryItem.members.UpdateHistoryTransaction(t) =>
         UpdateHistoryItemV2(
-          definitions.UpdateHistoryTransactionV2(
+          UpdateHistoryTransactionV2(
             updateId = t.updateId,
             migrationId = t.migrationId,
             workflowId = t.workflowId,
@@ -1432,6 +1388,31 @@ class HttpScanHandler(
     }
   }
 
+  override def getDateOfFirstSnapshotAfter(
+      respond: ScanResource.GetDateOfFirstSnapshotAfterResponse.type
+  )(after: OffsetDateTime, migrationId: Long)(
+      extracted: TraceContext
+  ): Future[ScanResource.GetDateOfFirstSnapshotAfterResponse] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getDateOfFirstSnapshotAfter") { _ => _ =>
+      snapshotStore
+        .lookupSnapshotAfter(migrationId, Codec.tryDecode(Codec.OffsetDateTime)(after))
+        .map {
+          case Some(snapshot) =>
+            ScanResource.GetDateOfFirstSnapshotAfterResponseOK(
+              definitions
+                .AcsSnapshotTimestampResponse(
+                  Codec.encode(snapshot.snapshotRecordTime)
+                )
+            )
+          case None =>
+            ScanResource.GetDateOfFirstSnapshotAfterResponseNotFound(
+              definitions.ErrorResponse(s"No snapshots found after $after")
+            )
+        }
+    }
+  }
+
   override def forceAcsSnapshotNow(
       respond: ScanResource.ForceAcsSnapshotNowResponse.type
   )()(extracted: TraceContext): Future[ScanResource.ForceAcsSnapshotNowResponse] = {
@@ -1554,7 +1535,7 @@ class HttpScanHandler(
             migrationId,
             result.createdEventsInPage
               .map(event =>
-                CompactJsonScanHttpEncodings.javaToHttpCreatedEvent(
+                CompactJsonScanHttpEncodings().javaToHttpCreatedEvent(
                   event.eventId,
                   event.event,
                 )
@@ -1613,7 +1594,7 @@ class HttpScanHandler(
             migrationId,
             result.createdEventsInPage
               .map(event =>
-                CompactJsonScanHttpEncodings.javaToHttpCreatedEvent(
+                CompactJsonScanHttpEncodings().javaToHttpCreatedEvent(
                   event.eventId,
                   event.event,
                 )
@@ -1755,17 +1736,17 @@ class HttpScanHandler(
 
   def getUpdateById(
       updateId: String,
-      encoding: definitions.DamlValueEncoding,
+      encoding: DamlValueEncoding,
       consistentResponses: Boolean,
       extracted: TraceContext,
-  ): Future[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]] = {
+  ): Future[Either[ErrorResponse, UpdateHistoryItem]] = {
     implicit val tc = extracted
     for {
       tx <- updateHistory.getUpdate(updateId)
     } yield {
-      tx.fold[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]](
+      tx.fold[Either[ErrorResponse, UpdateHistoryItem]](
         Left(
-          definitions.ErrorResponse(s"Transaction with id $updateId not found")
+          ErrorResponse(s"Transaction with id $updateId not found")
         )
       )(txWithMigration =>
         Right(
@@ -1788,9 +1769,9 @@ class HttpScanHandler(
     // in openAPI the operationID for /v0/updates/{update_id} is `getUpdateById`, logging as `getUpdateByIdV0` for clarity
     withSpan(s"$workflowId.getUpdateByIdV0") { _ => _ =>
       val encoding = if (lossless.getOrElse(false)) {
-        definitions.DamlValueEncoding.ProtobufJson
+        DamlValueEncoding.ProtobufJson
       } else {
-        definitions.DamlValueEncoding.CompactJson
+        DamlValueEncoding.CompactJson
       }
       getUpdateById(
         updateId = updateId,
@@ -1809,14 +1790,14 @@ class HttpScanHandler(
 
   override def getUpdateByIdV1(
       respond: ScanResource.GetUpdateByIdV1Response.type
-  )(updateId: String, damlValueEncoding: Option[definitions.DamlValueEncoding])(
+  )(updateId: String, damlValueEncoding: Option[DamlValueEncoding])(
       extracted: TraceContext
   ): Future[ScanResource.GetUpdateByIdV1Response] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getUpdateByIdV1") { _ => _ =>
       getUpdateById(
         updateId = updateId,
-        encoding = damlValueEncoding.getOrElse(definitions.DamlValueEncoding.members.CompactJson),
+        encoding = damlValueEncoding.getOrElse(DamlValueEncoding.members.CompactJson),
         consistentResponses = true,
         extracted,
       )
@@ -1837,7 +1818,7 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getUpdateByIdV2") { _ => _ =>
       getUpdateById(
         updateId = updateId,
-        encoding = damlValueEncoding.getOrElse(definitions.DamlValueEncoding.members.CompactJson),
+        encoding = damlValueEncoding.getOrElse(DamlValueEncoding.members.CompactJson),
         consistentResponses = true,
         extracted,
       )
@@ -2302,6 +2283,23 @@ class HttpScanHandler(
             definitions.ListSvBftSequencersResponse(sequencers.toVector)
           )
         )
+    }
+  }
+
+  override def listUnclaimedDevelopmentFundCoupons(
+      respond: ScanResource.ListUnclaimedDevelopmentFundCouponsResponse.type
+  )()(extracted: TraceContext): Future[ScanResource.ListUnclaimedDevelopmentFundCouponsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listUnclaimedDevelopmentFundCoupons") { _ => _ =>
+      for {
+        coupons <- store.multiDomainAcsStore.listContracts(
+          amulet.UnclaimedDevelopmentFundCoupon.COMPANION
+        )
+      } yield {
+        definitions.ListUnclaimedDevelopmentFundCouponsResponse(
+          coupons.map(_.toHttp).toVector
+        )
+      }
     }
   }
 }

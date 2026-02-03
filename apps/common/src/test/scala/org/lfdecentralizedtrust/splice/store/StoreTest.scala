@@ -585,7 +585,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       expiry: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600L),
       effectiveAt: Optional[Instant] = Optional.empty(),
       action: ActionRequiringConfirmation = addUser666Action,
-  ) = {
+  ): Contract[VoteRequest.ContractId, VoteRequest] = {
     val cid = new VoteRequest.ContractId(nextCid())
     val template = new VoteRequest(
       dsoParty.toProtoPrimitive,
@@ -891,6 +891,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   private var offsetCounter: Long = 0L
 
+  @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
   protected def nextOffset(): Long = blocking {
     synchronized {
       val offset = offsetCounter
@@ -908,6 +909,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       workflowId: String,
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
+      updateId: String = nextUpdateId(),
   ): Transaction = mkCreateTxWithInterfaces(
     offset,
     createRequests.map(cr =>
@@ -919,6 +921,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     workflowId,
     recordTime,
     createdEventObservers,
+    updateId,
   )
 
   protected def mkCreateTxWithInterfaces(
@@ -932,6 +935,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       workflowId: String,
       recordTime: Instant = defaultEffectiveAt,
       createdEventObservers: Seq[PartyId] = Seq.empty,
+      updateId: String = nextUpdateId(),
   ): Transaction = mkTx(
     offset,
     createRequests.map[Event] { case (contract, implementedInterfaces, failedInterfaces) =>
@@ -947,6 +951,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     effectiveAt,
     workflowId,
     recordTime = recordTime,
+    updateId = updateId,
   )
 
   protected def acs(
@@ -1276,8 +1281,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       workflowId: String = "",
       commandId: String = "",
       recordTime: Instant = defaultEffectiveAt,
+      updateId: String = nextUpdateId(),
   ): Transaction = {
-    val updateId = nextUpdateId()
     val eventsWithId = events.zipWithIndex.map { case (e, i) =>
       withNodeId(e, i)
     }
@@ -1291,6 +1296,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       recordTime,
+      ByteString.EMPTY,
     )
   }
 
@@ -1325,6 +1331,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       effectiveAt, // we equate record time and effectiveAt for simplicity
+      ByteString.EMPTY,
     )
   }
 

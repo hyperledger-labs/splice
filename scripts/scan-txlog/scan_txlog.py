@@ -93,8 +93,6 @@ class CSVReport:
             "cc_burnt",
             "traffic_bytes_bought",
             "traffic_member_id",
-            "computed_balance",
-            "scan_balance",
         ]
 
         self.current_batch = []
@@ -305,22 +303,7 @@ class ScanClient:
         response.raise_for_status()
         return await response.json()
 
-    async def balance(self, party, round_number):
-        params = {"party_id": party, "asOfEndOfRound": round_number}
-        json = await self.__get_with_retry_on_statuses(
-            f"{self.url}/api/scan/v0/wallet-balance",
-            params=params,
-            max_retries=30,
-            delay_seconds=0.5,
-            statuses={404, 429},
-        )
-        return (party, DamlDecimal(json["wallet_balance"]))
 
-    async def party_balances(self, round_number, parties):
-        balances = await asyncio.gather(
-            *[self.balance(party, round_number) for party in parties]
-        )
-        return dict(balances)
 
     async def get_acs_snapshot_page_at(
         self, migration_id, record_time, templates, after
@@ -2262,6 +2245,9 @@ class State:
                 case "InputUnclaimedActivityRecord":
                     cid = value.get_contract_id()
                     del self.active_contracts[cid]
+                case "InputDevelopmentFundCoupon":
+                    cid = value.get_contract_id()
+                    del self.active_contracts[cid]
                 case _:
                     self._fail(transaction, f"Unexpected transfer input: {tag}")
         return TransferInputs(
@@ -3796,6 +3782,8 @@ class State:
                 return self.handle_transfer_preapproval_send(transaction, event)
             case "TransferPreapproval_Cancel":
                 return HandleTransactionResult.empty()
+            case "DsoRules_ExpireTransferPreapproval":
+                return HandleTransactionResult.empty()
             case "TransferCommand_Send":
                 return self.handle_transfer_command_send(transaction, event)
             case "LockedAmulet_Unlock":
@@ -3907,6 +3895,14 @@ class State:
                 return HandleTransactionResult.empty()
             case "DsoRules_MergeValidatorLicense":
                 return HandleTransactionResult.empty()
+            case "DsoRules_MergeUnclaimedDevelopmentFundCoupons":
+                return HandleTransactionResult.empty()
+            case "DsoRules_ExpireDevelopmentFundCoupon":
+                return HandleTransactionResult.empty()
+            case "AmuletRules_AllocateDevelopmentFundCoupon":
+                return HandleTransactionResult.empty()
+            case "DevelopmentFundCoupon_Withdraw":
+                return HandleTransactionResult.empty()
             case "ExternalPartyAmuletRules_CreateTransferCommand":
                 return HandleTransactionResult.empty()
             case "FeaturedAppRight_CreateActivityMarker":
@@ -4016,32 +4012,23 @@ class PerPartyBalance:
 @dataclass
 class AppState:
     state: State
-    per_round_states: dict[int, State]
     pagination_key: Optional[PaginationKey]
 
     @classmethod
     def empty(cls, args, csv_report):
         state = State(args, {}, None, None, csv_report, DamlDecimal(0), DamlDecimal(0))
-        return cls(state, {}, None)
+        return cls(state, None)
 
     @classmethod
     def from_json(cls, args, data, csv_report):
         return cls(
             State.from_json(args, data["state"], csv_report),
-            {
-                int(round_number): State.from_json(args, round_data, csv_report)
-                for round_number, round_data in data["per_round_states"].items()
-            },
             PaginationKey.from_json(data["pagination_key"]),
         )
 
     def to_json(self):
         return {
             "state": self.state.to_json(),
-            "per_round_states": {
-                str(round_number): round_state.to_json()
-                for round_number, round_state in self.per_round_states.items()
-            },
             "pagination_key": (
                 None if self.pagination_key is None else self.pagination_key.to_json()
             ),
@@ -4139,11 +4126,6 @@ def _parse_cli_args():
     )
     parser.add_argument("--loglevel", help="Sets the log level", default="INFO")
     parser.add_argument(
-        "--scan-balance-assertions",
-        help="Enable comparison against end of round balances reported by scan.",
-        action="store_true",
-    )
-    parser.add_argument(
         "--cache-file-path",
         help="File path to save application state to. "
         "If the file exists, processing will resume from the persisted state."
@@ -4232,64 +4214,6 @@ def _log_uncaught_exceptions():
     sys.excepthook = handle_exception
 
 
-async def _check_scan_balance_assertions(
-    scan_client, transaction, previous_state, app_state, result
-):
-    for round_number in result.new_open_rounds:
-        app_state.per_round_states[round_number] = previous_state.clone_for_round(
-            round_number
-        )
-
-    if result.for_open_round != None:
-        for (
-            round_number,
-            per_round_state,
-        ) in app_state.per_round_states.items():
-            if round_number >= result.for_open_round:
-                per_round_state.handle_transaction(transaction)
-
-    if result.new_closed_round:
-        closed_round = result.new_closed_round
-        msg = f"Closing round {closed_round}, current rounds: {list(app_state.per_round_states.keys())}"
-        LOG.info(msg)
-        round_state = app_state.per_round_states[closed_round]
-        del app_state.per_round_states[closed_round]
-        balances = round_state.get_per_party_balances()
-        lines = [msg, f"effective balances for closed round: {closed_round}"]
-        matches = True
-        scan_party_balances = await scan_client.party_balances(
-            closed_round, balances.keys()
-        )
-        for party, balance in sorted(balances.items()):
-            if not _party_enabled(app_state.state.args, party):
-                continue
-
-            computed_balance = balance.effective_for_round(closed_round)
-            scan_balance = scan_party_balances[party]
-            matches_for_party = scan_balance == computed_balance
-            matches &= matches_for_party
-
-            app_state.state._report_line(
-                transaction,
-                "BALANCE",
-                {
-                    "update_id": transaction.update_id,
-                    "record_time": transaction.record_time,
-                    "round": closed_round,
-                    "owner": party,
-                    "computed_balance": computed_balance,
-                    "scan_balance": scan_balance,
-                },
-            )
-
-            lines += [
-                f"  {party}: {computed_balance}, scan: {scan_balance}, matches: {matches_for_party}"
-            ]
-        log = "\n".join(lines)
-        if matches:
-            LOG.info(log)
-        else:
-            LOG.error(log)
 
 
 async def _process_transaction(args, app_state, scan_client, transaction):
@@ -4297,13 +4221,7 @@ async def _process_transaction(args, app_state, scan_client, transaction):
         f"Processing transaction {transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
     )
 
-    previous_state = app_state.state.clone()
-    result = app_state.state.handle_transaction(transaction)
-
-    if args.scan_balance_assertions:
-        await _check_scan_balance_assertions(
-            scan_client, transaction, previous_state, app_state, result
-        )
+    app_state.state.handle_transaction(transaction)
 
 
 async def main():
@@ -4360,7 +4278,7 @@ async def main():
                     TransactionTree.parse(tx)
                     for tx in json_batch
                     if (stop_at_record_time is None)
-                    or (datetime.fromisoformat(tx["record_time"]) < stop_at_record_time)
+                    or (datetime.fromisoformat(tx["record_time"]) <= stop_at_record_time)
                 ]
                 LOG.debug(
                     f"Processing batch of size {len(batch)} starting at {app_state.pagination_key}"

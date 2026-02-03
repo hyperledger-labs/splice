@@ -44,12 +44,11 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.*
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
-import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
 import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.{BftSequencerConfig, LocalSynchronizerNode}
-import org.lfdecentralizedtrust.splice.util.{QualifiedName, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import java.nio.file.Path
 import scala.concurrent.ExecutionContextExecutor
@@ -430,7 +429,7 @@ class SvDsoAutomationService(
           internalClientConfig.decentralizedSynchronizerAlias,
           dsoStore,
           internalClientConfig.sequencerInternalConfig,
-          config.participantClient.sequencerRequestAmplification,
+          config.participantClient.sequencerRequestAmplification.toInternal,
           config.domainMigrationId,
           newSequencerConnectionPool = enabledFeatures.newSequencerConnectionPool,
         )
@@ -475,23 +474,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       sequencerInternalConfig: ClientConfig,
       decentralizedSynchronizerAlias: SynchronizerAlias,
   )
-
-  private[automation] def bootstrapPackageIdResolver(
-      initialPackageConfig: Option[InitialPackageConfig]
-  )(template: QualifiedName): Option[String] =
-    template.moduleName match {
-      // DsoBootstrap is how we create AmuletRules in the first place so we cannot infer the package id for that from AmuletRules.
-      // We could infer it from initialPackageConfig
-      case "Splice.DsoBootstrap" =>
-        initialPackageConfig
-          .flatMap(config =>
-            DarResources.dsoGovernance.getPackageIdWithVersion(config.dsoGovernanceVersion)
-          )
-          .orElse(
-            Some(DarResources.dsoGovernance.bootstrap.packageId)
-          )
-      case _ => None
-    }
 
   // defined because some triggers are registered later by
   // registerPostOnboardingTriggers

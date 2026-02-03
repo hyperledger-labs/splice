@@ -45,7 +45,9 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyh
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
+  updateAllScanAppConfigs_,
 }
+import org.lfdecentralizedtrust.splice.config.RateLimitersConfig
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -54,7 +56,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTestWithSharedEnvironment,
   SpliceTestConsoleEnvironment,
 }
-import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{SpliceRateLimitConfig, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
@@ -103,6 +105,16 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        // The test itself may hit scan hard, but this test is not about testing rate limiting...
+        updateAllScanAppConfigs_(config =>
+          config.copy(parameters =
+            config.parameters.copy(rateLimiting =
+              RateLimitersConfig(SpliceRateLimitConfig(enabled = false, 1), Map.empty)
+            )
+          )
         )(config)
       )
   }
@@ -609,19 +621,25 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             val getUpdatesPayload = JsUpdateServiceCodecs.getUpdatesRequestRW(
               GetUpdatesRequest(
                 updateFormat = Some(
-                  UpdateFormat(includeTransactions =
-                    Some(
+                  UpdateFormat(
+                    includeTransactions = Some(
                       TransactionFormat(
                         transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
                         eventFormat = Some(
                           EventFormat(
-                            filtersByParty(alice.partyId, interfaces, includeWildcard = true)
+                            filtersByParty(alice.partyId, interfaces, includeWildcard = true),
+                            filtersForAnyParty = None,
+                            verbose = false,
                           )
                         ),
                       )
-                    )
+                    ),
+                    includeReassignments = None,
+                    includeTopologyEvents = None,
                   )
-                )
+                ),
+                beginExclusive = 0,
+                endInclusive = None,
               )
             )
 
@@ -676,9 +694,12 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           "targetClosesAt",
           "value", // due to BurnMint using `AV_Time` for the expiresAt field of the locked output
         )
+
+      val amuletRulesId =
+        eventuallySucceeds()(sv1ScanBackend.getAmuletRules().contractId.contractId)
+
       def replaceStringsInJson(viewValue: Json) = {
         val current = viewValue.spaces2SortKeys
-        val amuletRulesId = sv1ScanBackend.getAmuletRules().contractId.contractId
         val allContracts =
           "\"([0-9a-fA-F]{138})\"".r.findAllIn(current).matchData.map(_.group(1)).toSeq
 
@@ -862,7 +883,9 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                       transferinstructionv1.TransferInstruction.TEMPLATE_ID,
                     ),
                     includeWildcard = true,
-                  )
+                  ),
+                  filtersForAnyParty = None,
+                  verbose = false,
                 )
               ),
             )
@@ -958,17 +981,20 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             filtersByParty = Map(
               party.partyId.toProtoPrimitive -> Filters(
                 Seq(
-                  CumulativeFilter().withInterfaceFilter(
+                  CumulativeFilter.defaultInstance.withInterfaceFilter(
                     InterfaceFilter(
                       Some(
                         com.daml.ledger.api.v2.value.Identifier.fromJavaProto(interface.toProto)
                       ),
                       includeInterfaceView = true,
+                      includeCreatedEventBlob = false,
                     )
                   )
                 )
               )
-            )
+            ),
+            filtersForAnyParty = None,
+            verbose = false,
           )
         ),
         activeAtOffset =

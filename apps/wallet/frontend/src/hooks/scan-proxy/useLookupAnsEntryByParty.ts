@@ -6,7 +6,7 @@ import { AnsEntry } from '@lfdecentralizedtrust/scan-openapi';
 
 import { useValidatorScanProxyClient } from '../../contexts/ValidatorScanProxyContext';
 
-const useLookupAnsEntryByParty = (party?: string): UseQueryResult<AnsEntry> => {
+const useLookupAnsEntryByParty = (party?: string): UseQueryResult<AnsEntry | null> => {
   const scanClient = useValidatorScanProxyClient();
 
   return useLookupAnsEntryByPartyFromResponse(p => scanClient.lookupAnsEntryByParty(p), party);

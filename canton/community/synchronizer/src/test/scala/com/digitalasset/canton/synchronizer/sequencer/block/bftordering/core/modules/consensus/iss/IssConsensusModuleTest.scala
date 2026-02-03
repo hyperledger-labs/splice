@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss
@@ -130,7 +130,7 @@ class IssConsensusModuleTest
         val (context, consensus) = createIssConsensusModule()
         implicit val ctx: ContextType = context
         consensus.receive(
-          Consensus.LocalAvailability.ProposalCreated(oneRequestOrderingBlock, EpochNumber.First)
+          Consensus.LocalAvailability.ProposalCreated(BlockNumber.First, oneRequestOrderingBlock)
         )
         // verifies that no ModuleRef receives any messages from Consensus
         succeed

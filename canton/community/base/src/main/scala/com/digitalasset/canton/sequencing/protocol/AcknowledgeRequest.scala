@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
@@ -44,7 +44,7 @@ object AcknowledgeRequest extends VersioningCompanionMemoization[AcknowledgeRequ
 
   override def name: String = "AcknowledgeRequest"
 
-  override def versioningTable: VersioningTable = VersioningTable(
+  override val versioningTable: VersioningTable = VersioningTable(
     ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.AcknowledgeRequest)(
       supportedProtoVersionMemoized(_) { req => bytes =>
         fromProtoV30(req)(Some(bytes))

@@ -1,19 +1,24 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.dao
 
+import com.digitalasset.canton.config.CantonRequireTypes.String185
 import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.api.ParticipantId
 import com.digitalasset.canton.ledger.api.health.{HealthStatus, ReportsHealth}
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.TestAcsChangeFactory
+import com.digitalasset.canton.ledger.participant.state.Update.TransactionAccepted.RepresentativePackageId.SameAsContractPackageId
+import com.digitalasset.canton.ledger.participant.state.Update.{
+  ContractInfo,
+  TopologyTransactionEffective,
+}
 import com.digitalasset.canton.ledger.participant.state.index.IndexerPartyDetails
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
-import com.digitalasset.canton.participant.store.LedgerApiContractStore
 import com.digitalasset.canton.platform.*
 import com.digitalasset.canton.platform.config.{
   ActiveContractsServiceStreamsConfig,
@@ -24,7 +29,7 @@ import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.Le
 import com.digitalasset.canton.platform.store.backend.{ParameterStorageBackend, ReadStorageBackend}
 import com.digitalasset.canton.platform.store.cache.LedgerEndCache
 import com.digitalasset.canton.platform.store.dao.events.*
-import com.digitalasset.canton.protocol.{ContractInstance, UpdateId}
+import com.digitalasset.canton.protocol.{ContractInstance, TestUpdateId, UpdateId}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Time.Timestamp
@@ -33,6 +38,7 @@ import com.digitalasset.daml.lf.transaction.CreationTime.CreatedAt
 import com.digitalasset.daml.lf.transaction.{CommittedTransaction, Node}
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
 
 private class JdbcLedgerWriteDao(
@@ -128,16 +134,19 @@ private class JdbcLedgerWriteDao(
         conn,
         offset,
         Some(
-          state.Update.PartyAddedToParticipant(
-            party = partyDetails.party,
-            // HACK: the `PartyAddedToParticipant` transmits `participantId`s, while here we only have the information
-            // whether the party is locally hosted or not. We use the `nonLocalParticipantId` to get the desired effect of
-            // the `isLocal = False` information to be transmitted via a `PartyAddedToParticipant` `Update`.
-            //
-            // This will be properly resolved once we move away from the `sandbox-classic` codebase.
-            participantId = if (partyDetails.isLocal) participantId else NonLocalParticipantId,
-            recordTime = CantonTimestamp(recordTime),
-            submissionId = submissionIdOpt,
+          state.Update.TopologyTransactionEffective(
+            updateId = TestUpdateId(UUID.randomUUID().toString),
+            events = Set(
+              TopologyTransactionEffective.TopologyEvent.PartyToParticipantAuthorization(
+                party = partyDetails.party,
+                participant = if (partyDetails.isLocal) participantId else NonLocalParticipantId,
+                authorizationEvent = TopologyTransactionEffective.AuthorizationEvent.Added(
+                  TopologyTransactionEffective.AuthorizationLevel.Confirmation
+                ),
+              )
+            ),
+            synchronizerId = SynchronizerId.tryFromString("invalid::deadbeef"),
+            effectiveTime = CantonTimestamp(recordTime),
           )
         ),
       )
@@ -177,10 +186,11 @@ private class JdbcLedgerWriteDao(
 
   override def listKnownParties(
       fromExcl: Option[Party],
+      filterParty: Option[String185],
       maxResults: Int,
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): Future[List[IndexerPartyDetails]] = readDao.listKnownParties(fromExcl, maxResults)
+  ): Future[List[IndexerPartyDetails]] = readDao.listKnownParties(fromExcl, filterParty, maxResults)
 
   /** Prunes the events and command completions tables.
     *
@@ -270,24 +280,18 @@ private class JdbcLedgerWriteDao(
               ),
               transaction = transaction,
               updateId = updateId,
-              contractAuthenticationData = new Map[ContractId, Bytes] {
-                override def removed(key: ContractId): Map[ContractId, Bytes] = this
-
-                override def updated[V1 >: Bytes](
-                    key: ContractId,
-                    value: V1,
-                ): Map[ContractId, V1] = this
-
-                override def get(key: ContractId): Option[Bytes] = Some(Bytes.Empty)
-
-                override def iterator: Iterator[(ContractId, Bytes)] = Iterator.empty
-              }, // only for tests
               synchronizerId = SynchronizerId.tryFromString("invalid::deadbeef"),
               recordTime = CantonTimestamp(recordTime),
               externalTransactionHash = None,
               acsChangeFactory =
                 TestAcsChangeFactory(contractActivenessChanged = contractActivenessChanged),
-              internalContractIds = internalContractIds,
+              contractInfos = internalContractIds.map { case (cid, internalContractId) =>
+                cid -> ContractInfo(
+                  internalContractId = internalContractId,
+                  contractAuthenticationData = Bytes.Empty,
+                  representativePackageId = SameAsContractPackageId,
+                )
+              },
             )
           ),
         )

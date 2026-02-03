@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.syntax.either.*
-import com.digitalasset.canton.config.{CommunityCantonEdition, TestingConfigInternal}
+import com.digitalasset.canton.config.{TestingConfigInternal}
 import com.digitalasset.canton.console.ConsoleOutput
 import com.digitalasset.canton.environment.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -28,7 +28,6 @@ class SpliceEnvironment(
     loggerFactory: NamedLoggerFactory,
 ) extends Environment[SpliceConfig](
       config,
-      CommunityCantonEdition,
       testingConfig,
       ParticipantNodeBootstrapFactoryImpl,
       SequencerNodeBootstrapFactoryImpl,
@@ -39,7 +38,7 @@ class SpliceEnvironment(
   // dump config (without sensitive data) to ease debugging
   logger.info(s"SpliceEnvironment with config = {\n${config.dumpString}\n}")
 
-  private lazy val metrics = SpliceMetricsFactory(
+  lazy val metrics = SpliceMetricsFactory(
     metricsRegistry,
     dbStorageHistograms,
     loggerFactory,

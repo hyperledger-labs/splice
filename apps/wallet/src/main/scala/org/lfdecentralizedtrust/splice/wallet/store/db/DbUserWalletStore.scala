@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.wallet.store.db
 
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
@@ -15,13 +14,14 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{AcsStoreId, SelectFromAcsTableResult}
 import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
   DbTxLogAppStore,
+  DbTransferInputQueries,
   TxLogQueries,
 }
 import org.lfdecentralizedtrust.splice.store.{Limit, LimitHelpers, PageLimit, TxLogStore}
@@ -46,7 +46,6 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
-import slick.jdbc.canton.SQLActionBuilder
 
 import scala.concurrent.*
 import scala.jdk.OptionConverters.*
@@ -60,9 +59,9 @@ class DbUserWalletStore(
     participantId: ParticipantId,
     ingestionConfig: IngestionConfig,
 )(implicit
-    ec: ExecutionContext,
-    templateJsonDecoder: TemplateJsonDecoder,
-    closeContext: CloseContext,
+    override protected val ec: ExecutionContext,
+    override protected val templateJsonDecoder: TemplateJsonDecoder,
+    override protected val closeContext: CloseContext,
 ) extends DbTxLogAppStore[TxLogEntry](
       storage = storage,
       acsTableName = WalletTables.acsTableName,
@@ -71,7 +70,7 @@ class DbUserWalletStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
-        version = 3,
+        version = 4,
         name = "DbUserWalletStore",
         party = key.endUserParty,
         participant = participantId,
@@ -98,6 +97,7 @@ class DbUserWalletStore(
       ingestionConfig,
     )
     with UserWalletStore
+    with DbTransferInputQueries
     with AcsTables
     with AcsQueries
     with TxLogQueries[TxLogEntry]
@@ -106,9 +106,11 @@ class DbUserWalletStore(
   import multiDomainAcsStore.waitUntilAcsIngested
   import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
-  private def acsStoreId: AcsStoreId = multiDomainAcsStore.acsStoreId
+  override protected def acsStoreId: AcsStoreId = multiDomainAcsStore.acsStoreId
   private def txLogStoreId: TxLogStoreId = multiDomainAcsStore.txLogStoreId
   override def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
+  override protected def acsTableName: String = WalletTables.acsTableName
+  override protected def dbStorage: DbStorage = storage
 
   override def toString: String = show"DbUserWalletStore(endUserParty=${key.endUserParty})"
 
@@ -187,53 +189,6 @@ class DbUserWalletStore(
       limit,
       ccValue = sql"rti.issuance * acs.reward_coupon_weight",
     )
-
-  private def listSortedRewardCoupons[C, TCid <: ContractId[?], T](
-      companion: C,
-      issuingRoundsMap: Map[Round, IssuingMiningRound],
-      roundToIssuance: IssuingMiningRound => Option[BigDecimal],
-      limit: Limit,
-      ccValue: SQLActionBuilder = sql"rti.issuance",
-  )(implicit
-      companionClass: ContractCompanion[C, TCid, T],
-      traceContext: TraceContext,
-  ): Future[Seq[(Contract[TCid, T], BigDecimal)]] = {
-    val packageQualifiedName = companionClass.packageQualifiedName(companion)
-    issuingRoundsMap
-      .flatMap { case (round, contract) =>
-        roundToIssuance(contract).map(round.number.longValue() -> _)
-      }
-      .map { case (round, issuance) =>
-        sql"($round, $issuance)"
-      }
-      .reduceOption { (acc, next) =>
-        (acc ++ sql"," ++ next).toActionBuilder
-      } match {
-      case None => Future.successful(Seq.empty) // no rounds = no results
-      case Some(roundToIssuance) =>
-        for {
-          result <- storage.query(
-            (sql"""
-                 with round_to_issuance(round, issuance) as (values """ ++ roundToIssuance ++ sql""")
-                 select
-                   #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()},""" ++ ccValue ++ sql"""
-                 from #${WalletTables.acsTableName} acs join round_to_issuance rti on acs.reward_coupon_round = rti.round
-                 where acs.store_id = $acsStoreId
-                   and migration_id = $domainMigrationId
-                   and acs.package_name = ${packageQualifiedName.packageName}
-                   and acs.template_id_qualified_name = ${packageQualifiedName.qualifiedName}
-                 order by (acs.reward_coupon_round, -""" ++ ccValue ++ sql""")
-                 limit ${sqlLimit(limit)}""").toActionBuilder
-              .as[(SelectFromAcsTableResult, BigDecimal)],
-            s"listSorted:$packageQualifiedName",
-          )
-        } yield applyLimit(s"listSorted:$packageQualifiedName", limit, result).map {
-          case (row, issuance) =>
-            val contract = contractFromRow(companion)(row)
-            contract -> issuance
-        }
-    }
-  }
 
   override def listTransactions(
       beginAfterEventIdO: Option[String],

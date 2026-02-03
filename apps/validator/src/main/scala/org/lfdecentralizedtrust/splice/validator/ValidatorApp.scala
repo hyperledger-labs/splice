@@ -39,7 +39,6 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, SharedSpliceAppParameters}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
-import org.lfdecentralizedtrust.splice.http.v0.definitions as http
 import org.lfdecentralizedtrust.splice.http.v0.status.wallet.WalletResource as StatusWalletResource
 import org.lfdecentralizedtrust.splice.http.v0.external.ans.AnsResource
 import org.lfdecentralizedtrust.splice.http.v0.external.wallet.WalletResource as ExternalWalletResource
@@ -271,8 +270,6 @@ class ValidatorApp(
                       sequencerConnections,
                       migrationDump.dars,
                       migrationDump.acsSnapshot,
-                      legacyAcsImport =
-                        migrationDump.acsFormat == http.DomainMigrationDump.AcsFormat.AdminApi,
                     )
                   }
                   _ <- appInitStep("Restoring participant users data") {
@@ -803,6 +800,7 @@ class ValidatorApp(
         domainMigrationInfo,
         participantId,
         config.automation.ingestion,
+        config.acsStoreDescriptorUserVersion,
       )
       validatorUpdateHistory = new UpdateHistory(
         storage,
@@ -876,6 +874,7 @@ class ValidatorApp(
             config.ingestFromParticipantBegin,
             config.ingestUpdateHistoryFromParticipantBegin,
             config.parameters,
+            scanConnection,
           )
           val walletManager = new UserWalletManager(
             ledgerClient,
@@ -942,7 +941,7 @@ class ValidatorApp(
         config.ingestFromParticipantBegin,
         config.ingestUpdateHistoryFromParticipantBegin,
         config.svValidator,
-        config.sequencerRequestAmplificationPatience,
+        config.sequencerRequestAmplificationPatience.toInternal,
         config.contactPoint,
         initialSynchronizerTime,
         config.maxVettingDelay,

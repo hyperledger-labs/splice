@@ -116,6 +116,15 @@ class DsoDelegateBasedAutomationService(
         svTaskContext,
       )
     )
+    registerTrigger(
+      new MergeUnclaimedDevelopmentFundCouponsTrigger(config, triggerContext, svTaskContext)
+    )
+    registerTrigger(
+      new ExpiredDevelopmentFundCouponTrigger(
+        triggerContext,
+        svTaskContext,
+      )
+    )
   }
 
 }
@@ -149,5 +158,7 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[AllocateUnallocatedUnclaimedActivityRecordTrigger],
     aTrigger[ExpiredUnallocatedUnclaimedActivityRecordTrigger],
     aTrigger[ExpiredUnclaimedActivityRecordTrigger],
+    aTrigger[MergeUnclaimedDevelopmentFundCouponsTrigger],
+    aTrigger[ExpiredDevelopmentFundCouponTrigger],
   )
 }

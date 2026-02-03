@@ -100,6 +100,8 @@ class DbScanStore(
     ingestionConfig: IngestionConfig,
     storeMetrics: DbScanStoreMetrics,
     initialRound: Long,
+    acsStoreDescriptorUserVersion: Option[Long] = None,
+    txLogStoreDescriptorUserVersion: Option[Long] = None,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -119,6 +121,7 @@ class DbScanStore(
         key = Map(
           "dsoParty" -> key.dsoParty.toProtoPrimitive
         ),
+        userVersion = acsStoreDescriptorUserVersion,
       ),
       txLogStoreDescriptor = StoreDescriptor(
         version = 1,
@@ -128,6 +131,7 @@ class DbScanStore(
         key = Map(
           "dsoParty" -> key.dsoParty.toProtoPrimitive
         ),
+        userVersion = txLogStoreDescriptorUserVersion,
       ),
       domainMigrationInfo,
       ingestionConfig,
@@ -571,34 +575,6 @@ class DbScanStore(
       }
     } yield nodeStates.map(_.contract.payload).toVector
 
-  override def getTotalAmuletBalance(asOfEndOfRound: Long)(implicit
-      tc: TraceContext
-  ): Future[Option[BigDecimal]] =
-    waitUntilAcsIngested {
-      for {
-        result <- ensureAggregated(asOfEndOfRound) { _ =>
-          storage.query(
-            // TODO(#800) change to query from round_totals when amulet expiry works again
-            // the round_total_amulet_balance is sparse and might not have an entry for the requested round
-            // which is why the first entry found <= asOfEndOfRound is used
-            sql"""
-              select greatest(
-                0,
-                sum_cumulative_change_to_initial_amount_as_of_round_zero -
-                sum_cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)
-              )
-              from    round_total_amulet_balance
-              where   store_id = $roundTotalsStoreId
-              and     closed_round <= $asOfEndOfRound
-              order by closed_round desc
-              limit 1;
-              """.as[BigDecimal].headOption,
-            "getTotalAmuletBalance",
-          )
-        }
-      } yield result
-    }
-
   override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =
     waitUntilAcsIngested {
       for {
@@ -634,44 +610,6 @@ class DbScanStore(
         )
       }
     } yield result.getOrElse(0)
-  }
-
-  override def getWalletBalance(partyId: PartyId, asOfEndOfRound: Long)(implicit
-      tc: TraceContext
-  ): Future[BigDecimal] = waitUntilAcsIngested {
-    for {
-      result <- ensureAggregated(asOfEndOfRound) { lastAggregatedRound =>
-        // if the asOfEndOrRound is the latest aggregated round, we can use the active_parties for a faster query.
-        if (lastAggregatedRound == asOfEndOfRound) {
-          storage.query(
-            sql"""
-             select  greatest(0, cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)) as total_amulet_balance
-             from    round_party_totals rpt
-             join    active_parties ap
-             on      rpt.store_id = ap.store_id
-             and     rpt.party = ap.party
-             and     rpt.closed_round = ap.closed_round
-             where   rpt.store_id = $roundTotalsStoreId
-             and     rpt.party = $partyId;
-           """.as[Option[BigDecimal]].headOption,
-            "getWalletBalanceForLastAggregatedRound",
-          )
-        } else {
-          storage.query(
-            sql"""
-            select   greatest(0, cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)) as total_amulet_balance
-            from     round_party_totals
-            where    store_id = $roundTotalsStoreId
-            and      closed_round <= $asOfEndOfRound
-            and      party = $partyId
-            order by closed_round desc
-            limit    1;
-            """.as[Option[BigDecimal]].headOption,
-            "getWalletBalanceForEarlierRound",
-          )
-        }
-      }
-    } yield result.flatten.getOrElse(0)
   }
 
   override def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit

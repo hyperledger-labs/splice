@@ -4,7 +4,9 @@
 imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
 
 pvc:
+  name: party-allocator-keys
   volumeStorageClass: standard-rwo
+  size: 20Gi
 
 metrics:
   release: prometheus-grafana-monitoring

@@ -32,13 +32,18 @@ every 10 minutes, which is a configuration parameter that the Super Validators m
 whitepaper for the details.
 
 There is no difference in activity record creation for an `external party
-<https://docs.digitalasset.com/build/3.3/tutorials/app-dev/external_signing_onboarding.html#tutorial-onboard-external-party>`__ or a
+<https://docs.digitalasset.com/build/3.4/tutorials/app-dev/external_signing_onboarding.html#tutorial-onboard-external-party>`__ or a
 local party, but there is a difference in the automation support used in the minting phase. For local parties onboarded to a
 validator, the validator application runs background automation to mint all activity records automatically. An external party signs
 transactions using a key they control. As a consequence, the validator automation is not able to perform minting for external
-parties. For external parties, automation needs to be developed to call :ref:`AmuletRules_Transfer
-<type-splice-amuletrules-amuletrulestransfer-23235>` at least once per round with all activity records as inputs.  An approved CIP,
-called `Weighted Validator Liveness Rewards for SV-Determined Parties
+parties directly. For external parties, there are two options:
+
+1. Use a :ref:`minting delegation <minting-delegations>` to delegate reward collection to a validator,
+   avoiding the need to build custom automation.
+2. Develop custom automation to call :ref:`AmuletRules_Transfer
+   <type-splice-amuletrules-amuletrulestransfer-23235>` at least once per round with all activity records as inputs.
+
+An approved CIP called `Weighted Validator Liveness Rewards for SV-Determined Parties
 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0073/cip-0073.md>`__ describes providing this support.
 
 As an aside, some interesting templates are important to the tokenomics are:

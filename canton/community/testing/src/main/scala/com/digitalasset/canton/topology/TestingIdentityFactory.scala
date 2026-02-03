@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
@@ -7,6 +7,7 @@ import cats.syntax.either.*
 import cats.syntax.functor.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.BaseTest.{
+  RichSynchronizerIdO,
   defaultStaticSynchronizerParameters,
   testedReleaseProtocolVersion,
 }
@@ -57,10 +58,12 @@ import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.collection.MapsUtil
 import com.digitalasset.canton.{BaseTest, FutureHelpers, LfPackageId, LfPartyId}
 import com.google.common.annotations.VisibleForTesting
+import com.google.protobuf.ByteString
 
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.reflect.ClassTag
 import scala.util.Try
 
 import TestingTopology.*
@@ -74,9 +77,11 @@ import TestingTopology.*
   * transaction protocol.
   *
   * Therefore, all the key crypto operations hide behind the so-called crypto-api which splits into
-  * the pure part [[CryptoPureApi]] and the more complicated part, the [[SyncCryptoApi]] such that
-  * from the transaction protocol perspective, we can conveniently use methods like
-  * [[SyncCryptoApi.sign]] or [[SyncCryptoApi.encryptFor]]
+  * the pure part [[com.digitalasset.canton.crypto.CryptoPureApi]] and the more complicated part,
+  * the [[com.digitalasset.canton.crypto.SyncCryptoApi]] such that from the transaction protocol
+  * perspective, we can conveniently use methods like
+  * [[com.digitalasset.canton.crypto.SyncCryptoApi.sign]] or
+  * [[com.digitalasset.canton.crypto.SyncCryptoApi.encryptFor]]
   *
   * The abstraction creates the following hierarchy of classes to resolve the state for a given
   * [[Member]] on a per (synchronizerId, timestamp)
@@ -86,8 +91,9 @@ import TestingTopology.*
   * \= SynchronizerSyncCryptoApi .snapshot(timestamp) | recentState - method to get the view for a
   * specific time \= SynchronizerSnapshotSyncCryptoApi (extends SyncCryptoApi)
   *
-  * All these object carry the necessary objects ([[CryptoPureApi]], [[TopologySnapshot]],
-  * [[KeyVaultApi]]) as arguments with them.
+  * All these objects carry the necessary objects ([[com.digitalasset.canton.crypto.CryptoPureApi]],
+  * [[com.digitalasset.canton.topology.client.TopologySnapshot]],
+  * [[com.digitalasset.canton.crypto.CryptoPrivateApi]]) as arguments with them.
   *
   * Now, in order to conveniently create a static topology for testing, we provide a <ul>
   * <li>[[TestingTopology]] which allows us to define a certain static topology</li>
@@ -95,10 +101,12 @@ import TestingTopology.*
   * components and objects that a unit test might need.</li> <li>[[DefaultTestIdentities]] which
   * provides a predefined set of identities that can be used for unit tests.</li> </ul>
   *
-  * Common usage patterns are: <ul> <li>Get a [[SynchronizerCryptoClient]] with an empty topology:
+  * Common usage patterns are: <ul> <li>Get a
+  * [[com.digitalasset.canton.crypto.SynchronizerCryptoClient]] with an empty topology:
   * `TestingIdentityFactory().forOwnerAndSynchronizer(participant1)`</li> <li>To get a
-  * [[SynchronizerSnapshotSyncCryptoApi]]: same as above, just add `.recentState`.</li> <li>Define a
-  * specific topology and get the [[SyncCryptoApiProvider]]:
+  * [[com.digitalasset.canton.crypto.SynchronizerSnapshotSyncCryptoApi]]: same as above, just add
+  * `.recentState`.</li> <li>Define a specific topology and get the
+  * [[com.digitalasset.canton.crypto.SyncCryptoApiParticipantProvider]]:
   * `TestingTopology().withTopology(Map(party1 -> participant1)).build()`.</li> </ul>
   *
   * @param synchronizers
@@ -412,23 +420,15 @@ class TestingIdentityFactory(
 
         override def psid: PhysicalSynchronizerId = dId
 
-        override protected[topology] def trySnapshot(timestamp: CantonTimestamp)(implicit
-            traceContext: TraceContext
-        ): TopologySnapshotLoader = {
-          require(
-            timestamp <= upToInclusive,
-            s"Topology information not yet available for $timestamp, known until $upToInclusive",
-          )
-          topologySnapshot(synchronizerId, timestampForSynchronizerParameters = timestamp)
-        }
-
         override def currentSnapshotApproximation(implicit
             traceContext: TraceContext
-        ): TopologySnapshot =
-          topologySnapshot(
-            synchronizerId,
-            timestampForSynchronizerParameters = currentSnapshotApproximationTimestamp,
-            timestampOfSnapshot = currentSnapshotApproximationTimestamp,
+        ): FutureUnlessShutdown[TopologySnapshot] =
+          FutureUnlessShutdown.pure(
+            topologySnapshot(
+              synchronizerId,
+              timestampForSynchronizerParameters = currentSnapshotApproximationTimestamp,
+              timestampOfSnapshot = currentSnapshotApproximationTimestamp,
+            )
           )
 
         override def snapshotAvailable(timestamp: CantonTimestamp): Boolean =
@@ -457,13 +457,18 @@ class TestingIdentityFactory(
             )
           }
 
-        override def approximateTimestamp: CantonTimestamp =
-          currentSnapshotApproximation(TraceContext.empty).timestamp
+        override def approximateTimestamp: CantonTimestamp = currentSnapshotApproximationTimestamp
 
         override def awaitSnapshot(timestamp: CantonTimestamp)(implicit
             traceContext: TraceContext
         ): FutureUnlessShutdown[TopologySnapshot] =
-          FutureUnlessShutdown.fromTry(Try(trySnapshot(timestamp)))
+          FutureUnlessShutdown.fromTry(Try {
+            require(
+              timestamp <= upToInclusive,
+              s"Topology information not yet available for $timestamp, known until $upToInclusive",
+            )
+            topologySnapshot(synchronizerId, timestampForSynchronizerParameters = timestamp)
+          })
 
         override def close(): Unit = ()
 
@@ -497,7 +502,13 @@ class TestingIdentityFactory(
           FutureUnlessShutdown.pure(None)
 
         override def headSnapshot(implicit traceContext: TraceContext): TopologySnapshot =
-          trySnapshot(topologyKnownUntilTimestamp)
+          topologySnapshot(
+            synchronizerId,
+            timestampForSynchronizerParameters = latestTopologyChangeTimestamp,
+          )
+
+        override def latestTopologyChangeTimestamp: CantonTimestamp =
+          currentSnapshotApproximationTimestamp
       })(TraceContext.empty)
     )
     ips
@@ -515,7 +526,7 @@ class TestingIdentityFactory(
   ): TopologySnapshotLoader = {
 
     val store = new InMemoryTopologyStore(
-      TopologyStoreId.AuthorizedStore,
+      TopologyStoreId.SynchronizerStore(synchronizerId.toPhysical),
       BaseTest.testedProtocolVersion,
       loggerFactory,
       DefaultProcessingTimeouts.testing,
@@ -599,6 +610,7 @@ class TestingIdentityFactory(
     ) // The in-memory topology store should complete the state update immediately
 
     new StoreBasedTopologySnapshot(
+      store.storeId.psid,
       timestampOfSnapshot,
       store,
       packageDependencyResolver,
@@ -939,13 +951,40 @@ class TestingOwnerWithKeys(
 
   }
 
-  def mkTrans[Op <: TopologyChangeOp, M <: TopologyMapping](
+  def mkTrans[Op <: TopologyChangeOp: ClassTag, M <: TopologyMapping: ClassTag](
       trans: TopologyTransaction[Op, M],
       signingKeys: NonEmpty[Set[SigningPublicKey]] = NonEmpty(Set, SigningKeys.key1),
       isProposal: Boolean = false,
+      randomizeHash: Boolean = true,
   )(implicit
       ec: ExecutionContext
   ): SignedTopologyTransaction[Op, M] = {
+    val modifiedTransaction = if (randomizeHash) {
+      if (trans.deserializedFrom.nonEmpty) {
+        trans
+      } else {
+        // Randomise the hash (to check whether our comparison is based on hash vs payload)
+        val randomStringBytes = ByteString
+          .copyFrom(
+            Array[Byte](130.toByte, 6.toByte, 8.toByte)
+          )
+          .concat(
+            ByteString.copyFrom(
+              scala.util.Random
+                .nextString(8)
+                .toCharArray
+                .map(_.toByte)
+                .take(8)
+            )
+          )
+        val bytes = trans.toByteStringUnmemoized.concat(randomStringBytes)
+        TopologyTransaction
+          .fromTrustedByteString(())(bytes)
+          .leftMap(_.toString)
+          .flatMap(_.select[Op, M].toRight("Parsed to different type"))
+          .getOrElse(throw new IllegalArgumentException("Unable to parse topology tx"))
+      }
+    } else trans
     // Randomize which hash gets signed when multiHash is true, to create a mix of single and multi signatures
     val hash = if (multiHash && scala.util.Random.nextBoolean()) {
       Some(
@@ -953,7 +992,7 @@ class TestingOwnerWithKeys(
         // But it actually doesn't matter what the other hash is as long as the transaction hash is included
         // in the hash set
         (
-          NonEmpty.mk(Set, trans.hash, TxHash(TestHash.digest("test_hash"))),
+          NonEmpty.mk(Set, modifiedTransaction.hash, TxHash(TestHash.digest("test_hash"))),
           syncCryptoClient.pureCrypto,
         )
       )
@@ -964,7 +1003,7 @@ class TestingOwnerWithKeys(
       .result(
         SignedTopologyTransaction
           .signAndCreate(
-            trans,
+            modifiedTransaction,
             signingKeys.map(_.fingerprint),
             isProposal,
             syncCryptoClient.crypto.privateCrypto,
@@ -995,7 +1034,7 @@ class TestingOwnerWithKeys(
     )
   }
 
-  def mkAdd[M <: TopologyMapping](
+  def mkAdd[M <: TopologyMapping: ClassTag](
       mapping: M,
       signingKey: SigningPublicKey = SigningKeys.key1,
       serial: PositiveInt = PositiveInt.one,
@@ -1005,7 +1044,7 @@ class TestingOwnerWithKeys(
   ): SignedTopologyTransaction[TopologyChangeOp.Replace, M] =
     mkAddMultiKey(mapping, NonEmpty(Set, signingKey), serial, isProposal)
 
-  def mkAddMultiKey[M <: TopologyMapping](
+  def mkAddMultiKey[M <: TopologyMapping: ClassTag](
       mapping: M,
       signingKeys: NonEmpty[Set[SigningPublicKey]] = NonEmpty(Set, SigningKeys.key1),
       serial: PositiveInt = PositiveInt.one,
@@ -1033,7 +1072,7 @@ class TestingOwnerWithKeys(
       tx.serial.increment,
     )
 
-  def mkRemove[M <: TopologyMapping](
+  def mkRemove[M <: TopologyMapping: ClassTag](
       mapping: M,
       signingKeys: NonEmpty[Set[SigningPublicKey]] = NonEmpty(Set, SigningKeys.key1),
       serial: PositiveInt = PositiveInt.one,

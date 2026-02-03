@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology.processing
@@ -12,10 +12,15 @@ import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervisor}
 import com.digitalasset.canton.config.{ProcessingTimeout, TopologyConfig}
 import com.digitalasset.canton.crypto.SynchronizerCryptoPureApi
-import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.CantonNodeParameters
-import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, LifeCycle}
+import com.digitalasset.canton.lifecycle.{
+  FlagCloseable,
+  FutureUnlessShutdown,
+  HasCloseContext,
+  LifeCycle,
+}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.protocol.messages.{
@@ -26,6 +31,7 @@ import com.digitalasset.canton.protocol.messages.{
 import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.protocol.{AllMembersOfSynchronizer, Deliver, DeliverError}
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
+import com.digitalasset.canton.topology.cache.TopologyStateWriteThroughCache
 import com.digitalasset.canton.topology.client.*
 import com.digitalasset.canton.topology.processing.TopologyTransactionProcessor.subscriptionTimestamp
 import com.digitalasset.canton.topology.store.{
@@ -64,6 +70,7 @@ import scala.math.Ordering.Implicits.*
 class TopologyTransactionProcessor(
     pureCrypto: SynchronizerCryptoPureApi,
     store: TopologyStore[TopologyStoreId.SynchronizerStore],
+    cache: TopologyStateWriteThroughCache,
     staticSynchronizerParameters: StaticSynchronizerParameters,
     acsCommitmentScheduleEffectiveTime: Traced[EffectiveTime] => Unit,
     val terminateProcessing: TerminateProcessing,
@@ -73,14 +80,17 @@ class TopologyTransactionProcessor(
     override val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging
-    with FlagCloseable {
+    with FlagCloseable
+    with HasCloseContext {
 
   private val psid = store.storeId.psid
 
   protected lazy val stateProcessor: TopologyStateProcessor =
     TopologyStateProcessor.forTransactionProcessing(
       store,
-      RequiredTopologyMappingChecks(store, Some(staticSynchronizerParameters), loggerFactory),
+      cache,
+      lookup =>
+        RequiredTopologyMappingChecks(Some(staticSynchronizerParameters), lookup, loggerFactory),
       pureCrypto,
       loggerFactory,
     )
@@ -187,7 +197,7 @@ class TopologyTransactionProcessor(
       // of the approximate time subsequently
       val maxEffective = clientInitTimes.map { case (effective, _) => effective }.max1
       val minApproximate = clientInitTimes.map { case (_, approximate) => approximate }.min1
-      listenersUpdateHead(sequencedTs, maxEffective, minApproximate)
+      listenersUpdateHeadWithoutTopologyChanges(sequencedTs, maxEffective, minApproximate)
 
       val directExecutionContext = DirectExecutionContext(noTracingLogger)
       clientInitTimes.foreach { case (effective, _approximate) =>
@@ -195,7 +205,7 @@ class TopologyTransactionProcessor(
         synchronizerTimeTracker.awaitTick(effective.value) match {
           case None =>
             // The effective time is in the past. Directly advance our approximate time to the respective effective time
-            listenersUpdateHead(
+            listenersUpdateHeadWithoutTopologyChanges(
               sequencedTs,
               effective,
               effective.toApproximate,
@@ -203,7 +213,7 @@ class TopologyTransactionProcessor(
           case Some(tickF) =>
             FutureUtil.doNotAwait(
               tickF.map(_ =>
-                listenersUpdateHead(
+                listenersUpdateHeadWithoutTopologyChanges(
                   sequencedTs,
                   effective,
                   effective.toApproximate,
@@ -216,7 +226,7 @@ class TopologyTransactionProcessor(
     }
   }
 
-  private def listenersUpdateHead(
+  private def listenersUpdateHeadWithoutTopologyChanges(
       sequenced: SequencedTime,
       effective: EffectiveTime,
       approximate: ApproximateTime,
@@ -240,7 +250,7 @@ class TopologyTransactionProcessor(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Unit] = initialise(start, synchronizerTimeTracker)
 
-  /** process envelopes mostly asynchronously
+  /** process envelopes mostly asynchronously (used by participant)
     *
     * Here, we return a Future[Future[Unit]]. We need to ensure the outer future finishes processing
     * before we tick the record order publisher.
@@ -302,7 +312,7 @@ class TopologyTransactionProcessor(
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     this.synchronizeWithClosingF(functionFullName) {
       Future {
-        listenersUpdateHead(
+        listenersUpdateHeadWithoutTopologyChanges(
           sequencedTimestamp,
           effectiveTimestamp,
           sequencedTimestamp.toApproximate,
@@ -310,6 +320,7 @@ class TopologyTransactionProcessor(
       }
     }
 
+  /** create handler for mediator / sequencer */
   def createHandler(synchronizerId: PhysicalSynchronizerId): UnsignedProtocolEventHandler =
     new UnsignedProtocolEventHandler {
 
@@ -525,9 +536,9 @@ object TopologyTransactionProcessor {
     ): FutureUnlessShutdown[TopologyTransactionProcessor]
   }
 
-  def createProcessorAndClientForSynchronizer(
+  def createProcessorAndClientForSynchronizerWithWriteThroughCache(
       topologyStore: TopologyStore[TopologyStoreId.SynchronizerStore],
-      synchronizerPredecessor: Option[SynchronizerPredecessor],
+      synchronizerUpgradeTime: Option[CantonTimestamp],
       pureCrypto: SynchronizerCryptoPureApi,
       parameters: CantonNodeParameters,
       topologyConfig: TopologyConfig,
@@ -536,15 +547,24 @@ object TopologyTransactionProcessor {
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
   )(
-      headStateInitializer: SynchronizerTopologyClientHeadStateInitializer =
-        new DefaultHeadStateInitializer(topologyStore)
+      sequencerSnapshotTimestamp: Option[EffectiveTime] = None
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
   ): FutureUnlessShutdown[(TopologyTransactionProcessor, SynchronizerTopologyClientWithInit)] = {
+    val cache = new TopologyStateWriteThroughCache(
+      topologyStore,
+      parameters.batchingConfig.topologyCacheAggregator,
+      maxCacheSize = topologyConfig.maxTopologyStateCacheItems,
+      enableConsistencyChecks = topologyConfig.enableTopologyStateCacheConsistencyChecks,
+      parameters.processingTimeouts,
+      loggerFactory,
+    )
+
     val processor = new TopologyTransactionProcessor(
       pureCrypto,
       topologyStore,
+      cache,
       staticSynchronizerParameters,
       _ => (),
       TerminateProcessing.NoOpTerminateTopologyProcessing,
@@ -554,21 +574,21 @@ object TopologyTransactionProcessor {
       loggerFactory,
     )
 
-    val cachingClientF = CachingSynchronizerTopologyClient.create(
+    val writeThroughCacheClientF = WriteThroughCacheSynchronizerTopologyClient.create(
       clock,
       staticSynchronizerParameters,
       topologyStore,
-      synchronizerPredecessor,
+      cache,
+      synchronizerUpgradeTime,
       NoPackageDependencies,
       parameters.cachingConfigs,
-      parameters.batchingConfig,
       topologyConfig,
       parameters.processingTimeouts,
       futureSupervisor,
       loggerFactory,
-    )(headStateInitializer)
+    )(sequencerSnapshotTimestamp)
 
-    cachingClientF.map { client =>
+    writeThroughCacheClientF.map { client =>
       processor.subscribe(client)
       (processor, client)
     }

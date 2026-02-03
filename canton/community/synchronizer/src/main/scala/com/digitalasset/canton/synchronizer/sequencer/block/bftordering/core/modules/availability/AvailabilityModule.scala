@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability
@@ -23,6 +23,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Env
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
+  BlockNumber,
   EpochNumber,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.OrderingRequestBatch.BatchValidityDurationEpochs
@@ -271,7 +272,11 @@ final class AvailabilityModule[E <: Env[E]](
           },
         )
 
-        logger.debug(s"$messageType: received $batchId from local mempool")
+        logger.debug(
+          s"$messageType: received batch from local mempool containing messages ${requests
+              .map(_.value.headerString)
+              .mkString(", ")}; created batch ID $batchId with reference epoch $lastKnownEpochNumber, storing locally"
+        )
         disseminationProtocolState.beingFirstSaved
           .put(batchId, InitialSaveInProgress(availabilityEnterInstant = Some(Instant.now)))
           .discard
@@ -446,7 +451,7 @@ final class AvailabilityModule[E <: Env[E]](
         voteToAdd,
       )
     ) {
-      shipAvailableConsensusProposals(actingOnMessageType)
+      satisfyConsensusProposalRequest(actingOnMessageType)
     }
 
   private def updateBatchDisseminationProgress(
@@ -543,13 +548,14 @@ final class AvailabilityModule[E <: Env[E]](
         spanManager.finishBlockSpan(batchIds)
 
       case Availability.Consensus.CreateProposal(
-            orderingTopology,
-            cryptoProvider: CryptoProvider[E],
-            forEpochNumber,
+            forBlock,
+            currentEpochNumber,
+            currentOrderingTopology,
+            currentCryptoProvider: CryptoProvider[E],
             ordered,
           ) =>
         val batchesToBeEvicted =
-          updateLastKnownEpochNumberAndForgetExpiredBatches(messageType, forEpochNumber)
+          updateLastKnownEpochNumberAndForgetExpiredBatches(messageType, currentEpochNumber)
 
         spanManager.finishBlockSpan(ordered)
 
@@ -565,9 +571,9 @@ final class AvailabilityModule[E <: Env[E]](
 
         handleConsensusProposalRequest(
           messageType,
-          orderingTopology,
-          cryptoProvider,
-          forEpochNumber,
+          forBlock,
+          currentOrderingTopology,
+          currentCryptoProvider,
           ordered,
         )
 
@@ -581,24 +587,44 @@ final class AvailabilityModule[E <: Env[E]](
 
   private def handleConsensusProposalRequest(
       actingOnMessageType: => String,
-      orderingTopology: OrderingTopology,
-      cryptoProvider: CryptoProvider[E],
-      forEpochNumber: EpochNumber,
+      forBlock: BlockNumber,
+      currentOrderingTopology: OrderingTopology,
+      currentCryptoProvider: CryptoProvider[E],
       orderedBatchIds: Seq[BatchId],
   )(implicit
       context: E#ActorContextT[Availability.Message[E]],
       traceContext: TraceContext,
   ): Unit = {
-    removeOrderedBatchesAndPullFromMempool(actingOnMessageType, orderedBatchIds)
+    val newNextToBeProvidedToConsensus =
+      NextToBeProvidedToConsensus(forBlock, Some(config.maxBatchesPerBlockProposal))
+    val currentOrExpectedProposalRequestBlockNumber =
+      disseminationProtocolState.nextToBeProvidedToConsensus.forBlock
+
+    disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal match {
+      case Some(maxBatches) => // Current proposal request
+        if (forBlock <= currentOrExpectedProposalRequestBlockNumber)
+          abort(
+            s"$actingOnMessageType: got proposal request from local consensus for block $forBlock " +
+              s"but there is an existing one for the same or a higher block number $currentOrExpectedProposalRequestBlockNumber"
+          )
+
+      case None => // Expected proposal request
+        if (forBlock < currentOrExpectedProposalRequestBlockNumber)
+          abort(
+            s"$actingOnMessageType: got proposal request from local consensus for block $forBlock " +
+              s"but we are expecting one for at least block number $currentOrExpectedProposalRequestBlockNumber"
+          )
+    }
 
     logger.debug(
-      s"$actingOnMessageType: recording block request from local consensus and reviewing progress"
+      s"$actingOnMessageType: recording proposal request $newNextToBeProvidedToConsensus from local consensus " +
+        s"(existing one = ${disseminationProtocolState.nextToBeProvidedToConsensus}) and reviewing progress"
     )
-    disseminationProtocolState.toBeProvidedToConsensus enqueue ToBeProvidedToConsensus(
-      config.maxBatchesPerBlockProposal,
-      forEpochNumber,
-    )
-    updateActiveTopology(actingOnMessageType, orderingTopology, cryptoProvider)
+    disseminationProtocolState.nextToBeProvidedToConsensus = newNextToBeProvidedToConsensus
+
+    removeOrderedBatchesAndPullFromMempool(actingOnMessageType, orderedBatchIds)
+
+    updateActiveTopology(actingOnMessageType, currentOrderingTopology, currentCryptoProvider)
 
     // Review and complete both in-progress and ready disseminations regardless of whether the topology
     //  has changed, so that we also try and complete ones that might have become stuck;
@@ -606,7 +632,7 @@ final class AvailabilityModule[E <: Env[E]](
     //  further acks due to a quorum reduction.
 
     syncAllDisseminationProgressWithTopology(actingOnMessageType)
-    advanceAllDisseminationProgressAndShipAvailableConsensusProposals(actingOnMessageType)
+    advanceAllDisseminationProgressAndSatisfyConsensusProposalRequest(actingOnMessageType)
 
     emitDisseminationStateStats(metrics, disseminationProtocolState)
   }
@@ -790,7 +816,7 @@ final class AvailabilityModule[E <: Env[E]](
           s"due to the new topology $currentOrderingTopology"
       )
 
-  private def advanceAllDisseminationProgressAndShipAvailableConsensusProposals(
+  private def advanceAllDisseminationProgressAndSatisfyConsensusProposalRequest(
       actingOnMessageType: => String
   )(implicit
       context: E#ActorContextT[Availability.Message[E]],
@@ -808,8 +834,9 @@ final class AvailabilityModule[E <: Env[E]](
       // We signal to consensus that we don't have proposals available immediately at the time it was requested.
       // However, a proposal will still be sent out when one is available.
       dependencies.consensus.asyncSend(Consensus.LocalAvailability.NoProposalAvailableYet)
-    } else
-      shipAvailableConsensusProposals(actingOnMessageType)
+    } else {
+      satisfyConsensusProposalRequest(actingOnMessageType)
+    }
   }
 
   private def advanceBatchIfComplete(
@@ -1250,37 +1277,46 @@ final class AvailabilityModule[E <: Env[E]](
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.While"))
-  private def shipAvailableConsensusProposals(
+  private def satisfyConsensusProposalRequest(
       actingOnMessageType: => String
-  )(implicit context: E#ActorContextT[Availability.Message[E]]): Unit =
-    while (
-      disseminationProtocolState.batchesReadyForOrdering.nonEmpty &&
-      disseminationProtocolState.toBeProvidedToConsensus.nonEmpty
-    ) {
-      val maxBatchesPerProposal =
-        disseminationProtocolState.toBeProvidedToConsensus.dequeue()
-      assembleAndSendConsensusProposal(
-        actingOnMessageType,
-        maxBatchesPerProposal,
-      )
+  )(implicit context: E#ActorContextT[Availability.Message[E]]): Unit = {
+    val currentForBlock = disseminationProtocolState.nextToBeProvidedToConsensus.forBlock
+    disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal.foreach {
+      maxBatchesPerProposal =>
+        assembleAndSendConsensusProposal(
+          actingOnMessageType,
+          currentForBlock,
+          maxBatchesPerProposal,
+        )
+        disseminationProtocolState.nextToBeProvidedToConsensus =
+          disseminationProtocolState.nextToBeProvidedToConsensus.copy(
+            forBlock = BlockNumber(
+              currentForBlock + 1
+            ), // We expect the next proposal request to be for a higher block number
+            maxBatchesPerProposal = None,
+          )
     }
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.While"))
   private def assembleAndSendConsensusProposal(
       actingOnMessageType: => String,
-      toBeProvidedToConsensus: ToBeProvidedToConsensus,
-  )(implicit context: E#ActorContextT[Availability.Message[E]]): Unit = {
+      forBlock: BlockNumber,
+      maxBatchesPerProposal: Short,
+  )(implicit
+      context: E#ActorContextT[Availability.Message[E]]
+  ): Unit = {
     val batchesToBeProposed = // May be empty if no batches are ready for ordering
       disseminationProtocolState.batchesReadyForOrdering.take(
-        toBeProvidedToConsensus.maxBatchesPerProposal.toInt
+        maxBatchesPerProposal.toInt
       )
     emitBatchesQueuedForBlockInclusionLatencies(batchesToBeProposed)
     locally {
-      val tracedProofOfAvailabilities = batchesToBeProposed.view.values.map(_.proofOfAvailability)
+      val tracedProofOfAvailabilities = batchesToBeProposed.view.map(_._2.proofOfAvailability)
       val proposal =
         Consensus.LocalAvailability.ProposalCreated(
+          forBlock,
           OrderingBlock(tracedProofOfAvailabilities.map(_.value).toSeq),
-          toBeProvidedToConsensus.forEpochNumber,
         )
       val (span, newContext) = startSpan(s"BFTOrderer.Availability.ProposeBlock")(
         context.traceContextOfBatch(tracedProofOfAvailabilities),
@@ -1319,7 +1355,7 @@ final class AvailabilityModule[E <: Env[E]](
   private def recordStartWaitIfIdle(): Unit = {
     import disseminationProtocolState.*
     if (
-      toBeProvidedToConsensus.nonEmpty && batchesReadyForOrdering.isEmpty && disseminationProgress.isEmpty
+      nextToBeProvidedToConsensus.maxBatchesPerProposal.nonEmpty && batchesReadyForOrdering.isEmpty && disseminationProgress.isEmpty
     )
       waitingForBatchSince = Some(Instant.now)
   }
@@ -1489,12 +1525,12 @@ final class AvailabilityModule[E <: Env[E]](
   }
 
   private def emitBatchesQueuedForBlockInclusionLatencies(
-      batchesToBeProposed: collection.Map[BatchId, DisseminatedBatchMetadata]
+      batchesToBeProposed: Iterable[(BatchId, DisseminatedBatchMetadata)]
   ): Unit = {
     val now = Instant.now
     import metrics.performance.orderingStageLatency.*
-    batchesToBeProposed.values
-      .map(_.readyForOrderingInstant)
+    batchesToBeProposed
+      .map(_._2.readyForOrderingInstant)
       .foreach(
         emitOrderingStageLatency(
           labels.stage.values.availability.dissemination.BatchQueuedForBlockInclusion,

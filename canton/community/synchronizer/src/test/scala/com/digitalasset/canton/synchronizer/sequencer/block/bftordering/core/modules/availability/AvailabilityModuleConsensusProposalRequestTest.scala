@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability
@@ -12,6 +12,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftKeyId,
+  BlockNumber,
   EpochNumber,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.availability.*
@@ -29,6 +30,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.{
   fakeRecordingModule,
 }
 import com.digitalasset.canton.tracing.Traced
+import org.scalatest.exceptions.TestFailedException
 import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j.event.Level
 
@@ -66,13 +68,18 @@ class AvailabilityModuleConsensusProposalRequestTest
 
           availability.receive(
             Availability.Consensus
-              .CreateProposal(OrderingTopologyNode0, failingCryptoProvider, EpochNumber.First)
+              .CreateProposal(
+                BlockNumber.First,
+                EpochNumber.First,
+                OrderingTopologyNode0,
+                failingCryptoProvider,
+              )
           )
 
           consensusCell.get() should contain(Consensus.LocalAvailability.NoProposalAvailableYet)
 
           disseminationProtocolState.disseminationProgress should be(empty)
-          disseminationProtocolState.toBeProvidedToConsensus should contain only AToBeProvidedToConsensus
+          disseminationProtocolState.nextToBeProvidedToConsensus shouldBe ANextToBeProvidedToConsensus
           disseminationProtocolState.batchesReadyForOrdering should be(empty)
         }
       }
@@ -129,7 +136,12 @@ class AvailabilityModuleConsensusProposalRequestTest
             )
             availability.receive(
               Availability.Consensus
-                .CreateProposal(OrderingTopologyNode0, failingCryptoProvider, EpochNumber.First)
+                .CreateProposal(
+                  BlockNumber.First,
+                  EpochNumber.First,
+                  OrderingTopologyNode0,
+                  failingCryptoProvider,
+                )
             )
 
             val batchIdsWithProofsOfAvailabilityReadyForOrdering = batchIdsWithMetadata
@@ -143,8 +155,8 @@ class AvailabilityModuleConsensusProposalRequestTest
               case Some(
                     Consensus.LocalAvailability
                       .ProposalCreated(
+                        BlockNumber.First,
                         OrderingBlock(poas),
-                        EpochNumber.First,
                       )
                   )
                   if poas.toSet.sizeIs == BftBlockOrdererConfig.DefaultMaxBatchesPerProposal.toInt =>
@@ -152,7 +164,7 @@ class AvailabilityModuleConsensusProposalRequestTest
             pipeToSelfQueue shouldBe empty
 
             disseminationProtocolState.disseminationProgress should be(empty)
-            disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+            disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
 
             availability.receive(
               Availability.Consensus.Ordered(
@@ -206,14 +218,19 @@ class AvailabilityModuleConsensusProposalRequestTest
           {
             availability.receive(
               Availability.Consensus
-                .CreateProposal(OrderingTopologyNode0, failingCryptoProvider, EpochNumber.First)
+                .CreateProposal(
+                  BlockNumber.First,
+                  EpochNumber.First,
+                  OrderingTopologyNode0,
+                  failingCryptoProvider,
+                )
             )
             consensusCell.get() should matchPattern {
               case Some(
                     Consensus.LocalAvailability
                       .ProposalCreated(
-                        OrderingBlock(poas),
                         EpochNumber.First,
+                        OrderingBlock(poas),
                       )
                   )
                   if poas.toSet.sizeIs == BftBlockOrdererConfig.DefaultMaxBatchesPerProposal.toInt =>
@@ -226,13 +243,18 @@ class AvailabilityModuleConsensusProposalRequestTest
             // if we ask for a proposal again without acking the previous response, we'll get the same thing again
             availability.receive(
               Availability.Consensus
-                .CreateProposal(OrderingTopologyNode0, failingCryptoProvider, EpochNumber.First)
+                .CreateProposal(
+                  BlockNumber(1),
+                  EpochNumber.First,
+                  OrderingTopologyNode0,
+                  failingCryptoProvider,
+                )
             )
             consensusCell.get() should contain(
               Consensus.LocalAvailability
                 .ProposalCreated(
+                  BlockNumber(1),
                   OrderingBlock(proposedProofsOfAvailability),
-                  EpochNumber.First,
                 )
             )
             pipeToSelfQueue shouldBe empty
@@ -242,9 +264,10 @@ class AvailabilityModuleConsensusProposalRequestTest
             // now we ask for a new proposal, but ack the previous one
             availability.receive(
               Availability.Consensus.CreateProposal(
+                BlockNumber(2),
+                EpochNumber.First,
                 OrderingTopologyNode0,
                 failingCryptoProvider,
-                EpochNumber.First,
                 orderedBatchIds = proposedProofsOfAvailability.map(_.batchId),
               )
             )
@@ -257,7 +280,7 @@ class AvailabilityModuleConsensusProposalRequestTest
 
             consensusCell.get() should contain(
               Consensus.LocalAvailability
-                .ProposalCreated(OrderingBlock(proposedProofsOfAvailability), EpochNumber.First)
+                .ProposalCreated(BlockNumber(2), OrderingBlock(proposedProofsOfAvailability))
             )
 
             availability.receive(
@@ -266,7 +289,7 @@ class AvailabilityModuleConsensusProposalRequestTest
           }
 
           disseminationProtocolState.disseminationProgress should be(empty)
-          disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+          disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
           disseminationProtocolState.batchesReadyForOrdering should be(empty)
         }
       }
@@ -313,11 +336,16 @@ class AvailabilityModuleConsensusProposalRequestTest
             )
             availability.receive(
               Availability.Consensus
-                .CreateProposal(OrderingTopologyNode0, failingCryptoProvider, EpochNumber.First)
+                .CreateProposal(
+                  BlockNumber.First,
+                  EpochNumber.First,
+                  OrderingTopologyNode0,
+                  failingCryptoProvider,
+                )
             )
 
             disseminationProtocolState.disseminationProgress should be(empty)
-            disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+            disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
             disseminationProtocolState.batchesReadyForOrdering should not be empty
 
             val proposedProofsOfAvailability =
@@ -325,7 +353,7 @@ class AvailabilityModuleConsensusProposalRequestTest
             consensusCell.get() should matchPattern {
               case Some(
                     Consensus.LocalAvailability
-                      .ProposalCreated(OrderingBlock(poas), EpochNumber.First)
+                      .ProposalCreated(BlockNumber.First, OrderingBlock(poas))
                   ) if poas.toSet.sizeIs == numberOfBatchesReadyForOrdering =>
             }
             pipeToSelfQueue shouldBe empty
@@ -364,11 +392,16 @@ class AvailabilityModuleConsensusProposalRequestTest
             )
             availability.receive(
               Availability.Consensus
-                .CreateProposal(OrderingTopologyNodes0To3, failingCryptoProvider, EpochNumber.First)
+                .CreateProposal(
+                  BlockNumber.First,
+                  EpochNumber.First,
+                  OrderingTopologyNodes0To3,
+                  failingCryptoProvider,
+                )
             )
 
             disseminationProtocolState.disseminationProgress should be(empty)
-            disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+            disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
             disseminationProtocolState.batchesReadyForOrdering should not be empty
 
             val proposedProofsOfAvailability = ADisseminationProgressNode0To6WithNonQuorumVotes
@@ -380,7 +413,7 @@ class AvailabilityModuleConsensusProposalRequestTest
             )
             consensusCell.get() should contain(
               Consensus.LocalAvailability
-                .ProposalCreated(OrderingBlock(Seq(poa)), EpochNumber.First)
+                .ProposalCreated(BlockNumber.First, OrderingBlock(Seq(poa)))
             )
             pipeToSelfQueue shouldBe empty
 
@@ -418,9 +451,10 @@ class AvailabilityModuleConsensusProposalRequestTest
           availability.receive(
             Availability.Consensus
               .CreateProposal(
+                BlockNumber.First,
+                EpochNumber.First,
                 OrderingTopologyWithNode0To6,
                 failingCryptoProvider,
-                EpochNumber.First,
               )
           )
 
@@ -438,7 +472,7 @@ class AvailabilityModuleConsensusProposalRequestTest
               reviewedProgress.batchMetadata
                 .copy(regressionsToSigning = 0, disseminationRegressions = 0)
             ))
-          disseminationProtocolState.toBeProvidedToConsensus should contain only AToBeProvidedToConsensus
+          disseminationProtocolState.nextToBeProvidedToConsensus shouldBe ANextToBeProvidedToConsensus
           disseminationProtocolState.batchesReadyForOrdering should be(empty)
 
           consensusCell.get() should contain(Consensus.LocalAvailability.NoProposalAvailableYet)
@@ -452,7 +486,7 @@ class AvailabilityModuleConsensusProposalRequestTest
       }
 
     "it receives Consensus.CreateProposal (from local consensus), " +
-      "there are multiple pending pulls from consensus and" +
+      "there is a pending proposal request from consensus," +
       "there is a batch ready for ordering," +
       "there is a batch in progress but " +
       "the new topology has a smaller weak quorum; after that " +
@@ -486,12 +520,8 @@ class AvailabilityModuleConsensusProposalRequestTest
             // We need local consensus pulls for both the in-progress and ready batches, to ensure that
             //  the ready batch that becomes stale is not included in a proposal to consensus even
             //  if there is one pending.
-            disseminationProtocolState.toBeProvidedToConsensus.enqueue(
-              ToBeProvidedToConsensus(1, EpochNumber.First)
-            )
-            disseminationProtocolState.toBeProvidedToConsensus.enqueue(
-              ToBeProvidedToConsensus(1, EpochNumber.First)
-            )
+            disseminationProtocolState.nextToBeProvidedToConsensus =
+              NextToBeProvidedToConsensus(BlockNumber.First, Some(1))
             val availabilityStore = new FakeAvailabilityStore[FakePipeToSelfQueueUnitTestEnv](
               TrieMap[BatchId, OrderingRequestBatch](AnotherBatchId -> ABatch)
             )
@@ -502,7 +532,12 @@ class AvailabilityModuleConsensusProposalRequestTest
             )
             availability.receive(
               Availability.Consensus
-                .CreateProposal(OrderingTopologyNodes0To3, failingCryptoProvider, EpochNumber.First)
+                .CreateProposal(
+                  BlockNumber(1),
+                  EpochNumber.First,
+                  OrderingTopologyNodes0To3,
+                  failingCryptoProvider,
+                )
             )
 
             val reviewedProgress =
@@ -519,7 +554,7 @@ class AvailabilityModuleConsensusProposalRequestTest
                 reviewedProgress.batchMetadata
                   .copy(regressionsToSigning = 0, disseminationRegressions = 0)
               ))
-            disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+            disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
             disseminationProtocolState.batchesReadyForOrdering.keys should contain only ABatchId
 
             val proposedProofsOfAvailability = ADisseminationProgressNode0To6WithNonQuorumVotes
@@ -531,8 +566,8 @@ class AvailabilityModuleConsensusProposalRequestTest
             )
             consensusBuffer should contain only
               Consensus.LocalAvailability.ProposalCreated(
+                BlockNumber(1),
                 OrderingBlock(Seq(poa)),
-                EpochNumber.First,
               )
 
             val selfMessages = pipeToSelfQueue.flatMap(_.apply())
@@ -576,22 +611,27 @@ class AvailabilityModuleConsensusProposalRequestTest
           val newTopology = OrderingTopology.forTesting(Node0To6.filterNot(_ == "node6"))
           availability.receive(
             Availability.Consensus
-              .CreateProposal(newTopology, failingCryptoProvider, EpochNumber.First)
+              .CreateProposal(
+                BlockNumber.First,
+                EpochNumber.First,
+                newTopology,
+                failingCryptoProvider,
+              )
           )
           val acksAfter = acksBefore.filterNot(_.from == "node6")
 
           val poa = ProofOfAvailability(ABatchId, acks = acksAfter, anEpochNumber)
 
           disseminationProtocolState.disseminationProgress shouldBe empty
-          disseminationProtocolState.toBeProvidedToConsensus should be(empty)
+          disseminationProtocolState.nextToBeProvidedToConsensus.maxBatchesPerProposal shouldBe None
           disseminationProtocolState.batchesReadyForOrdering.keys should contain only ABatchId
 
           pipeToSelfQueue shouldBe empty // We should not try to sign/store anything in this case
 
           consensusBuffer shouldBe Seq(
             Consensus.LocalAvailability.ProposalCreated(
+              BlockNumber.First,
               OrderingBlock(Seq(poa)),
-              EpochNumber.First,
             )
           )
         }
@@ -650,9 +690,10 @@ class AvailabilityModuleConsensusProposalRequestTest
           availability.receive(
             Availability.Consensus
               .CreateProposal(
+                BlockNumber.First,
+                EpochNumber.First,
                 newTopology,
                 failingCryptoProvider,
-                EpochNumber.First,
               )
           )
 
@@ -671,8 +712,8 @@ class AvailabilityModuleConsensusProposalRequestTest
               reviewedProgress.batchMetadata
                 .copy(regressionsToSigning = 0, disseminationRegressions = 0)
             ))
-          disseminationProtocolState.toBeProvidedToConsensus should contain only
-            ToBeProvidedToConsensus(16, EpochNumber.First)
+          disseminationProtocolState.nextToBeProvidedToConsensus shouldBe
+            NextToBeProvidedToConsensus(BlockNumber.First, Some(16))
           disseminationProtocolState.batchesReadyForOrdering shouldBe empty
           consensusBuffer should contain(Consensus.LocalAvailability.NoProposalAvailableYet)
 
@@ -739,15 +780,16 @@ class AvailabilityModuleConsensusProposalRequestTest
           availability.receive(
             Availability.Consensus
               .CreateProposal(
+                BlockNumber.First,
+                EpochNumber.First,
                 newTopology,
                 failingCryptoProvider,
-                EpochNumber.First,
               )
           )
 
           disseminationProtocolState.disseminationProgress shouldBe empty
-          disseminationProtocolState.toBeProvidedToConsensus should contain only
-            ToBeProvidedToConsensus(16, EpochNumber.First)
+          disseminationProtocolState.nextToBeProvidedToConsensus shouldBe
+            NextToBeProvidedToConsensus(BlockNumber.First, Some(16))
           disseminationProtocolState.batchesReadyForOrdering shouldBe empty
           consensusBuffer should contain(Consensus.LocalAvailability.NoProposalAvailableYet)
 
@@ -794,6 +836,7 @@ class AvailabilityModuleConsensusProposalRequestTest
             ).complete(
               ProofOfAvailabilityNode0AckNode0InTopology.copy(batchId = batchId).acks
             )
+
           val validBatchIdsWithMetadata =
             validBatchIds.map(batchId => batchIdWithMetadata(batchId, initialEpochNumber))
           val expiredBatchIdsWithMetadata =
@@ -806,7 +849,12 @@ class AvailabilityModuleConsensusProposalRequestTest
         loggerFactory.assertLogs(
           availability.receive(
             Availability.Consensus
-              .CreateProposal(OrderingTopologyNode0, failingCryptoProvider, initialEpochNumber)
+              .CreateProposal(
+                BlockNumber.First,
+                initialEpochNumber,
+                OrderingTopologyNode0,
+                failingCryptoProvider,
+              )
           ),
           log => {
             log.level shouldBe Level.WARN
@@ -820,8 +868,8 @@ class AvailabilityModuleConsensusProposalRequestTest
           case Some(
                 Consensus.LocalAvailability
                   .ProposalCreated(
+                    BlockNumber.First,
                     OrderingBlock(poas),
-                    `initialEpochNumber`,
                   )
               ) =>
             poas.map(_.batchId) should contain theSameElementsAs validBatchIds
@@ -865,6 +913,7 @@ class AvailabilityModuleConsensusProposalRequestTest
               ),
               Set(AvailabilityAck(Node0, Signature.noSignature)),
             )
+
           val validBatchIdsWithMetadata =
             validBatchIds.map(batchId => batchIdWithMetadata(batchId, initialEpochNumber))
           val expiredBatchIdsWithMetadata =
@@ -877,7 +926,12 @@ class AvailabilityModuleConsensusProposalRequestTest
         loggerFactory.assertLogs(
           availability.receive(
             Availability.Consensus
-              .CreateProposal(OrderingTopologyNodes0To3, failingCryptoProvider, initialEpochNumber)
+              .CreateProposal(
+                BlockNumber.First,
+                initialEpochNumber,
+                OrderingTopologyNodes0To3,
+                failingCryptoProvider,
+              )
           ),
           log => {
             log.level shouldBe Level.WARN
@@ -888,6 +942,98 @@ class AvailabilityModuleConsensusProposalRequestTest
         )
 
         disseminationProtocolState.disseminationProgress.keys should contain theSameElementsAs validBatchIds
+      }
+    }
+
+  "it receives multiple Consensus.CreateProposal (from local consensus) and " +
+    "no batches are ready for ordering" should {
+
+      "discard all requests but the one for the highest block" in {
+        val disseminationProtocolState = new DisseminationProtocolState()
+        val consensusBuffer = new ArrayBuffer[Consensus.Message[IgnoringUnitTestEnv]]()
+
+        val availability = createAvailability[IgnoringUnitTestEnv](
+          disseminationProtocolState = disseminationProtocolState,
+          consensus = fakeRecordingModule(consensusBuffer),
+        )
+
+        Seq(1, 2, 3).foreach { blockNum =>
+          availability.receive(
+            Availability.Consensus
+              .CreateProposal(
+                BlockNumber(blockNum.toLong),
+                EpochNumber.First,
+                OrderingTopologyNode0,
+                failingCryptoProvider,
+              )
+          )
+        }
+
+        disseminationProtocolState.nextToBeProvidedToConsensus shouldBe
+          NextToBeProvidedToConsensus(
+            BlockNumber(3),
+            Some(BftBlockOrdererConfig.DefaultMaxBatchesPerProposal),
+          )
+      }
+
+      "abort if a request is made for a previous block" in {
+        val disseminationProtocolState = new DisseminationProtocolState()
+        val consensusBuffer = new ArrayBuffer[Consensus.Message[IgnoringUnitTestEnv]]()
+
+        val availability = createAvailability[IgnoringUnitTestEnv](
+          disseminationProtocolState = disseminationProtocolState,
+          consensus = fakeRecordingModule(consensusBuffer),
+        )
+
+        // A proposal request for expected block 0 is OK
+        availability.receive(
+          Availability.Consensus
+            .CreateProposal(
+              BlockNumber.First,
+              EpochNumber.First,
+              OrderingTopologyNode0,
+              failingCryptoProvider,
+            )
+        )
+
+        // A proposal request for already requested block 0 fails
+        suppressProblemLogs(
+          a[TestFailedException] should be thrownBy (availability.receive(
+            Availability.Consensus
+              .CreateProposal(
+                BlockNumber.First,
+                EpochNumber.First,
+                OrderingTopologyNode0,
+                failingCryptoProvider,
+              )
+          )),
+          count = 2,
+        )
+
+        // A proposal request for blocks greater than minimum expected 1 is OK
+        availability.receive(
+          Availability.Consensus
+            .CreateProposal(
+              BlockNumber(2),
+              EpochNumber.First,
+              OrderingTopologyNode0,
+              failingCryptoProvider,
+            )
+        )
+
+        // A proposal request for a previous block fails
+        suppressProblemLogs(
+          a[TestFailedException] should be thrownBy (availability.receive(
+            Availability.Consensus
+              .CreateProposal(
+                BlockNumber.First,
+                EpochNumber.First,
+                OrderingTopologyNode0,
+                failingCryptoProvider,
+              )
+          )),
+          count = 2,
+        )
       }
     }
 }

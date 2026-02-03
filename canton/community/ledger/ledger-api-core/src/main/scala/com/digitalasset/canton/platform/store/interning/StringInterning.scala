@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.interning
@@ -18,7 +18,7 @@ import com.digitalasset.daml.lf.data.Ref.{
   *
   * @note
   *   The accessors defined in this interface are thread-safe and can be used concurrently with
-  *   [[StringInterningView.internize]] and [[StringInterningView.update]].
+  *   StringInterningView.internize and [[StringInterningView.update]].
   */
 trait StringInterning {
   def templateId: StringInterningDomain[NameTypeConRef]

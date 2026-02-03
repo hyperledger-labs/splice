@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
@@ -292,13 +292,13 @@ object ReassignmentId {
         contractIdCounters: Map[LfContractId, ReassignmentCounter],
     ): ReassignmentId = {
       val builder = Hash.build(HashPurpose.ReassignmentId, HashAlgorithm.Sha256)
-      builder.add(source.unwrap.toProtoPrimitive)
-      builder.add(target.unwrap.toProtoPrimitive)
-      builder.add(unassignmentTs.toProtoPrimitive)
+      builder.addString(source.unwrap.toProtoPrimitive)
+      builder.addString(target.unwrap.toProtoPrimitive)
+      builder.addLong(unassignmentTs.toProtoPrimitive)
       contractIdCounters.view.toSeq.sortBy(_._1.coid).foreach {
         case (contractId, reassignmentCounter) =>
-          builder.add(contractId.coid)
-          builder.add(reassignmentCounter.toProtoPrimitive)
+          builder.addString(contractId.coid)
+          builder.addLong(reassignmentCounter.toProtoPrimitive)
       }
       V0(builder.finish().getCryptographicEvidence)
     }

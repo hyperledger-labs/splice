@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.admin
@@ -38,7 +38,9 @@ class PackageUpgradeValidator(
   }
 
   private val upgradeCompatCache =
-    cacheConfig.buildScaffeine().build[(PackageId, PackageId), Either[TopologyManagerError, Unit]]()
+    cacheConfig
+      .buildScaffeine(loggerFactory)
+      .build[(PackageId, PackageId), Either[TopologyManagerError, Unit]]()
 
   /** Validate the upgrade-compatibility of the vetted lineages that are affected by a new package
     * to vet. That is,

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.store
@@ -120,9 +120,9 @@ object IndexedSynchronizer extends IndexedStringFromDb[IndexedSynchronizer, Sync
 }
 
 final case class IndexedPhysicalSynchronizer private (
-    synchronizerId: PhysicalSynchronizerId,
+    psid: PhysicalSynchronizerId,
     index: Int,
-) extends IndexedString.Impl[PhysicalSynchronizerId](synchronizerId) {
+) extends IndexedString.Impl[PhysicalSynchronizerId](psid) {
   require(
     index > 0,
     s"Illegal index $index. The index must be positive to prevent clashes with participant event log ids.",
@@ -287,7 +287,7 @@ class IndexedStringCache(
   private val str2Index
       : TracedAsyncLoadingCache[FutureUnlessShutdown, (String300, IndexedStringType), Int] =
     ScaffeineCache.buildTracedAsync[FutureUnlessShutdown, (String300, IndexedStringType), Int](
-      cache = config.buildScaffeine(),
+      cache = config.buildScaffeine(loggerFactory),
       loader = implicit tc => { case (str, typ) =>
         parent
           .getOrCreateIndex(typ, str)
@@ -303,7 +303,7 @@ class IndexedStringCache(
       : TracedAsyncLoadingCache[FutureUnlessShutdown, (Int, IndexedStringType), Option[String300]] =
     ScaffeineCache
       .buildTracedAsync[FutureUnlessShutdown, (Int, IndexedStringType), Option[String300]](
-        cache = config.buildScaffeine(),
+        cache = config.buildScaffeine(loggerFactory),
         loader = implicit tc => { case (idx, typ) =>
           parent
             .getForIndex(typ, idx)

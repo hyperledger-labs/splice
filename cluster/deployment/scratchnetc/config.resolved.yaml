@@ -95,10 +95,20 @@ pulumiProjectConfig:
     cloudSql:
       enabled: false
 pulumiStacks:
+  canton-network:
+    resources:
+      requests:
+        memory: '4Gi'
   default:
     parallelism: 64
+    resources:
+      requests:
+        memory: '2Gi'
   multi-validator:
     parallelism: 10
+    resources:
+      requests:
+        memory: '6Gi'
 sv:
   scan:
     externalRateLimits:

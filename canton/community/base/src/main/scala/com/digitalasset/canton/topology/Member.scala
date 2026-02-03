@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
@@ -23,6 +23,8 @@ import com.digitalasset.canton.{LedgerParticipantId, LfPartyId, ProtoDeserializa
 import com.google.common.annotations.VisibleForTesting
 import io.circe.Encoder
 import slick.jdbc.{GetResult, PositionedParameters, SetParameter}
+
+import scala.language.implicitConversions
 
 /** Top level trait representing an identity within the system */
 sealed trait Identity
@@ -226,8 +228,8 @@ object SynchronizerId {
 
 final case class PhysicalSynchronizerId(
     logical: SynchronizerId,
-    protocolVersion: ProtocolVersion,
     serial: NonNegativeInt,
+    protocolVersion: ProtocolVersion,
 ) extends Synchronizer {
   def suffix: String = s"$protocolVersion${PhysicalSynchronizerId.secondaryDelimiter}$serial"
   def uid: UniqueIdentifier = logical.uid
@@ -256,13 +258,13 @@ object PhysicalSynchronizerId {
   ): PhysicalSynchronizerId =
     PhysicalSynchronizerId(
       synchronizerId,
-      staticSynchronizerParameters.protocolVersion,
       staticSynchronizerParameters.serial,
+      staticSynchronizerParameters.protocolVersion,
     )
 
   implicit val physicalSynchronizerIdOrdering: Ordering[PhysicalSynchronizerId] =
     Ordering.by(psid =>
-      (psid.logical.toLengthLimitedString.unwrap, psid.protocolVersion, psid.serial)
+      (psid.logical.toLengthLimitedString.unwrap, psid.serial, psid.protocolVersion)
     )
 
   def fromString(raw: String): Either[String, PhysicalSynchronizerId] = {
@@ -284,7 +286,7 @@ object PhysicalSynchronizerId {
           s"Cannot parse ${suffixComponents(1)} to an int"
         )
         serial <- NonNegativeInt.create(serialInt).leftMap(_.message)
-      } yield PhysicalSynchronizerId(lsid, pv, serial)
+      } yield PhysicalSynchronizerId(lsid, serial, pv)
     } else
       Left(s"Unable to parse `$raw` as physical synchronizer id")
   }
@@ -372,6 +374,10 @@ object ParticipantId {
     ToDbPrimitive(_.uid.toLengthLimitedString)
 }
 
+object Party {
+  implicit def partyToPartyId(party: Party): PartyId = party.partyId
+}
+
 sealed trait Party extends Identity with Product with Serializable {
   override def uid: UniqueIdentifier
   def partyId: PartyId
@@ -391,7 +397,7 @@ final case class ExternalParty private (
   /** The annotation ensures that [[ExternalParty]] is used only in tests.
     */
   @VisibleForTesting
-  def copy(
+  private[canton] def copy(
       partyId: PartyId = partyId,
       signingFingerprints: NonEmpty[Seq[Fingerprint]] = signingFingerprints,
       signingThreshold: PositiveInt = signingThreshold,

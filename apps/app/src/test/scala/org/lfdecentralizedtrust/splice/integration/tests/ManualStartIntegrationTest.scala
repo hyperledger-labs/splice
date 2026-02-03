@@ -246,7 +246,7 @@ class ManualStartIntegrationTest
             sequencerConnections.connections.size shouldBe 1
             sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
             sequencerConnections.sequencerLivenessMargin shouldBe NonNegativeInt.zero
-            sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification
+            sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification.toInternal
             mediatorConnection.getPruningSchedule().futureValue.value shouldBe PruningSchedule(
               "0 /10 * * * ?",
               PositiveDurationSeconds.ofMinutes(5),

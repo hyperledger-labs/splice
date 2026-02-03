@@ -181,6 +181,8 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   options.setCapability("webSocketUrl", true: Any);
 
   protected val webDrivers: mutable.Map[String, WebDriverType] = mutable.Map.empty
+
+  @SuppressWarnings(Array("com.digitalasset.canton.RequireBlocking"))
   private def registerWebDriver(name: String, webDriver: WebDriverType): Unit = blocking {
     synchronized {
       webDrivers += (name -> webDriver)
@@ -682,6 +684,16 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       }
     }
     clickOn(query)
+  }
+
+  protected def clickByCssSelector(selector: String)(implicit
+      webDriver: WebDriver
+  ): Unit = {
+    val query = cssSelector(selector)
+    waitForCondition(query) {
+      ExpectedConditions.elementToBeClickable(_)
+    }
+    eventuallyClickOn(query)
   }
 
   protected def eventuallyFind(query: Query)(implicit driver: WebDriver) = {

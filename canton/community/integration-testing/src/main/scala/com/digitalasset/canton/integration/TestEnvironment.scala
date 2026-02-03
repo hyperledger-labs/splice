@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration
@@ -12,8 +12,13 @@ import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
 }
-import com.digitalasset.canton.config.{CachingConfigs, SharedCantonConfig, CryptoConfig}
-import com.digitalasset.canton.console.commands.GlobalSecretKeyAdministration
+import com.digitalasset.canton.config.{
+  BatchingConfig,
+  CachingConfigs,
+  CryptoConfig,
+  SessionEncryptionKeyCacheConfig,
+  SharedCantonConfig,
+}
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
   ConsoleEnvironmentTestHelpers,
@@ -21,6 +26,7 @@ import com.digitalasset.canton.console.{
   InstanceReference,
   LocalInstanceReference,
 }
+import com.digitalasset.canton.console.commands.GlobalSecretKeyAdministration
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.integration.bootstrap.InitializedSynchronizer
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -57,7 +63,7 @@ trait TestEnvironment[C <: SharedCantonConfig[C]]
     .create(
       CryptoConfig(),
       CachingConfigs.defaultKmsMetadataCache,
-      CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+      SessionEncryptionKeyCacheConfig(),
       CachingConfigs.defaultPublicKeyConversionCache,
       storage,
       Option.empty[ReplicaManager],
@@ -66,6 +72,7 @@ trait TestEnvironment[C <: SharedCantonConfig[C]]
       environment.clock,
       executionContext,
       environmentTimeouts,
+      BatchingConfig(),
       loggerFactory,
       NoReportingTracerProvider,
     )(executionContext, TraceContext.empty)

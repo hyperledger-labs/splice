@@ -141,7 +141,8 @@ abstract class TopologyAdminConnection(
   )(implicit traceContext: TraceContext): Future[FetchTimeResponse] =
     runCmd(
       SynchronizerTimeCommands.FetchTime(
-        Some(synchronizerId),
+        // TODO(#456) Use the proper serial and protocol version
+        Some(PhysicalSynchronizerId(synchronizerId, NonNegativeInt.zero, ProtocolVersion.v34)),
         freshnessBound =
           com.digitalasset.canton.time.NonNegativeFiniteDuration.fromConfig(maxDomainTimeLag),
         timeout = timeout,
@@ -1468,7 +1469,7 @@ abstract class TopologyAdminConnection(
       (previous: TopologyResult[PartyToParticipant]) =>
         proposeMapping(
           TopologyStoreId.Synchronizer(synchronizerId),
-          previous.mapping.copy(
+          previous.mapping.tryCopy(
             participants = previous.mapping.participants.filterNot(_.participantId == participant)
           ),
           previous.base.serial + PositiveInt.one,
