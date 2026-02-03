@@ -332,6 +332,7 @@ function buildDecentralizedSynchronizerChanges(
     label: `Decentralized Synchronizer (Required Synchronizer ${idx + 1})`,
     currentValue: beforeRequiredSynchronizers.includes(sync) ? sync : '',
     newValue: afterRequiredSynchronizers.includes(sync) ? sync : '',
+    disabled: true,
   }));
 
   return [
@@ -341,6 +342,7 @@ function buildDecentralizedSynchronizerChanges(
       currentValue: before?.activeSynchronizer || '',
       newValue: after?.activeSynchronizer || '',
       isId: true,
+      disabled: true,
     },
     {
       fieldName: 'decentralizedSynchronizerFeesBaseRateTrafficLimitsBurstAmount',
