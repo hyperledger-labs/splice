@@ -43,7 +43,7 @@ export const grantRevokeFeaturedAppRightSchema = z.string().min(1, { message: 'R
 export const partyIdSchema = z
   .string()
   .min(1, { message: 'Required' })
-  .regex(/^[a-zA-Z0-9_-]::[a-zA-Z0-9_-]$/, {
+  .regex(/^[a-zA-Z0-9_-]+::[a-zA-Z0-9_-]+$/, {
     message: 'Invalid PartyId format. Expected format: identifier::fingerprint',
   });
 
