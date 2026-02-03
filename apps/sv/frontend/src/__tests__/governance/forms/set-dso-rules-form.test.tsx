@@ -355,6 +355,37 @@ describe('Set DSO Config Rules Form', () => {
     await user.click(jsonDiffs);
     expect(screen.queryByTestId('config-diffs-display')).toBeInTheDocument();
   });
+
+  test('should have decentralized synchronizer fields disabled', async () => {
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      const lastSyncIdInput = screen.getByTestId(
+        'config-field-decentralizedSynchronizerLastSynchronizerId'
+      );
+      expect(lastSyncIdInput).toBeDisabled();
+
+      const activeSyncIdInput = screen.getByTestId(
+        'config-field-decentralizedSynchronizerActiveSynchronizerId'
+      );
+      expect(activeSyncIdInput).toBeDisabled();
+
+      const syncInput = screen.getByTestId('config-field-decentralizedSynchronizer1');
+      expect(syncInput).toBeDisabled();
+
+      const syncStateInput = screen.getByTestId('config-field-decentralizedSynchronizerState1');
+      expect(syncStateInput).toBeDisabled();
+
+      const syncGenesisInput = screen.getByTestId(
+        'config-field-decentralizedSynchronizerCometBftGenesisJson1'
+      );
+      expect(syncGenesisInput).toBeDisabled();
+    });
+  });
 });
 
 describe('Next Scheduled Synchronizer Upgrade', () => {

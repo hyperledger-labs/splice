@@ -90,7 +90,7 @@ monitoring:
       # we alert if the rate is higher than expected to spot potential overload situations
       confirmationRequests:
         total:
-          rate: 15
+          rate: 25
           overMinutes: 5
         perMember:
           rate: 3
