@@ -231,16 +231,11 @@ class WalletFrontendIntegrationTest
 
         // Onboard three external parties as beneficiaries
         val beneficiary1Onboarding =
-          onboardExternalParty(aliceValidatorBackend, Some("beneficiary1"))
-        createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiary1Onboarding)
-
+          onboardAndSetupExternalParty(aliceValidatorBackend, Some("beneficiary1"))
         val beneficiary2Onboarding =
-          onboardExternalParty(aliceValidatorBackend, Some("beneficiary2"))
-        createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiary2Onboarding)
-
+          onboardAndSetupExternalParty(aliceValidatorBackend, Some("beneficiary2"))
         val beneficiary3Onboarding =
-          onboardExternalParty(aliceValidatorBackend, Some("beneficiary3"))
-        createAndAcceptExternalPartySetupProposal(aliceValidatorBackend, beneficiary3Onboarding)
+          onboardAndSetupExternalParty(aliceValidatorBackend, Some("beneficiary3"))
 
         // 2. Verify empty initial state via API
         clue("Check that no minting delegation proposals exist initially") {
