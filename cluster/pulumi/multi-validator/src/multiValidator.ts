@@ -10,6 +10,7 @@ import {
   DecentralizedSynchronizerUpgradeConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 
+import { pvcSuffix, standardStorageClassName } from '../../common/src/storage/storageClass';
 import { multiValidatorConfig } from './config';
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';
 
@@ -31,7 +32,7 @@ export class MultiValidator extends MultiNodeDeployment {
       {
         metadata: {
           namespace: args.namespace.metadata.name,
-          name: `${name}-domain-migration-pvc`,
+          name: `${name}-domain-migration-${pvcSuffix}`,
         },
         spec: {
           accessModes: ['ReadWriteOnce'],
@@ -40,7 +41,7 @@ export class MultiValidator extends MultiNodeDeployment {
               storage: '20G',
             },
           },
-          storageClassName: 'standard-rwo',
+          storageClassName: standardStorageClassName,
         },
       },
       opts

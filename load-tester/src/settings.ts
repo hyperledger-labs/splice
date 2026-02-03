@@ -40,7 +40,7 @@ export const configSchema = z.object({
     duration: z.string().min(1),
     iterationsPerMinute: z.coerce.number().min(1),
     preAllocatedVUs: z.coerce.number().default(20),
-    maxVUs: z.coerce.number().default(50),
+    maxVUs: z.coerce.number().default(100),
   }),
   adaptiveScenario: z.object({
     enabled: z.boolean(),

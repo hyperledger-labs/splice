@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2220,
+  "id": 1182,
   "links": [],
   "panels": [
     {
@@ -69,7 +69,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -105,7 +106,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -114,10 +115,10 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_count(rate(daml_http_requests_duration_seconds{namespace=~\"$namespace\", job=~\"$job\", http_service=~\"$service\", operation=~\"$operation\", status_code=~\"2.*\"}[$__rate_interval]))",
+          "expr": "label_replace(histogram_count(rate(daml_http_requests_duration_seconds{namespace=~\"$namespace\", job=~\"$job\", http_service=~\"$service\", operation=~\"$operation\", status_code=~\"2.*\"}[$__rate_interval])), \"source_display\", \"Source UI: $1\", \"source_ui\", \"(.+)\")",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{namespace}} {{job}} {{http_service}} {{operation}} {{status_code}}",
+          "legendFormat": "{{namespace}} {{job}} {{http_service}} {{operation}} {{status_code}} {{source_display}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -174,7 +175,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -210,7 +212,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -279,7 +281,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -315,7 +318,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -384,7 +387,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -420,7 +424,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -450,11 +454,9 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": [
-            "sv-1"
-          ],
+          "text": "All",
           "value": [
-            "sv-1"
+            "$__all"
           ]
         },
         "definition": "label_values(daml_http_requests_duration_seconds,namespace)",
@@ -474,11 +476,9 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": [
-            "scan-app"
-          ],
+          "text": "All",
           "value": [
-            "scan-app"
+            "$__all"
           ]
         },
         "definition": "label_values(daml_http_requests_duration_seconds{namespace=~\"$namespace\"},job)",
@@ -498,9 +498,7 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": [
-            "All"
-          ],
+          "text": "All",
           "value": [
             "$__all"
           ]
@@ -543,18 +541,18 @@
       },
       {
         "current": {
-          "text": "0.95",
-          "value": "0.95"
+          "text": "0.9",
+          "value": "0.9"
         },
         "name": "percentile",
         "options": [
           {
-            "selected": false,
+            "selected": true,
             "text": "0.9",
             "value": "0.9"
           },
           {
-            "selected": true,
+            "selected": false,
             "text": "0.95",
             "value": "0.95"
           },
@@ -570,12 +568,12 @@
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-5m",
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Http Server",
   "uid": "aerbb811lwveod",
-  "version": 3
+  "version": 4
 }

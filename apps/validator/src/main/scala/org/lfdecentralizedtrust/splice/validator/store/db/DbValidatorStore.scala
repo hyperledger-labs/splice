@@ -51,6 +51,7 @@ class DbValidatorStore(
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     ingestionConfig: IngestionConfig,
+    acsStoreDescriptorUserVersion: Option[Long] = None,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -70,6 +71,7 @@ class DbValidatorStore(
           "validatorParty" -> key.validatorParty.toProtoPrimitive,
           "dsoParty" -> key.dsoParty.toProtoPrimitive,
         ),
+        userVersion = acsStoreDescriptorUserVersion,
       ),
       domainMigrationInfo = domainMigrationInfo,
       ingestionConfig,

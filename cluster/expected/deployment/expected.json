@@ -274,6 +274,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "4Gi"
+              }
             }
           }
         }
@@ -608,6 +613,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -891,6 +901,11 @@
                     }
                   }
                 ]
+              }
+            },
+            "resources": {
+              "requests": {
+                "memory": "6Gi"
               }
             }
           }
@@ -1636,6 +1651,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -1920,6 +1940,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -2203,6 +2228,11 @@
                     }
                   }
                 ]
+              }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
               }
             }
           }
@@ -2500,6 +2530,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -2796,6 +2831,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -3080,6 +3120,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -3363,6 +3408,11 @@
                     }
                   }
                 ]
+              }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
               }
             }
           }
@@ -3660,6 +3710,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -3956,6 +4011,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -4242,6 +4302,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -4527,6 +4592,11 @@
                     }
                   }
                 ]
+              }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
               }
             }
           }
@@ -4826,6 +4896,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -5124,6 +5199,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -5409,6 +5489,11 @@
                     }
                   }
                 ]
+              }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
               }
             }
           }
@@ -5702,6 +5787,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -5985,6 +6075,11 @@
                     }
                   }
                 ]
+              }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
               }
             }
           }
@@ -6277,6 +6372,11 @@
                     }
                   }
                 ]
+              }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
               }
             }
           }

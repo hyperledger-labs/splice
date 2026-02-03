@@ -2,7 +2,8 @@ package org.lfdecentralizedtrust.splice.util
 
 import com.digitalasset.canton.{BaseTest, ScalaFuturesWithPatience}
 import com.typesafe.scalalogging.LazyLogging
-import org.lfdecentralizedtrust.splice.automation.Trigger
+import org.lfdecentralizedtrust.splice.automation.{Trigger, UpdateIngestionService}
+import org.lfdecentralizedtrust.splice.console.ScanAppBackendReference
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition.sv1Backend
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
@@ -32,6 +33,17 @@ trait TriggerTestUtil { self: BaseTest =>
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     eventually(timeUntilSuccess) {
       advanceOpenMiningRoundTrigger.runOnce().futureValue should be(true)
+    }
+  }
+
+  def pauseScanIngestionWithin[T](scan: ScanAppBackendReference)(codeBlock: => T): T = {
+    try {
+      logger.info(s"Pausing ingestion for ${scan.name}")
+      scan.automation.services[UpdateIngestionService].foreach(_.pause().futureValue)
+      codeBlock
+    } finally {
+      logger.info(s"Resuming ingestion for ${scan.name}")
+      scan.automation.services[UpdateIngestionService].foreach(_.resume())
     }
   }
 }

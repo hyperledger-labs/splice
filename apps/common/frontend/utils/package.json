@@ -19,7 +19,7 @@
     "zod": "3.19.1"
   },
   "devDependencies": {
-    "@tanstack/eslint-plugin-query": "5.72.2",
+    "@tanstack/eslint-plugin-query": "5.91.3",
     "@trivago/prettier-plugin-sort-imports": "5.2.2",
     "@types/node": "22.14.0",
     "@types/react": "18.3.12",

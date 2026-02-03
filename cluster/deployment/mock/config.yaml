@@ -120,6 +120,7 @@ loadTester:
   iterationsPerMinute: 30
   minRate: 0.123
   chartVersion: 1.2.3
+  maxVUs: 30
   adaptiveScenario:
     enabled: true
 svs:
@@ -136,6 +137,9 @@ svs:
         cron: "0 0 * * *"
         maxDuration: "30m"
         retentionPeriod: "7d"
+    cometbft:
+      mempool:
+        size: 4000
     scanApp:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
@@ -308,7 +312,7 @@ validators:
         scanType: "bft-custom"
         seedUrls: [ "https://scan.sv-2-eng.test.network.canton.global","https://scan.sv-3-eng.test.network.canton.global" ]
         threshold: 2
-        trustedSvs: [ "Digital-Asset-Eng-2","Digital-Asset-Eng-3" ]
+        svNames: [ "Digital-Asset-Eng-2","Digital-Asset-Eng-3" ]
       additionalEnvVars:
         - name: ADDITIONAL_ENV_VAR_VALIDATOR_NAME
           value: ADDITIONAL_ENV_VAR_VALIDATOR_NAME

@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvBftSequencerPeerOffboardingTrigger
@@ -200,6 +201,7 @@ object ConfigTransforms {
       updateAllAutomationConfigs(
         _.copy(rewardOperationRoundsCloseBufferDuration = NonNegativeFiniteDuration.ofMillis(100))
       ),
+      disableDevelopmentFund(),
     )
   }
 
@@ -298,6 +300,9 @@ object ConfigTransforms {
 
   def disableZeroFees(): ConfigTransform =
     updateAllSvAppFoundDsoConfigs_(c => c.copy(zeroTransferFees = false))
+
+  def disableDevelopmentFund(): ConfigTransform =
+    updateAllSvAppFoundDsoConfigs_(c => c.copy(developmentFundPercentage = Some(0.0)))
 
   def updateAllValidatorAppConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig
@@ -717,6 +722,12 @@ object ConfigTransforms {
       )
     }
   }
+
+  def withDevelopmentFundPercentage(percentage: BigDecimal): ConfigTransform =
+    updateAllSvAppFoundDsoConfigs_(c => c.copy(developmentFundPercentage = Some(percentage)))
+
+  def withDevelopmentFundManager(fundManager: PartyId): ConfigTransform =
+    updateAllSvAppFoundDsoConfigs_(c => c.copy(developmentFundManager = Some(fundManager)))
 
   private def portTransform(bump: Int, c: AdminServerConfig): AdminServerConfig =
     c.copy(internalPort = c.internalPort.map(_ + bump))

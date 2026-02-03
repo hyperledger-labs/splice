@@ -7,7 +7,7 @@ import {
   Login,
   useUserState,
 } from '@lfdecentralizedtrust/splice-common-frontend';
-import { Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router';
 
 import { useAnsConfig } from '../utils';
 

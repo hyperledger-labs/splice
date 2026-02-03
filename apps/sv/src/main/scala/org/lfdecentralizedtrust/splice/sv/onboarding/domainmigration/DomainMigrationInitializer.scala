@@ -104,6 +104,8 @@ class DomainMigrationInitializer(
         Option[CometBftNode],
     ) => JoiningNodeInitializer,
     enabledFeatures: EnabledFeaturesConfig,
+    svAcsStoreDescriptorUserVersion: Option[Long],
+    dsoAcsStoreDescriptorUserVersion: Option[Long],
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
@@ -186,8 +188,13 @@ class DomainMigrationInitializer(
             )
           ),
         )
-      svStore = newSvStore(storeKey, migrationInfo, participantId)
-      dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
+      svStore = newSvStore(storeKey, migrationInfo, participantId, svAcsStoreDescriptorUserVersion)
+      dsoStore = newDsoStore(
+        svStore.key,
+        migrationInfo,
+        participantId,
+        dsoAcsStoreDescriptorUserVersion,
+      )
       svAutomation = newSvSvAutomationService(
         svStore,
         dsoStore,
@@ -312,8 +319,6 @@ class DomainMigrationInitializer(
         SequencerConnections.single(localSynchronizerNode.sequencerConnection),
         domainMigrationDump.domainDataSnapshot.dars,
         domainMigrationDump.domainDataSnapshot.acsSnapshot,
-        legacyAcsImport =
-          domainMigrationDump.domainDataSnapshot.acsFormat == http.DomainDataSnapshot.AcsFormat.AdminApi,
       )
       _ = logger.info("resumed domain")
     } yield {}

@@ -308,6 +308,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }

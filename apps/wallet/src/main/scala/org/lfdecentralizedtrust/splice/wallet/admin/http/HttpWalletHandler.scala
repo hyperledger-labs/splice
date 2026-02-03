@@ -7,7 +7,11 @@ import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletAllocationCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as validatorLicenseCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
+  Amulet,
+  LockedAmulet,
+  UnclaimedDevelopmentFundCoupon,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_AcceptedAppPayment
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{
   AmuletOperationOutcome,
@@ -16,6 +20,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   install as installCodegen,
+  mintingdelegation as mintingDelegationCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
@@ -77,8 +82,14 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferins
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AllocateAmuletRequest,
+  AllocateDevelopmentFundCouponRequest,
+  AllocateDevelopmentFundCouponResponse,
   CreateTokenStandardTransferRequest,
+  ListActiveDevelopmentFundCouponsResponse,
+  WithdrawDevelopmentFundCouponRequest,
+  WithdrawDevelopmentFundCouponResponse,
 }
+import org.lfdecentralizedtrust.splice.util.SpliceUtil.damlDecimal
 import org.lfdecentralizedtrust.splice.wallet.admin.http.UserWalletAuthExtractor.WalletUserRequest
 
 import java.math.RoundingMode as JRM
@@ -1275,6 +1286,416 @@ class HttpWalletHandler(
           .yieldResult()
       } yield WalletResource.RejectAllocationRequestResponseOK(
         d0.ChoiceExecutionMetadata(result.exerciseResult.meta.values.asScala.toMap)
+      )
+    }
+  }
+
+  override def allocateDevelopmentFundCoupon(
+      respond: WalletResource.AllocateDevelopmentFundCouponResponse.type
+  )(body: AllocateDevelopmentFundCouponRequest)(
+      extracted: WalletUserRequest
+  ): Future[WalletResource.AllocateDevelopmentFundCouponResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = extracted
+    withSpan(s"$workflowId.rejectAllocationRequest") { implicit traceContext => _ =>
+      val store = userWallet.store
+      for {
+        domain <- scanConnection.getAmuletRulesDomain()(traceContext)
+        amuletRules <- scanConnection.getAmuletRulesWithState()
+        amuletRulesCt = amuletRules.toAssignedContract.getOrElse(
+          throw Status.Code.FAILED_PRECONDITION.toStatus
+            .withDescription(
+              s"AmuletRules contract is not assigned to a domain."
+            )
+            .asRuntimeException()
+        )
+        beneficiary = Codec.tryDecode(Codec.Party)(body.beneficiary)
+        amount = Codec.tryDecode(Codec.BigDecimal)(body.amount)
+        expiresAt = Codec.tryDecode(Codec.Timestamp)(body.expiresAt)
+        optDevelopmentFundManager =
+          amuletRulesCt.contract.payload.configSchedule.initialValue.optDevelopmentFundManager
+            .map(Codec.tryDecode(Codec.Party)(_))
+            .toScala
+        // validate development fund manager
+        developmentFundManager =
+          optDevelopmentFundManager match {
+            case None =>
+              throw Status.FAILED_PRECONDITION
+                .withDescription("Development fund manager has not been configured.")
+                .asRuntimeException()
+            case Some(developmentFundManager) if developmentFundManager == store.key.endUserParty =>
+              developmentFundManager
+            case Some(developmentFundManager) =>
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"Invalid fund manager: expected '$developmentFundManager', " +
+                    s"but the submitter was '${store.key.endUserParty.toProtoPrimitive}'."
+                )
+                .asRuntimeException()
+          }
+        unclaimedDevelopmentFundCoupons <- scanConnection.listUnclaimedDevelopmentFundCoupons()
+        unclaimedDevelopmentFundCouponsToAllocate = takeUnclaimedDevelopmentFundCouponsUntilAtLeast(
+          unclaimedDevelopmentFundCoupons,
+          amount,
+        ).getOrElse(
+          throw Status.FAILED_PRECONDITION
+            .withDescription(
+              s"The total amount of unclaimed development coupons is insufficient to cover the amount requested"
+            )
+            .asRuntimeException
+        )
+        cmd = amuletRulesCt
+          .exercise(
+            _.exerciseAmuletRules_AllocateDevelopmentFundCoupon(
+              unclaimedDevelopmentFundCouponsToAllocate.map(_.contract.contractId).asJava,
+              beneficiary.toProtoPrimitive,
+              damlDecimal(amount),
+              expiresAt.toInstant,
+              body.reason,
+              developmentFundManager.toProtoPrimitive,
+            )
+          )
+        result <- userWallet.connection
+          .submit(
+            Seq(store.key.validatorParty, store.key.endUserParty),
+            Seq.empty,
+            cmd,
+          )
+          .withSynchronizerId(domain)
+          .withDedup(
+            commandId = SpliceLedgerConnection
+              .CommandId(
+                "org.lfdecentralizedtrust.splice.wallet.allocateDevelopmentFundCoupon",
+                Seq(store.key.validatorParty, store.key.endUserParty),
+                Seq(s"${body.beneficiary}:${body.amount}:${body.expiresAt}:${body.reason}"),
+              ),
+            deduplicationConfig = dedupDuration,
+          )
+          .withDisclosedContracts(
+            userWallet.connection
+              .disclosedContracts(amuletRules, unclaimedDevelopmentFundCouponsToAllocate*)
+          )
+          .yieldResult()
+      } yield WalletResource.AllocateDevelopmentFundCouponResponseOK(
+        AllocateDevelopmentFundCouponResponse(
+          result.exerciseResult.developmentFundCouponCid.contractId,
+          result.exerciseResult.optUnclaimedDevelopmentFundCouponCid.toScala.map(_.contractId),
+        )
+      )
+    }
+  }
+
+  // Returns the largest coupons first until their total reaches at least the requested amount;
+  // returns None if the available coupons are insufficient.
+  private def takeUnclaimedDevelopmentFundCouponsUntilAtLeast(
+      coupons: Seq[
+        ContractWithState[
+          UnclaimedDevelopmentFundCoupon.ContractId,
+          UnclaimedDevelopmentFundCoupon,
+        ]
+      ],
+      n: BigDecimal,
+  ): Option[
+    List[
+      ContractWithState[
+        UnclaimedDevelopmentFundCoupon.ContractId,
+        UnclaimedDevelopmentFundCoupon,
+      ]
+    ]
+  ] = {
+    type Cws =
+      ContractWithState[
+        UnclaimedDevelopmentFundCoupon.ContractId,
+        UnclaimedDevelopmentFundCoupon,
+      ]
+
+    def amountOf(c: Cws): BigDecimal =
+      BigDecimal(c.contract.payload.amount)
+
+    val sortedDesc: List[Cws] =
+      coupons
+        .sortBy(amountOf)(Ordering[BigDecimal].reverse)
+        .toList
+
+    @annotation.tailrec
+    def loop(rest: List[Cws], sum: BigDecimal, acc: List[Cws]): Option[List[Cws]] =
+      if (sum >= n) Some(acc)
+      else
+        rest match {
+          case Nil =>
+            None
+          case cur :: tail =>
+            val amt = amountOf(cur)
+            loop(tail, sum + amt, cur :: acc)
+        }
+
+    loop(sortedDesc, BigDecimal(0), Nil)
+  }
+
+  override def listActiveDevelopmentFundCoupons(
+      respond: WalletResource.ListActiveDevelopmentFundCouponsResponse.type
+  )()(
+      extracted: WalletUserRequest
+  ): Future[WalletResource.ListActiveDevelopmentFundCouponsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = extracted
+    withSpan(s"$workflowId.listActiveDevelopmentFundCoupons") { _ => _ =>
+      for {
+        coupons <- userWallet.store.listDevelopmentFundCoupons()
+        sortedCoupons = coupons.sortBy(_.payload.expiresAt)
+      } yield WalletResource.ListActiveDevelopmentFundCouponsResponseOK(
+        ListActiveDevelopmentFundCouponsResponse(
+          sortedCoupons.map(_.toHttp).toVector
+        )
+      )
+    }
+  }
+
+  override def withdrawDevelopmentFundCoupon(
+      respond: WalletResource.WithdrawDevelopmentFundCouponResponse.type
+  )(contractId: String, body: WithdrawDevelopmentFundCouponRequest)(
+      extracted: WalletUserRequest
+  ): Future[WalletResource.WithdrawDevelopmentFundCouponResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = extracted
+    withSpan(s"$workflowId.withdrawDevelopmentFundCoupon") { _ => _ =>
+      val store = userWallet.store
+      val developmentFundCouponContractId =
+        Codec.tryDecodeJavaContractId(UnclaimedDevelopmentFundCoupon.COMPANION)(contractId)
+      for {
+        domain <- scanConnection.getAmuletRulesDomain()(traceContext)
+        developmentFundCoupon <- store.multiDomainAcsStore
+          .getContractById(amuletCodegen.DevelopmentFundCoupon.COMPANION)(
+            developmentFundCouponContractId
+          )
+          .map(
+            _.toAssignedContract.getOrElse(
+              throw Status.Code.FAILED_PRECONDITION.toStatus
+                .withDescription(s"DevelopmentFundCoupon is not assigned to a synchronizer.")
+                .asRuntimeException()
+            )
+          )
+        _ = if (
+          developmentFundCoupon.contract.payload.fundManager != store.key.endUserParty.toProtoPrimitive
+        )
+          throw Status.Code.FAILED_PRECONDITION.toStatus
+            .withDescription(
+              s"Invalid controller: expected fund manager " +
+                s"'${developmentFundCoupon.contract.payload.fundManager}', " +
+                s"but the submitter was '${store.key.endUserParty.toProtoPrimitive}'."
+            )
+            .asRuntimeException()
+
+        result <- userWallet.connection
+          .submit(
+            Seq(store.key.endUserParty),
+            Seq.empty,
+            developmentFundCoupon.exercise(_.exerciseDevelopmentFundCoupon_Withdraw(body.reason)),
+          )
+          .withSynchronizerId(domain)
+          .noDedup
+          .yieldResult()
+      } yield WalletResource.WithdrawDevelopmentFundCouponResponseOK(
+        WithdrawDevelopmentFundCouponResponse(
+          result.exerciseResult.unclaimedDevelopmentFundCouponCid.contractId
+        )
+      )
+    }
+  }
+
+  override def listMintingDelegationProposals(
+      respond: WalletResource.ListMintingDelegationProposalsResponse.type
+  )(after: Option[Long], limit: Option[Int])(
+      tuser: WalletUserRequest
+  ): Future[WalletResource.ListMintingDelegationProposalsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+    withSpan(s"$workflowId.listMintingDelegationProposals") { _ => _ =>
+      val pageLimit = PageLimit.tryCreate(limit.getOrElse(Limit.DefaultMaxPageSize))
+      for {
+        page <- userWallet.store.listMintingDelegationProposals(after, pageLimit)
+      } yield {
+        val proposalsWithStatus = page.resultsInPage.map { proposal =>
+          val beneficiary = PartyId.tryFromProtoPrimitive(proposal.payload.delegation.beneficiary)
+          val isHosted =
+            walletManager.externalPartyWalletManager
+              .lookupExternalPartyWallet(beneficiary)
+              .isDefined
+          d0.MintingDelegationProposalWithStatus(proposal.toHttp, isHosted)
+        }.toVector
+        WalletResource.ListMintingDelegationProposalsResponseOK(
+          d0.ListMintingDelegationProposalsResponse(
+            proposalsWithStatus,
+            page.nextPageToken,
+          )
+        )
+      }
+    }
+  }
+
+  // Accepts a MintingDelegationProposal, atomically archiving (one) existing delegation from the
+  // same beneficiary if present.
+  override def acceptMintingDelegationProposal(
+      respond: WalletResource.AcceptMintingDelegationProposalResponse.type
+  )(contractId: String)(
+      tuser: WalletUserRequest
+  ): Future[WalletResource.AcceptMintingDelegationProposalResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+    withSpan(s"$workflowId.acceptMintingDelegationProposal") { implicit traceContext => _ =>
+      val proposalCid = Codec.tryDecodeJavaContractId(
+        mintingDelegationCodegen.MintingDelegationProposal.COMPANION
+      )(contractId)
+      val store = userWallet.store
+      for {
+        // Accept the proposal while archiving existing delegation
+        newDelegationCid <- retryProvider.retryForClientCalls(
+          "accept_minting_delegation_proposal",
+          "Accept minting delegation proposal",
+          for {
+            proposal <- store.multiDomainAcsStore
+              .getContractById(mintingDelegationCodegen.MintingDelegationProposal.COMPANION)(
+                proposalCid
+              )
+              .map(
+                _.toAssignedContract.getOrElse(
+                  throw Status.Code.FAILED_PRECONDITION.toStatus
+                    .withDescription(
+                      s"MintingDelegationProposal is not assigned to a synchronizer."
+                    )
+                    .asRuntimeException()
+                )
+              )
+            beneficiary = proposal.payload.delegation.beneficiary
+            existingDelegations <- store.listMintingDelegations(None, PageLimit.tryCreate(100))
+            sameBeneficiaryDelegations = existingDelegations.resultsInPage.toList.filter(
+              _.payload.beneficiary == beneficiary
+            )
+            existingDelegationCidOpt = sameBeneficiaryDelegations.headOption
+              .map(_.contractId)
+              .toJava
+            result <- userWallet.connection
+              .submit(
+                Seq(store.key.endUserParty),
+                Seq.empty,
+                proposal.exercise(
+                  _.exerciseMintingDelegationProposal_Accept(existingDelegationCidOpt)
+                ),
+              )
+              .noDedup
+              .withSynchronizerId(proposal.domain)
+              .yieldResult()
+          } yield result.exerciseResult.mintingDelegationCid,
+          logger,
+        )
+      } yield WalletResource.AcceptMintingDelegationProposalResponseOK(
+        d0.AcceptMintingDelegationProposalResponse(
+          Codec.encodeContractId(newDelegationCid)
+        )
+      )
+    }
+  }
+
+  override def rejectMintingDelegationProposal(
+      respond: WalletResource.RejectMintingDelegationProposalResponse.type
+  )(contractId: String)(
+      tuser: WalletUserRequest
+  ): Future[WalletResource.RejectMintingDelegationProposalResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+    withSpan(s"$workflowId.rejectMintingDelegationProposal") { implicit traceContext => _ =>
+      val proposalCid = Codec.tryDecodeJavaContractId(
+        mintingDelegationCodegen.MintingDelegationProposal.COMPANION
+      )(contractId)
+      val store = userWallet.store
+      retryProvider.retryForClientCalls(
+        "reject_minting_delegation_proposal",
+        "Reject minting delegation proposal",
+        for {
+          proposal <- store.multiDomainAcsStore
+            .getContractById(mintingDelegationCodegen.MintingDelegationProposal.COMPANION)(
+              proposalCid
+            )
+            .map(
+              _.toAssignedContract.getOrElse(
+                throw Status.Code.FAILED_PRECONDITION.toStatus
+                  .withDescription(s"MintingDelegationProposal is not assigned to a synchronizer.")
+                  .asRuntimeException()
+              )
+            )
+          _ <- userWallet.connection
+            .submit(
+              Seq(store.key.endUserParty),
+              Seq.empty,
+              proposal.exercise(_.exerciseMintingDelegationProposal_Reject()),
+            )
+            .noDedup
+            .withSynchronizerId(proposal.domain)
+            .yieldUnit()
+        } yield WalletResource.RejectMintingDelegationProposalResponseOK,
+        logger,
+      )
+    }
+  }
+
+  override def listMintingDelegations(
+      respond: WalletResource.ListMintingDelegationsResponse.type
+  )(after: Option[Long], limit: Option[Int])(
+      tuser: WalletUserRequest
+  ): Future[WalletResource.ListMintingDelegationsResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+    withSpan(s"$workflowId.listMintingDelegations") { _ => _ =>
+      val pageLimit = PageLimit.tryCreate(limit.getOrElse(Limit.DefaultMaxPageSize))
+      for {
+        page <- userWallet.store.listMintingDelegations(after, pageLimit)
+      } yield {
+        val delegationsWithStatus = page.resultsInPage.map { delegation =>
+          val beneficiary = PartyId.tryFromProtoPrimitive(delegation.payload.beneficiary)
+          val isHosted =
+            walletManager.externalPartyWalletManager
+              .lookupExternalPartyWallet(beneficiary)
+              .isDefined
+          d0.MintingDelegationWithStatus(delegation.toHttp, isHosted)
+        }.toVector
+        WalletResource.ListMintingDelegationsResponseOK(
+          d0.ListMintingDelegationsResponse(
+            delegationsWithStatus,
+            page.nextPageToken,
+          )
+        )
+      }
+    }
+  }
+
+  override def rejectMintingDelegation(
+      respond: WalletResource.RejectMintingDelegationResponse.type
+  )(contractId: String)(
+      tuser: WalletUserRequest
+  ): Future[WalletResource.RejectMintingDelegationResponse] = {
+    implicit val WalletUserRequest(user, userWallet, traceContext) = tuser
+    withSpan(s"$workflowId.rejectMintingDelegation") { implicit traceContext => _ =>
+      val delegationCid = Codec.tryDecodeJavaContractId(
+        mintingDelegationCodegen.MintingDelegation.COMPANION
+      )(contractId)
+      val store = userWallet.store
+      retryProvider.retryForClientCalls(
+        "reject_minting_delegation",
+        "Reject minting delegation",
+        for {
+          delegation <- store.multiDomainAcsStore
+            .getContractById(mintingDelegationCodegen.MintingDelegation.COMPANION)(delegationCid)
+            .map(
+              _.toAssignedContract.getOrElse(
+                throw Status.Code.FAILED_PRECONDITION.toStatus
+                  .withDescription(s"MintingDelegation is not assigned to a synchronizer.")
+                  .asRuntimeException()
+              )
+            )
+          _ <- userWallet.connection
+            .submit(
+              Seq(store.key.endUserParty),
+              Seq.empty,
+              delegation.exercise(_.exerciseMintingDelegation_Reject()),
+            )
+            .noDedup
+            .withSynchronizerId(delegation.domain)
+            .yieldUnit()
+        } yield WalletResource.RejectMintingDelegationResponseOK,
+        logger,
       )
     }
   }

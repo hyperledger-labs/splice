@@ -18,6 +18,7 @@ import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   InteractiveSubmissionServiceGrpc,
 }
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc
+import com.daml.ledger.api.v2.event.CreatedEvent
 import com.daml.ledger.api.v2.offset_checkpoint.OffsetCheckpoint.toJavaProto
 import com.daml.ledger.api.v2.package_reference.PackageReference
 import com.daml.ledger.api.v2.package_service.{ListPackagesRequest, PackageServiceGrpc}
@@ -149,6 +150,8 @@ private[environment] class LedgerClient(
     lapi.command_completion_service.CommandCompletionServiceGrpc.stub(channel)
   private val stateServiceStub: lapi.state_service.StateServiceGrpc.StateServiceStub =
     lapi.state_service.StateServiceGrpc.stub(channel)
+  private val contractServiceStub: lapi.contract_service.ContractServiceGrpc.ContractServiceStub =
+    lapi.contract_service.ContractServiceGrpc.stub(channel)
   private val identityProviderConfigServiceStub
       : identity_provider_config_service.IdentityProviderConfigServiceGrpc.IdentityProviderConfigServiceStub =
     identity_provider_config_service.IdentityProviderConfigServiceGrpc.stub(channel)
@@ -190,6 +193,23 @@ private[environment] class LedgerClient(
       } yield ClientAdapter
         .serverStreaming(request, stub.getActiveContracts)
     )
+
+  def getContract(contractId: ContractId[?], queryingParties: Seq[PartyId])(implicit
+      tc: TraceContext
+  ): Future[Option[CreatedEvent]] = {
+    (for {
+      stub <- withCredentialsAndTraceContext(contractServiceStub)
+      contract <- stub.getContract(
+        new lapi.contract_service.GetContractRequest(
+          contractId.contractId,
+          queryingParties.map(_.toProtoPrimitive),
+        )
+      )
+    } yield contract.createdEvent).recover {
+      case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
+        None
+    }
+  }
 
   def updates(
       request: GetUpdatesRequest

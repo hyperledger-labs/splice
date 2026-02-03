@@ -209,7 +209,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
         ),
         encoding = CompactJson,
       )
-      .map(CompactJsonScanHttpEncodings.httpToLapiUpdate)
+      .map(CompactJsonScanHttpEncodings().httpToLapiUpdate)
       .map(_.update)
       .map(dropTrailingNones)
 
@@ -234,7 +234,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     updatesFromScanApi.headOption.foreach(fromHistory => {
       val fromPointwiseLookup =
-        CompactJsonScanHttpEncodings.httpToLapiUpdate(
+        CompactJsonScanHttpEncodings().httpToLapiUpdate(
           scanClient.getUpdate(fromHistory.update.updateId, encoding = CompactJson)
         )
       fromPointwiseLookup.update shouldBe fromHistory

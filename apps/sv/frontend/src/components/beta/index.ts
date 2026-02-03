@@ -2,9 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import CopyableIdentifier from './CopyableIdentifier';
+import CopyableUrl from './CopyableUrl';
 import MemberIdentifier from './MemberIdentifier';
 import PageHeader from './PageHeader';
 import PageSectionHeader from './PageSectionHeader';
 import VoteStats from './VoteStats';
 
-export { CopyableIdentifier, MemberIdentifier, PageHeader, PageSectionHeader, VoteStats };
+export {
+  CopyableIdentifier,
+  CopyableUrl,
+  MemberIdentifier,
+  PageHeader,
+  PageSectionHeader,
+  VoteStats,
+};

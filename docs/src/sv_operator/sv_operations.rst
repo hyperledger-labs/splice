@@ -791,3 +791,58 @@ calculations, SV operators should keep the following considerations in mind:
   - Set ``--concurrency`` as a multiple of the number of Scan servers. In practice,
     values around 5–10× the number of provided Scan URLs have shown good results.
 
+.. _sv-reingest-scan-stores:
+
+Trigger re-ingestion of the Scan Stores
+---------------------------------------
+
+The Scan App keeps track of the version of its database stores (ACS store and TxLog store) using a Store Descriptor.
+The Store Descriptor in the Scan App binary is compared against the Store Descriptor stored in the database.
+If the descriptors differ, the Scan App will update the descriptor in the database and re-ingest all data into a fresh store.
+This allows for fixing any unexpected parsing or storage bugs in a subsequent Splice Release.
+
+SV operators can trigger re-ingestion of the stores without requiring a new Splice Release.
+This is done by setting a `user version` on the Store Descriptor via a helm chart value. Once the `user version` is set,
+it will be compared and stored in the database as part of the Store Descriptor.
+
+The user version is an optional `Long` parameter that is not set by default. Setting it triggers a re-ingestion.
+The user version can be provided through a helm chart value. It's important to note that
+a user version should start with `1`, and only increment by one, whenever a re-ingestion is desired.
+Once the user version is set, it needs to be kept to that value in every subsequent helm chart deployment, to prevent an unwanted re-ingestion.
+
+The `ScanAppBackendConfig` has a field for both the ACS store and the TxLog store user versions,
+`acsStoreDescriptorUserVersion` for the ACS store and `txLogStoreDescriptorUserVersion` for the TxLog store.
+
+The helm chart value `acsStoreDescriptorUserVersion` sets the `user version` of the
+ACS store, which is shown in the example below:
+
+   .. code-block:: yaml
+
+      # Example to trigger re-ingestion of the ACS store for the first time
+      persistence:
+        acsStoreDescriptorUserVersion: 1
+
+A subsequent re-ingestion can be triggered by incrementing the value, as shown in the example below:
+
+   .. code-block:: yaml
+
+      # Example to trigger re-ingestion of the ACS store for the second time
+      persistence:
+        acsStoreDescriptorUserVersion: 2
+
+The helm chart value `txLogStoreDescriptorUserVersion` sets the `user version` of the
+TxLog store, which is shown in the example below:
+
+   .. code-block:: yaml
+
+      # Example to trigger re-ingestion of the TxLog store for the first time
+      persistence:
+        txLogStoreDescriptorUserVersion: 1
+
+A subsequent re-ingestion can be triggered by incrementing the value, as shown in the example below:
+
+   .. code-block:: yaml
+
+      # Example to trigger re-ingestion of the TxLog store for the second time
+      persistence:
+        txLogStoreDescriptorUserVersion: 2

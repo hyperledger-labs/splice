@@ -199,6 +199,7 @@ export const amuletRules = {
                 amuletToIssuePerYear: '40000000000.0',
                 validatorRewardCap: '0.2',
                 optValidatorFaucetCap: '2.85',
+                optDevelopmentFundPercentage: '0.05',
               },
               futureValues: [
                 {
@@ -213,6 +214,7 @@ export const amuletRules = {
                     amuletToIssuePerYear: '20000000000.0',
                     validatorRewardCap: '0.2',
                     optValidatorFaucetCap: '2.85',
+                    optDevelopmentFundPercentage: '0.05',
                   },
                 },
                 {
@@ -227,6 +229,7 @@ export const amuletRules = {
                     amuletToIssuePerYear: '10000000000.0',
                     validatorRewardCap: '0.2',
                     optValidatorFaucetCap: '2.85',
+                    optDevelopmentFundPercentage: '0.05',
                   },
                 },
                 {
@@ -241,6 +244,7 @@ export const amuletRules = {
                     amuletToIssuePerYear: '5000000000.0',
                     validatorRewardCap: '0.2',
                     optValidatorFaucetCap: '2.85',
+                    optDevelopmentFundPercentage: '0.05',
                   },
                 },
                 {
@@ -255,12 +259,14 @@ export const amuletRules = {
                     amuletToIssuePerYear: '2500000000.0',
                     validatorRewardCap: '0.2',
                     optValidatorFaucetCap: '2.85',
+                    optDevelopmentFundPercentage: '0.05',
                   },
                 },
               ],
             },
             transferPreapprovalFee: null,
             featuredAppActivityMarkerAmount: null,
+            optDevelopmentFundManager: null,
           },
           futureValues: [],
         },
@@ -300,6 +306,7 @@ export const miningRounds = {
             amuletToIssuePerYear: '40000000000.0',
             validatorRewardCap: '0.2',
             optValidatorFaucetCap: '2.85',
+            optDevelopmentFundPercentage: '0.05',
           },
           opensAt: '2024-08-05T16:30:50.974657Z',
           transferConfigUsd: {
@@ -369,6 +376,7 @@ export const miningRounds = {
             amuletToIssuePerYear: '40000000000.0',
             validatorRewardCap: '0.2',
             optValidatorFaucetCap: '2.85',
+            optDevelopmentFundPercentage: '0.05',
           },
           opensAt: '2024-08-05T16:41:21.419411Z',
           transferConfigUsd: {
@@ -438,6 +446,7 @@ export const miningRounds = {
             amuletToIssuePerYear: '40000000000.0',
             validatorRewardCap: '0.2',
             optValidatorFaucetCap: '2.85',
+            optDevelopmentFundPercentage: '0.05',
           },
           opensAt: '2024-08-05T16:51:47.336118Z',
           transferConfigUsd: {

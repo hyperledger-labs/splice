@@ -1193,7 +1193,6 @@ object BuildCommon {
         `canton-daml-grpc-utils`,
         `canton-daml-jwt`,
         `canton-util-observability`,
-        `canton-ledger-api`,
       )
       .settings(
         removeTestSources,
@@ -1385,39 +1384,6 @@ object BuildCommon {
       ),
     )
 
-  lazy val `canton-ledger-api` = {
-    import CantonDependencies._
-    sbt.Project
-      .apply("canton-ledger-api", file("canton/community/ledger-api"))
-      .dependsOn(`canton-google-common-protos-scala`, `canton-ledger-api-value`)
-      .disablePlugins(
-        ScalafixPlugin,
-        ScalafmtPlugin,
-        WartRemover,
-      )
-      .settings(
-        sharedCantonSettings,
-        scalacOptions --= removeCompileFlagsForDaml,
-        scalacOptions += "-Wconf:cat=deprecation:s",
-        sharedSettings,
-        Compile / PB.targets := Seq(
-          // build java codegen too
-          PB.gens.java -> (Compile / sourceManaged).value,
-          // build scala codegen with java conversions
-          scalapb.gen(
-            javaConversions = true,
-            flatPackage = false,
-          ) -> (Compile / sourceManaged).value,
-        ),
-        Compile / unmanagedResources += (ThisBuild / baseDirectory).value / "community/ledger-api/VERSION",
-        libraryDependencies ++= Seq(
-          scalapb_runtime,
-          scalapb_runtime_grpc,
-          daml_ledger_api_value_scalapb,
-        ),
-      )
-  }
-
   lazy val `canton-ledger-json-api` = {
     import CantonDependencies._
     sbt.Project
@@ -1491,9 +1457,6 @@ object BuildCommon {
     import CantonDependencies._
     sbt.Project
       .apply("canton-sequencer-driver-api", file("canton/community/sequencer-driver"))
-      .dependsOn(
-        `canton-ledger-api`
-      )
       .dependsOn(`canton-util-external`)
       .settings(
         sharedCantonSettings,

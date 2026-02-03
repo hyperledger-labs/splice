@@ -6,7 +6,7 @@ import { ProposalListingSection } from '../../components/governance/ProposalList
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { ProposalListingData } from '../../utils/types';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 const inflightVoteRequests: ProposalListingData[] = [
   {
@@ -62,13 +62,13 @@ describe('Inflight Vote Requests', () => {
           sectionTitle="Inflight Vote Requests"
           data={inflightVoteRequests}
           noDataMessage="No Inflight Vote Requests available"
-          uniqueId="inflight-vote-request"
+          uniqueId="proposals-request"
           showStatus
         />
       </MemoryRouter>
     );
 
-    expect(screen.getByTestId('inflight-vote-request-section')).toBeDefined();
+    expect(screen.getByTestId('proposals-request-section')).toBeDefined();
     expect(await screen.findByText('Inflight Vote Requests')).toBeDefined();
   });
 
@@ -79,18 +79,18 @@ describe('Inflight Vote Requests', () => {
           sectionTitle="Inflight Vote Requests"
           data={inflightVoteRequests}
           noDataMessage="No Inflight Vote Requests available"
-          uniqueId="inflight-vote-request"
+          uniqueId="proposals-request"
           showStatus
         />
       </MemoryRouter>
     );
 
-    const rows = screen.getAllByTestId('inflight-vote-request-row');
+    const rows = screen.getAllByTestId('proposals-request-row');
     expect(rows.length).toBe(inflightVoteRequests.length);
   });
 
   test('should render inflight vote request details', () => {
-    const uniqueId = 'inflight-vote-request';
+    const uniqueId = 'proposals-request';
     const data = {
       actionName: 'Feature Application',
       votingThresholdDeadline: '2025-09-25 11:00',
@@ -109,7 +109,6 @@ describe('Inflight Vote Requests', () => {
           noDataMessage="No Inflight Vote Requests available"
           uniqueId={uniqueId}
           showVoteStats
-          showAcceptanceThreshold
           showThresholdDeadline
         />
       </MemoryRouter>
@@ -133,15 +132,12 @@ describe('Inflight Vote Requests', () => {
     const rejectedVoteStats = screen.getByTestId(`${uniqueId}-row-all-votes-stats-rejected`);
     expect(rejectedVoteStats.textContent).toBe('3 Rejected');
 
-    const acceptanceThreshold = screen.getByTestId(`${uniqueId}-row-acceptance-threshold`);
-    expect(acceptanceThreshold.textContent).toBe('11');
-
     const yourVote = screen.getByTestId(`${uniqueId}-row-your-vote`);
     expect(yourVote.textContent).toMatch(/No Vote/);
   });
 
   test('should render Accepted inflight vote request', () => {
-    const uniqueId = 'inflight-vote-request';
+    const uniqueId = 'proposals-request';
     const data = {
       actionName: 'Feature Application',
       votingThresholdDeadline: '2025-09-25 11:00',
@@ -172,7 +168,7 @@ describe('Inflight Vote Requests', () => {
   });
 
   test('should render Rejected inflight vote request', () => {
-    const uniqueId = 'inflight-vote-request';
+    const uniqueId = 'proposals-request';
     const data = {
       actionName: 'Feature Application',
       votingThresholdDeadline: '2025-09-25 11:00',
@@ -203,7 +199,7 @@ describe('Inflight Vote Requests', () => {
   });
 
   test('should render info when no data is available', async () => {
-    const uniqueId = 'inflight-vote-request';
+    const uniqueId = 'proposals-request';
 
     render(
       <MemoryRouter>
@@ -276,7 +272,6 @@ describe('Vote history', () => {
           uniqueId={uniqueId}
           showStatus
           showVoteStats
-          showAcceptanceThreshold
         />
       </MemoryRouter>
     );
@@ -298,9 +293,6 @@ describe('Vote history', () => {
 
     const rejectedVoteStats = screen.getByTestId(`${uniqueId}-row-all-votes-stats-rejected`);
     expect(rejectedVoteStats.textContent).toBe('2 Rejected');
-
-    const acceptanceThreshold = screen.getByTestId(`${uniqueId}-row-acceptance-threshold`);
-    expect(acceptanceThreshold.textContent).toBe('11');
 
     const yourVote = screen.getByTestId(`${uniqueId}-row-your-vote`);
     expect(yourVote.textContent).toMatch(/Accepted/);

@@ -21,7 +21,6 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainUnpausedSynchronization,
   UpdateHistory,
 }
-import org.lfdecentralizedtrust.splice.util.QualifiedName
 import org.lfdecentralizedtrust.splice.wallet.config.{AutoAcceptTransfersConfig, WalletSweepConfig}
 import org.lfdecentralizedtrust.splice.wallet.store.{TxLogEntry, UserWalletStore}
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
@@ -194,11 +193,25 @@ class UserWalletAutomationService(
       )
     )
   }
+
+  registerTrigger(
+    new ExpireMintingDelegationTrigger(
+      triggerContext,
+      store,
+      connection(SpliceLedgerConnectionPriority.Low),
+    )
+  )
+
+  registerTrigger(
+    new ExpireMintingDelegationProposalTrigger(
+      triggerContext,
+      store,
+      connection(SpliceLedgerConnectionPriority.Low),
+    )
+  )
 }
 
 object UserWalletAutomationService extends AutomationServiceCompanion {
-  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] = None
-
   // defined because instances are created by UserWalletService, not immediately
   // available in the app state
   override protected[this] def expectedTriggerClasses: Seq[TriggerClass] =
@@ -219,5 +232,7 @@ object UserWalletAutomationService extends AutomationServiceCompanion {
       aTrigger[AutoAcceptTransferOffersTrigger],
       aTrigger[AmuletMetricsTrigger],
       aTrigger[TxLogBackfillingTrigger[TxLogEntry]],
+      aTrigger[ExpireMintingDelegationTrigger],
+      aTrigger[ExpireMintingDelegationProposalTrigger],
     )
 }

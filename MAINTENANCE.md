@@ -16,15 +16,12 @@
 1. Generate a patch file of the JSON API v2 OpenAPI definition by running `diff-openapi.sh` in `token-standard/dependencies/canton-json-api-v2/openapi/`.
 2. Choose the Canton version you wish to upgrade to. The currently published versions on
    Artifactory can be found [here](https://digitalasset.jfrog.io/ui/repos/tree/General/canton-enterprise).
-3. Compute the hashes of the corresponding enterprise and oss versions by running:
-   `nix store prefetch-file --json --hash-type sha256 https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-<version>.tar.gz | jq -r '.hash'` and
-   `nix store prefetch-file --json --hash-type sha256  https://www.canton.io/releases/canton-open-source-<version>.tar.gz | jq -r '.hash'`
-4. Update the Canton version and hashes of the oss and enterprise versions in `nix/canton-sources.json`.
-5. In case you have also made configuration changes to Canton in `simple-topology-canton.conf`, remember
+3. Update the hashes in `nix/canton-sources.json` by running: `build-tools/bump-canton.sh <version>`
+4. In case you have also made configuration changes to Canton in `simple-topology-canton.conf`, remember
    to also make the corresponding changes for our cluster deployments. It is recommended to test any configuration
    changes on scratchnet first.
-6. Update the OpenAPI definitions from step 1 by running `update-openapi.sh` in `token-standard/dependencies/canton-json-api-v2/openapi/`.
-7. Cleanup the `openapi.patch` file.
+5. Update the OpenAPI definitions from step 1 by running `update-openapi.sh` in `token-standard/dependencies/canton-json-api-v2/openapi/`.
+6. Cleanup the `openapi.patch` file.
    Check `token-standard/dependencies/canton-json-api-v2/openapi/CHANGES.md` and apply any changes manually if CI breaks due to
    token standard CLI issues that look caused by bad OpenAPI definitions.
 
@@ -103,6 +100,14 @@ Current Canton commit: `ea31dc19958f0313bdd55e4decb3951964db27fd`
 
 You can refer to https://github.com/DACH-NY/canton-network-node/pull/446/commits for an example of how the update PR should look like.
 
+## Patching Our Canton fork
+When we want to patch our Canton fork with a fix or improvement from a stable release of Canton,
+we cherry-pick the relevant commit(s) from the Canton repo:
+```
+    git remote add canton-upstream https://github.com/DACH-NY/canton.git
+    git fetch canton-upstream
+    git cherry-pick COMMIT_HASH # you may sign-off the cherry-pick if original DCO is missing
+```
 
 ### Updating Canton build dependencies
 

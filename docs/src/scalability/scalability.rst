@@ -50,7 +50,7 @@ Bypassing the Limit
 
 The preferred option of bypassing the limit is to set up an external
 party either directly through the `Canton APIs for external signing
-<https://docs.digitalasset.com/build/3.3/explanations/external-signing/external_signing_overview.html>`_
+<https://docs.digitalasset.com/build/3.4/explanations/external-signing/external_signing_overview.html>`_
 or ``/v0/admin/external-party/topology/{generate,submit}`` on the
 validator API or but *not* use the endpoints under
 ``/v0/admin/external-party/setup-proposal``.
@@ -76,8 +76,12 @@ app does not process any contracts for that party. Most notably, this
 means that there is no reward minting automation running for that
 party including the fact that ``ValidatorRewardCoupon`` activity
 records generated for that party cannot be minted by the validator
-operator as this relies on the ``ValidatorRight`` contract. If this is
-required, you must build your own minting automation.
+operator as this relies on the ``ValidatorRight`` contract. If reward
+minting is required, you have two options:
+
+1. Use a :ref:`minting delegation <minting-delegations>` to delegate reward
+   collection to a validator
+2. Build your own minting automation.
 
 You also cannot use any of the validator endpoints under
 ``/v0/admin/external-party/`` for this party, e.g., to initiate a
