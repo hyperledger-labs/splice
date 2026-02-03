@@ -9,7 +9,6 @@
       },
       "cluster": "cn-mocknet",
       "initialNodeCount": 0,
-      "location": "europe-west6-z",
       "nodeConfig": {
         "bootDisk": {
           "diskType": "hyperdisk-balanced",
@@ -27,7 +26,10 @@
             "value": "true"
           }
         ]
-      }
+      },
+      "nodeLocations": [
+        "europe-west6-z"
+      ]
     },
     "name": "cn-apps-node-pool-hd",
     "provider": "",
