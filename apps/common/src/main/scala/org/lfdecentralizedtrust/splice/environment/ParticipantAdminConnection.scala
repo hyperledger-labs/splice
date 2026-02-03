@@ -19,7 +19,12 @@ import com.digitalasset.canton.admin.api.client.data.{
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.admin.participant.v30.{ExportAcsResponse, PruningServiceGrpc}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
+import com.digitalasset.canton.config.{
+  ApiLoggingConfig,
+  ClientConfig,
+  NonNegativeDuration,
+  NonNegativeFiniteDuration,
+}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
   ContractImportMode,
@@ -29,10 +34,11 @@ import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionCo
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnection,
-  SequencerConnectionValidation,
   SequencerConnections,
+  SequencerConnectionValidation,
 }
 import com.digitalasset.canton.sequencing.protocol.TrafficState
+import com.digitalasset.canton.time.FetchTimeResponse
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
@@ -104,11 +110,18 @@ class ParticipantAdminConnection(
       _.getSchedule(_),
     )
 
-  private val synchronizerIdCache =
+  private val synchronizerIdAliasCache =
     Scaffeine()
-      .expireAfterWrite(10.minutes)
+      // expire fairly quickly to account for LSUs
+      .expireAfterWrite(30.seconds)
       .maximumSize(100)
       .buildAsync[SynchronizerAlias, SynchronizerId]()
+  private val synchronizerIdLogicalCache =
+    Scaffeine()
+      // expire fairly quickly to account for LSUs
+      .expireAfterWrite(30.seconds)
+      .maximumSize(100)
+      .buildAsync[SynchronizerId, PhysicalSynchronizerId]()
 
   override type Status = ParticipantStatus
 
@@ -131,9 +144,27 @@ class ParticipantAdminConnection(
   def getSynchronizerId(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
   ): Future[SynchronizerId] = {
-    synchronizerIdCache.getFuture(
+    synchronizerIdAliasCache.getFuture(
       synchronizerAlias,
       alias => getPhysicalSynchronizerId(alias).map(_.logical),
+    )
+  }
+
+  def getPhysicalSynchronizerId(synchronizerId: SynchronizerId)(implicit
+      traceContext: TraceContext
+  ): Future[PhysicalSynchronizerId] = {
+    synchronizerIdLogicalCache.getFuture(
+      synchronizerId,
+      id =>
+        listConnectedDomains().map(
+          _.find(
+            _.synchronizerId == id
+          ).fold(
+            throw Status.NOT_FOUND
+              .withDescription(s"Synchronizer with logical id $synchronizerId is not connected")
+              .asRuntimeException()
+          )(_.physicalSynchronizerId)
+        ),
     )
   }
 
@@ -152,15 +183,6 @@ class ParticipantAdminConnection(
           .asRuntimeException()
       )(_.physicalSynchronizerId)
     )
-
-  /** Usually you want getSynchronizerId instead which is much faster if the domain is connected
-    *  but in some cases we want to check the domain id
-    * without risking a full domain connection.
-    */
-  def getSynchronizerIdWithoutConnecting(synchronizerAlias: SynchronizerAlias)(implicit
-      traceContext: TraceContext
-  ): Future[SynchronizerId] =
-    getPhysicalSynchronizerIdWithoutConnecting(synchronizerAlias).map(_.logical)
 
   def getPhysicalSynchronizerIdWithoutConnecting(synchronizerAlias: SynchronizerAlias)(implicit
       traceContext: TraceContext
@@ -410,6 +432,16 @@ class ParticipantAdminConnection(
 
   def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId] =
     getId().map(ParticipantId(_))
+
+  def getDomainTimeLowerBound(
+      synchronizerId: SynchronizerId,
+      maxDomainTimeLag: NonNegativeFiniteDuration,
+      timeout: NonNegativeDuration = retryProvider.timeouts.default,
+  )(implicit traceContext: TraceContext): Future[FetchTimeResponse] = {
+    getPhysicalSynchronizerId(synchronizerId).flatMap(psid =>
+      getDomainTimeLowerBound(psid, maxDomainTimeLag, timeout)
+    )
+  }
 
   def lookupSynchronizerConnectionConfig(
       domain: SynchronizerAlias
@@ -824,23 +856,6 @@ object ParticipantAdminConnection {
     */
   sealed trait HasParticipantId {
     def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId]
-  }
-
-  object HasParticipantId {
-    @com.google.common.annotations.VisibleForTesting
-    private[splice] def Const(participantId: ParticipantId): HasParticipantId =
-      new HasParticipantId {
-        override def getParticipantId()(implicit
-            traceContext: TraceContext
-        ): Future[ParticipantId] =
-          Future successful participantId
-      }
-
-    /** For tests that don't care about the random separation provided by the
-      * participant ID in the hash.
-      */
-    @com.google.common.annotations.VisibleForTesting
-    private[splice] val ForTesting = Const(ParticipantId("OnlyForTesting"))
   }
 
   def dropSequencerId(config: SynchronizerConnectionConfig): SynchronizerConnectionConfig =
