@@ -22,7 +22,7 @@ import org.lfdecentralizedtrust.splice.scan.store.{
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
-import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest}
+import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTest, TimestampWithMigrationId}
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito
@@ -58,8 +58,7 @@ class AcsSnapshotBulkStorageTest
         for {
           _ <- SingleAcsSnapshotBulkStorage
             .asSource(
-              0,
-              MockAcsSnapshotStore.initialSnapshotTimestamp,
+              TimestampWithMigrationId(MockAcsSnapshotStore.initialSnapshotTimestamp, 0),
               bulkStorageTestConfig,
               store,
               s3BucketConnection,
@@ -118,26 +117,26 @@ class AcsSnapshotBulkStorageTest
             kvProvider,
             loggerFactory,
           ).getSource()
-            .toMat(TestSink.probe[(Long, CantonTimestamp)])(Keep.both)
+            .toMat(TestSink.probe[TimestampWithMigrationId])(Keep.both)
             .run()
 
           _ = clue("Initially, a single snapshot is dumped") {
             probe.request(2)
-            probe.expectNext(2.minutes) shouldBe (0, ts1)
+            probe.expectNext(2.minutes) shouldBe TimestampWithMigrationId(ts1, 0)
             probe.expectNoMessage(10.seconds)
           }
           persistedTs1 <- kvProvider.getLatestAcsSnapshotInBulkStorage().value
-          _ = persistedTs1.value shouldBe (0, ts1)
+          _ = persistedTs1.value shouldBe TimestampWithMigrationId(ts1, 0)
 
           _ = clue("Add another snapshot to the store, it is also dumped") {
             store.addSnapshot(CantonTimestamp.tryFromInstant(Instant.ofEpochSecond(20)))
             val next = probe.expectNext(2.minutes)
-            next shouldBe (0, ts2)
+            next shouldBe TimestampWithMigrationId(ts2, 0)
             probe.expectNoMessage(10.seconds)
           }
           persistedTs2 <- kvProvider.getLatestAcsSnapshotInBulkStorage().value
         } yield {
-          persistedTs2.value shouldBe (0, ts2)
+          persistedTs2.value shouldBe TimestampWithMigrationId(ts2, 0)
           killSwitch.shutdown()
           succeed
         }
