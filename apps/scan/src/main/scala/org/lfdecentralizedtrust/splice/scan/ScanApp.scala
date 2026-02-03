@@ -36,11 +36,13 @@ import org.lfdecentralizedtrust.splice.scan.admin.http.{
 import org.lfdecentralizedtrust.splice.scan.automation.{
   ScanAutomationService,
   ScanVerdictAutomationService,
+  SequencerTrafficSummaryAutomationService,
 }
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanEventStore, ScanStore}
 import org.lfdecentralizedtrust.splice.scan.store.db.{
+  DbSequencerTrafficSummaryStore,
   DbScanVerdictStore,
   ScanAggregatesReader,
   ScanAggregatesReaderContext,
@@ -292,6 +294,18 @@ class ScanApp(
         synchronizerId,
         nodeMetrics.verdictIngestion,
       )
+      scanTrafficStore = DbSequencerTrafficSummaryStore(storage, updateHistory, loggerFactory)(ec)
+      trafficAutomation = new SequencerTrafficSummaryAutomationService(
+        config,
+        clock,
+        retryProvider,
+        loggerFactory,
+        nodeMetrics.grpcClientMetrics,
+        scanTrafficStore,
+        migrationInfo.currentMigrationId,
+        synchronizerId,
+        nodeMetrics.trafficIngestion,
+      )
       scanHandler = new HttpScanHandler(
         serviceUserPrimaryParty,
         config.svUser,
@@ -416,6 +430,7 @@ class ScanApp(
         store,
         automation,
         verdictAutomation,
+        trafficAutomation,
         scanEventStore,
         loggerFactory.getTracedLogger(ScanApp.State.getClass),
         timeouts,
@@ -427,7 +442,7 @@ class ScanApp(
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
   protected[this] override def automationServices(st: ScanApp.State) =
-    Seq(st.automation, st.verdictAutomation)
+    Seq(st.automation, st.verdictAutomation, st.trafficAutomation)
 }
 
 object ScanApp {
@@ -439,6 +454,7 @@ object ScanApp {
       store: ScanStore,
       automation: ScanAutomationService,
       verdictAutomation: ScanVerdictAutomationService,
+      trafficAutomation: SequencerTrafficSummaryAutomationService,
       eventStore: ScanEventStore,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
@@ -447,7 +463,7 @@ object ScanApp {
   ) extends AutoCloseable
       with HasHealth {
     override def isHealthy: Boolean =
-      storage.isActive && automation.isHealthy && verdictAutomation.isHealthy
+      storage.isActive && automation.isHealthy && verdictAutomation.isHealthy && trafficAutomation.isHealthy
 
     override def close(): Unit = {
       LifeCycle.close(bftSequencersAdminConnections*)(logger)
@@ -455,6 +471,7 @@ object ScanApp {
       LifeCycle.close(
         automation,
         verdictAutomation,
+        trafficAutomation,
         store,
         storage,
         sequencerAdminConnection,
