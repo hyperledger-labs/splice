@@ -163,7 +163,7 @@ function attachCloudArmorToLBBackend(
       },
       spec: {
         default: {
-          // TODO (#2723) cloudArmor.ts creates a global security policy but GKE appears to search for a regional one
+          // if global vs regional is mismatched you'll see
           // SetSecurityPolicy: Invalid value for field 'resource': '{  "securityPolicy": "https://www.googleapis.com/compute/beta/projects/da-cn-scratchnet/regions/us-c...'. The given security policy does not exist
           securityPolicy: policy.name.apply(name => {
             console.assert(
@@ -203,7 +203,7 @@ function createHealthCheckPolicy(
           config: {
             type: 'HTTP',
             httpHealthCheck: {
-              // TODO (#2723) confirm Istio's default status port answers readyz
+              // Istio's default status endpoint
               port: 15021,
               requestPath: '/healthz/ready',
             },
