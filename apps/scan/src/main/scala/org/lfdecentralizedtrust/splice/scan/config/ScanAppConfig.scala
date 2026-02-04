@@ -31,6 +31,8 @@ final case class MediatorVerdictIngestionConfig(
 )
 
 final case class SequencerTrafficIngestionConfig(
+    /** Whether sequencer traffic ingestion is enabled. */
+    enabled: Boolean = false,
     /** Max traffic summary items for DB insert batch. */
     batchSize: Int = 50,
     /** Max time window to wait for DB insert batch. */

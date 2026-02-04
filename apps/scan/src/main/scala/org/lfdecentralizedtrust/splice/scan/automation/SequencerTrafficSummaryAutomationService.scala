@@ -23,8 +23,8 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.SynchronizerId
 
 import scala.concurrent.ExecutionContextExecutor
-import org.lfdecentralizedtrust.splice.scan.automation.SequencerTrafficSummaryStoreIngestion.prettyTrafficBatch
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import org.lfdecentralizedtrust.splice.scan.automation.SequencerTrafficSummaryStoreIngestion.prettyTrafficBatch
 
 class SequencerTrafficSummaryAutomationService(
     config: ScanAppBackendConfig,
@@ -49,22 +49,35 @@ class SequencerTrafficSummaryAutomationService(
       retryProvider,
     ) {
 
-  override def companion: AutomationServiceCompanion = SequencerTrafficSummaryAutomationService
+  override def companion: AutomationServiceCompanion =
+    if (config.sequencerTrafficIngestion.enabled)
+      SequencerTrafficSummaryAutomationService.Enabled
+    else
+      SequencerTrafficSummaryAutomationService.Disabled
 
-  registerTrigger(
-    new SequencerTrafficSummaryStoreIngestion(
-      triggerContext,
-      config,
-      grpcClientMetrics,
-      store,
-      migrationId,
-      synchronizerId,
-      ingestionMetrics,
+  if (config.sequencerTrafficIngestion.enabled) {
+    registerTrigger(
+      new SequencerTrafficSummaryStoreIngestion(
+        triggerContext,
+        config,
+        grpcClientMetrics,
+        store,
+        migrationId,
+        synchronizerId,
+        ingestionMetrics,
+      )
     )
-  )
+  }
 }
 
-object SequencerTrafficSummaryAutomationService extends AutomationServiceCompanion {
-  override protected[this] def expectedTriggerClasses: Seq[TriggerClass] =
-    Seq(aTrigger[SequencerTrafficSummaryStoreIngestion])
+object SequencerTrafficSummaryAutomationService {
+
+  object Enabled extends AutomationServiceCompanion {
+    override protected[this] def expectedTriggerClasses: Seq[TriggerClass] =
+      Seq(aTrigger[SequencerTrafficSummaryStoreIngestion])
+  }
+
+  object Disabled extends AutomationServiceCompanion {
+    override protected[this] def expectedTriggerClasses: Seq[TriggerClass] = Seq.empty
+  }
 }
