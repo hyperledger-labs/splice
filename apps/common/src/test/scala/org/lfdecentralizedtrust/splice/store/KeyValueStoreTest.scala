@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.store.db.{SplicePostgresTest, StoreDescri
 import org.scalatest.matchers.should.Matchers
 
 class KeyValueStoreTest
-    extends StoreTest
+    extends StoreTestBase
     with Matchers
     with HasExecutionContext
     with SplicePostgresTest {

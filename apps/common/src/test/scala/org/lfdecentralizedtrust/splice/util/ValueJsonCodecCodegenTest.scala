@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   validatorlicense as validatorlicenseCodegen,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
-import org.lfdecentralizedtrust.splice.store.{StoreErrors, StoreTest}
+import org.lfdecentralizedtrust.splice.store.{StoreErrors, StoreTestBase}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.{
@@ -25,7 +25,7 @@ import scala.jdk.OptionConverters.*
 import java.util.Optional
 import scala.jdk.CollectionConverters.*
 
-class ValueJsonCodecCodegenTest extends StoreTest with StoreErrors {
+class ValueJsonCodecCodegenTest extends StoreTestBase with StoreErrors {
 
   "ValueJsonCodecCodecTest" should {
 
