@@ -415,6 +415,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         )
       ),
       subViews = Seq(3),
+      viewHash = "hash0",
     )
     val view1 = DbScanVerdictStore.TransactionViewT(
       verdictRowId = 0L,
@@ -427,6 +428,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         )
       ),
       subViews = Seq.empty,
+      viewHash = "hash1",
     )
 
     val view2 = DbScanVerdictStore.TransactionViewT(
@@ -444,6 +446,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         ),
       ),
       subViews = Seq(1),
+      viewHash = "hash2",
     )
 
     val view3 = DbScanVerdictStore.TransactionViewT(
@@ -457,6 +460,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         )
       ),
       subViews = Seq(4, 5),
+      viewHash = "hash3",
     )
 
     val view4 = DbScanVerdictStore.TransactionViewT(
@@ -470,6 +474,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         )
       ),
       subViews = Seq(6),
+      viewHash = "hash4",
     )
     val view5 = DbScanVerdictStore.TransactionViewT(
       verdictRowId = 0L,
@@ -486,6 +491,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         )
       ),
       subViews = Seq.empty,
+      viewHash = "hash5",
     )
 
     val view6 = DbScanVerdictStore.TransactionViewT(
@@ -499,6 +505,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         )
       ),
       subViews = Seq.empty,
+      viewHash = "hash6",
     )
 
     val viewsIn = Seq(view2, view0, view1, view6, view4, view5, view3)
