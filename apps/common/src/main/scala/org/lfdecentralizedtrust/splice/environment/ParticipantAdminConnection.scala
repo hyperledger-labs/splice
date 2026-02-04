@@ -19,12 +19,7 @@ import com.digitalasset.canton.admin.api.client.data.{
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.admin.participant.v30.{ExportAcsResponse, PruningServiceGrpc}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{
-  ApiLoggingConfig,
-  ClientConfig,
-  NonNegativeDuration,
-  NonNegativeFiniteDuration,
-}
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.data.{
   ContractImportMode,
@@ -38,7 +33,6 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnectionValidation,
 }
 import com.digitalasset.canton.sequencing.protocol.TrafficState
-import com.digitalasset.canton.time.FetchTimeResponse
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
@@ -112,16 +106,9 @@ class ParticipantAdminConnection(
 
   private val synchronizerIdAliasCache =
     Scaffeine()
-      // expire fairly quickly to account for LSUs
-      .expireAfterWrite(30.seconds)
+      .expireAfterWrite(10.minutes)
       .maximumSize(100)
       .buildAsync[SynchronizerAlias, SynchronizerId]()
-  private val synchronizerIdLogicalCache =
-    Scaffeine()
-      // expire fairly quickly to account for LSUs
-      .expireAfterWrite(30.seconds)
-      .maximumSize(100)
-      .buildAsync[SynchronizerId, PhysicalSynchronizerId]()
 
   override type Status = ParticipantStatus
 
@@ -147,24 +134,6 @@ class ParticipantAdminConnection(
     synchronizerIdAliasCache.getFuture(
       synchronizerAlias,
       alias => getPhysicalSynchronizerId(alias).map(_.logical),
-    )
-  }
-
-  def getPhysicalSynchronizerId(synchronizerId: SynchronizerId)(implicit
-      traceContext: TraceContext
-  ): Future[PhysicalSynchronizerId] = {
-    synchronizerIdLogicalCache.getFuture(
-      synchronizerId,
-      id =>
-        listConnectedDomains().map(
-          _.find(
-            _.synchronizerId == id
-          ).fold(
-            throw Status.NOT_FOUND
-              .withDescription(s"Synchronizer with logical id $synchronizerId is not connected")
-              .asRuntimeException()
-          )(_.physicalSynchronizerId)
-        ),
     )
   }
 
@@ -432,16 +401,6 @@ class ParticipantAdminConnection(
 
   def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId] =
     getId().map(ParticipantId(_))
-
-  def getDomainTimeLowerBound(
-      synchronizerId: SynchronizerId,
-      maxDomainTimeLag: NonNegativeFiniteDuration,
-      timeout: NonNegativeDuration = retryProvider.timeouts.default,
-  )(implicit traceContext: TraceContext): Future[FetchTimeResponse] = {
-    getPhysicalSynchronizerId(synchronizerId).flatMap(psid =>
-      getDomainTimeLowerBound(psid, maxDomainTimeLag, timeout)
-    )
-  }
 
   def lookupSynchronizerConnectionConfig(
       domain: SynchronizerAlias

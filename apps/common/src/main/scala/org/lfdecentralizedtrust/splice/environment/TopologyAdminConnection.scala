@@ -135,9 +135,9 @@ abstract class TopologyAdminConnection(
    *  fresh domain-time proof.
    */
   def getDomainTimeLowerBound(
-      synchronizerId: PhysicalSynchronizerId,
+      synchronizerId: SynchronizerId,
       maxDomainTimeLag: NonNegativeFiniteDuration,
-      timeout: NonNegativeDuration,
+      timeout: NonNegativeDuration = retryProvider.timeouts.default,
   )(implicit traceContext: TraceContext): Future[FetchTimeResponse] =
     runCmd(
       SynchronizerTimeCommands.FetchTime(

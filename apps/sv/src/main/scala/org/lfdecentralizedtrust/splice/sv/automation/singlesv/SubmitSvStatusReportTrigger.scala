@@ -91,24 +91,20 @@ class SubmitSvStatusReportTrigger(
   private def getDomainTimeLowerBound(connection: TopologyAdminConnection, domain: SynchronizerId)(
       implicit tc: TraceContext
   ): Future[Instant] = {
-    participantAdminConnection
-      .getPhysicalSynchronizerId(domain)
-      .flatMap(psid =>
-        connection
-          .getDomainTimeLowerBound(
-            psid,
-            maxDomainTimeLag = context.config.pollingInterval,
-            timeout = SubmitSvStatusReportTrigger.DomainTimeTimeout,
-          )
-          .transform {
-            case Success(ok) =>
-              Success(ok.timestamp.toInstant)
-            case Failure(ex) =>
-              logger
-                .info(s"Failed to get domain time lower bound from ${connection.serviceName}", ex)
-              Success(Instant.EPOCH)
-          }
+    connection
+      .getDomainTimeLowerBound(
+        domain,
+        maxDomainTimeLag = context.config.pollingInterval,
+        timeout = SubmitSvStatusReportTrigger.DomainTimeTimeout,
       )
+      .transform {
+        case Success(ok) =>
+          Success(ok.timestamp.toInstant)
+        case Failure(ex) =>
+          logger
+            .info(s"Failed to get domain time lower bound from ${connection.serviceName}", ex)
+          Success(Instant.EPOCH)
+      }
   }
 }
 

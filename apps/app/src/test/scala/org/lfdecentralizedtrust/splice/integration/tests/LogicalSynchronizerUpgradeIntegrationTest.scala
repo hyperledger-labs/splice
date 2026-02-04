@@ -419,7 +419,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
             0L,
             Some("transfer-command-description"),
           )
-        actAndCheck(
+        // remove extended timeUntilSuccess after we also migrate traffic
+        actAndCheck(timeUntilSuccess = 2.minutes)(
           "Submit signed TransferCommand creation",
           aliceValidatorBackend.submitTransferPreapprovalSend(
             externalPartyOnboarding.party,
