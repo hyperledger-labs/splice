@@ -15,6 +15,7 @@ import org.openqa.selenium.WebDriver
 import java.time.Duration
 import scala.jdk.CollectionConverters.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceWallet_0_1_16
 class WalletFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
