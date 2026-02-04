@@ -309,8 +309,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
                   .result
                   .size shouldBe topologyTransactionsOnTheSync
               }
-              newBackend.sequencerClient.traffic_control
-                .set_lsu_state(oldBackend.sequencerClient.traffic_control.get_lsu_state())
             }
 
             clue(s"init ${oldBackend.name} mediator") {
@@ -352,6 +350,21 @@ class LogicalSynchronizerUpgradeIntegrationTest
           .pause()
           .futureValue
       )
+
+      clue("Wait until upgrade time") {
+        wallClock
+          .scheduleAt(
+            _ =>
+              allNewBackends.zip(allBackends).par.map { case (newBackend, oldBackend) =>
+                clue(s"transfer traffic for  ${oldBackend.name}") {
+                  newBackend.sequencerClient.traffic_control
+                    .set_lsu_state(oldBackend.sequencerClient.traffic_control.get_lsu_state())
+                }
+              },
+            upgradeTime,
+          )
+          .futureValueUS
+      }
 
       clue("Announce new sequencer urls") {
         allBackends.zip(allNewBackends).par.map { case (oldBackend, newBackend) =>
