@@ -2,13 +2,8 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.featuredapprightv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.util.featuredapp.batchedmarkersproxy
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  ConfigurableApp,
-  updateAutomationConfig,
-}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.FeaturedAppActivityMarkerTrigger
 import org.lfdecentralizedtrust.splice.util.*
 import scala.jdk.CollectionConverters.*
 
@@ -22,11 +17,6 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .addConfigTransforms((_, config) =>
-        updateAutomationConfig(ConfigurableApp.Sv)(
-          _.withPausedTrigger[FeaturedAppActivityMarkerTrigger]
-        )(config)
-      )
 
   "Batched activity marker creation produces only one view" in { implicit env =>
     Seq(aliceValidatorBackend, sv1ValidatorBackend, bobValidatorBackend).foreach {
