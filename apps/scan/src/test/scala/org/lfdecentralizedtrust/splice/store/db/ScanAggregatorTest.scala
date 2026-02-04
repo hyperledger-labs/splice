@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.scan.store.db.{
   ScanAggregator,
 }
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.*
-import org.lfdecentralizedtrust.splice.store.StoreTest
+import org.lfdecentralizedtrust.splice.store.StoreTestBase
 import org.lfdecentralizedtrust.splice.store.StoreErrors
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.util.ResourceTemplateDecoder
@@ -42,7 +42,7 @@ import org.scalatest.Assertion
 import slick.jdbc.{GetResult, JdbcProfile}
 
 class ScanAggregatorTest
-    extends StoreTest
+    extends StoreTestBase
     with HasExecutionContext
     with StoreErrors
     with SplicePostgresTest
