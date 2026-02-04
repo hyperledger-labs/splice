@@ -26,7 +26,7 @@ import scala.concurrent.ExecutionContextExecutor
 import org.lfdecentralizedtrust.splice.scan.automation.ScanVerdictStoreIngestion.prettyVerdictBatch
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 
-class ScanVerdictAutomationService(
+class ScanIngestionAutomationService(
     config: ScanAppBackendConfig,
     clock: Clock,
     retryProvider: RetryProvider,
@@ -49,7 +49,7 @@ class ScanVerdictAutomationService(
       retryProvider,
     ) {
 
-  override def companion: AutomationServiceCompanion = ScanVerdictAutomationService
+  override def companion: AutomationServiceCompanion = ScanIngestionAutomationService
 
   registerTrigger(
     new ScanVerdictStoreIngestion(
@@ -64,7 +64,7 @@ class ScanVerdictAutomationService(
   )
 }
 
-object ScanVerdictAutomationService extends AutomationServiceCompanion {
+object ScanIngestionAutomationService extends AutomationServiceCompanion {
   override protected[this] def expectedTriggerClasses: Seq[TriggerClass] =
     Seq(aTrigger[ScanVerdictStoreIngestion])
 }
