@@ -948,6 +948,7 @@ lazy val `apps-common` =
       `splice-token-test-dummy-holding-daml`,
       `splice-token-test-trading-app-daml`,
       `splice-featured-app-api-v1-daml`,
+      `splice-util-batched-markers-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
     .settings(
@@ -1970,7 +1971,6 @@ lazy val `apps-app`: Project =
       `canton-community-base`,
       `canton-community-integration-testing` % "test",
       `splice-util-featured-app-proxies-daml` % "test",
-      `splice-util-batched-markers-daml` % "test",
       // necessary for token-standard-cli to get `npm install`ed so that TokenStandardCliSanityCheckPlugin can run
       `apps-common-frontend`,
     )

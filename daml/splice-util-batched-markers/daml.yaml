@@ -14,5 +14,5 @@ build-options:
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java
-    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceAmulet
+    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderBatchedMarkers
     output-directory: target/daml-codegen-java
