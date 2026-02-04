@@ -9,7 +9,7 @@ import scala.concurrent.Future
 
 import UpdateHistory.UpdateHistoryResponse
 
-class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
+class UpdateHistoryBackfillingTest extends UpdateHistoryStoreTestBase {
 
   "UpdateHistory" should {
 

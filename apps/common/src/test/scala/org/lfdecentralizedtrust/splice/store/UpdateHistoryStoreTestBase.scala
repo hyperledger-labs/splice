@@ -30,7 +30,7 @@ import UpdateHistory.UpdateHistoryResponse
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 
-abstract class UpdateHistoryTestBase
+abstract class UpdateHistoryStoreTestBase
     extends StoreTestBase
     with HasExecutionContext
     with StoreErrors
@@ -39,7 +39,7 @@ abstract class UpdateHistoryTestBase
     with AcsJdbcTypes
     with AcsTables {
 
-  import UpdateHistoryTestBase.*
+  import UpdateHistoryStoreTestBase.*
 
   protected def create(
       domain: SynchronizerId,
@@ -288,7 +288,7 @@ abstract class UpdateHistoryTestBase
   protected val reassignmentId1 = "%08d".format(1)
 }
 
-object UpdateHistoryTestBase {
+object UpdateHistoryStoreTestBase {
   sealed trait ExpectedUpdate extends Product with Serializable
   final case class ExpectedCreate(cid: String, synchronizerId: SynchronizerId)
       extends ExpectedUpdate
@@ -328,7 +328,7 @@ object UpdateHistoryTestBase {
       mode: LostDataMode,
   ): TreeUpdateWithMigrationId = {
     TreeUpdateWithMigrationId(
-      UpdateHistoryTestBase.withoutLostData(update.update, mode),
+      UpdateHistoryStoreTestBase.withoutLostData(update.update, mode),
       update.migrationId,
     )
   }

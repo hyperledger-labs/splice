@@ -29,11 +29,11 @@ import org.lfdecentralizedtrust.splice.scan.admin.http.{
   ProtobufJsonScanHttpEncodings,
   ScanHttpEncodings,
 }
-import org.lfdecentralizedtrust.splice.store.UpdateHistoryTestBase.{
+import org.lfdecentralizedtrust.splice.store.UpdateHistoryStoreTestBase.{
   LostInScanApi,
   LostInStoreIngestion,
 }
-import org.lfdecentralizedtrust.splice.store.{PageLimit, UpdateHistory, UpdateHistoryTestBase}
+import org.lfdecentralizedtrust.splice.store.{PageLimit, UpdateHistory, UpdateHistoryStoreTestBase}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import com.daml.ledger.api.v2.transaction_filter
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
@@ -139,7 +139,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     // Note: UpdateHistory does not preserve all information in updates,
     // so remove fields that are not preserved before comparing.
     val actualUpdatesWithoutLostData =
-      actualUpdates.map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInStoreIngestion))
+      actualUpdates.map(UpdateHistoryStoreTestBase.withoutLostData(_, mode = LostInStoreIngestion))
     val recordedUpdatesWithoutLostData = recordedUpdates.map(_.update)
     actualUpdatesWithoutLostData should have length recordedUpdatesWithoutLostData.size.longValue()
     actualUpdatesWithoutLostData.zip(recordedUpdatesWithoutLostData).foreach {
@@ -168,7 +168,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     val historyFromStoreWithoutLostData =
       historyFromStore
-        .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
+        .map(UpdateHistoryStoreTestBase.withoutLostData(_, mode = LostInScanApi))
         .map(ScanHttpEncodings.makeConsistentAcrossSvs)
 
     historyFromStoreWithoutLostData should contain theSameElementsInOrderAs historyThroughApi
@@ -193,7 +193,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     val dsoParty = svAppBackend.getDsoInfo().dsoParty
 
     val updatesFromHistory = updateHistoryFromParticipant(ledgerBegin, dsoParty, participant)
-      .map(UpdateHistoryTestBase.withoutLostData(_, mode = LostInScanApi))
+      .map(UpdateHistoryStoreTestBase.withoutLostData(_, mode = LostInScanApi))
       .map(ScanHttpEncodings.makeConsistentAcrossSvs)
 
     val updatesFromScanApi = scanClient

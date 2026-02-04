@@ -17,7 +17,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 
-class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
+class ScanHistoryBackfillingTest extends UpdateHistoryStoreTestBase {
 
   "ScanHistoryBackfilling" should {
     "backfill from one complete history" in {

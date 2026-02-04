@@ -32,9 +32,9 @@ import UpdateHistory.UpdateHistoryResponse
 import StoreTestBase.*
 import cats.data.NonEmptyList
 
-class UpdateHistoryTest extends UpdateHistoryTestBase {
+class UpdateHistoryTest extends UpdateHistoryStoreTestBase {
 
-  import UpdateHistoryTestBase.*
+  import UpdateHistoryStoreTestBase.*
 
   protected def updates(
       store: UpdateHistory,
