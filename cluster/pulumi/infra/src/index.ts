@@ -49,7 +49,7 @@ if (useGKEL7Gateway) {
     ingressAddress: network.ingressIp,
     gatewayName: 'cn-gke-l7-gateway',
     backendServiceName: istio.httpServiceName,
-    serviceTarget: { port: 80 },
+    serviceTarget: { port: 443 },
     tlsSecretName: `cn-${clusterBasename}net-tls`,
     securityPolicy: cloudArmorSecurityPolicy,
     istioResource: istio.istioResource,

@@ -514,7 +514,16 @@ function configureGateway(
             ...(withSeparateGcpGateway ? {} : { tls: { httpsRedirect: true } }),
           },
           ...(withSeparateGcpGateway
-            ? []
+            ? [
+                  {
+                      hosts,
+                      port: {
+                          name: 'https',
+                          number: 443,
+                          protocol: 'HTTP',
+                      },
+                  }
+              ]
             : [
                 {
                   hosts,
