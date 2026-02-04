@@ -5,12 +5,13 @@ import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
-import { configureCloudArmorPolicy } from './cloudArmor';
+import { configureCloudArmorPolicy, CloudArmorPolicy } from './cloudArmor';
 import {
   cloudArmorConfig,
   clusterBaseDomain,
   clusterBasename,
   enableGCReaperJob,
+  infraConfig,
   monitoringConfig,
 } from './config';
 import { installExtraCustomResources } from './extraCustomResources';
@@ -33,9 +34,12 @@ export const ingressIp = network.ingressIp.address;
 export const ingressNs = network.ingressNs.ns.metadata.name;
 export const egressIp = network.egressIp.address;
 
-const cloudArmorSecurityPolicy = configureCloudArmorPolicy(cloudArmorConfig, network.ingressNs);
+const cloudArmorSecurityPolicy = configureCloudArmorPolicy(cloudArmorConfig);
+const useGKEL7Gateway = infraConfig.gkeGateway.proxyForIstioHttp;
+if (!useGKEL7Gateway && cloudArmorSecurityPolicy) {
+  console.warn('Cloud Armor requires gkeGateway.proxyForIstioHttp to be enabled to take effect');
+}
 
-const useGKEL7Gateway = !!cloudArmorSecurityPolicy;
 const istio = configureIstio(
   network.ingressNs,
   ingressIp,

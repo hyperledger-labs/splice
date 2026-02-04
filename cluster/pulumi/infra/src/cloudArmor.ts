@@ -36,8 +36,8 @@ export interface PredefinedWafRule {
 
 // Regional and Global policies and rules use different types/constructors; most
 // of our pulumi code doesn't care about the difference so can use this alias
-export type Policy = gcp.compute.RegionSecurityPolicy;
-const Policy = gcp.compute.RegionSecurityPolicy;
+export type CloudArmorPolicy = gcp.compute.RegionSecurityPolicy;
+const CloudArmorPolicy = gcp.compute.RegionSecurityPolicy;
 const PolicyRule = gcp.compute.RegionSecurityPolicyRule;
 
 /**
@@ -49,16 +49,15 @@ const PolicyRule = gcp.compute.RegionSecurityPolicyRule;
  */
 export function configureCloudArmorPolicy(
   cac: CloudArmorConfig,
-  bothGatewaysNs: ExactNamespace,
   opts?: pulumi.ComponentResourceOptions
-): Policy | undefined {
+): CloudArmorPolicy | undefined {
   if (!cac.enabled) {
     return undefined;
   }
 
   // Step 1: Create the security policy
   const name = `waf-whitelist-throttle-ban-${CLUSTER_BASENAME}`;
-  const securityPolicy = new Policy(
+  const securityPolicy = new CloudArmorPolicy(
     name,
     {
       name,
@@ -121,7 +120,7 @@ function addIpWhitelistRules(): void {
  * Adds throttle and ban rules for API endpoints to a security policy
  */
 function addThrottleAndBanRules(
-  securityPolicy: Policy,
+  securityPolicy: CloudArmorPolicy,
   throttles: ThrottleConfig,
   preview: boolean,
   opts: pulumi.ResourceOptions
@@ -182,7 +181,7 @@ function addThrottleAndBanRules(
  * Adds a default deny rule to a security policy
  */
 function addDefaultDenyRule(
-  securityPolicy: Policy,
+  securityPolicy: CloudArmorPolicy,
   preview: boolean,
   opts: pulumi.ResourceOptions
 ): void {

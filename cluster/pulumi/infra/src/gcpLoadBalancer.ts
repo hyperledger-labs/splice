@@ -5,7 +5,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { CLUSTER_BASENAME, ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
 
-import { Policy as SecurityPolicy } from './cloudArmor';
+import { CloudArmorPolicy } from './cloudArmor';
 
 /*
 Any cluster that uses this must first run
@@ -27,7 +27,7 @@ then normal up/apply should work
 // possible values and their meaning: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/gateway-api#gatewayclass
 // global vs regional:
 //   - the ingressAddress must match
-//   - the SecurityPolicy must match
+//   - the CloudArmorPolicy must match
 //   - the SSL policy must match
 const gcpGatewayClass = 'gke-l7-regional-external-managed';
 
@@ -46,7 +46,7 @@ interface L7GatewayConfig {
   // the istio gateway service that must be updated before creating this gateway
   istioResource: pulumi.Resource;
   // the Cloud Armor policy to attach
-  securityPolicy: SecurityPolicy;
+  securityPolicy?: CloudArmorPolicy;
   // if provided, an HTTPS listener will be created on port 443 that
   // terminates TLS using this secret
   tlsSecretName?: pulumi.Input<string>;
@@ -147,6 +147,7 @@ function backendTargetRef(config: L7GatewayConfig): BackendTargetRef {
  * Creates a GCPBackendPolicy for Cloud Armor integration
  */
 function attachCloudArmorToLBBackend(
+  policy: CloudArmorPolicy,
   config: L7GatewayConfig,
   gateway: k8s.apiextensions.CustomResource
 ): k8s.apiextensions.CustomResource {
@@ -164,7 +165,7 @@ function attachCloudArmorToLBBackend(
         default: {
           // TODO (#2723) cloudArmor.ts creates a global security policy but GKE appears to search for a regional one
           // SetSecurityPolicy: Invalid value for field 'resource': '{  "securityPolicy": "https://www.googleapis.com/compute/beta/projects/da-cn-scratchnet/regions/us-c...'. The given security policy does not exist
-          securityPolicy: config.securityPolicy.name.apply(name => {
+          securityPolicy: policy.name.apply(name => {
             console.assert(
               !name.includes('/'),
               `${name} should be just the name, not a full resource path`
@@ -175,7 +176,7 @@ function attachCloudArmorToLBBackend(
         targetRef: backendTargetRef(config),
       },
     },
-    { parent: gateway, dependsOn: [config.securityPolicy] }
+    { parent: gateway, dependsOn: [policy] }
   );
 }
 
@@ -378,7 +379,9 @@ export function configureGKEL7Gateway(config: L7GatewayConfig): {
 } {
   const gateway = createL7Gateway(config);
 
-  attachCloudArmorToLBBackend(config, gateway);
+  if (config.securityPolicy) {
+    attachCloudArmorToLBBackend(config.securityPolicy, config, gateway);
+  }
 
   createHealthCheckPolicy(config, gateway);
 

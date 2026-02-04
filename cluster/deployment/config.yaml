@@ -16,6 +16,8 @@ infra:
     retentionDuration: "1y"
     retentionSize: "1500GB"
     storageSize: "2Ti"
+  gkeGateway:
+    proxyForIstioHttp: false
   istio:
     enableIngressAccessLogging: true
 # configs specific for the pulumi project
