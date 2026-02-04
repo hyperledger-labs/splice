@@ -1504,9 +1504,10 @@ object StoreTest {
   val testTxLogConfig = new TxLogStore.Config[TestTxLogEntry] {
     override def parser: org.lfdecentralizedtrust.splice.store.StoreTest.TestTxLogStoreParser.type =
       TestTxLogStoreParser
-    override def entryToRow
-        : org.lfdecentralizedtrust.splice.store.TestTxLogEntry => org.lfdecentralizedtrust.splice.store.db.TxLogRowData.TxLogRowDataWithoutIndices.type =
-      _ => TxLogRowData.noIndices
+    override def entryToRow: org.lfdecentralizedtrust.splice.store.TestTxLogEntry => Option[
+      org.lfdecentralizedtrust.splice.store.db.TxLogRowData.TxLogRowDataWithoutIndices.type
+    ] =
+      _ => Some(TxLogRowData.noIndices)
     override def encodeEntry = StoreTest.TxLogEntry.encode
     override def decodeEntry = StoreTest.TxLogEntry.decode
   }
