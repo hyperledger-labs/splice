@@ -38,6 +38,7 @@ import com.digitalasset.canton.synchronizer.sequencer.Sequencer.RegisterError
 import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig.External
 import com.digitalasset.canton.synchronizer.sequencer.admin.data.SequencerAdminStatus
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockOrderer
+import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.LSUSequencerError
 import com.digitalasset.canton.synchronizer.sequencer.errors.{
   CreateSubscriptionError,
   SequencerAdministrationError,
@@ -45,6 +46,7 @@ import com.digitalasset.canton.synchronizer.sequencer.errors.{
 }
 import com.digitalasset.canton.synchronizer.sequencer.traffic.TimestampSelector.TimestampSelector
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
+  LSUTrafficState,
   SequencerRateLimitError,
   SequencerRateLimitManager,
   SequencerTrafficStatus,
@@ -451,6 +453,16 @@ class ProgrammableSequencer(
     baseSequencer.updateSynchronizerSuccessor(successorO, announcementEffectiveTime)
 
   override private[canton] def orderer: Option[BlockOrderer] = baseSequencer.orderer
+
+  override def getLSUTrafficControlState(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, LSUSequencerError, LSUTrafficState] =
+    baseSequencer.getLSUTrafficControlState
+
+  override def setLSUTrafficControlState(state: LSUTrafficState)(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, LSUSequencerError, Unit] =
+    baseSequencer.setLSUTrafficControlState(state)
 }
 
 /** Utilities for using the [[ProgrammableSequencer]] from tests */
