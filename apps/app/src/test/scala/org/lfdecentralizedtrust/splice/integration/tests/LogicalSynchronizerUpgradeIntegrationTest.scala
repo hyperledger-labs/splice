@@ -309,6 +309,8 @@ class LogicalSynchronizerUpgradeIntegrationTest
                   .result
                   .size shouldBe topologyTransactionsOnTheSync
               }
+              newBackend.sequencerClient.traffic_control
+                .set_lsu_state(oldBackend.sequencerClient.traffic_control.get_lsu_state())
             }
 
             clue(s"init ${oldBackend.name} mediator") {
