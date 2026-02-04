@@ -28,14 +28,17 @@ class UpdateHistoryBulkStorage(
 )(implicit actorSystem: ActorSystem, tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
 
-  private def getMigrationIdForAcsSnapshot(snapshotTimestamp: CantonTimestamp): Future[Long] = ???
-  // TODO: make sure to handle both cases:
-  //  1. this is an old migration, the next snapshot is known, and
-  //  2. we just completed a migration, the next snapshot is not yet known, but should be assumed to be the current, similarly to how we handle dumping a segment that started in the current
-  // I think that we should do here:
-  //   look for updates with record time > timestamp (any migration), if exists, then return "lowest migration ID for which we have a tx with record time > timestamp"
-  //   else, return currentMigrationId
-  // But too tired right now to check my logic...
+  private def getMigrationIdForAcsSnapshot(snapshotTimestamp: CantonTimestamp): Future[Long] = {
+    // TODO: make sure to handle both cases:
+    //  1. this is an old migration, the next snapshot is known, and
+    //  2. we just completed a migration, the next snapshot is not yet known, but should be assumed to be the current, similarly to how we handle dumping a segment that started in the current
+    // I think that we should do here:
+    //   look for updates with record time > timestamp (any migration):
+    //      if exists, then return "lowest migration ID for which we have a tx with record time > timestamp"
+    //      else, return currentMigrationId
+    // But too tired right now to check my logic...
+    ???
+  }
 
   private def getSegmentEndAfter(ts: TimestampWithMigrationId): Future[TimestampWithMigrationId] = {
     val endTs = config.computeBulkSnapshotTimeAfter(ts.timestamp)
