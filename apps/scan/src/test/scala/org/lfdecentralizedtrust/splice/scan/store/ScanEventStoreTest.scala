@@ -5,7 +5,12 @@ import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
-import org.lfdecentralizedtrust.splice.store.{HistoryMetrics, PageLimit, StoreTestBase, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HistoryMetrics,
+  PageLimit,
+  StoreTestBase,
+  UpdateHistory,
+}
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import com.digitalasset.canton.resource.DbStorage

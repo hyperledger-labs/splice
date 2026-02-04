@@ -22,7 +22,12 @@ import org.lfdecentralizedtrust.splice.scan.store.{
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.QueryAcsSnapshotResult
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
-import org.lfdecentralizedtrust.splice.store.{HardLimit, Limit, StoreTestBase, TimestampWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
+  Limit,
+  StoreTestBase,
+  TimestampWithMigrationId,
+}
 import org.lfdecentralizedtrust.splice.util.PackageQualifiedName
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito

@@ -954,19 +954,20 @@ abstract class StoreTestBase extends AsyncWordSpec with BaseTest {
   )
 
   protected def acs(
-                     acs: Seq[StoreTestBase.AcsImportEntry] = Seq.empty,
-                     incompleteOut: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
-                     incompleteIn: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
-                     acsOffset: Long = nextOffset(),
+      acs: Seq[StoreTestBase.AcsImportEntry] = Seq.empty,
+      incompleteOut: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
+      incompleteIn: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
+      acsOffset: Long = nextOffset(),
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.ingestAcs(
       acsOffset,
-      acs.map { case StoreTestBase.AcsImportEntry(contract, domain, counter, implementedInterfaces) =>
-        ActiveContract(
-          domain,
-          toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
-          counter,
-        )
+      acs.map {
+        case StoreTestBase.AcsImportEntry(contract, domain, counter, implementedInterfaces) =>
+          ActiveContract(
+            domain,
+            toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
+            counter,
+          )
       },
       incompleteOut.map {
         case StoreTestBase.AcsImportIncompleteEntry(
@@ -1008,10 +1009,10 @@ abstract class StoreTestBase extends AsyncWordSpec with BaseTest {
   } yield ()
 
   protected def initWithAcs(
-                             activeContracts: Seq[StoreTestBase.AcsImportEntry] = Seq.empty,
-                             incompleteOut: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
-                             incompleteIn: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
-                             acsOffset: Long = nextOffset(),
+      activeContracts: Seq[StoreTestBase.AcsImportEntry] = Seq.empty,
+      incompleteOut: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
+      incompleteIn: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
+      acsOffset: Long = nextOffset(),
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.initialize()
     _ <- acs(activeContracts, incompleteOut, incompleteIn, acsOffset)
@@ -1502,7 +1503,8 @@ object StoreTestBase {
   }
 
   val testTxLogConfig = new TxLogStore.Config[TestTxLogEntry] {
-    override def parser: org.lfdecentralizedtrust.splice.store.StoreTestBase.TestTxLogStoreParser.type =
+    override def parser
+        : org.lfdecentralizedtrust.splice.store.StoreTestBase.TestTxLogStoreParser.type =
       TestTxLogStoreParser
     override def entryToRow: org.lfdecentralizedtrust.splice.store.TestTxLogEntry => Option[
       org.lfdecentralizedtrust.splice.store.db.TxLogRowData.TxLogRowDataWithoutIndices.type
