@@ -32,7 +32,7 @@ object DbScanVerdictStore {
       informees: Seq[String],
       confirmingParties: Json,
       subViews: Seq[Int],
-      viewHash: String,
+      viewHash: Option[String],
   )
 
   final case class VerdictT(
@@ -147,7 +147,7 @@ class DbScanVerdictStore(
       stringArrayGetResult(prs).toSeq,
       <<[Json],
       intArrayGetResult(prs).toSeq,
-      <<[Option[String]].getOrElse(""),
+      <<[Option[String]],
     )
   }
 

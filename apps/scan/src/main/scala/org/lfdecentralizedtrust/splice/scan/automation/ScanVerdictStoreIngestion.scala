@@ -195,7 +195,7 @@ class ScanVerdictStoreIngestion(
           informees = txView.informees,
           confirmingParties = confirmingPartiesJson,
           subViews = txView.subViews,
-          viewHash = txView.viewHash,
+          viewHash = Some(txView.viewHash).filter(_.nonEmpty),
         )
       }.toSeq
     }
