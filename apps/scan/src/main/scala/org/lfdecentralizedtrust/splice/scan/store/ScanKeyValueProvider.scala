@@ -12,6 +12,7 @@ import cats.data.OptionT
 import cats.implicits.toBifunctorOps
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider.*
+import org.lfdecentralizedtrust.splice.scan.store.bulk.UpdatesSegment
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -33,6 +34,8 @@ class ScanKeyValueProvider(val store: KeyValueStore, val loggerFactory: NamedLog
   ): OptionT[Future, TimestampWithMigrationId] = {
     store.readValueAndLogOnDecodingFailure(latestAcsSnapshotInBulkStorageKey)
   }
+
+  final def getLatestUpdatesSegmentInBulkStorage(): OptionT[Future, UpdatesSegment] = ???
 }
 
 object ScanKeyValueProvider {

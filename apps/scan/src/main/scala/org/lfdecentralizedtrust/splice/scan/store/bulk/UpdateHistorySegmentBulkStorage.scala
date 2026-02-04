@@ -31,12 +31,16 @@ import scala.math.Ordering.Implicits.*
 
 // TODO(#3429): some duplication between this and SingleAcsSnapshotBulkStorage, see if we can more nicely reuse stuff
 
+case class UpdatesSegment(
+    val fromTimestamp: TimestampWithMigrationId,
+    val toTimestamp: TimestampWithMigrationId,
+)
+
 class UpdateHistorySegmentBulkStorage(
     val config: ScanStorageConfig,
     val updateHistory: UpdateHistory,
     val s3Connection: S3BucketConnection,
-    val fromTimestamp: TimestampWithMigrationId,
-    val toTimestamp: TimestampWithMigrationId,
+    val segment: UpdatesSegment,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit tc: TraceContext, ec: ExecutionContext)
     extends NamedLogging {
@@ -54,7 +58,7 @@ class UpdateHistorySegmentBulkStorage(
         HardLimit.tryCreate(config.bulkDbReadChunkSize),
       )
       updatesInSegment = updates.filter(update =>
-        TimestampWithMigrationId(update.update.update.recordTime, update.migrationId) <= toTimestamp
+        TimestampWithMigrationId(update.update.update.recordTime, update.migrationId) <= segment.toTimestamp
       )
       result <-
         if (
@@ -117,7 +121,7 @@ class UpdateHistorySegmentBulkStorage(
       actorSystem: ActorSystem
   ): Source[TimestampWithMigrationId, NotUsed] = {
     Source
-      .unfoldAsync(fromTimestamp)(ts => getUpdatesChunk(ts))
+      .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
       .via(ZstdGroupedWeight(config.bulkMaxFileSize))
       // Add a buffer so that the next object continues accumulating while we write the previous one
       .buffer(
@@ -140,7 +144,7 @@ class UpdateHistorySegmentBulkStorage(
       // emit a Unit upon completion of the write to s3
       .fold(()) { case ((), _) => () }
       // emit the timestamp of the last update dumped upon completion.
-      .map(_ => lastEmitted.get().getOrElse(fromTimestamp))
+      .map(_ => lastEmitted.get().getOrElse(segment.fromTimestamp))
 
   }
 }
@@ -154,18 +158,14 @@ object UpdateHistorySegmentBulkStorage {
       tc: TraceContext,
       ec: ExecutionContext,
       actorSystem: ActorSystem,
-  ): Flow[(TimestampWithMigrationId, TimestampWithMigrationId), TimestampWithMigrationId, NotUsed] =
-    Flow[(TimestampWithMigrationId, TimestampWithMigrationId)].flatMapConcat {
-      case (
-            from: TimestampWithMigrationId,
-            to: TimestampWithMigrationId,
-          ) =>
+  ): Flow[UpdatesSegment, TimestampWithMigrationId, NotUsed] =
+    Flow[UpdatesSegment].flatMapConcat {
+      (segment: UpdatesSegment) =>
         new UpdateHistorySegmentBulkStorage(
           config,
           updateHistory,
           s3Connection,
-          from,
-          to,
+          segment,
           loggerFactory,
         ).getSource
     }
@@ -174,8 +174,7 @@ object UpdateHistorySegmentBulkStorage {
       config: ScanStorageConfig,
       updateHistory: UpdateHistory,
       s3Connection: S3BucketConnection,
-      from: TimestampWithMigrationId,
-      to: TimestampWithMigrationId,
+      segment: UpdatesSegment,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       tc: TraceContext,
@@ -186,8 +185,7 @@ object UpdateHistorySegmentBulkStorage {
       config,
       updateHistory,
       s3Connection,
-      from,
-      to,
+      segment,
       loggerFactory,
     ).getSource
 
