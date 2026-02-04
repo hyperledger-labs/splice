@@ -205,10 +205,7 @@ async function installValidator(
     ),
   };
 
-  if (
-    validatorConfig.validatorApp?.scanClient != null ||
-    validatorValuesFromYamlFiles.scanClient != null
-  ) {
+  if (validatorConfig.validatorApp?.scanClient != null) {
     delete validatorValuesFromYamlFiles.scanAddress;
   }
 
