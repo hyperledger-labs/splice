@@ -1618,7 +1618,7 @@ class UpdateHistory(
           /*offset = */ LegacyOffset.Api.assertFromStringToLong(updateRow.participantOffset),
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
-          /*recordTime = */ updateRow.recordTime.toInstant,q
+          /*recordTime = */ updateRow.recordTime.toInstant,
           /*externalTransactionHash = */ ByteString.copyFrom(updateRow.externalTransactionHash),
         )
       ),
