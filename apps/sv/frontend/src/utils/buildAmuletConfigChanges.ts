@@ -73,7 +73,8 @@ export function buildAmuletConfigChanges(
     },
     {
       fieldName: 'transferConfigExtraFeaturedAppRewardAmount',
-      label: 'Amount of the AppRewardCoupon contract that is created per featured app transfer (in USD)',
+      label:
+        'Amount of the AppRewardCoupon contract that is created per featured app transfer (in USD)',
       currentValue: before?.transferConfig.extraFeaturedAppRewardAmount || '',
       newValue: after?.transferConfig.extraFeaturedAppRewardAmount || '',
     },
