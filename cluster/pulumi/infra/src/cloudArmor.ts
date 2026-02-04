@@ -43,7 +43,6 @@ const PolicyRule = gcp.compute.RegionSecurityPolicyRule;
 /**
  * Creates a Cloud Armor security policy
  * @param cac loaded configuration
- * @param bothGatewaysNs namespace where both the L7 ALB and the Istio gateways are installed
  * @param opts Pulumi resource options
  * @returns The created security policy resource, if enabled
  */

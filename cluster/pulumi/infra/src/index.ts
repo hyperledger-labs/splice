@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // ensure the config is loaded and the ENV is overriden
 import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { log as pulumiLog } from '@pulumi/pulumi';
 
 import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
@@ -36,8 +37,11 @@ export const egressIp = network.egressIp.address;
 
 const cloudArmorSecurityPolicy = configureCloudArmorPolicy(cloudArmorConfig);
 const useGKEL7Gateway = infraConfig.gkeGateway.proxyForIstioHttp;
+
 if (!useGKEL7Gateway && cloudArmorSecurityPolicy) {
-  console.warn('Cloud Armor requires gkeGateway.proxyForIstioHttp to be enabled to take effect');
+  void pulumiLog.warn(
+    'Cloud Armor requires gkeGateway.proxyForIstioHttp to be enabled to take effect'
+  );
 }
 
 const istio = configureIstio(
