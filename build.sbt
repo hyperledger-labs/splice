@@ -108,6 +108,9 @@ lazy val root: Project = (project in file("."))
     `splice-util-featured-app-proxies-test-daml`,
     `splice-util-token-standard-wallet-daml`,
     `splice-util-token-standard-wallet-test-daml`,
+    `splice-util-token-standard-wallet-test-daml`,
+    `splice-util-batched-markers-daml`,
+    `splice-util-batched-markers-test-daml`,
     `splitwell-daml`,
     `splitwell-test-daml`,
     `splice-dso-governance-daml`,
@@ -836,6 +839,28 @@ lazy val `splice-util-token-standard-wallet-test-daml` =
       Compile / damlDependencies :=
         (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
           (`splice-util-token-standard-wallet-daml` / Compile / damlBuild).value,
+      Compile / damlEnableJavaCodegen := false,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `splice-util-batched-markers-daml` =
+  project
+    .in(file("daml/splice-util-batched-markers"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `splice-util-batched-markers-test-daml` =
+  project
+    .in(file("daml/splice-util-batched-markers-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`splice-util-batched-markers-daml` / Compile / damlBuild).value ++
+        (`splice-token-standard-test-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
     .dependsOn(`canton-bindings-java`)
@@ -1945,6 +1970,7 @@ lazy val `apps-app`: Project =
       `canton-community-base`,
       `canton-community-integration-testing` % "test",
       `splice-util-featured-app-proxies-daml` % "test",
+      `splice-util-batched-markers-daml` % "test",
       // necessary for token-standard-cli to get `npm install`ed so that TokenStandardCliSanityCheckPlugin can run
       `apps-common-frontend`,
     )

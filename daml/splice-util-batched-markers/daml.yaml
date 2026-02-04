@@ -1,0 +1,18 @@
+sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
+name: splice-util-batched-markers
+source: daml
+version: 1.0.0
+dependencies:
+  - daml-prim
+  - daml-stdlib
+data-dependencies:
+  - ../splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
+build-options:
+  - --ghc-option=-Wunused-binds
+  - --ghc-option=-Wunused-matches
+  - --target=2.1
+codegen:
+  java:
+    package-prefix: org.lfdecentralizedtrust.splice.codegen.java
+    decoderClass: org.lfdecentralizedtrust.splice.codegen.java.DecoderSpliceAmulet
+    output-directory: target/daml-codegen-java
