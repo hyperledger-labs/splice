@@ -84,7 +84,6 @@ import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant}
 import java.util
 import java.util.Optional
-import java.security.SecureRandom
 import scala.concurrent.{Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -1273,13 +1272,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   private def nextUpdateId(): String = java.util.UUID.randomUUID().toString.replace("-", "")
 
-  private def getRandomByteString(length: Int = 32): ByteString = {
-    require(length >= 0, "length must be non-negative")
-    val bytes = new Array[Byte](length)
-    new SecureRandom().nextBytes(bytes)
-    ByteString.copyFrom(bytes)
-  }
-
   protected def mkTx(
       offset: Long,
       events: Seq[Event],
@@ -1289,7 +1281,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       commandId: String = "",
       recordTime: Instant = defaultEffectiveAt,
       updateId: String = nextUpdateId(),
-      externalTransactionHash: ByteString = getRandomByteString(),
+      externalTransactionHash: ByteString = ByteString.EMPTY,
   ): Transaction = {
     val eventsWithId = events.zipWithIndex.map { case (e, i) =>
       withNodeId(e, i)

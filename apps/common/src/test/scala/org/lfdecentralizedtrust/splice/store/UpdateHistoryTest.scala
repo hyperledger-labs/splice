@@ -31,6 +31,8 @@ import scala.jdk.OptionConverters.*
 import UpdateHistory.UpdateHistoryResponse
 import StoreTest.*
 import cats.data.NonEmptyList
+import com.google.protobuf.ByteString
+import java.security.SecureRandom
 
 class UpdateHistoryTest extends UpdateHistoryTestBase {
 
@@ -43,6 +45,13 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
     store
       .getAllUpdates(None, PageLimit.tryCreate(1000))
       .map(_.filter(_.migrationId == migrationId).map(_.update))
+  }
+
+  private def getRandomByteString(length: Int = 32): ByteString = {
+    require(length >= 0, "length must be non-negative")
+    val bytes = new Array[Byte](length)
+    new SecureRandom().nextBytes(bytes)
+    ByteString.copyFrom(bytes)
   }
 
   "UpdateHistory" should {
@@ -954,6 +963,72 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           migrationId <- UpdateHistory.getHighestKnownMigrationId(storage)
         } yield {
           migrationId shouldBe Some(migration2)
+        }
+      }
+    }
+
+    "getExternalTransactionHash" should {
+      "return stored external transaction hash" in {
+        val store1 = mkStore(storeName = "store1")
+        val party1 = mkPartyId("someParty1").toProtoPrimitive
+        val contractId1 = nextCid()
+        val id1 = new com.daml.ledger.javaapi.data.Identifier(
+          "somePackageId1",
+          "someModuleName1",
+          "someEntityName1",
+        )
+        val someValue = new DamlRecord(
+          new DamlRecord.Field("a", new Int64(42))
+        )
+        val effectiveAt = CantonTimestamp.MinValue.toInstant
+        val recordTime = CantonTimestamp.MinValue.toInstant
+        val externalTransactionHash = getRandomByteString()
+        for {
+          _ <- initStore(store1)
+          // Store1 ingests all import updates in a single transaction
+          expectedUpdate <- domain1.ingest(offset => {
+            mkTx(
+              offset = offset,
+              events = Seq(
+                new CreatedEvent(
+                  /*witnessParties*/ Seq(party1).asJava,
+                  /*offset = */ 133,
+                  /*nodeId = */ 154,
+                  /*templateId*/ id1,
+                  /*packageName*/ "somePackageName",
+                  /*contractId*/ contractId1,
+                  /*arguments*/ someValue,
+                  /*createdEventBlob*/ Bytes.assertFromString("00abcd").toByteString,
+                  /*interfaceViews*/ new java.util.HashMap(Map(id1 -> someValue).asJava),
+                  /*failedInterfaceViews*/ new java.util.HashMap(
+                    Map(id1 -> toJavaProto(Status.of(1, "some message", Seq.empty))).asJava
+                  ),
+                  /*contractKey*/ Some[Value](someValue).toJava,
+                  /*signatories*/ Seq(party1).asJava,
+                  /*observers*/ Seq(party1, party1).asJava,
+                  /*createdAt*/ effectiveAt,
+                  /*acsDelta*/ false,
+                  /*representativePackageId*/ id1.getPackageId,
+                )
+              ),
+              synchronizerId = domain1,
+              effectiveAt = effectiveAt,
+              recordTime = recordTime,
+              workflowId = "WorkflowId3",
+              commandId = "CommandId3",
+              externalTransactionHash = externalTransactionHash,
+            )
+          })(store1)
+          updates <- store1.getAllUpdates(
+            None,
+            PageLimit.Max,
+          )
+        } yield {
+          updates should have size 1
+          val storedTransaction =
+            updates.loneElement.update.update.asInstanceOf[TransactionTreeUpdate].tree
+          storedTransaction.getExternalTransactionHash shouldBe externalTransactionHash
+          storedTransaction.getExternalTransactionHash shouldBe expectedUpdate.getExternalTransactionHash
         }
       }
     }

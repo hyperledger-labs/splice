@@ -1110,7 +1110,8 @@ class UpdateHistory(
         effective_at,
         root_event_ids,
         workflow_id,
-        command_id
+        command_id,
+        external_transaction_hash
       from update_history_transactions
       where
         history_id = $historyId and """ ++ afterFilter ++
@@ -1617,8 +1618,8 @@ class UpdateHistory(
           /*offset = */ LegacyOffset.Api.assertFromStringToLong(updateRow.participantOffset),
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
-          /*recordTime = */ updateRow.recordTime.toInstant,
-          /*externalTransactionHash = */ ByteString.EMPTY, // TODO(#3408): Revisit when ingesting to DB
+          /*recordTime = */ updateRow.recordTime.toInstant,q
+          /*externalTransactionHash = */ ByteString.copyFrom(updateRow.externalTransactionHash),
         )
       ),
       synchronizerId = SynchronizerId.tryFromString(updateRow.synchronizerId),
@@ -1707,6 +1708,7 @@ class UpdateHistory(
           <<[Seq[String]],
           <<[Option[String]],
           <<[Option[String]],
+          <<[Array[Byte]],
         )
       )
     }
@@ -2415,6 +2417,7 @@ object UpdateHistory {
       rootEventIds: Seq[String],
       workflowId: Option[String],
       commandId: Option[String],
+      externalTransactionHash: Array[Byte],
   )
 
   case class SelectFromCreateEvents(
