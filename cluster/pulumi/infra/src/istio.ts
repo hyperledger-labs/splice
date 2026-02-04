@@ -341,41 +341,44 @@ function configureGatewayService(
 
   const istioPolicies = istioAccessPolicies(ingressNs, externalIPRangesInIstio, suffix);
 
-  const serviceValues =
-    gatewayVariant.type == 'LoadBalancer'
+  const { serviceValues, deploymentValues } =
+    gatewayVariant.type === 'LoadBalancer'
       ? {
-          // type's default is LoadBalancer; see values.yaml
-          loadBalancerIP: gatewayVariant.ingressIp,
-          loadBalancerSourceRanges: gatewayVariant.externalIPRangesInLB,
-          // See https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#network
-          // If you are using a TCP/UDP network load balancer that preserves the client IP address ..
-          // then you can use the externalTrafficPolicy: Local setting to also preserve the client IP inside Kubernetes by bypassing kube-proxy
-          // and preventing it from sending traffic to other nodes.
-          externalTrafficPolicy: 'Local',
+          serviceValues: {
+            // type's default is LoadBalancer; see values.yaml
+            loadBalancerIP: gatewayVariant.ingressIp,
+            loadBalancerSourceRanges: gatewayVariant.externalIPRangesInLB,
+            // See https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#network
+            // If you are using a TCP/UDP network load balancer that preserves the client IP address ..
+            // then you can use the externalTrafficPolicy: Local setting to also preserve the client IP inside Kubernetes by bypassing kube-proxy
+            // and preventing it from sending traffic to other nodes.
+            externalTrafficPolicy: 'Local',
+          },
+          deploymentValues: {},
         }
-      : // Create a ClusterIP Service for the istio ingress so the GKE L7 Gateway can
-        // target it (the GKE controller will create NEGs for the service ports).
-        {
-          // without LoadBalancer, the istio Gateway will not create a public IP
-          type: gatewayVariant.type,
-          // TODO (#2723) works without?
-          // (prior to IP fixes) without this ALB returns 5xx, with it returns 403
-          /*annotations: {
+      : {
+          // Create a ClusterIP Service for the istio ingress so the GKE L7 Gateway can
+          // target it (the GKE controller will create NEGs for the service ports).
+          serviceValues: {
+            // without LoadBalancer, the istio Gateway will not create a public IP
+            type: gatewayVariant.type,
+            // TODO (#2723) works without?
+            // (prior to IP fixes) without this ALB returns 5xx, with it returns 403
+            /*annotations: {
             // Use numeric port keys (as strings) to avoid
             // error parsing value of NEG annotation "cloud.google.com/neg" on service "cluster-ingress"/"istio-ingress": NEG annotation is invalid
             'cloud.google.com/neg': JSON.stringify({ exposed_ports: { '80': {} } }),
           },*/
-        };
-  const deploymentValues =
-    gatewayVariant.type === 'ClusterIP'
-      ? {
-          podAnnotations: {
-            'proxy.istio.io/config': JSON.stringify({
-              gatewayTopology: { numTrustedProxies: 2 },
-            }),
           },
-        }
-      : {};
+          deploymentValues: {
+            podAnnotations: {
+              'proxy.istio.io/config': JSON.stringify({
+                // the 2 are an IP from the proxy-only subnet and the ingress IP itself
+                gatewayTopology: { numTrustedProxies: 2 },
+              }),
+            },
+          },
+        };
 
   const gateway = new k8s.helm.v3.Release(
     `istio-ingress${suffix}`,
@@ -487,16 +490,6 @@ function configureGateway(
       metadata: {
         name: 'cn-http-gateway',
         namespace: ingressNs.ns.metadata.name,
-        // TODO (#2723) remove?
-        /*...(withSeparateGcpGateway
-          ? {
-              annotations: {
-                'proxy.istio.io/config': JSON.stringify({
-                  gatewayTopology: { numTrustedProxies: 2 },
-                }),
-              },
-            }
-          : {}),*/
       },
       spec: {
         selector: {
