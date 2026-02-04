@@ -515,14 +515,16 @@ function configureGateway(
           },
           ...(withSeparateGcpGateway
             ? [
-                  {
-                      hosts,
-                      port: {
-                          name: 'https',
-                          number: 443,
-                          protocol: 'HTTP',
-                      },
-                  }
+                {
+                  hosts,
+                  // our VirtualServices charts hardcode 443 as port match on http;
+                  // without this you get 403 route_not_found in istio
+                  port: {
+                    name: 'http-on-443',
+                    number: 443,
+                    protocol: 'HTTP',
+                  },
+                },
               ]
             : [
                 {
