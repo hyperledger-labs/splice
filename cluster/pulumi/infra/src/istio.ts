@@ -171,6 +171,20 @@ function ingressPort(name: string, port: number): IngressPort {
   };
 }
 
+/*
+The result of configureInternalGatewayService is passed to configureGKEL7Gateway
+as a dependency. This is important because reconfiguring the `istio-ingress` helm
+release has to complete before creating that gateway. This works fine. However,
+when turning off the flag, which causes the configureGKEL7Gateway gateway to be deleted,
+this deletion should happen before reconfiguring the `istio-ingress` helm release.
+However, pulumi up always tries to update the `istio-ingress` helm release first,
+which is guaranteed to fail.
+
+Changes that do not improve things at all:
+- having replaceOnChanges include service.type
+- having istio-ingress be cn-gke-l7-gateway's parent
+ */
+
 // Note that despite the helm chart name being "gateway", this does not actually
 // deploy an istio "gateway" resource, but rather the istio-ingress LoadBalancer
 // service and the istio-ingress pod.
