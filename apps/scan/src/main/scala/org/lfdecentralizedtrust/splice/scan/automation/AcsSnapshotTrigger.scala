@@ -178,7 +178,7 @@ class AcsSnapshotTrigger(
             s"SynchronizerId with no data in $migrationRecordTimeRange"
           )
         )
-      firstSnapshotTime = storageConfig.computeSnapshotTimeAfter(minTime)
+      firstSnapshotTime = storageConfig.computeDbSnapshotTimeAfter(minTime)
       migrationLastedLongEnough = firstSnapshotTime
         .plus(Duration.ofHours(storageConfig.dbAcsSnapshotPeriodHours.toLong))
         .isBefore(maxTime)
@@ -271,7 +271,7 @@ class AcsSnapshotTrigger(
           Some(
             AcsSnapshotTrigger
               .Task(
-                storageConfig.computeSnapshotTimeAfter(firstNonAcsImportRecordTime),
+                storageConfig.computeDbSnapshotTimeAfter(firstNonAcsImportRecordTime),
                 migrationId,
                 None,
               )
