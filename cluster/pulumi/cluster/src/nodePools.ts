@@ -28,6 +28,7 @@ export function installNodePools(): void {
     appsNodePool(cluster, appsNodePoolConfig);
   }
 
+  const nodePoolComputeZone = config.optionalEnv('CLOUDSDK_NODEPOOL_COMPUTE_ZONE');
   new gcp.container.NodePool('cn-infra-node-pool', {
     cluster,
     nodeConfig: {
@@ -44,7 +45,7 @@ export function installNodePools(): void {
       },
       loggingVariant: 'DEFAULT',
     },
-    location: config.optionalEnv('CLOUDSDK_NODEPOOL_COMPUTE_ZONE'),
+    nodeLocations: nodePoolComputeZone ? [nodePoolComputeZone] : undefined,
     initialNodeCount: 1,
     autoscaling: {
       minNodeCount: gkeClusterConfig.nodePools.infra.minNodes,
@@ -53,7 +54,6 @@ export function installNodePools(): void {
   });
 
   new gcp.container.NodePool('gke-node-pool', {
-    name: 'gke-pool',
     cluster,
     nodeConfig: {
       machineType: 'e2-standard-4',
@@ -66,7 +66,7 @@ export function installNodePools(): void {
       ],
       loggingVariant: 'DEFAULT',
     },
-    location: config.optionalEnv('CLOUDSDK_NODEPOOL_COMPUTE_ZONE'),
+    nodeLocations: nodePoolComputeZone ? [nodePoolComputeZone] : undefined,
     initialNodeCount: 1,
     autoscaling: {
       minNodeCount: 1,
