@@ -505,7 +505,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         for {
           _ <- initStore(storeMigrationId1)
           _ <- storeMigrationId1
-            .getRecordTimeRange(1)
+            .getRecordTimeRangeBySynchronizer(1)
             .map(_ shouldBe Map.empty)
           _ <-
             MonadUtil.sequentialTraverse(1 to 10)(i =>
@@ -520,7 +520,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             )
           _ <- initStore(storeMigrationId2)
           _ <- storeMigrationId1
-            .getRecordTimeRange(1)
+            .getRecordTimeRangeBySynchronizer(1)
             .map(
               _ shouldBe Map(
                 domain1 -> DomainRecordTimeRange(
@@ -530,7 +530,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
               )
             )
           _ <- storeMigrationId2
-            .getRecordTimeRange(1)
+            .getRecordTimeRangeBySynchronizer(1)
             .map(
               _ shouldBe Map(
                 domain1 -> DomainRecordTimeRange(
@@ -539,7 +539,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                 )
               )
             )
-          _ <- storeMigrationId2.getRecordTimeRange(2).map(_ shouldBe Map())
+          _ <- storeMigrationId2.getRecordTimeRangeBySynchronizer(2).map(_ shouldBe Map())
 
           // We exclude CantonTimestamp.MinValue which are the transactions imported as part of the HDM as opposed to transactions actually sequenced.
           _ <- create(
@@ -551,7 +551,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             CantonTimestamp.MinValue,
           )
 
-          _ <- storeMigrationId2.getRecordTimeRange(2).map(_ shouldBe Map())
+          _ <- storeMigrationId2.getRecordTimeRangeBySynchronizer(2).map(_ shouldBe Map())
 
           // insert a transaction after CantonTimestamp.MinValue which now advances the record timestamp boundaries.
           _ <- create(
@@ -564,7 +564,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           )
 
           _ <- storeMigrationId2
-            .getRecordTimeRange(2)
+            .getRecordTimeRangeBySynchronizer(2)
             .map(
               _ shouldBe Map(
                 domain1 -> DomainRecordTimeRange(
@@ -584,7 +584,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             time(0),
           )
           _ <- storeMigrationId2
-            .getRecordTimeRange(2)
+            .getRecordTimeRangeBySynchronizer(2)
             .map(
               _ shouldBe Map(
                 domain1 -> DomainRecordTimeRange(

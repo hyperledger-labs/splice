@@ -508,10 +508,14 @@ class AcsSnapshotStore(
       """.as[Long].head
       _ <- (sql"""
         insert into #${table.tableName} (
-          """ ++ copyFromUpdateHistoryTargetColumns ++ sql"""
+          """ ++ copyFromUpdateHistoryTargetColumns ++ sql""",
+          snapshot_id
         )
+
+
         select
-          """ ++ copyFromUpdateHistorySourceColumns ++ sql"""
+          """ ++ copyFromUpdateHistorySourceColumns ++ sql""",
+          $snapshotId
         from acs_snapshot_data d
         join update_history_creates c on d.create_id=c.row_id
         where
@@ -568,10 +572,12 @@ class AcsSnapshotStore(
       insertedRows <-
         (sql"""
           insert into #${table.tableName} (
-            """ ++ copyFromUpdateHistoryTargetColumns ++ sql"""
+            """ ++ copyFromUpdateHistoryTargetColumns ++ sql""",
+            snapshot_id
           )
           select
-            """ ++ copyFromUpdateHistorySourceColumns ++ sql"""
+            """ ++ copyFromUpdateHistorySourceColumns ++ sql""",
+            $snapshotId
           from update_history_creates c
           where history_id = $historyId
             and migration_id = ${migrationId}
@@ -623,7 +629,7 @@ class AcsSnapshotStore(
         select s.create_id, s.template_id, stakeholder
         from #${table.tableName} s
         cross join unnest(s.stakeholders) as stakeholder
-        where s.history_id = $historyId
+        where s.snapshot_id = ${snapshot.snapshotId}
         order by created_at, contract_id
       """
 
@@ -640,7 +646,7 @@ class AcsSnapshotStore(
             sum(s.unlocked_amulet_balance) AS unlocked_amulet_balance,
             sum(s.locked_amulet_balance) AS locked_amulet_balance
         from #${table.tableName} s
-        where history_id = $historyId
+        where snapshot_id = ${snapshot.snapshotId}
       """.as[(BigDecimal, BigDecimal)].head
 
       _ <- sqlu"""
@@ -713,10 +719,12 @@ class AcsSnapshotStore(
       insertedRows <-
         (sql"""
           insert into #${table.tableName} (
-            """ ++ copyFromUpdateHistoryTargetColumns ++ sql"""
+            """ ++ copyFromUpdateHistoryTargetColumns ++ sql""",
+            snapshot_id
           )
           select
-            """ ++ copyFromUpdateHistorySourceColumns ++ sql"""
+            """ ++ copyFromUpdateHistorySourceColumns ++ sql""",
+            ${snapshot.snapshotId}
           from update_history_creates c
           where history_id = $historyId
             and migration_id = ${snapshot.migrationId}
@@ -728,7 +736,7 @@ class AcsSnapshotStore(
           delete
           from #${table.tableName} as s
           using update_history_exercises as e
-          where s.history_id = $historyId
+          where s.snapshot_id = ${snapshot.snapshotId}
             and s.contract_id = e.contract_id
             and e.history_id = $historyId
             and e.migration_id = ${snapshot.migrationId}
@@ -758,7 +766,7 @@ class AcsSnapshotStore(
     assert(snapshot.historyId == historyId)
     val statement = for {
       _ <- sqlu"""delete from acs_incremental_snapshot where snapshot_id = ${snapshot.snapshotId}"""
-      _ <- sqlu"""delete from #${table.tableName} where history_id = $historyId"""
+      _ <- sqlu"""delete from #${table.tableName} where snapshot_id = ${snapshot.snapshotId}"""
     } yield ()
     storage.queryAndUpdate(
       withIncrementalSnapshotIdempotencyCheck(table, statement, Some(snapshot)),
@@ -820,7 +828,6 @@ object AcsSnapshotStore {
 
     val copyFromUpdateHistoryTargetColumns: SQLActionBuilder =
       sql"""
-      history_id,
       create_id,
       contract_id,
       created_at,
@@ -831,7 +838,6 @@ object AcsSnapshotStore {
     """
     val copyFromUpdateHistorySourceColumns: SQLActionBuilder =
       sql"""
-      c.history_id,
       c.row_id,
       c.contract_id,
       c.created_at,

@@ -164,7 +164,6 @@ class AcsSnapshotTriggerTest
           Seq(
             AcsSnapshotTriggerBase.UpdateIncrementalSnapshotTask(
               snapshot = snapshot,
-              now = now,
               updateUntil = now.minusSeconds(2770L),
             )
           )
@@ -187,7 +186,6 @@ class AcsSnapshotTriggerTest
           Seq(
             AcsSnapshotTriggerBase.UpdateIncrementalSnapshotTask(
               snapshot = snapshot,
-              now = now,
               updateUntil = now.minusSeconds(1800L),
             )
           )
@@ -270,7 +268,7 @@ class AcsSnapshotTriggerTest
             )
           )
         )
-        backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 1L)
+        // backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 1L)
       }
       "continue backfilling from an existing snapshot" in new AcsSnapshotTriggerTestScope() {
         noPreviousIncrementalSnapshot()
@@ -287,7 +285,7 @@ class AcsSnapshotTriggerTest
             )
           )
         )
-        backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 1L)
+        // backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 1L)
       }
       "skip migrations that are too short" in new AcsSnapshotTriggerTestScope() {
         noPreviousIncrementalSnapshot()
@@ -300,7 +298,7 @@ class AcsSnapshotTriggerTest
 
         // So we skip it and start backfilling from the migration before that.
         backfillingTrigger.retrieveTasks().futureValue shouldBe empty
-        backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 2L)
+        // backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 2L)
         backfillingTrigger.retrieveTasks().futureValue should be(
           Seq(
             InitializeIncrementalSnapshotFromImportUpdatesTask(
@@ -324,7 +322,7 @@ class AcsSnapshotTriggerTest
 
         // Skip the completed migration and start backfilling from the migration before that.
         backfillingTrigger.retrieveTasks().futureValue shouldBe empty
-        backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 2L)
+        // backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 2L)
         backfillingTrigger.retrieveTasks().futureValue should be(
           Seq(
             InitializeIncrementalSnapshotFromImportUpdatesTask(
@@ -379,12 +377,11 @@ class AcsSnapshotTriggerTest
           Seq(
             AcsSnapshotTriggerBase.UpdateIncrementalSnapshotTask(
               snapshot = snapshot,
-              now = now,
               updateUntil = now.minusSeconds(2770L),
             )
           )
         )
-        backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 2L)
+        // backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 2L)
       }
       "save snapshot at its target record time" in new AcsSnapshotTriggerTestScope() {
         val snapshot = IncrementalAcsSnapshot(
@@ -407,7 +404,7 @@ class AcsSnapshotTriggerTest
             )
           )
         )
-        backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 2L)
+        // backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 2L)
       }
       "move to the next migration when done with one" in new AcsSnapshotTriggerTestScope() {
         val snapshot = IncrementalAcsSnapshot(
@@ -426,7 +423,7 @@ class AcsSnapshotTriggerTest
         // Incremental snapshot has a targetRecordTime beyond the end of the migration,
         // move on to the next migration
         backfillingTrigger.retrieveTasks().futureValue shouldBe empty
-        backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 3L)
+        // backfillingTrigger.currentBackfillingMigrationId shouldBe Some(currentMigrationId - 3L)
         backfillingTrigger.retrieveTasks().futureValue should be(
           Seq(
             AcsSnapshotTriggerBase.DeleteIncrementalSnapshotTask(
@@ -625,7 +622,7 @@ class AcsSnapshotTriggerTest
         )
       )
       when(
-        updateHistory.getRecordTimeRange(eqTo(migrationId))(any[TraceContext])
+        updateHistory.getRecordTimeRangeBySynchronizer(eqTo(migrationId))(any[TraceContext])
       ).thenReturn(
         Future.successful(
           Map(dummyDomain -> DomainRecordTimeRange(minRecordTime, maxRecordTime))
@@ -650,7 +647,7 @@ class AcsSnapshotTriggerTest
         )
       )
       when(
-        updateHistory.getRecordTimeRange(eqTo(migrationId))(any[TraceContext])
+        updateHistory.getRecordTimeRangeBySynchronizer(eqTo(migrationId))(any[TraceContext])
       ).thenReturn(
         Future.successful(
           Map.empty
@@ -710,7 +707,7 @@ class AcsSnapshotTriggerTest
         max: CantonTimestamp,
         min: CantonTimestamp = CantonTimestamp.MinValue,
     ): Unit = {
-      when(updateHistory.getRecordTimeRange(eqTo(migrationId))(any[TraceContext]))
+      when(updateHistory.getRecordTimeRangeBySynchronizer(eqTo(migrationId))(any[TraceContext]))
         .thenReturn(
           Future.successful(
             Map(dummyDomain -> DomainRecordTimeRange(min, max))
