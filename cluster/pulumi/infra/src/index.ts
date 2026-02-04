@@ -5,7 +5,7 @@ import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
-import { configureCloudArmorPolicy, CloudArmorPolicy } from './cloudArmor';
+import { configureCloudArmorPolicy } from './cloudArmor';
 import {
   cloudArmorConfig,
   clusterBaseDomain,

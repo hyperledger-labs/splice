@@ -3,7 +3,7 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as _ from 'lodash';
-import { CLUSTER_BASENAME, ExactNamespace } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CLUSTER_BASENAME } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import * as config from './config';
 
