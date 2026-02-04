@@ -22,7 +22,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItem.mem
   UpdateHistoryTransaction as HttpUpdateHistoryTx,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{DamlValueEncoding, UpdateHistoryItem}
-import org.lfdecentralizedtrust.splice.store.{StoreTest, TreeUpdateWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.{StoreTestBase, TreeUpdateWithMigrationId}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.VerdictResultDbValue
@@ -32,7 +32,7 @@ import org.scalatest.matchers.should.Matchers
 import java.time.Instant
 import scala.util.Random
 
-class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers {
+class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Matchers {
   private val haveMicrosecondPrecision = endWith regex """\.\d{6}Z"""
 
   "LosslessScanHttpEncodings" should {

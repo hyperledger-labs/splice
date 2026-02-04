@@ -88,7 +88,7 @@ import scala.concurrent.{Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-abstract class StoreTest extends AsyncWordSpec with BaseTest {
+abstract class StoreTestBase extends AsyncWordSpec with BaseTest {
 
   protected val upgradedAppRewardCouponPackageId = "upgradedpackageid"
   protected val dummyHoldingPackageId = DummyHolding.TEMPLATE_ID.getPackageId
@@ -808,7 +808,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     }
   }
 
-  protected lazy val dummyDomain = StoreTest.dummyDomain
+  protected lazy val dummyDomain = StoreTestBase.dummyDomain
 
   protected val dummy2Domain = SynchronizerId.tryFromString("dummy2::domain")
 
@@ -954,22 +954,23 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   )
 
   protected def acs(
-      acs: Seq[StoreTest.AcsImportEntry] = Seq.empty,
-      incompleteOut: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
-      incompleteIn: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
+      acs: Seq[StoreTestBase.AcsImportEntry] = Seq.empty,
+      incompleteOut: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
+      incompleteIn: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
       acsOffset: Long = nextOffset(),
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.ingestAcs(
       acsOffset,
-      acs.map { case StoreTest.AcsImportEntry(contract, domain, counter, implementedInterfaces) =>
-        ActiveContract(
-          domain,
-          toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
-          counter,
-        )
+      acs.map {
+        case StoreTestBase.AcsImportEntry(contract, domain, counter, implementedInterfaces) =>
+          ActiveContract(
+            domain,
+            toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
+            counter,
+          )
       },
       incompleteOut.map {
-        case StoreTest.AcsImportIncompleteEntry(
+        case StoreTestBase.AcsImportIncompleteEntry(
               c,
               sourceDomain,
               targetDomain,
@@ -987,7 +988,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
           )
       },
       incompleteIn.map {
-        case StoreTest.AcsImportIncompleteEntry(
+        case StoreTestBase.AcsImportIncompleteEntry(
               c,
               sourceDomain,
               targetDomain,
@@ -1008,9 +1009,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   } yield ()
 
   protected def initWithAcs(
-      activeContracts: Seq[StoreTest.AcsImportEntry] = Seq.empty,
-      incompleteOut: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
-      incompleteIn: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
+      activeContracts: Seq[StoreTestBase.AcsImportEntry] = Seq.empty,
+      incompleteOut: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
+      incompleteIn: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
       acsOffset: Long = nextOffset(),
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.initialize()
@@ -1420,7 +1421,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   }
 }
 
-object StoreTest {
+object StoreTestBase {
 
   implicit class IngestSingleElementSink(underlying: MultiDomainAcsStore.IngestionSink) {
     final def ingestUpdate(synchronizerId: SynchronizerId, update: TreeUpdate)(implicit
@@ -1502,14 +1503,15 @@ object StoreTest {
   }
 
   val testTxLogConfig = new TxLogStore.Config[TestTxLogEntry] {
-    override def parser: org.lfdecentralizedtrust.splice.store.StoreTest.TestTxLogStoreParser.type =
+    override def parser
+        : org.lfdecentralizedtrust.splice.store.StoreTestBase.TestTxLogStoreParser.type =
       TestTxLogStoreParser
     override def entryToRow: org.lfdecentralizedtrust.splice.store.TestTxLogEntry => Option[
       org.lfdecentralizedtrust.splice.store.db.TxLogRowData.TxLogRowDataWithoutIndices.type
     ] =
       _ => Some(TxLogRowData.noIndices)
-    override def encodeEntry = StoreTest.TxLogEntry.encode
-    override def decodeEntry = StoreTest.TxLogEntry.decode
+    override def encodeEntry = StoreTestBase.TxLogEntry.encode
+    override def decodeEntry = StoreTestBase.TxLogEntry.decode
   }
 
   case class AcsImportEntry(
