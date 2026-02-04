@@ -103,7 +103,6 @@
       },
       "cluster": "cn-mocknet",
       "initialNodeCount": 1,
-      "name": "gke-pool",
       "nodeConfig": {
         "loggingVariant": "DEFAULT",
         "machineType": "e2-standard-4",
