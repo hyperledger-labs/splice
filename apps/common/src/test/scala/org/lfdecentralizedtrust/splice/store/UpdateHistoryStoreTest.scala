@@ -32,7 +32,7 @@ import UpdateHistory.UpdateHistoryResponse
 import StoreTestBase.*
 import cats.data.NonEmptyList
 
-class UpdateHistoryTest extends UpdateHistoryStoreTestBase {
+class UpdateHistoryStoreTest extends UpdateHistoryStoreTestBase {
 
   import UpdateHistoryStoreTestBase.*
 
