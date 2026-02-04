@@ -879,8 +879,6 @@ class UserWalletTxLogParser(
               sender = Some(PartyAndAmount(sender, 0.0)),
               receivers = Seq(PartyAndAmount(receiver, 0.0)),
               senderHoldingFees = BigDecimal(0.0),
-              // dummy value as it's mandatory
-              amuletPrice = BigDecimal(0.0),
               appRewardsUsed = BigDecimal(0.0),
               validatorRewardsUsed = BigDecimal(0.0),
               svRewardsUsed = Some(BigDecimal(0.0)),
@@ -1142,8 +1140,6 @@ object UserWalletTxLogParser {
           date = Some(tx.getEffectiveAt),
           amount = BigDecimal(0.0),
           receiver = party.toProtoPrimitive,
-          // We need a dummy price here to make our parsers happy.
-          amuletPrice = BigDecimal(0.0),
         )
         State(
           entries = immutable.Queue(
@@ -1177,7 +1173,6 @@ object UserWalletTxLogParser {
         date = Some(tx.getEffectiveAt),
         amount = BigDecimal(0),
         receiver = owner,
-        amuletPrice = BigDecimal(0),
       )
       State(
         entries = immutable.Queue(newEntry)
@@ -1305,7 +1300,6 @@ object UserWalletTxLogParser {
           sender = Some(sender),
           receivers = receivers,
           senderHoldingFees = node.result.value.summary.holdingFees,
-          amuletPrice = node.result.value.summary.amuletPrice,
           appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
           validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
           svRewardsUsed = Some(BigDecimal(node.result.value.summary.inputSvRewardAmount)),
@@ -1398,7 +1392,6 @@ object UserWalletTxLogParser {
         sender = Some(PartyAndAmount(sender, senderBalanceChange)),
         receivers = receivers,
         senderHoldingFees = node.result.value.summary.holdingFees,
-        amuletPrice = node.result.value.summary.amuletPrice,
         appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
         validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
         developmentFundCouponsUsed = BigDecimal(
@@ -1479,7 +1472,6 @@ object UserWalletTxLogParser {
         sender = Some(PartyAndAmount(provider, senderBalanceChange)),
         receivers = Seq.empty,
         senderHoldingFees = summary.holdingFees,
-        amuletPrice = summary.amuletPrice,
         appRewardsUsed = BigDecimal(summary.inputAppRewardAmount),
         validatorRewardsUsed = BigDecimal(summary.inputValidatorRewardAmount),
         developmentFundCouponsUsed =
@@ -1532,7 +1524,6 @@ object UserWalletTxLogParser {
         date = Some(tx.getEffectiveAt),
         amount = amulet.amount.initialAmount,
         receiver = amulet.owner,
-        amuletPrice = acsum.amuletPrice,
       )
       State(
         entries = immutable.Queue(newEntry)
@@ -1567,7 +1558,6 @@ object UserWalletTxLogParser {
           eventId = "",
           subtype = Some(BalanceChangeTransactionSubtype.Tap.toProto),
           date = Some(Instant.now()),
-          amuletPrice = BigDecimal(0),
         )
       )
     )

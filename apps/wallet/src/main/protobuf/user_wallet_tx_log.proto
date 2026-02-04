@@ -47,7 +47,7 @@ message TransferTxLogEntry {
   PartyAndAmount sender = 5;
   repeated PartyAndAmount receivers = 6;
   string sender_holding_fees = 7 [(scalapb.field).type = "scala.math.BigDecimal"];
-  string amulet_price = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string amulet_price = 8; // Unused but our decoding infrastructure doesn't like reserved fields.
   string app_rewards_used = 9 [(scalapb.field).type = "scala.math.BigDecimal"];
   string validator_rewards_used = 10 [(scalapb.field).type = "scala.math.BigDecimal"];
   string sv_rewards_used = 11 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
@@ -68,7 +68,7 @@ message BalanceChangeTxLogEntry {
   google.protobuf.Timestamp date = 3 [(scalapb.field).type = "java.time.Instant"];
   string receiver = 4;
   string amount = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
-  string amulet_price = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string amulet_price = 6; // Unused but our decoding infrastructure doesn't like reserved fields.
   string transfer_instruction_cid = 7;
 }
 

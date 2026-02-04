@@ -1460,7 +1460,6 @@ components:
             - sender
             - receivers
             - holding_fees
-            - amulet_price
             - app_rewards_used
             - validator_rewards_used
             - sv_rewards_used
@@ -1473,8 +1472,6 @@ components:
               items:
                 $ref: "#/components/schemas/PartyAndAmount"
             holding_fees:
-              type: string
-            amulet_price:
               type: string
             app_rewards_used:
               type: string
@@ -1498,14 +1495,11 @@ components:
         - type: object
           required:
             - receivers
-            - amulet_price
           properties:
             receivers:
               type: array
               items:
                 $ref: "#/components/schemas/PartyAndAmount"
-            amulet_price:
-              type: string
             transfer_instruction_cid:
               type: string
     NotificationResponseItem:
