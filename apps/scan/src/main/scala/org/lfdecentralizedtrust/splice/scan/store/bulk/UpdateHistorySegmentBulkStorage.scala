@@ -32,8 +32,8 @@ import scala.math.Ordering.Implicits.*
 // TODO(#3429): some duplication between this and SingleAcsSnapshotBulkStorage, see if we can more nicely reuse stuff
 
 case class UpdatesSegment(
-    val fromTimestamp: TimestampWithMigrationId,
-    val toTimestamp: TimestampWithMigrationId,
+    fromTimestamp: TimestampWithMigrationId,
+    toTimestamp: TimestampWithMigrationId,
 )
 
 class UpdateHistorySegmentBulkStorage(
@@ -58,7 +58,10 @@ class UpdateHistorySegmentBulkStorage(
         HardLimit.tryCreate(config.bulkDbReadChunkSize),
       )
       updatesInSegment = updates.filter(update =>
-        TimestampWithMigrationId(update.update.update.recordTime, update.migrationId) <= segment.toTimestamp
+        TimestampWithMigrationId(
+          update.update.update.recordTime,
+          update.migrationId,
+        ) <= segment.toTimestamp
       )
       result <-
         if (
@@ -129,7 +132,11 @@ class UpdateHistorySegmentBulkStorage(
         OverflowStrategy.backpressure,
       )
       .mapAsync(1) { case ByteStringWithTermination(zstdObj, isLast) =>
-        val objectKey = if (isLast) s"updates_${s3ObjIdx}_last.zstd" else s"updates_$s3ObjIdx.zstd"
+        // TODO(#3429): cleanup the path syntax, and move it somewhere that we can use also for the ACS snapshots
+        val objectKey =
+          if (isLast)
+            s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_${s3ObjIdx}_last.zstd"
+          else s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_$s3ObjIdx.zstd"
         // TODO(#3429): For now, we accumulate the full object in memory, then write it as a whole.
         //    Consider streaming it to S3 instead. Need to make sure that it then handles crashes correctly,
         //    i.e. that until we tell S3 that we're done writing, if we stop, then S3 throws away the
@@ -159,15 +166,14 @@ object UpdateHistorySegmentBulkStorage {
       ec: ExecutionContext,
       actorSystem: ActorSystem,
   ): Flow[UpdatesSegment, TimestampWithMigrationId, NotUsed] =
-    Flow[UpdatesSegment].flatMapConcat {
-      (segment: UpdatesSegment) =>
-        new UpdateHistorySegmentBulkStorage(
-          config,
-          updateHistory,
-          s3Connection,
-          segment,
-          loggerFactory,
-        ).getSource
+    Flow[UpdatesSegment].flatMapConcat { (segment: UpdatesSegment) =>
+      new UpdateHistorySegmentBulkStorage(
+        config,
+        updateHistory,
+        s3Connection,
+        segment,
+        loggerFactory,
+      ).getSource
     }
 
   def asSource(

@@ -6,13 +6,12 @@ package org.lfdecentralizedtrust.splice.scan.store.bulk
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import org.apache.pekko.NotUsed
 import org.apache.pekko.pattern.after
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.{KillSwitches, RestartSettings, UniqueKillSwitch}
 import org.apache.pekko.stream.scaladsl.{Keep, RestartSource, Source}
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
-import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanKeyValueProvider}
+import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider
 import org.lfdecentralizedtrust.splice.store.{HardLimit, TimestampWithMigrationId, UpdateHistory}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -37,53 +36,57 @@ class UpdateHistoryBulkStorage(
     //      if exists, then return "lowest migration ID for which we have a tx with record time > timestamp"
     //      else, return currentMigrationId
     // But too tired right now to check my logic...
-    ???
+    updateHistory
+      .getLowestMigrationForRecordTime(snapshotTimestamp)
+      .map(_.getOrElse(currentMigrationId))
   }
 
   private def getSegmentEndAfter(ts: TimestampWithMigrationId): Future[TimestampWithMigrationId] = {
     val endTs = config.computeBulkSnapshotTimeAfter(ts.timestamp)
     for {
-      endMigration <- if (ts.migrationId < currentMigrationId) {
-        getMigrationIdForAcsSnapshot(endTs)
-      } else {
-        /* When dumping updates for the current migration ID, we always assume that this migration ID
+      endMigration <-
+        if (ts.migrationId < currentMigrationId) {
+          getMigrationIdForAcsSnapshot(endTs)
+        } else {
+          /* When dumping updates for the current migration ID, we always assume that this migration ID
            continues beyond the segment, i.e. that the current migration ID is also the migration ID at
            the end of the segment. If this does not hold, and a migration happens before the end of the
            segment, then:
            a. this app will stop ingesting updates before the end of the segment, hence this segment will not be considered completed
            b. eventually, the app will be restarted with the new migration ID, and this segment will be retried in the new app,
               where (ts.migrationId == currentMigrationId) will no longer hold.
-         */
-        Future.successful(currentMigrationId)
-      }
+           */
+          Future.successful(currentMigrationId)
+        }
     } yield {
       TimestampWithMigrationId(endTs, endMigration)
     }
   }
 
-  /**
-   * Gets the very first updates segment for this network after genesis
-   * May return None if unknown yet. This could happen if no updates have been ingested,
-   * so we do not know the genesis record time yet. The caller should then sleep and retry.
-   */
+  /** Gets the very first updates segment for this network after genesis
+    * May return None if unknown yet. This could happen if no updates have been ingested,
+    * so we do not know the genesis record time yet. The caller should then sleep and retry.
+    */
   private def getFirstSegmentFromGenesis: Future[Option[UpdatesSegment]] =
     for {
       firstUpdate <- updateHistory.getUpdatesWithoutImportUpdates(None, HardLimit.tryCreate(1))
       segmentEnd <- firstUpdate.headOption match {
         case None => Future.successful(None)
-        case Some(first) => getSegmentEndAfter(TimestampWithMigrationId(first.update.update.recordTime, first.migrationId)).map(Some(_))
+        case Some(first) =>
+          getSegmentEndAfter(
+            TimestampWithMigrationId(first.update.update.recordTime, first.migrationId)
+          ).map(Some(_))
       }
     } yield {
       // TODO: should we indicate genesis using something more explicit than (0,0) ?
-      segmentEnd.map(UpdatesSegment(TimestampWithMigrationId(CantonTimestamp.MinValue, 0),_))
+      segmentEnd.map(UpdatesSegment(TimestampWithMigrationId(CantonTimestamp.MinValue, 0), _))
     }
 
-  /**
-   * Gets the segment from which this app should start dumping, e.g. after a restart.
-   * May return None if unknown yet. The caller should then sleep and retry.
-   */
+  /** Gets the segment from which this app should start dumping, e.g. after a restart.
+    * May return None if unknown yet. The caller should then sleep and retry.
+    */
   private def getFirstSegment: Future[Option[UpdatesSegment]] =
-    kvProvider.getLatestUpdatesSegmentInBulkStorage().value.flatMap{
+    kvProvider.getLatestUpdatesSegmentInBulkStorage().value.flatMap {
       case None => getFirstSegmentFromGenesis
       case Some(after) => getNextSegment(Some(after))
     }
@@ -91,7 +94,9 @@ class UpdateHistoryBulkStorage(
   private def getNextSegment(afterO: Option[UpdatesSegment]): Future[Option[UpdatesSegment]] =
     afterO match {
       case Some(previous) =>
-        getSegmentEndAfter(previous.toTimestamp).map(end => Some(UpdatesSegment(previous.toTimestamp, end)))
+        getSegmentEndAfter(previous.toTimestamp).map(end =>
+          Some(UpdatesSegment(previous.toTimestamp, end))
+        )
       case None => getFirstSegment
     }
 
@@ -108,7 +113,7 @@ class UpdateHistoryBulkStorage(
           case None =>
             logger.debug(s"Next segment after $current not known yet, sleeping...")
             after(5.seconds, actorSystem.scheduler)(
-              Future.successful(Some(current, None))
+              Future.successful(Some((current, None)))
             )
         }
       }
