@@ -11,7 +11,7 @@ const DevelopmentFundTotal: React.FC = () => {
     <Card variant="outlined">
       <CardContent>
         <Stack spacing={1}>
-          <Typography variant="h5">Active Development Fund Coupons</Typography>
+          <Typography variant="h5">Development Fund Total</Typography>
           <Typography variant="h4" fontWeight="bold">
             {total}
           </Typography>
