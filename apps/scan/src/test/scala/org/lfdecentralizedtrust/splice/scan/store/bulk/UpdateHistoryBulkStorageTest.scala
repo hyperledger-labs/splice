@@ -20,12 +20,12 @@ import org.lfdecentralizedtrust.splice.store.*
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import software.amazon.awssdk.services.s3.model.ListObjectsRequest
 
-import java.time.temporal.ChronoUnit
 import java.time.{Instant, LocalDate, ZoneOffset}
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
+import scala.math.Ordering.Implicits.*
 
 class UpdateHistoryBulkStorageTest
     extends StoreTestBase
@@ -49,7 +49,7 @@ class UpdateHistoryBulkStorageTest
         val segmentSize = 2200L
         val segmentFromTimestamp = 100L
         val mockStore =
-          new MockUpdateHistoryStore(initialStoreSize, Instant.ofEpochMilli, _.toEpochMilli)
+          new MockUpdateHistoryStore(initialStoreSize, Instant.ofEpochMilli)
         val fromTimestamp =
           CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp))
         val toTimestamp =
@@ -135,15 +135,7 @@ class UpdateHistoryBulkStorageTest
         val mockStore = new MockUpdateHistoryStore(
           initialStoreSize,
           i => genesisInstant.plusSeconds(i * 10),
-          t => ChronoUnit.SECONDS.between(genesisInstant, t.toInstant) / 10,
         )
-        clue("Wait for the store to be ready by getting the first update from it") {
-          eventually(2.minutes) {
-            mockStore.store
-              .getUpdatesWithoutImportUpdates(None, HardLimit.tryCreate(1))
-              .futureValue should not be Seq.empty
-          }
-        }
 
         for {
           kvProvider <- mkProvider
@@ -197,19 +189,24 @@ class UpdateHistoryBulkStorageTest
   class MockUpdateHistoryStore(
       val initialStoreSize: Int,
       val idxToTimestamp: Long => Instant,
-      val timestampToIdx: CantonTimestamp => Long,
   ) {
 
-    private var storeSize = initialStoreSize
     val store = mockUpdateHistoryStore()
 
-    def mockIngestion(extraUpdates: Int) = { storeSize = storeSize + extraUpdates }
+    val alicePartyId = mkPartyId("alice")
+    val bobPartyId = mkPartyId("bob")
+    val charliePartyId = mkPartyId("charlie")
+
+    private var data: Seq[TreeUpdateWithMigrationId] =
+      Seq.range(0, initialStoreSize).map(_.toLong).map(genElement)
+
+    def mockIngestion(extraUpdates: Int): Unit = {
+      val curSize = data.size
+      data = data ++ Seq.range(curSize, curSize + extraUpdates).map(_.toLong).map(genElement)
+    }
 
     def mockUpdateHistoryStore(): UpdateHistory = {
       val store = mock[UpdateHistory]
-      val alicePartyId = mkPartyId("alice")
-      val bobPartyId = mkPartyId("bob")
-      val charliePartyId = mkPartyId("charlie")
       when(
         store.getUpdatesWithoutImportUpdates(
           any[Option[(Long, CantonTimestamp)]],
@@ -220,43 +217,47 @@ class UpdateHistoryBulkStorageTest
             afterO: Option[(Long, CantonTimestamp)],
             limit: Limit,
         ) =>
-          Future {
-            val fromIdx =
-              afterO.map { case (_, t) => math.max(timestampToIdx(t), 0) }.getOrElse(0L) + 1
-            val remaining = storeSize - fromIdx
-            val numElems = math.min(limit.limit.toLong, remaining)
-            Seq
-              .range(0, numElems)
-              .map(i => {
-                val idx = i + fromIdx
-                val contract = amulet(
-                  alicePartyId,
-                  BigDecimal(idx),
-                  0L,
-                  BigDecimal(0.1),
-                  contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
-                )
-                val tx = mkCreateTx(
-                  1, // not used in updates v2 (TODO(#3429): double-check what the actual value in the updateHistory is. The parser in read (httpToLapiTransaction) sets this to 1, so for now we use 1 here too.)
-                  Seq(contract),
-                  idxToTimestamp(idx),
-                  Seq(alicePartyId, bobPartyId),
-                  dummyDomain,
-                  "",
-                  idxToTimestamp(idx),
-                  Seq(charliePartyId),
-                  updateId = idx.toString,
-                )
-                new TreeUpdateWithMigrationId(
-                  UpdateHistoryResponse(TransactionTreeUpdate(tx), dummyDomain),
-                  0,
-                )
-              })
-          }
+          val after = afterO
+            .map(a => TimestampWithMigrationId(a._2, a._1))
+            .getOrElse(TimestampWithMigrationId(CantonTimestamp.MinValue, 0L))
+          Future.successful(
+            data
+              .filter(update =>
+                TimestampWithMigrationId(
+                  update.update.update.recordTime,
+                  update.migrationId,
+                ) > after
+              )
+              .take(limit.limit)
+          )
       }
       store
     }
 
+    private def genElement(idx: Long) = {
+      val contract = amulet(
+        alicePartyId,
+        BigDecimal(idx),
+        0L,
+        BigDecimal(0.1),
+        contractId = LfContractId.assertFromString("00" + f"$idx%064x").coid,
+      )
+      val tx = mkCreateTx(
+        1, // not used in updates v2 (TODO(#3429): double-check what the actual value in the updateHistory is. The parser in read (httpToLapiTransaction) sets this to 1, so for now we use 1 here too.)
+        Seq(contract),
+        idxToTimestamp(idx),
+        Seq(alicePartyId, bobPartyId),
+        dummyDomain,
+        "",
+        idxToTimestamp(idx),
+        Seq(charliePartyId),
+        updateId = idx.toString,
+      )
+      new TreeUpdateWithMigrationId(
+        UpdateHistoryResponse(TransactionTreeUpdate(tx), dummyDomain),
+        0,
+      )
+    }
   }
 
   def mkProvider: Future[ScanKeyValueProvider] = {
