@@ -126,17 +126,21 @@ class UpdateHistoryBulkStorage(
           loggerFactory,
         )
       )
-      .mapAsync(1) { (ts: TimestampWithMigrationId) =>
-        logger.info(
-          s"Successfully completed dumping updates up to migration ${ts.migrationId}, ${ts.timestamp}"
-        )
-//        kvProvider.setLatestUpdatesSegmentInBulkStorage()
-        // TODO: persist progress to kvStore
-        Future.successful(ts)
+      .mapAsync(1) { case (segment, lastUpdate) =>
+        lastUpdate match {
+          case Some(ts) =>
+            logger.info(
+              s"Successfully completed dumping updates. Last update from the segment is from ${ts.migrationId}, ${ts.timestamp}"
+            )
+          case None =>
+            // TODO: really a warning? What happens with a long HDM?
+            logger.warn(s"Segment $segment contained no updates")
+        }
+        kvProvider.setLatestUpdatesSegmentInBulkStorage(segment).map(_ => segment)
       }
   }
 
-  def getSource(): Source[TimestampWithMigrationId, UniqueKillSwitch] = {
+  def getSource(): Source[UpdatesSegment, UniqueKillSwitch] = {
     val restartSettings = RestartSettings(
       minBackoff = 3.seconds,
       maxBackoff = 30.seconds,

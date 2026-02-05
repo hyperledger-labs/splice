@@ -90,7 +90,7 @@ class UpdateHistorySegmentBulkStorage(
           }
         } else {
           logger.debug(
-            s"Not enough updates yet (queried for ${config.bulkDbReadChunkSize}, found ${updates.length}), sleeping..."
+            s"Not enough updates yet (queried for ${config.bulkDbReadChunkSize}, found ${updates.length}. Last update is from ${updates.lastOption.map(_.update.update.recordTime)}, migration ${updates.lastOption.map(_.migrationId)}), sleeping..."
           )
           after(updatesPollingInterval, actorSystem.scheduler) {
             Future.successful(Some((afterTs, ByteString.empty)))
@@ -123,7 +123,7 @@ class UpdateHistorySegmentBulkStorage(
 
   private def getSource(implicit
       actorSystem: ActorSystem
-  ): Source[TimestampWithMigrationId, NotUsed] = {
+  ): Source[(UpdatesSegment, Option[TimestampWithMigrationId]), NotUsed] = {
     Source
       .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
       .via(ZstdGroupedWeight(config.bulkMaxFileSize))
@@ -152,7 +152,7 @@ class UpdateHistorySegmentBulkStorage(
       // emit a Unit upon completion of the write to s3
       .fold(()) { case ((), _) => () }
       // emit the timestamp of the last update dumped upon completion.
-      .map(_ => lastEmitted.get().getOrElse(segment.fromTimestamp))
+      .map(_ => (segment, lastEmitted.get()))
 
   }
 }
@@ -166,7 +166,7 @@ object UpdateHistorySegmentBulkStorage {
       tc: TraceContext,
       ec: ExecutionContext,
       actorSystem: ActorSystem,
-  ): Flow[UpdatesSegment, TimestampWithMigrationId, NotUsed] =
+  ): Flow[UpdatesSegment, (UpdatesSegment, Option[TimestampWithMigrationId]), NotUsed] =
     Flow[UpdatesSegment].flatMapConcat { (segment: UpdatesSegment) =>
       new UpdateHistorySegmentBulkStorage(
         config,
@@ -187,7 +187,7 @@ object UpdateHistorySegmentBulkStorage {
       tc: TraceContext,
       ec: ExecutionContext,
       actorSystem: ActorSystem,
-  ): Source[TimestampWithMigrationId, NotUsed] =
+  ): Source[(UpdatesSegment, Option[TimestampWithMigrationId]), NotUsed] =
     new UpdateHistorySegmentBulkStorage(
       config,
       updateHistory,

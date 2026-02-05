@@ -9,7 +9,9 @@ import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
+import org.apache.pekko.stream.UniqueKillSwitch
 import org.apache.pekko.stream.scaladsl.Keep
+import org.apache.pekko.stream.testkit.TestSubscriber
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
@@ -63,18 +65,19 @@ class UpdateHistoryBulkStorageTest
           }
         }
 
+        val segment = UpdatesSegment(
+          TimestampWithMigrationId(fromTimestamp, 0),
+          TimestampWithMigrationId(toTimestamp, 0),
+        )
         val probe = UpdateHistorySegmentBulkStorage
           .asSource(
             bulkStorageTestConfig,
             mockStore.store,
             bucketConnection,
-            UpdatesSegment(
-              TimestampWithMigrationId(fromTimestamp, 0),
-              TimestampWithMigrationId(toTimestamp, 0),
-            ),
+            segment,
             loggerFactory,
           )
-          .toMat(TestSink.probe[TimestampWithMigrationId])(Keep.right)
+          .toMat(TestSink.probe[(UpdatesSegment, Option[TimestampWithMigrationId])])(Keep.right)
           .run()
 
         probe.request(2)
@@ -89,7 +92,7 @@ class UpdateHistoryBulkStorageTest
           "Ingest 1000 more events. Now the last timestamp will be beyond the segment, so the source will complete and emit the last timestamp"
         ) {
           mockStore.mockIngestion(1000)
-          probe.expectNext(20.seconds) should be(TimestampWithMigrationId(toTimestamp, 0))
+          probe.expectNext(20.seconds) should be((segment, Some(TimestampWithMigrationId(toTimestamp, 0))))
           probe.expectComplete()
         }
 
@@ -140,46 +143,64 @@ class UpdateHistoryBulkStorageTest
         for {
           kvProvider <- mkProvider
         } yield {
-          val (killSwitch, probe) = new UpdateHistoryBulkStorage(
-            bulkStorageTestConfig,
-            mockStore.store,
-            kvProvider,
-            0L,
-            bucketConnection,
-            loggerFactory,
-          ).getSource()
-            .toMat(TestSink.probe[TimestampWithMigrationId])(Keep.both)
-            .run()
+          def newUpdatesBulkStorageFlow(migrationId: Long): (UniqueKillSwitch, TestSubscriber.Probe[UpdatesSegment]) = {
+            new UpdateHistoryBulkStorage(
+              bulkStorageTestConfig,
+              mockStore.store,
+              kvProvider,
+              migrationId,
+              bucketConnection,
+              loggerFactory,
+            ).getSource()
+              .toMat(TestSink.probe[UpdatesSegment])(Keep.both)
+              .run()
+          }
+
+          val (killSwitch, probe) = newUpdatesBulkStorageFlow(0L)
 
           probe.request(4)
-          probe.expectNext(20.seconds) shouldBe TimestampWithMigrationId(
-            CantonTimestamp.tryFromInstant(genesisDate.atTime(4, 0).toInstant(ZoneOffset.UTC)),
-            0,
+          val seg1 = UpdatesSegment(
+            TimestampWithMigrationId(CantonTimestamp.MinValue, 0),
+            TimestampWithMigrationId(
+              CantonTimestamp.tryFromInstant(genesisDate.atTime(4, 0).toInstant(ZoneOffset.UTC)),
+              0,
+            )
           )
-          probe.expectNext(20.seconds) shouldBe TimestampWithMigrationId(
-            CantonTimestamp.tryFromInstant(genesisDate.atTime(6, 0).toInstant(ZoneOffset.UTC)),
-            0,
+          probe.expectNext(20.seconds) shouldBe seg1
+          def seg(fromHour: Int, fromMigration: Int, toHour: Int, toMigration: Int) = UpdatesSegment(
+            TimestampWithMigrationId(
+              CantonTimestamp.tryFromInstant(genesisDate.atTime(fromHour, 0).toInstant(ZoneOffset.UTC)),
+              fromMigration.toLong,
+            ),
+            TimestampWithMigrationId(
+              CantonTimestamp.tryFromInstant(genesisDate.atTime(toHour, 0).toInstant(ZoneOffset.UTC)),
+              toMigration.toLong,
+            ),
           )
-          probe.expectNext(20.seconds) shouldBe TimestampWithMigrationId(
-            CantonTimestamp.tryFromInstant(genesisDate.atTime(8, 0).toInstant(ZoneOffset.UTC)),
-            0,
-          )
+          probe.expectNext(20.seconds) shouldBe seg(4, 0, 6, 0)
+          probe.expectNext(20.seconds) shouldBe seg(6, 0, 8, 0)
           // First 2000 events end up 08:07:10, so the last full segment is the one up to 08:00
           probe.expectNoMessage(20.seconds)
 
           mockStore.mockIngestion(2000)
           probe.request(2)
-          probe.expectNext(20.seconds) shouldBe TimestampWithMigrationId(
-            CantonTimestamp.tryFromInstant(genesisDate.atTime(10, 0).toInstant(ZoneOffset.UTC)),
-            0,
-          )
-          probe.expectNext(20.seconds) shouldBe TimestampWithMigrationId(
-            CantonTimestamp.tryFromInstant(genesisDate.atTime(12, 0).toInstant(ZoneOffset.UTC)),
-            0,
-          )
+          probe.expectNext(20.seconds) shouldBe seg(8, 0, 10, 0)
+          probe.expectNext(20.seconds) shouldBe seg(10, 0, 12, 0)
+          // Last update is now from 13:14:30, so not enough to close the 12-2 segment
           probe.expectNoMessage(20.seconds)
 
+          // Now we simulate a migration: we kill the current pipeline (to simulate the scan app restarting),
+          // then start a new one with the new migration and ingest updates in the new migration
           killSwitch.shutdown()
+          val (killSwitch1, probe1) = newUpdatesBulkStorageFlow(1L)
+          mockStore.mockMigration()
+          mockStore.mockIngestion(2000)
+          probe1.request(3)
+          probe1.expectNext(20.seconds) shouldBe seg(12, 0, 2, 1)
+          probe1.expectNext(20.seconds) shouldBe seg(2, 1, 4, 1)
+          probe1.expectNext(20.seconds) shouldBe seg(4, 1, 6, 1)
+          probe1.expectNoMessage(20.seconds)
+
           succeed
         }
       }
@@ -199,11 +220,13 @@ class UpdateHistoryBulkStorageTest
 
     private var data: Seq[TreeUpdateWithMigrationId] =
       Seq.range(0, initialStoreSize).map(_.toLong).map(genElement)
+    private var currentMigration = 0
 
     def mockIngestion(extraUpdates: Int): Unit = {
       val curSize = data.size
       data = data ++ Seq.range(curSize, curSize + extraUpdates).map(_.toLong).map(genElement)
     }
+    def mockMigration(): Unit = currentMigration = currentMigration+1
 
     def mockUpdateHistoryStore(): UpdateHistory = {
       val store = mock[UpdateHistory]
@@ -255,7 +278,7 @@ class UpdateHistoryBulkStorageTest
       )
       new TreeUpdateWithMigrationId(
         UpdateHistoryResponse(TransactionTreeUpdate(tx), dummyDomain),
-        0,
+        currentMigration.toLong,
       )
     }
   }
