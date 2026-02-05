@@ -186,7 +186,8 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- include "splice-util-lib.affinity" (set .Values "app" "sequencer") | nindent 6 }}
+      {{- $ctx := merge .Values (dict "app" "sequencer" "affinity" (default .Values.sequencer.affinity .Values.affinity)) }}
+      {{- include "splice-util-lib.affinity" $ctx | nindent 6 }}
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}

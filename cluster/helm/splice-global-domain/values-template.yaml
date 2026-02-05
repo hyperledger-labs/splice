@@ -43,8 +43,12 @@ metrics:
   release: prometheus-grafana-monitoring
   interval: 30s
 
-# k8s affinity for all deployed pods (optional)
+# k8s affinity (optional). Use top-level for both, or set per-component:
+#   sequencer.affinity  - applied only to the sequencer deployment
+#   mediator.affinity   - applied only to the mediator deployment
 # affinity:
+# sequencer.affinity: {}
+# mediator.affinity: {}
 
 # k8s nodeSelector for all deployed pods (optional)
 # nodeSelector:
