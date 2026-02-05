@@ -20,6 +20,7 @@ class ScanKeyValueProvider(val store: KeyValueStore, val loggerFactory: NamedLog
     extends NamedLogging {
 
   private val latestAcsSnapshotInBulkStorageKey = "latest_acs_snapshot_in_bulk_storage"
+  private val latestUpdatesSegmentInBulkStorageKey = "latest_updates_segment_in_bulk_storage"
 
   final def setLatestAcsSnapshotsInBulkStorage(
       ts: TimestampWithMigrationId
@@ -35,7 +36,18 @@ class ScanKeyValueProvider(val store: KeyValueStore, val loggerFactory: NamedLog
     store.readValueAndLogOnDecodingFailure(latestAcsSnapshotInBulkStorageKey)
   }
 
-  final def getLatestUpdatesSegmentInBulkStorage(): OptionT[Future, UpdatesSegment] = ???
+  final def setLatestUpdatesSegmentInBulkStorage(
+      segment: UpdatesSegment
+  )(implicit tc: TraceContext): Future[Unit] = store.setValue(
+    latestUpdatesSegmentInBulkStorageKey,
+    segment,
+  )
+
+  final def getLatestUpdatesSegmentInBulkStorage()(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): OptionT[Future, UpdatesSegment] =
+    store.readValueAndLogOnDecodingFailure(latestUpdatesSegmentInBulkStorageKey)
 }
 
 object ScanKeyValueProvider {
@@ -47,4 +59,6 @@ object ScanKeyValueProvider {
       )
   implicit val acsSnapshotTimestampMigrationCodec: Codec[TimestampWithMigrationId] =
     deriveCodec[TimestampWithMigrationId]
+
+  implicit val updatesSegmentCodec: Codec[UpdatesSegment] = deriveCodec[UpdatesSegment]
 }

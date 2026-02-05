@@ -1,0 +1,43 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Util.FeaturedApp.UnitTests.BatchedMarkersProxy where
+
+import DA.Assert
+import Daml.Script
+import Splice.Api.FeaturedAppRightV1
+import Splice.Util.FeaturedApp.BatchedMarkersProxy
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+
+test = script do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig with
+    noTransferFee = True
+
+  provider <- allocateParty "provider"
+  beneficiary <- allocateParty "beneficiary"
+  featuredAppRightCid <- AmuletRegistry.featureApp registry provider
+
+  markerProxy <- submit provider $ createCmd BatchedMarkersProxy with
+    provider
+    dso = registry.dso
+
+  submit provider $ exerciseCmd markerProxy $ BatchedMarkersProxy_CreateMarkers with
+    featuredAppRightCid = toInterfaceContractId featuredAppRightCid
+    batches = [
+      RewardBatch
+        {
+          beneficiaries = [AppRewardBeneficiary provider 0.8, AppRewardBeneficiary beneficiary 0.2],
+          numMarkers = 50
+        },
+      RewardBatch
+        {
+          beneficiaries = [AppRewardBeneficiary beneficiary 1.0],
+          numMarkers = 50
+        }
+      ]
+
+
+  markers <- queryInterface @FeaturedAppActivityMarker registry.dso
+  length markers === 150 -- 100 from first batch, 50 for each beneficiary and 50 from the second batch
+
+  pure ()

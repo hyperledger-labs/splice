@@ -130,6 +130,7 @@ class UpdateHistoryBulkStorage(
         logger.info(
           s"Successfully completed dumping updates up to migration ${ts.migrationId}, ${ts.timestamp}"
         )
+//        kvProvider.setLatestUpdatesSegmentInBulkStorage()
         // TODO: persist progress to kvStore
         Future.successful(ts)
       }
