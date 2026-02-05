@@ -42,6 +42,7 @@ import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
@@ -744,12 +745,32 @@ object MultiDomainAcsStore extends StoreErrors {
     /** Must be the first method called. Returns information about where and how to start ingestion. */
     def initialize()(implicit traceContext: TraceContext): Future[IngestionStart]
 
+    @VisibleForTesting
     def ingestAcs(
         offset: Long,
         acs: Seq[ActiveContract],
         incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
-    )(implicit traceContext: TraceContext): Future[Unit]
+    )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
+      val acsIngestor = makeAcsIngestor()
+      for {
+        _ <- acsIngestor.ingestAcsBatch(offset, acs, incompleteOut, incompleteIn)
+        _ <- acsIngestor.markAcsIngestedAsOf(offset)
+      } yield ()
+    }
+
+    def makeAcsIngestor(): AcsIngestor
+
+    trait AcsIngestor {
+      def ingestAcsBatch(
+          offset: Long,
+          acs: Seq[ActiveContract],
+          incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
+          incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
+      )(implicit traceContext: TraceContext): Future[Unit]
+
+      def markAcsIngestedAsOf(offset: Long)(implicit traceContext: TraceContext): Future[Unit]
+    }
 
     def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
         traceContext: TraceContext

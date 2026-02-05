@@ -84,7 +84,7 @@ import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant}
 import java.util
 import java.util.Optional
-import scala.concurrent.{Future, blocking}
+import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -1063,15 +1063,31 @@ abstract class StoreTestBase extends AsyncWordSpec with BaseTest {
         acs: Seq[ActiveContract],
         incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
-    )(implicit traceContext: TraceContext) =
+    )(implicit ec: ExecutionContext, traceContext: TraceContext) =
       withoutRepeatedIngestionWarning(
         underlying.ingestAcs(
           offset,
           acs,
           incompleteOut,
           incompleteIn,
-        )(traceContext)
+        )(ec, traceContext)
       )
+
+    override def makeAcsIngestor(): AcsIngestor = new AcsIngestor {
+      val underlyingIngestor = underlying.makeAcsIngestor()
+      override def ingestAcsBatch(
+          offset: Long,
+          acs: Seq[ActiveContract],
+          incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
+          incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
+      )(implicit traceContext: TraceContext): Future[Unit] = withoutRepeatedIngestionWarning(
+        underlyingIngestor.ingestAcsBatch(offset, acs, incompleteOut, incompleteIn)(traceContext)
+      )
+
+      override def markAcsIngestedAsOf(offset: Long)(implicit
+          traceContext: TraceContext
+      ): Future[Unit] = underlyingIngestor.markAcsIngestedAsOf(offset)(traceContext)
+    }
 
     override def ingestUpdateBatch(batch: NonEmptyList[TreeUpdateOrOffsetCheckpoint])(implicit
         traceContext: TraceContext
