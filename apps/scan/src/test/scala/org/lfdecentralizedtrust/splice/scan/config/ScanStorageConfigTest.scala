@@ -15,32 +15,35 @@ class ScanStorageConfigTest
       "return correct time if the previous one is not a valid snapshot time" in {
         val config = ScanStorageConfig(
           dbAcsSnapshotPeriodHours = 2,
-          0,
-          0L,
+          bulkAcsSnapshotPeriodHours = 4,
+          1,
+          1L,
         )
         val prev = cantonTimestamp("2007-12-03T11:30:00.00Z")
         val next = cantonTimestamp("2007-12-03T12:00:00.00Z")
-        config.computeSnapshotTimeAfter(prev) shouldBe next
+        config.computeDbSnapshotTimeAfter(prev) shouldBe next
       }
       "return correct time if the previous one is a valid snapshot time" in {
         val config = ScanStorageConfig(
           dbAcsSnapshotPeriodHours = 2,
-          0,
-          0L,
+          bulkAcsSnapshotPeriodHours = 4,
+          1,
+          1L,
         )
         val prev = cantonTimestamp("2007-12-03T12:00:00.00Z")
         val next = cantonTimestamp("2007-12-03T14:00:00.00Z")
-        config.computeSnapshotTimeAfter(prev) shouldBe next
+        config.computeDbSnapshotTimeAfter(prev) shouldBe next
       }
       "return correct time if the next one is on the day after" in {
         val config = ScanStorageConfig(
           dbAcsSnapshotPeriodHours = 4,
-          0,
-          0L,
+          bulkAcsSnapshotPeriodHours = 8,
+          1,
+          1L,
         )
         val prev = cantonTimestamp("2007-12-03T21:00:00.00Z")
         val next = cantonTimestamp("2007-12-04T00:00:00.00Z")
-        config.computeSnapshotTimeAfter(prev) shouldBe next
+        config.computeDbSnapshotTimeAfter(prev) shouldBe next
       }
     }
   }

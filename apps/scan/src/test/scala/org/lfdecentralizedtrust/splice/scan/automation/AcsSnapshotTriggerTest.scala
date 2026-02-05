@@ -641,8 +641,9 @@ class AcsSnapshotTriggerTest
 
   private def storageConfig = ScanStorageConfig(
     dbAcsSnapshotPeriodHours = 1,
-    0, // ignored in this test
-    0L, // ignored in this test
+    bulkAcsSnapshotPeriodHours = 1, // ignored in this test
+    bulkDbReadChunkSize = 1, // ignored in this test
+    bulkMaxFileSize = 1L, // ignored in this test
   )
 
   private def unused0[T]: () => Future[T] = () => fail("This argument should not be used")
@@ -680,6 +681,10 @@ class AcsSnapshotTriggerTest
   private def snapshotTime2 = cantonTimestamp("2007-12-03T02:00:00.00Z")
   private def snapshotTime3 = cantonTimestamp("2007-12-03T03:00:00.00Z")
   private def snapshotTime4 = cantonTimestamp("2007-12-03T04:00:00.00Z")
+
+  assert(storageConfig.computeDbSnapshotTimeAfter(snapshotTime1) == snapshotTime2)
+  assert(storageConfig.computeDbSnapshotTimeAfter(snapshotTime2) == snapshotTime3)
+  assert(storageConfig.computeDbSnapshotTimeAfter(snapshotTime3) == snapshotTime4)
 
   private def migration1 = 1L
   private def migration2 = 2L

@@ -200,7 +200,7 @@ object AcsSnapshotTriggerBase {
                   case Some(range) =>
                     val emptySnapshotRecordTime = range.min.minusSeconds(1L)
                     val nextSnapshotTime =
-                      storageConfig.computeSnapshotTimeAfter(range.min)
+                      storageConfig.computeDbSnapshotTimeAfter(range.min)
                     // Note: since there is a non-import update, we know that we have finished
                     // ingesting import updates for this migration. It's safe to initialize
                     // the snapshot from import updates now.
