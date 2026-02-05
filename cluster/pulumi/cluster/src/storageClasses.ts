@@ -10,6 +10,7 @@ export function installStorageClasses(): void {
     },
     provisioner: 'pd.csi.storage.gke.io',
     volumeBindingMode: 'WaitForFirstConsumer',
+    allowVolumeExpansion: true,
     parameters: {
       type: 'hyperdisk-balanced',
       'provisioned-throughput-on-create': '250Mi',
@@ -22,6 +23,7 @@ export function installStorageClasses(): void {
     },
     provisioner: 'pd.csi.storage.gke.io',
     volumeBindingMode: 'WaitForFirstConsumer',
+    allowVolumeExpansion: true,
     parameters: {
       type: 'hyperdisk-balanced',
       // use default iops/throughput for lower cost
