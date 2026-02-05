@@ -4,13 +4,14 @@ import React, { createContext, useContext } from 'react';
 import { useActiveDevelopmentFundCoupons } from '../hooks/useActiveDevelopmentFundCoupons';
 import { useIsDevelopmentFundManager } from '../hooks/useIsDevelopmentFundManager';
 import { DevelopmentFundCoupon } from '../models/models';
+import BigNumber from 'bignumber.js';
 
 interface DevelopmentFundContextValue {
   // Fund manager status
   isFundManager: boolean;
   // Coupons data
   coupons: DevelopmentFundCoupon[];
-  total: number;
+  totalAmount: BigNumber;
   isLoading: boolean;
   isError: boolean;
   error: Error | null;

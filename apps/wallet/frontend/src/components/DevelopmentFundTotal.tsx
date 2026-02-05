@@ -5,7 +5,7 @@ import { Card, CardContent, Stack, Typography } from '@mui/material';
 import { useDevelopmentFundContext } from '../contexts/DevelopmentFundCouponsContext';
 
 const DevelopmentFundTotal: React.FC = () => {
-  const { total } = useDevelopmentFundContext();
+  const { totalAmount } = useDevelopmentFundContext();
 
   return (
     <Card variant="outlined">
@@ -13,7 +13,7 @@ const DevelopmentFundTotal: React.FC = () => {
         <Stack spacing={1}>
           <Typography variant="h5">Development Fund Total</Typography>
           <Typography variant="h4" fontWeight="bold">
-            {total}
+            {totalAmount.toFixed(4)} CC
           </Typography>
         </Stack>
       </CardContent>

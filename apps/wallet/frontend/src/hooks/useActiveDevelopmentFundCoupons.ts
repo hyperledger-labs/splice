@@ -3,6 +3,7 @@
 import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWalletClient } from '../contexts/WalletServiceContext';
+import BigNumber from 'bignumber.js';
 
 const PAGE_SIZE = 10;
 
@@ -18,7 +19,8 @@ export const useActiveDevelopmentFundCoupons = () => {
   });
 
   const allCoupons = couponsQuery.data || [];
-  const total = allCoupons.length;
+  const totalCount = allCoupons.length;
+  const totalAmount = allCoupons.reduce((sum, c) => sum.plus(c.amount), new BigNumber(0));
 
   const sortedCoupons = React.useMemo(
     () => [...allCoupons].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
@@ -29,10 +31,10 @@ export const useActiveDevelopmentFundCoupons = () => {
   const coupons = sortedCoupons.slice(offset, offset + PAGE_SIZE);
 
   const goToNextPage = React.useCallback(() => {
-    if (offset + PAGE_SIZE < total) {
+    if (offset + PAGE_SIZE < totalCount) {
       setCurrentPage(prev => prev + 1);
     }
-  }, [offset, total]);
+  }, [offset, totalCount]);
 
   const goToPreviousPage = React.useCallback(() => {
     if (currentPage > 1) {
@@ -40,7 +42,7 @@ export const useActiveDevelopmentFundCoupons = () => {
     }
   }, [currentPage]);
 
-  const hasNextPage = offset + PAGE_SIZE < total;
+  const hasNextPage = offset + PAGE_SIZE < totalCount;
   const hasPreviousPage = currentPage > 1;
 
   const invalidate = React.useCallback(() => {
@@ -49,7 +51,7 @@ export const useActiveDevelopmentFundCoupons = () => {
 
   return {
     coupons,
-    total,
+    totalAmount,
     isLoading: couponsQuery.isLoading,
     isError: couponsQuery.isError,
     error: couponsQuery.error,
