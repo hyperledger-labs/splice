@@ -123,6 +123,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "allowVolumeExpansion": true,
       "apiVersion": "storage.k8s.io/v1",
       "kind": "StorageClass",
       "metadata": {
@@ -144,6 +145,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "allowVolumeExpansion": true,
       "apiVersion": "storage.k8s.io/v1",
       "kind": "StorageClass",
       "metadata": {
