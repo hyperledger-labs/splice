@@ -112,7 +112,8 @@ class UpdateHistorySegmentBulkStorage(
     val updatesStr = encoded.map(_.asJson.noSpacesSortKeys).mkString("\n") + "\n"
     val updatesBytes = ByteString(updatesStr.getBytes(StandardCharsets.UTF_8))
     logger.debug(
-      s"Read and encoded ${encoded.length} updates from DB, to a bytestring of size ${updatesBytes.length} bytes. Timestamps are ${updates.headOption.map(_.update.update.recordTime)} to ${updates.lastOption.map(_.update.update.recordTime)}"
+      s"Read and encoded ${encoded.length} updates from DB, to a bytestring of size ${updatesBytes.length} bytes. Timestamps are ${updates.headOption
+          .map(_.update.update.recordTime)} to ${updates.lastOption.map(_.update.update.recordTime)}"
     )
     updatesBytes
   }

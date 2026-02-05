@@ -48,7 +48,8 @@ class UpdateHistoryBulkStorageTest
         val initialStoreSize = 1500
         val segmentSize = 2200L
         val segmentFromTimestamp = 100L
-        val mockStore = new MockUpdateHistoryStore(initialStoreSize, Instant.ofEpochMilli, _.toEpochMilli)
+        val mockStore =
+          new MockUpdateHistoryStore(initialStoreSize, Instant.ofEpochMilli, _.toEpochMilli)
         val fromTimestamp =
           CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp))
         val toTimestamp =
@@ -134,7 +135,7 @@ class UpdateHistoryBulkStorageTest
         val mockStore = new MockUpdateHistoryStore(
           initialStoreSize,
           i => genesisInstant.plusSeconds(i * 10),
-          t => ChronoUnit.SECONDS.between(genesisInstant, t.toInstant) / 10
+          t => ChronoUnit.SECONDS.between(genesisInstant, t.toInstant) / 10,
         )
         clue("Wait for the store to be ready by getting the first update from it") {
           eventually(2.minutes) {
@@ -183,8 +184,8 @@ class UpdateHistoryBulkStorageTest
 
   class MockUpdateHistoryStore(
       val initialStoreSize: Int,
-      val idxToTimestamp: Long=>Instant,
-      val timestampToIdx: CantonTimestamp=>Long,
+      val idxToTimestamp: Long => Instant,
+      val timestampToIdx: CantonTimestamp => Long,
   ) {
 
     private var storeSize = initialStoreSize
@@ -208,7 +209,8 @@ class UpdateHistoryBulkStorageTest
             limit: Limit,
         ) =>
           Future {
-            val fromIdx = afterO.map { case (_, t) => math.max(timestampToIdx(t), 0) }.getOrElse(0L) + 1
+            val fromIdx =
+              afterO.map { case (_, t) => math.max(timestampToIdx(t), 0) }.getOrElse(0L) + 1
             val remaining = storeSize - fromIdx
             val numElems = math.min(limit.limit.toLong, remaining)
             Seq
