@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4663,
+  "id": 572,
   "links": [],
   "panels": [
     {
@@ -49,7 +49,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -82,7 +83,7 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -155,7 +156,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -191,7 +193,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -222,10 +224,10 @@
       {
         "current": {
           "text": [
-            "sv-1"
+            "All"
           ],
           "value": [
-            "sv-1"
+            "$__all"
           ]
         },
         "definition": "label_values(daml_sequencer_public_api_subscriptions,namespace)",
@@ -245,12 +247,12 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-2d",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Sequencer Subscriptions",
   "uid": "685922ac-4aca-4b28-a1a1-4375a93a514c",
-  "version": 3
+  "version": 1
 }
