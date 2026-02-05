@@ -3,8 +3,15 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
-import { CloudSqlConfigSchema, CLUSTER_BASENAME, config, ExactNamespace, GCP_REGION, GCP_ZONE, installPostgresPasswordSecret } from '@lfdecentralizedtrust/splice-pulumi-common';
-
+import {
+  CloudSqlConfigSchema,
+  CLUSTER_BASENAME,
+  config,
+  ExactNamespace,
+  GCP_REGION,
+  GCP_ZONE,
+  installPostgresPasswordSecret,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 export interface PerformanceTestDb {
   db: gcp.sql.Database;
