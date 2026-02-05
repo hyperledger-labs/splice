@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.store
 
-import com.daml.ledger.javaapi.data.TransactionTree
+import com.daml.ledger.javaapi.data.Transaction
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -58,14 +58,14 @@ object TxLogStore {
   trait Parser[+TXE] {
 
     /** Extract application-specific TxLog entries from the given daml transaction */
-    def tryParse(tx: TransactionTree, domain: SynchronizerId)(implicit tc: TraceContext): Seq[TXE]
+    def tryParse(tx: Transaction, domain: SynchronizerId)(implicit tc: TraceContext): Seq[TXE]
 
     /** Returns a TxLog entry to be stored in case this parser failed to parse the given daml transaction.
       * Must not throw an error.
       */
     def error(offset: Long, eventId: String, synchronizerId: SynchronizerId): Option[TXE]
 
-    final def parse(tx: TransactionTree, domain: SynchronizerId, logger: TracedLogger)(implicit
+    final def parse(tx: Transaction, domain: SynchronizerId, logger: TracedLogger)(implicit
         tc: TraceContext
     ): Seq[TXE] =
       Try(tryParse(tx, domain))
@@ -89,7 +89,7 @@ object TxLogStore {
 
   object Parser {
     lazy val empty: Parser[Nothing] = new Parser[Nothing] {
-      override def tryParse(tx: TransactionTree, domain: SynchronizerId)(implicit
+      override def tryParse(tx: Transaction, domain: SynchronizerId)(implicit
           tc: TraceContext
       ): Seq[Nothing] = Seq.empty
       override def error(
@@ -106,7 +106,7 @@ object TxLogStore {
     def parser: Parser[TXE]
 
     /** Defines index columns */
-    def entryToRow: TXE => TxLogRowData
+    def entryToRow: TXE => Option[TxLogRowData]
 
     /** Encodes the entry payload to a JSON object */
     def encodeEntry: TXE => (String3, String)

@@ -16,11 +16,9 @@ import com.digitalasset.canton.sequencing.client.*
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.time.{Clock, SynchronizerTimeTracker}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
-import com.digitalasset.canton.topology.{Member, SynchronizerId}
+import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.EitherTUtil
-import com.digitalasset.canton.version.ProtocolVersion
-import org.slf4j.event.Level
+import com.digitalasset.canton.util.LoggerUtil
 
 import scala.concurrent.ExecutionContext
 
@@ -33,18 +31,18 @@ trait RegisterTopologyTransactionHandle extends FlagCloseable {
 
 class SequencerBasedRegisterTopologyTransactionHandle(
     sequencerClient: SequencerClient,
-    val synchronizerId: SynchronizerId,
     val member: Member,
     timeTracker: SynchronizerTimeTracker,
     clock: Clock,
     topologyConfig: TopologyConfig,
-    protocolVersion: ProtocolVersion,
     protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends RegisterTopologyTransactionHandle
     with NamedLogging
     with PrettyPrinting {
+
+  private val psid: PhysicalSynchronizerId = sequencerClient.psid
 
   override def submit(
       transactions: Seq[GenericSignedTopologyTransaction]
@@ -55,17 +53,18 @@ class SequencerBasedRegisterTopologyTransactionHandle(
     val maxSequencingTime =
       clock.now.add(topologyConfig.topologyTransactionRegistrationTimeout.toInternal.duration)
     val request = TopologyTransactionsBroadcast(
-      synchronizerId,
+      sequencerClient.psid,
       transactions,
-      protocolVersion,
     )
-    performUnlessClosingEitherUSF(functionFullName)(
+    synchronizeWithClosing(functionFullName)(
       sendRequest(request, maxSequencingTime, sendCallback)
     )
       .biSemiflatMap(
-        sendAsyncClientError => {
-          logger.warn(
-            s"Failed broadcasting topology transactions: $sendAsyncClientError. This will be retried automatically."
+        { sendAsyncClientError =>
+          val logLevel = SendAsyncClientError.logLevel(sendAsyncClientError)
+          LoggerUtil.logAtLevel(
+            logLevel,
+            s"Failed broadcasting topology transactions: $sendAsyncClientError. This will be retried automatically.",
           )
           FutureUnlessShutdown.pure[TopologyTransactionsBroadcast.State](
             TopologyTransactionsBroadcast.State.Failed
@@ -104,23 +103,21 @@ class SequencerBasedRegisterTopologyTransactionHandle(
     implicit val metricsContext: MetricsContext = MetricsContext(
       "type" -> "send-topology"
     )
-    logger.debug(s"Broadcasting topology transaction: ${request.transactions}")
-    EitherTUtil.logOnErrorU(
-      sequencerClient.send(
-        Batch.of(protocolVersion, (request, Recipients.cc(TopologyBroadcastAddress.recipient))),
-        maxSequencingTime = maxSequencingTime,
-        callback = sendCallback,
-        // Do not amplify because we are running our own retry loop here anyway
-        amplify = false,
-      ),
-      s"Failed sending topology transaction broadcast: $request. This will be retried automatically.",
-      level = Level.WARN,
+    logger.debug(
+      s"Broadcasting topology transaction: ${request.transactions.transactions.map(_.hash)}"
+    )
+    sequencerClient.send(
+      Batch.of(psid.protocolVersion, (request, Recipients.cc(TopologyBroadcastAddress.recipient))),
+      maxSequencingTime = maxSequencingTime,
+      callback = sendCallback,
+      // Do not amplify because we are running our own retry loop here anyway
+      amplify = false,
     )
   }
 
   override protected def pretty: Pretty[SequencerBasedRegisterTopologyTransactionHandle.this.type] =
     prettyOfClass(
-      param("synchronizerId", _.synchronizerId),
+      param("psid", _.psid),
       param("member", _.member),
     )
 }

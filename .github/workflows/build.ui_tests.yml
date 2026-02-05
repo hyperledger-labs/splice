@@ -38,7 +38,7 @@ jobs:
         uses: ./.github/actions/tests/common_test_setup
         with:
           test_name: ui_tests
-          oss_only: true
+          target: 'oss'
 
       - name: Run UI tests
         if: steps.skip.outputs.skip != 'true'
@@ -58,7 +58,7 @@ jobs:
         if: steps.skip.outputs.skip != 'true'
         uses: ./.github/actions/sbt/post_sbt
         with:
-          cache_version: 5
+          cache_version: 7
           setup_sbt_cache_hits: ${{ steps.setup.outputs.sbt_cache_hits }}
 
       - name: Upload logs

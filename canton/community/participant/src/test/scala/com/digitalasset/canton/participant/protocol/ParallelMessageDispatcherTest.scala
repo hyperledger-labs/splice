@@ -16,8 +16,7 @@ import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTra
 import com.digitalasset.canton.participant.protocol.submission.InFlightSubmissionSynchronizerTracker
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor
 import com.digitalasset.canton.sequencing.traffic.TrafficControlProcessor
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.{BaseTest, HasExecutorService}
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -30,8 +29,7 @@ class ParallelMessageDispatcherTest
   private def processAsynchronously(viewType: ViewType): Boolean = viewType == TestViewType
 
   private def create(
-      protocolVersion: ProtocolVersion,
-      synchronizerId: SynchronizerId,
+      psid: PhysicalSynchronizerId,
       participantId: ParticipantId,
       requestTracker: RequestTracker,
       requestProcessors: RequestProcessors,
@@ -46,8 +44,7 @@ class ParallelMessageDispatcherTest
       metrics: ConnectedSynchronizerMetrics,
   ): ParallelMessageDispatcher =
     new ParallelMessageDispatcher(
-      protocolVersion,
-      synchronizerId,
+      psid,
       participantId,
       requestTracker,
       requestProcessors,

@@ -90,8 +90,8 @@ class ExternalPartySetupProposalIntegrationTest
               .withPausedTrigger[ExpireIssuingMiningRoundTrigger]
           )(config),
         (_, config) =>
-          ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-            _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
+          ConfigTransforms.updateInitialTickDuration(
+            NonNegativeFiniteDuration.ofMillis(500)
           )(config),
       )
 
@@ -446,23 +446,15 @@ class ExternalPartySetupProposalIntegrationTest
       )
 
       val txs = sv1ScanBackend.listActivity(None, 1000)
-      forExactly(1, txs) { tx =>
+      // Alice transfers twice (1000, and then 500 to bob)
+      forExactly(2, txs) { tx =>
         // Test that the tx history for the TransferCommand_Send exercise gets parsed properly.
         val transfer = tx.transfer.value
         transfer.sender.party shouldBe aliceParty.toProtoPrimitive
-        transfer.balanceChanges should have size (2)
         transfer.transferKind shouldBe Some(
           definitions.Transfer.TransferKind.members.PreapprovalSend
         )
         transfer.description shouldBe Some("transfer-command-description")
-        forExactly(1, transfer.balanceChanges) { change =>
-          change.party shouldBe aliceParty.toProtoPrimitive
-          BigDecimal(change.changeToInitialAmountAsOfRoundZero) should beAround(BigDecimal(-517))
-        }
-        forExactly(1, transfer.balanceChanges) { change =>
-          change.party shouldBe bobParty.toProtoPrimitive
-          BigDecimal(change.changeToInitialAmountAsOfRoundZero) should beAround(BigDecimal(500))
-        }
       }
 
       // Check that transfer command gets archived if preapproval does not exist.

@@ -11,7 +11,7 @@ import org.lfdecentralizedtrust.splice.scan.store.db.{
   ScanAggregator,
 }
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator.*
-import org.lfdecentralizedtrust.splice.store.StoreTest
+import org.lfdecentralizedtrust.splice.store.StoreTestBase
 import org.lfdecentralizedtrust.splice.store.StoreErrors
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.util.ResourceTemplateDecoder
@@ -36,12 +36,13 @@ import org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.EntryType
 import scala.concurrent.ExecutionContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.topology.ParticipantId
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import org.scalatest.Assertion
 import slick.jdbc.{GetResult, JdbcProfile}
 
 class ScanAggregatorTest
-    extends StoreTest
+    extends StoreTestBase
     with HasExecutionContext
     with StoreErrors
     with SplicePostgresTest
@@ -235,27 +236,16 @@ class ScanAggregatorTest
           .futureValueUS
         val prevTotals = aggr.getLastAggregatedRoundTotals().futureValue.value
 
-        val expectedRound1CumulativeChangeToInitialAmountAsOfRoundZero =
-          (1 + closedRound) * BigDecimal(balanceChangeRoundZero)
-        val expectedRound1CumulativeChangeToHoldingFeesRate =
-          (1 + closedRound) * BigDecimal(holdingFee)
         prevTotals.copy(closedRoundEffectiveAt = CantonTimestamp.MinValue) shouldBe
           RoundTotals(
             closedRound = 1L,
             closedRoundEffectiveAt = CantonTimestamp.MinValue,
-            changeToInitialAmountAsOfRoundZero = BigDecimal(10),
-            changeToHoldingFeesRate = BigDecimal(holdingFee),
-            cumulativeChangeToInitialAmountAsOfRoundZero =
-              expectedRound1CumulativeChangeToInitialAmountAsOfRoundZero,
-            cumulativeChangeToHoldingFeesRate = expectedRound1CumulativeChangeToHoldingFeesRate,
-            totalAmuletBalance =
-              expectedRound1CumulativeChangeToInitialAmountAsOfRoundZero - expectedRound1CumulativeChangeToHoldingFeesRate * (1 + closedRound),
+            changeToInitialAmountAsOfRoundZero = zero,
+            changeToHoldingFeesRate = zero,
+            cumulativeChangeToInitialAmountAsOfRoundZero = zero,
+            cumulativeChangeToHoldingFeesRate = zero,
+            totalAmuletBalance = zero,
           )
-
-        getTotalAmuletBalanceFromTxLog(
-          closedRound,
-          store.txLogStoreId,
-        ).futureValue shouldBe prevTotals.totalAmuletBalance
 
         val _ = storage
           .update_(
@@ -264,27 +254,16 @@ class ScanAggregatorTest
           )
           .futureValueUS
         val lastTotals = aggr.getLastAggregatedRoundTotals().futureValue.value
-        val expectedRound10CumulativeChangeToInitialAmountAsOfRoundZero =
-          BigDecimal((1 + lastRound) * balanceChangeRoundZero)
-        val expectedRound10CumulativeChangeToHoldingFeesRate =
-          (lastRound + 1) * BigDecimal(holdingFee)
         lastTotals.copy(closedRoundEffectiveAt = CantonTimestamp.MinValue) shouldBe
           RoundTotals(
             closedRound = lastRound.toLong,
             closedRoundEffectiveAt = CantonTimestamp.MinValue,
-            changeToInitialAmountAsOfRoundZero = BigDecimal(10),
-            changeToHoldingFeesRate = BigDecimal(holdingFee),
-            cumulativeChangeToInitialAmountAsOfRoundZero =
-              expectedRound10CumulativeChangeToInitialAmountAsOfRoundZero,
-            cumulativeChangeToHoldingFeesRate = expectedRound10CumulativeChangeToHoldingFeesRate,
-            totalAmuletBalance =
-              expectedRound10CumulativeChangeToInitialAmountAsOfRoundZero - expectedRound10CumulativeChangeToHoldingFeesRate * (1 + lastRound),
+            changeToInitialAmountAsOfRoundZero = zero,
+            changeToHoldingFeesRate = zero,
+            cumulativeChangeToInitialAmountAsOfRoundZero = zero,
+            cumulativeChangeToHoldingFeesRate = zero,
+            totalAmuletBalance = zero,
           )
-
-        getTotalAmuletBalanceFromTxLog(
-          lastRound.toLong,
-          store.txLogStoreId,
-        ).futureValue shouldBe lastTotals.totalAmuletBalance
 
         val (round, effectiveAt) = store.getRoundOfLatestData().futureValue
         round shouldBe lastTotals.closedRound
@@ -755,25 +734,32 @@ class ScanAggregatorTest
       val topProviders =
         getTopProvidersByAppRewardsFromTxLog(round, limit, aggr.txLogStoreId).futureValueUS
       topProviders should not be empty
-      store.getTopProvidersByAppRewards(round, limit).futureValue shouldBe topProviders
+      if (i == lastRound.toInt) {
+        store.getTopProvidersByAppRewards(round, limit).futureValue shouldBe topProviders
+      }
       val topValidatorsByValidatorRewards =
         getTopValidatorsByValidatorRewardsFromTxLog(
           round,
           limit,
           aggr.txLogStoreId,
         ).futureValueUS
-      store
-        .getTopValidatorsByValidatorRewards(round, limit)
-        .futureValue shouldBe topValidatorsByValidatorRewards
-      val topValidatorsByPurchasedTraffic =
-        getTopValidatorsByPurchasedTrafficFromTxLog(
-          round,
-          limit,
-          aggr.txLogStoreId,
-        ).futureValue
-      store
-        .getTopValidatorsByPurchasedTraffic(round, limit)
-        .futureValue shouldBe topValidatorsByPurchasedTraffic
+
+      if (i == lastRound.toInt) {
+        store
+          .getTopValidatorsByValidatorRewards(round, limit)
+          .futureValue shouldBe topValidatorsByValidatorRewards
+      }
+      if (i == lastRound.toInt) {
+        val topValidatorsByPurchasedTraffic =
+          getTopValidatorsByPurchasedTrafficFromTxLog(
+            round,
+            limit,
+            aggr.txLogStoreId,
+          ).futureValue
+        store
+          .getTopValidatorsByPurchasedTraffic(round, limit)
+          .futureValue shouldBe topValidatorsByPurchasedTraffic
+      }
     }
     val topProviders =
       getTopProvidersByAppRewardsFromTxLog(lastRound, limit, aggr.txLogStoreId).futureValueUS
@@ -970,7 +956,7 @@ class ScanAggregatorTest
         None,
       ),
       participantId = mkParticipantId("ScanAggregatorTest"),
-      enableImportUpdateBackfill = true,
+      ingestionConfig = IngestionConfig(),
       new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, ProcessingTimeout()),
       initialRound = initialRound,
     )(parallelExecutionContext, implicitly, implicitly)
@@ -1110,26 +1096,6 @@ class ScanAggregatorTest
       .map(_ => ())
   }
 
-  def getTotalAmuletBalanceFromTxLog(
-      asOfEndOfRound: Long,
-      txLogStoreId: TxLogStoreId,
-  ): Future[BigDecimal] =
-    for {
-      result <- storage
-        .query(
-          sql"""
-               select sum(balance_change_change_to_initial_amount_as_of_round_zero) -
-                     ($asOfEndOfRound + 1) * sum(balance_change_change_to_holding_fees_rate)
-               from scan_txlog_store
-               where store_id = $txLogStoreId
-                 and entry_type = ${EntryType.BalanceChangeTxLogEntry}
-                 and round <= $asOfEndOfRound;
-             """.as[Option[BigDecimal]].headOption,
-          "getTotalAmuletBalanceFromTxLog",
-        )
-        .failOnShutdown
-    } yield result.flatten.getOrElse(0)
-
   def getTopProvidersByAppRewardsFromTxLog(
       asOfEndOfRound: Long,
       limit: Int,
@@ -1142,7 +1108,7 @@ class ScanAggregatorTest
         and      entry_type = ${EntryType.AppRewardTxLogEntry}
         and      round <= $asOfEndOfRound
         group by rewarded_party
-        order by total_app_rewards desc
+        order by total_app_rewards desc, rewarded_party desc
         limit $limit;
       """.as[(PartyId, BigDecimal)]
     storage.query(q, "getTopProvidersByAppRewardsFromTxLog")
@@ -1160,7 +1126,7 @@ class ScanAggregatorTest
         and    entry_type = ${EntryType.ValidatorRewardTxLogEntry}
         and    round <= $asOfEndOfRound
         group by rewarded_party
-        order by total_validator_rewards desc
+        order by total_validator_rewards desc, rewarded_party desc
         limit $limit;
         """.as[(PartyId, BigDecimal)]
     storage.query(q, "getTopValidatorsByValidatorRewardsFromTxLog")
@@ -1184,7 +1150,7 @@ class ScanAggregatorTest
                 and entry_type = ${EntryType.ExtraTrafficPurchaseTxLogEntry}
                 and round <= $asOfEndOfRound
               group by extra_traffic_validator
-              order by total_traffic_purchased desc
+              order by total_traffic_purchased desc, validator desc
               limit $limit;
            """.as[(PartyId, Long, Long, BigDecimal, Long)],
         "getTopValidatorsByPurchasedTrafficFromTxLog",

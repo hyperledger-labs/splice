@@ -14,14 +14,14 @@ import com.digitalasset.canton.console.CommandErrors.{
   GenericCommandError,
 }
 import com.digitalasset.canton.console.Help.{Description, Summary, Topic}
-import com.digitalasset.canton.crypto.Fingerprint
+import com.digitalasset.canton.console.commands.GlobalSecretKeyAdministration
+import com.digitalasset.canton.crypto.{Crypto, Fingerprint}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.{CantonEnvironment, Environment}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
-import com.digitalasset.canton.protocol.SerializableContract
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnection,
@@ -29,10 +29,16 @@ import com.digitalasset.canton.sequencing.{
 }
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PartyId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+}
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.{LfPartyId, SequencerAlias, SynchronizerAlias}
 import com.digitalasset.daml.lf.data.Ref.PackageId
+import com.digitalasset.daml.lf.transaction.CreationTime
 import com.typesafe.scalalogging.Logger
 import io.opentelemetry.api.trace.Tracer
 import org.tpolecat.typename.TypeName
@@ -64,12 +70,28 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
 
   override protected val loggerFactory: NamedLoggerFactory = environment.loggerFactory
 
+  /** Return global crypto object that allows to help interacting with external parties. Should be
+    * defined only in tests.
+    */
+  // Overridden in TestEnvironment
+  private[canton] def tryGlobalCrypto: Crypto = throw new RuntimeException(
+    "Supported only in tests"
+  )
+
   def consoleLogger: Logger = super.noTracingLogger
 
   @Help.Summary("Environment health inspection")
   @Help.Group("Health")
   private lazy val health_ = new CantonHealthAdministration(this)
   def health: CantonHealthAdministration = health_
+
+  @Help.Summary("Global secret operations")
+  @Help.Group("Secret keys")
+  protected lazy val global_secret_ = new GlobalSecretKeyAdministration(this, loggerFactory)
+  // Overridden in TestEnvironment
+  private[canton] def global_secret: GlobalSecretKeyAdministration = throw new RuntimeException(
+    "Supported only in tests"
+  )
 
   /** determines the control exception thrown on errors */
   private val errorHandler: ConsoleErrorHandler = ThrowErrorHandler
@@ -163,12 +185,11 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
   /** returns the currently enabled feature sets */
   def featureSet: Set[FeatureFlag] = featureSetReference.get().scope
 
-  def updateFeatureSet(flag: FeatureFlag, include: Boolean): Unit = {
-    val _ = featureSetReference.updateAndGet { x =>
+  def updateFeatureSet(flag: FeatureFlag, include: Boolean): Unit =
+    featureSetReference.updateAndGet { x =>
       val scope = if (include) x.scope + flag else x.scope - flag
       HelperItems(scope)
-    }
-  }
+    }.discard
 
   /** Holder for top level values including their name, their value, and a description to display
     * when `help` is printed.
@@ -189,19 +210,6 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
 
     lazy val asHelpItem: Help.Item =
       Help.Item(nameUnsafe, None, Help.Summary(summary), Help.Description(""), Help.Topic(topic))
-  }
-
-  object TopLevelValue {
-
-    /** Provide all details but the value itself. A subsequent call can then specify the value from
-      * another location. This oddness is to allow the ConsoleEnvironment implementations to specify
-      * the values of node instances they use as scala's runtime reflection can't easily take
-      * advantage of the type members we have available here.
-      */
-    case class Partial(name: String, summary: String, topics: Seq[String] = Seq.empty) {
-      def apply[T: universe.TypeTag](value: T): TopLevelValue[T] =
-        TopLevelValue(name, summary, value, topics)
-    }
   }
 
   // lazy to prevent publication of this before this has been fully initialized
@@ -388,33 +396,33 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
 
   /** Assemble top level values with their identifier name, value binding, and help description.
     */
-  protected def topLevelValues: Seq[TopLevelValue[_]] = {
+  protected def topLevelValues: Seq[TopLevelValue[?]] = {
     val nodeTopic = Seq(topicNodeReferences)
-    val localParticipantBinds: Seq[TopLevelValue[_]] =
+    val localParticipantBinds: Seq[TopLevelValue[?]] =
       participants.local.map(p =>
         TopLevelValue(p.name, helpText("participant", p.name), p, nodeTopic)
       )
-    val remoteParticipantBinds: Seq[TopLevelValue[_]] =
+    val remoteParticipantBinds: Seq[TopLevelValue[?]] =
       participants.remote.map(p =>
         TopLevelValue(p.name, helpText("remote participant", p.name), p, nodeTopic)
       )
-    val localMediatorBinds: Seq[TopLevelValue[_]] =
+    val localMediatorBinds: Seq[TopLevelValue[?]] =
       mediators.local.map(d =>
         TopLevelValue(d.name, helpText("local mediator", d.name), d, nodeTopic)
       )
-    val remoteMediatorBinds: Seq[TopLevelValue[_]] =
+    val remoteMediatorBinds: Seq[TopLevelValue[?]] =
       mediators.remote.map(d =>
         TopLevelValue(d.name, helpText("remote mediator", d.name), d, nodeTopic)
       )
-    val localSequencerBinds: Seq[TopLevelValue[_]] =
+    val localSequencerBinds: Seq[TopLevelValue[?]] =
       sequencers.local.map(d =>
         TopLevelValue(d.name, helpText("local sequencer", d.name), d, nodeTopic)
       )
-    val remoteSequencerBinds: Seq[TopLevelValue[_]] =
+    val remoteSequencerBinds: Seq[TopLevelValue[?]] =
       sequencers.remote.map(d =>
         TopLevelValue(d.name, helpText("remote sequencer", d.name), d, nodeTopic)
       )
-    val clockBinds: Option[TopLevelValue[_]] =
+    val clockBinds: Option[TopLevelValue[?]] =
       environment.simClock.map(cl =>
         TopLevelValue("clock", "Simulated time", new SimClockCommand(cl))
       )
@@ -445,7 +453,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
   /** Bindings for ammonite Add a reference to this instance to resolve implicit references within
     * the console
     */
-  lazy val bindings: Either[RuntimeException, IndexedSeq[Bind[_]]] = {
+  lazy val bindings: Either[RuntimeException, IndexedSeq[Bind[?]]] = {
     import cats.syntax.traverse.*
     for {
       bindsWithoutSelfAlias <- topLevelValues.traverse(_.asBind)
@@ -454,7 +462,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
     } yield binds.toIndexedSeq
   }
 
-  private def validateNameUniqueness(binds: Seq[Bind[_]]) = {
+  private def validateNameUniqueness(binds: Seq[Bind[?]]) = {
     val nonUniqueNames =
       binds.map(_.name).groupBy(identity).collect {
         case (name, occurrences) if occurrences.sizeIs > 1 =>
@@ -489,7 +497,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
 
   /** So we can we make this available
     */
-  protected def selfAlias(): Bind[_] = Bind(ConsoleEnvironmentBinding.BindingName, this)
+  protected def selfAlias(): Bind[?] = Bind(ConsoleEnvironmentBinding.BindingName, this)
 
   override def onClosed(): Unit =
     LifeCycle.close(
@@ -564,6 +572,8 @@ object ConsoleEnvironment {
       SynchronizerAlias.tryCreate(alias)
     implicit def toSynchronizerAliases(aliases: Seq[String]): Seq[SynchronizerAlias] =
       aliases.map(SynchronizerAlias.tryCreate)
+    implicit def toSomeSynchronizerAlias(alias: SynchronizerAlias): Option[SynchronizerAlias] =
+      Some(alias)
 
     implicit def toInstanceName(name: String): InstanceName = InstanceName.tryCreate(name)
 
@@ -612,10 +622,10 @@ object ConsoleEnvironment {
       */
     implicit def toPositiveDouble(n: Double): PositiveDouble = PositiveDouble.tryCreate(n)
 
-    /** Implicitly map a `CantonTimestamp` to a `LedgerCreateTime`
+    /** Implicitly map a `CantonTimestamp` to a `CreationTime.CreatedAt`
       */
-    implicit def toLedgerCreateTime(ts: CantonTimestamp): SerializableContract.LedgerCreateTime =
-      SerializableContract.LedgerCreateTime(ts)
+    implicit def toLedgerCreateTime(ts: CantonTimestamp): CreationTime.CreatedAt =
+      CreationTime.CreatedAt(ts.toLf)
 
     /** Implicitly convert a duration to a [[com.digitalasset.canton.config.NonNegativeDuration]]
       * @throws java.lang.IllegalArgumentException
@@ -653,12 +663,39 @@ object ConsoleEnvironment {
     ): PositiveDurationSeconds =
       PositiveDurationSeconds.tryFromDuration(duration)
 
-    /** Implicitly convert a [[com.digitalasset.canton.topology.SynchronizerId]] to
+    /** Implicitly convert a [[com.digitalasset.canton.topology.PhysicalSynchronizerId]] to
+      * [[scala.Option]] of [[com.digitalasset.canton.topology.SynchronizerId]]
+      */
+    implicit def physicalSynchronizerIdIsSomeLogical(
+        synchronizerId: PhysicalSynchronizerId
+    ): Option[SynchronizerId] = Some(synchronizerId.logical)
+
+    /** Implicitly convert a [[com.digitalasset.canton.topology.PhysicalSynchronizerId]] to
+      * [[scala.Option]] of
       * [[com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer]]
       */
-    implicit def toSynchronizerTopologyStoreId(
-        synchronizerId: SynchronizerId
-    ): TopologyStoreId.Synchronizer = TopologyStoreId.Synchronizer(synchronizerId)
+    implicit def physicalSynchronizerIdIsSomeTopologyStoreId(
+        synchronizerId: PhysicalSynchronizerId
+    ): Option[TopologyStoreId.Synchronizer] = Some(
+      TopologyStoreId.Synchronizer(synchronizerId)
+    )
+
+    /** Implicitly convert a [[com.digitalasset.canton.topology.PhysicalSynchronizerId]] to
+      * [[scala.collection.immutable.Set]] of [[com.digitalasset.canton.topology.SynchronizerId]]
+      */
+    implicit def physicalSynchronizerIdIsLogicalSet(
+        synchronizerId: PhysicalSynchronizerId
+    ): Set[SynchronizerId] = Set(
+      synchronizerId.logical
+    )
+
+    /** Implicitly convert a [[com.digitalasset.canton.topology.PhysicalSynchronizerId]] to
+      * [[scala.collection.immutable.Set]] of
+      * [[com.digitalasset.canton.topology.PhysicalSynchronizerId]]
+      */
+    implicit def physicalSynchronizerIdIsSome(
+        synchronizerId: PhysicalSynchronizerId
+    ): Option[PhysicalSynchronizerId] = Some(synchronizerId)
 
     /** Implicitly convert a [[com.digitalasset.canton.topology.SynchronizerId]] to [[scala.Option]]
       * of [[com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer]]
@@ -666,7 +703,7 @@ object ConsoleEnvironment {
     implicit def synchronizerIdIsSomeTopologyStoreId(
         synchronizerId: SynchronizerId
     ): Option[TopologyStoreId.Synchronizer] =
-      Some(TopologyStoreId.Synchronizer(synchronizerId))
+      Some(synchronizerId)
 
     /** Implicitly convert a [[com.digitalasset.canton.topology.SynchronizerId]] to [[scala.Option]]
       * of [[com.digitalasset.canton.topology.SynchronizerId]]
@@ -681,7 +718,7 @@ object ConsoleEnvironment {
     implicit def optionSynchronizerIdIsOptionTopologyStoreId(
         synchronizerId: Option[SynchronizerId]
     ): Option[TopologyStoreId] =
-      synchronizerId.map(TopologyStoreId.Synchronizer(_))
+      synchronizerId.map(id => TopologyStoreId.Synchronizer(id))
 
     /** Implicitly convert a [[com.digitalasset.canton.topology.admin.grpc.TopologyStoreId]] to
       * [[scala.Option]] of
@@ -708,13 +745,13 @@ class SimClockCommand(clock: SimClock) {
   def now: Instant = clock.now.toInstant
 
   @Help.Description("Advance time to given time-point")
-  def advanceTo(timestamp: Instant): Unit = TraceContext.withNewTraceContext {
+  def advanceTo(timestamp: Instant): Unit = TraceContext.withNewTraceContext("clock_advance_to") {
     implicit traceContext =>
       clock.advanceTo(CantonTimestamp.assertFromInstant(timestamp))
   }
 
   @Help.Description("Advance time by given time-period")
-  def advance(duration: JDuration): Unit = TraceContext.withNewTraceContext {
+  def advance(duration: JDuration): Unit = TraceContext.withNewTraceContext("clock_advance") {
     implicit traceContext =>
       clock.advance(duration)
   }

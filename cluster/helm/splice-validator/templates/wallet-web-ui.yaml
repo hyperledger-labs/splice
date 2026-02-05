@@ -29,20 +29,6 @@ spec:
       {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:
       - env:
-        - name: SPLICE_APP_UI_AUTH_CLIENT_ID
-          valueFrom:
-            secretKeyRef:
-              key: client-id
-              name: splice-app-wallet-ui-auth
-              optional: false
-        - name: SPLICE_APP_UI_AUTH_URL
-          valueFrom:
-            secretKeyRef:
-              key: url
-              name: splice-app-wallet-ui-auth
-              optional: false
-        - name: SPLICE_APP_UI_AUTH_AUDIENCE
-          value: {{ .Values.auth.audience | quote }}
         - name: SPLICE_APP_UI_NETWORK_NAME
           value: {{ .Values.spliceInstanceNames.networkName | quote }}
         - name: SPLICE_APP_UI_NETWORK_FAVICON_URL
@@ -57,6 +43,29 @@ spec:
           value: {{ .Values.spliceInstanceNames.nameServiceNameAcronym | quote }}
         - name: SPLICE_APP_UI_POLL_INTERVAL
           value: {{ .Values.uiPollInterval | quote }}
+        {{- if .Values.disableAuth }}
+        - name: SPLICE_APP_UI_UNSAFE
+          value: "true"
+        - name: SPLICE_APP_UI_UNSAFE_SECRET
+          value: "unsafe"
+        - name: SPLICE_APP_UI_AUTH_AUDIENCE
+          value: "https://validator.example.com"
+        {{- else }}
+        - name: SPLICE_APP_UI_AUTH_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: splice-app-wallet-ui-auth
+              optional: false
+        - name: SPLICE_APP_UI_AUTH_AUDIENCE
+          value: {{ .Values.auth.audience | quote }}
+        - name: SPLICE_APP_UI_AUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              key: client-id
+              name: splice-app-wallet-ui-auth
+              optional: false
+        {{- end }}
         image: "{{ .Values.imageRepo }}/wallet-web-ui:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).wallet_web_ui) }}"
         {{- with .Values.imagePullPolicy }}
         imagePullPolicy: {{ . }}
@@ -71,7 +80,6 @@ spec:
             cpu: 0.1
             memory: 240Mi
           limits:
-            cpu: 1
             memory: 1536Mi
       {{- with .Values.nodeSelector }}
       nodeSelector:

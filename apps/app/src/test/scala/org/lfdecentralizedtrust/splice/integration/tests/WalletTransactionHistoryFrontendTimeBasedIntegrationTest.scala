@@ -55,6 +55,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           _ => {
             val txs = findAll(className("tx-row")).toSeq
             txs should have size 3
+            forAll(txs.take(2))(readPartyDescriptionFromRow(_) shouldBe defined)
             txs
           },
         )
@@ -75,6 +76,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           _ => {
             val txs = findAll(className("tx-row")).toSeq
             txs should have size 5
+            forAll(txs.take(2))(readPartyDescriptionFromRow(_) shouldBe defined)
             txs
           },
         )
@@ -116,7 +118,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
             if (isInitial)
               s"${ansAcronym.toUpperCase()} Entry Initial Payment Collected"
             else s"${ansAcronym.toUpperCase()} Entry Renewal Payment Collected",
-          expectedPartyDescription = Some(s"$entryForAns $entryForAns"),
+          expectedPartyDescription = Some(s"$entryForAns"),
           expectedAmountAmulet = BigDecimal(0), // 0 USD
         )
         matchTransaction(lockForAns)(
@@ -126,8 +128,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
             if (isInitial)
               "Subscription Initial Payment Accepted"
             else "Subscription Payment Accepted",
-          expectedPartyDescription =
-            Some(s"Automation ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"),
+          expectedPartyDescription = Some(s"Automation"),
           expectedAmountAmulet = BigDecimal("-0.5"), // 1 USD
         )
       }

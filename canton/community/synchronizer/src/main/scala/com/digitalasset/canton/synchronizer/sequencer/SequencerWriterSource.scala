@@ -12,7 +12,7 @@ import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, LogicalUpgradeTime}
 import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.*
@@ -22,6 +22,7 @@ import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.{
   ExceededMaxSequencingTime,
   PayloadToEventTimeBoundExceeded,
+  SequencedBeforeOrAtLowerBound,
 }
 import com.digitalasset.canton.synchronizer.sequencer.store.*
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
@@ -29,6 +30,7 @@ import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.BatchTracing.withTracedBatch
 import com.digitalasset.canton.tracing.{HasTraceContext, TraceContext, Traced}
 import com.digitalasset.canton.util.BatchN.MaximizeBatchSize
+import com.digitalasset.canton.util.EitherUtil.*
 import com.digitalasset.canton.util.PekkoUtil.WithKillSwitch
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.canton.util.{BatchN, EitherTUtil, ErrorUtil}
@@ -202,6 +204,7 @@ object SequencerWriterSource {
       protocolVersion: ProtocolVersion,
       metrics: SequencerMetrics,
       blockSequencerMode: Boolean,
+      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
   )(implicit
       executionContext: ExecutionContext,
       traceContext: TraceContext,
@@ -272,6 +275,7 @@ object SequencerWriterSource {
           writerConfig,
           store,
           eventTimestampGenerator,
+          sequencingTimeLowerBoundExclusive,
           loggerFactory,
           protocolVersion,
           blockSequencerMode,
@@ -302,7 +306,10 @@ object SequencerWriterSource {
           Flow[Traced[BatchWritten]].map { tracedBatchWritten =>
             tracedBatchWritten.withTraceContext { _ => batchWritten =>
               batchWritten.events.foreach { events =>
-                store.bufferEvents(events)
+                store.bufferEvents(events.map(_.map(_.id)))
+                events.foreach { event =>
+                  event.event.payloadO.foreach(store.bufferPayload(_)(event.traceContext))
+                }
               }
             }
             tracedBatchWritten
@@ -381,6 +388,11 @@ class SendEventGenerator(
       }
 
       def deliver(recipientIds: Set[SequencerMemberId]): StoreEvent[BytesPayload] = {
+        val finalRecipientIds = if (submission.batch.isBroadcast) {
+          Set(SequencerMemberId.Broadcast)
+        } else {
+          recipientIds
+        }
         val payload =
           BytesPayload(
             submissionOrOutcome.fold(
@@ -393,7 +405,7 @@ class SendEventGenerator(
         DeliverStoreEvent.ensureSenderReceivesEvent(
           senderId,
           submission.messageId,
-          recipientIds,
+          finalRecipientIds,
           payload,
           submission.topologyTimestamp,
           trafficReceiptO,
@@ -501,6 +513,7 @@ object SequenceWritesFlow {
       writerConfig: SequencerWriterConfig,
       store: SequencerWriterStore,
       eventTimestampGenerator: PartitionedTimestampGenerator,
+      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
       loggerFactory: NamedLoggerFactory,
       protocolVersion: ProtocolVersion,
       blockSequencerMode: Boolean,
@@ -578,18 +591,38 @@ object SequenceWritesFlow {
     ): Option[Sequenced[BytesPayload]] = {
       def checkMaxSequencingTime(
           event: Presequenced[StoreEvent[BytesPayload]]
-      ): Either[CantonBaseError, Presequenced[StoreEvent[BytesPayload]]] =
+      ): Either[CantonBaseError, Unit] =
         event.maxSequencingTimeO
-          .toLeft(event)
+          .toLeft(())
           .leftFlatMap { maxSequencingTime =>
             Either.cond(
               timestamp <= maxSequencingTime,
-              event,
+              (),
               ExceededMaxSequencingTime.Error(timestamp, maxSequencingTime, event.event.description),
             )
           }
 
-      def checkTopologyTimestamp(
+      def checkSequencingTimeLowerBound(
+          event: Presequenced[StoreEvent[BytesPayload]]
+      ): Either[CantonBaseError, Unit] =
+        sequencingTimeLowerBoundExclusive match {
+          case Some(bound) =>
+            Either.cond(
+              LogicalUpgradeTime.canProcessKnowingPastUpgrade(
+                upgradeTime = Some(bound),
+                sequencingTime = timestamp,
+              ),
+              (),
+              SequencedBeforeOrAtLowerBound.Error(
+                timestamp,
+                bound,
+                event.event.description,
+              ),
+            )
+          case None => ().asRight
+        }
+
+      def deliverErrorForInvalidTopologyTimestamp(
           event: Presequenced[StoreEvent[BytesPayload]]
       ): Presequenced[StoreEvent[BytesPayload]] =
         event.map {
@@ -632,18 +665,18 @@ object SequenceWritesFlow {
 
       def checkPayloadToEventMargin(
           presequencedEvent: Presequenced[StoreEvent[BytesPayload]]
-      ): Either[CantonBaseError, Presequenced[StoreEvent[BytesPayload]]] =
+      ): Either[CantonBaseError, Unit] =
         presequencedEvent match {
           // we only need to check deliver events for payloads
           // the only reason why
-          case presequencedDeliver @ Presequenced(deliver: DeliverStoreEvent[BytesPayload], _, _) =>
+          case Presequenced(deliver: DeliverStoreEvent[BytesPayload], _, _) =>
             val payloadTs = deliver.payload.id.unwrap
             val bound = writerConfig.payloadToEventMargin
             val maxAllowableEventTime = payloadTs.add(bound.asJava)
             Either
               .cond(
                 timestamp <= maxAllowableEventTime,
-                presequencedDeliver,
+                (),
                 PayloadToEventTimeBoundExceeded.Error(
                   bound.duration,
                   payloadTs,
@@ -651,26 +684,23 @@ object SequenceWritesFlow {
                   messageId = deliver.messageId,
                 ),
               )
-          case other =>
-            Right(other)
+          case _ =>
+            Right(())
         }
 
       val resultE = for {
-        event <- checkPayloadToEventMargin(presequencedEvent)
-        event <- checkMaxSequencingTime(event)
-      } yield event
+        _ <- checkPayloadToEventMargin(presequencedEvent)
+        _ <- checkMaxSequencingTime(presequencedEvent)
+        _ <- checkSequencingTimeLowerBound(presequencedEvent)
+        checkedEvent = deliverErrorForInvalidTopologyTimestamp(presequencedEvent)
+      } yield Sequenced(timestamp, checkedEvent.event)
 
-      resultE match {
-        case Left(error) =>
-          // log here as we don't have the trace context in the error itself
-          implicit val errorLoggingContext =
-            ErrorLoggingContext(logger, loggerFactory.properties, presequencedEvent.traceContext)
-          error.log()
-          None
-        case Right(event) =>
-          val checkedEvent = checkTopologyTimestamp(event)
-          Some(Sequenced(timestamp, checkedEvent.event))
-      }
+      resultE.tapLeft { error =>
+        // log here as we don't have the trace context in the error itself
+        implicit val errorLoggingContext =
+          ErrorLoggingContext(logger, loggerFactory.properties, presequencedEvent.traceContext)
+        error.log()
+      }.toOption
     }
 
     val batching =
@@ -734,7 +764,8 @@ object WritePayloadsFlow {
       if (events.isEmpty)
         FutureUnlessShutdown.pure(Seq.empty[WithKillSwitch[Presequenced[StoreEvent[BytesPayload]]]])
       else {
-        implicit val traceContext: TraceContext = TraceContext.ofBatch(events.map(_.value))(logger)
+        implicit val traceContext: TraceContext =
+          TraceContext.ofBatch("write_payloads_batch")(events.map(_.value))(logger)
         implicit val errorLoggingContext: ErrorLoggingContext =
           ErrorLoggingContext.fromTracedLogger(logger)
         // extract the payloads themselves for storing

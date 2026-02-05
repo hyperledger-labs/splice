@@ -10,12 +10,10 @@ import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorServic
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.environment.ManagedNodes
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.DbMigrationsFactory
 
 /** Splitwell app instances. */
 class SplitwellApps(
     create: (String, SplitwellAppBackendConfig) => SplitwellAppBootstrap,
-    migrationsFactory: DbMigrationsFactory,
     _timeouts: ProcessingTimeout,
     configs: Map[String, SplitwellAppBackendConfig],
     parametersFor: String => SharedSpliceAppParameters,
@@ -30,7 +28,6 @@ class SplitwellApps(
       SplitwellAppBootstrap,
     ](
       create,
-      migrationsFactory,
       _timeouts,
       configs,
       parametersFor,

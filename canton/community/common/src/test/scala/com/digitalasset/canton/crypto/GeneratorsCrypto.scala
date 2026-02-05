@@ -5,12 +5,11 @@ package com.digitalasset.canton.crypto
 
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.config.CantonRequireTypes.String68
-import com.digitalasset.canton.config.DefaultProcessingTimeouts
+import com.digitalasset.canton.config.{DefaultProcessingTimeouts, PositiveFiniteDuration}
 import com.digitalasset.canton.crypto.provider.jce.JcePrivateCrypto
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.{BaseTest, Generators}
 import com.google.protobuf.ByteString
 import magnolify.scalacheck.auto.*
@@ -59,9 +58,7 @@ object GeneratorsCrypto {
     key <- Arbitrary.arbitrary[ByteString]
     keySpec <- Arbitrary.arbitrary[SigningKeySpec]
     format = CryptoKeyFormat.Symbolic
-    usage <- Gen
-      .nonEmptyListOf(Gen.oneOf(SigningKeyUsage.All.toList))
-      .map(usages => NonEmptyUtil.fromUnsafe(usages.toSet))
+    usage <- nonEmptySetGen(Arbitrary(Gen.oneOf(SigningKeyUsage.All.toList)))
       .suchThat(usagesNE => SigningKeyUsage.isUsageValid(usagesNE))
   } yield SigningPublicKey.create(format, key, keySpec, usage).value)
 
@@ -71,7 +68,7 @@ object GeneratorsCrypto {
   implicit val signatureDelegationArb: Arbitrary[SignatureDelegation] = Arbitrary(
     for {
       periodFrom <- Arbitrary.arbitrary[CantonTimestamp]
-      periodDuration <- Gen.choose(1, 86400L).map(PositiveSeconds.tryOfSeconds)
+      periodDuration <- Gen.choose(1, 86400L).map(PositiveFiniteDuration.ofSeconds)
       period = SignatureDelegationValidityPeriod(periodFrom, periodDuration)
 
       signingKeySpec <- Arbitrary
@@ -152,12 +149,13 @@ object GeneratorsCrypto {
     key <- Arbitrary.arbitrary[ByteString]
     keySpec <- Arbitrary.arbitrary[EncryptionKeySpec]
     format = CryptoKeyFormat.Symbolic
-  } yield new EncryptionPublicKey(format, key, keySpec)())
+  } yield EncryptionPublicKey.create(format, key, keySpec).value)
 
-  // TODO(#14515) Check that the generator is exhaustive
-  implicit val publicKeyArb: Arbitrary[PublicKey] = Arbitrary(
-    Gen.oneOf(Arbitrary.arbitrary[SigningPublicKey], Arbitrary.arbitrary[EncryptionPublicKey])
-  )
+  implicit val publicKeyArb: Arbitrary[PublicKey] =
+    arbitraryForAllSubclasses(classOf[PublicKey])(
+      GeneratorForClass(Arbitrary.arbitrary[SigningPublicKey], classOf[SigningPublicKey]),
+      GeneratorForClass(Arbitrary.arbitrary[EncryptionPublicKey], classOf[EncryptionPublicKey]),
+    )
 
   // Test key intended for signing an unassignment result message.
   lazy val testSigningKey: SigningPublicKey =
@@ -176,10 +174,14 @@ object GeneratorsCrypto {
   implicit val symmetricKeyArb: Arbitrary[SymmetricKey] =
     Arbitrary(
       for {
-        format <- Arbitrary.arbitrary[CryptoKeyFormat]
-        key <- Arbitrary.arbitrary[ByteString]
+        key <- Gen
+          .containerOfN[Array, Byte](
+            SymmetricKeyScheme.Aes128Gcm.keySizeInBytes,
+            Arbitrary.arbitrary[Byte],
+          )
+          .map(ByteString.copyFrom)
         scheme <- Arbitrary.arbitrary[SymmetricKeyScheme]
-      } yield new SymmetricKey(format, key, scheme)
+      } yield SymmetricKey.create(CryptoKeyFormat.Raw, key, scheme).value
     )
 
   implicit def asymmetricEncryptedArb[T]: Arbitrary[AsymmetricEncrypted[T]] =

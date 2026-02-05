@@ -113,7 +113,8 @@ trait ProcessTestUtil { this: BaseTest =>
       extraEnv*
     )
   }
-
+  val javaToolOptionsKey = "JAVA_TOOL_OPTIONS"
+  val defaultJavaToolOptions = "-Xms6g -Xmx8g"
   private def startCantonInternal(
       args: Seq[String],
       logSuffix: String,
@@ -123,9 +124,15 @@ trait ProcessTestUtil { this: BaseTest =>
       s"${extraEnv.map(e => s"${e._1}=${e._2}").mkString(" ")} ${(defaultArgsCanton(logSuffix) ++ args)
           .mkString(" ")}"
     )
+    val extraJavaToolOptions = extraEnv.toMap.get(javaToolOptionsKey) match {
+      case Some(value) => value
+      case None => ""
+    }
     startProcess(
       defaultArgsCanton(logSuffix) ++ args,
-      extraEnv = extraEnv,
+      // Using the same memory settings as in the `./start-canton.sh` script
+      extraEnv =
+        extraEnv :+ ((javaToolOptionsKey, s"$defaultJavaToolOptions $extraJavaToolOptions")),
     )
   }
 

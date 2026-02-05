@@ -189,7 +189,7 @@ components:
       properties:
         kind:
           type: string
-          enum: [ "participantAdmin", "canActAs", "canReadAs", "identityProviderAdmin", "canReadAsAnyParty" ]
+          enum: [ "participantAdmin", "canActAs", "canReadAs", "canExecuteAs", "identityProviderAdmin", "canReadAsAnyParty", "canExecuteAsAnyParty" ]
         party:
           type: string
 

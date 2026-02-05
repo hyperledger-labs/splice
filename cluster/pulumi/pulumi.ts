@@ -9,6 +9,8 @@ import {
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import {spliceEnvConfig} from "@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig";
+import {allowDowngrade} from "@lfdecentralizedtrust/splice-pulumi-common";
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulumi-'));
 
@@ -44,8 +46,11 @@ export function pulumiOptsWithPrefix(
   onOutput: (output: string) => void;
   signal: AbortSignal;
   color: 'always';
+  policyPacks: string[];
+  diff: boolean;
 } {
   return {
+    diff: true,
     parallel: 128,
     onOutput: (output: string) => {
       // do not output empty lines or lines containing just '.'
@@ -55,6 +60,7 @@ export function pulumiOptsWithPrefix(
     },
     signal: abortSignal,
     color: 'always',
+    policyPacks: allowDowngrade ? [] : [`${spliceEnvConfig.context.splicePath}/cluster/pulumi/policies`],
   };
 }
 

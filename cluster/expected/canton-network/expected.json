@@ -51,6 +51,28 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "postgresPassword": ""
         }
       },
@@ -109,14 +131,6 @@
     "name": "cn-app-sv-da-1-key",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "projects/test-project/global/networks/default",
-    "inputs": {},
-    "name": "default",
-    "provider": "",
-    "type": "gcp:compute/network:Network"
   },
   {
     "custom": true,
@@ -180,6 +194,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -228,7 +249,127 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "auth0Client": {},
+      "decentralizedSynchronizerUpgradeConfig": {
+        "active": {
+          "id": 3,
+          "releaseReference": {
+            "deploymentDir": "cluster/deployment",
+            "gitReference": "refs/heads/release-line-0.3.20",
+            "privateConfigsDir": "cluster/configs/configs-private",
+            "publicConfigsDir": "cluster/configs/configs",
+            "pulumiBaseDir": "splice/cluster/pulumi",
+            "pulumiStacksDir": "cluster/stacks/prod",
+            "repoUrl": "https://github.com/hyperledger-labs/splice",
+            "spliceRoot": "splice"
+          },
+          "sequencer": {
+            "enableBftSequencer": false
+          },
+          "version": {
+            "type": "remote",
+            "version": "0.3.20"
+          }
+        },
+        "archived": [
+          {
+            "id": 1,
+            "releaseReference": {
+              "deploymentDir": "cluster/deployment",
+              "gitReference": "981227e62011e386cca3cdb5f00b472cf05a12c4",
+              "pulumiBaseDir": "splice/cluster/pulumi",
+              "pulumiStacksDir": "cluster/stacks/prod",
+              "repoUrl": "https://github.com/hyperledger-labs/splice",
+              "spliceRoot": "splice"
+            },
+            "sequencer": {
+              "enableBftSequencer": false
+            },
+            "version": {
+              "type": "remote",
+              "version": "0.3.18"
+            }
+          },
+          {
+            "id": 2,
+            "releaseReference": {
+              "deploymentDir": "cluster/deployment",
+              "gitReference": "refs/heads/release-line-0.3.19",
+              "pulumiBaseDir": "splice/cluster/pulumi",
+              "pulumiStacksDir": "cluster/stacks/prod",
+              "repoUrl": "https://github.com/hyperledger-labs/splice",
+              "spliceRoot": "splice"
+            },
+            "sequencer": {
+              "enableBftSequencer": false
+            },
+            "version": {
+              "type": "remote",
+              "version": "0.3.19"
+            }
+          }
+        ],
+        "upgrade": {
+          "id": 4,
+          "releaseReference": {
+            "deploymentDir": "cluster/deployment",
+            "gitReference": "refs/heads/release-line-0.3.21",
+            "privateConfigsDir": "cluster/configs/configs-private",
+            "publicConfigsDir": "cluster/configs/configs",
+            "pulumiBaseDir": "splice/cluster/pulumi",
+            "pulumiStacksDir": "cluster/stacks/prod",
+            "repoUrl": "https://github.com/hyperledger-labs/splice",
+            "spliceRoot": "splice"
+          },
+          "sequencer": {
+            "enableBftSequencer": false
+          },
+          "version": {
+            "type": "remote",
+            "version": "0.3.21"
+          }
+        }
+      },
+      "disableOnboardingParticipantPromotionDelay": false,
+      "expectedValidatorOnboardings": [
+        {
+          "expiresIn": "24h",
+          "name": "splitwell2",
+          "secret": "splitwellsecret2"
+        },
+        {
+          "expiresIn": "24h",
+          "name": "validator12",
+          "secret": "validator1secret2"
+        }
+      ],
+      "identitiesBackupLocation": {
+        "bucket": {
+          "bucketName": "da-cn-data-dumps",
+          "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+          "projectId": "da-cn-devnet",
+          "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+        }
+      },
+      "isDevNet": false,
+      "periodicBackupConfig": {
+        "backupInterval": "10m",
+        "location": {
+          "bucket": {
+            "bucketName": "da-cn-data-dumps",
+            "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+            "projectId": "da-cn-devnet",
+            "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+          }
+        }
+      },
+      "splitPostgresInstances": true,
+      "topupConfig": {
+        "minTopupInterval": "1m",
+        "targetThroughput": 0
+      }
+    },
     "name": "dso",
     "provider": "",
     "type": "canton:network:dso"
@@ -763,6 +904,16 @@
   },
   {
     "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",
@@ -865,14 +1016,14 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "audience": "https://canton.network.global",
-          "client-id": "sv-1-client-id",
+          "client-id": "sv1-sv-client-id",
           "client-secret": "***",
-          "ledger-api-user": "sv-1-client-id@clients",
+          "ledger-api-user": "sv1-sv-client-id@clients",
           "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
-    "name": "splice-auth0-secret-sv-1-sv-1",
+    "name": "splice-auth0-secret-sv-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -897,7 +1048,32 @@
         }
       }
     },
-    "name": "splice-auth0-secret-sv-1-sv1_validator",
+    "name": "splice-auth0-secret-sv-1-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-ledger-api-auth",
+        "namespace": "sv-da-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://canton.network.global",
+          "client-id": "sv-da-1-sv-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv-da-1-sv-client-id@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-sv-da-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -922,32 +1098,7 @@
         }
       }
     },
-    "name": "splice-auth0-secret-sv-da-1-sv-da-1_validator",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-sv-ledger-api-auth",
-        "namespace": "sv-da-1"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "audience": "https://canton.network.global",
-          "client-id": "sv-da-1-client-id",
-          "client-secret": "***",
-          "ledger-api-user": "sv-da-1-client-id@clients",
-          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
-        }
-      }
-    },
-    "name": "splice-auth0-secret-sv-da-1-sv-da-1",
+    "name": "splice-auth0-secret-sv-da-1-validator",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -991,7 +1142,7 @@
         }
       }
     },
-    "name": "splice-auth0-ui-secret-sv-1-sv-1",
+    "name": "splice-auth0-ui-secret-sv-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1057,7 +1208,7 @@
         }
       }
     },
-    "name": "splice-auth0-ui-secret-sv-da-1-sv-da-1",
+    "name": "splice-auth0-ui-secret-sv-da-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1086,7 +1237,35 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "appLabel": "scan-app",
+      "globalLimits": {
+        "fillInterval": "60s",
+        "maxTokens": 2147483647,
+        "tokensPerFill": 2147483647
+      },
+      "inboundPort": 5012,
+      "namespace": "sv-1",
+      "rateLimits": [
+        {
+          "actions": [
+            {
+              "name": "acs",
+              "pathPrefix": "/api/scan/v0/acs"
+            },
+            {
+              "clientIp": true,
+              "name": "client_ip"
+            }
+          ],
+          "limits": {
+            "fillInterval": "60s",
+            "maxTokens": 10,
+            "tokensPerFill": 5
+          }
+        }
+      ]
+    },
     "name": "splice-sv-1-scan-app-rate-limit",
     "provider": "",
     "type": "splice:RateLimit"
@@ -1094,7 +1273,35 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "appLabel": "scan-app",
+      "globalLimits": {
+        "fillInterval": "60s",
+        "maxTokens": 2147483647,
+        "tokensPerFill": 2147483647
+      },
+      "inboundPort": 5012,
+      "namespace": "sv-da-1",
+      "rateLimits": [
+        {
+          "actions": [
+            {
+              "name": "acs",
+              "pathPrefix": "/api/scan/v0/acs"
+            },
+            {
+              "clientIp": true,
+              "name": "client_ip"
+            }
+          ],
+          "limits": {
+            "fillInterval": "60s",
+            "maxTokens": 10,
+            "tokensPerFill": 5
+          }
+        }
+      ]
+    },
     "name": "splice-sv-da-1-scan-app-rate-limit",
     "provider": "",
     "type": "splice:RateLimit"
@@ -1133,6 +1340,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -1237,6 +1448,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -1321,6 +1539,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -1548,6 +1773,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -1565,6 +1797,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": true,
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
@@ -1581,6 +1814,15 @@
           "schema": "scan_sv_1",
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2048Mi"
+          },
+          "requests": {
+            "cpu": "0.5",
+            "memory": "1536Mi"
+          }
         },
         "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
@@ -1622,8 +1864,8 @@
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
           },
           {
-            "name": "ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY",
-            "value": "canton.sv-apps.sv.topology-change-delay-duration=250ms"
+            "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
+            "value": "canton.sv-apps.sv.local-synchronizer-node.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
@@ -1636,6 +1878,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -1646,7 +1895,7 @@
         "approvedSvIdentities": [
           {
             "name": "Digital-Asset-2",
-            "publicKey": "PUBKEY_0==",
+            "publicKey": "sv1-id-public-key",
             "rewardWeightBps": 100000
           },
           {
@@ -1673,6 +1922,11 @@
             "name": "Digital-Asset-1",
             "publicKey": "svda1-mock-id-public-key",
             "rewardWeightBps": 150000
+          },
+          {
+            "name": "DA-Helm-Test-Node",
+            "publicKey": "sv-id-public-key",
+            "rewardWeightBps": 10000
           }
         ],
         "auth": {
@@ -1698,7 +1952,7 @@
           "sequencerAddress": "global-domain-3-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
-            "pruningInterval": "1 hours",
+            "pruningInterval": "1 hour",
             "retentionPeriod": "30 days"
           },
           "sequencerPublicUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com",
@@ -1749,6 +2003,7 @@
           "readVsWriteScalingFactor": 4
         },
         "isDevNet": false,
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -1764,6 +2019,18 @@
         "onboardingRoundZeroDuration": "2 h",
         "onboardingType": "found-dso",
         "participantAddress": "participant-3",
+        "periodicTopologySnapshotConfig": {
+          "backupInterval": "24h",
+          "location": {
+            "bucket": {
+              "bucketName": "da-cn-topology-snapshots",
+              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+              "projectId": "da-cn-test",
+              "secretName": "cn-gcp-bucket-da-cn-test-da-cn-topology-snapshots"
+            },
+            "prefix": "mock/sv-1"
+          }
+        },
         "persistence": {
           "databaseName": "sv_sv_1",
           "port": 5432,
@@ -1771,6 +2038,19 @@
           "schema": "sv_sv_1",
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
+        },
+        "pvc": {
+          "volumeName": "sv-app-global-domain-migration-pvc",
+          "volumeStorageClass": "standard-rwo"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-1:5012",
@@ -1809,7 +2089,12 @@
       "namespace": "sv-1",
       "timeout": 600,
       "values": {
-        "additionalEnvVars": [],
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT",
+            "value": "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+          }
+        ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
         "affinity": {
@@ -1821,6 +2106,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -1841,9 +2133,11 @@
         },
         "contactPoint": "sv-support@digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
+        "disableAuth": false,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -1873,6 +2167,10 @@
           "schema": "validator_sv_1",
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
+        },
+        "pvc": {
+          "volumeName": "domain-migration-validator-pvc",
+          "volumeStorageClass": "standard-rwo"
         },
         "resources": {
           "limits": {
@@ -1974,6 +2272,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -2078,6 +2380,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -2162,6 +2471,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -2389,6 +2705,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -2406,6 +2729,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": false,
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
@@ -2422,6 +2746,15 @@
           "schema": "scan_sv_da_1",
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2048Mi"
+          },
+          "requests": {
+            "cpu": "0.5",
+            "memory": "1536Mi"
+          }
         },
         "sequencerAddress": "global-domain-3-sequencer",
         "spliceInstanceNames": {
@@ -2463,8 +2796,8 @@
             "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
           },
           {
-            "name": "ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY",
-            "value": "canton.sv-apps.sv.topology-change-delay-duration=250ms"
+            "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
+            "value": "canton.sv-apps.sv.local-synchronizer-node.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
@@ -2477,6 +2810,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -2487,7 +2827,7 @@
         "approvedSvIdentities": [
           {
             "name": "Digital-Asset-2",
-            "publicKey": "PUBKEY_0==",
+            "publicKey": "sv1-id-public-key",
             "rewardWeightBps": 100000
           },
           {
@@ -2514,6 +2854,11 @@
             "name": "Digital-Asset-1",
             "publicKey": "svda1-mock-id-public-key",
             "rewardWeightBps": 150000
+          },
+          {
+            "name": "DA-Helm-Test-Node",
+            "publicKey": "sv-id-public-key",
+            "rewardWeightBps": 10000
           }
         ],
         "auth": {
@@ -2541,7 +2886,7 @@
           "sequencerAddress": "global-domain-3-sequencer",
           "sequencerPruningConfig": {
             "enabled": true,
-            "pruningInterval": "1 hours",
+            "pruningInterval": "1 hour",
             "retentionPeriod": "30 days"
           },
           "sequencerPublicUrl": "https://sequencer-3.sv-1.mock.global.canton.network.digitalasset.com",
@@ -2565,6 +2910,7 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -2585,6 +2931,19 @@
           "schema": "sv_sv_da_1",
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
+        },
+        "pvc": {
+          "volumeName": "sv-app-global-domain-migration-pvc",
+          "volumeStorageClass": "standard-rwo"
+        },
+        "resources": {
+          "limits": {
+            "memory": "2Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1Gi"
+          }
         },
         "scan": {
           "internalUrl": "http://scan-app.sv-da-1:5012",
@@ -2623,7 +2982,16 @@
       "namespace": "sv-da-1",
       "timeout": 600,
       "values": {
-        "additionalEnvVars": [],
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_CONFIG_TOPOLOGY_METRICS_EXPORT",
+            "value": "canton.validator-apps.validator_backend.automation.topology-metrics-polling-interval = 5m\n"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+            "value": "canton.validator-apps.validator_backend.participant-pruning-schedule {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
+          }
+        ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
         "affinity": {
@@ -2635,6 +3003,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -2655,9 +3030,11 @@
         },
         "contactPoint": "sv-support@digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
+        "disableAuth": false,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -2687,6 +3064,10 @@
           "schema": "validator_sv_da_1",
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
+        },
+        "pvc": {
+          "volumeName": "domain-migration-validator-pvc",
+          "volumeStorageClass": "standard-rwo"
         },
         "resources": {
           "limits": {

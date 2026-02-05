@@ -16,7 +16,7 @@ if [[ ! " ${*} " =~ " --console " ]]; then
     ARGS+=( daemon --no-tty )
 fi
 
-ARGS+=( --log-encoder=json --log-level-stdout="${LOG_LEVEL_STDOUT:-DEBUG}" --log-level-canton="${LOG_LEVEL_CANTON:-DEBUG}" --log-file-appender=off )
+ARGS+=( --log-encoder=json --log-level-stdout="${LOG_LEVEL_STDOUT:-DEBUG}" --log-level-canton="${LOG_LEVEL_CANTON:-DEBUG}" --log-file-appender=off --log-immediate-flush="${LOG_IMMEDIATE_FLUSH:-false}" --log-last-errors=false)
 
 if [ -f /app/logback.xml ]; then
    export JAVA_TOOL_OPTIONS="-Dlogback.configurationFile=/app/logback.xml ${JAVA_TOOL_OPTIONS:-}"
@@ -33,6 +33,8 @@ if [ -n "${OVERRIDE_BOOTSTRAP_SCRIPT:-}" ]; then
 fi
 
 if [ -f /app/bootstrap.sc ]; then
+ # Rename file to avoid namespace confusion with canton console bootstrap object
+  cp /app/bootstrap.sc /app/user-bootstrap.sc
   ARGS+=( --bootstrap /app/bootstrap-entrypoint.sc )
 fi
 

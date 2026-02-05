@@ -1,9 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as gcp from '@pulumi/gcp';
-import { GCP_PROJECT, config } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { config, GCP_PROJECT } from '@lfdecentralizedtrust/splice-pulumi-common';
 
-import { gkeClusterConfig } from './config';
+import { hyperdiskSupportConfig } from '../../common/src/config/hyperdiskSupportConfig';
+import { gkeClusterConfig, GkeNodePoolConfig } from './config';
 
 export function installNodePools(): void {
   const clusterName = `cn-${config.requireEnv('GCP_CLUSTER_BASENAME')}net`;
@@ -11,31 +12,24 @@ export function installNodePools(): void {
     ? `projects/${GCP_PROJECT}/locations/${config.requireEnv('CLOUDSDK_COMPUTE_ZONE')}/clusters/${clusterName}`
     : clusterName;
 
-  new gcp.container.NodePool('cn-apps-node-pool', {
-    name: 'cn-apps-pool',
-    cluster,
-    nodeConfig: {
-      machineType: gkeClusterConfig.nodePools.apps.nodeType,
-      taints: [
-        {
-          effect: 'NO_SCHEDULE',
-          key: 'cn_apps',
-          value: 'true',
-        },
-      ],
-      labels: {
-        cn_apps: 'true',
-      },
-    },
-    initialNodeCount: 0,
-    autoscaling: {
-      minNodeCount: gkeClusterConfig.nodePools.apps.minNodes,
-      maxNodeCount: gkeClusterConfig.nodePools.apps.maxNodes,
-    },
-  });
+  const nodepoolLocation = config.optionalEnv('CLOUDSDK_HYPERDISK_NODEPOOL_COMPUTE_ZONE');
 
+  if (gkeClusterConfig.nodePools.hyperdiskApps) {
+    hyperdiskNodePool(cluster, gkeClusterConfig.nodePools.hyperdiskApps, nodepoolLocation);
+  }
+  const appsNodePoolConfig = gkeClusterConfig.nodePools.apps;
+
+  if (
+    hyperdiskSupportConfig.hyperdiskSupport.enabled &&
+    !hyperdiskSupportConfig.hyperdiskSupport.migrating
+  ) {
+    hyperdiskNodePool(cluster, appsNodePoolConfig, nodepoolLocation);
+  } else {
+    appsNodePool(cluster, appsNodePoolConfig);
+  }
+
+  const nodePoolComputeZone = config.optionalEnv('CLOUDSDK_NODEPOOL_COMPUTE_ZONE');
   new gcp.container.NodePool('cn-infra-node-pool', {
-    name: 'cn-infra-pool',
     cluster,
     nodeConfig: {
       machineType: gkeClusterConfig.nodePools.infra.nodeType,
@@ -49,7 +43,9 @@ export function installNodePools(): void {
       labels: {
         cn_infra: 'true',
       },
+      loggingVariant: 'DEFAULT',
     },
+    nodeLocations: nodePoolComputeZone ? [nodePoolComputeZone] : undefined,
     initialNodeCount: 1,
     autoscaling: {
       minNodeCount: gkeClusterConfig.nodePools.infra.minNodes,
@@ -58,7 +54,6 @@ export function installNodePools(): void {
   });
 
   new gcp.container.NodePool('gke-node-pool', {
-    name: 'gke-pool',
     cluster,
     nodeConfig: {
       machineType: 'e2-standard-4',
@@ -69,11 +64,66 @@ export function installNodePools(): void {
           value: 'true',
         },
       ],
+      loggingVariant: 'DEFAULT',
     },
+    nodeLocations: nodePoolComputeZone ? [nodePoolComputeZone] : undefined,
     initialNodeCount: 1,
     autoscaling: {
       minNodeCount: 1,
       maxNodeCount: 3,
+    },
+  });
+}
+function hyperdiskNodePool(cluster: string, config: GkeNodePoolConfig, location?: string) {
+  new gcp.container.NodePool('cn-apps-node-pool-hd', {
+    cluster,
+    nodeConfig: {
+      machineType: config.nodeType,
+      bootDisk: {
+        diskType: 'hyperdisk-balanced',
+        sizeGb: 100,
+      },
+      taints: [
+        {
+          effect: 'NO_SCHEDULE',
+          key: 'cn_apps',
+          value: 'true',
+        },
+      ],
+      labels: {
+        cn_apps: 'hyperdisk',
+      },
+      loggingVariant: 'DEFAULT',
+    },
+    nodeLocations: location ? [location] : undefined,
+    initialNodeCount: 0,
+    autoscaling: {
+      minNodeCount: config.minNodes,
+      maxNodeCount: config.maxNodes,
+    },
+  });
+}
+function appsNodePool(cluster: string, appsNodePoolConfig: GkeNodePoolConfig) {
+  new gcp.container.NodePool('cn-apps-node-pool', {
+    cluster,
+    nodeConfig: {
+      machineType: appsNodePoolConfig.nodeType,
+      taints: [
+        {
+          effect: 'NO_SCHEDULE',
+          key: 'cn_apps',
+          value: 'true',
+        },
+      ],
+      labels: {
+        cn_apps: 'standard',
+      },
+      loggingVariant: 'DEFAULT',
+    },
+    initialNodeCount: 0,
+    autoscaling: {
+      minNodeCount: appsNodePoolConfig.minNodes,
+      maxNodeCount: appsNodePoolConfig.maxNodes,
     },
   });
 }

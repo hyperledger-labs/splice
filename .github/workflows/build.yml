@@ -123,7 +123,7 @@ jobs:
   scala_test_record_time_tolerance:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-small
+      runs_on: self-hosted-k8s-medium
       test_names_file: 'test-full-class-names-record-time-tolerance.log'
       start_canton_options: -s
       parallelism: 1
@@ -158,6 +158,20 @@ jobs:
       daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
+  scala_test_signatures:
+    uses: ./.github/workflows/build.scala_test.yml
+    with:
+      runs_on: self-hosted-k8s-medium
+      test_names_file: 'test-full-class-names-signatures.log'
+      start_canton_options: -B "scripts/bootstrap/bootstrap-canton-with-unsigned-keys.sc"
+      parallelism: 1
+      test_name: signatures
+      with_gcp_creds: false
+      commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
+      oss_only: ${{ inputs.oss_only }}
+    secrets: inherit
+
   scala_test_wall_clock_time:
     uses: ./.github/workflows/build.scala_test.yml
     with:
@@ -165,9 +179,26 @@ jobs:
       test_names_file: 'test-full-class-names.log'
       start_canton_options: -w
       # TODO(DACH-NY/canton-network-node#10912) Investigate why things got slower
-      parallelism: 10
+      parallelism: 11
       test_name: wall-clock-time
       with_gcp_creds: true
+      skip_if_regex: "\\[bft\\]"
+      commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
+      oss_only: ${{ inputs.oss_only }}
+    secrets: inherit
+
+  scala_test_wall_clock_time_bft:
+    uses: ./.github/workflows/build.scala_test.yml
+    with:
+      runs_on: self-hosted-k8s-x-large
+      test_names_file: 'test-full-class-names.log'
+      start_canton_options: -we
+      parallelism: 10
+      test_name: wall-clock-time-bft
+      with_gcp_creds: true
+      pre_sbt_cmd: "export SPLICE_USE_BFT_SEQUENCER=1"
+      run_if_commit_tag: 'bft'
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
       oss_only: ${{ inputs.oss_only }}

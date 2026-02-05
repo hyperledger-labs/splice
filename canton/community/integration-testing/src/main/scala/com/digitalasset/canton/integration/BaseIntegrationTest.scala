@@ -3,11 +3,12 @@
 
 package com.digitalasset.canton.integration
 
+import com.daml.ledger.javaapi.data.Event
 import com.daml.metrics.Timed
 import com.digitalasset.canton.config.SharedCantonConfig
 import com.digitalasset.canton.console.{CommandFailure, ParticipantReference}
 import com.digitalasset.canton.environment.Environment
-import com.digitalasset.canton.logging.LogEntry
+import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.{
   BaseTest,
@@ -19,6 +20,7 @@ import org.scalactic.source
 import org.scalactic.source.Position
 import org.scalatest.wordspec.FixtureAnyWordSpec
 import org.scalatest.{Assertion, ConfigMap, Outcome}
+import org.slf4j.event.Level.WARN
 
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
@@ -111,6 +113,15 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
       }*
     )
 
+  def suppressPackageIdWarning[A](within: => A): A =
+    loggerFactory.assertLogsSeq(SuppressionRule.Level(WARN))(
+      within,
+      entries =>
+        forAtLeast(1, entries) { e =>
+          e.warningMessage should (include regex "Received an identifier with package ID .*, but expected a package name.")
+        },
+    )
+
   /** Similar to [[com.digitalasset.canton.console.commands.ParticipantAdministration#ping]] But
     * unlike `ping`, this version mixes nicely with `eventually`.
     */
@@ -190,4 +201,23 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
       )
   }
 
+  implicit class EnrichedEvent(events: Event) {
+    def asScalaProtoEvent: com.daml.ledger.api.v2.event.Event =
+      com.daml.ledger.api.v2.event.Event.fromJavaProto(events.toProtoEvent)
+
+    def asScalaProtoCreated: Option[com.daml.ledger.api.v2.event.CreatedEvent] =
+      com.daml.ledger.api.v2.event.Event.fromJavaProto(events.toProtoEvent).event.created
+  }
+
+  implicit class EnrichedEvents(events: java.util.List[Event]) {
+    def asScalaProtoEvents: List[com.daml.ledger.api.v2.event.Event] =
+      events.asScala.iterator
+        .map(_.asScalaProtoEvent)
+        .toList
+
+    def asScalaProtoCreatedContracts: List[com.daml.ledger.api.v2.event.CreatedEvent] =
+      events.asScala.iterator
+        .flatMap(_.asScalaProtoCreated)
+        .toList
+  }
 }

@@ -13,10 +13,10 @@ import org.lfdecentralizedtrust.splice.http.UrlValidator
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.{
   BftSequencerConfig,
+  MediatorVerdictIngestionConfig,
   ScanAppBackendConfig,
   ScanAppClientConfig,
   ScanCacheConfig,
-  MediatorVerdictIngestionConfig,
   ScanSynchronizerConfig,
   CacheConfig as SpliceCacheConfig,
 }
@@ -82,6 +82,7 @@ import com.digitalasset.canton.synchronizer.sequencer.config.{
 }
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 
 case class SpliceConfig(
     override val name: Option[String] = None,
@@ -105,10 +106,11 @@ case class SpliceConfig(
     ),
     features: CantonFeatures = CantonFeatures(),
     override val pekkoConfig: Option[Config] = None,
-) extends ConfigDefaults[DefaultPorts, SpliceConfig]
+) extends ConfigDefaults[Option[DefaultPorts], SpliceConfig]
     with SharedCantonConfig[SpliceConfig] {
 
-  override def withDefaults(defaults: DefaultPorts, edition: CantonEdition): SpliceConfig = this
+  override def withDefaults(defaults: Option[DefaultPorts], edition: CantonEdition): SpliceConfig =
+    this
 
   // TODO(DACH-NY/canton-network-node#736): we want to remove all of the configurations options below:
   override val participants: Map[InstanceName, ParticipantNodeConfig] = Map.empty
@@ -142,6 +144,7 @@ case class SpliceConfig(
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         validatorConfig.parameters.circuitBreakers,
+        validatorConfig.parameters.enabledFeatures,
         validatorConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -180,6 +183,7 @@ case class SpliceConfig(
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         svConfig.parameters.circuitBreakers,
+        svConfig.parameters.enabledFeatures,
         svConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -217,6 +221,7 @@ case class SpliceConfig(
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         scanConfig.parameters.circuitBreakers,
+        scanConfig.parameters.enabledFeatures,
         scanConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -254,6 +259,7 @@ case class SpliceConfig(
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
         splitwellConfig.parameters.circuitBreakers,
+        splitwellConfig.parameters.enabledFeatures,
         splitwellConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -325,7 +331,8 @@ object SpliceConfig {
       case Right(resolvedConfig) =>
         loadRawConfig(resolvedConfig)
           .flatMap { conf =>
-            val confWithDefaults = conf.withDefaults(new DefaultPorts(), CommunityCantonEdition)
+            val confWithDefaults =
+              conf.withDefaults(Some(DefaultPorts.create()), CommunityCantonEdition)
             confWithDefaults.validate.toEither
               .map(_ => confWithDefaults)
               .leftMap(causes => ConfigErrors.ValidationError.Error(causes.toList))
@@ -356,16 +363,17 @@ object SpliceConfig {
       loaded <- loadAndValidate(parsedAndMerged)
     } yield loaded
 
-  import CantonConfig.*
   import pureconfig.generic.semiauto.*
+
+  private val cantonConfigReaders = new CantonConfig.ConfigReaders()(elc)
 
   class ConfigReaders(implicit
       private val
       elc: ErrorLoggingContext
   ) {
-    import CantonConfig.ConfigReaders.*
     import BaseCantonConfig.Readers.*
-    import CantonConfig.ConfigReaders.dbConfigReader
+
+    import cantonConfigReaders.*
 
     implicit val configReader: ConfigReader[SynchronizerAlias] = ConfigReader.fromString(str =>
       SynchronizerAlias.create(str).left.map(err => CannotConvert(str, "SynchronizerAlias", err))
@@ -405,15 +413,21 @@ object SpliceConfig {
       deriveReader[CircuitBreakerConfig]
     implicit val circuitBreakersConfig: ConfigReader[CircuitBreakersConfig] =
       deriveReader[CircuitBreakersConfig]
+    implicit val contractFetchLedgerFallbackConfigReader
+        : ConfigReader[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig] =
+      deriveReader[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig]
     implicit val spliceParametersConfig: ConfigReader[SpliceParametersConfig] =
       deriveReader[SpliceParametersConfig]
     implicit val rateLimitersConfig: ConfigReader[RateLimitersConfig] =
       deriveReader[RateLimitersConfig]
     implicit val spliceRateLimiterConfig: ConfigReader[SpliceRateLimitConfig] =
       deriveReader[SpliceRateLimitConfig]
+    implicit val enabledFeaturesConfigReader: ConfigReader[EnabledFeaturesConfig] =
+      deriveReader[EnabledFeaturesConfig]
 
     implicit val upgradesConfig: ConfigReader[UpgradesConfig] = deriveReader[UpgradesConfig]
 
+    implicit val ingestionConfig: ConfigReader[IngestionConfig] = deriveReader[IngestionConfig]
     implicit val automationConfig: ConfigReader[AutomationConfig] =
       deriveReader[AutomationConfig]
     implicit val LedgerApiClientConfigReader: ConfigReader[LedgerApiClientConfig] =
@@ -427,6 +441,9 @@ object SpliceConfig {
     implicit val scanClientConfigTrustSingleConfigReader
         : ConfigReader[BftScanClientConfig.TrustSingle] =
       deriveReader[BftScanClientConfig.TrustSingle]
+    implicit val scanClientConfigBftCustomConfigReader
+        : ConfigReader[BftScanClientConfig.BftCustom] =
+      deriveReader[BftScanClientConfig.BftCustom]
     implicit val scanClientConfigSeedsConfigReader: ConfigReader[BftScanClientConfig.Bft] =
       deriveReader[BftScanClientConfig.Bft]
     implicit val scanClientConfigConfigReader: ConfigReader[BftScanClientConfig] =
@@ -665,6 +682,9 @@ object SpliceConfig {
       deriveReader[ValidatorExtraSynchronizerConfig]
     implicit val validatorSynchronizerConfigReader: ConfigReader[ValidatorSynchronizerConfig] =
       deriveReader[ValidatorSynchronizerConfig]
+    implicit val validatorTrustedSynchronizerConfigReader
+        : ConfigReader[ValidatorTrustedSynchronizerConfig] =
+      deriveReader[ValidatorTrustedSynchronizerConfig]
     implicit val offsetDateTimeConfigurationReader: ConfigReader[java.time.OffsetDateTime] =
       implicitly[ConfigReader[String]].map(java.time.OffsetDateTime.parse)
     implicit val transferPreapprovalConfigReader: ConfigReader[TransferPreapprovalConfig] =
@@ -679,13 +699,29 @@ object SpliceConfig {
       }
     implicit val migrateValidatorPartyConfigReader: ConfigReader[MigrateValidatorPartyConfig] =
       deriveReader[MigrateValidatorPartyConfig]
-    implicit val participantPruningConfigReader: ConfigReader[ParticipantPruningConfig] =
-      deriveReader[ParticipantPruningConfig]
+    implicit val pruningConfigReader: ConfigReader[PruningConfig] =
+      deriveReader[PruningConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
       deriveReader[ValidatorAppBackendConfig].emap { conf =>
         val participantIdentifier =
           ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(conf).participant
         for {
+          _ <- Either.cond(
+            !(conf.domains.global.url.isDefined && conf.domains.global.trustedSynchronizerConfig.isDefined),
+            (),
+            ConfigValidationFailed(
+              "Configuration error: `url` and `trustedSynchronizerConfig` are mutually exclusive parameters."
+            ),
+          )
+          _ <- Either.cond(
+            conf.domains.global.trustedSynchronizerConfig.forall(c =>
+              c.svNames.length >= c.threshold
+            ),
+            (),
+            ConfigValidationFailed(
+              "Configuration error: Length of svNames should be greater than or equal to threshold."
+            ),
+          )
           _ <- Either.cond(
             !conf.svValidator || conf.validatorPartyHint.isEmpty,
             (),
@@ -806,6 +842,9 @@ object SpliceConfig {
       deriveWriter[CircuitBreakerConfig]
     implicit val circuitBreakersConfig: ConfigWriter[CircuitBreakersConfig] =
       deriveWriter[CircuitBreakersConfig]
+    implicit val contractFetchLedgerFallbackConfigWriter
+        : ConfigWriter[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig] =
+      deriveWriter[ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig]
     implicit val spliceParametersConfig: ConfigWriter[SpliceParametersConfig] =
       deriveWriter[SpliceParametersConfig]
 
@@ -813,6 +852,9 @@ object SpliceConfig {
       deriveWriter[RateLimitersConfig]
     implicit val spliceRateLimiterConfig: ConfigWriter[SpliceRateLimitConfig] =
       deriveWriter[SpliceRateLimitConfig]
+
+    implicit val enabledFeaturesConfigWriter: ConfigWriter[EnabledFeaturesConfig] =
+      deriveWriter[EnabledFeaturesConfig]
 
     implicit val authTokenSourceConfigHint: FieldCoproductHint[AuthTokenSourceConfig] =
       new FieldCoproductHint[AuthTokenSourceConfig]("type")
@@ -834,6 +876,7 @@ object SpliceConfig {
 
     implicit val upgradesConfig: ConfigWriter[UpgradesConfig] = deriveWriter[UpgradesConfig]
 
+    implicit val ingestionConfig: ConfigWriter[IngestionConfig] = deriveWriter[IngestionConfig]
     implicit val automationConfig: ConfigWriter[AutomationConfig] =
       deriveWriter[AutomationConfig]
     implicit val LedgerApiClientConfigWriter: ConfigWriter[LedgerApiClientConfig] =
@@ -847,6 +890,9 @@ object SpliceConfig {
     implicit val scanClientConfigTrustSingleConfigWriter
         : ConfigWriter[BftScanClientConfig.TrustSingle] =
       deriveWriter[BftScanClientConfig.TrustSingle]
+    implicit val scanClientConfigBftCustomConfigWriter
+        : ConfigWriter[BftScanClientConfig.BftCustom] =
+      deriveWriter[BftScanClientConfig.BftCustom]
     implicit val scanClientConfigSeedsConfigWriter: ConfigWriter[BftScanClientConfig.Bft] =
       deriveWriter[BftScanClientConfig.Bft]
     implicit val scanClientConfigConfigWriter: ConfigWriter[BftScanClientConfig] =
@@ -1001,14 +1047,17 @@ object SpliceConfig {
       deriveWriter[ValidatorExtraSynchronizerConfig]
     implicit val validatorSynchronizerConfigWriter: ConfigWriter[ValidatorSynchronizerConfig] =
       deriveWriter[ValidatorSynchronizerConfig]
+    implicit val validatorTrustedSynchronizerConfigWriter
+        : ConfigWriter[ValidatorTrustedSynchronizerConfig] =
+      deriveWriter[ValidatorTrustedSynchronizerConfig]
     implicit val offsetDateTimeConfigurationWriter: ConfigWriter[java.time.OffsetDateTime] =
       implicitly[ConfigWriter[String]].contramap(_.toString)
     implicit val transferPreapprovalConfigWriter: ConfigWriter[TransferPreapprovalConfig] =
       deriveWriter[TransferPreapprovalConfig]
     implicit val migrateValidatorPartyConfigWriter: ConfigWriter[MigrateValidatorPartyConfig] =
       deriveWriter[MigrateValidatorPartyConfig]
-    implicit val participantPruningConfigWriter: ConfigWriter[ParticipantPruningConfig] =
-      deriveWriter[ParticipantPruningConfig]
+    implicit val pruningConfigWriter: ConfigWriter[PruningConfig] =
+      deriveWriter[PruningConfig]
     implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =
       deriveWriter[ValidatorAppBackendConfig]
     implicit val validatorClientConfigWriter: ConfigWriter[ValidatorAppClientConfig] =

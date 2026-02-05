@@ -4,19 +4,24 @@
 package com.digitalasset.canton.crypto.kms.mock.v1
 
 import cats.syntax.either.*
-import cats.syntax.functorFilter.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.buildinfo.BuildInfo
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.{CryptoConfig, CryptoProvider, ProcessingTimeout}
-import com.digitalasset.canton.crypto.KeyName
+import com.digitalasset.canton.config.{
+  CachingConfigs,
+  CryptoConfig,
+  CryptoProvider,
+  ProcessingTimeout,
+}
 import com.digitalasset.canton.crypto.kms.driver.api.v1.KmsDriverFactory
 import com.digitalasset.canton.crypto.kms.driver.v1.KmsDriverSpecsConverter
+import com.digitalasset.canton.crypto.kms.mock.v1.MockKmsDriverFactory.mockKmsDriverName
 import com.digitalasset.canton.crypto.provider.jce.JceCrypto
 import com.digitalasset.canton.crypto.store.memory.{
   InMemoryCryptoPrivateStore,
   InMemoryCryptoPublicStore,
 }
+import com.digitalasset.canton.crypto.{CryptoSchemes, KeyName}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.version.ReleaseProtocolVersion
 import org.slf4j.Logger
@@ -29,7 +34,7 @@ import scala.concurrent.ExecutionContext
 class MockKmsDriverFactory extends KmsDriverFactory {
   override type Driver = MockKmsDriver
 
-  override def name: String = "mock-kms"
+  override def name: String = mockKmsDriverName
 
   override def buildInfo: Option[String] = Some(BuildInfo.version)
 
@@ -59,13 +64,13 @@ class MockKmsDriverFactory extends KmsDriverFactory {
   // Convert the supported specs that are also supported by KMS drivers
   private def convertSpec[CS, DS](
       supported: NonEmpty[Set[CS]],
-      convertFn: CS => Either[_, DS],
+      convertFn: CS => DS,
   ): Set[DS] =
-    supported.forgetNE.toList.mapFilter(convertFn(_).toOption).toSet
+    supported.forgetNE.toList.map(convertFn(_)).toSet
 
   override def create(
       config: MockKmsDriverConfig,
-      loggerFactory: Class[_] => Logger,
+      loggerFactory: Class[?] => Logger,
       executionContext: ExecutionContext,
   ): MockKmsDriver = {
 
@@ -75,7 +80,13 @@ class MockKmsDriverFactory extends KmsDriverFactory {
     val namedLoggerFactory = NamedLoggerFactory.root
     val timeouts = ProcessingTimeout()
 
+    // The MockKms driver supports all schemes supported by JCE.
     val cryptoConfig = CryptoConfig(provider = CryptoProvider.Jce)
+    val cryptoSchemes = CryptoSchemes
+      .fromConfig(cryptoConfig)
+      .getOrElse(
+        throw new RuntimeException("failed to validate crypto schemes from the configuration file")
+      )
 
     val cryptoPrivateStore =
       new InMemoryCryptoPrivateStore(ReleaseProtocolVersion.latest, namedLoggerFactory)
@@ -86,6 +97,9 @@ class MockKmsDriverFactory extends KmsDriverFactory {
       crypto <- JceCrypto
         .create(
           cryptoConfig,
+          cryptoSchemes,
+          CachingConfigs.defaultSessionEncryptionKeyCacheConfig,
+          CachingConfigs.defaultPublicKeyConversionCache,
           cryptoPrivateStore,
           cryptoPublicStore,
           timeouts,
@@ -125,4 +139,8 @@ class MockKmsDriverFactory extends KmsDriverFactory {
       throw new RuntimeException(s"Failed to create driver: $err")
     }
   }
+}
+
+object MockKmsDriverFactory {
+  lazy val mockKmsDriverName: String = "mock-kms"
 }

@@ -47,10 +47,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.{PaymentAmount, Unit}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.*
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.store.{Limit, MiningRoundsStore, PageLimit, StoreTest}
+import org.lfdecentralizedtrust.splice.store.{Limit, MiningRoundsStore, PageLimit, StoreTestBase}
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore.{IdleAnsSubscription, RoundBatch}
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore}
@@ -69,7 +70,7 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
-abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
+abstract class SvDsoStoreTest extends StoreTestBase with HasExecutionContext {
 
   "SvDsoStore" should {
 
@@ -1581,6 +1582,7 @@ class DbSvDsoStoreTest
         None,
       ),
       participantId = mkParticipantId("SvDsoStoreTest"),
+      IngestionConfig(),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
@@ -1793,6 +1795,90 @@ class DbSvDsoStoreTest
         votes = result.flatMap(_.payload.votes.values().asScala)
       } yield {
         votes should contain theSameElementsAs (goodVotes.flatten)
+      }
+    }
+  }
+
+  "featuredAppActivityMarkerCountAboveOrEqualTo" should {
+
+    "compute the right values" in {
+      val markers =
+        (1 to 3).map(n =>
+          appActivityMarker(
+            provider = providerParty(n)
+          )
+        )
+      val thresholds = Seq.range(0, 5)
+      for {
+        store <- mkStore()
+        _ <- MonadUtil.sequentialTraverse(markers)(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        actualMarkers <- store.listFeaturedAppActivityMarkers(1000)
+        results <- MonadUtil.sequentialTraverse(thresholds)(threshold =>
+          store
+            .featuredAppActivityMarkerCountAboveOrEqualTo(threshold)
+            .map(result => (threshold, result))
+        )
+      } yield {
+        forAll(results) { case (threshold, result) =>
+          result shouldBe (threshold <= actualMarkers.size)
+        }
+      }
+    }
+  }
+
+  "listFeaturedAppActivityMarkersByContractIdHash" should {
+
+    val markers =
+      (1 to 10).map(n =>
+        appActivityMarker(
+          provider = providerParty(n)
+        )
+      )
+
+    "fetch all contracts with complete bounds" in {
+      for {
+        store <- mkStore()
+        _ <- MonadUtil.sequentialTraverse(markers)(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        results1 <- store
+          .listFeaturedAppActivityMarkersByContractIdHash(
+            Int.MinValue,
+            0,
+            10,
+          )
+          .map(_.map(_.contractId))
+        results2 <- store
+          .listFeaturedAppActivityMarkersByContractIdHash(
+            1,
+            Int.MaxValue,
+            10,
+          )
+          .map(_.map(_.contractId))
+      } yield {
+        // Only comparing contract-ids to avoid compare-by-reference shenanigans
+        val set1: Set[ContractId[?]] = results1.toSet
+        val set2: Set[ContractId[?]] = results2.toSet
+        set1.union(set2) shouldBe markers.map(_.contractId).toSet
+        set1.intersect(set2) shouldBe empty
+      }
+    }
+
+    "properly limit the number of retrieved contracts" in {
+      for {
+        store <- mkStore()
+        _ <- MonadUtil.sequentialTraverse(markers)(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        limitedResults <- store.listFeaturedAppActivityMarkersByContractIdHash(
+          Int.MinValue,
+          Int.MaxValue,
+          2,
+        )
+      } yield {
+        limitedResults should have(size(2))
       }
     }
   }

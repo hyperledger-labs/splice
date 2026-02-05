@@ -10,6 +10,7 @@ service SequencerBftAdministrationService {
   rpc RemovePeerEndpoint(RemovePeerEndpointRequest) returns (RemovePeerEndpointResponse);
   rpc GetPeerNetworkStatus(GetPeerNetworkStatusRequest) returns (GetPeerNetworkStatusResponse);
   rpc GetOrderingTopology(GetOrderingTopologyRequest) returns (GetOrderingTopologyResponse);
+  rpc SetPerformanceMetricsEnabled(SetPerformanceMetricsEnabledRequest) returns (SetPerformanceMetricsEnabledResponse);
 }
 
 message AddPeerEndpointRequest {
@@ -56,18 +57,21 @@ message RemovePeerEndpointResponse {
   bool removed = 1;
 }
 
+message Authenticated {
+  string sequencer_id = 1;
+}
+
 message PeerEndpointHealthStatus {
   oneof status {
     UnknownEndpoint unknown_endpoint = 1;
-    Unauthenticated unauthenticated = 2;
-    Authenticated authenticated = 3;
+    Disconnected disconnected = 2;
+    Unauthenticated unauthenticated = 3;
+    Authenticated authenticated = 4;
   }
 
   message UnknownEndpoint {}
+  message Disconnected {}
   message Unauthenticated {}
-  message Authenticated {
-    string sequencer_id = 1;
-  }
 }
 
 message PeerEndpointHealth {
@@ -77,7 +81,15 @@ message PeerEndpointHealth {
 
 message PeerEndpointStatus {
   PeerEndpointId endpoint_id = 1;
-  PeerEndpointHealth health = 2;
+  bool is_outgoing_connection = 2;
+  PeerEndpointHealth health = 3;
+}
+
+message PeerConnectionStatus {
+  oneof status {
+    PeerEndpointStatus peer_endpoint_status = 1;
+    Authenticated peer_incoming_connection = 2;
+  }
 }
 
 message GetPeerNetworkStatusRequest {
@@ -86,7 +98,7 @@ message GetPeerNetworkStatusRequest {
 }
 
 message GetPeerNetworkStatusResponse {
-  repeated PeerEndpointStatus statuses = 1;
+  repeated PeerConnectionStatus statuses = 1;
 }
 
 message GetOrderingTopologyRequest {}
@@ -97,3 +109,9 @@ message GetOrderingTopologyResponse {
   // The sequencer IDs of the active BFT ordering nodes in the network.
   repeated string sequencer_ids = 2;
 }
+
+message SetPerformanceMetricsEnabledRequest {
+  bool enabled = 1;
+}
+
+message SetPerformanceMetricsEnabledResponse {}

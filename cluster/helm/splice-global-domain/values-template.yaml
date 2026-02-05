@@ -10,13 +10,13 @@ pod:
   annotations: {}
   labels: {}
 
-defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data
+defaultJvmOptions: -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.numThreads=8 -XX:ActiveProcessorCount=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data
 resources:
   limits:
-    memory: 4Gi
+    memory: 8Gi
   requests:
-    cpu: "1"
-    memory: 2Gi
+    cpu: "2"
+    memory: 3Gi
 
 sequencer:
   persistence:
@@ -26,7 +26,7 @@ sequencer:
     port: 5432
   resources:
     limits:
-      memory: 6Gi
+      memory: 8Gi
     requests:
       cpu: "3"
       memory: 4Gi

@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3402,
+  "id": 555,
   "links": [],
   "panels": [
     {
@@ -66,7 +66,8 @@
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
-              "type": "linear"
+              "log": 2,
+              "type": "log"
             },
             "showPoints": "auto",
             "spanNulls": false,
@@ -83,7 +84,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -119,7 +121,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -136,7 +138,100 @@
           "range": true,
           "refId": "A",
           "useBackend": false
+        }
+      ],
+      "title": "Sequencer Client Delay",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "Catchup speed of the sequencer in the last 5min",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "log": 2,
+              "type": "log"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
         },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last *",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
@@ -156,7 +251,7 @@
           "useBackend": false
         }
       ],
-      "title": "Sequencer Client Delay",
+      "title": "Sequencer Catchup Speed",
       "type": "timeseries"
     },
     {
@@ -191,7 +286,8 @@
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
-              "type": "linear"
+              "log": 2,
+              "type": "log"
             },
             "showPoints": "auto",
             "spanNulls": false,
@@ -208,7 +304,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -216,7 +313,7 @@
               }
             ]
           },
-          "unit": "ms"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -224,7 +321,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 12
+        "y": 23
       },
       "id": 3,
       "options": {
@@ -244,7 +341,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -253,7 +350,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "min by (namespace)(daml_sequencer_client_handler_delay{namespace=~\"$namespace\",component=\"participant\"})",
+          "expr": "max by (namespace) (timestamp(daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"participant\", migration_id=~\"$migration\"}) - ((daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"participant\", migration_id=~\"$migration\"} > 0) / 1e6))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -298,7 +395,8 @@
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
-              "type": "linear"
+              "log": 2,
+              "type": "log"
             },
             "showPoints": "auto",
             "spanNulls": false,
@@ -315,7 +413,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -323,7 +422,7 @@
               }
             ]
           },
-          "unit": "ms"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -331,7 +430,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 12
+        "y": 23
       },
       "id": 2,
       "options": {
@@ -351,7 +450,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -360,7 +459,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "min by (namespace, job)(daml_sequencer_client_handler_delay{namespace=~\"$namespace\", component=\"mediator\",job=~\"global-domain-$migration-mediator\"})",
+          "expr": "max by (namespace, job) (timestamp(daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"mediator\",job=~\"global-domain-$migration-mediator\"}) - ((daml_sequencer_client_handler_last_sequencing_time_micros{namespace=~\"$namespace\",component=\"mediator\",job=~\"global-domain-$migration-mediator\"}  > 0) / 1e6)) ",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -379,7 +478,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 31
       },
       "id": 10,
       "panels": [],
@@ -436,7 +535,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -452,7 +552,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 32
       },
       "id": 11,
       "options": {
@@ -468,7 +568,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -543,7 +643,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -559,7 +660,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 39
       },
       "id": 7,
       "options": {
@@ -575,7 +676,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -650,7 +751,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -666,7 +768,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 35
+        "y": 46
       },
       "id": 6,
       "options": {
@@ -682,7 +784,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -755,7 +857,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -770,7 +873,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 41
+        "y": 52
       },
       "id": 8,
       "options": {
@@ -786,7 +889,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -856,7 +959,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -871,7 +975,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 41
+        "y": 52
       },
       "id": 4,
       "options": {
@@ -887,7 +991,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -957,7 +1061,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -972,7 +1077,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 49
+        "y": 60
       },
       "id": 5,
       "options": {
@@ -988,7 +1093,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -1025,7 +1130,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -1040,7 +1146,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 49
+        "y": 60
       },
       "id": 15,
       "options": {
@@ -1058,7 +1164,7 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -1129,7 +1235,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -1144,7 +1251,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 57
+        "y": 68
       },
       "id": 17,
       "options": {
@@ -1160,7 +1267,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -1264,5 +1371,5 @@
   "timezone": "",
   "title": "Global Domain Catchup",
   "uid": "ca9df344-c699-4efe-83c2-5fb2639d96d9",
-  "version": 4
+  "version": 2
 }

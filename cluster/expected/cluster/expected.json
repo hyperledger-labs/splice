@@ -4,16 +4,52 @@
     "id": "",
     "inputs": {
       "autoscaling": {
+        "maxNodeCount": 1,
+        "minNodeCount": 0
+      },
+      "cluster": "cn-mocknet",
+      "initialNodeCount": 0,
+      "nodeConfig": {
+        "bootDisk": {
+          "diskType": "hyperdisk-balanced",
+          "sizeGb": 100
+        },
+        "labels": {
+          "cn_apps": "hyperdisk"
+        },
+        "loggingVariant": "DEFAULT",
+        "machineType": "c4-standard-16",
+        "taints": [
+          {
+            "effect": "NO_SCHEDULE",
+            "key": "cn_apps",
+            "value": "true"
+          }
+        ]
+      },
+      "nodeLocations": [
+        "europe-west6-z"
+      ]
+    },
+    "name": "cn-apps-node-pool-hd",
+    "provider": "",
+    "type": "gcp:container/nodePool:NodePool"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "autoscaling": {
         "maxNodeCount": 20,
         "minNodeCount": 0
       },
       "cluster": "cn-mocknet",
       "initialNodeCount": 0,
-      "name": "cn-apps-pool",
       "nodeConfig": {
         "labels": {
-          "cn_apps": "true"
+          "cn_apps": "standard"
         },
+        "loggingVariant": "DEFAULT",
         "machineType": "n2-standard-16",
         "taints": [
           {
@@ -38,11 +74,11 @@
       },
       "cluster": "cn-mocknet",
       "initialNodeCount": 1,
-      "name": "cn-infra-pool",
       "nodeConfig": {
         "labels": {
           "cn_infra": "true"
         },
+        "loggingVariant": "DEFAULT",
         "machineType": "e2-standard-8",
         "taints": [
           {
@@ -67,8 +103,8 @@
       },
       "cluster": "cn-mocknet",
       "initialNodeCount": 1,
-      "name": "gke-pool",
       "nodeConfig": {
+        "loggingVariant": "DEFAULT",
         "machineType": "e2-standard-4",
         "taints": [
           {
@@ -87,6 +123,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "allowVolumeExpansion": true,
       "apiVersion": "storage.k8s.io/v1",
       "kind": "StorageClass",
       "metadata": {
@@ -103,5 +140,35 @@
     "name": "hyperdisk-balanced-rwo",
     "provider": "",
     "type": "kubernetes:storage.k8s.io/v1:StorageClass"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "allowVolumeExpansion": true,
+      "apiVersion": "storage.k8s.io/v1",
+      "kind": "StorageClass",
+      "metadata": {
+        "name": "hyperdisk-standard-rwo"
+      },
+      "parameters": {
+        "type": "hyperdisk-balanced"
+      },
+      "provisioner": "pd.csi.storage.gke.io",
+      "volumeBindingMode": "WaitForFirstConsumer"
+    },
+    "name": "hyperdisk-standard-rwo",
+    "provider": "",
+    "type": "kubernetes:storage.k8s.io/v1:StorageClass"
+  },
+  {
+    "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
   }
 ]

@@ -10,17 +10,17 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.{
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
+import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
 import org.lfdecentralizedtrust.splice.store.{MultiDomainAcsStore, StoreErrors}
 import org.lfdecentralizedtrust.splice.sv.store.{SvStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.util.{Contract, QualifiedName, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
+import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -33,6 +33,8 @@ class DbSvSvStore(
     override protected val retryProvider: RetryProvider,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    ingestionConfig: IngestionConfig,
+    acsStoreDescriptorUserVersion: Option[Long] = None,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -44,7 +46,7 @@ class DbSvSvStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
-        version = 1,
+        version = 2,
         name = "DbSvSvStore",
         party = key.svParty,
         participant = participantId,
@@ -52,12 +54,10 @@ class DbSvSvStore(
           "svParty" -> key.svParty.toProtoPrimitive,
           "dsoParty" -> key.dsoParty.toProtoPrimitive,
         ),
+        userVersion = acsStoreDescriptorUserVersion,
       ),
       domainMigrationInfo = domainMigrationInfo,
-      participantId = participantId,
-      enableissue12777Workaround = false,
-      enableImportUpdateBackfill = false,
-      BackfillingRequirement.BackfillingNotRequired,
+      ingestionConfig,
     )
     with SvSvStore
     with AcsTables
@@ -82,12 +82,14 @@ class DbSvSvStore(
             DbSvSvStore.tableName,
             acsStoreId,
             domainMigrationId,
-            sql"""
-            template_id_qualified_name = ${QualifiedName(
-                ValidatorOnboarding.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-              and onboarding_secret = ${lengthLimited(secret)}
-          """,
+            ValidatorOnboarding.COMPANION,
+            where = sql"""
+              onboarding_secret = ${lengthLimited(secret)}
+                or (
+                  onboarding_secret like '{%'
+                  and (onboarding_secret::jsonb ->> 'secret') = ${lengthLimited(secret)}
+                )
+              """,
           ).headOption,
           "lookupValidatorOnboardingBySecretWithOffset",
         )
@@ -108,11 +110,13 @@ class DbSvSvStore(
               DbSvSvStore.tableName,
               acsStoreId,
               domainMigrationId,
-              sql"""
-                  template_id_qualified_name = ${QualifiedName(
-                  UsedSecret.TEMPLATE_ID_WITH_PACKAGE_ID
-                )}
-                    and onboarding_secret = ${lengthLimited(secret)}
+              UsedSecret.COMPANION,
+              where = sql"""
+                  onboarding_secret = ${lengthLimited(secret)}
+                  or (
+                    onboarding_secret like '{%'
+                    and (onboarding_secret::jsonb ->> 'secret') = ${lengthLimited(secret)}
+                  )
                 """,
             ).headOption,
             "lookupUsedSecretWithOffset",

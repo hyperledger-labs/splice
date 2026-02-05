@@ -8,11 +8,12 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
+  updateAllScanAppConfigs_,
   updateAllSvAppFoundDsoConfigs_,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.http.v0.definitions.TransferInstructionResultOutput.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType as HttpTransactionType
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransferInstructionResultOutput.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AbortTransferInstruction,
   ReceiverAmount,
@@ -20,7 +21,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
-import org.lfdecentralizedtrust.splice.integration.tests.WalletTxLogTestUtil
+import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import org.lfdecentralizedtrust.splice.wallet.store.{
@@ -54,6 +55,17 @@ class TokenStandardTransferIntegrationTest
       .addConfigTransforms((_, config) =>
         updateAllSvAppFoundDsoConfigs_(
           _.copy(zeroTransferFees = true)
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        updateAllScanAppConfigs_(scanConfig =>
+          scanConfig.copy(parameters =
+            scanConfig.parameters.copy(contractFetchLedgerFallbackConfig =
+              ChoiceContextContractFetcher.StoreContractFetcherWithLedgerFallbackConfig(
+                enabled = false // expiry test doesn't see the archival otherwise
+              )
+            )
+          )
         )(config)
       )
   }
@@ -305,11 +317,15 @@ class TokenStandardTransferIntegrationTest
 
       // TODO(#2254): check the exact balances once the scan backend supports it
 
-      val activityTxs = sv1ScanBackend
-        .listActivity(None, 1000)
-        .filter(t => t.transfer.isDefined || t.abortTransferInstruction.isDefined)
-      // 4 transfer instructions + accept + withdraw + reject
-      activityTxs should have size (7)
+      val activityTxs = eventually() {
+        val activityTxs = sv1ScanBackend
+          .listActivity(None, 1000)
+          .filter(t => t.transfer.isDefined || t.abortTransferInstruction.isDefined)
+        // 4 transfer instructions + accept + withdraw + reject
+        activityTxs should have size (7)
+        activityTxs
+      }
+
       clue("TransferInstruction accept") {
         activityTxs(0).transactionType shouldBe HttpTransactionType.Transfer
         val transfer = activityTxs(0).transfer.value
@@ -321,21 +337,6 @@ class TokenStandardTransferIntegrationTest
         transfer.receivers shouldBe Seq(
           ReceiverAmount(bobUserParty.toProtoPrimitive, "10.0000000000", "0.0000000000")
         )
-        transfer.balanceChanges should have size (2)
-        // Note: Scan tracks the sum of unlocked and locked balances so this is different from the
-        // wallet transaction history.
-        forExactly(1, transfer.balanceChanges) { change =>
-          {
-            change.party shouldBe aliceUserParty.toProtoPrimitive
-            BigDecimal(change.changeToInitialAmountAsOfRoundZero) should beAround(BigDecimal(-10))
-          }
-        }
-        forExactly(1, transfer.balanceChanges) { change =>
-          {
-            change.party shouldBe bobUserParty.toProtoPrimitive
-            BigDecimal(change.changeToInitialAmountAsOfRoundZero) should beAround(BigDecimal(10))
-          }
-        }
       }
       clue("TransferInstruction withdraw") {
         activityTxs(1).transactionType shouldBe HttpTransactionType.AbortTransferInstruction
@@ -371,12 +372,6 @@ class TokenStandardTransferIntegrationTest
           val receiver = transfer.receivers.loneElement
           receiver.party shouldBe aliceUserParty.toProtoPrimitive
           BigDecimal(receiver.amount) shouldBe (BigDecimal(10))
-          val balanceChange = transfer.balanceChanges.loneElement
-          balanceChange.party shouldBe aliceUserParty.toProtoPrimitive
-          // Alice now additional owns the locked amulet, which means its
-          // initial amount as of round zero goes up by one holding fee
-          BigDecimal(balanceChange.changeToInitialAmountAsOfRoundZero) should
-            ((be >= BigDecimal(0)) and (be <= BigDecimal(0.5)))
         }
       }
     }

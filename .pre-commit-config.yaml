@@ -50,12 +50,14 @@ repos:
         language: system
         entry: "scripts/fix-ts.py"
         types_or: [javascript, jsx, ts, tsx]
-        exclude: "/[.]prettierrc[.]cjs$"
-      - id: pulumi_config
-        name: check pulumi configs
+        # TODO(#3334): The current implementation of fix-ts.py makes it impossible to format files
+        #              in the top level pulumi package.
+        exclude: "(/[.]prettierrc[.]cjs$|/pulumi/[^/]+.ts$)"
+      - id: pulumi_tests
+        name: run pulumi tests and check expected files
         language: system
         entry: "make cluster/pulumi/test -j8"
-        files: '^cluster/pulumi/.*[.]ts$'
+        files: '^(cluster/pulumi/.*[.]ts|cluster/.*[.](yaml|yml))$'
         pass_filenames: false
       - id: gha_lint
         name: static check github actions
@@ -81,6 +83,11 @@ repos:
         entry: "./scripts/check-daml-return-types.sh"
         pass_filenames: false
         always_run: true
+      - id: check-grafana-dashboards
+        name: Check Grafana Dashboards
+        language: script
+        entry: "./scripts/check-grafana-dashboards.sh"
+        files: 'cluster/pulumi/infra/grafana-dashboards/.*\.json'
   -  repo: https://github.com/rstcheck/rstcheck
      rev: v6.2.5
      hooks:
@@ -89,6 +96,6 @@ repos:
        additional_dependencies: ['rstcheck[sphinx]']
        args: [
          --report-level, WARNING,
-         --ignore-directives, "openapi,todo",
+         --ignore-directives, "openapi,todo,release-notes",
          --ignore-substitutions, "version_literal,chart_version_literal"
        ]

@@ -13,6 +13,7 @@ import dayjs from 'dayjs';
 import { OffboardSvForm } from '../../../components/forms/OffboardSvForm';
 import { server, svUrl } from '../../setup/setup';
 import { rest } from 'msw';
+import { PROPOSAL_SUMMARY_SUBTITLE, PROPOSAL_SUMMARY_TITLE } from '../../../utils/constants';
 
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
@@ -23,7 +24,7 @@ describe('SV user can', () => {
       </SvConfigProvider>
     );
 
-    expect(await screen.findByText('Log In')).toBeDefined();
+    expect(await screen.findByText('Log In')).toBeInTheDocument();
 
     const input = screen.getByRole('textbox');
     await user.type(input, 'sv1');
@@ -31,7 +32,7 @@ describe('SV user can', () => {
     const button = screen.getByRole('button', { name: 'Log In' });
     await user.click(button);
 
-    expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
+    expect(await screen.findAllByDisplayValue(svPartyId)).not.toBe([]);
   });
 });
 
@@ -43,26 +44,30 @@ describe('Offboard SV Form', () => {
       </Wrapper>
     );
 
-    expect(screen.getByTestId('offboard-sv-form')).toBeDefined();
-    expect(screen.getByText('Action')).toBeDefined();
+    expect(screen.getByTestId('offboard-sv-form')).toBeInTheDocument();
+    expect(screen.getByText('Action')).toBeInTheDocument();
 
     const actionInput = screen.getByTestId('offboard-sv-action');
-    expect(actionInput).toBeDefined();
+    expect(actionInput).toBeInTheDocument();
     expect(actionInput.getAttribute('value')).toBe('Offboard Member');
 
     const summaryInput = screen.getByTestId('offboard-sv-summary');
-    expect(summaryInput).toBeDefined();
+    expect(summaryInput).toBeInTheDocument();
     expect(summaryInput.getAttribute('value')).toBeNull();
 
+    const summarySubtitle = screen.getByTestId('offboard-sv-summary-subtitle');
+    expect(summarySubtitle).toBeInTheDocument();
+    expect(summarySubtitle.textContent).toBe(PROPOSAL_SUMMARY_SUBTITLE);
+
     const urlInput = screen.getByTestId('offboard-sv-url');
-    expect(urlInput).toBeDefined();
+    expect(urlInput).toBeInTheDocument();
     expect(urlInput.getAttribute('value')).toBe('');
 
     const memberInput = screen.getByTestId('offboard-sv-member-dropdown');
-    expect(memberInput).toBeDefined();
+    expect(memberInput).toBeInTheDocument();
     expect(memberInput.getAttribute('value')).toBe('');
 
-    expect(screen.getByText('Review Proposal')).toBeDefined();
+    expect(screen.getByText('Review Proposal')).toBeInTheDocument();
   });
 
   test('should render errors when submit button is clicked on new form', async () => {
@@ -76,47 +81,46 @@ describe('Offboard SV Form', () => {
 
     const actionInput = screen.getByTestId('offboard-sv-action');
     const submitButton = screen.getByTestId('submit-button');
-    expect(submitButton).toBeDefined();
-    expect(screen.getByText('Review Proposal')).toBeDefined();
+    expect(submitButton).toBeInTheDocument();
+    expect(screen.getByText('Review Proposal')).toBeInTheDocument();
 
     await user.click(submitButton);
     expect(submitButton.getAttribute('disabled')).toBeDefined();
-    expect(async () => await user.click(submitButton)).rejects.toThrowError(
+    await expect(async () => await user.click(submitButton)).rejects.toThrowError(
       /Unable to perform pointer interaction/
     );
 
-    expect(screen.getByText('Summary is required')).toBeDefined();
-    expect(screen.getByText('Invalid URL')).toBeDefined();
-    expect(screen.getByText('SV is required')).toBeDefined();
+    expect(screen.getByText('Summary is required')).toBeInTheDocument();
+    expect(screen.getByText('Invalid URL')).toBeInTheDocument();
+    expect(screen.getByText('SV is required')).toBeInTheDocument();
 
     // completing the form should reenable the submit button
     const summaryInput = screen.getByTestId('offboard-sv-summary');
-    expect(summaryInput).toBeDefined();
+    expect(summaryInput).toBeInTheDocument();
     await user.type(summaryInput, 'Summary of the proposal');
 
     const urlInput = screen.getByTestId('offboard-sv-url');
-    expect(urlInput).toBeDefined();
+    expect(urlInput).toBeInTheDocument();
     await user.type(urlInput, 'https://example.com');
 
     const memberDropdown = screen.getByTestId('offboard-sv-member-dropdown');
-    expect(memberDropdown).toBeDefined();
+    expect(memberDropdown).toBeInTheDocument();
 
     const selectInput = screen.getByRole('combobox');
     fireEvent.mouseDown(selectInput);
 
     await waitFor(async () => {
       const memberToSelect = screen.getByText('Digital-Asset-Eng-2');
-      expect(memberToSelect).toBeDefined();
+      expect(memberToSelect).toBeInTheDocument();
       await user.click(memberToSelect);
     });
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-    expect(submitButton.getAttribute('disabled')).toBe('');
+    expect(submitButton.getAttribute('disabled')).toBe(null);
   });
 
   test('expiry date must be in the future', async () => {
-    const user = userEvent.setup();
     render(
       <Wrapper>
         <OffboardSvForm />
@@ -124,27 +128,25 @@ describe('Offboard SV Form', () => {
     );
 
     const expiryDateInput = screen.getByTestId('offboard-sv-expiry-date-field');
-    expect(expiryDateInput).toBeDefined();
+    expect(expiryDateInput).toBeInTheDocument();
 
     const thePast = dayjs().subtract(1, 'day').format(dateTimeFormatISO);
     const theFuture = dayjs().add(1, 'day').format(dateTimeFormatISO);
 
-    await user.type(expiryDateInput, thePast);
+    fireEvent.change(expiryDateInput, { target: { value: thePast } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
+      expect(screen.queryByText('Expiration must be in the future')).toBeInTheDocument();
     });
 
-    await user.type(expiryDateInput, theFuture);
+    fireEvent.change(expiryDateInput, { target: { value: theFuture } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Expiration must be in the future')).toBeNull();
+      expect(screen.queryByText('Expiration must be in the future')).not.toBeInTheDocument();
     });
   });
 
   test('effective date must be after expiry date', async () => {
-    const user = userEvent.setup();
-
     render(
       <Wrapper>
         <OffboardSvForm />
@@ -157,19 +159,25 @@ describe('Offboard SV Form', () => {
     const expiryDate = dayjs().add(1, 'week');
     const effectiveDate = expiryDate.subtract(1, 'day');
 
-    await user.type(expiryDateInput, expiryDate.format(dateTimeFormatISO));
-    await user.type(effectiveDateInput, effectiveDate.format(dateTimeFormatISO));
+    fireEvent.change(expiryDateInput, { target: { value: expiryDate.format(dateTimeFormatISO) } });
+    fireEvent.change(effectiveDateInput, {
+      target: { value: effectiveDate.format(dateTimeFormatISO) },
+    });
 
     await waitFor(() => {
-      expect(screen.queryByText('Effective Date must be after expiration date')).toBeDefined();
+      expect(
+        screen.queryByText('Effective Date must be after expiration date')
+      ).toBeInTheDocument();
     });
 
     const validEffectiveDate = expiryDate.add(1, 'day').format(dateTimeFormatISO);
 
-    await user.type(effectiveDateInput, validEffectiveDate);
+    fireEvent.change(effectiveDateInput, { target: { value: validEffectiveDate } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+      expect(
+        screen.queryByText('Effective Date must be after expiration date')
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -181,7 +189,7 @@ describe('Offboard SV Form', () => {
     );
 
     const memberDropdown = screen.getByTestId('offboard-sv-member-dropdown');
-    expect(memberDropdown).toBeDefined();
+    expect(memberDropdown).toBeInTheDocument();
 
     const selectInput = screen.getByRole('combobox');
     fireEvent.mouseDown(selectInput);
@@ -218,7 +226,7 @@ describe('Offboard SV Form', () => {
       await user.click(memberToSelect);
     });
 
-    expect(screen.getByText('Review Proposal')).toBeDefined();
+    expect(screen.getByText('Review Proposal')).toBeInTheDocument();
     const submitButton = screen.getByTestId('submit-button');
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
@@ -228,7 +236,7 @@ describe('Offboard SV Form', () => {
 
     await user.click(submitButton);
 
-    expect(screen.getByText('Proposal Summary')).toBeDefined();
+    expect(screen.getByText(PROPOSAL_SUMMARY_TITLE)).toBeInTheDocument();
   });
 
   test('should show error on form if submission fails', async () => {
@@ -262,7 +270,7 @@ describe('Offboard SV Form', () => {
       await user.click(memberToSelect);
     });
 
-    expect(screen.getByText('Review Proposal')).toBeDefined();
+    expect(screen.getByText('Review Proposal')).toBeInTheDocument();
     const submitButton = screen.getByTestId('submit-button');
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
@@ -273,9 +281,9 @@ describe('Offboard SV Form', () => {
     await user.click(submitButton); //review proposal
     await user.click(submitButton); //submit proposal
 
-    expect(screen.getByTestId('proposal-submission-error')).toBeDefined();
-    expect(screen.getByText(/Submission failed/)).toBeDefined();
-    expect(screen.getByText(/Service Unavailable/)).toBeDefined();
+    expect(screen.getByTestId('proposal-submission-error')).toBeInTheDocument();
+    expect(screen.getByText(/Submission failed/)).toBeInTheDocument();
+    expect(screen.getByText(/Service Unavailable/)).toBeInTheDocument();
   });
 
   test('should redirect to governance page after successful submission', async () => {
@@ -319,11 +327,6 @@ describe('Offboard SV Form', () => {
     await user.click(submitButton); //review proposal
     await user.click(submitButton); //submit proposal
 
-    waitFor(() => {
-      expect(screen.getByText('Action Required')).toBeDefined();
-      expect(screen.getByText('Inflight Votes')).toBeDefined();
-      expect(screen.getByText('Vote History')).toBeDefined();
-      expect(screen.getByText('Successfully submitted the proposal')).toBeDefined();
-    });
+    await screen.findByText('Successfully submitted the proposal');
   });
 });

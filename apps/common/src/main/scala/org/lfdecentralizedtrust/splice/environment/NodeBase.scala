@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.digitalasset.canton.auth.CantonAdminToken
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import org.lfdecentralizedtrust.splice.SpliceMetrics
 import org.lfdecentralizedtrust.splice.admin.api.HttpRequestLogger
 import org.lfdecentralizedtrust.splice.auth.{
@@ -39,32 +39,19 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.{HasUptime, WallClock}
 import com.digitalasset.canton.topology.UniqueIdentifier
-import com.digitalasset.canton.tracing.{Spanning, TraceContext, TracerProvider, W3CTraceContext}
-import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.tracing.{Spanning, TraceContext, TracerProvider}
 import com.digitalasset.canton.version.ReleaseVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.{ConnectionContext, Http}
-import org.apache.pekko.http.scaladsl.model.{
-  ContentTypes,
-  HttpEntity,
-  HttpHeader,
-  HttpRequest,
-  HttpResponse,
-}
+import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.server.Directive0
-import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
-
 import java.time
 import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicReference
-import javax.net.ssl.SSLContext
 import scala.annotation.nowarn
-import scala.collection.immutable
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
-import scala.util.control.NonFatal
 
 /** A running instance of a canton node. See Node for the subclass that provides the default initialization for most apps. */
 abstract class NodeBase[State <: AutoCloseable & HasHealth](
@@ -90,7 +77,7 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
   val name: InstanceName
 
   // Not used for splice
-  override def adminToken: CantonAdminToken = ???
+  override def adminTokenDispenser: CantonAdminTokenDispenser = ???
 
   protected val retryProvider: RetryProvider =
     RetryProvider(
@@ -118,100 +105,11 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
 
   private val httpExt = Http()(ac)
 
-  private def traceContextFromHeaders(headers: immutable.Seq[HttpHeader]) = {
-    W3CTraceContext
-      .fromHeaders(headers.map(h => h.name() -> h.value()).toMap)
-      .map(_.toTraceContext)
-      .getOrElse(TraceContext.empty)
-  }
-
-  private def buildHttpClient(
-      outerRequestParameters: HttpClient.HttpRequestParameters
-  ): HttpClient =
-    new HttpClient {
-      override val requestParameters: HttpClient.HttpRequestParameters = outerRequestParameters
-
-      override def withOverrideParameters(
-          newParameters: HttpClient.HttpRequestParameters
-      ): HttpClient = buildHttpClient(outerRequestParameters)
-
-      override def executeRequest(request: HttpRequest): Future[HttpResponse] = {
-        implicit val traceContext: TraceContext = traceContextFromHeaders(request.headers)
-        import parameters.monitoringConfig.logging.api.*
-        val logPayload = messagePayloads
-        val pathLimited = request.uri.path.toString
-          .limit(maxMethodLength)
-        def msg(message: String): String =
-          s"HTTP client (${request.method.name} ${pathLimited}): ${message}"
-
-        if (logPayload) {
-          request.entity match {
-            // Only logging strict messages which are already in memory, not attempting to log streams
-            case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
-              logger.debug(
-                msg(s"Requesting with entity data: ${data.utf8String.limit(maxStringLength)}")
-              )
-            case _ => logger.debug(msg(s"omitting logging of request entity data."))
-          }
-        }
-        logger
-          .trace(msg(s"headers: ${request.headers.toString.limit(maxMetadataSize)}"))
-        val host = request.uri.authority.host.address()
-        val port = request.uri.effectivePort
-        logger.trace(
-          s"Connecting to host: ${host}, port: ${port} request.uri = ${request.uri}"
-        )
-        val connectionContext = request.uri.scheme match {
-          case "https" => ConnectionContext.httpsClient(SSLContext.getDefault)
-          case _ => ConnectionContext.noEncryption()
-        }
-        val connectionFlow: Flow[HttpRequest, HttpResponse, Future[Http.OutgoingConnection]] =
-          Http()
-            .outgoingConnectionUsingContext(host, port, connectionContext)
-
-        // A new stream is materialized, creating a new connection for every request. The connection is closed on stream completion (success or failure)
-        // There is overhead in doing this, but it is the simplest way to implement a request-timeout.
-        def dispatchRequest(request: HttpRequest): Future[HttpResponse] =
-          Source
-            .single(request)
-            .via(connectionFlow)
-            .completionTimeout(requestParameters.requestTimeout.asFiniteApproximation)
-            .runWith(Sink.head)
-            .recoverWith { case NonFatal(e) =>
-              logger.debug(msg("HTTP request failed"), e)(traceContext)
-              Future.failed(e)
-            }
-        val start = System.currentTimeMillis()
-        dispatchRequest(request).map { response =>
-          val responseTraceCtx = traceContextFromHeaders(response.headers)
-          val end = System.currentTimeMillis()
-          logger.trace(msg(s"HTTP request took ${end - start} ms to complete"))(responseTraceCtx)
-          logger.debug(msg(s"Received response with status code: ${response.status}"))(
-            responseTraceCtx
-          )
-          if (logPayload) {
-            response.entity match {
-              // Only logging strict messages which are already in memory, not attempting to log streams
-              case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
-                logger.debug(
-                  msg(
-                    s"Received response with entity data: ${data.utf8String.limit(maxStringLength)}"
-                  )
-                )(responseTraceCtx)
-              case _ =>
-                logger.debug(msg(s"omitting logging of response entity data."))(responseTraceCtx)
-            }
-          }
-          logger.trace(
-            msg(s"Response contains headers: ${response.headers.toString.limit(maxMetadataSize)}")
-          )(responseTraceCtx)
-          response
-        }
-      }
-    }
-
-  protected implicit val httpClient: HttpClient = buildHttpClient(
-    HttpClient.HttpRequestParameters(parameters.requestTimeout)
+  protected implicit val httpClient: HttpClient = HttpClient(
+    parameters.monitoringConfig.logging.api,
+    HttpClient.HttpRequestParameters(parameters.requestTimeout),
+    nodeMetrics.httpClientMetrics,
+    logger,
   )
 
   def requestLogger(implicit traceContext: TraceContext): Directive0 =
@@ -242,6 +140,7 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
     _ = logger.info("Creating ledger API auth token source")
     authTokenSource = AuthTokenSource.fromConfig(
       participantClient.ledgerApi.authConfig,
+      nodeMetrics.httpClientMetrics,
       loggerFactory,
     )
   } yield {
@@ -339,7 +238,7 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
 
   protected def appInitStepSync[T](
       description: String
-  )(f: => T): T = TraceContext.withNewTraceContext(implicit tc => {
+  )(f: => T): T = TraceContext.withNewTraceContext(description)(implicit tc => {
     logger.info(s"$appInitMessage: $description started")(tc)
     // See note about trace context in appInitStep
     Try(f) match {
@@ -470,6 +369,5 @@ object NodeBase {
           s"Version: $version",
         ).mkString(System.lineSeparator())
       )
-
   }
 }

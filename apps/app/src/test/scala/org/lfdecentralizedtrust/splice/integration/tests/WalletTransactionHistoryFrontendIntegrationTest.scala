@@ -20,7 +20,6 @@ import org.scalatest.Assertion
 import java.time.Duration
 import java.util.UUID
 import scala.collection.parallel.immutable.ParVector
-import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
@@ -59,7 +58,6 @@ class WalletTransactionHistoryFrontendIntegrationTest
       val aliceEntryName = perTestCaseName("alice")
 
       waitForWalletUser(aliceValidatorWalletClient)
-      val aliceValidatorParty = aliceValidatorWalletClient.userStatus().party
 
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
       val charlieEntryName = perTestCaseName("charlie")
@@ -135,7 +133,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               amuletPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "App Payment Accepted",
-              expectedPartyDescription = Some(s"Automation $aliceValidatorParty"),
+              expectedPartyDescription = Some(s"Automation"),
               expectedAmountAmulet = BigDecimal("-1.31415"),
             )
             matchTransaction(sent)(
@@ -143,7 +141,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               expectedAction = "Sent",
               expectedSubtype = "P2P Payment Completed",
               expectedPartyDescription = Some(
-                s"${expectedAns(charlieUserParty, charlieEntryName)} $aliceValidatorParty"
+                s"${expectedAns(charlieUserParty, charlieEntryName)}"
               ),
               expectedAmountAmulet = BigDecimal("-1.18"),
             )
@@ -152,7 +150,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               expectedAction = "Received",
               expectedSubtype = "P2P Payment Completed",
               expectedPartyDescription = Some(
-                s"${expectedAns(charlieUserParty, charlieEntryName)} $aliceValidatorParty"
+                s"${expectedAns(charlieUserParty, charlieEntryName)}"
               ),
               expectedAmountAmulet = BigDecimal("1.07"),
             )
@@ -162,14 +160,14 @@ class WalletTransactionHistoryFrontendIntegrationTest
               amuletPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = s"${ansAcronym.toUpperCase()} Entry Initial Payment Collected",
-              expectedPartyDescription = Some(s"$dsoEntry $dsoEntry"),
+              expectedPartyDescription = Some(s"$dsoEntry"),
               expectedAmountAmulet = BigDecimal(0), // 0 USD
             )
             matchTransaction(lockForAns)(
               amuletPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "Subscription Initial Payment Accepted",
-              expectedPartyDescription = Some(s"Automation $aliceValidatorParty"),
+              expectedPartyDescription = Some(s"Automation"),
               expectedAmountAmulet = BigDecimal("-0.5"), // 1 USD
             )
             matchTransaction(balanceChange)(
@@ -181,13 +179,15 @@ class WalletTransactionHistoryFrontendIntegrationTest
             )
         }
 
-        txs.map(row => {
-          val updateId = readTransactionFromRow(row).updateId
-          updateId should not be empty
-          updateId
-        })
+        txs
+          .map(row => {
+            val updateId = readTransactionFromRow(row).updateId
+            updateId should not be empty
+            updateId
+          })
+          // remove the balance change tx for scan comparison
+          .init
       }
-
       withFrontEnd("scan") { implicit webDriver =>
         actAndCheck(
           "Go to Scan",
@@ -208,7 +208,6 @@ class WalletTransactionHistoryFrontendIntegrationTest
           },
         )
       }
-
       clue("update IDs from the UI can be used for querying scan") {
         updateIds.foreach(updateId =>
           eventuallySucceeds() {
@@ -221,7 +220,6 @@ class WalletTransactionHistoryFrontendIntegrationTest
     "show extra traffic purchases" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         val sv1WalletUser = sv1ValidatorBackend.config.validatorWalletUsers.loneElement
-        val sv1Party = sv1ValidatorBackend.getValidatorPartyId()
         browseToSv1Wallet(sv1WalletUser)
         val trafficAmount = 10_000_000L
         val (_, trafficCostCc) = computeSynchronizerFees(trafficAmount)
@@ -232,25 +230,12 @@ class WalletTransactionHistoryFrontendIntegrationTest
           "SV1 sees the transaction",
           _ => {
             val txs = findAll(className("tx-row")).toSeq
-            val sv1ValidatorParty = sv1WalletClient.userStatus().party
-            val sv1Name =
-              sv1Backend
-                .getDsoInfo()
-                .dsoRules
-                .payload
-                .svs
-                .asScala
-                .get(sv1ValidatorParty)
-                .value
-                .name
             forExactly(1, txs) { tx =>
               matchTransaction(tx)(
                 amuletPrice = 2,
                 expectedAction = "Sent",
                 expectedSubtype = "Extra Traffic Purchase",
-                expectedPartyDescription = Some(
-                  s"Automation ${expectedAns(sv1Party, s"${sv1Name.toLowerCase}.sv.$ansAcronym")}"
-                ),
+                expectedPartyDescription = Some("Automation"),
                 expectedAmountAmulet = -trafficCostCc,
               )
             }
@@ -308,7 +293,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
         actAndCheck(
           "Load second page", {
-            click on id("view-more-transactions")
+            eventuallyClickOn(id("view-more-transactions"))
           },
         )(
           "Alice sees second page of transactions appended",
@@ -319,7 +304,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
         actAndCheck(
           "Load third page", {
-            click on id("view-more-transactions")
+            eventuallyClickOn(id("view-more-transactions"))
           },
         )(
           "Alice sees third page of transactions appended",
@@ -331,7 +316,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         // we have to click the button one last time to know there's no more data to fetch
         actAndCheck(
           "Load final empty page", {
-            click on id("view-more-transactions")
+            eventuallyClickOn(id("view-more-transactions"))
           },
         )(
           "Alice sees there are no more transactions to load",
@@ -399,16 +384,6 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
     "show transfer preapproval purchases and renewals" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
-        val sv1Party = sv1ValidatorBackend.getValidatorPartyId()
-        val sv1Name = sv1Backend
-          .getDsoInfo()
-          .dsoRules
-          .payload
-          .svs
-          .asScala
-          .get(sv1Party.toProtoPrimitive)
-          .value
-          .name
         val sv1ValidatorWalletUser = sv1ValidatorBackend.config.validatorWalletUsers.loneElement
         val amuletConfig = sv1ScanBackend.getAmuletConfigAsOf(env.environment.clock.now)
         val preapprovalFeeRate = amuletConfig.transferPreapprovalFee.toScala.map(BigDecimal(_))
@@ -421,7 +396,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         browseToSv1Wallet(sv1ValidatorWalletUser)
         actAndCheck(
           "SV1 creates a transfer preapproval and automation renews it immediately",
-          createTransferPreapprovalIfNotExists(sv1WalletClient),
+          createTransferPreapprovalEnsuringItExists(sv1WalletClient, sv1ValidatorBackend),
         )(
           "SV1 sees the creation and renewal transactions",
           _ => {
@@ -431,9 +406,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
                 amuletPrice = 2,
                 expectedAction = "Sent",
                 expectedSubtype = "Transfer Preapproval Created",
-                expectedPartyDescription = Some(
-                  s"Automation ${expectedAns(sv1Party, s"${sv1Name.toLowerCase}.sv.$ansAcronym")}"
-                ),
+                expectedPartyDescription = Some("Automation"),
                 expectedAmountAmulet = -preapprovalFee,
               )
             }
@@ -442,9 +415,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
                 amuletPrice = 2,
                 expectedAction = "Sent",
                 expectedSubtype = "Transfer Preapproval Renewed",
-                expectedPartyDescription = Some(
-                  s"Automation ${expectedAns(sv1Party, s"${sv1Name.toLowerCase}.sv.$ansAcronym")}"
-                ),
+                expectedPartyDescription = Some("Automation"),
                 expectedAmountAmulet = -preapprovalFee,
               )
             }

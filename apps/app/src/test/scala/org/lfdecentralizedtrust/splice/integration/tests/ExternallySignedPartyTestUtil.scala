@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.config.CryptoProvider
+import com.digitalasset.canton.config.{CachingConfigs, CryptoProvider, CryptoSchemeConfig}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.jce.JcePureCrypto
 import com.digitalasset.canton.topology.PartyId
@@ -17,15 +17,17 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   SignedTopologyTx,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 
 import java.util.UUID
+import scala.concurrent.ExecutionContext
 
 trait ExternallySignedPartyTestUtil extends TestCommon {
 
   def onboardExternalParty(
       validatorBackend: ValidatorAppBackendReference,
       partyHint: Option[String] = None,
-  ): OnboardingResult = {
+  )(implicit env: SpliceTestConsoleEnvironment): OnboardingResult = {
     val generatedKey: SigningPublicKey =
       validatorBackend.participantClient.keys.secret
         .generate_signing_key(
@@ -55,7 +57,7 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       SignedTopologyTx(
         tx.topologyTx,
         HexString.toHexString(
-          crypto
+          crypto(env.executionContext)
             .sign(
               hash = Hash.fromHexString(tx.hash).value,
               signingKey = privateKey.asInstanceOf[SigningPrivateKey],
@@ -108,14 +110,14 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
   }
 
   // The parameters here are just defaults so don't really matter
-  val crypto = new JcePureCrypto(
+  def crypto(implicit ec: ExecutionContext) = new JcePureCrypto(
     CryptoProvider.Jce.symmetric.default,
-    CryptoProvider.Jce.signingAlgorithms.default,
-    CryptoProvider.Jce.signingAlgorithms.supported,
-    CryptoProvider.Jce.encryptionAlgorithms.default,
-    CryptoProvider.Jce.encryptionAlgorithms.supported,
+    CryptoScheme.create(CryptoSchemeConfig(), CryptoProvider.Jce.signingAlgorithms).value,
+    CryptoScheme.create(CryptoSchemeConfig(), CryptoProvider.Jce.encryptionAlgorithms).value,
     CryptoProvider.Jce.hash.default,
     CryptoProvider.Jce.pbkdf.value.default,
+    CachingConfigs.defaultPublicKeyConversionCache,
+    None,
     loggerFactory,
   )
 
@@ -124,11 +126,11 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       publicKey: SigningPublicKey,
       privateKey: PrivateKey,
   ) {
-    def richPartyId: LedgerApiExtensions.RichPartyId =
+    def richPartyId(implicit env: SpliceTestConsoleEnvironment): LedgerApiExtensions.RichPartyId =
       LedgerApiExtensions.RichPartyId.external(
         party,
         privateKey.asInstanceOf[SigningPrivateKey],
-        crypto,
+        crypto(env.executionContext),
       )
   }
 
@@ -136,9 +138,22 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,
       verboseHashing: Boolean = false,
-  ): (TransferPreapproval.ContractId, String) = {
+  )(implicit env: SpliceTestConsoleEnvironment): (TransferPreapproval.ContractId, String) = {
     val proposal = createExternalPartySetupProposal(provider, externalPartyOnboarding)
     acceptExternalPartySetupProposal(provider, externalPartyOnboarding, proposal, verboseHashing)
+  }
+
+  protected def onboardAndSetupExternalParty(
+      validatorBackend: ValidatorAppBackendReference,
+      partyHint: Option[String] = None,
+  )(implicit env: SpliceTestConsoleEnvironment): OnboardingResult = {
+    val onboarding = onboardExternalParty(validatorBackend, partyHint)
+    eventuallySucceeds() {
+      // While there is a server-side retry on this, it is not always sufficiently long in our tests,
+      // so we wrap it here in an eventuallySucceeds()
+      createAndAcceptExternalPartySetupProposal(validatorBackend, onboarding)
+    }
+    onboarding
   }
 
   protected def createExternalPartySetupProposal(
@@ -165,7 +180,7 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       externalPartyOnboarding: OnboardingResult,
       proposal: ExternalPartySetupProposal.ContractId,
       verboseHashing: Boolean = false,
-  ): (TransferPreapproval.ContractId, String) = {
+  )(implicit env: SpliceTestConsoleEnvironment): (TransferPreapproval.ContractId, String) = {
     val preparedTx =
       prepareAcceptExternalPartySetupProposal(
         provider,
@@ -207,14 +222,14 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,
       preparedTx: PrepareAcceptExternalPartySetupProposalResponse,
-  ): (TransferPreapproval.ContractId, String) = {
+  )(implicit env: SpliceTestConsoleEnvironment): (TransferPreapproval.ContractId, String) = {
     val (_, result) = actAndCheck(
       s"Submit acceptExternalPartySetupProposal tx for ${externalPartyOnboarding.party}",
       provider.submitAcceptExternalPartySetupProposal(
         externalPartyOnboarding.party,
         preparedTx.transaction,
         HexString.toHexString(
-          crypto
+          crypto(env.executionContext)
             .signBytes(
               HexString.parseToByteString(preparedTx.txHash).value,
               externalPartyOnboarding.privateKey.asInstanceOf[SigningPrivateKey],

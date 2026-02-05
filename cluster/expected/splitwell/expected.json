@@ -89,14 +89,6 @@
   },
   {
     "custom": true,
-    "id": "projects/test-project/global/networks/default",
-    "inputs": {},
-    "name": "default",
-    "provider": "",
-    "type": "gcp:compute/network:Network"
-  },
-  {
-    "custom": true,
     "id": "",
     "inputs": {
       "enableServerSideApply": "true"
@@ -237,6 +229,16 @@
   },
   {
     "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",
@@ -264,31 +266,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "splice-app-validator-ledger-api-auth",
-        "namespace": "splitwell"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "audience": "https://canton.network.global",
-          "client-id": "splitwell-validator-client-id",
-          "client-secret": "***",
-          "ledger-api-user": "splitwell-validator-client-id@clients",
-          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
-        }
-      }
-    },
-    "name": "splice-auth0-secret-splitwell-splitwell_validator",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
         "name": "splice-app-splitwell-ledger-api-auth",
         "namespace": "splitwell"
       },
@@ -304,6 +281,31 @@
       }
     },
     "name": "splice-auth0-secret-splitwell-splitwell",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-ledger-api-auth",
+        "namespace": "splitwell"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://canton.network.global",
+          "client-id": "splitwell-validator-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "splitwell-validator-client-id@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-splitwell-validator",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -371,6 +373,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -539,6 +548,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -556,6 +572,7 @@
           "hostname": "mock.global.canton.network.digitalasset.com",
           "name": "cn-mocknet"
         },
+        "disableAuth": false,
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
@@ -636,6 +653,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -687,6 +708,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -767,6 +795,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -832,6 +864,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -902,6 +938,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -921,6 +964,7 @@
           "name": "cn-mocknet"
         },
         "contactPoint": "sv-support@digitalasset.com",
+        "disableAuth": false,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
@@ -953,6 +997,11 @@
             "prefix": "mock/splitwell"
           }
         },
+        "participantPruningSchedule": {
+          "cron": "0 /10 * * * ?",
+          "maxDuration": "5m",
+          "retention": "30d"
+        },
         "persistence": {
           "databaseName": "val_splitwell",
           "port": 5432,
@@ -960,6 +1009,10 @@
           "schema": "val_splitwell",
           "secretName": "validator-pg-secrets",
           "user": "cnadmin"
+        },
+        "pvc": {
+          "volumeName": "domain-migration-validator-pvc",
+          "volumeStorageClass": "standard-rwo"
         },
         "resources": {},
         "scanAddress": "http://scan-app.sv-1:5012",

@@ -55,6 +55,7 @@ spec:
           value: {{ .Values.mediator.persistence.databaseName }}
         {{- end }}
         {{- include "splice-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
+        {{- include "splice-util-lib.additional-env-vars" .Values.mediator.additionalEnvVars | indent 8}}
         {{- include "splice-util-lib.log-level" .Values | indent 8}}
         {{- with .Values.imagePullPolicy }}
         imagePullPolicy: {{ . }}
@@ -67,7 +68,7 @@ spec:
           name: cm-metrics
           protocol: TCP
       {{- if .Values.mediator.resources }}
-        resources: {{- toYaml .Values.mediator.resources | nindent 12 }}
+        resources: {{- toYaml (merge .Values.mediator.resources .Values.resources) | nindent 12 }}
         {{- else }}
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 12 }}

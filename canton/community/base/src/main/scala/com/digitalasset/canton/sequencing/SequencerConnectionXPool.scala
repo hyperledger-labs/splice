@@ -3,24 +3,30 @@
 
 package com.digitalasset.canton.sequencing
 
+import cats.data.EitherT
 import cats.syntax.either.*
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.health.{AtomicHealthComponent, ComponentHealthState}
-import com.digitalasset.canton.lifecycle.{FlagCloseable, HasRunOnClosing}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.lifecycle.{
+  FlagCloseable,
+  FutureUnlessShutdown,
+  HasRunOnClosing,
+  OnShutdownRunner,
+}
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.{NamedLogging, TracedLogger}
 import com.digitalasset.canton.networking.Endpoint
+import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencing.ConnectionX.ConnectionXConfig
-import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{Member, SequencerId, SynchronizerId}
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId}
+import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
 import com.digitalasset.canton.util.MonadUtil
 import com.google.common.annotations.VisibleForTesting
+import org.apache.pekko.stream.Materializer
 
-import java.time.Duration
 import scala.concurrent.ExecutionContextExecutor
 
 /** Pool of sequencer connections.
@@ -46,9 +52,9 @@ import scala.concurrent.ExecutionContextExecutor
   *     the threshold, degraded if it is below, and failing if it reaches 0.
   *
   * The configuration can also optionally define an expected
-  * [[com.digitalasset.canton.topology.SynchronizerId]]. If defined, any connection that does not
-  * report connecting to that synchronizer will be rejected. If undefined, the synchronizer ID will
-  * be determined by consensus once trust-threshold-many connections (to different logical
+  * [[com.digitalasset.canton.topology.PhysicalSynchronizerId]]. If defined, any connection that
+  * does not report connecting to that synchronizer will be rejected. If undefined, the synchronizer
+  * ID will be determined by consensus once trust-threshold-many connections (to different logical
   * sequencers) report the same synchronizer.
   */
 trait SequencerConnectionXPool extends FlagCloseable with NamedLogging {
@@ -57,9 +63,26 @@ trait SequencerConnectionXPool extends FlagCloseable with NamedLogging {
   /** Return the synchronizer ID to which the connections in the pool are connected. Empty if the
     * pool has not yet reached enough validated connections to initialize.
     */
-  def synchronizerId: Option[SynchronizerId]
+  def physicalSynchronizerIdO: Option[PhysicalSynchronizerId]
 
-  def start()(implicit traceContext: TraceContext): Unit
+  /** Return the static parameters of the synchronizer to which the connections in the pool are
+    * connected. Empty if the pool has not yet reached enough validated connections to initialize.
+    */
+  def staticSynchronizerParametersO: Option[StaticSynchronizerParameters]
+
+  /** Start the connection pool. This will start all the configured connections and begin validating
+    * them.
+    *
+    * @return
+    *   A future that completes either when the connection pool has initialized and is serving
+    *   connections, or when the initialization has timed out. The value of the timeout is defined
+    *   by the [[com.digitalasset.canton.config.ProcessingTimeout.sequencerInfo]] configuration. In
+    *   case of timeout, the pool is closed and unusable. A new connection pool must be created if
+    *   desired.
+    */
+  def start()(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SequencerConnectionXPoolError, Unit]
 
   /** Return the current configuration of the pool.
     */
@@ -94,9 +117,29 @@ trait SequencerConnectionXPool extends FlagCloseable with NamedLogging {
     *     returned for that sequencer ID is chosen via round-robin
     */
   def getConnections(
-      nb: Int,
+      requester: String,
+      nb: PositiveInt,
       exclusions: Set[SequencerId],
   )(implicit traceContext: TraceContext): Set[SequencerConnectionX]
+
+  /** Obtain a single connection for each different sequencer ID present in the pool.
+    */
+  def getOneConnectionPerSequencer(requester: String)(implicit
+      traceContext: TraceContext
+  ): Map[SequencerId, SequencerConnectionX]
+
+  /** Obtain all the connections present in the pool. */
+  def getAllConnections()(implicit traceContext: TraceContext): Seq[SequencerConnectionX]
+
+  /** Determine whether the connection pool can still reach the given threshold, ignoring the
+    * `ignored` connections and considering an additional `extraUndecided` number of undecided
+    * connections.
+    */
+  def isThresholdStillReachable(
+      threshold: PositiveInt,
+      ignored: Set[ConnectionXConfig] = Set.empty,
+      extraUndecided: NonNegativeInt = NonNegativeInt.zero,
+  )(implicit traceContext: TraceContext): Boolean
 
   @VisibleForTesting
   def contents: Map[SequencerId, Set[SequencerConnectionX]]
@@ -113,9 +156,13 @@ object SequencerConnectionXPool {
     *   for the pool to initialize and start serving connections. After initialization, if the
     *   number of connections in the pool goes below the threshold, the pool's health will
     *   transition to `degraded` (or `failed` if it reaches 0).
-    * @param restartConnectionDelay
-    *   The duration after which a failed connection is restarted.
-    * @param expectedSynchronizerIdO
+    * @param minRestartConnectionDelay
+    *   The minimum duration after which a failed connection is restarted.
+    * @param maxRestartConnectionDelay
+    *   The maximum duration after which a failed connection is restarted.
+    * @param warnConnectionValidationDelay
+    *   The duration after which a warning is issued if a started connection still fails validation.
+    * @param expectedPSIdO
     *   If provided, defines the synchronizer to which the connections are expected to connect. If
     *   empty, the synchronizer will be determined as soon as [[trustThreshold]]-many connections
     *   are validated and agree on bootstrap information.
@@ -123,11 +170,22 @@ object SequencerConnectionXPool {
   final case class SequencerConnectionXPoolConfig(
       connections: NonEmpty[Seq[ConnectionXConfig]],
       trustThreshold: PositiveInt,
-      restartConnectionDelay: Duration = Duration.ofMillis(500),
-      expectedSynchronizerIdO: Option[SynchronizerId] = None,
-  ) {
+      minRestartConnectionDelay: config.NonNegativeFiniteDuration,
+      maxRestartConnectionDelay: config.NonNegativeFiniteDuration,
+      warnConnectionValidationDelay: config.NonNegativeFiniteDuration,
+      expectedPSIdO: Option[PhysicalSynchronizerId] = None,
+  ) extends PrettyPrinting {
     // TODO(i24780): when persisting, use com.digitalasset.canton.version.Invariant machinery for validation
     import SequencerConnectionXPoolConfig.*
+
+    override protected def pretty: Pretty[SequencerConnectionXPoolConfig] = prettyOfClass(
+      param("connections", _.connections),
+      param("trustThreshold", _.trustThreshold),
+      param("minRestartConnectionDelay", _.minRestartConnectionDelay),
+      param("maxRestartConnectionDelay", _.maxRestartConnectionDelay),
+      param("warnConnectionValidationDelay", _.warnConnectionValidationDelay),
+      paramIfDefined("expectedPSIdO", _.expectedPSIdO),
+    )
 
     def validate: Either[SequencerConnectionXPoolError, Unit] = {
       val (names, endpoints) = connections.map(conn => conn.name -> conn.endpoint).unzip
@@ -152,6 +210,11 @@ object SequencerConnectionXPool {
           (),
           s"Trust threshold ($trustThreshold) must not exceed the number of connections (${connections.size})",
         )
+        _ <- Either.cond(
+          minRestartConnectionDelay.duration <= maxRestartConnectionDelay.duration,
+          (),
+          s"Minimum restart connection delay ($minRestartConnectionDelay) must not exceed the maximum ($maxRestartConnectionDelay)",
+        )
       } yield ()
 
       check.leftMap(SequencerConnectionXPoolError.InvalidConfigurationError.apply)
@@ -171,10 +234,67 @@ object SequencerConnectionXPool {
   }
 
   object SequencerConnectionXPoolConfig {
-    final case class ChangedConnections(
+    private[sequencing] final case class ChangedConnections(
         added: Set[ConnectionXConfig],
         removed: Set[ConnectionXConfig],
-    )
+    ) extends PrettyPrinting {
+      override protected def pretty: Pretty[ChangedConnections] = prettyOfClass(
+        param("added", _.added),
+        param("removed", _.removed),
+      )
+    }
+
+    /** Create a sequencer connection pool configuration from the existing format.
+      *
+      * TODO(i27260): remove when no longer needed
+      */
+    def fromSequencerConnections(
+        sequencerConnections: SequencerConnections,
+        tracingConfig: TracingConfig,
+        expectedPSIdO: Option[PhysicalSynchronizerId],
+    ): SequencerConnectionXPoolConfig = {
+      val connectionsConfig = sequencerConnections.aliasToConnection.flatMap {
+        case (
+              _,
+              GrpcSequencerConnection(
+                endpoints,
+                transportSecurity,
+                customTrustCertificates,
+                sequencerAlias,
+                expectedSequencerIdO,
+              ),
+            ) =>
+          // In the current format, sequencers can have several connections if they are HA.
+          // To get unique connection names, we name the connections using the sequencer alias followed by an
+          // index corresponding to the connection.
+          // In other words, for a given sequencer, the connections will be named "<sequencer alias>-0",
+          // "<sequencer alias>-1", etc.
+          val baseName = sequencerAlias.unwrap
+          endpoints.zipWithIndex.map { case (ep, index) =>
+            ConnectionXConfig(
+              name = s"$baseName-$index",
+              endpoint = ep,
+              transportSecurity = transportSecurity,
+              customTrustCertificates = customTrustCertificates,
+              expectedSequencerIdO = expectedSequencerIdO,
+              tracePropagation = tracingConfig.propagation,
+            )
+          }
+      }.toSeq
+
+      new SequencerConnectionXPoolConfig(
+        connectionsConfig,
+        trustThreshold = sequencerConnections.sequencerTrustThreshold,
+        expectedPSIdO = expectedPSIdO,
+        minRestartConnectionDelay =
+          sequencerConnections.sequencerConnectionPoolDelays.minRestartDelay,
+        maxRestartConnectionDelay =
+          sequencerConnections.sequencerConnectionPoolDelays.maxRestartDelay,
+        warnConnectionValidationDelay =
+          sequencerConnections.sequencerConnectionPoolDelays.warnValidationDelay,
+      )
+    }
+
   }
 
   class SequencerConnectionXPoolHealth(
@@ -186,42 +306,51 @@ object SequencerConnectionXPool {
       ComponentHealthState.NotInitializedState
   }
 
+  object SequencerConnectionXPoolHealth {
+    class AlwaysHealthy(
+        override val name: String,
+        protected override val logger: TracedLogger,
+    ) extends SequencerConnectionXPoolHealth(
+          name,
+          new OnShutdownRunner.PureOnShutdownRunner(logger),
+          logger,
+        ) {
+      override protected val initialHealthState: ComponentHealthState = ComponentHealthState.Ok()
+      override val closingState: ComponentHealthState = ComponentHealthState.Ok()
+    }
+  }
+
   sealed trait SequencerConnectionXPoolError
 
   object SequencerConnectionXPoolError {
     final case class InvalidConfigurationError(error: String) extends SequencerConnectionXPoolError
+    final case class TimeoutError(error: String) extends SequencerConnectionXPoolError
+    final case class ThresholdUnreachableError(error: String) extends SequencerConnectionXPoolError
   }
 }
 
-object SequencerConnectionXPoolFactory {
+trait SequencerConnectionXPoolFactory {
   import SequencerConnectionXPool.{SequencerConnectionXPoolConfig, SequencerConnectionXPoolError}
 
   def create(
       initialConfig: SequencerConnectionXPoolConfig,
-      connectionFactory: InternalSequencerConnectionXFactory,
-      clock: Clock,
-      authConfig: AuthenticationTokenManagerConfig,
-      member: Member,
-      crypto: Crypto,
-      seedForRandomnessO: Option[Long],
-      timeouts: ProcessingTimeout,
-      loggerFactory: NamedLoggerFactory,
+      name: String,
   )(implicit
-      ec: ExecutionContextExecutor
-  ): Either[SequencerConnectionXPoolError, SequencerConnectionXPoolImpl] =
-    for {
-      _ <- initialConfig.validate
-    } yield {
-      new SequencerConnectionXPoolImpl(
-        initialConfig,
-        connectionFactory,
-        clock,
-        authConfig: AuthenticationTokenManagerConfig,
-        member: Member,
-        crypto: Crypto,
-        seedForRandomnessO,
-        timeouts,
-        loggerFactory,
-      )
-    }
+      ec: ExecutionContextExecutor,
+      esf: ExecutionSequencerFactory,
+      materializer: Materializer,
+  ): Either[SequencerConnectionXPoolError, SequencerConnectionXPool]
+
+  // TODO(i27260): remove when no longer needed
+  def createFromOldConfig(
+      sequencerConnections: SequencerConnections,
+      expectedPSIdO: Option[PhysicalSynchronizerId],
+      tracingConfig: TracingConfig,
+      name: String,
+  )(implicit
+      ec: ExecutionContextExecutor,
+      esf: ExecutionSequencerFactory,
+      materializer: Materializer,
+      traceContext: TraceContext,
+  ): Either[SequencerConnectionXPoolError, SequencerConnectionXPool]
 }

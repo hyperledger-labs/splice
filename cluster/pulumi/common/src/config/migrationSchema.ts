@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from 'zod';
 
-import { CnChartVersion, parsedVersion } from '../artifacts';
-import { spliceEnvConfig } from './envConfig';
+import { CnChartVersionSchema } from './versionSchema';
 
 export const defaultActiveMigration = {
   id: 0,
@@ -12,18 +11,6 @@ export const defaultActiveMigration = {
     enableBftSequencer: false,
   },
 };
-
-const migrationVersion = z.string().transform<CnChartVersion>((version, ctx) => {
-  if (version == 'local' && spliceEnvConfig.optionalEnv('SPLICE_OPERATOR_DEPLOYMENT')) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: `Using a local version for the operator deployment is not supported.`,
-    });
-    return z.NEVER;
-  } else {
-    return parsedVersion(version);
-  }
-});
 
 export const GitReferenceSchema = z.object({
   repoUrl: z.string(),
@@ -43,7 +30,7 @@ export const MigrationInfoSchema = z
       .number()
       .lt(10, 'Migration id must be less than or equal to 10 as we use in the cometbft ports.')
       .gte(0),
-    version: migrationVersion,
+    version: CnChartVersionSchema,
     releaseReference: GitReferenceSchema.optional(),
     sequencer: z
       .object({
@@ -58,12 +45,13 @@ export const SynchronizerMigrationSchema = z
     legacy: MigrationInfoSchema.optional(),
     active: MigrationInfoSchema.extend({
       migratingFrom: z.number().optional(),
-      version: migrationVersion,
+      version: CnChartVersionSchema,
     })
       .strict()
       .default(defaultActiveMigration),
     upgrade: MigrationInfoSchema.optional(),
     archived: z.array(MigrationInfoSchema).optional(),
     activeDatabaseId: z.number().optional(),
+    attachPvc: z.boolean().default(true),
   })
   .strict();

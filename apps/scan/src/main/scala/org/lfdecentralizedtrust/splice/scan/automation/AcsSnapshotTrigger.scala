@@ -20,9 +20,9 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.Done
 import org.apache.pekko.stream.Materializer
 
-import java.time.temporal.ChronoField
-import java.time.{Duration, ZoneOffset}
+import java.time.Duration
 import cats.implicits.*
+import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
@@ -30,7 +30,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class AcsSnapshotTrigger(
     store: AcsSnapshotStore,
     updateHistory: UpdateHistory,
-    snapshotPeriodHours: Int,
+    storageConfig: ScanStorageConfig,
     updateHistoryBackfillEnabled: Boolean,
     protected val context: TriggerContext,
 )(implicit
@@ -40,7 +40,6 @@ class AcsSnapshotTrigger(
     // we always return 1 task, so PollingParallelTaskExecutionTrigger in effect does nothing in parallel
 ) extends PollingParallelTaskExecutionTrigger[AcsSnapshotTrigger.Task] {
 
-  private val timesToDoSnapshot = (0 to 23).filter(_ % snapshotPeriodHours == 0)
   private val currentMigrationId = store.currentMigrationId
 
   override def retrieveTasks()(implicit
@@ -84,20 +83,16 @@ class AcsSnapshotTrigger(
     }
   }
 
-  private def nextSnapshotTime(lastSnapshot: AcsSnapshot) = {
-    lastSnapshot.snapshotRecordTime.plus(Duration.ofHours(snapshotPeriodHours.toLong))
-  }
-
   private def retrieveTaskForCurrentMigrationId(
       now: CantonTimestamp
   )(implicit tc: TraceContext): OptionT[Future, AcsSnapshotTrigger.Task] = {
     OptionT(for {
-      lastSnapshot <- store.lookupSnapshotBefore(currentMigrationId, CantonTimestamp.MaxValue)
+      lastSnapshot <- store.lookupSnapshotAtOrBefore(currentMigrationId, CantonTimestamp.MaxValue)
       possibleTask <- lastSnapshot match {
         case None =>
           firstSnapshotForMigrationIdTask(currentMigrationId)
         case Some(lastSnapshot) => // new snapshot should be created, if ACS for it is complete
-          val newSnapshotRecordTime = nextSnapshotTime(lastSnapshot)
+          val newSnapshotRecordTime = storageConfig.nextSnapshotTime(lastSnapshot)
           Future.successful(
             Some(
               AcsSnapshotTrigger.Task(newSnapshotRecordTime, currentMigrationId, Some(lastSnapshot))
@@ -167,23 +162,36 @@ class AcsSnapshotTrigger(
   ): Future[Option[AcsSnapshotTrigger.Task]] = {
     for {
       migrationRecordTimeRange <- updateHistory.getRecordTimeRange(migrationIdToBackfill)
+      maxTime = migrationRecordTimeRange
+        .map(_._2.max)
+        .maxOption
+        .getOrElse(
+          throw new IllegalStateException(
+            s"SynchronizerId with no data in $migrationRecordTimeRange"
+          )
+        )
+      minTime = migrationRecordTimeRange
+        .map(_._2.min)
+        .minOption
+        .getOrElse(
+          throw new IllegalStateException(
+            s"SynchronizerId with no data in $migrationRecordTimeRange"
+          )
+        )
+      firstSnapshotTime = storageConfig.computeDbSnapshotTimeAfter(minTime)
+      migrationLastedLongEnough = firstSnapshotTime
+        .plus(Duration.ofHours(storageConfig.dbAcsSnapshotPeriodHours.toLong))
+        .isBefore(maxTime)
       latestSnapshot <- store
-        .lookupSnapshotBefore(migrationIdToBackfill, CantonTimestamp.MaxValue)
+        .lookupSnapshotAtOrBefore(migrationIdToBackfill, CantonTimestamp.MaxValue)
       task <- latestSnapshot match {
         // Avoid creating the last snapshot for past migration ids, which will be contain a portion of empty history.
         // This is important because, if the migration id gets restored after HDM fast enough,
         // said snapshot might be invalid.
         case Some(snapshot)
             if snapshot.snapshotRecordTime.plus(
-              Duration.ofHours(snapshotPeriodHours.toLong)
-            ) > migrationRecordTimeRange
-              .map(_._2.max)
-              .maxOption
-              .getOrElse(
-                throw new IllegalStateException(
-                  s"SynchronizerId with no data in $migrationRecordTimeRange"
-                )
-              ) =>
+              Duration.ofHours(storageConfig.dbAcsSnapshotPeriodHours.toLong)
+            ) > maxTime =>
           logger.info(
             s"Backfilling of migration id $migrationIdToBackfill is complete. Trying with next oldest."
           )
@@ -193,9 +201,19 @@ class AcsSnapshotTrigger(
           Future.successful(
             Some(
               AcsSnapshotTrigger
-                .Task(nextSnapshotTime(snapshot), migrationIdToBackfill, Some(snapshot))
+                .Task(
+                  storageConfig.nextSnapshotTime(snapshot),
+                  migrationIdToBackfill,
+                  Some(snapshot),
+                )
             )
           )
+        case None if !migrationLastedLongEnough =>
+          logger.info(
+            s"Migration id $migrationIdToBackfill didn't last more than ${storageConfig.dbAcsSnapshotPeriodHours} hours (from $minTime to $maxTime), so it won't have any snapshots."
+          )
+          lastCompleteBackfilledMigrationId.set(Right(migrationIdToBackfill))
+          taskToContinueBackfillingACSSnapshots().value
         case None =>
           firstSnapshotForMigrationIdTask(migrationIdToBackfill)
       }
@@ -225,7 +243,7 @@ class AcsSnapshotTrigger(
       tc: TraceContext
   ): Future[Boolean] = {
     store
-      .lookupSnapshotBefore(currentMigrationId, task.snapshotRecordTime)
+      .lookupSnapshotAtOrBefore(currentMigrationId, task.snapshotRecordTime)
       .map(_.exists(_.snapshotRecordTime == task.snapshotRecordTime))
   }
 
@@ -249,18 +267,15 @@ class AcsSnapshotTrigger(
           logger.info(s"No updates other than ACS imports found. Retrying snapshot creation later.")
           None
         case Some(firstNonAcsImport) =>
-          val firstNonAcsImportRecordTime =
-            firstNonAcsImport.update.update.recordTime.toInstant.atOffset(ZoneOffset.UTC)
-          val (hourForSnapshot, plusDays) = timesToDoSnapshot
-            .find(_ > firstNonAcsImportRecordTime.get(ChronoField.HOUR_OF_DAY)) match {
-            case Some(hour) => hour -> 0 // current day at hour
-            case None => 0 -> 1 // next day at 00:00
-          }
-          val until = firstNonAcsImportRecordTime.toLocalDate
-            .plusDays(plusDays.toLong)
-            .atTime(hourForSnapshot, 0)
-            .toInstant(ZoneOffset.UTC)
-          Some(AcsSnapshotTrigger.Task(CantonTimestamp.assertFromInstant(until), migrationId, None))
+          val firstNonAcsImportRecordTime = firstNonAcsImport.update.update.recordTime
+          Some(
+            AcsSnapshotTrigger
+              .Task(
+                storageConfig.computeDbSnapshotTimeAfter(firstNonAcsImportRecordTime),
+                migrationId,
+                None,
+              )
+          )
       }
   }
 }

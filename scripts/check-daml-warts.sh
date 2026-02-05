@@ -17,6 +17,8 @@ ignored_files=(
   'token-standard/examples/splice-token-test-trading-app/daml/Splice/Testing/Apps/TradingApp.daml'
   'daml/splice-util-featured-app-proxies/daml/Splice/Util/FeaturedApp/DelegateProxy.daml'
   'daml/splice-util-featured-app-proxies/daml/Splice/Util/FeaturedApp/WalletUserProxy.daml'
+  'daml/splice-util-token-standard-wallet/daml/Splice/Util/Token/Wallet/MergeDelegation.daml'
+  'daml/splice-util-batched-markers/daml/Splice/Util/FeaturedApp/BatchedMarkersProxy.daml'
   'canton/')
 
 command=('git' 'grep' '-n' -E '(exercise.*_Fetch|fetch|archive)\b' '--' '*.daml')

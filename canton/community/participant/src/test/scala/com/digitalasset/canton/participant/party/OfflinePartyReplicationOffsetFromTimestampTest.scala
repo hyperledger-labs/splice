@@ -94,12 +94,10 @@ class OfflinePartyReplicationOffsetFromTimestampTest extends AnyWordSpec with Ba
     }
 
     "refuse to emit a synchronizer offset with a record time after the requested timestamp" in {
-      // This tests breaking an internal invariant ensured by the
-      // StorageBackendTestsEvents lastSynchronizerOffsetBeforeOrAtPublicationTime unit tests.
       val synchronizerOffsetTooLarge = highestOffsetBeforeOrAtRequestedTimestamp
         .copy(recordTime = requestedTimestamp.immediateSuccessor.underlying)
 
-      loggerFactory.assertThrowsAndLogs[IllegalStateException](
+      val error =
         GrpcPartyManagementService
           .identifyHighestOffsetByTimestamp(
             requestedTimestamp = requestedTimestamp,
@@ -108,12 +106,31 @@ class OfflinePartyReplicationOffsetFromTimestampTest extends AnyWordSpec with Ba
             cleanSynchronizerTimestamp = timestampAfter,
             ledgerEnd = ledgerEnd,
             synchronizerId,
-          ),
-        logEntry => {
-          logEntry.errorMessage should include("An internal error has occurred.")
-          logEntry.throwable.value.getMessage should include regex "Returned offset record time .* must be before or at the requested timestamp"
-        },
-      )
+          )
+          .left
+          .value
+      error shouldBe a[PartyManagementServiceError.InvalidTimestamp.Error]
+      error.cause should include regex "Coding bug: Returned offset record time .* must be before or at the requested timestamp"
+    }
+
+    "error if the synchronizer offset if larger than the ledger end offset" in {
+      val synchronizerOffsetLargerThanLedgerEnd = highestOffsetBeforeOrAtRequestedTimestamp
+        .copy(offset = ledgerEnd.lastOffset.increment)
+
+      val error =
+        GrpcPartyManagementService
+          .identifyHighestOffsetByTimestamp(
+            requestedTimestamp = requestedTimestamp,
+            synchronizerOffsetBeforeOrAtRequestedTimestamp = synchronizerOffsetLargerThanLedgerEnd,
+            forceFlag = false,
+            cleanSynchronizerTimestamp = timestampAfter,
+            ledgerEnd = ledgerEnd,
+            synchronizerId,
+          )
+          .left
+          .value
+      error shouldBe a[PartyManagementServiceError.InvalidTimestamp.Error]
+      error.cause should include regex "The synchronizer offset .* is not less than or equal to the ledger end offset"
     }
   }
 }

@@ -19,7 +19,6 @@ Designed primarily for development and testing, LocalNet is not intended for pro
 Setup
 -----
 
-
 1. Download the release artifacts from the
    |bundle_download_link| link, and extract the bundle:
 
@@ -28,7 +27,7 @@ Setup
         tar xzvf |version|\_splice-node.tar.gz
 
    The extracted docker compose files defining LocalNet are located in
-   ``splice-node/cluster/compose/localnet``.
+   ``splice-node/docker-compose/localnet``.
 
 2. Export these two environment variables used in the later commands:
 
@@ -39,9 +38,8 @@ Setup
 
       .. parsed-literal::
 
-         export LOCALNET_DIR=$PWD/splice-node/cluster/compose/localnet
+         export LOCALNET_DIR=$PWD/splice-node/docker-compose/localnet
          |image_tag_set_plain|
-
 
 3. See :ref:`use-localnet` for the commands to start, stop, inspect, and administrate the LocalNet nodes.
 
@@ -116,10 +114,18 @@ Application UIs
     - **URL**: `http://scan.localhost:4000 <http://scan.localhost:4000>`_
     - **Description**: Interface to monitor transactions.
 
-    .. note::
-         `LocalNet` rounds may take up to 6 rounds (equivalent to one hour) to display in the scan UI.
+.. note::
+   `LocalNet` rounds may take up to 6 rounds (equivalent to one hour) to display in the scan UI.
 
-The ``*.localhost`` domains will resolve to your local host IP ``127.0.0.1``.
+In most scenarios, the ``*.localhost`` domains (e.g., ``http://scan.localhost``) will resolve to your local host IP ``127.0.0.1``.
+There are some situations where the resolution does not occur and the solution is to add entries to your ``/etc/hosts`` file.  For example,
+to resolve ``http://scan.localhost`` and ``http://wallet.localhost`` add these entry to the file:
+
+.. code-block::
+
+   127.0.0.1   scan.localhost
+   127.0.0.1   wallet.localhost
+
 
 Default Wallet Users
 --------------------
@@ -213,8 +219,8 @@ Access the Canton Admin Console
 Use the Canton Admin Console to inspect and modify the run configuration
 of the Canton sequencer, mediator, and participant nodes in your LocalNet deployment.
 
-* `Canton Console How-To <https://docs.digitalasset.com/operate/3.3/howtos/operate/console/console.html?>`__
-* `Canton Console commands <https://docs.digitalasset.com/operate/3.3/reference/console.html>`__
+* `Canton Console How-To <https://docs.digitalasset.com/operate/3.4/howtos/operate/console/console.html?>`__
+* `Canton Console commands <https://docs.digitalasset.com/operate/3.4/reference/console.html>`__
 
 
 .. code-block:: bash

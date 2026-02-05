@@ -1,7 +1,13 @@
-# Note that we don't currently support arm64 runners, so we build this only for amd64
-FROM --platform=$BUILDPLATFORM ghcr.io/actions/actions-runner:2.328.0@sha256:db0dcae6d28559e54277755a33aba7d0665f255b3bd2a66cdc5e132712f155e0
+ARG RUNNER_VERSION=2.331.0
+ARG RUNNER_DIGEST=sha256:dced476aa42703ebd9aafc295ce52f160989c4528e831fc3be2aef83a1b3f6da
 
-LABEL org.opencontainers.image.base.name="ghcr.io/actions/actions-runner:2.328.0"
+# Note that we don't currently support arm64 runners, so we build this only for amd64
+FROM --platform=$BUILDPLATFORM ghcr.io/actions/actions-runner:${RUNNER_VERSION}@${RUNNER_DIGEST}
+
+# required to get the org.opencontainers.image.base.name label to render correctly
+ARG RUNNER_VERSION
+
+LABEL org.opencontainers.image.base.name="ghcr.io/actions/actions-runner:${RUNNER_VERSION}"
 
 COPY target/index.js /home/runner/k8s/index.js
 COPY target/LICENSE .

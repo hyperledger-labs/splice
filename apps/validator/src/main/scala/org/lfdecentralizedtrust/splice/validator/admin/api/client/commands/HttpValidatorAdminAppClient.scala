@@ -6,9 +6,8 @@ package org.lfdecentralizedtrust.splice.validator.admin.api.client.commands
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
-import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, validator_admin as http}
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
@@ -20,28 +19,18 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse, StatusCodes}
-import org.apache.pekko.stream.Materializer
 
 import java.time.{Instant, ZoneOffset}
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 object HttpValidatorAdminAppClient {
-  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = http.ValidatorAdminClient
+  import http.ValidatorAdminClient as Client
 
-    def createClient(host: String)(implicit
-        httpClient: HttpClient,
-        tc: TraceContext,
-        ec: ExecutionContext,
-        mat: Materializer,
-    ): Client =
-      http.ValidatorAdminClient.httpClient(
-        HttpClientBuilder().buildClient(Set(StatusCodes.NotFound)),
-        host,
-      )
+  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result, Client] {
+    val createGenClientFn = (fn, host, ec, mat) => Client.httpClient(fn, host)(ec, mat)
+    override val nonErrorStatusCodes = Set(StatusCodes.NotFound)
   }
 
   case class GenerateExternalPartyTopology(partyHint: String, publicKey: String)
@@ -98,15 +87,19 @@ object HttpValidatorAdminAppClient {
     }
   }
 
-  case class OnboardUser(name: String, existingPartyId: Option[PartyId])
-      extends BaseCommand[http.OnboardUserResponse, PartyId] {
+  case class OnboardUser(
+      name: String,
+      existingPartyId: Option[PartyId],
+      createIfMissing: Option[Boolean] = None,
+  ) extends BaseCommand[http.OnboardUserResponse, PartyId] {
 
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardUserResponse] =
       client.onboardUser(
-        definitions.OnboardUserRequest(name, existingPartyId.map(_.toProtoPrimitive)),
+        definitions
+          .OnboardUserRequest(name, existingPartyId.map(_.toProtoPrimitive), createIfMissing),
         headers,
       )
 

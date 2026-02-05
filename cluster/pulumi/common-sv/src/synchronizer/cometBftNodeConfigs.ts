@@ -42,7 +42,6 @@ export class CometBftNodeConfigs {
       identifier: this.nodeIdentifier,
       externalAddress: this.p2pExternalAddress(staticConf.nodeIndex),
       istioPort: cometBFTExternalPort(this._domainMigrationId, staticConf.nodeIndex),
-      retainBlocks: staticConf.retainBlocks,
       validator: staticConf.validator,
     };
   }
@@ -57,10 +56,6 @@ export class CometBftNodeConfigs {
 
   get sv1NodeConfig(): CometBftNodeConfig {
     return this.staticToNodeConfig(this._nodeConfigs.sv1);
-  }
-
-  p2pServiceAddress(nodeId: string): string {
-    return `${this.nodeIdentifier}-cometbft-p2p.${this._nodeConfigs.peers.concat(this._nodeConfigs.sv1).find(peer => peer.id === nodeId)?.nodeName}.svc.cluster.local:26656`;
   }
 
   get nodeIdentifier(): string {

@@ -3,8 +3,8 @@ package org.lfdecentralizedtrust.splice.automation
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
-import org.lfdecentralizedtrust.splice.store.{StoreErrors, StoreTest}
-import com.digitalasset.canton.concurrent.FutureSupervisor
+import org.lfdecentralizedtrust.splice.store.{StoreErrors, StoreTestBase}
+import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.resource.DbStorage
@@ -22,7 +22,7 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import scala.concurrent.Future
 
 class SqlIndexInitializationTriggerStoreTest
-    extends StoreTest
+    extends StoreTestBase
     with HasExecutionContext
     with StoreErrors
     with HasActorSystem
@@ -192,7 +192,7 @@ class SqlIndexInitializationTriggerStoreTest
               end;
               $$$$ language plpgsql immutable;
               """,
-            "insert test data",
+            "create slow_function",
           )
           .failOnShutdown
         _ <- storage.underlying
@@ -205,6 +205,9 @@ class SqlIndexInitializationTriggerStoreTest
                 // 'create index concurrently' internally consists of 3 transactions: one to register the index as invalid,
                 // and two table scans to build the index. Aborting the statement will leave the index in an invalid state.
                 sqlu"create index concurrently if not exists test_index on active_parties (slow_function(party))",
+                // `set statement_timeout` lasts for the whole session, and we are using connection pools,
+                // so reset it to default to avoid affecting later statements.
+                sqlu"set statement_timeout to default",
               )
               .asTry,
             "insert test data",
@@ -247,6 +250,93 @@ class SqlIndexInitializationTriggerStoreTest
         indexNamesAfter <- listIndexNames()
       } yield {
         indexNamesAfter should contain("test_index")
+      }
+    }
+
+    "avoid deleting index that is being created" in {
+      val trigger = new SqlIndexInitializationTrigger(
+        storage = storage,
+        context = triggerContext,
+        indexActions = List(
+          IndexAction.Create(
+            "test_index",
+            sqlu"create index concurrently if not exists test_index on active_parties (closed_round)",
+          )
+        ),
+      )
+      // Too annoying to get this value out of Future.sequence below, so we use a var
+      var tasksResult: Option[Seq[SqlIndexInitializationTrigger.Task]] = None
+      for {
+        _ <- Future.unit
+        _ <- storage.underlying
+          .update(
+            DBIOAction
+              .seq(
+                sqlu"""
+                  insert into active_parties (store_id, party, closed_round)
+                  values (1, 'test_party', 1)
+                """,
+                sqlu"""
+                  insert into active_parties (store_id, party, closed_round)
+                  values (2, 'test_party2', 1)
+                """,
+              ),
+            "insert test data",
+          )
+          .failOnShutdown
+        _ <- storage.underlying
+          .update(
+            sqlu"""
+              create or replace function slow_function(text) returns text as $$$$
+              begin
+                  perform pg_sleep(2); -- simulate a long-running operation
+                  return $$1;
+              end;
+              $$$$ language plpgsql immutable;
+              """,
+            "create slow_function",
+          )
+          .failOnShutdown
+
+        // This block simulates a trigger checking for tasks while an index is being created.
+        // We run the following actions in parallel to achieve this:
+        // - Create an index using slow_function(), which takes 4 seconds in total
+        //   (2 rows in the table and 2 seconds per function invocation).
+        // - Wait 2 seconds, then have the trigger check for tasks.
+        _ <- Future.sequence(
+          Seq(
+            storage.underlying
+              .update(
+                DBIOAction
+                  .seq(
+                    // This statement will take 4sec to execute, because slow_function() takes 2 seconds to execute per row,
+                    // and there are 2 rows in the table.
+                    sqlu"create index concurrently if not exists test_index on active_parties (slow_function(party))",
+                    // `set statement_timeout` lasts for the whole session, and we are using connection pools,
+                    // so reset it to default to avoid affecting later statements.
+                    sqlu"set statement_timeout to default",
+                  )
+                  .asTry,
+                "insert test data",
+              )
+              .failOnShutdown,
+            loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+              within = {
+                Threading.sleep(2000)
+                trigger.retrieveTasks().map(tasks => tasksResult = Some(tasks))
+              },
+              assertion = { entries =>
+                forExactly(1, entries) {
+                  _.message should include(
+                    "Index test_index is being built by backend process"
+                  )
+                }
+              },
+            ),
+          )
+        )
+      } yield {
+        tasksResult.value shouldBe empty
       }
     }
   }
@@ -330,5 +420,7 @@ class SqlIndexInitializationTriggerStoreTest
     _ <- dropIndexes(
       SqlIndexInitializationTrigger.defaultIndexActions.map(_.indexName) ++ Seq("test_index")
     )
+    // Need to drop this after dropping the indexes using it.
+    _ <- storage.update(sqlu"drop function if exists slow_function", "drop slow_function")
   } yield ()
 }

@@ -58,11 +58,24 @@ on:
         required: false
         type: boolean
         default: false
+      postgres_image:
+        description: "The image to use for PostgreSQL"
+        required: false
+        type: string
+        default: "postgres:17"
+      postgres_init_args:
+        description: "Additional arguments to pass to Postgres on initialization via POSTGRES_INITDB_ARGS"
+        required: false
+        type: string
+        default: "-c max_connections=16000"
 
 jobs:
 
   split_tests:
-    runs-on: ubuntu-24.04
+    # required to have access to the /cache directory to read test-reports
+    runs-on: self-hosted-k8s-small
+    container:
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
     name: Split the tests into parallel runs
     outputs:
       indices: ${{ steps.prep.outputs.indices }}
@@ -90,7 +103,7 @@ jobs:
   scala_test:
     runs-on: ${{ inputs.runs_on }}
     name: ${{ inputs.test_name }} (${{ matrix.runner-index }})
-    timeout-minutes: 45
+    timeout-minutes: 60 # TODO(#3013): Investigate, and reduce back
     permissions:
       id-token: write # Required for GCP Workload Identity for failure notifications
       contents: read
@@ -106,9 +119,10 @@ jobs:
 
     services:
       postgres:
-        image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-postgres:0.3.12
+        image: ${{ inputs.postgres_image }}
         env:
           POSTGRES_PASSWORD: postgres
+          POSTGRES_INITDB_ARGS: ${{ inputs.postgres_init_args }}
 
     steps:
 

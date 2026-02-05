@@ -23,7 +23,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
   // Note: Update actions must be idempotent. To avoid manually constructing a 'INSERT ... ON UPDATE DO NOTHING' statement,
   // we first check whether the target row exists in a separate statement. This is good enough for tests that perform
   // all database operations sequentially.
-  protected def insertRowIfNotExists[E <: slick.lifted.AbstractTable[_]](
+  protected def insertRowIfNotExists[E <: slick.lifted.AbstractTable[?]](
       table: TableQuery[E]
   )(
       filter: E => Rep[Boolean],
@@ -62,6 +62,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
         for {
           _ <- debugPrintPgActivity()
           _ <- sql"""TRUNCATE
+                active_parties,
                 user_wallet_acs_store,
                 user_wallet_acs_interface_views,
                 user_wallet_txlog_store,
@@ -78,6 +79,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
                 store_last_ingested_offsets,
                 round_totals,
                 round_party_totals,
+                round_total_amulet_balance,
                 update_history_descriptors,
                 update_history_last_ingested_offsets,
                 update_history_transactions,
@@ -89,7 +91,8 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
                 acs_snapshot_data,
                 acs_snapshot,
                 scan_verdict_store,
-                scan_verdict_transaction_view_store
+                scan_verdict_transaction_view_store,
+                key_value_store
             RESTART IDENTITY CASCADE""".asUpdate
           _ <- debugPrintPgActivity()
         } yield (),

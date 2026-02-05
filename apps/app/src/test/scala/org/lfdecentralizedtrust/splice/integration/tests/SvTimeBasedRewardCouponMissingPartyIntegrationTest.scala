@@ -70,7 +70,7 @@ class SvTimeBasedRewardCouponMissingPartyIntegrationTest
 
             eventually() {
               clue("No SvRewardCoupon should be issued") {
-                advanceRoundsByOneTick
+                advanceRoundsToNextRoundOpening
                 sv1RewardCouponTrigger.runOnce().futureValue
                 eventually() {
                   val openRounds = sv1ScanBackend

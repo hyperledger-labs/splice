@@ -34,6 +34,7 @@ export interface DsoInfo {
 function encodeSvUiState(uiState: DsoInfo): unknown {
   return {
     ...uiState,
+    votingThreshold: uiState.votingThreshold.toString(),
     amuletRules: Contract.encode(AmuletRules, uiState.amuletRules),
     dsoRules: Contract.encode(DsoRules, uiState.dsoRules),
     nodeStates: uiState.nodeStates.map(c => Contract.encode(SvNodeState, c)),

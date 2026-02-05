@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   SequencerAdminConnection,
 }
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
+import org.lfdecentralizedtrust.splice.util.{DomainRecordTimeRange, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, SyncCloseable}
@@ -24,14 +24,25 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.jdk.DurationConverters.*
 import io.grpc.Status
+import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.{
+  BackfillingScanConnection,
+  ScanConnection,
+}
+import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.sv.config.SvScanConfig
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** A trigger to periodically call the sequencer pruning command
   */
 class SequencerPruningTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
+    scanConfig: SvScanConfig,
+    upgradesConfig: UpgradesConfig,
     sequencerAdminConnection: SequencerAdminConnection,
     mediatorAdminConnection: MediatorAdminConnection,
     clock: Clock,
@@ -39,19 +50,38 @@ class SequencerPruningTrigger(
     participantAdminConnection: ParticipantAdminConnection,
     migrationId: Long,
 )(implicit
-    override val ec: ExecutionContext,
+    override val ec: ExecutionContextExecutor,
     override val tracer: Tracer,
+    mat: Materializer,
+    httpClient: HttpClient,
+    templateDecoder: TemplateJsonDecoder,
 ) extends PollingTrigger {
   val pruningMetrics = new SequencerPruningMetrics(
     context.metricsFactory
   )
 
+  // Similar to PublishScanConfigTrigger, this class creates its own scan connection
+  // on demand, because scan might not be available at application startup.
+  private def createScanConnection()(implicit
+      tc: TraceContext
+  ): Future[BackfillingScanConnection] =
+    ScanConnection
+      .singleUncached(
+        ScanAppClientConfig(NetworkAppClientConfig(scanConfig.internalUrl)),
+        upgradesConfig,
+        clock,
+        context.retryProvider,
+        loggerFactory,
+        retryConnectionOnInitialFailure = true,
+      )
+
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
     for {
       synchronizerId <- sequencerAdminConnection.getStatus.map(_.trySuccess.synchronizerId)
-      recordTimeRangeO <- store.updateHistory
-        .getRecordTimeRange(migrationId)
-        .map(_.get(synchronizerId))
+      scanConnection <- createScanConnection()
+      recordTimeRangeO <- scanConnection
+        .getMigrationInfo(migrationId)
+        .map(_.flatMap(_.recordTimeRange.get(synchronizerId.logical)))
       _ <- recordTimeRangeO match {
         case Some(DomainRecordTimeRange(earliest, latest))
             if (latest - earliest).compareTo(retentionPeriod.asJava) > 0 =>
@@ -70,9 +100,9 @@ class SequencerPruningTrigger(
               Future.unit
             } { _ =>
               {
-                logger.debug("Attempt pruning our sequencer...")
+                logger.info("Attempt pruning our sequencer...")
                 prune().map { prunedResult =>
-                  logger.debug(s"Completed pruning our sequencer with result: $prunedResult")
+                  logger.info(s"Completed pruning our sequencer with result: $prunedResult")
                 }
               }
             }

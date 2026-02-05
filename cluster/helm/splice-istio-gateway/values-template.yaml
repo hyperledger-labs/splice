@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
-defaultJvmOptions: -Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data
 cometbftPorts:
   nodes: 10
   domains: 5

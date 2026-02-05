@@ -47,6 +47,8 @@ sealed abstract class HashAlgorithm(val name: String, val index: Long, val lengt
   def toProtoEnum: v30.HashAlgorithm
 
   override protected def pretty: Pretty[HashAlgorithm] = prettyOfString(_.name)
+
+  private[crypto] def internalBlockSizeInBytes: Int
 }
 
 object HashAlgorithm {
@@ -62,6 +64,8 @@ object HashAlgorithm {
 
   case object Sha256 extends HashAlgorithm("SHA-256", 0x12, 32) {
     override def toProtoEnum: v30.HashAlgorithm = v30.HashAlgorithm.HASH_ALGORITHM_SHA256
+
+    override private[crypto] def internalBlockSizeInBytes: Int = 64
   }
 
   def lookup(index: Long, length: Long): Either[String, HashAlgorithm] =
@@ -87,8 +91,10 @@ object HashAlgorithm {
     }
 }
 
-final case class Hash private (private val hash: ByteString, private val algorithm: HashAlgorithm)
-    extends HasCryptographicEvidence
+final case class Hash private (
+    private val hash: ByteString,
+    private[crypto] val algorithm: HashAlgorithm,
+) extends HasCryptographicEvidence
     with Ordered[Hash]
     with PrettyPrinting {
 
@@ -162,7 +168,7 @@ object Hash {
       s"Size of given hash ${hash.size()} does not match expected size ${algorithm.length} for ${algorithm.name}",
     )
 
-  private def tryFromByteString(bytes: ByteString): Hash =
+  def tryFromByteString(bytes: ByteString): Hash =
     fromByteString(bytes).valueOr(err =>
       throw new IllegalArgumentException(s"Failed to deserialize hash from $bytes: $err")
     )

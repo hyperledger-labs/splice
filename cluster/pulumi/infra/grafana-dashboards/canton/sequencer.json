@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4663,
+  "id": 19525,
   "links": [],
   "panels": [
     {
@@ -49,7 +49,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -72,9 +73,7 @@
         "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -82,7 +81,7 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -155,7 +154,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -175,10 +175,7 @@
       "id": 3,
       "options": {
         "legend": {
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ],
+          "calcs": ["lastNotNull", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
@@ -191,7 +188,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -212,6 +209,103 @@
       ],
       "title": "Number of active subscriptions",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "rate(daml_cache_misses{namespace=~\"$namespace\", cache=\"events-fan-out-buffer\"}[$__rate_interval]) > 0",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "outside buffer {{namespace}} {{subscriber}}",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Subscriber cache misses",
+      "type": "timeseries"
     }
   ],
   "preload": false,
@@ -221,12 +315,8 @@
     "list": [
       {
         "current": {
-          "text": [
-            "sv-1"
-          ],
-          "value": [
-            "sv-1"
-          ]
+          "text": ["All"],
+          "value": ["$__all"]
         },
         "definition": "label_values(daml_sequencer_public_api_subscriptions,namespace)",
         "includeAll": true,
@@ -249,7 +339,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Sequencer Subscriptions",
   "uid": "685922ac-4aca-4b28-a1a1-4375a93a514c",
   "version": 3

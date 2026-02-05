@@ -5,6 +5,7 @@ package com.digitalasset.canton.synchronizer.sequencer.block
 
 import cats.data.EitherT
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.sequencer.admin.v30
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.synchronizer.block.{
@@ -12,7 +13,7 @@ import com.digitalasset.canton.synchronizer.block.{
   SequencerDriver,
   SequencerDriverHealthStatus,
 }
-import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedOrderingRequest
+import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SenderSigned
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.ServerServiceDefinition
@@ -37,13 +38,13 @@ class DriverBlockOrderer(
     driver.subscribe()
 
   override def send(
-      signedOrderingRequest: SignedOrderingRequest
+      signedSubmissionRequest: SenderSigned[SubmissionRequest]
   )(implicit traceContext: TraceContext): EitherT[Future, SequencerDeliverError, Unit] = {
-    val submissionRequest = signedOrderingRequest.content.content.content
+    val submissionRequest = signedSubmissionRequest.content
     // The driver API doesn't provide error reporting, so we don't attempt to translate the exception
     EitherT.right(
       driver.send(
-        signedOrderingRequest = signedOrderingRequest.toByteString,
+        signedOrderingRequest = signedSubmissionRequest.toByteString,
         submissionId = submissionRequest.messageId.toProtoPrimitive,
         senderId = submissionRequest.sender.toProtoPrimitive,
       )
@@ -69,4 +70,14 @@ class DriverBlockOrderer(
       timestamp: CantonTimestamp
   ): EitherT[Future, SequencerError, Option[v30.BftSequencerSnapshotAdditionalInfo]] =
     EitherT.rightT(None)
+
+  override def sequencingTime(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[CantonTimestamp]] =
+    FutureUnlessShutdown.outcomeF(
+      driver.sequencingTime.map(t =>
+        t.map(CantonTimestamp.fromProtoPrimitive)
+          .map(_.fold(e => throw new RuntimeException(e.message), identity))
+      )
+    )
 }

@@ -48,7 +48,7 @@ object PasswordBasedEncrypted extends HasVersionedMessageCompanion[PasswordBased
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
       supportedProtoVersion(v30.PasswordBasedEncrypted)(fromProtoV30),
       _.toProtoV30,
     )
@@ -172,6 +172,13 @@ object PbkdfScheme {
 sealed trait PasswordBasedEncryptionError extends Product with Serializable with PrettyPrinting
 
 object PasswordBasedEncryptionError {
+
+  final case class KeyCreationError(error: EncryptionKeyCreationError)
+      extends PasswordBasedEncryptionError {
+    override protected def pretty: Pretty[KeyCreationError] = prettyOfClass(
+      unnamedParam(_.error)
+    )
+  }
 
   final case class DecryptError(error: DecryptionError) extends PasswordBasedEncryptionError {
     override protected def pretty: Pretty[DecryptError] = prettyOfClass(

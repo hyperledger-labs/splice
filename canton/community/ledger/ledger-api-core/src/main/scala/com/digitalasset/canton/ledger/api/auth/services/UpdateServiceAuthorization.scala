@@ -8,16 +8,11 @@ import com.daml.ledger.api.v2.update_service.UpdateServiceGrpc.UpdateService
 import com.digitalasset.canton.auth.{Authorizer, RequiredClaim}
 import com.digitalasset.canton.ledger.api.ProxyCloseable
 import com.digitalasset.canton.ledger.api.auth.RequiredClaims
-import com.digitalasset.canton.ledger.api.auth.services.UpdateServiceAuthorization.{
-  getTransactionByIdClaims,
-  getTransactionByOffsetClaims,
-  getUpdatesClaims,
-}
+import com.digitalasset.canton.ledger.api.auth.services.UpdateServiceAuthorization.getUpdatesClaims
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import io.grpc.ServerServiceDefinition
 import io.grpc.stub.StreamObserver
 
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 final class UpdateServiceAuthorization(
@@ -38,47 +33,6 @@ final class UpdateServiceAuthorization(
     authorizer.stream(service.getUpdates)(
       getUpdatesClaims(request)*
     )(request, responseObserver)
-
-  @nowarn("cat=deprecation")
-  override def getUpdateTrees(
-      request: GetUpdatesRequest,
-      responseObserver: StreamObserver[GetUpdateTreesResponse],
-  ): Unit =
-    authorizer.stream(service.getUpdateTrees)(
-      getUpdatesClaims(request)*
-    )(request, responseObserver)
-
-  @nowarn("cat=deprecation")
-  override def getTransactionTreeByOffset(
-      request: GetTransactionByOffsetRequest
-  ): Future[GetTransactionTreeResponse] =
-    authorizer.rpc(service.getTransactionTreeByOffset)(
-      RequiredClaims.readAsForAllParties[GetTransactionByOffsetRequest](request.requestingParties)*
-    )(request)
-
-  @nowarn("cat=deprecation")
-  override def getTransactionTreeById(
-      request: GetTransactionByIdRequest
-  ): Future[GetTransactionTreeResponse] =
-    authorizer.rpc(service.getTransactionTreeById)(
-      RequiredClaims.readAsForAllParties[GetTransactionByIdRequest](request.requestingParties)*
-    )(request)
-
-  @nowarn("cat=deprecation")
-  override def getTransactionByOffset(
-      request: GetTransactionByOffsetRequest
-  ): Future[GetTransactionResponse] =
-    authorizer.rpc(service.getTransactionByOffset)(
-      getTransactionByOffsetClaims(request)*
-    )(request)
-
-  @nowarn("cat=deprecation")
-  override def getTransactionById(
-      request: GetTransactionByIdRequest
-  ): Future[GetTransactionResponse] =
-    authorizer.rpc(service.getTransactionById)(
-      getTransactionByIdClaims(request)*
-    )(request)
 
   override def getUpdateByOffset(
       request: GetUpdateByOffsetRequest
@@ -101,31 +55,8 @@ final class UpdateServiceAuthorization(
 
 object UpdateServiceAuthorization {
 
-  @nowarn("cat=deprecation")
   def getUpdatesClaims(request: GetUpdatesRequest): List[RequiredClaim[GetUpdatesRequest]] =
     request.updateFormat.toList.flatMap(
       RequiredClaims.updateFormatClaims[GetUpdatesRequest]
-    ) ::: request.filter.toList.flatMap(RequiredClaims.transactionFilterClaims[GetUpdatesRequest])
-
-  @nowarn("cat=deprecation")
-  def getTransactionByOffsetClaims(
-      request: GetTransactionByOffsetRequest
-  ): List[RequiredClaim[GetTransactionByOffsetRequest]] =
-    request.transactionFormat.toList
-      .flatMap(
-        RequiredClaims.transactionFormatClaims[GetTransactionByOffsetRequest]
-      ) ::: RequiredClaims.readAsForAllParties[GetTransactionByOffsetRequest](
-      request.requestingParties
-    )
-
-  @nowarn("cat=deprecation")
-  def getTransactionByIdClaims(
-      request: GetTransactionByIdRequest
-  ): List[RequiredClaim[GetTransactionByIdRequest]] =
-    request.transactionFormat.toList
-      .flatMap(
-        RequiredClaims.transactionFormatClaims[GetTransactionByIdRequest]
-      ) ::: RequiredClaims.readAsForAllParties[GetTransactionByIdRequest](
-      request.requestingParties
     )
 }

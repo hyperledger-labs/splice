@@ -7,7 +7,6 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
-import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultIssuanceCurve
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, TimeTestUtil, WalletTestUtil}
 
 import scala.util.Try
@@ -75,6 +74,9 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
       aliceWalletClient.tap(3)
     }
 
+    // advance rounds for the reward triggers to run
+    advanceTimeForRewardAutomationToRunForCurrentRound
+
     // TODO(DACH-NY/canton-network-node#2930): Since we are reporting in getRoundOfLatestData() only the latest round that is aggregated (fully closed),
     // we must advance rounds until round 3 closes, which is the first round that sv2's scan is guaranteed to have seen.
     (firstOpenRound.payload.round.number.toInt to (firstOpenRound.payload.round.number.toInt + 6))
@@ -97,7 +99,7 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
           }
         }
 
-        advanceRoundsByOneTick
+        advanceRoundsToNextRoundOpening
 
         val roundForWhichCouponsAreNowRedeemed = n.toLong - 2
         if (roundForWhichCouponsAreNowRedeemed >= 0) {
@@ -136,39 +138,6 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
     }
 
     val validatorLivenessActivityRecordAmount = 2.85
-    clue("Aggregated total amulet balance on both scan apps should match") {
-      val svRewardPerRound =
-        BigDecimal(
-          computeSvRewardInRound0(
-            defaultIssuanceCurve.initialValue,
-            defaultTickDuration,
-            dsoSize = 2,
-          )
-        )
-      forEvery(
-        Table(
-          ("round", "total floor", "total ceiling"),
-          // Alice has 23 USD in Amulet, Bob has 3 USD, all minus holding fees
-          (2L, walletUsdToAmulet(25.9), walletUsdToAmulet(26.0)),
-          // sv2 did not start up it's validator app (thus wallet), so it won't claim any coupons.
-          (
-            3L,
-            // validator liveness activity record: SV1, Alice, Bob
-            walletUsdToAmulet(
-              26.0 + validatorLivenessActivityRecordAmount * 3 - smallAmount
-            ) + svRewardPerRound,
-            walletUsdToAmulet(26.0 + validatorLivenessActivityRecordAmount * 3) + svRewardPerRound,
-          ),
-        )
-      ) { (round, floor, ceil) =>
-        val total1 =
-          sv1ScanBackend.getTotalAmuletBalance(round).valueOrFail("Amulet balance not yet computed")
-        val total2 =
-          sv2ScanBackend.getTotalAmuletBalance(round).valueOrFail("Amulet balance not yet computed")
-        total1 shouldBe total2
-        total1 should beWithin(floor, ceil)
-      }
-    }
 
     clue("Aggregated rewards collected on both scan apps should match") {
       forEvery(

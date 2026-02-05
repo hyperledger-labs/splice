@@ -6,16 +6,19 @@ package com.digitalasset.canton.integration.tests.sequencer.reference
 import com.digitalasset.canton.MockedNodeParameters
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.PositiveDouble
-import com.digitalasset.canton.config.{ProcessingTimeout, SessionSigningKeysConfig, StorageConfig}
+import com.digitalasset.canton.config.{ProcessingTimeout, StorageConfig}
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
-import com.digitalasset.canton.synchronizer.block.SequencerDriver
+import com.digitalasset.canton.synchronizer.block.{AsyncWriterParameters, SequencerDriver}
 import com.digitalasset.canton.synchronizer.metrics.SequencerTestMetrics
 import com.digitalasset.canton.synchronizer.sequencer.block.DriverBlockSequencerFactory
-import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameters
+import com.digitalasset.canton.synchronizer.sequencer.config.{
+  SequencerNodeParameterConfig,
+  SequencerNodeParameters,
+}
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerTrafficConfig
 import com.digitalasset.canton.synchronizer.sequencer.{
   BlockSequencerConfig,
@@ -35,7 +38,6 @@ class ReferenceSequencerApiTest extends SequencerApiTest with RateLimitManagerTe
     val storage = createStorage()
     val params = createSynchronizerNodeParameters()
     clock = createClock()
-    driverClock = createClock()
 
     val factory =
       DriverBlockSequencerFactory.getFactory(
@@ -54,13 +56,13 @@ class ReferenceSequencerApiTest extends SequencerApiTest with RateLimitManagerTe
 
     factory
       .create(
-        synchronizerId,
-        SequencerId(synchronizerId.uid),
+        SequencerId(psid.uid),
         clock,
-        driverClock,
         crypto,
         FutureSupervisor.Noop,
         SequencerTrafficConfig(),
+        sequencingTimeLowerBoundExclusive =
+          SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
         runtimeReady = FutureUnlessShutdown.unit,
       )
       .futureValueUS
@@ -79,12 +81,12 @@ class ReferenceSequencerApiTest extends SequencerApiTest with RateLimitManagerTe
         ProcessingTimeout()
       ),
       protocol = CantonNodeParameters.Protocol.Impl(
-        sessionSigningKeys = SessionSigningKeysConfig.disabled,
         alphaVersionSupport = false,
         betaVersionSupport = true,
         dontWarnOnDeprecatedPV = false,
       ),
       maxConfirmationRequestsBurstFactor = PositiveDouble.tryCreate(1.0),
+      asyncWriter = AsyncWriterParameters(),
     )
 
   "Reference sequencer" when runSequencerApiTests()

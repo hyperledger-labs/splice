@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.validator.config
 
+import cats.data.NonEmptyList
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.config.*
@@ -97,6 +98,7 @@ case class ValidatorDecentralizedSynchronizerConfig(
       */
     trafficBalanceCacheTimeToLive: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(1),
+    trustedSynchronizerConfig: Option[ValidatorTrustedSynchronizerConfig] = None,
 ) {
 
   /** Converts the reservedTraffic into an Option that is set to None if the validator is not
@@ -105,6 +107,18 @@ case class ValidatorDecentralizedSynchronizerConfig(
   lazy val reservedTrafficO: Option[NonNegativeLong] =
     if (buyExtraTraffic.targetThroughput.value <= 0L) None else Some(reservedTraffic)
 }
+
+case class ValidatorTrustedSynchronizerConfig(
+    /** static list of trusted sequencer names to connect to.
+      * svNames is mutually exclusive with `url`.
+      */
+    svNames: NonEmptyList[String],
+
+    /** parameter to specify the BFT threshold for the domain connections.
+      * If not specified, f +1 will be used.
+      */
+    threshold: Int,
+)
 
 // Validators are responsible for establishing connections to domains and so need more information than just a `SynchronizerConfig`
 case class ValidatorExtraSynchronizerConfig(
@@ -125,17 +139,6 @@ final case class MigrateValidatorPartyConfig(
     // if it is not set, it will get the list of parties from the participant
     // otherwise, it will be used to filter the list of parties to migrate
     partiesToMigrate: Option[Seq[String]] = None,
-)
-
-/** The schedule is specified in cron format and "max_duration" and "retention" durations. The cron string indicates
-  *      the points in time at which pruning should begin in the GMT time zone, and the maximum duration indicates how
-  *      long from the start time pruning is allowed to run as long as pruning has not finished pruning up to the
-  *      specified retention period.
-  */
-final case class ParticipantPruningConfig(
-    cron: String,
-    maxDuration: PositiveDurationSeconds,
-    retention: PositiveDurationSeconds,
 )
 
 case class ValidatorAppBackendConfig(
@@ -188,13 +191,13 @@ case class ValidatorAppBackendConfig(
     // so it can produce a more recent acknowledgement.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(30),
-    // If observation latency is set to 5s, time proofs will be created 5s in the future so if a node receives an event within those 5s
+    // If observation latency is set to 10s, time proofs will be created 10s in the future so if a node receives an event within those 10s
     // it will never send a time proof.
     timeTrackerObservationLatency: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofSeconds(5),
+      NonNegativeFiniteDuration.ofSeconds(10),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[ValidatorCantonIdentifierConfig] = None,
-    participantPruningSchedule: Option[ParticipantPruningConfig] = None,
+    participantPruningSchedule: Option[PruningConfig] = None,
     deduplicationDuration: PositiveDurationSeconds = PositiveDurationSeconds.ofHours(24),
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
@@ -209,6 +212,7 @@ case class ValidatorAppBackendConfig(
     maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(24),
     // `latestPackagesOnly=true` is intended for LocalNet testing only and is not supported in production
     latestPackagesOnly: Boolean = false,
+    acsStoreDescriptorUserVersion: Option[Long] = None,
 ) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

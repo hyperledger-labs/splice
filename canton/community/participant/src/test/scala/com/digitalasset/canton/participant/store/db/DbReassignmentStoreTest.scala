@@ -6,15 +6,14 @@ package com.digitalasset.canton.participant.store.db
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.BatchingConfig
-import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.store.ReassignmentStoreTest
+import com.digitalasset.canton.protocol.ExampleContractFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
 import com.digitalasset.canton.store.memory.InMemoryIndexedStringStore
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag
-import com.digitalasset.canton.util.ReassignmentTag.Target
 import org.scalatest.wordspec.AsyncWordSpec
 
 trait DbReassignmentStoreTest extends AsyncWordSpec with BaseTest with ReassignmentStoreTest {
@@ -36,8 +35,6 @@ trait DbReassignmentStoreTest extends AsyncWordSpec with BaseTest with Reassignm
         storage,
         ReassignmentTag.Target(synchronizerId),
         indexStore,
-        Target(testedProtocolVersion),
-        new SymbolicPureCrypto,
         futureSupervisor,
         exitOnFatalFailures = true,
         BatchingConfig(),
@@ -45,6 +42,21 @@ trait DbReassignmentStoreTest extends AsyncWordSpec with BaseTest with Reassignm
         loggerFactory,
       )
     )
+  }
+
+}
+
+class DbContractsTest extends AsyncWordSpec with BaseTest {
+  import DbReassignmentStore.DbContracts
+
+  "DbContracts" should {
+    "roundTrip" in {
+      val contract = ExampleContractFactory.build()
+
+      DbContracts.tryDeserializeOne(
+        DbContracts.serializeOne(contract)
+      ) shouldBe contract
+    }
   }
 }
 

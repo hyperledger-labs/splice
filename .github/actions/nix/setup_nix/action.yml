@@ -7,10 +7,18 @@ inputs:
   artifactory_password:
     description: "The Artifactory password"
     required: true
-  oss_only:
-    description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)"
-    default: "false"
+  nix_path:
+    description: "The path to nix flake directory"
     required: false
+    default: ${{ format('{0}/nix', github.repository == 'hyperledger-labs/splice' && '.' || 'splice') }}
+  target:
+    description: "Choose nix target: oss - restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts), static_tests - for static tests, default - for enterprise dependencies"
+    type: choice
+    options:
+      - oss
+      - default
+      - static_tests
+    required: true
   cache_version:
     description: "The cache version"
     required: true
@@ -38,17 +46,24 @@ runs:
       shell: bash
       run: |
         set -euxo pipefail
-        git ls-files nix/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
+        NIX_BINARY_VERSION=2.32.1
+        echo "NIX_BINARY_VERSION=$NIX_BINARY_VERSION" >> $GITHUB_ENV
+        cat ${{ inputs.nix_path }}/canton-sources.json
+        git ls-files ${{ inputs.nix_path }}/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
         uname -m >> /tmp/nix-cache-key # Add architecture to the cache key
         echo "gh_cache_version: ${{ inputs.cache_version }}" >> /tmp/nix-cache-key # Add cache version to the cache key
-        if [ "${{ inputs.oss_only }}" == true ]; then
+        echo "home: $HOME" >> /tmp/nix-cache-key # important when restoring simlinks from cache, apparently
+        echo "nix binary version: $NIX_BINARY_VERSION" >> /tmp/nix-cache-key # different nix versions might behave differently and corrupt the caches
+        echo "target: ${{ inputs.target }}" >> /tmp/nix-cache-key
+        if [ "${{ inputs.target }}" != 'default' ]; then
           echo "Using OSS only dependencies"
-          echo "oss_only: ${{ inputs.oss_only }}" >> /tmp/nix-cache-key
-          touch /tmp/oss-only # Create a file to indicate that we are using OSS only dependencies (so we don't need to re-specifify oss_only to run_bash_command_in_nix)
         fi
         cat /tmp/nix-cache-key
         cache_key=($(md5sum "/tmp/nix-cache-key"))
         echo "cache_key=$cache_key" >> $GITHUB_ENV
+
+        echo ${{ inputs.target }} > /tmp/nix_target # Create a file to indicate which target are we using (so we don't need to re-specifify target to run_bash_command_in_nix)
+        echo ${{ inputs.nix_path }} > /tmp/nix_path # Create a file to indicate where the nix config is (so we don't need to re-specifify nix_path to run_bash_command_in_nix)
 
     - name: Download cache (for non-self-hosted)
       if: ${{ !startsWith(runner.name, 'self-hosted') }}
@@ -56,7 +71,7 @@ runs:
       run: |
         set -euxo pipefail
 
-        if [ ${{ inputs.oss_only }} != 'true' ]; then
+        if [[ ${{ inputs.target }} == 'default' ]]; then
           echo "Must use OSS only dependencies in GitHub-hosted runners"
           exit 1
         fi
@@ -64,15 +79,18 @@ runs:
         echo "Latest nix cache:"
 
         wget -q "https://storage.googleapis.com/splice-nix-cache-public/${cache_key}.tar.gz" -O cache.tar.gz || true
-        if [ ! -s cache.tar.gz ]; then
-          echo "Cache not found, fetching latest instead"
-          latest=$(curl https://storage.googleapis.com/storage/v1/b/splice-nix-cache-public/o | jq -r '.items | sort_by(.updated) | .[-1].name')
-          wget -q "https://storage.googleapis.com/splice-nix-cache-public/${latest}" -O cache.tar.gz
-
-        fi
+        # TODO (#2663): restore this, keep in mind that caches from a different HOME dir will not work
+        # if [ ! -s cache.tar.gz ]; then
+          # echo "Cache not found, fetching latest instead"
+          # latest=$(curl https://storage.googleapis.com/storage/v1/b/splice-nix-cache-public/o | jq -r '.items | sort_by(.updated) | .[-1].name')
+          # wget -q "https://storage.googleapis.com/splice-nix-cache-public/${latest}" -O cache.tar.gz
+        # fi
 
         sudo mkdir -p /cache/nix/${cache_key}
-        sudo tar -xzf cache.tar.gz -C /cache/nix/${cache_key}
+
+        if [ -s cache.tar.gz ]; then
+          sudo tar -xzf cache.tar.gz -C /cache/nix/${cache_key}
+        fi
 
     - name: Restore nix
       id: restore_nix
@@ -86,8 +104,9 @@ runs:
           # we use rsync here because it's simply faster to install
           rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
           rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
-          rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
-          sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
+          # TODO (#2663): fix & uncomment these two lines
+          # rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
+          # sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
         else
           sudo mkdir -p "/cache/nix/$cache_key"
           sudo chown $(whoami):$(whoami) "/cache/nix/$cache_key"
@@ -106,30 +125,20 @@ runs:
           # 1. It doesn't work on CircleCI (sethostname is not allowed)
           # 2. We don't plan to build anything, so the risk is fairly low
           mkdir -p ~/.config/nix
-          if [ true ]; then
-            cat <<EOF > ~/.config/nix/nix.conf
-            sandbox = false
-            netrc-file = /etc/nix/netrc
-            extra-experimental-features = nix-command flakes
-            substituters = file:///cache/nix/binary_cache?trusted=1 https://cache.nixos.org/
-            trusted-substituters = file:///cache/nix/binary_cache?trusted=1
-            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
-            cores = 4
-            max-jobs = 16
+          cat <<EOF > ~/.config/nix/nix.conf
+          sandbox = false
+          netrc-file = /etc/nix/netrc
+          extra-experimental-features = nix-command flakes
+          substituters = file:///cache/nix/binary_cache?trusted=1 https://cache.nixos.org/
+          trusted-substituters = file:///cache/nix/binary_cache?trusted=1
+          trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+          cores = 4
+          max-jobs = 16
         EOF
-          else
-            cat <<EOF > ~/.config/nix/nix.conf
-            sandbox = false
-            netrc-file = /etc/nix/netrc
-            extra-experimental-features = nix-command flakes
-            cores = 4
-            max-jobs = 16
-        EOF
-          fi
-          sh <(curl -fsSL --retry 8 https://releases.nixos.org/nix/nix-2.13.3/install) --no-daemon
+          sh <(curl -fsSL --retry 8 "https://releases.nixos.org/nix/nix-$NIX_BINARY_VERSION/install") --no-daemon
           sudo mkdir -p /etc/nix
           sudo chmod a+rw /etc/nix
-          if [[ "${{ inputs.oss_only }}" == true ]]; then
+          if [[ "${{ inputs.target }}" != 'default' ]]; then
             echo "Using OSS only dependencies, not setting up Artifactory credentials"
           else
             cat <<EOF > /etc/nix/netrc
@@ -141,14 +150,7 @@ runs:
           export USER=$(whoami)
           echo "Running nix.sh"
           . ~/.nix-profile/etc/profile.d/nix.sh
-          if [[ "${{ inputs.oss_only }}" == true ]]; then
-            target="oss"
-          else
-            target="default"
-          fi
-          nix develop path:nix#${target} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
-          echo "Garbage collecting to reduce cache size"
-          nix-store --gc
+          nix develop path:${{ inputs.nix_path }}#${{ inputs.target }} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
         fi
 
     - name: Invoke nix before saving cache
@@ -176,6 +178,9 @@ runs:
           export USER=$(whoami)
           . ~/.nix-profile/etc/profile.d/nix.sh
 
+          echo "Garbage collecting to reduce cache size"
+          nix-store --gc
+
           nix copy --all --to 'file:///cache/nix/binary_cache?trusted=1' -v
 
           CLONE_COMMAND="rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=32 --transfers=32 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed --retries 10 copy"
@@ -187,7 +192,8 @@ runs:
 
           #requires to preserve read only during clone
           sudo ${CLONE_COMMAND} /nix/store/ /cache/nix/$cache_key/nix_store/store
-          sudo ${CLONE_COMMAND} /nix/var/ "/cache/nix/$cache_key/nix_store/var"
+          # TODO (#2663): fix & uncomment this line
+          # sudo ${CLONE_COMMAND} /nix/var/ "/cache/nix/$cache_key/nix_store/var"
 
           echo "done" > "/cache/nix/$cache_key/cached"
         fi

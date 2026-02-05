@@ -22,10 +22,8 @@ class AutomationControlIntegrationTest
       // start only sv1 but not sv2-4, to speed up the test
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // Very short round ticks
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-          _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
-        )(config)
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
       )
       // Start rounds trigger in paused state
       .addConfigTransforms((_, config) =>

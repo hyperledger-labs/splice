@@ -274,6 +274,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "4Gi"
+              }
             }
           }
         }
@@ -282,14 +287,6 @@
     "name": "canton-network",
     "provider": "",
     "type": "kubernetes:pulumi.com/v1:Stack"
-  },
-  {
-    "custom": true,
-    "id": "projects/test-project/global/networks/default",
-    "inputs": {},
-    "name": "default",
-    "provider": "",
-    "type": "gcp:compute/network:Network"
   },
   {
     "custom": true,
@@ -616,6 +613,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -900,6 +902,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "6Gi"
+              }
             }
           }
         }
@@ -908,6 +915,16 @@
     "name": "multi-validator",
     "provider": "",
     "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
   },
   {
     "custom": true,
@@ -1045,7 +1062,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.18"
+          "commit": "981227e62011e386cca3cdb5f00b472cf05a12c4"
         },
         "secretRef": {
           "name": "github"
@@ -1098,7 +1115,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.18"
+          "commit": "981227e62011e386cca3cdb5f00b472cf05a12c4"
         },
         "secretRef": {
           "name": "github"
@@ -1634,6 +1651,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -1918,6 +1940,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -2201,6 +2228,11 @@
                     }
                   }
                 ]
+              }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
               }
             }
           }
@@ -2498,6 +2530,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -2794,6 +2831,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -3078,6 +3120,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -3361,6 +3408,11 @@
                     }
                   }
                 ]
+              }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
               }
             }
           }
@@ -3658,6 +3710,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -3954,6 +4011,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -4240,6 +4302,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -4525,6 +4592,11 @@
                     }
                   }
                 ]
+              }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
               }
             }
           }
@@ -4824,6 +4896,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -5122,6 +5199,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -5407,6 +5489,11 @@
                     }
                   }
                 ]
+              }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
               }
             }
           }
@@ -5700,6 +5787,11 @@
                   }
                 ]
               }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
+              }
             }
           }
         }
@@ -5983,6 +6075,11 @@
                     }
                   }
                 ]
+              }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
               }
             }
           }
@@ -6275,6 +6372,11 @@
                     }
                   }
                 ]
+              }
+            },
+            "resources": {
+              "requests": {
+                "memory": "2Gi"
               }
             }
           }

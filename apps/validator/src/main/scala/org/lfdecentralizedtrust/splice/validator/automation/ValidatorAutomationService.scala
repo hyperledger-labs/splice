@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.config.{
   AutomationConfig,
+  EnabledFeaturesConfig,
   PeriodicBackupDumpConfig,
   SpliceParametersConfig,
 }
@@ -19,8 +20,8 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
+  UpdateHistory,
 }
-import org.lfdecentralizedtrust.splice.util.QualifiedName
 import org.lfdecentralizedtrust.splice.validator.domain.DomainConnector
 import org.lfdecentralizedtrust.splice.validator.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
@@ -35,7 +36,7 @@ import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -59,7 +60,8 @@ class ValidatorAutomationService(
     domainUnpausedSync: DomainUnpausedSynchronization,
     walletManagerOpt: Option[UserWalletManager], // None when config.enableWallet=false
     store: ValidatorStore,
-    storage: Storage,
+    val updateHistory: UpdateHistory,
+    storage: DbStorage,
     scanConnection: BftScanConnection,
     ledgerClient: SpliceLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
@@ -75,6 +77,7 @@ class ValidatorAutomationService(
     maxVettingDelay: NonNegativeFiniteDuration,
     params: SpliceParametersConfig,
     latestPackagesOnly: Boolean,
+    enabledFeatures: EnabledFeaturesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -93,6 +96,20 @@ class ValidatorAutomationService(
   override def companion
       : org.lfdecentralizedtrust.splice.validator.automation.ValidatorAutomationService.type =
     ValidatorAutomationService
+
+  registerUpdateHistoryIngestion(updateHistory)
+
+  automationConfig.topologyMetricsPollingInterval.foreach(topologyPollingInterval =>
+    registerTrigger(
+      new TopologyMetricsTrigger(
+        triggerContext
+          .focus(_.config.pollingInterval)
+          .replace(topologyPollingInterval),
+        scanConnection,
+        participantAdminConnection,
+      )
+    )
+  )
 
   walletManagerOpt.foreach { walletManager =>
     registerTrigger(
@@ -210,6 +227,7 @@ class ValidatorAutomationService(
         domainConnector,
         sequencerSubmissionAmplificationPatience,
         initialSynchronizerTime,
+        newSequencerConnectionPool = enabledFeatures.newSequencerConnectionPool,
       )
     )
 
@@ -254,6 +272,7 @@ class ValidatorAutomationService(
           participantAdminConnection,
           path,
           scanConnection,
+          enabledFeatures,
         )
       )
     }
@@ -268,7 +287,5 @@ class ValidatorAutomationService(
 }
 
 object ValidatorAutomationService extends AutomationServiceCompanion {
-  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] = None
-
   override protected[this] def expectedTriggerClasses: Seq[Nothing] = Seq.empty
 }

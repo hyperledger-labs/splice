@@ -64,6 +64,7 @@ trait AmuletConfigUtil extends TestCommon {
       existingAmuletConfig.packageConfig,
       existingAmuletConfig.transferPreapprovalFee,
       existingAmuletConfig.featuredAppActivityMarkerAmount,
+      existingAmuletConfig.optDevelopmentFundManager,
     )
   }
 

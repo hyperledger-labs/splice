@@ -4,18 +4,11 @@
 package com.digitalasset.canton.data
 
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.{
-  LfContractId,
-  LfTemplateId,
-  RootHash,
-  SerializableContract,
-  Stakeholders,
-  ViewHash,
-}
+import com.digitalasset.canton.protocol.{RootHash, Stakeholders, ViewHash}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
-import com.digitalasset.canton.{LfPartyId, LfWorkflowId, ReassignmentCounter}
+import com.digitalasset.canton.{LfPartyId, LfWorkflowId}
 
 /** Common supertype of all view trees that are sent as
   * [[com.digitalasset.canton.protocol.messages.EncryptedViewMessage]]s
@@ -37,15 +30,15 @@ trait ViewTree extends PrettyPrinting {
 
   /** The root hash of the view tree.
     *
-    * Two view trees with the same [[rootHash]] must also have the same [[synchronizerId]] and
-    * [[mediator]] (except for hash collisions).
+    * Two view trees with the same [[rootHash]] must also have the same [[psid]] and [[mediator]]
+    * (except for hash collisions).
     */
   def rootHash: RootHash
 
   /** The synchronizer to which the
     * [[com.digitalasset.canton.protocol.messages.EncryptedViewMessage]] should be sent to
     */
-  def synchronizerId: SynchronizerId
+  def psid: PhysicalSynchronizerId
 
   /** The mediator group that is responsible for coordinating this request */
   def mediator: MediatorGroupRecipient
@@ -65,8 +58,8 @@ trait FullReassignmentViewTree extends ViewTree {
   val viewPosition: ViewPosition =
     ViewPosition.root // Use a dummy value, as there is only one view.
 
-  def sourceSynchronizer: Source[SynchronizerId]
-  def targetSynchronizer: Target[SynchronizerId]
+  def sourceSynchronizer: Source[PhysicalSynchronizerId]
+  def targetSynchronizer: Target[PhysicalSynchronizerId]
 
   // Submissions
   def submitterMetadata: ReassignmentSubmitterMetadata = commonData.submitterMetadata
@@ -75,7 +68,7 @@ trait FullReassignmentViewTree extends ViewTree {
 
   // Parties and participants
   override def informees: Set[LfPartyId] =
-    view.contract.metadata.stakeholders + commonData.submitterMetadata.submittingAdminParty
+    view.contracts.stakeholders.all + commonData.submitterMetadata.submittingAdminParty
   def stakeholders: Stakeholders = commonData.stakeholders
   def confirmingParties: Set[LfPartyId] = commonData.confirmingParties
 
@@ -84,8 +77,5 @@ trait FullReassignmentViewTree extends ViewTree {
     reassigningParticipants.contains(participantId)
 
   // Contract
-  def contract: SerializableContract = view.contract
-  def contractId: LfContractId = view.contract.contractId
-  def templateId: LfTemplateId = view.templateId
-  def reassignmentCounter: ReassignmentCounter = view.reassignmentCounter
+  def contracts: ContractsReassignmentBatch = view.contracts
 }

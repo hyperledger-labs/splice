@@ -66,6 +66,7 @@ object SvUtil {
   // (See #12107).
   val defaultAcsCommitmentReconciliationInterval: PositiveDurationSeconds =
     PositiveDurationSeconds.ofMinutes(30)
+
   val defaultAcsCommitmentsCatchUpParameters: AcsCommitmentsCatchUpParameters =
     AcsCommitmentsCatchUpParameters(
       // With the default reconciliation interval of 30m this corresponds to a catchup interval of 30m * 24 = 12 hours.
@@ -130,7 +131,10 @@ object SvUtil {
     List.empty.asJava,
   )
 
-  private def defaultDsoDecentralizedSynchronizerConfig(synchronizerId: SynchronizerId) =
+  private def defaultDsoDecentralizedSynchronizerConfig(
+      synchronizerId: SynchronizerId,
+      acsCommitmentReconciliationInterval: PositiveDurationSeconds,
+  ) =
     new DsoDecentralizedSynchronizerConfig(
       // domains
       Map(
@@ -138,7 +142,7 @@ object SvUtil {
           dso.decentralizedsynchronizer.SynchronizerState.DS_OPERATIONAL,
           "TODO(DACH-NY/canton-network-node#4900): share CometBFT genesis.json of sv1 via DsoRules config.",
           // TODO(M3-47): also share the Canton SynchronizerId of the decentralized domain here
-          Optional.of(defaultAcsCommitmentReconciliationInterval.duration.toSeconds),
+          Optional.of(acsCommitmentReconciliationInterval.duration.toSeconds),
         )
       ).asJava,
       synchronizerId.toProtoPrimitive, // lastSynchronizerId
@@ -180,7 +184,7 @@ object SvUtil {
   def getSV1SynchronizerNodeConfig(
       cometBftNode: Option[CometBftNode],
       localSynchronizerNode: LocalSynchronizerNode,
-      scanConfig: Option[SvScanConfig],
+      scanConfig: SvScanConfig,
       synchronizerId: SynchronizerId,
       clock: Clock,
       migrationId: Long,
@@ -234,7 +238,7 @@ object SvUtil {
           cometBftConfig,
           sequencerConfig.toJava,
           mediatorConfig.toJava,
-          scanConfig.map(c => new ScanConfig(c.publicUrl.toString())).toJava,
+          Optional.of(new ScanConfig(scanConfig.publicUrl.toString())),
           Optional.empty(),
         )
       ).asJava
@@ -245,6 +249,7 @@ object SvUtil {
   def defaultDsoRulesConfig(
       synchronizerId: SynchronizerId,
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
+      acsCommitmentReconciliationInterval: PositiveDurationSeconds,
   ): DsoRulesConfig = new DsoRulesConfig(
     10, // numUnclaimedRewardsThreshold
     5, // numMemberTrafficContractsThreshold, arbitrarily set as 5 for now.
@@ -255,7 +260,10 @@ object SvUtil {
     new RelTime(TimeUnit.SECONDS.toMicros(70)), // dsoDelegateInactiveTimeout
     defaultSynchronizerNodeConfigLimits,
     1024, // maxTextLength
-    defaultDsoDecentralizedSynchronizerConfig(synchronizerId), // decentralizedSynchronizerConfig
+    defaultDsoDecentralizedSynchronizerConfig(
+      synchronizerId,
+      acsCommitmentReconciliationInterval,
+    ), // decentralizedSynchronizerConfig
     Optional.empty(), // nextScheduledHardDomainMigration
     voteCooldownTime.map(t => new RelTime(t.duration.toMicros)).toJava,
   )
@@ -317,7 +325,10 @@ object SvUtil {
     }
   }
 
-  def generateRandomOnboardingSecret(sv: PartyId): ValidatorOnboardingSecret = {
+  def generateRandomOnboardingSecret(
+      sv: PartyId,
+      partyHint: Option[String],
+  ): ValidatorOnboardingSecret = {
     val rng = new SecureRandom();
     // 256 bits of entropy
     val bytes = new Array[Byte](ValidatorOnboardingSecretLength)
@@ -326,6 +337,7 @@ object SvUtil {
     ValidatorOnboardingSecret(
       sv,
       secret,
+      partyHint,
     )
   }
 

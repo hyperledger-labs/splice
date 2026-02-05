@@ -8,6 +8,7 @@ import com.digitalasset.canton.topology.PartyId
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.headers.RawHeader
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
@@ -20,7 +21,6 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
-  BalanceChange,
   TransactionHistoryRequest,
   TransactionHistoryResponseItem,
 }
@@ -31,7 +31,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.store.Limit
-import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvAppClient
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvPublicAppClient
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
   ExpireIssuingMiningRoundTrigger,
@@ -46,7 +46,7 @@ import scala.util.{Success, Try}
 // this test sets fees to zero, and that only works from 0.1.14 onwards
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_14
 class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeTestUtil {
-  private val defaultPageSize = Limit.MaxPageSize
+  private val defaultPageSize = Limit.DefaultMaxPageSize
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
@@ -92,10 +92,8 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           )
         )(config)
       )
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-          _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
-        )(config)
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
       )
       .withTrafficTopupsEnabled
 
@@ -112,7 +110,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
   "return dso info same as the sv app" in { implicit env =>
     val scan = sv1ScanBackend.getDsoInfo()
     inside(sv1Backend.getDsoInfo()) {
-      case HttpSvAppClient.DsoInfo(
+      case HttpSvPublicAppClient.DsoInfo(
             svUser,
             svParty,
             dsoParty,
@@ -357,13 +355,6 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
 
       bobMergeAmuletsTrigger.pause().futureValue
 
-      val latestRound =
-        sv1ScanBackend.getLatestOpenMiningRound(CantonTimestamp.now()).contract.payload.round.number
-
-      val amuletConfig =
-        sv1ScanBackend.getAmuletConfigForRound(latestRound)
-
-      val holdingFee = amuletConfig.holdingFee
       val bobTapAmount = 100000.0
       val aliceTapAmount = 100000.0
 
@@ -412,7 +403,6 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
               })
 
           activities should have size (1)
-          val round = activities.loneElement.round
           activities.loneElement.round shouldBe Some(openRoundForTransfer)
           val transfer = activities.flatMap(_.transfer).loneElement
           val inputAmuletAmount =
@@ -428,29 +418,6 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           transfer.receivers
             .map(r => BigDecimal(r.amount))
             .sum shouldBe transferAmount
-          val amuletAsOfRoundZeroAdjustment = round.value * holdingFee
-          transfer.balanceChanges shouldBe Vector(
-            BalanceChange(
-              aliceUserParty.toProtoPrimitive,
-              Codec.encode(
-                transferAmount + round.value * holdingFee
-              ),
-              Codec.encode(
-                1 * holdingFee
-              ),
-            ),
-            BalanceChange(
-              bobUserParty.toProtoPrimitive,
-              Codec.encode(
-                senderChangeAmount + amuletAsOfRoundZeroAdjustment - (inputAmuletAmount + holdingFee * round.value) // See AmuletRules: senderChangeAmount + amuletAsOfRoundZeroAdjustment - inp.amountArchivedAsOfRoundZero
-              ),
-              Codec.encode(
-                BigDecimal(
-                  0 // See AmuletRules: transferConfigAmulet.holdingFee.rate - amulet.amount.ratePerRound.rate
-                )
-              ),
-            ),
-          )
 
           // receiverFee is by default set to 0, sender pays all fees.
           transfer.receivers
@@ -690,29 +657,6 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     }
   }
 
-  "getWalletBalance should return 400 for invalid party ID" in { implicit env =>
-    implicit val sys = env.actorSystem
-    registerHttpConnectionPoolsCleanup(env)
-
-    val response = Http()
-      .singleRequest(
-        Get(
-          s"${sv1ScanBackend.httpClientConfig.url}/api/scan/v0/wallet-balance?party_id=None&asOfEndOfRound=0"
-        )
-      )
-      .futureValue
-
-    inside(response) {
-      case _ if response.status == StatusCodes.BadRequest =>
-        inside(Unmarshal(response.entity).to[String].value.value) {
-          case Success(successfullResponse) =>
-            successfullResponse should include(
-              "Invalid unique identifier `None` with missing namespace"
-            )
-        }
-    }
-  }
-
   "getUpdateHistory should return 400 for invalid after timestamp" in { implicit env =>
     import env.{actorSystem, executionContext}
     registerHttpConnectionPoolsCleanup(env)
@@ -790,6 +734,49 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
         _.message should include("Too Many Requests")
       },
     )
+  }
+
+  "accept invalid headers" in { implicit env =>
+    import org.apache.pekko.http.scaladsl.model.headers as h
+    import env.actorSystem
+    registerHttpConnectionPoolsCleanup(env)
+
+    // see pekko.http.server.parsing.ignore-illegal-header-for in application.conf
+    // if pekko-http doesn't have a ModeledCompanion, it doesn't have a special parser,
+    // so there is no need to suppress warnings for it
+    val invalidHeaders = Seq[(h.ModeledCompanion[?], String)](
+      (h.Authorization, "Bearer Bearer exxxxxxxxxx"),
+      (h.Cookie, "foo=bar baz"),
+      (h.Origin, "http://foo bar"),
+      (h.`Proxy-Authorization`, "Basic dXNlcjpwYXNz,"), // "user:pass" with trailing comma
+      (h.Referer, "http://foo bar"),
+      (h.`User-Agent`, "OpenAPI-Generator/0.0.1/java"),
+      (h.`X-Forwarded-For`, "1.2.3.4,"),
+      (h.`X-Forwarded-Host`, "a b"),
+      (h.`X-Real-Ip`, "1.2.3.4,"),
+    ).map { case (companion, value) =>
+      val header = RawHeader(companion.name, value)
+      // using `User-Agent` (non-RawHeaders in general) fails the following check;
+      // it cleans away the invalid part of the header,
+      // so we have to use RawHeader to simulate the actual client case
+      header.value shouldBe value
+      import language.existentials
+      companion.parseFromValueString(value) shouldBe a[
+        Left[?, ?]
+      ] withClue s"actual bad value for ${companion.name}"
+      header
+    }
+
+    // SuppressingLogger does not catch the warning (from pekko-http)
+    // if present, it's seen in checkErrors instead
+    val response = Http()
+      .singleRequest(
+        Get(
+          s"${sv1ScanBackend.httpClientConfig.url}/api/scan/v0/splice-instance-names"
+        ).withHeaders(invalidHeaders)
+      )
+      .futureValue
+    response.status shouldBe StatusCodes.OK
   }
 
   def triggerTopupAliceAndBob()(implicit env: SpliceTestConsoleEnvironment): (Boolean, Boolean) = {

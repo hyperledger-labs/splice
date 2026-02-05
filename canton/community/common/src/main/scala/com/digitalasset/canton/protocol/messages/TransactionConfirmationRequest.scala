@@ -32,17 +32,16 @@ final case class TransactionConfirmationRequest(
 
   def mediator: MediatorGroupRecipient = informeeMessage.mediator
 
-  lazy val rootHash: RootHash = informeeMessage.fullInformeeTree.transactionId.toRootHash
+  lazy val rootHash: RootHash = informeeMessage.fullInformeeTree.updateId.toRootHash
 
   private def rootHashMessage(
       submissionTopologyTime: CantonTimestamp
   ): RootHashMessage[EmptyRootHashMessagePayload.type] = RootHashMessage(
     rootHash = rootHash,
-    synchronizerId = informeeMessage.synchronizerId,
+    psid = informeeMessage.psid,
     viewType = ViewType.TransactionViewType,
-    submissionTopologyTime = submissionTopologyTime,
+    submissionTopologyTimestamp = submissionTopologyTime,
     payload = EmptyRootHashMessagePayload,
-    protocolVersion = protocolVersion,
   )
 
   def asBatch(ipsSnapshot: TopologySnapshot)(implicit

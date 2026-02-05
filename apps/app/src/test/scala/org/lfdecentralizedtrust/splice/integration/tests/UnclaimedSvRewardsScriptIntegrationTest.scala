@@ -45,10 +45,8 @@ class UnclaimedSvRewardsScriptIntegrationTest
             .withPausedTrigger[ArchiveClosedMiningRoundsTrigger]
         )(config)
       )
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-          _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
-        )(config)
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
       )
       .withTrafficTopupsDisabled
 
@@ -185,6 +183,7 @@ class UnclaimedSvRewardsScriptIntegrationTest
               Seq(
                 "python",
                 "scripts/scan-txlog/unclaimed_sv_rewards.py",
+                "https://scan.sv-1.global.canton.network.invalid.com", // Intentionally invalid URL to simulate a down Scan server
                 sv1ScanBackend.httpClientConfig.url.toString(),
                 "--grace-period-for-mining-rounds-in-minutes",
                 "30",
@@ -255,6 +254,7 @@ class UnclaimedSvRewardsScriptIntegrationTest
               Seq(
                 "python",
                 "scripts/scan-txlog/unclaimed_sv_rewards.py",
+                "https://scan.sv-1.global.canton.network.invalid.com", // Intentionally invalid URL to simulate a down Scan server
                 sv1ScanBackend.httpClientConfig.url.toString(),
                 "--grace-period-for-mining-rounds-in-minutes",
                 "30",
@@ -324,6 +324,7 @@ class UnclaimedSvRewardsScriptIntegrationTest
               Seq(
                 "python",
                 "scripts/scan-txlog/unclaimed_sv_rewards.py",
+                "https://scan.sv-1.global.canton.network.invalid.com", // Intentionally invalid URL to simulate a down Scan server
                 sv1ScanBackend.httpClientConfig.url.toString(),
                 "--grace-period-for-mining-rounds-in-minutes",
                 "30",

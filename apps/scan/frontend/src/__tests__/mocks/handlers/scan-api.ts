@@ -11,7 +11,6 @@ import {
   GetRewardsCollectedResponse,
   GetRoundOfLatestDataResponse,
   GetDsoPartyIdResponse,
-  GetTotalAmuletBalanceResponse,
   ListActivityResponse,
   LookupEntryByPartyResponse,
   GetOpenAndIssuingMiningRoundsResponse,
@@ -83,6 +82,7 @@ export const buildScanMock = (baseScanUrl: string): RestHandler[] => {
                       amuletToIssuePerYear: '40000000000.0',
                       validatorRewardCap: '0.2',
                       optValidatorFaucetCap: '2.85',
+                      optDevelopmentFundPercentage: '0.05',
                     },
                     opensAt: '2025-02-03T13:43:37.895871Z',
                     transferConfigUsd: {
@@ -153,6 +153,7 @@ export const buildScanMock = (baseScanUrl: string): RestHandler[] => {
                       amuletToIssuePerYear: '40000000000.0',
                       validatorRewardCap: '0.2',
                       optValidatorFaucetCap: '2.85',
+                      optDevelopmentFundPercentage: '0.05',
                     },
                     opensAt: '2025-02-03T13:54:09.430298Z',
                     transferConfigUsd: {
@@ -223,6 +224,7 @@ export const buildScanMock = (baseScanUrl: string): RestHandler[] => {
                       amuletToIssuePerYear: '40000000000.0',
                       validatorRewardCap: '0.2',
                       optValidatorFaucetCap: '2.85',
+                      optDevelopmentFundPercentage: '0.05',
                     },
                     opensAt: '2025-02-03T14:04:37.024279Z',
                     transferConfigUsd: {
@@ -371,8 +373,6 @@ export const buildScanMock = (baseScanUrl: string): RestHandler[] => {
               amulet_price: '1.0000000000',
               round: 1,
               transfer: {
-                provider:
-                  'alice__validator__user::12200d3c885d2cb51226911f828da25f7f0fc0d06b8c6bf00c714266729033f138f7',
                 sender: {
                   party:
                     'charlie__wallet__user::12200d3c885d2cb51226911f828da25f7f0fc0d06b8c6bf00c714266729033f138f7',
@@ -405,9 +405,6 @@ export const buildScanMock = (baseScanUrl: string): RestHandler[] => {
     }),
     rest.get(`${scanUrl}/v0/rewards-collected`, (_, res, ctx) => {
       return res(ctx.json<GetRewardsCollectedResponse>({ amount: '0.0' }));
-    }),
-    rest.get(`${scanUrl}/v0/total-amulet-balance`, (_, res, ctx) => {
-      return res(ctx.json<GetTotalAmuletBalanceResponse>({ total_balance: '66605.2180742781' }));
     }),
     rest.post(`${scanUrl}/v0/amulet-rules`, (_, res, ctx) => {
       return res(ctx.json<GetAmuletRulesResponse>(getAmuletRulesResponse(true)));

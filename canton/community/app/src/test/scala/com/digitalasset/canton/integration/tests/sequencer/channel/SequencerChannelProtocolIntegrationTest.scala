@@ -13,10 +13,7 @@ import com.digitalasset.canton.integration.bootstrap.{
   NetworkBootstrapper,
   NetworkTopologyDescription,
 }
-import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
-  UsePostgres,
-}
+import com.digitalasset.canton.integration.plugins.{UsePostgres, UseReferenceBlockSequencer}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
@@ -32,6 +29,7 @@ import com.digitalasset.canton.sequencing.protocol.channel.{
   SequencerChannelSessionKey,
   SequencerChannelSessionKeyAck,
 }
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
@@ -40,6 +38,7 @@ import com.google.protobuf.ByteString
 import scala.annotation.nowarn
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
+import scala.util.chaining.scalaUtilChainingOps
 
 /** Objective: Test sequencer channels with variously behaving test sequencer protocol processors.
   *
@@ -52,11 +51,11 @@ sealed trait SequencerChannelProtocolIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment
     with SequencerChannelProtocolTestExecHelpers {
-  registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.H2](loggerFactory))
+  registerPlugin(new UseReferenceBlockSequencer[DbConfig.H2](loggerFactory))
 
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P2S1M1_Manual
-      .addConfigTransforms(ConfigTransforms.unsafeEnableOnlinePartyReplication*)
+      .addConfigTransforms(ConfigTransforms.unsafeEnableOnlinePartyReplication()*)
       .withNetworkBootstrap { implicit env =>
         import env.*
         new NetworkBootstrapper(
@@ -93,8 +92,8 @@ sealed trait SequencerChannelProtocolIntegrationTest
       }
 
       val channelId = SequencerChannelId("empty channel")
-      val testProcessor1 = new TestProcessor()
-      val testProcessor2 = new TestProcessor()
+      val testProcessor1 = new TestProcessor(daId)
+      val testProcessor2 = new TestProcessor(daId)
 
       val recorder1 =
         new TestRecorder(participant1, daId, staticSynchronizerParameters1)
@@ -127,8 +126,8 @@ sealed trait SequencerChannelProtocolIntegrationTest
         )
 
         eventually() {
-          testProcessor1.hasChannelConnected shouldBe true
-          testProcessor2.hasChannelConnected shouldBe true
+          testProcessor1.isChannelConnected shouldBe true
+          testProcessor2.isChannelConnected shouldBe true
         }
       }
 
@@ -171,7 +170,7 @@ sealed trait SequencerChannelProtocolIntegrationTest
       val responsesReceivedP2 = mutable.Buffer[String]()
 
       val channelId = SequencerChannelId("exchange messages channel")
-      val testProcessor1 = new TestProcessor {
+      val testProcessor1 = new TestProcessor(daId) {
         override def handlePayload(payload: ByteString)(implicit
             traceContext: TraceContext
         ): EitherT[FutureUnlessShutdown, String, Unit] = {
@@ -181,7 +180,7 @@ sealed trait SequencerChannelProtocolIntegrationTest
           sendTestPayload(s"responding to \"$str\"", response)
         }
       }
-      val testProcessor2 = new TestProcessor {
+      val testProcessor2 = new TestProcessor(daId) {
         override def handlePayload(payload: ByteString)(implicit
             traceContext: TraceContext
         ): EitherT[FutureUnlessShutdown, String, Unit] = {
@@ -223,8 +222,8 @@ sealed trait SequencerChannelProtocolIntegrationTest
         )
 
         eventually() {
-          testProcessor1.hasChannelConnected shouldBe true
-          testProcessor2.hasChannelConnected shouldBe true
+          testProcessor1.isChannelConnected shouldBe true
+          testProcessor2.isChannelConnected shouldBe true
         }
       }
 
@@ -271,7 +270,7 @@ sealed trait SequencerChannelProtocolIntegrationTest
         .getOrElse(fail("Cannot find client"))
 
       val channelId = SequencerChannelId("canceled channel")
-      val testProcessor1 = new TestProcessor()
+      val testProcessor1 = new TestProcessor(daId)
       val recorder1 = new TestRecorder(participant1, daId, staticSynchronizerParameters1)
 
       channelClient.connectToSequencerChannel(
@@ -312,21 +311,21 @@ sealed trait SequencerChannelProtocolIntegrationTest
           entry => {
             entry.loggerName should include("GrpcSequencerChannelMemberMessageHandler")
             entry.warningMessage should include(
-              s"Member message handler received error $serverSideCancelMessage."
+              s"Member message handler received error \"$serverSideCancelMessage\"."
             )
           },
         ),
       )
   }
 
-  "Participant cannot reuse channel processor for multiple connections" onlyRunWith ProtocolVersion.dev in {
+  "Participant can reuse channel processor for multiple connections" onlyRunWith ProtocolVersion.dev in {
     implicit env =>
       import env.*
       val channelClient = participant1.testing.state_inspection
         .getSequencerChannelClient(daId)
         .getOrElse(fail("Cannot find client"))
 
-      val testProcessor = new TestProcessor()
+      val testProcessor = new TestProcessor(daId)
       val timestamp =
         (new TestRecorder(participant1, daId, staticSynchronizerParameters1)).timestamp
 
@@ -350,7 +349,7 @@ sealed trait SequencerChannelProtocolIntegrationTest
         }
       }
 
-      val error = execWithError("connect processor the second time")(
+      exec("connect processor the second time")(
         channelClient.connectToSequencerChannel(
           sequencer1.id,
           SequencerChannelId("reuse processor channel2"),
@@ -360,18 +359,28 @@ sealed trait SequencerChannelProtocolIntegrationTest
           timestamp,
         )
       )
-      error shouldBe "Channel protocol processor previously connected to a different channel endpoint"
+
+      asyncExec("Complete channel2")(
+        testProcessor.sendTestCompleted("Close channel before fully connected")
+      )
+      clue("Channel2 completed on P1 and P2") {
+        eventually() {
+          testProcessor.hasChannelCompleted shouldBe true
+        }
+      }
   }
 
   private class TestProcessor(
+      protected val psid: PhysicalSynchronizerId,
       initialPayloads: Seq[ByteString] = Seq.empty,
-      protected val protocolVersion: ProtocolVersion = testedProtocolVersion,
   )(implicit val executionContext: ExecutionContext)
       extends SequencerChannelProtocolProcessor {
     override def onConnected()(implicit
         traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, String, Unit] =
-      MonadUtil.sequentialTraverse_(initialPayloads)(sendPayload("initial payload", _))
+    ): EitherT[FutureUnlessShutdown, String, Unit] = for {
+      _ <- super.onConnected()
+      _ <- MonadUtil.sequentialTraverse_(initialPayloads)(sendPayload("initial payload", _))
+    } yield ()
 
     override def handlePayload(payload: ByteString)(implicit
         traceContext: TraceContext
@@ -394,8 +403,12 @@ sealed trait SequencerChannelProtocolIntegrationTest
 
     override def onDisconnected(status: Either[String, Unit])(implicit
         traceContext: TraceContext
-    ): Unit =
-      status.swap.foreach(err => logger.warn(s"TestProcessor disconnected with error: $err"))
+    ): Boolean =
+      super
+        .onDisconnected(status)
+        .tap(_ =>
+          status.swap.foreach(err => logger.warn(s"TestProcessor disconnected with error: $err"))
+        )
 
     override protected def timeouts: ProcessingTimeout =
       SequencerChannelProtocolIntegrationTest.this.timeouts

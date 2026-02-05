@@ -18,16 +18,15 @@ import com.digitalasset.canton.participant.sync.{
   ConnectedSynchronizersLookup,
 }
 import com.digitalasset.canton.protocol.{LfContractId, StaticSynchronizerParameters}
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.topology.client.TopologySnapshotLoader
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.concurrent.ExecutionContext
 
 object RoutingSynchronizerStateFactory {
   type SyncCryptoPureApiLookup =
-    (SynchronizerId, StaticSynchronizerParameters) => Option[SynchronizerCryptoPureApi]
+    (PhysicalSynchronizerId, StaticSynchronizerParameters) => Option[SynchronizerCryptoPureApi]
 
   def create(
       connectedSynchronizers: ConnectedSynchronizersLookup,
@@ -51,29 +50,23 @@ object RoutingSynchronizerStateFactory {
 }
 
 class RoutingSynchronizerStateImpl private[routing] (
-    connectedSynchronizers: Map[SynchronizerId, ConnectedSynchronizer],
-    val topologySnapshots: Map[SynchronizerId, TopologySnapshotLoader],
+    val connectedSynchronizers: Map[PhysicalSynchronizerId, ConnectedSynchronizer],
+    val topologySnapshots: Map[PhysicalSynchronizerId, TopologySnapshotLoader],
     syncCryptoPureApiLookup: SyncCryptoPureApiLookup,
 ) extends RoutingSynchronizerState {
 
-  override def getTopologySnapshotAndPVFor(
-      synchronizerId: SynchronizerId
-  ): Either[UnableToQueryTopologySnapshot.Failed, (TopologySnapshotLoader, ProtocolVersion)] =
-    connectedSynchronizers
+  override def getTopologySnapshotFor(
+      synchronizerId: PhysicalSynchronizerId
+  ): Either[UnableToQueryTopologySnapshot.Failed, TopologySnapshotLoader] =
+    topologySnapshots
       .get(synchronizerId)
       .toRight(UnableToQueryTopologySnapshot.Failed(synchronizerId))
-      .map { connectedSynchronizer =>
-        (
-          topologySnapshots(synchronizerId),
-          connectedSynchronizer.staticSynchronizerParameters.protocolVersion,
-        )
-      }
 
   override def getSynchronizersOfContracts(coids: Seq[LfContractId])(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): FutureUnlessShutdown[Map[LfContractId, (SynchronizerId, ContractStateStatus)]] = {
-    type Acc = (Seq[LfContractId], Map[LfContractId, (SynchronizerId, ContractStateStatus)])
+  ): FutureUnlessShutdown[Map[LfContractId, (PhysicalSynchronizerId, ContractStateStatus)]] = {
+    type Acc = (Seq[LfContractId], Map[LfContractId, (PhysicalSynchronizerId, ContractStateStatus)])
     connectedSynchronizers
       .collect {
         // only look at synchronizers that are ready for submission
@@ -83,7 +76,7 @@ class RoutingSynchronizerStateImpl private[routing] (
       }
       .toList
       .foldM[FutureUnlessShutdown, Acc](
-        (coids, Map.empty[LfContractId, (SynchronizerId, ContractStateStatus)]): Acc
+        (coids, Map.empty[LfContractId, (PhysicalSynchronizerId, ContractStateStatus)]): Acc
       ) {
         // if there are no more cids for which we don't know the synchronizer, we are done
         case ((pending, acc), _) if pending.isEmpty => FutureUnlessShutdown.pure((pending, acc))
@@ -95,9 +88,15 @@ class RoutingSynchronizerStateImpl private[routing] (
               val done =
                 acc ++ res.collect {
                   case (cid, status) if status.status.isActive =>
-                    (cid, (connectedSynchronizer.synchronizerId, ContractStateStatus.Active))
+                    (
+                      cid,
+                      (connectedSynchronizer.psid, ContractStateStatus.Active),
+                    )
                   case (cid, status) if status.status.isArchived =>
-                    (cid, (connectedSynchronizer.synchronizerId, ContractStateStatus.Archived))
+                    (
+                      cid,
+                      (connectedSynchronizer.psid, ContractStateStatus.Archived),
+                    )
                 }
               (pending.filterNot(cid => done.contains(cid)), done)
             }
@@ -111,7 +110,7 @@ class RoutingSynchronizerStateImpl private[routing] (
     }
 
   def getSyncCryptoPureApi(
-      synchronizerId: SynchronizerId
+      synchronizerId: PhysicalSynchronizerId
   ): Either[UnableToGetStaticParameters.Failed, Option[SynchronizerCryptoPureApi]] =
     connectedSynchronizers
       .get(synchronizerId)

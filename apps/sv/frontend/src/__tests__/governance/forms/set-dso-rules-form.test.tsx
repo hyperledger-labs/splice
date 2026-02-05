@@ -5,7 +5,7 @@ import {
   dateTimeFormatISO,
   nextScheduledSynchronizerUpgradeFormat,
 } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import { rest } from 'msw';
@@ -26,7 +26,7 @@ describe('SV user can', () => {
       </SvConfigProvider>
     );
 
-    expect(await screen.findByText('Log In')).toBeDefined();
+    expect(await screen.findByText('Log In')).toBeInTheDocument();
 
     const input = screen.getByRole('textbox');
     await user.type(input, 'sv1');
@@ -34,7 +34,7 @@ describe('SV user can', () => {
     const button = screen.getByRole('button', { name: 'Log In' });
     await user.click(button);
 
-    expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
+    expect(await screen.findAllByDisplayValue(svPartyId)).not.toBe([]);
   });
 });
 
@@ -46,19 +46,19 @@ describe('Set DSO Config Rules Form', () => {
       </Wrapper>
     );
 
-    expect(screen.getByTestId('set-dso-config-rules-form')).toBeDefined();
-    expect(screen.getByText('Action')).toBeDefined();
+    expect(screen.getByTestId('set-dso-config-rules-form')).toBeInTheDocument();
+    expect(screen.getByText('Action')).toBeInTheDocument();
 
     const actionInput = screen.getByTestId('set-dso-config-rules-action');
-    expect(actionInput).toBeDefined();
+    expect(actionInput).toBeInTheDocument();
     expect(actionInput.getAttribute('value')).toBe('Set Dso Rules Configuration');
 
     const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
-    expect(summaryInput).toBeDefined();
+    expect(summaryInput).toBeInTheDocument();
     expect(summaryInput.getAttribute('value')).toBeNull();
 
     const urlInput = screen.getByTestId('set-dso-config-rules-url');
-    expect(urlInput).toBeDefined();
+    expect(urlInput).toBeInTheDocument();
     expect(urlInput.getAttribute('value')).toBe('');
 
     const configLabels = screen.getAllByTestId(/config-label-/);
@@ -70,6 +70,8 @@ describe('Set DSO Config Rules Form', () => {
     expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
       /Unable to find an element/
     );
+
+    expect(screen.getByTestId('json-diffs-details')).toBeInTheDocument();
   });
 
   test('should render errors when submit button is clicked on new form', async () => {
@@ -83,7 +85,7 @@ describe('Set DSO Config Rules Form', () => {
 
     const actionInput = screen.getByTestId('set-dso-config-rules-action');
     const submitButton = screen.getByTestId('submit-button');
-    expect(submitButton).toBeDefined();
+    expect(submitButton).toBeInTheDocument();
 
     await user.click(submitButton);
     expect(submitButton.getAttribute('disabled')).toBeDefined();
@@ -91,16 +93,16 @@ describe('Set DSO Config Rules Form', () => {
       /Unable to perform pointer interaction/
     );
 
-    expect(screen.getByText('Summary is required')).toBeDefined();
-    expect(screen.getByText('Invalid URL')).toBeDefined();
+    expect(screen.getByText('Summary is required')).toBeInTheDocument();
+    expect(screen.getByText('Invalid URL')).toBeInTheDocument();
 
     // completing the form should reenable the submit button
     const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
-    expect(summaryInput).toBeDefined();
+    expect(summaryInput).toBeInTheDocument();
     await user.type(summaryInput, 'Summary of the proposal');
 
     const urlInput = screen.getByTestId('set-dso-config-rules-url');
-    expect(urlInput).toBeDefined();
+    expect(urlInput).toBeInTheDocument();
     await user.type(urlInput, 'https://example.com');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
@@ -109,7 +111,6 @@ describe('Set DSO Config Rules Form', () => {
   });
 
   test('expiry date must be in the future', async () => {
-    const user = userEvent.setup();
     render(
       <Wrapper>
         <SetDsoConfigRulesForm />
@@ -117,27 +118,25 @@ describe('Set DSO Config Rules Form', () => {
     );
 
     const expiryDateInput = screen.getByTestId('set-dso-config-rules-expiry-date-field');
-    expect(expiryDateInput).toBeDefined();
+    expect(expiryDateInput).toBeInTheDocument();
 
     const thePast = dayjs().subtract(1, 'day').format(dateTimeFormatISO);
     const theFuture = dayjs().add(1, 'day').format(dateTimeFormatISO);
 
-    await user.type(expiryDateInput, thePast);
+    fireEvent.change(expiryDateInput, { target: { value: thePast } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
+      expect(screen.queryByText('Expiration must be in the future')).toBeInTheDocument();
     });
 
-    await user.type(expiryDateInput, theFuture);
+    fireEvent.change(expiryDateInput, { target: { value: theFuture } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Expiration must be in the future')).toBeNull();
+      expect(screen.queryByText('Expiration must be in the future')).not.toBeInTheDocument();
     });
   });
 
   test('effective date must be after expiry date', async () => {
-    const user = userEvent.setup();
-
     render(
       <Wrapper>
         <SetDsoConfigRulesForm />
@@ -150,19 +149,25 @@ describe('Set DSO Config Rules Form', () => {
     const expiryDate = dayjs().add(1, 'week');
     const effectiveDate = expiryDate.subtract(1, 'day');
 
-    await user.type(expiryDateInput, expiryDate.format(dateTimeFormatISO));
-    await user.type(effectiveDateInput, effectiveDate.format(dateTimeFormatISO));
+    fireEvent.change(expiryDateInput, { target: { value: expiryDate.format(dateTimeFormatISO) } });
+    fireEvent.change(effectiveDateInput, {
+      target: { value: effectiveDate.format(dateTimeFormatISO) },
+    });
 
     await waitFor(() => {
-      expect(screen.queryByText('Effective Date must be after expiration date')).toBeDefined();
+      expect(
+        screen.queryByText('Effective Date must be after expiration date')
+      ).toBeInTheDocument();
     });
 
     const validEffectiveDate = expiryDate.add(1, 'day').format(dateTimeFormatISO);
 
-    await user.type(effectiveDateInput, validEffectiveDate);
+    fireEvent.change(effectiveDateInput, { target: { value: validEffectiveDate } });
 
     await waitFor(() => {
-      expect(screen.queryByText('Effective Date must be after expiration date')).toBeNull();
+      expect(
+        screen.queryByText('Effective Date must be after expiration date')
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -180,11 +185,11 @@ describe('Set DSO Config Rules Form', () => {
     );
 
     const c1Input = screen.getByTestId('config-field-numUnclaimedRewardsThreshold');
-    expect(c1Input).toBeDefined();
+    expect(c1Input).toBeInTheDocument();
     await user.type(c1Input, '99');
 
     const c2Input = screen.getByTestId('config-field-voteCooldownTime');
-    expect(c2Input).toBeDefined();
+    expect(c2Input).toBeInTheDocument();
     await user.type(c2Input, '9999');
 
     const changes = screen.getAllByTestId(/config-current-value-/);
@@ -214,7 +219,7 @@ describe('Set DSO Config Rules Form', () => {
     const c2Input = screen.getByTestId('config-field-voteCooldownTime');
     await user.type(c2Input, '9999');
 
-    expect(screen.getByText('Review Proposal')).toBeDefined();
+    expect(screen.getByText('Review Proposal')).toBeInTheDocument();
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
     const submitButton = screen.getByTestId('submit-button');
@@ -224,7 +229,7 @@ describe('Set DSO Config Rules Form', () => {
 
     await user.click(submitButton);
 
-    expect(screen.getByText('Proposal Summary')).toBeDefined();
+    expect(screen.getByText('Proposal Summary')).toBeInTheDocument();
   });
 
   test('should show error on form if submission fails', async () => {
@@ -267,9 +272,9 @@ describe('Set DSO Config Rules Form', () => {
     await user.click(submitButton); // review proposal
     await user.click(submitButton); // submit proposal
 
-    expect(screen.getByTestId('proposal-submission-error')).toBeDefined();
-    expect(screen.getByText(/Submission failed/)).toBeDefined();
-    expect(screen.getByText(/Service Unavailable/)).toBeDefined();
+    expect(screen.getByTestId('proposal-submission-error')).toBeInTheDocument();
+    expect(screen.getByText(/Submission failed/)).toBeInTheDocument();
+    expect(screen.getByText(/Service Unavailable/)).toBeInTheDocument();
   });
 
   test('should redirect to governance page after successful submission', async () => {
@@ -304,51 +309,14 @@ describe('Set DSO Config Rules Form', () => {
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
     const submitButton = screen.getByTestId('submit-button');
-
     await waitFor(async () => {
       expect(submitButton.getAttribute('disabled')).toBeNull();
     });
 
-    await user.click(submitButton); // review proposal
-    await user.click(submitButton); // submit proposal
+    await user.click(submitButton); //review proposal
+    await user.click(submitButton); //submit proposal
 
-    await waitFor(() => {
-      expect(screen.queryByText('Action Required')).toBeDefined();
-      expect(screen.queryByText('Inflight Votes')).toBeDefined();
-      expect(screen.queryByText('Vote History')).toBeDefined();
-      expect(screen.queryByText('Successfully submitted the proposal')).toBeDefined();
-    });
-  });
-
-  test('should not render diffs if no changes to config values were made', async () => {
-    const user = userEvent.setup();
-
-    render(
-      <Wrapper>
-        <SetDsoConfigRulesForm />
-      </Wrapper>
-    );
-
-    const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
-    await user.type(summaryInput, 'Summary of the proposal');
-
-    const urlInput = screen.getByTestId('set-dso-config-rules-url');
-    await user.type(urlInput, 'https://example.com');
-
-    const jsonDiffs = screen.getByText('JSON Diffs');
-    expect(jsonDiffs).toBeDefined();
-
-    await user.click(jsonDiffs);
-    expect(screen.queryByText('No changes')).toBeDefined();
-
-    const reviewButton = screen.getByTestId('submit-button');
-    await waitFor(async () => {
-      expect(reviewButton.getAttribute('disabled')).toBeNull();
-    });
-
-    expect(jsonDiffs).toBeDefined();
-    await user.click(jsonDiffs);
-    expect(screen.queryByText('No changes')).toBeDefined();
+    await screen.findByText('Successfully submitted the proposal');
   });
 
   test('should render diffs if changes to config values were made', async () => {
@@ -373,26 +341,55 @@ describe('Set DSO Config Rules Form', () => {
     await user.type(c2Input, '9999');
 
     const jsonDiffs = screen.getByText('JSON Diffs');
-    expect(jsonDiffs).toBeDefined();
+    expect(jsonDiffs).toBeInTheDocument();
 
     await user.click(jsonDiffs);
-    expect(screen.queryByTestId('config-diffs-display')).toBeDefined();
+    expect(await screen.findByTestId('config-diffs-display')).toBeInTheDocument();
 
     const reviewButton = screen.getByTestId('submit-button');
     await waitFor(async () => {
       expect(reviewButton.getAttribute('disabled')).toBeNull();
     });
 
-    expect(jsonDiffs).toBeDefined();
+    expect(jsonDiffs).toBeInTheDocument();
     await user.click(jsonDiffs);
-    expect(screen.queryByTestId('config-diffs-display')).toBeDefined();
+    expect(screen.queryByTestId('config-diffs-display')).toBeInTheDocument();
+  });
+
+  test('should have decentralized synchronizer fields disabled', async () => {
+    render(
+      <Wrapper>
+        <SetDsoConfigRulesForm />
+      </Wrapper>
+    );
+
+    await waitFor(() => {
+      const lastSyncIdInput = screen.getByTestId(
+        'config-field-decentralizedSynchronizerLastSynchronizerId'
+      );
+      expect(lastSyncIdInput).toBeDisabled();
+
+      const activeSyncIdInput = screen.getByTestId(
+        'config-field-decentralizedSynchronizerActiveSynchronizerId'
+      );
+      expect(activeSyncIdInput).toBeDisabled();
+
+      const syncInput = screen.getByTestId('config-field-decentralizedSynchronizer1');
+      expect(syncInput).toBeDisabled();
+
+      const syncStateInput = screen.getByTestId('config-field-decentralizedSynchronizerState1');
+      expect(syncStateInput).toBeDisabled();
+
+      const syncGenesisInput = screen.getByTestId(
+        'config-field-decentralizedSynchronizerCometBftGenesisJson1'
+      );
+      expect(syncGenesisInput).toBeDisabled();
+    });
   });
 });
 
 describe('Next Scheduled Synchronizer Upgrade', () => {
   test('render default time for next scheduled upgrade', async () => {
-    const user = userEvent.setup();
-
     render(
       <Wrapper>
         <SetDsoConfigRulesForm />
@@ -400,13 +397,14 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
     );
 
     const effectiveDateInput = screen.getByTestId('set-dso-config-rules-effective-date-field');
-    expect(effectiveDateInput).toBeDefined();
+    expect(effectiveDateInput).toBeInTheDocument();
 
     const tenDaysFromNow = dayjs().add(10, 'day').format(dateTimeFormatISO);
-    await user.type(effectiveDateInput, tenDaysFromNow);
+
+    fireEvent.change(effectiveDateInput, { target: { value: tenDaysFromNow } });
 
     const defaultTimeDisplay = screen.getByTestId('next-scheduled-upgrade-time-default');
-    expect(defaultTimeDisplay).toBeDefined();
+    expect(defaultTimeDisplay).toBeInTheDocument();
 
     // The default should be effective date + 1 hour in UTC format
     await waitFor(() => {
@@ -449,12 +447,12 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
     const migrationIdInput = screen.getByTestId(
       'config-field-nextScheduledSynchronizerUpgradeMigrationId'
     );
-    expect(migrationIdInput).toBeDefined();
+    expect(migrationIdInput).toBeInTheDocument();
 
     await user.type(migrationIdInput, '12345');
 
     await waitFor(() => {
-      expect(screen.queryByText(errorMessage)).toBeDefined();
+      expect(screen.queryByText(errorMessage)).toBeInTheDocument();
     });
 
     // Error should be gone when migration ID is cleared
@@ -466,13 +464,13 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
     });
 
     const timeInput = screen.getByTestId('config-field-nextScheduledSynchronizerUpgradeTime');
-    expect(timeInput).toBeDefined();
+    expect(timeInput).toBeInTheDocument();
 
     const futureTime = dayjs().add(2, 'hour').format(dateTimeFormatISO);
     await user.type(timeInput, futureTime);
 
     await waitFor(() => {
-      expect(screen.queryByText(errorMessage)).toBeDefined();
+      expect(screen.queryByText(errorMessage)).toBeInTheDocument();
     });
 
     // Error should be gone when upgrade time is cleared
@@ -496,7 +494,8 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
 
     const effectiveDateInput = screen.getByTestId('set-dso-config-rules-effective-date-field');
     const effectiveDate = dayjs().add(10, 'day').format(dateTimeFormatISO);
-    await user.type(effectiveDateInput, effectiveDate);
+
+    fireEvent.change(effectiveDateInput, { target: { value: effectiveDate } });
 
     expect(screen.queryByText(errorMessage)).toBeNull();
 
@@ -514,7 +513,7 @@ describe('Next Scheduled Synchronizer Upgrade', () => {
     await user.type(migrationIdInput, '12345');
 
     await waitFor(() => {
-      expect(screen.queryByText(errorMessage)).toBeDefined();
+      expect(screen.queryByText(errorMessage)).toBeInTheDocument();
     });
 
     // Set upgrade time to be more than 1 hour after effective date - error should disappear

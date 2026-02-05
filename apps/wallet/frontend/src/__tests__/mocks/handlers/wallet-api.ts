@@ -10,9 +10,15 @@ import {
 import { ListTransferOffersResponse } from '@lfdecentralizedtrust/wallet-external-openapi';
 import {
   GetBalanceResponse,
+  ListMintingDelegationsResponse,
+  ListMintingDelegationProposalsResponse,
   ListTransactionsResponse,
   UserStatusResponse,
 } from '@lfdecentralizedtrust/wallet-openapi';
+import {
+  MintingDelegation,
+  MintingDelegationProposal,
+} from '@daml.js/splice-wallet/lib/Splice/Wallet/MintingDelegation/module';
 
 import {
   aliceEntry,
@@ -23,6 +29,13 @@ import {
   miningRounds,
   nameServiceEntries,
 } from '../constants';
+import {
+  mockMintingDelegations,
+  mockMintingDelegationProposals,
+  mockDelegationHostedStatus,
+  mockProposalHostedStatus,
+} from '../delegation-constants';
+import { mkContract } from '../contract';
 
 export const buildWalletMock = (walletUrl: string): RestHandler[] => [
   rest.get(`${walletUrl}/v0/wallet/user-status`, (_, res, ctx) => {
@@ -125,7 +138,6 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
               '009a97ffdf201d323d12a428187d9118d985678c37c6c1081f848269943f0da8bbca1112207e4b3e9a65879126e8b8103714f0144e1e0218fa98fb5231c63be74a0bb40402',
 
             // the openapi generator seems to generate a garbage type so there are a bunch of non-sense fields we need to fill in
-            provider: '',
             sender: { party: '', amount: '' },
             holding_fees: '',
             app_rewards_used: '',
@@ -143,7 +155,6 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
             },
             event_id: '#u3:0',
             date: new Date('2025-05-21T12:14:12Z'),
-            provider: alicePartyId,
             sender: { party: bobPartyId, amount: '-42.0' },
             receivers: [{ party: alicePartyId, amount: '0.0' }],
             holding_fees: '0.0',
@@ -167,7 +178,6 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
             },
             event_id: '#u2:0',
             date: new Date('2025-05-21T12:12:12Z'),
-            provider: alicePartyId,
             sender: { party: alicePartyId, amount: '23.0' },
             receivers: [],
             holding_fees: '0.0',
@@ -189,7 +199,6 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
             },
             event_id: '#u1:0',
             date: new Date('2025-05-21T12:10:12Z'),
-            provider: alicePartyId,
             sender: { party: alicePartyId, amount: '-42.0' },
             receivers: [],
             holding_fees: '0.0',
@@ -219,5 +228,39 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
 
   rest.get(`${walletUrl}/v0/scan-proxy/featured-apps/:party`, (_, res, ctx) => {
     return res(ctx.status(404), ctx.json({}));
+  }),
+
+  rest.get(`${walletUrl}/v0/wallet/minting-delegations`, (_, res, ctx) => {
+    return res(
+      ctx.json<ListMintingDelegationsResponse>({
+        delegations: mockMintingDelegations.map((delegation, index) => ({
+          contract: mkContract(MintingDelegation, delegation),
+          beneficiary_hosted: mockDelegationHostedStatus[index],
+        })),
+      })
+    );
+  }),
+
+  rest.get(`${walletUrl}/v0/wallet/minting-delegation-proposals`, (_, res, ctx) => {
+    return res(
+      ctx.json<ListMintingDelegationProposalsResponse>({
+        proposals: mockMintingDelegationProposals.map((proposal, index) => ({
+          contract: mkContract(MintingDelegationProposal, proposal),
+          beneficiary_hosted: mockProposalHostedStatus[index],
+        })),
+      })
+    );
+  }),
+
+  rest.post(`${walletUrl}/v0/wallet/minting-delegations/:cid/reject`, (_, res, ctx) => {
+    return res(ctx.status(200));
+  }),
+
+  rest.post(`${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/accept`, (_, res, ctx) => {
+    return res(ctx.status(200));
+  }),
+
+  rest.post(`${walletUrl}/v0/wallet/minting-delegation-proposals/:cid/reject`, (_, res, ctx) => {
+    return res(ctx.status(200));
   }),
 ];

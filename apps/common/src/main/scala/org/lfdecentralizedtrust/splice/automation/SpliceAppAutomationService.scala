@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.store.{
   AppStoreWithIngestion,
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
+  UpdateHistory,
 }
 import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.tracing.TraceContext
@@ -78,7 +79,8 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
       SpliceCircuitBreaker(
         s"$name-priority-connection",
         config,
-        logger,
+        clock,
+        loggerFactory,
       ),
       completionOffsetCallback,
     )
@@ -94,6 +96,22 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
       case SpliceLedgerConnectionPriority.AmuletExpiry => amuletExpiryConnection
     }
 
+  final protected def registerUpdateHistoryIngestion(
+      updateHistory: UpdateHistory
+  ): Unit = {
+    registerService(
+      new UpdateIngestionService(
+        updateHistory.getClass.getSimpleName,
+        updateHistory.ingestionSink,
+        connection(SpliceLedgerConnectionPriority.High),
+        automationConfig,
+        backoffClock = triggerContext.pollingClock,
+        triggerContext.retryProvider,
+        triggerContext.loggerFactory,
+      )
+    )
+  }
+
   private def completionOffsetCallback(offset: Long): Future[Unit] =
     store.multiDomainAcsStore.signalWhenIngestedOrShutdown(offset)(TraceContext.empty)
 
@@ -101,18 +119,6 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
     new UpdateIngestionService(
       store.getClass.getSimpleName,
       store.multiDomainAcsStore.ingestionSink,
-      connection(SpliceLedgerConnectionPriority.High),
-      automationConfig,
-      backoffClock = triggerContext.pollingClock,
-      triggerContext.retryProvider,
-      triggerContext.loggerFactory,
-    )
-  )
-
-  registerService(
-    new UpdateIngestionService(
-      store.updateHistory.getClass.getSimpleName,
-      store.updateHistory.ingestionSink,
       connection(SpliceLedgerConnectionPriority.High),
       automationConfig,
       backoffClock = triggerContext.pollingClock,

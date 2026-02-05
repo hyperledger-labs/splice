@@ -6,12 +6,13 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulat
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.synchronizer.block.BlockFormat
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.topology.TopologyActivationTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.PeanoQueue
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.data.OutputMetadataStore
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.TopologyActivationTime
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
   BlockNumber,
+  EpochLength,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.SimulationModuleSystem.SimulationEnv
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.{
@@ -26,14 +27,16 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.DurationConverters.ScalaDurationOps
 
-import BftOrderingVerifier.LivenessState
+import BftOrderingVerifier.{LivenessState, OffboardingStatus}
 
 final class BftOrderingVerifier(
     queue: mutable.Queue[(BftNodeId, BlockFormat.Block)],
     stores: Map[BftNodeId, OutputMetadataStore[SimulationEnv]],
     onboardingTimes: Map[BftNodeId, TopologyActivationTime],
+    offboardingTimes: Map[BftNodeId, CantonTimestamp],
     initialNodes: Seq[BftNodeId],
     simSettings: SimulationSettings,
+    epochLength: EpochLength,
     override val loggerFactory: NamedLoggerFactory,
 ) extends SimulationVerifier
     with Matchers
@@ -50,6 +53,8 @@ final class BftOrderingVerifier(
   }
 
   private var livenessState: LivenessState = LivenessState.NotChecking
+
+  private val offboardingProgress = mutable.Map.empty[BftNodeId, OffboardingStatus]
 
   override def resumeCheckingLiveness(at: CantonTimestamp): Unit =
     livenessState match {
@@ -100,6 +105,7 @@ final class BftOrderingVerifier(
   def newStage(
       simulationSettings: SimulationSettings,
       newOnboardingTimes: Map[BftNodeId, TopologyActivationTime],
+      newOffboardingTimes: Map[BftNodeId, CantonTimestamp],
       newStores: Map[BftNodeId, OutputMetadataStore[SimulationEnv]],
   ): BftOrderingVerifier = {
     val newVerifier =
@@ -107,8 +113,10 @@ final class BftOrderingVerifier(
         queue,
         stores ++ newStores,
         newOnboardingTimes,
+        newOffboardingTimes,
         Seq.empty,
         simulationSettings,
+        epochLength,
         loggerFactory,
       )
     newVerifier.currentLog ++= currentLog
@@ -121,17 +129,26 @@ final class BftOrderingVerifier(
     livenessState match {
       case LivenessState.NotChecking => ()
       case LivenessState.Checking(startedAt, logSizeAtStart, peanoQueueSnapshots) =>
-        val hasEveryoneMadeProgress = peanoQueueSnapshots.forall { case (node, peanoQueueHead) =>
-          peanoQueues(node).head.unwrap > peanoQueueHead
-        }
+        val (nodesInTopology, nodesNotInTopology) = peanoQueueSnapshots
+          .partition(x => offboardingTimes.get(x._1).forall(at <= _))
+        val hasEveryoneMadeProgress = nodesInTopology
+          .forall { case (node, peanoQueueHead) =>
+            peanoQueues(node).head.unwrap > peanoQueueHead
+          }
         if (currentLog.sizeIs > logSizeAtStart && hasEveryoneMadeProgress) {
           // There has been progress since the simulation became healthy, so we don't need to check anymore
           livenessState = LivenessState.NotChecking
         } else {
           withClue(
-            s"previous log size = $logSizeAtStart, current log size = ${currentLog.size}, " +
-              s"previous peano queue heads = $peanoQueueSnapshots, " +
-              s"current peano queue heads = ${peanoQueues.view.mapValues(_.head.unwrap).toMap}; " +
+            s"previous log size = $logSizeAtStart, current log size = ${currentLog.size}\n" +
+              s"previous peano queue heads (onboarded)  = $nodesInTopology\n" +
+              s"current  peano queue heads (onboarded)  = ${peanoQueues.view.filterKeys(nodesInTopology.contains).mapValues(_.head.unwrap).toMap}\n" +
+              s"previous peano queue heads (offboarded) = $nodesNotInTopology\n" +
+              s"current  peano queue heads (offboarded) = ${peanoQueues.view.filterKeys(nodesNotInTopology.contains).mapValues(_.head.unwrap).toMap}\n" +
+              (if (nodesNotInTopology.nonEmpty) {
+                 s"offboarding times = $offboardingTimes\n" +
+                   s"offboardingProgress = $offboardingProgress\n"
+               } else "") +
               "liveness timeout occurred"
           ) {
             at should be <= startedAt.add(simSettings.livenessCheckInterval.toJava)
@@ -142,7 +159,7 @@ final class BftOrderingVerifier(
   private def checkBlockAgainstModel(block: BlockFormat.Block): Unit =
     if (block.blockHeight < currentLog.size) {
       // Block already exists in the model, check it is the same
-      currentLog(block.blockHeight.toInt) shouldBe block
+      block shouldBe currentLog(block.blockHeight.toInt)
     } else {
       // New block
       block.blockHeight shouldBe currentLog.size
@@ -153,6 +170,41 @@ final class BftOrderingVerifier(
       }
       currentLog.append(block)
     }
+
+  private def checkOffboardingStatus(node: BftNodeId, block: BlockFormat.Block): Unit =
+    offboardingTimes.get(node) match {
+      case Some(offboardingTime) =>
+        val blockNumber = BlockNumber(block.blockHeight)
+        offboardingProgress.get(node) match {
+          case Some(OffboardingStatus.FinishedOffboarding) =>
+            throw new RuntimeException(
+              s"Sequencer $node published block $blockNumber after finished offboarding"
+            )
+          case Some(OffboardingStatus.StartedOffboarding(finalBlock)) =>
+            if (blockNumber == finalBlock) {
+              offboardingProgress(node) = OffboardingStatus.FinishedOffboarding
+            }
+          case None =>
+            val blockPartOfLastEpoch =
+              block.requests.exists(_.value.microsecondsSinceEpoch >= offboardingTime.toMicros)
+
+            if (blockPartOfLastEpoch) {
+              val lastBlockInEpoch = computeLastBlockInEpoch(blockNumber)
+              if (blockNumber == lastBlockInEpoch) {
+                offboardingProgress(node) = OffboardingStatus.FinishedOffboarding
+              } else {
+                offboardingProgress(node) = OffboardingStatus.StartedOffboarding(lastBlockInEpoch)
+              }
+            }
+        }
+
+      case None =>
+    }
+
+  // TODO(#19289) this assumes an ever static epoch length
+  private def computeLastBlockInEpoch(blockNumber: BlockNumber): BlockNumber = BlockNumber(
+    epochLength * ((blockNumber / epochLength) + 1) - 1
+  )
 
   private def checkStores(): Unit = {
     implicit val traceContext: TraceContext = TraceContext.empty
@@ -169,6 +221,7 @@ final class BftOrderingVerifier(
           s"Simulation verifier: checking block ${blockToInsert.blockHeight} in order from sequencer $sequencer"
         )
         checkBlockAgainstModel(blockToInsert)
+        checkOffboardingStatus(sequencer, blockToInsert)
       }
     }
     queue.clear()
@@ -188,5 +241,12 @@ object BftOrderingVerifier {
         logSizeAtStart: Int,
         peanoQueueSnapshots: Map[BftNodeId, PeanoQueueHead],
     ) extends LivenessState
+  }
+
+  sealed trait OffboardingStatus
+
+  object OffboardingStatus {
+    final case object FinishedOffboarding extends OffboardingStatus
+    final case class StartedOffboarding(finalBlock: BlockNumber) extends OffboardingStatus
   }
 }

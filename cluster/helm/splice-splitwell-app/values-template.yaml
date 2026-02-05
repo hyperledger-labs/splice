@@ -2,11 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
-defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data
+defaultJvmOptions: -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.numThreads=8 -XX:ActiveProcessorCount=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data
 fixedTokens: false
 resources:
   limits:
-    cpu: "2"
     memory: 1536Mi
   requests:
     cpu: "0.2"

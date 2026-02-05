@@ -109,7 +109,7 @@ spec:
                 path: postgresPassword
       containers:
       - name: postgres-exporter
-        image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
+        image: quay.io/prometheuscommunity/postgres-exporter:v0.18.1
         env:
           - name: DATA_SOURCE_PASS_FILE
             value: /tmp/pwd
@@ -117,6 +117,9 @@ spec:
             value: cnadmin
           - name: DATA_SOURCE_URI
             value: {{ $persistence.host  }}:{{ $persistence.port | default 5432 }}/{{ $.persistence.databaseName }}?sslmode=disable
+          # TODO(#3752): remove this once this works in postgres-exporter again
+          - name: PG_EXPORTER_DISABLE_SETTINGS_METRICS
+            value: "true"
         command:
           - '/bin/postgres_exporter'
           - '--log.format=json'
@@ -198,17 +201,13 @@ spec:
   targetLabels:
       - server
 {{- end }}
-{{- define "splice-util-lib.log-level" -}}
-{{- if .logLevel }}
+{{- define "splice-util-lib.log-level" }}
 - name: LOG_LEVEL_CANTON
-  value: {{ .logLevel }}
+  value: {{ .logLevel | default "INFO" }}
 - name: LOG_LEVEL_STDOUT
-{{- if .logLevelStdout }}
-  value: {{ .logLevelStdout }}
-{{- else }}
-  value: {{ .logLevel }}
-{{- end }}
-{{- end }}
+  value: {{ .logLevelStdout | default "DEBUG" }}
+- name: LOG_IMMEDIATE_FLUSH
+  value: {{ .logAsyncFlush | default true | not | quote }}
 {{- end }}
 {{- define "splice-util-lib.service-account" -}}
 {{- if .serviceAccountName -}}
@@ -240,4 +239,25 @@ app: {{ .app }}
 {{- else }} {{ $value }}
 {{- end }}
 {{- end -}}
+{{- end -}}
+
+{{- define "splice-util-lib.affinity" -}}
+{{- if or .enableAntiAffinity .affinity }}
+affinity:
+  {{- with .affinity }}
+    {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- if .enableAntiAffinity }}
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: splice-component
+              operator: In
+              values:
+                - {{ .app }}
+        topologyKey: kubernetes.io/hostname
+        namespaceSelector: { } # search in all namespaces
+  {{- end }}
+{{- end }}
 {{- end -}}

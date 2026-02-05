@@ -5,7 +5,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { describe, expect, test, vi } from 'vitest';
 
 import CreateUnallocatedUnclaimedActivityRecord from '../../components/votes/actions/CreateUnallocatedUnclaimedActivityRecord';

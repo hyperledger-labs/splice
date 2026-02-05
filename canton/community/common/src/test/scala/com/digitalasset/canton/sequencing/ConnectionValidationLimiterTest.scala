@@ -6,6 +6,7 @@ package com.digitalasset.canton.sequencing
 import cats.syntax.parallel.*
 import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
+  HasUnlessClosing,
   PromiseUnlessShutdown,
   UnlessShutdown,
 }
@@ -16,6 +17,10 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.util.concurrent.atomic.AtomicInteger
 
 class ConnectionValidationLimiterTest extends AnyWordSpec with BaseTest with HasExecutionContext {
+  private val mockHasUnlessClosing = new HasUnlessClosing {
+    override def isClosing: Boolean = false
+  }
+
   "ConnectionValidationLimiter" should {
     "limit to 2 validations in the presence of a burst" in {
       val promises = Seq.fill(2)(PromiseUnlessShutdown.unsupervised[Unit]())
@@ -28,13 +33,18 @@ class ConnectionValidationLimiterTest extends AnyWordSpec with BaseTest with Has
       }
 
       val validator =
-        new ConnectionValidationLimiter(mockValidate, futureSupervisor, loggerFactory)
+        new ConnectionValidationLimiter(
+          mockValidate,
+          futureSupervisor,
+          mockHasUnlessClosing,
+          loggerFactory,
+        )
 
       // Request a burst of validations
-      val fut = (1 to 42).toList.map(_ => validator.maybeValidate()(TraceContext.createNew()))
+      val fut = (1 to 42).toList.map(_ => validator.maybeValidate()(TraceContext.createNew("test")))
 
       // Complete all validations
-      promises.foreach(_.outcome(()))
+      promises.foreach(_.outcome_(()))
 
       // Wait for all validation requests to complete
       fut.parSequence.futureValueUS
@@ -54,10 +64,15 @@ class ConnectionValidationLimiterTest extends AnyWordSpec with BaseTest with Has
       }
 
       val validator =
-        new ConnectionValidationLimiter(mockValidate, futureSupervisor, loggerFactory)
+        new ConnectionValidationLimiter(
+          mockValidate,
+          futureSupervisor,
+          mockHasUnlessClosing,
+          loggerFactory,
+        )
 
       // Request two validations so one gets scheduled
-      val fut = (1 to 2).toList.map(_ => validator.maybeValidate()(TraceContext.createNew()))
+      val fut = (1 to 2).toList.map(_ => validator.maybeValidate()(TraceContext.createNew("test")))
 
       // Shutdown the validator
       validator.close()
@@ -80,13 +95,18 @@ class ConnectionValidationLimiterTest extends AnyWordSpec with BaseTest with Has
       }
 
       val validator =
-        new ConnectionValidationLimiter(mockValidate, futureSupervisor, loggerFactory)
+        new ConnectionValidationLimiter(
+          mockValidate,
+          futureSupervisor,
+          mockHasUnlessClosing,
+          loggerFactory,
+        )
 
       // Request two validations so one gets scheduled
-      val fut = (1 to 2).toList.map(_ => validator.maybeValidate()(TraceContext.createNew()))
+      val fut = (1 to 2).toList.map(_ => validator.maybeValidate()(TraceContext.createNew("test")))
 
       // Shutdown the first validation
-      promises(0).shutdown()
+      promises(0).shutdown_()
 
       // All validation requests should be shutdown
       forAll(fut.map(_.unwrap.futureValue))(_ shouldBe UnlessShutdown.AbortedDueToShutdown)
@@ -106,10 +126,15 @@ class ConnectionValidationLimiterTest extends AnyWordSpec with BaseTest with Has
       }
 
       val validator =
-        new ConnectionValidationLimiter(mockValidate, futureSupervisor, loggerFactory)
+        new ConnectionValidationLimiter(
+          mockValidate,
+          futureSupervisor,
+          mockHasUnlessClosing,
+          loggerFactory,
+        )
 
       // Request two validations so one gets scheduled
-      val fut = (1 to 2).toList.map(_ => validator.maybeValidate()(TraceContext.createNew()))
+      val fut = (1 to 2).toList.map(_ => validator.maybeValidate()(TraceContext.createNew("test")))
 
       // Fail the first validation
       promises(0).failure(new Exception("boom"))

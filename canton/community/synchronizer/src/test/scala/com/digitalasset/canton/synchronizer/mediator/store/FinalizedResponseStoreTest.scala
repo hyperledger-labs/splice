@@ -40,7 +40,7 @@ trait FinalizedResponseStoreTest {
 
   val requestId: RequestId = RequestId(CantonTimestamp.Epoch)
   val fullInformeeTree: FullInformeeTree = {
-    val synchronizerId = DefaultTestIdentities.synchronizerId
+    val synchronizerId = DefaultTestIdentities.physicalSynchronizerId
     val participantId = DefaultTestIdentities.participant1
 
     val alice = LfPartyId.assertFromString("alice")
@@ -81,7 +81,7 @@ trait FinalizedResponseStoreTest {
       testedProtocolVersion,
     )
     val commonMetadata = CommonMetadata
-      .create(hashOps, testedProtocolVersion)(
+      .create(hashOps)(
         synchronizerId,
         MediatorGroupRecipient(MediatorGroupIndex.zero),
         s(5417),

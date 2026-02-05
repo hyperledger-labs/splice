@@ -5,7 +5,7 @@ package com.digitalasset.canton.topology.processing
 
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.{
@@ -29,7 +29,8 @@ abstract class TopologyTransactionHandlingBase
   object Factory extends TopologyTransactionTestFactory(loggerFactory, parallelExecutionContext)
 
   protected def mkStore(
-      synchronizerId: SynchronizerId = Factory.synchronizerId1a
+      synchronizerId: PhysicalSynchronizerId = Factory.physicalSynchronizerId1a,
+      testName: String,
   ): TopologyStore[TopologyStoreId.SynchronizerStore]
 
   protected def ts(idx: Int): CantonTimestamp = CantonTimestamp.Epoch.plusSeconds(idx.toLong)
@@ -59,7 +60,12 @@ abstract class TopologyTransactionHandlingBase
   protected def validate(
       observed: Seq[TopologyMapping],
       expected: Seq[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]],
-  ): Assertion =
+  ): Assertion = {
+    if (observed.toSet != expected.map(_.mapping).toSet) {
+      logger.debug("OBSERVED\n  " + observed.mkString("  \n"))
+      logger.debug("EXPECTED\n  " + expected.map(_.mapping).mkString("  \n"))
+    }
     observed.toSet shouldBe expected.map(_.mapping).toSet
+  }
 
 }

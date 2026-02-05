@@ -153,7 +153,6 @@ object TxLogEntry extends StoreErrors {
           .ofInstant(entry.date.getOrElse(throw txMissingField()), ZoneOffset.UTC),
         transfer = Some(
           httpDef.Transfer(
-            provider = entry.provider.toProtoPrimitive,
             sender = toResponse(entry.sender.getOrElse(throw txMissingField())),
             receivers = entry.receivers.map(toResponse).toVector,
             balanceChanges = entry.balanceChanges.map(toResponse).toVector,

@@ -4,8 +4,9 @@
 package com.digitalasset.canton.crypto.provider.symbolic
 
 import com.digitalasset.canton.crypto.{
-  Crypto,
   EncryptionTest,
+  HmacAlgorithm,
+  HmacTest,
   PasswordBasedEncryptionTest,
   PrivateKeySerializationTest,
   RandomTest,
@@ -18,13 +19,14 @@ class SymbolicCryptoTest
     extends AsyncWordSpec
     with SigningTest
     with EncryptionTest
+    with HmacTest
     with PrivateKeySerializationTest
     with PasswordBasedEncryptionTest
     with RandomTest {
 
   "SymbolicCrypto" can {
 
-    def symbolicCrypto(): FutureUnlessShutdown[Crypto] =
+    def symbolicCrypto(): FutureUnlessShutdown[SymbolicCrypto] =
       FutureUnlessShutdown.pure(
         SymbolicCrypto.create(
           testedReleaseProtocolVersion,
@@ -43,6 +45,10 @@ class SymbolicCryptoTest
       SymbolicCryptoProvider.supportedEncryptionSpecs.algorithms.forgetNE,
       SymbolicCryptoProvider.supportedSymmetricKeySchemes,
       symbolicCrypto(),
+    )
+    behave like hmacProvider(
+      Set(HmacAlgorithm.HmacSha256),
+      symbolicCrypto().map(_.pureCrypto),
     )
     behave like privateKeySerializerProvider(
       SymbolicCryptoProvider.supportedSigningSpecs.keys.forgetNE,

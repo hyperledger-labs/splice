@@ -5,20 +5,26 @@ package com.digitalasset.canton.participant.protocol
 
 import cats.data.EitherT
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{
+  CantonTimestamp,
+  LogicalUpgradeTime,
+  SynchronizerPredecessor,
+  SynchronizerSuccessor,
+}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.ledger.participant.state.Update
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.protocol.ParticipantTopologyTerminateProcessing.EventInfo
+import com.digitalasset.canton.participant.sync.LogicalSynchronizerUpgradeCallback
+import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.TopologyStore.EffectiveStateChange
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.transaction.TopologyMapping
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{SequencerCounter, topology}
 
 import scala.concurrent.ExecutionContext
@@ -33,16 +39,18 @@ object ParticipantTopologyTerminateProcessing {
 }
 
 class ParticipantTopologyTerminateProcessing(
-    synchronizerId: SynchronizerId,
-    protocolVersion: ProtocolVersion,
     recordOrderPublisher: RecordOrderPublisher,
     store: TopologyStore[TopologyStoreId.SynchronizerStore],
     initialRecordTime: CantonTimestamp,
     participantId: ParticipantId,
     pauseSynchronizerIndexingDuringPartyReplication: Boolean,
+    synchronizerPredecessor: Option[SynchronizerPredecessor],
+    lsuCallback: LogicalSynchronizerUpgradeCallback,
     override protected val loggerFactory: NamedLoggerFactory,
 ) extends topology.processing.TerminateProcessing
     with NamedLogging {
+
+  private val psid = store.storeId.psid
 
   override def terminate(
       sc: SequencerCounter,
@@ -51,12 +59,22 @@ class ParticipantTopologyTerminateProcessing(
   )(implicit
       traceContext: TraceContext,
       executionContext: ExecutionContext,
-  ): FutureUnlessShutdown[Unit] =
-    if (sequencedTime.value > initialRecordTime) {
+  ): FutureUnlessShutdown[Unit] = {
+    val shouldPublish =
+      sequencedTime.value > initialRecordTime &&
+        LogicalUpgradeTime.canProcessKnowingPredecessor(synchronizerPredecessor, sequencedTime)
+
+    if (shouldPublish) {
       for {
         effectiveStateChanges <- store.findEffectiveStateChanges(
           fromEffectiveInclusive = effectiveTime.value,
           onlyAtEffective = true,
+          filterTypes = Some(
+            Seq(
+              TopologyMapping.Code.PartyToParticipant,
+              TopologyMapping.Code.SynchronizerTrustCertificate,
+            )
+          ),
         )
         _ = if (effectiveStateChanges.sizeIs > 1)
           logger.error(
@@ -77,6 +95,27 @@ class ParticipantTopologyTerminateProcessing(
       )
       FutureUnlessShutdown.unit
     }
+  }
+
+  override def notifyUpgradeAnnouncement(
+      successor: SynchronizerSuccessor
+  )(implicit traceContext: TraceContext): Unit = {
+    logger.info(
+      s"Node is notified about the upgrade of $psid to ${successor.psid} scheduled at ${successor.upgradeTime}"
+    )
+
+    lsuCallback.registerCallback(successor)
+    recordOrderPublisher.setSuccessor(Some(successor))
+  }
+
+  override def notifyUpgradeCancellation()(implicit traceContext: TraceContext): Unit = {
+    logger.info(
+      s"Node is notified about the cancellation of upgrade"
+    )
+
+    lsuCallback.unregisterCallback()
+    recordOrderPublisher.setSuccessor(None)
+  }
 
   private def scheduleEvent(
       effectiveTime: EffectiveTime,
@@ -148,15 +187,23 @@ class ParticipantTopologyTerminateProcessing(
       outstandingEffectiveChanges <- store.findEffectiveStateChanges(
         fromEffectiveInclusive = initialRecordTime,
         onlyAtEffective = false,
+        filterTypes = Some(
+          Seq(
+            TopologyMapping.Code.PartyToParticipant,
+            TopologyMapping.Code.SynchronizerTrustCertificate,
+          )
+        ),
       )
       eventFromEffectiveChangeWithInitializationTraceContext =
         (effectiveChange: EffectiveStateChange) =>
           getNewEvents(effectiveChange)
             .map(eventInfo => eventInfo.event -> effectiveChange.sequencedTime.value)
       eventsFromBootstrapping = outstandingEffectiveChanges.view
-        .filter(
+        .filter(change =>
           // changes coming from bootstrapping (not a mistake, topology state initialization is happening for this bound - topology transaction will be emitted to new member which are sequenced after the trustCertificateEffectiveTime)
-          _.sequencedTime.value <= trustCertificateEffectiveTime
+          change.sequencedTime.value <= trustCertificateEffectiveTime &&
+            LogicalUpgradeTime
+              .canProcessKnowingPredecessor(synchronizerPredecessor, change.sequencedTime)
         )
         .flatMap(eventFromEffectiveChangeWithInitializationTraceContext)
         .toVector
@@ -248,17 +295,16 @@ class ParticipantTopologyTerminateProcessing(
       traceContext: TraceContext
   ): Option[EventInfo] =
     TopologyTransactionDiff(
-      synchronizerId = synchronizerId,
+      psid = psid,
       oldRelevantState = effectiveStateChange.before.signedTransactions,
       currentRelevantState = effectiveStateChange.after.signedTransactions,
       localParticipantId = participantId,
-      protocolVersion = protocolVersion,
     ).map { case TopologyTransactionDiff(events, updateId, requiresLocalPartyReplication) =>
       EventInfo(
         Update.TopologyTransactionEffective(
           updateId = updateId,
           events = events,
-          synchronizerId = synchronizerId,
+          synchronizerId = psid.logical,
           effectiveTime = effectiveStateChange.effectiveTime.value,
         ),
         requiresLocalPartyReplication,

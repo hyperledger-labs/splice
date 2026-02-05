@@ -39,10 +39,8 @@ class UpdateHistoryIntegrationTest
           _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
         )(config)
       )
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-          _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
-        )(config)
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateInitialTickDuration(NonNegativeFiniteDuration.ofMillis(500))(config)
       )
       .withTrafficTopupsDisabled
 
@@ -145,7 +143,7 @@ class UpdateHistoryIntegrationTest
               aliceUserParty,
               Set(update.contractId.contractId),
             ) shouldBe Map(
-            update.contractId.contractId -> synchronizerId
+            update.contractId.contractId -> synchronizerId.logical
           )
         },
     )
@@ -156,7 +154,7 @@ class UpdateHistoryIntegrationTest
       eventually() {
         compareHistory(
           sv1Backend.participantClient,
-          sv1ScanBackend.appState.store.updateHistory,
+          sv1ScanBackend.appState.automation.updateHistory,
           ledgerBeginSv1,
         )
       }
@@ -181,7 +179,7 @@ class UpdateHistoryIntegrationTest
             .lookupUserWallet(aliceWalletClient.config.ledgerApiUser)
             .futureValue
             .getOrElse(throw new RuntimeException("Alice wallet should exist"))
-            .store
+            .automation
             .updateHistory,
           ledgerBeginAlice,
           true,
@@ -189,22 +187,8 @@ class UpdateHistoryIntegrationTest
       }
       eventually() {
         compareHistory(
-          sv1Backend.participantClient,
-          sv1Backend.appState.svStore.updateHistory,
-          ledgerBeginSv1,
-        )
-      }
-      eventually() {
-        compareHistory(
-          sv1Backend.participantClient,
-          sv1Backend.appState.dsoStore.updateHistory,
-          ledgerBeginSv1,
-        )
-      }
-      eventually() {
-        compareHistory(
           aliceValidatorBackend.participantClient,
-          aliceValidatorBackend.appState.store.updateHistory,
+          aliceValidatorBackend.appState.automation.updateHistory,
           ledgerBeginAlice,
         )
       }

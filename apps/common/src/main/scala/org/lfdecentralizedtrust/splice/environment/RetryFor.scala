@@ -39,6 +39,16 @@ object RetryFor {
     resetRetriesAfter = None,
   )
 
+  /** A retry intended for app initialization steps that might take a long time to execute.
+    * Eg: after a migration waiting for store ingestion
+    */
+  val WaitingOnInitDependencyLong: RetryFor = RetryFor(
+    maxRetries = 500,
+    initialDelay = 200.millis,
+    maxDelay = 5.seconds,
+    resetRetriesAfter = None,
+  )
+
   /** A retry intended for automation that is expected to run forever, e.g.,
     * ledger ingestion. Retries are bounded but reset after a period of
     * no errors. This should usually be wrapped in an outer retry loop that

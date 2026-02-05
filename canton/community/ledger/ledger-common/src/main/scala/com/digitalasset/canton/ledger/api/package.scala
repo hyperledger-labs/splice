@@ -3,12 +3,10 @@
 
 package com.digitalasset.canton.ledger
 
+import com.daml.jwt.JwksUrl
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.value.Value as Lf
 import scalaz.{@@, Tag}
-
-import java.net.URI
-import scala.util.Try
 
 package object api {
   type Value = Lf
@@ -42,22 +40,6 @@ package api {
   sealed trait ParticipantIdTag
 
   sealed trait SubmissionIdTag
-
-  final case class JwksUrl(value: String) extends AnyVal {
-    def toURL = new URI(value).toURL
-  }
-
-  object JwksUrl {
-    def fromString(value: String): Either[String, JwksUrl] =
-      Try(new URI(value).toURL).toEither.left
-        .map(_.getMessage)
-        .map(_ => JwksUrl(value))
-
-    def assertFromString(str: String): JwksUrl = fromString(str) match {
-      case Right(value) => value
-      case Left(err) => throw new IllegalArgumentException(err)
-    }
-  }
 
   sealed trait IdentityProviderId {
     def toRequestString: String
@@ -154,18 +136,28 @@ package api {
       identityProviderId: IdentityProviderId,
   )
 
-  sealed abstract class UserRight extends Product with Serializable
+  sealed abstract class UserRight extends Product with Serializable {
+    def getParty: Option[Ref.Party] = None
+  }
+
+  sealed abstract class UserRightForParty(party: Ref.Party) extends UserRight {
+    override def getParty: Option[Ref.Party] = Some(party)
+  }
 
   object UserRight {
     final case object ParticipantAdmin extends UserRight
 
     final case object IdentityProviderAdmin extends UserRight
 
-    final case class CanActAs(party: Ref.Party) extends UserRight
+    final case class CanActAs(party: Ref.Party) extends UserRightForParty(party)
 
-    final case class CanReadAs(party: Ref.Party) extends UserRight
+    final case class CanReadAs(party: Ref.Party) extends UserRightForParty(party)
 
     final case object CanReadAsAnyParty extends UserRight
+
+    final case class CanExecuteAs(party: Ref.Party) extends UserRightForParty(party)
+
+    final case object CanExecuteAsAnyParty extends UserRight
   }
 
   sealed abstract class Feature extends Product with Serializable

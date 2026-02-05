@@ -12,7 +12,6 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   InstalledMigrationSpecificSv,
-  installSvParticipant,
   SingleSvConfiguration,
   StaticCometBftConfigWithNodeName,
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
@@ -21,6 +20,9 @@ import {
   InStackCantonBftDecentralizedSynchronizerNode,
   InStackCometBftDecentralizedSynchronizerNode,
 } from '@lfdecentralizedtrust/splice-pulumi-sv-canton/src/decentralizedSynchronizerNode';
+
+import { spliceConfig } from '../../common/src/config/config';
+import { installSvParticipant } from './participant';
 
 export function installCantonComponents(
   xns: ExactNamespace,
@@ -59,7 +61,7 @@ export function installCantonComponents(
     auth0Client,
     xns,
     `sv-canton-migration-${migrationId}`,
-    svConfig.auth0SvAppName
+    'sv'
   );
   const ledgerApiUserSecretSource = auth0UserNameEnvVarSource(
     `sv-canton-migration-${migrationId}`,
@@ -73,30 +75,43 @@ export function installCantonComponents(
   if (!migrationInfo) {
     throw new Error(`Migration ${migrationId} not found in migration config`);
   }
+  const version = isActiveMigration
+    ? (svConfig.versionOverride ?? migrationInfo.version)
+    : migrationInfo.version;
   const participantPg =
     dbs?.participant ||
     installPostgres(
       xns,
       `participant-${migrationId}-pg`,
       `participant-pg`,
-      migrationInfo.version,
+      version,
+      svConfig.participant?.cloudSql || spliceConfig.pulumiProjectConfig.cloudSql,
       true,
       { isActive: migrationStillRunning, migrationId, disableProtection }
     );
   const mediatorPostgres =
     dbs?.mediator ||
-    installPostgres(xns, `mediator-${migrationId}-pg`, `mediator-pg`, migrationInfo.version, true, {
-      isActive: migrationStillRunning,
-      migrationId,
-      disableProtection,
-    });
+    installPostgres(
+      xns,
+      `mediator-${migrationId}-pg`,
+      `mediator-pg`,
+      version,
+      svConfig.mediator?.cloudSql || spliceConfig.pulumiProjectConfig.cloudSql,
+      true,
+      {
+        isActive: migrationStillRunning,
+        migrationId,
+        disableProtection,
+      }
+    );
   const sequencerPostgres =
     dbs?.sequencer ||
     installPostgres(
       xns,
       `sequencer-${migrationId}-pg`,
       `sequencer-pg`,
-      migrationInfo.version,
+      version,
+      svConfig.sequencer?.cloudSql || spliceConfig.pulumiProjectConfig.cloudSql,
       true,
       { isActive: migrationStillRunning, migrationId, disableProtection }
     );
@@ -106,10 +121,8 @@ export function installCantonComponents(
       svConfig,
       migrationId,
       auth0Config,
-      isActiveMigration,
       participantPg,
-      migrationInfo.version,
-      svConfig.onboardingName,
+      version,
       ledgerApiUserSecretSource,
       imagePullServiceAccountName,
       withAddedDependencies(opts, ledgerApiUserSecret ? [ledgerApiUserSecret] : [])
@@ -125,8 +138,7 @@ export function installCantonComponents(
             mediatorPostgres: mediatorPostgres,
             setCoreDbNames: svConfig.isCoreSv,
           },
-          isActiveMigration,
-          migrationInfo.version,
+          version,
           imagePullServiceAccountName,
           opts
         )
@@ -143,7 +155,7 @@ export function installCantonComponents(
           isActiveMigration,
           migrationConfig.isRunningMigration(),
           svConfig.onboardingName,
-          migrationInfo.version,
+          version,
           imagePullServiceAccountName,
           disableProtection,
           opts

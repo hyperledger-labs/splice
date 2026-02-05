@@ -23,16 +23,17 @@ import org.lfdecentralizedtrust.splice.codegen.java.{
   DecoderSpliceValidatorLifecycle,
   DecoderSpliceWallet,
   DecoderSpliceWalletPayments,
+  DecoderBatchedMarkers,
 }
 
 import scala.jdk.CollectionConverters.*
 
 // TODO (#916): Replace with usage of com.digitalasset.transcode
 object ContractCompanions {
-  type C = Contract.Companion.Template[_ <: ContractId[?], _ <: DamlRecord[?]]
-  type I = Contract.Companion.Interface[_ <: ContractId[?], _ <: JavaGenContract[_ <: ContractId[
+  type C = Contract.Companion.Template[? <: ContractId[?], ? <: DamlRecord[?]]
+  type I = Contract.Companion.Interface[? <: ContractId[?], ? <: JavaGenContract[? <: ContractId[
     ?
-  ], _ <: DamlRecord[?]], _ <: DamlRecord[?]]
+  ], ? <: DamlRecord[?]], ? <: DamlRecord[?]]
 
   // A choice where we don't know the type parameters at compile time.
   // ArgType: a subclass of com.daml.ledger.javaapi.data.codegen.DamlRecord
@@ -42,7 +43,7 @@ object ContractCompanions {
   //   - com.daml.ledger.javaapi.data.codegen.ContractId (which is NOT a subclass of com.daml.ledger.javaapi.data.Value)
   //   - java.util.List
   //   - org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
-  type GenericChoice = Choice[_ <: DamlRecord[?], DamlRecord[?], Any]
+  type GenericChoice = Choice[? <: DamlRecord[?], DamlRecord[?], Any]
 
   // Only includes decoders for 1rst party daml contracts.
   // In particular, does not include splitwell.
@@ -53,6 +54,7 @@ object ContractCompanions {
     DecoderSpliceValidatorLifecycle.contractDecoder,
     DecoderSpliceWallet.contractDecoder,
     DecoderSpliceWalletPayments.contractDecoder,
+    DecoderBatchedMarkers.contractDecoder,
   )
 
   // Unfortunately interfaces need to be declared explicitly, as there's no auto-generated list of decoders

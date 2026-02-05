@@ -57,7 +57,7 @@ class LocalSequencerStateEventSignaller(
   override def notifyOfLocalWrite(
       notification: WriteNotification
   )(implicit traceContext: TraceContext): Future[Unit] =
-    performUnlessClosingF(functionFullName) {
+    synchronizeWithClosingF(functionFullName) {
       queueWithLogging("latest-head-state-queue", queue)(notification)
     }.onShutdown {
       logger.info("Dropping local write signal due to shutdown")
@@ -68,9 +68,9 @@ class LocalSequencerStateEventSignaller(
       member: Member,
       memberId: SequencerMemberId,
   )(implicit traceContext: TraceContext): Source[ReadSignal, NotUsed] = {
-    logger.debug(s"Creating signal source for $member")
+    logger.info(s"Creating signal source for $member")
     notificationsHubSource
-      .filter(_.includes(memberId))
+      .filter(_.isBroadcastOrIncludes(memberId))
       .map(_ => ReadSignal)
       // this conflate ensures that a slow consumer doesn't cause backpressure and therefore
       // block the stream of signals for other consumers

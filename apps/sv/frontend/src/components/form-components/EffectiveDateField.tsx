@@ -62,7 +62,7 @@ export const EffectiveDateField: React.FC<EffectiveDateFieldProps> = props => {
         <FormControlLabel
           value="custom"
           control={<Radio />}
-          label={<Typography>Custom</Typography>}
+          label={<Typography>Date</Typography>}
         />
 
         {currentType === 'custom' && (
@@ -81,11 +81,13 @@ export const EffectiveDateField: React.FC<EffectiveDateFieldProps> = props => {
                     effectiveDate: newDate?.format(dateTimeFormatISO) || undefined,
                   });
                 }}
+                enableAccessibleFieldDOMStructure={false}
                 slotProps={{
                   textField: {
                     fullWidth: true,
                     variant: 'outlined',
                     id: `${id}-field`,
+                    className: 'effective-date-field',
                     onBlur: field.handleBlur,
                     error: !field.state.meta.isValid,
                     helperText: field.state.meta.errors?.[0],
@@ -101,12 +103,12 @@ export const EffectiveDateField: React.FC<EffectiveDateFieldProps> = props => {
 
         <FormControlLabel
           value="threshold"
-          control={<Radio />}
+          control={<Radio id="effective-at-threshold-radio" />}
           label={
             <Box>
               <Typography>Make effective at threshold</Typography>
               <Typography variant="body2" color="text.secondary">
-                This will allow the vote proposal to take effect immediately when 2/3 vote in favor
+                Allow the vote proposal to take effect immediately when 2/3 vote in favor
               </Typography>
             </Box>
           }

@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.scan.util
+import org.lfdecentralizedtrust.splice.store.ChoiceContextContractFetcher
 import org.lfdecentralizedtrust.splice.util.Contract
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.definitions.GetChoiceContextRequest
@@ -24,6 +25,7 @@ import scala.jdk.CollectionConverters.*
 
 class HttpTokenStandardAllocationHandler(
     store: ScanStore,
+    contractFetcher: ChoiceContextContractFetcher,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -50,6 +52,7 @@ class HttpTokenStandardAllocationHandler(
           allocationId,
           requireLockedAmulet = true,
           canBeFeatured = true,
+          excludeDebugFields = body.excludeDebugFields.getOrElse(false),
         )
       } yield v1.Resource.GetAllocationTransferContextResponseOK(choiceContext)
     }
@@ -67,6 +70,7 @@ class HttpTokenStandardAllocationHandler(
           allocationId,
           requireLockedAmulet = false,
           canBeFeatured = false,
+          excludeDebugFields = body.excludeDebugFields.getOrElse(false),
         )
       } yield v1.Resource.GetAllocationCancelContextResponseOK(choiceContext)
     }
@@ -84,6 +88,7 @@ class HttpTokenStandardAllocationHandler(
           allocationId,
           requireLockedAmulet = false,
           canBeFeatured = false,
+          excludeDebugFields = body.excludeDebugFields.getOrElse(false),
         )
       } yield v1.Resource.GetAllocationWithdrawContextResponseOK(choiceContext)
     }
@@ -94,11 +99,12 @@ class HttpTokenStandardAllocationHandler(
       allocationId: String,
       requireLockedAmulet: Boolean,
       canBeFeatured: Boolean,
+      excludeDebugFields: Boolean,
   )(implicit
       tc: TraceContext
   ): Future[definitions.ChoiceContext] = {
     for {
-      amuletAlloc <- store.multiDomainAcsStore
+      amuletAlloc <- contractFetcher
         .lookupContractById(amuletallocation.AmuletAllocation.COMPANION)(
           new amuletallocation.AmuletAllocation.ContractId(
             allocationId
@@ -117,15 +123,16 @@ class HttpTokenStandardAllocationHandler(
         ChoiceContextBuilder,
       ](
         s"AmuletAllocation '$allocationId'",
-        amuletAlloc.contract.payload.lockedAmulet,
-        amuletAlloc.contract.payload.allocation.settlement.settleBefore,
+        amuletAlloc.payload.lockedAmulet,
+        amuletAlloc.payload.allocation.settlement.settleBefore,
         requireLockedAmulet,
         Option.when(canBeFeatured)(
           PartyId.tryFromProtoPrimitive(amuletAlloc.payload.allocation.settlement.executor)
         ),
         store,
+        contractFetcher,
         clock,
-        new ChoiceContextBuilder(_),
+        new ChoiceContextBuilder(_, excludeDebugFields),
       )
     } yield context
   }
@@ -133,13 +140,13 @@ class HttpTokenStandardAllocationHandler(
 
 object HttpTokenStandardAllocationHandler {
 
-  final class ChoiceContextBuilder(activeSynchronizerId: String)(implicit
-      elc: ErrorLoggingContext
+  final class ChoiceContextBuilder(activeSynchronizerId: String, excludeDebugFields: Boolean)(
+      implicit elc: ErrorLoggingContext
   ) extends util.ChoiceContextBuilder[
         definitions.DisclosedContract,
         definitions.ChoiceContext,
         ChoiceContextBuilder,
-      ](activeSynchronizerId) {
+      ](activeSynchronizerId, excludeDebugFields) {
 
     def build(): definitions.ChoiceContext = definitions.ChoiceContext(
       choiceContextData = io.circe.parser
@@ -156,6 +163,7 @@ object HttpTokenStandardAllocationHandler {
     override protected def toTokenStandardDisclosedContract[TCId, T](
         contract: Contract[TCId, T],
         synchronizerId: String,
+        excludeDebugFields: Boolean,
     ): definitions.DisclosedContract = {
       val asHttp = contract.toHttp
       definitions.DisclosedContract(
@@ -164,9 +172,15 @@ object HttpTokenStandardAllocationHandler {
         createdEventBlob = asHttp.createdEventBlob,
         synchronizerId = synchronizerId,
         debugPackageName =
-          DarResources.lookupPackageId(contract.identifier.getPackageId).map(_.metadata.name),
-        debugPayload = Some(asHttp.payload),
-        debugCreatedAt = Some(contract.createdAt.atOffset(ZoneOffset.UTC)),
+          if (excludeDebugFields) None
+          else
+            DarResources
+              .lookupPackageId(contract.identifier.getPackageId)
+              .map(_.metadata.name),
+        debugPayload = if (excludeDebugFields) None else Some(asHttp.payload),
+        debugCreatedAt =
+          if (excludeDebugFields) None
+          else Some(contract.createdAt.atOffset(ZoneOffset.UTC)),
       )
     }
   }

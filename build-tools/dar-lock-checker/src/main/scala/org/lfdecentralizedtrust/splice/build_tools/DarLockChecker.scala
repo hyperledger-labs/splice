@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.build_tools
 
 import better.files.*
-import com.digitalasset.daml.lf.archive.{DarDecoder, DarParser}
+import com.digitalasset.daml.lf.archive.DarParser
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 
 import scala.concurrent.duration.{Duration, DurationInt}
@@ -166,10 +166,21 @@ object DarLockChecker {
     implicit val ec = ExecutionContext.global
 
     def readDar(filename: String): Dar = {
-      val hash = DarParser.assertReadArchiveFromFile(File(filename).toJava).main.getHash
-      val metadata =
-        DarDecoder.assertReadArchiveFromFile(File(filename).toJava).main._2.metadata
-      Dar(metadata.name, metadata.version, hash, filename)
+      val archive = DarParser.assertReadArchiveFromFile(File(filename).toJava)
+      val hash = archive.main.getHash
+      // low-level decoding of the protobuf instead of using the LF libraries
+      // as we only care about the metadata
+      // and can avoid decoding the full LF AST.
+      val payload = com.digitalasset.daml.lf.archive.ArchivePayloadParser
+        .assertFromByteString(archive.main.getPayload)
+      val input = payload.getDamlLf2.newCodedInput()
+      input.setRecursionLimit(1000)
+      val pkg = com.digitalasset.daml.lf.archive.DamlLf2.Package.parseFrom(input)
+      val metadata = pkg.getMetadata
+      val internedStrings = pkg.getInternedStrings
+      val name = PackageName.assertFromString(internedStrings(metadata.getNameInternedStr))
+      val version = PackageVersion.assertFromString(internedStrings(metadata.getVersionInternedStr))
+      Dar(name, version, hash, filename)
     }
 
     val darFutures: Seq[Future[Dar]] = filenames.map { filename =>

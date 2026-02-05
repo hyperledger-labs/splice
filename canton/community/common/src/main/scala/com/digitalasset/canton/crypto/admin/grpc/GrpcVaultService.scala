@@ -204,7 +204,7 @@ class GrpcVaultService(
     for {
       scheme <-
         if (request.keySpec.isSigningKeySpecUnspecified)
-          Future.successful(crypto.privateCrypto.defaultSigningKeySpec)
+          Future.successful(crypto.privateCrypto.signingSchemes.keySpecs.default)
         else
           Future(
             SigningKeySpec
@@ -237,7 +237,7 @@ class GrpcVaultService(
     for {
       scheme <-
         if (request.keySpec.isEncryptionKeySpecUnspecified)
-          Future.successful(crypto.privateCrypto.defaultEncryptionKeySpec)
+          Future.successful(crypto.privateCrypto.encryptionSchemes.keySpecs.default)
         else
           Future(
             EncryptionKeySpec
@@ -486,9 +486,9 @@ class GrpcVaultService(
       )
       keyPair <- (publicKey, privateKey) match {
         case (pub: SigningPublicKey, pkey: SigningPrivateKey) =>
-          FutureUnlessShutdown.pure(new SigningKeyPair(pub, pkey))
+          FutureUnlessShutdown.pure(SigningKeyPair.create(pub, pkey))
         case (pub: EncryptionPublicKey, pkey: EncryptionPrivateKey) =>
-          FutureUnlessShutdown.pure(new EncryptionKeyPair(pub, pkey))
+          FutureUnlessShutdown.pure(EncryptionKeyPair.create(pub, pkey))
         case _ =>
           FutureUnlessShutdown.failed(
             Status.INVALID_ARGUMENT
@@ -577,7 +577,7 @@ class GrpcVaultService(
       )
 
       // Decrypt the keypair if a password is provided
-      keyPair <-
+      parsedKeyPair <-
         OptionUtil.emptyStringAsNone(request.password) match {
           case Some(password) =>
             val resultE = for {
@@ -602,7 +602,21 @@ class GrpcVaultService(
             }
         }
 
-      _ <- loadKeyPair(validatedName, keyPair)
+      derivedKeyPair <- (parsedKeyPair.privateKey: @unchecked) match {
+        case encryptionPrivateKey: EncryptionPrivateKey =>
+          EncryptionKeyPair
+            .create(encryptionPrivateKey)
+            .toFutureUS { errMsg =>
+              throw EncryptionKeyCreationError.ErrorCode.Wrap(errMsg).asGrpcError
+            }
+        case signingPrivateKey: SigningPrivateKey =>
+          SigningKeyPair
+            .create(signingPrivateKey)
+            .toFutureUS { errMsg =>
+              throw SigningKeyCreationError.ErrorCode.Wrap(errMsg).asGrpcError
+            }
+      }
+      _ <- loadKeyPair(validatedName, derivedKeyPair)
     } yield v30.ImportKeyPairResponse()
   }.failOnShutdownTo(AbortedDueToShutdown.Error().asGrpcError)
 

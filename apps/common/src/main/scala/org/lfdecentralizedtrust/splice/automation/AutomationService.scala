@@ -23,7 +23,7 @@ import scala.reflect.ClassTag
 
 /** Shared base class for running ingestion and task-handler automation in applications. */
 abstract class AutomationService(
-    private val automationConfig: AutomationConfig,
+    protected val automationConfig: AutomationConfig,
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
@@ -78,15 +78,18 @@ abstract class AutomationService(
         s"Registering unexpected trigger $triggerName; possibly missing from $companion's expectedTriggerClasses"
       )(TraceContext.empty)
     val paused = automationConfig.pausedTriggers contains triggerName
+    logger.debug(s"Starting trigger $triggerName")(TraceContext.empty)
     trigger.run(paused)
   }
 
   /** Returns all triggers of the given class */
-  final def triggers[T <: Trigger](implicit tag: ClassTag[T]): Seq[T] = {
+  final def triggers[T <: Trigger](implicit tag: ClassTag[T]): Seq[T] = services[T](tag)
+
+  final def services[T](implicit tag: ClassTag[T]): Seq[T] = {
     backgroundServices
       .get()
-      .collect { case trigger: T =>
-        trigger
+      .collect { case service: T =>
+        service
       }
   }
 

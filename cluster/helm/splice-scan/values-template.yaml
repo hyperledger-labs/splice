@@ -8,13 +8,13 @@ pod:
   annotations: {}
   labels: {}
 
-defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=70 -XX:InitialRAMPercentage=70 -Dscala.concurrent.context.minThreads=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data
+defaultJvmOptions: -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=70 -XX:InitialRAMPercentage=70 -Dscala.concurrent.context.numThreads=8 -XX:ActiveProcessorCount=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data
 resources:
   limits:
-    memory: 2048Mi
+    memory: 6Gi
   requests:
-    cpu: "0.5"
-    memory: 1536Mi
+    cpu: "3"
+    memory: 3Gi
 
 metrics:
   enable: false
@@ -28,6 +28,13 @@ persistence:
   port: 5432
   user: cnadmin
   secretName: "postgres-secrets"
+  # The user version of the ACS store (optional), a positive integer,
+  # set to 1 if previously unset to re-ingest, increment by 1 to subsequently re-ingest, the ACS store
+  # acsStoreDescriptorUserVersion:
+
+  # The user version of the TxLog store (optional), a positive integer,
+  # set to 1 if previously unset to re-ingest, increment by 1 to subsequently re-ingest, the TxLog store
+  # txLogStoreDescriptorUserVersion:
 
 migration:
   id: 0
@@ -57,3 +64,4 @@ spliceInstanceNames:
 service:
   ui:
     port: 80
+logLevel: DEBUG

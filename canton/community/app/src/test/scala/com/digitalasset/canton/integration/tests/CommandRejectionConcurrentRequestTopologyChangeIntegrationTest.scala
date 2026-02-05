@@ -11,11 +11,11 @@ import com.digitalasset.canton.console.LocalParticipantReference
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.MediatorError.MalformedMessage
 import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
-import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
+import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencer.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
-  UseCommunityReferenceBlockSequencer,
   UsePostgres,
   UseProgrammableSequencer,
+  UseReferenceBlockSequencer,
 }
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.util.{AcsInspection, EntitySyntax, PartiesAllocator}
@@ -86,13 +86,6 @@ sealed trait CommandRejectionConcurrentRequestTopologyChangeIntegrationTest
       )
       .withSetup { implicit env =>
         import env.*
-
-        // So that topology changes become effective as of sequencing time
-        sequencer1.topology.synchronizer_parameters
-          .propose_update(
-            daId,
-            _.update(topologyChangeDelay = config.NonNegativeFiniteDuration.Zero),
-          )
 
         participants.all.synchronizers.connect_local(sequencer1, alias = daName)
         participants.all.dars.upload(BaseTest.CantonExamplesPath)
@@ -224,7 +217,7 @@ sealed trait CommandRejectionConcurrentRequestTopologyChangeIntegrationTest
       )
 
       val commandStatus = NoViewWithValidRecipients.Error(CantonTimestamp.now())
-      commandCompletion.synchronizerTime.value.synchronizerId shouldBe daId.toProtoPrimitive
+      commandCompletion.synchronizerTime.value.synchronizerId shouldBe daId.logical.toProtoPrimitive
       commandCompletion.status.value.code shouldBe Code.ABORTED.value()
       commandCompletion.status.value.message should include(commandStatus.cause)
 
@@ -305,7 +298,15 @@ sealed trait CommandRejectionConcurrentRequestTopologyChangeIntegrationTest
       implicit env =>
         import env.*
 
-        PartiesAllocator(Set(participant2, participant4))(
+        PartiesAllocator(
+          Set(
+            participant2,
+            participant4,
+            // Include P1 to wait until charlie is known on P1 to be hosted on P2 before creating the
+            // IOU owned by charlie below to avoid a flaky UNKNOWN_INFORMEES submission error.
+            participant1,
+          )
+        )(
           Seq(
             "charlie" -> participant2,
             "donald" -> participant4,
@@ -350,7 +351,7 @@ sealed trait CommandRejectionConcurrentRequestTopologyChangeIntegrationTest
           .list(charlie, atLeastNumCompletions = 1, beginOffsetExclusive = ledgerEnd)
           .loneElement
 
-        commandCompletion.synchronizerTime.value.synchronizerId shouldBe daId.toProtoPrimitive
+        commandCompletion.synchronizerTime.value.synchronizerId shouldBe daId.logical.toProtoPrimitive
         commandCompletion.status.value.code shouldBe Code.INVALID_ARGUMENT.value()
 
         participant1.topology.party_to_participant_mappings.is_known(
@@ -410,7 +411,7 @@ sealed trait CommandRejectionConcurrentRequestTopologyChangeIntegrationTest
         .list(aliceId, atLeastNumCompletions = 1, beginOffsetExclusive = ledgerEnd)
         .loneElement
 
-      commandCompletion.synchronizerTime.value.synchronizerId shouldBe daId.toProtoPrimitive
+      commandCompletion.synchronizerTime.value.synchronizerId shouldBe daId.logical.toProtoPrimitive
       commandCompletion.status.value.code shouldBe Code.INVALID_ARGUMENT.value()
 
       participantsHostingPartyFor(eve, participant2) shouldBe Seq(participant2.id)
@@ -422,7 +423,7 @@ class CommandRejectionConcurrentRequestTopologyChangeIntegrationTestPostgres
     extends CommandRejectionConcurrentRequestTopologyChangeIntegrationTest {
   registerPlugin(new UsePostgres(loggerFactory))
   registerPlugin(
-    new UseCommunityReferenceBlockSequencer[DbConfig.Postgres](
+    new UseReferenceBlockSequencer[DbConfig.Postgres](
       loggerFactory,
       sequencerGroups = MultiSynchronizer(
         Seq(Set("sequencer1"), Set("sequencer2"))

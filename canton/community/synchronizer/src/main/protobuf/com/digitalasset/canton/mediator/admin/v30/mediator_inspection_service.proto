@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
@@ -40,7 +40,7 @@ message Verdict {
   VerdictResult verdict = 3;
   // the time of the finalization of the verdict, i.e.:
   // - the nth response required to finalize the verdict
-  // - the sequencing time that determined the timeout of a request
+  // - the participant response deadline in case the request timed out
   google.protobuf.Timestamp finalization_time = 4;
   // record time of the request
   google.protobuf.Timestamp record_time = 5;
@@ -62,6 +62,10 @@ message TransactionView {
   repeated string informees = 1;
   repeated Quorum confirming_parties = 2;
   repeated int32 sub_views = 3;
+
+  // Hash of the view. Provided for correlation purposes; e.g., with the traffic
+  // information on envelopes reported by the sequencer.
+  string view_hash = 4;
 }
 
 message Quorum {

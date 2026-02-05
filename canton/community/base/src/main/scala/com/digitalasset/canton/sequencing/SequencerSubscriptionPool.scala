@@ -4,13 +4,19 @@
 package com.digitalasset.canton.sequencing
 
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.health.{AtomicHealthComponent, ComponentHealthState}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, HasRunOnClosing}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.{NamedLogging, TracedLogger}
+import com.digitalasset.canton.sequencing.SequencerSubscriptionPool.SequencerSubscriptionPoolConfig
+import com.digitalasset.canton.sequencing.SequencerSubscriptionPoolImpl.SubscriptionStartProvider
+import com.digitalasset.canton.sequencing.client.SequencerClient.SequencerTransports
+import com.digitalasset.canton.sequencing.client.{SequencerClient, SequencerClientSubscriptionError}
+import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
+
+import scala.concurrent.{ExecutionContext, Future}
 
 /** Pool of sequencer subscriptions.
   *
@@ -46,30 +52,48 @@ trait SequencerSubscriptionPool extends FlagCloseable with NamedLogging {
   def health: SequencerSubscriptionPoolHealth
 
   /** Return the current active subscriptions in the pool. */
-  def subscriptions: Set[FakeSequencerSubscription]
+  def subscriptions: Set[SequencerSubscriptionX[SequencerClientSubscriptionError]]
 
   /** Return the number of active subscriptions in the pool. */
   final def nbSubscriptions: NonNegativeInt = NonNegativeInt.tryCreate(subscriptions.size)
+
+  /** Future that completes when the sequencer subscription pool closes */
+  def completion: Future[SequencerClient.CloseReason]
 }
 
 object SequencerSubscriptionPool {
 
   /** Subscription pool configuration
-    * @param trustThreshold
-    *   Minimal number of subscriptions needed to satisfy the trust requirements.
     * @param livenessMargin
     *   Number of extra subscriptions to maintain to ensure liveness.
-    * @param connectionRequestDelay
+    * @param subscriptionRequestDelay
     *   Delay between the attempts to obtain new connections, when the current number of
-    *   subscriptions is not [[trustThreshold]] + [[livenessMargin]].
+    *   subscriptions is not `trustThreshold` + [[livenessMargin]].
     */
   final case class SequencerSubscriptionPoolConfig(
-      trustThreshold: PositiveInt,
       livenessMargin: NonNegativeInt,
-      connectionRequestDelay: config.NonNegativeFiniteDuration =
-        config.NonNegativeFiniteDuration.ofSeconds(1),
-  ) {
-    lazy val activeThreshold: PositiveInt = trustThreshold + livenessMargin
+      subscriptionRequestDelay: config.NonNegativeFiniteDuration,
+  ) extends PrettyPrinting {
+    override protected def pretty: Pretty[SequencerSubscriptionPoolConfig] = prettyOfClass(
+      param("livenessMargin", _.livenessMargin),
+      param("subscriptionRequestDelay", _.subscriptionRequestDelay),
+    )
+  }
+
+  object SequencerSubscriptionPoolConfig {
+
+    /** Create a sequencer subscription pool configuration from the existing format.
+      *
+      * TODO(i27260): remove when no longer needed
+      */
+    def fromSequencerTransports(
+        sequencerTransports: SequencerTransports[?]
+    ): SequencerSubscriptionPoolConfig =
+      SequencerSubscriptionPoolConfig(
+        livenessMargin = sequencerTransports.sequencerLivenessMargin,
+        subscriptionRequestDelay =
+          sequencerTransports.sequencerConnectionPoolDelays.subscriptionRequestDelay,
+      )
   }
 
   class SequencerSubscriptionPoolHealth(
@@ -80,23 +104,14 @@ object SequencerSubscriptionPool {
     override protected val initialHealthState: ComponentHealthState =
       ComponentHealthState.NotInitializedState
   }
-
-  /** Currently, a fake sequencer subscription, used as a placeholder before wiring a real one */
-  private[sequencing] class FakeSequencerSubscription(val connection: SequencerConnectionX)
-      extends AutoCloseable {
-    def close(): Unit = ()
-  }
 }
 
-object SequencerSubscriptionPoolFactory {
-  import SequencerSubscriptionPool.SequencerSubscriptionPoolConfig
-
+trait SequencerSubscriptionPoolFactory {
   def create(
       initialConfig: SequencerSubscriptionPoolConfig,
-      pool: SequencerConnectionXPool,
-      clock: Clock,
-      timeouts: ProcessingTimeout,
-      loggerFactory: NamedLoggerFactory,
-  ): SequencerSubscriptionPool =
-    new SequencerSubscriptionPoolImpl(initialConfig, pool, clock, timeouts, loggerFactory)
+      connectionPool: SequencerConnectionXPool,
+      member: Member,
+      initialSubscriptionEventO: Option[ProcessingSerializedEvent],
+      subscriptionStartProvider: SubscriptionStartProvider,
+  )(implicit ec: ExecutionContext): SequencerSubscriptionPool
 }

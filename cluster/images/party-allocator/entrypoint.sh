@@ -4,6 +4,8 @@
 
 set -euo pipefail
 
-export EXTERNAL_CONFIG="{\"token\": \"${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN}\", \"userId\": \"${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME}\", \"jsonLedgerApiUrl\": \"$JSON_LEDGER_API_URL\", \"scanApiUrl\": \"$SCAN_API_URL\", \"validatorApiUrl\": \"$VALIDATOR_API_URL\", \"maxParties\": $MAX_PARTIES, \"keyDirectory\": \"$KEYS_DIRECTORY\", \"parallelism\": $PARALLELISM}"
+# shellcheck disable=SC2016
+EXTERNAL_CONFIG="$(echo "$EXTERNAL_CONFIG" | envsubst '$SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN,$SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME')"
+export EXTERNAL_CONFIG
 
 exec node --enable-source-maps party-allocator/bundle.js

@@ -8,10 +8,9 @@ pod:
   annotations: {}
   labels: {}
 
-defaultJvmOptions: -XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data
+defaultJvmOptions: -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.numThreads=8 -XX:ActiveProcessorCount=8 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/persistent-data
 resources:
   limits:
-    cpu: "2"
     memory: 8Gi
   requests:
     cpu: "1"

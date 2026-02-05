@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 images := \
-	canton \
+    canton \
 	canton-participant \
 	canton-domain \
 	canton-sequencer \
@@ -106,18 +106,18 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 # docker pattern rules
 #########
 
-%/$(docker-local-image-tag): force-update-version
-	mkdir -p $(@D)
+cluster/images/%/target:
+	mkdir -p $@
+
+%/$(docker-local-image-tag): force-update-version | %/target
 	overwrite-if-changed $$(basename $$(dirname $(@D))):$(shell get-snapshot-version) $@
 
-%/$(docker-image-tag): force-update-version
-	mkdir -p $(@D)
+%/$(docker-image-tag): force-update-version | %/target
 	get-docker-image-reference $$(basename $$(dirname $(@D))) > $@
 
-%/$(docker-build): %/$(docker-local-image-tag) %/Dockerfile
+%/$(docker-build): %/$(docker-local-image-tag) %/Dockerfile | %/target
 	docker-check-multi-arch
 	docker-check-env-vars
-	mkdir -pv $(@D)
 	@echo docker build triggered because these files changed: $?
 	docker buildx build $(platform_opt) \
 		--label "org.opencontainers.image.ref.name=$$(basename $$(dirname $(@D)))" \
@@ -127,13 +127,10 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 		--iidfile $@ $(cache_opt) $(build_arg) -t $$(cat $<) $(@D)/..
 
 %/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
-	cd $(@D)/.. && docker-push $$(cat $(abspath $<))
+	cd $(@D)/.. && prefix-output docker-push $$(cat $(abspath $<))
 
 %/$(docker-scan):  %/$(docker-image-tag)
-	cd $(@D) && docker-scan $$(cat $(abspath $<))
-
-%/$(docker-copy-release-to-ghcr):  %/$(docker-image-tag) %/$(docker-build)
-	cd $(@D)/.. && copy_release_to_ghcr $$(cat $(abspath $<))
+	cd $(@D) && prefix-output docker-scan $$(cat $(abspath $<))
 
 #########
 # Global targets
@@ -145,4 +142,4 @@ write-images:
 
 .PHONY: cluster/docker/copy_release_to_ghcr
 cluster/docker/copy_release_to_ghcr: write-images
-	./build-tools/copy_release_images_to_ghcr.sh -v '$(shell get-snapshot-version)' -f $(images_file)
+	prefix-output ./build-tools/copy_release_images_to_ghcr.sh -v '$(shell get-snapshot-version)' -f $(images_file)

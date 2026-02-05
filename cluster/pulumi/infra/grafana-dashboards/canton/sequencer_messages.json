@@ -17,10 +17,23 @@
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
-  "id": 5075,
+  "graphTooltip": 1,
+  "id": 448,
   "links": [],
   "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 9,
+      "panels": [],
+      "title": "Messages",
+      "type": "row"
+    },
     {
       "datasource": {
         "type": "prometheus",
@@ -48,7 +61,7 @@
         "h": 11,
         "w": 7,
         "x": 0,
-        "y": 0
+        "y": 1
       },
       "id": 8,
       "options": {
@@ -80,7 +93,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -153,7 +166,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -181,7 +195,7 @@
         "h": 11,
         "w": 17,
         "x": 7,
-        "y": 0
+        "y": 1
       },
       "id": 1,
       "options": {
@@ -197,7 +211,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -319,7 +333,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -334,7 +349,7 @@
         "h": 11,
         "w": 20,
         "x": 0,
-        "y": 11
+        "y": 12
       },
       "id": 4,
       "options": {
@@ -347,12 +362,12 @@
           "showLegend": true
         },
         "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
+          "hideZeros": true,
+          "mode": "multi",
+          "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -396,7 +411,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -411,7 +427,7 @@
         "h": 11,
         "w": 4,
         "x": 20,
-        "y": 11
+        "y": 12
       },
       "id": 6,
       "options": {
@@ -426,7 +442,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -509,7 +525,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -521,10 +538,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 15,
+        "h": 12,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 23
       },
       "id": 2,
       "options": {
@@ -539,12 +556,12 @@
           "sortDesc": true
         },
         "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
+          "hideZeros": true,
+          "mode": "multi",
+          "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -614,7 +631,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -626,10 +644,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 15,
-        "w": 24,
+        "h": 11,
+        "w": 12,
         "x": 0,
-        "y": 37
+        "y": 35
       },
       "id": 7,
       "options": {
@@ -642,12 +660,12 @@
           "showLegend": true
         },
         "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
+          "hideZeros": true,
+          "mode": "multi",
+          "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -717,7 +735,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -730,9 +749,9 @@
       },
       "gridPos": {
         "h": 11,
-        "w": 24,
-        "x": 0,
-        "y": 52
+        "w": 12,
+        "x": 12,
+        "y": 35
       },
       "id": 5,
       "options": {
@@ -746,11 +765,11 @@
         },
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
+          "mode": "multi",
+          "sort": "desc"
         }
       },
-      "pluginVersion": "12.0.2",
+      "pluginVersion": "12.1.1",
       "targets": [
         {
           "datasource": {
@@ -770,6 +789,292 @@
         }
       ],
       "title": "Sequencer Message Rate by Member excluding Mediator/Participant",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 46
+      },
+      "id": 10,
+      "panels": [],
+      "title": "Message Bytes",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "total"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "total"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 47
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "sum(rate(daml_sequencer_block_event_bytes_total{namespace=\"$namespace\", job=\"$job\"}[$__rate_interval]))",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "total",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "sum by(type) (rate(daml_sequencer_block_event_bytes_total{namespace=\"$namespace\", job=\"$job\"}[$__rate_interval]))",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "type",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "sum(rate(daml_sequencer_block_event_bytes_total{namespace=\"$namespace\", job=\"$job\"}[1h]))",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "hourly total",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "sum(rate(daml_sequencer_block_event_bytes_total{namespace=\"$namespace\", job=\"$job\"}[1h] offset 30d))",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "hourly total 30 days ago",
+          "range": true,
+          "refId": "B",
+          "useBackend": false
+        }
+      ],
+      "title": "Sequencer Message Byte Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 20,
+        "x": 0,
+        "y": 58
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": true,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "topk(\n  100,\n  avg_over_time(\n    (\n      sum by(member) (\n        rate(daml_sequencer_block_event_bytes_total{namespace=\"$namespace\", job=\"$job\", type=\"send-confirmation-request\"}[$__rate_interval])\n      )\n    )[$__range:]\n  )\n)",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "total",
+          "useBackend": false
+        }
+      ],
+      "title": "Top 100 Confirmation Requests Byte Rate by Member",
       "type": "timeseries"
     }
   ],
@@ -803,8 +1108,8 @@
       },
       {
         "current": {
-          "text": "global-domain-6-sequencer",
-          "value": "global-domain-6-sequencer"
+          "text": "global-domain-7-sequencer",
+          "value": "global-domain-7-sequencer"
         },
         "datasource": {
           "type": "prometheus",
@@ -826,12 +1131,12 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Sequencer Messages",
   "uid": "fdjrxql2alblsd",
-  "version": 5
+  "version": 2
 }

@@ -5,13 +5,17 @@ package com.digitalasset.canton.sequencing
 
 import cats.data.EitherT
 import cats.implicits.catsSyntaxEither
+import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.connection.v30
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc.ApiInfoServiceStub
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.networking.grpc.GrpcError
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencer.api.v30.SequencerConnect.GetSynchronizerParametersResponse.Parameters
 import com.digitalasset.canton.sequencer.api.v30.SequencerConnectServiceGrpc.SequencerConnectServiceStub
@@ -23,10 +27,11 @@ import com.digitalasset.canton.sequencer.api.v30.{
 import com.digitalasset.canton.sequencing.SequencerConnectionXStub.SequencerConnectionXStubError
 import com.digitalasset.canton.sequencing.client.transports.GrpcSequencerClientAuth
 import com.digitalasset.canton.sequencing.protocol.{HandshakeRequest, HandshakeResponse}
-import com.digitalasset.canton.topology.{SequencerId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Channel
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.ExecutionContextExecutor
 
@@ -36,19 +41,25 @@ class GrpcSequencerConnectionXStub(
     connection: GrpcConnectionX,
     apiSvcFactory: Channel => ApiInfoServiceStub,
     sequencerConnectSvcFactory: Channel => SequencerConnectServiceStub,
+    metricsContext: MetricsContext,
 )(implicit
     ec: ExecutionContextExecutor
 ) extends SequencerConnectionXStub {
-  override def getApiName(retryPolicy: GrpcError => Boolean)(implicit
+  override def getApiName(
+      retryPolicy: GrpcError => Boolean,
+      logPolicy: CantonGrpcUtil.GrpcLogPolicy,
+  )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, String] = for {
+  ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError.ConnectionError, String] = for {
     apiName <- connection
       .sendRequest(
         requestDescription = "get API info",
         stubFactory = apiSvcFactory,
         retryPolicy = retryPolicy,
+        logPolicy = logPolicy,
+        metricsContext = metricsContext.withExtraLabels("endpoint" -> "GetApiInfo"),
       )(_.getApiInfo(v30.GetApiInfoRequest()).map(_.name))
-      .leftMap[SequencerConnectionXStubError](
+      .leftMap(
         SequencerConnectionXStubError.ConnectionError.apply
       )
   } yield apiName
@@ -57,6 +68,7 @@ class GrpcSequencerConnectionXStub(
       clientProtocolVersions: NonEmpty[Seq[ProtocolVersion]],
       minimumProtocolVersion: Option[ProtocolVersion],
       retryPolicy: GrpcError => Boolean,
+      logPolicy: CantonGrpcUtil.GrpcLogPolicy,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, HandshakeResponse] = {
@@ -67,6 +79,8 @@ class GrpcSequencerConnectionXStub(
           requestDescription = "perform handshake",
           stubFactory = sequencerConnectSvcFactory,
           retryPolicy = retryPolicy,
+          logPolicy = logPolicy,
+          metricsContext = metricsContext.withExtraLabels("endpoint" -> "Handshake"),
         )(_.handshake(handshakeRequest.toProtoV30))
         .leftMap(SequencerConnectionXStubError.ConnectionError.apply)
       handshakeResponse <- EitherT
@@ -77,21 +91,30 @@ class GrpcSequencerConnectionXStub(
     } yield handshakeResponse
   }
 
-  override def getSynchronizerAndSequencerIds(retryPolicy: GrpcError => Boolean)(implicit
+  override def getSynchronizerAndSequencerIds(
+      retryPolicy: GrpcError => Boolean,
+      logPolicy: CantonGrpcUtil.GrpcLogPolicy,
+  )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, (SynchronizerId, SequencerId)] =
+  ): EitherT[
+    FutureUnlessShutdown,
+    SequencerConnectionXStubError,
+    (PhysicalSynchronizerId, SequencerId),
+  ] =
     for {
       synchronizerIdP <- connection
         .sendRequest(
           requestDescription = "get synchronizer ID",
           stubFactory = sequencerConnectSvcFactory,
           retryPolicy = retryPolicy,
+          logPolicy = logPolicy,
+          metricsContext = metricsContext.withExtraLabels("endpoint" -> "GetSynchronizerId"),
         )(_.getSynchronizerId(SequencerConnect.GetSynchronizerIdRequest()))
         .leftMap(SequencerConnectionXStubError.ConnectionError.apply)
 
-      synchronizerId <- EitherT.fromEither[FutureUnlessShutdown](
-        SynchronizerId
-          .fromProtoPrimitive(synchronizerIdP.synchronizerId, "synchronizer_id")
+      psid <- EitherT.fromEither[FutureUnlessShutdown](
+        PhysicalSynchronizerId
+          .fromProtoPrimitive(synchronizerIdP.physicalSynchronizerId, "physical_synchronizer_id")
           .leftMap(err => SequencerConnectionXStubError.DeserializationError(err.message))
       )
 
@@ -103,9 +126,12 @@ class GrpcSequencerConnectionXStub(
             SequencerConnectionXStubError.DeserializationError(err.message)
           )
       )
-    } yield (synchronizerId, sequencerId)
+    } yield (psid, sequencerId)
 
-  override def getStaticSynchronizerParameters(retryPolicy: GrpcError => Boolean)(implicit
+  override def getStaticSynchronizerParameters(
+      retryPolicy: GrpcError => Boolean,
+      logPolicy: CantonGrpcUtil.GrpcLogPolicy,
+  )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, StaticSynchronizerParameters] =
     for {
@@ -114,6 +140,8 @@ class GrpcSequencerConnectionXStub(
           requestDescription = "get static synchronizer parameters",
           stubFactory = sequencerConnectSvcFactory,
           retryPolicy = retryPolicy,
+          logPolicy = logPolicy,
+          metricsContext = metricsContext.withExtraLabels("endpoint" -> "GetSynchronizerParameters"),
         )(_.getSynchronizerParameters(SequencerConnect.GetSynchronizerParametersRequest()))
         .leftMap(SequencerConnectionXStubError.ConnectionError.apply)
 
@@ -132,8 +160,9 @@ class GrpcSequencerConnectionXStub(
     } yield synchronizerParameters
 }
 
-object SequencerConnectionXStubFactoryImpl extends SequencerConnectionXStubFactory {
-  override def createStub(connection: ConnectionX)(implicit
+class SequencerConnectionXStubFactoryImpl(loggerFactory: NamedLoggerFactory)
+    extends SequencerConnectionXStubFactory {
+  override def createStub(connection: ConnectionX, metricsContext: MetricsContext)(implicit
       ec: ExecutionContextExecutor
   ): SequencerConnectionXStub = connection match {
     case grpcConnection: GrpcConnectionX =>
@@ -141,19 +170,32 @@ object SequencerConnectionXStubFactoryImpl extends SequencerConnectionXStubFacto
         grpcConnection,
         ApiInfoServiceGrpc.stub,
         SequencerConnectServiceGrpc.stub,
+        metricsContext,
       )
 
     case _ => throw new IllegalStateException(s"Connection type not supported: $connection")
   }
 
-  override def createUserStub(connection: ConnectionX, clientAuth: GrpcSequencerClientAuth)(implicit
-      ec: ExecutionContextExecutor
+  def createUserStub(
+      connection: ConnectionX,
+      clientAuth: GrpcSequencerClientAuth,
+      metricsContext: MetricsContext,
+      timeouts: ProcessingTimeout,
+      protocolVersion: ProtocolVersion,
+  )(implicit
+      ec: ExecutionContextExecutor,
+      esf: ExecutionSequencerFactory,
+      materializer: Materializer,
   ): UserSequencerConnectionXStub =
     connection match {
       case grpcConnection: GrpcConnectionX =>
         new GrpcUserSequencerConnectionXStub(
           grpcConnection,
           channel => clientAuth(SequencerServiceGrpc.stub(channel)),
+          metricsContext,
+          timeouts,
+          loggerFactory,
+          protocolVersion,
         )
 
       case _ => throw new IllegalStateException(s"Connection type not supported: $connection")

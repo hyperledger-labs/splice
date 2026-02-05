@@ -3,15 +3,21 @@
 
 package com.digitalasset.canton.participant.ledger.api
 
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.participant.state.Update.EmptyAcsPublicationRequired
-import com.digitalasset.canton.ledger.participant.state.{CommitSetUpdate, Update}
+import com.digitalasset.canton.ledger.participant.state.Update.{
+  AcsChangeSequencedUpdate,
+  EmptyAcsPublicationRequired,
+  LogicalSynchronizerUpgradeTimeReached,
+}
+import com.digitalasset.canton.ledger.participant.state.{
+  AcsChangeFactory,
+  SynchronizerIndex,
+  Update,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.protocol.conflictdetection.CommitSet
+import com.digitalasset.canton.participant.event.RecordTime
 import com.digitalasset.canton.participant.sync.ConnectedSynchronizersLookupContainer
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ErrorUtil
 
 class AcsCommitmentPublicationPostProcessor(
     connectedSynchronizersLookupContainer: ConnectedSynchronizersLookupContainer,
@@ -20,47 +26,59 @@ class AcsCommitmentPublicationPostProcessor(
     with (Update => Unit) {
 
   def apply(update: Update): Unit = {
-    implicit val tc: TraceContext = update.traceContext
     def publishAcsCommitment(
         synchronizerId: SynchronizerId,
-        sequencerTimestamp: CantonTimestamp,
-        commitSetO: Option[CommitSet],
+        synchronizerIndex: SynchronizerIndex,
+        acsChangeFactoryO: Option[AcsChangeFactory],
     ): Unit =
       connectedSynchronizersLookupContainer
-        // not publishing if no synchronizer active: it means subsequent crash recovery will establish consistency again
+        // not publishing if not connected to synchronizer: it means subsequent crash recovery will establish consistency again
         .get(synchronizerId)
         // not publishing anything if the AcsCommitmentProcessor initialization succeeded with AbortedDueToShutdown or failed
         .foreach(
           _.acsCommitmentProcessor.publish(
-            sequencerTimestamp,
-            commitSetO,
+            RecordTime.fromSynchronizerIndex(synchronizerIndex),
+            acsChangeFactoryO,
           )(
             // The trace context is deliberately generated here instead of continuing the one for the Update
             // to unlink the asynchronous acs commitment processing from message processing trace.
-            TraceContext.createNew()
+            TraceContext.createNew("publish_acs_commitment")
           )
         )
+
     update match {
-      // publishing for the CommitSetUpdate-s a CommitSet (or empty if not specified)
-      case withCommitSet: CommitSetUpdate =>
+      case updateWithAcsChangeFactory: AcsChangeSequencedUpdate =>
+        val (synchronizerId, synchronizerIndex) = updateWithAcsChangeFactory.synchronizerIndex
         publishAcsCommitment(
-          synchronizerId = withCommitSet.synchronizerId,
-          sequencerTimestamp = withCommitSet.recordTime,
-          commitSetO = withCommitSet.commitSet match {
-            case commitSet: CommitSet => Some(commitSet)
-            case unexpectedCommitSet =>
-              ErrorUtil.invalidState(
-                s"Unexpected CommitSet of type ${unexpectedCommitSet.getClass.getName} $unexpectedCommitSet"
-              )
-          },
+          synchronizerId,
+          synchronizerIndex,
+          Some(updateWithAcsChangeFactory.acsChangeFactory),
         )
 
       case emptyAcsPublicationRequired: EmptyAcsPublicationRequired =>
+        val (synchronizerId, synchronizerIndex) = emptyAcsPublicationRequired.synchronizerIndex
         publishAcsCommitment(
-          synchronizerId = emptyAcsPublicationRequired.synchronizerId,
-          sequencerTimestamp = emptyAcsPublicationRequired.recordTime,
-          commitSetO = None,
+          synchronizerId,
+          synchronizerIndex,
+          acsChangeFactoryO = None,
         )
+
+      case upgradeTimeReached: LogicalSynchronizerUpgradeTimeReached =>
+        val (synchronizerId, synchronizerIndex) = upgradeTimeReached.synchronizerIndex
+
+        connectedSynchronizersLookupContainer
+          // not publishing if not connected to synchronizer: it means subsequent crash recovery will establish consistency again
+          .get(synchronizerId)
+          // not publishing anything if the AcsCommitmentProcessor initialization succeeded with AbortedDueToShutdown or failed
+          .foreach(
+            _.acsCommitmentProcessor.publishForUpgradeTime(
+              synchronizerIndex.recordTime
+            )(
+              // The trace context is deliberately generated here instead of continuing the one for the Update
+              // to unlink the asynchronous acs commitment processing from message processing trace.
+              TraceContext.createNew("publish_acs_commitment_upgrade_time")
+            )
+          )
 
       // not publishing otherwise
       case _ => ()

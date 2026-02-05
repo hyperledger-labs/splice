@@ -12,7 +12,6 @@ import com.digitalasset.canton.ledger.api.util.TimeProvider
 import com.digitalasset.canton.ledger.api.{Commands as ApiCommands, SubmissionId}
 import com.digitalasset.canton.ledger.configuration.LedgerTimeModel
 import com.digitalasset.canton.ledger.participant.state
-import com.digitalasset.canton.ledger.participant.state.SubmissionResult
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.LoggingContextWithTrace.{
   implicitExtractTraceContext,
@@ -32,7 +31,6 @@ import com.digitalasset.canton.platform.apiserver.execution.{
   CommandExecutor,
 }
 import com.digitalasset.canton.platform.apiserver.services.{
-  ErrorCause,
   RejectionGenerators,
   TimeProviderType,
   logging,
@@ -102,13 +100,13 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
       logger.debug(show"Submitted commands are: ${if (cmds.length > 1) "\n  " else ""}${cmds
           .map {
             case ApiCommand.Create(templateRef, _) =>
-              s"create ${templateRef.qName}"
+              s"create ${templateRef.qualifiedName}"
             case ApiCommand.Exercise(templateRef, _, choiceId, _) =>
-              s"exercise @${templateRef.qName} $choiceId"
+              s"exercise @${templateRef.qualifiedName} $choiceId"
             case ApiCommand.ExerciseByKey(templateRef, _, choiceId, _) =>
-              s"exerciseByKey @${templateRef.qName} $choiceId"
+              s"exerciseByKey @${templateRef.qualifiedName} $choiceId"
             case ApiCommand.CreateAndExercise(templateRef, _, choiceId, _) =>
-              s"createAndExercise ${templateRef.qName} ... $choiceId ..."
+              s"createAndExercise ${templateRef.qualifiedName} ... $choiceId ..."
           }
           .map(_.singleQuoted)
           .toSeq
@@ -172,7 +170,7 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
           .semiflatMap(submitTransactionWithDelay)
           .valueOrF { error =>
             metrics.commands.failedCommandInterpretations.mark()
-            failedOnCommandProcessing(error)
+            RejectionGenerators.commandExecutorErrorFUS(error)
           }
       )
 
@@ -224,18 +222,6 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
       )
       .toScalaUnwrapped
   }
-
-  // TODO(#25385): Deduplicate with same logic from InteractiveSubmissionService
-  private def failedOnCommandProcessing(
-      error: ErrorCause
-  )(implicit
-      errorLoggingContext: ErrorLoggingContext
-  ): FutureUnlessShutdown[SubmissionResult] =
-    FutureUnlessShutdown.failed(
-      RejectionGenerators
-        .commandExecutorError(error)
-        .asGrpcError
-    )
 
   override def close(): Unit = ()
 }

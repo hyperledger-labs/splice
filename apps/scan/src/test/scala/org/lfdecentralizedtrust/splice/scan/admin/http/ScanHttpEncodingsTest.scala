@@ -22,7 +22,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItem.mem
   UpdateHistoryTransaction as HttpUpdateHistoryTx,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{DamlValueEncoding, UpdateHistoryItem}
-import org.lfdecentralizedtrust.splice.store.{StoreTest, TreeUpdateWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.{StoreTestBase, TreeUpdateWithMigrationId}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanVerdictStore.VerdictResultDbValue
@@ -32,7 +32,7 @@ import org.scalatest.matchers.should.Matchers
 import java.time.Instant
 import scala.util.Random
 
-class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers {
+class ScanHttpEncodingsTest extends StoreTestBase with TestEssentials with Matchers {
   private val haveMicrosecondPrecision = endWith regex """\.\d{6}Z"""
 
   "LosslessScanHttpEncodings" should {
@@ -208,7 +208,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       ProtobufJsonScanHttpEncodings.lapiToHttpUpdate(tree, EventId.prefixedFromUpdateIdAndNodeId)
     check(encodedLossless)
     val encodedLossy =
-      CompactJsonScanHttpEncodings.lapiToHttpUpdate(tree, EventId.prefixedFromUpdateIdAndNodeId)
+      CompactJsonScanHttpEncodings().lapiToHttpUpdate(tree, EventId.prefixedFromUpdateIdAndNodeId)
     check(encodedLossy)
   }
 
@@ -387,11 +387,13 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
     val partyA = mkPartyId("Alice").toProtoPrimitive
     val partyB = mkPartyId("Bob").toProtoPrimitive
     val partyC = mkPartyId("Charlie").toProtoPrimitive
-
+    val dummyDomainLongString =
+      "global-domain::122015405b2293753a19749682fce0c2a6bb6bf03bcd7d9bde2cd0dce9e426c9a2df"
+    val dummyDomainLong = SynchronizerId.tryFromString(dummyDomainLongString)
     val verdictBase = DbScanVerdictStore.VerdictT(
       rowId = 0L,
       migrationId = 3L,
-      domainId = dummyDomain,
+      domainId = dummyDomainLong,
       recordTime = recordTs,
       finalizationTime = recordTs,
       submittingParticipantUid = mkParticipantId("participant").toProtoPrimitive,
@@ -413,6 +415,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         )
       ),
       subViews = Seq(3),
+      viewHash = Some("hash0"),
     )
     val view1 = DbScanVerdictStore.TransactionViewT(
       verdictRowId = 0L,
@@ -425,6 +428,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         )
       ),
       subViews = Seq.empty,
+      viewHash = Some("hash1"),
     )
 
     val view2 = DbScanVerdictStore.TransactionViewT(
@@ -442,6 +446,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         ),
       ),
       subViews = Seq(1),
+      viewHash = Some("hash2"),
     )
 
     val view3 = DbScanVerdictStore.TransactionViewT(
@@ -455,6 +460,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         )
       ),
       subViews = Seq(4, 5),
+      viewHash = Some("hash3"),
     )
 
     val view4 = DbScanVerdictStore.TransactionViewT(
@@ -468,6 +474,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         )
       ),
       subViews = Seq(6),
+      viewHash = Some("hash4"),
     )
     val view5 = DbScanVerdictStore.TransactionViewT(
       verdictRowId = 0L,
@@ -484,6 +491,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         )
       ),
       subViews = Seq.empty,
+      viewHash = Some("hash5"),
     )
 
     val view6 = DbScanVerdictStore.TransactionViewT(
@@ -497,6 +505,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         )
       ),
       subViews = Seq.empty,
+      viewHash = None, // Test that None encodes to empty string
     )
 
     val viewsIn = Seq(view2, view0, view1, view6, view4, view5, view3)
@@ -505,7 +514,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
 
     encodedVerdict.updateId shouldBe verdictBase.updateId
     encodedVerdict.migrationId shouldBe verdictBase.migrationId
-    encodedVerdict.domainId shouldBe dummyDomain.toString
+    encodedVerdict.domainId shouldBe dummyDomainLongString
     encodedVerdict.recordTime should haveMicrosecondPrecision
     encodedVerdict.finalizationTime should haveMicrosecondPrecision
     encodedVerdict.submittingParties shouldBe verdictBase.submittingParties.toVector
@@ -523,6 +532,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       v.informees shouldBe Vector(partyC)
       v.subViews shouldBe Vector(3)
       v.confirmingParties shouldBe Vector(httpApi.Quorum(Vector(partyA), 1))
+      v.viewHash shouldBe "hash0" // Some("hash0") encodes to "hash0"
     }
 
     inside(views(1)) { case v =>
@@ -578,6 +588,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       v.confirmingParties shouldBe Vector(
         httpApi.Quorum(Vector(partyA), 1)
       )
+      v.viewHash shouldBe "" // None encodes to empty string
     }
 
     val encodedAccepted =

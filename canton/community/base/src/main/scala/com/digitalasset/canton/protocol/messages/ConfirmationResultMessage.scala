@@ -9,14 +9,14 @@ import com.digitalasset.canton.protocol.messages.SignedProtocolMessageContent.Si
 import com.digitalasset.canton.protocol.{RequestId, RootHash, v30}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{ProtoConverter, ProtocolVersionedMemoizedEvidence}
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.version.*
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 
 /** Result message that the mediator sends to all informees of a request with its verdict.
   *
-  * @param synchronizerId
+  * @param psid
   *   the synchronizer on which the request is running
   * @param viewType
   *   determines which processor (transaction / reassignment) must process this message
@@ -29,35 +29,35 @@ import com.google.protobuf.ByteString
   */
 @SuppressWarnings(Array("org.wartremover.warts.FinalCaseClass")) // This class is mocked in tests
 case class ConfirmationResultMessage private (
-    override val synchronizerId: SynchronizerId,
+    override val psid: PhysicalSynchronizerId,
     viewType: ViewType,
     override val requestId: RequestId,
     rootHash: RootHash,
     verdict: Verdict,
 )(
-    override val representativeProtocolVersion: RepresentativeProtocolVersion[
-      ConfirmationResultMessage.type
-    ],
-    override val deserializedFrom: Option[ByteString],
+    override val deserializedFrom: Option[ByteString]
 ) extends ProtocolVersionedMemoizedEvidence
-    with HasSynchronizerId
+    with HasPhysicalSynchronizerId
     with HasRequestId
     with SignedProtocolMessageContent
     with HasProtocolVersionedWrapper[ConfirmationResultMessage]
     with PrettyPrinting {
 
+  override val representativeProtocolVersion: RepresentativeProtocolVersion[
+    ConfirmationResultMessage.type
+  ] = ConfirmationResultMessage.protocolVersionRepresentativeFor(psid.protocolVersion)
+
   override def signingTimestamp: Option[CantonTimestamp] = Some(requestId.unwrap)
 
   def copy(
-      synchronizerId: SynchronizerId = this.synchronizerId,
+      synchronizerId: PhysicalSynchronizerId = this.psid,
       viewType: ViewType = this.viewType,
       requestId: RequestId = this.requestId,
       rootHash: RootHash = this.rootHash,
       verdict: Verdict = this.verdict,
   ): ConfirmationResultMessage =
     ConfirmationResultMessage(synchronizerId, viewType, requestId, rootHash, verdict)(
-      representativeProtocolVersion,
-      None,
+      None
     )
 
   override protected[this] def toByteStringUnmemoized: ByteString =
@@ -68,7 +68,7 @@ case class ConfirmationResultMessage private (
 
   protected def toProtoV30: v30.ConfirmationResultMessage =
     v30.ConfirmationResultMessage(
-      synchronizerId = synchronizerId.toProtoPrimitive,
+      physicalSynchronizerId = psid.toProtoPrimitive,
       viewType = viewType.toProtoEnum,
       requestId = requestId.toProtoPrimitive,
       rootHash = rootHash.toProtoPrimitive,
@@ -84,7 +84,7 @@ case class ConfirmationResultMessage private (
   @VisibleForTesting
   override def pretty: Pretty[ConfirmationResultMessage] =
     prettyOfClass(
-      param("synchronizerId", _.synchronizerId),
+      param("psid", _.psid),
       param("viewType", _.viewType),
       param("requestId", _.requestId.unwrap),
       param("rootHash", _.rootHash),
@@ -99,7 +99,7 @@ object ConfirmationResultMessage
   override val name: String = "ConfirmationResultMessage"
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(
       v30.ConfirmationResultMessage
     )(
       supportedProtoVersionMemoized(_)(fromProtoV30),
@@ -108,17 +108,13 @@ object ConfirmationResultMessage
   )
 
   def create(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       viewType: ViewType,
       requestId: RequestId,
       rootHash: RootHash,
       verdict: Verdict,
-      protocolVersion: ProtocolVersion,
   ): ConfirmationResultMessage =
-    ConfirmationResultMessage(synchronizerId, viewType, requestId, rootHash, verdict)(
-      protocolVersionRepresentativeFor(protocolVersion),
-      None,
-    )
+    ConfirmationResultMessage(synchronizerId, viewType, requestId, rootHash, verdict)(None)
 
   private def fromProtoV30(protoResultMessage: v30.ConfirmationResultMessage)(
       bytes: ByteString
@@ -132,19 +128,21 @@ object ConfirmationResultMessage
     ) = protoResultMessage
 
     for {
-      synchronizerId <- SynchronizerId.fromProtoPrimitive(synchronizerIdP, "synchronizer_id")
+      synchronizerId <- PhysicalSynchronizerId.fromProtoPrimitive(
+        synchronizerIdP,
+        "physical_synchronizer_id",
+      )
       viewType <- ViewType.fromProtoEnum(viewTypeP)
       requestId <- RequestId.fromProtoPrimitive(requestIdP)
       rootHash <- RootHash.fromProtoPrimitive(rootHashP)
       verdict <- ProtoConverter.parseRequired(Verdict.fromProtoV30, "verdict", verdictPO)
-      rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
     } yield ConfirmationResultMessage(
       synchronizerId,
       viewType,
       requestId,
       rootHash,
       verdict,
-    )(rpv, Some(bytes))
+    )(Some(bytes))
   }
 
   implicit val confirmationResultMessageCast: SignedMessageContentCast[ConfirmationResultMessage] =

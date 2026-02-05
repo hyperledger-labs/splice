@@ -93,8 +93,6 @@ class CSVReport:
             "cc_burnt",
             "traffic_bytes_bought",
             "traffic_member_id",
-            "computed_balance",
-            "scan_balance",
         ]
 
         self.current_batch = []
@@ -305,23 +303,6 @@ class ScanClient:
         response.raise_for_status()
         return await response.json()
 
-    async def balance(self, party, round_number):
-        params = {"party_id": party, "asOfEndOfRound": round_number}
-        json = await self.__get_with_retry_on_statuses(
-            f"{self.url}/api/scan/v0/wallet-balance",
-            params=params,
-            max_retries=30,
-            delay_seconds=0.5,
-            statuses={404, 429},
-        )
-        return (party, DamlDecimal(json["wallet_balance"]))
-
-    async def party_balances(self, round_number, parties):
-        balances = await asyncio.gather(
-            *[self.balance(party, round_number) for party in parties]
-        )
-        return dict(balances)
-
     async def get_acs_snapshot_page_at(
         self, migration_id, record_time, templates, after
     ):
@@ -343,7 +324,9 @@ class ScanClient:
         return json
 
     async def get_amulet_token_metadata(self):
-        response = await self.session.get(f"{self.url}/registry/metadata/v1/instruments/Amulet")
+        response = await self.session.get(
+            f"{self.url}/registry/metadata/v1/instruments/Amulet"
+        )
         try:
             response.raise_for_status()
         except Exception as e:
@@ -353,7 +336,6 @@ class ScanClient:
 
         json = await response.json()
         return json
-
 
 
 # Daml Decimals have a precision of 38 and a scale of 10, i.e., 10 digits after the decimal point.
@@ -417,6 +399,18 @@ class DamlDecimal:
 class KnownPackageIds:
     amulet_0_1_0 = "48cac5ba4b6bf78df6c3a952ce05409a1d2ef39c05351074679adc0cf9cd1351"
     amulet_0_1_1 = "67bc95402ad7b08fcdff0ed478308d39c70baca2238c35c5d425a435a8a9e7f7"
+    amulet_0_1_2 = "1446ffdf23326cef2de97923df96618eb615792bea36cf1431f03639448f1645"
+    amulet_0_1_3 = "0d89016d5a90eb8bced48bbac99e81c57781b3a36094b8d48b8e4389851e19af"
+    amulet_0_1_4 = "a36ef8888fb44caae13d96341ce1fabd84fc9e2e7b209bbc3caabb48b6be1668"
+    amulet_0_1_5 = "b4867a47abbfa2d15482f22c9c50516f0af14036287f299342f5d336391e4997"
+    amulet_0_1_6 = "979ec710c3ae3a05cb44edf8461a9b4d7dd2053add95664f94fc89e5f18df80f"
+    amulet_0_1_7 = "4646d50cbdec6f088c98ae543da5c973d2d1be3363b9f32eb097d8fdc063ade7"
+    amulet_0_1_8 = "511bd3bf23fab4e5171edb22dceabe3061f7faf78a44f8af44f3b87f977c61f6"
+    amulet_0_1_9 = "a5b055492fb8f08b2e7bc0fc94da6da50c39c2e1d7f24cd5ea8db12fc87c1332"
+    amulet_0_1_10 = "17e51d96dbe9e41e7e5f621861419905206c12aeef77956c0a0da14714c1fa62"
+    amulet_0_1_11 = "9824927cdb455f833867b74c01cffcd8cb8cc5edd4d2273cea1329b708ef3ce5"
+    amulet_0_1_12 = "95a88ff9ffd509e097802ecf3bbd58c83a5dff408e439cca4e2105ebd2cd0760"
+    amulet_0_1_13 = "6e9fc50fb94e56751b49f09ba2dc84da53a9d7cff08115ebb4f6b7a12d0c990c"
 
     # Returns True if the package id of splice-amulet that the
     # AmuletRules_Transfer choice was exercised on
@@ -426,6 +420,25 @@ class KnownPackageIds:
         return package_id in [
             KnownPackageIds.amulet_0_1_0,
             KnownPackageIds.amulet_0_1_1,
+        ]
+
+    @staticmethod
+    def deducts_holding_fees(package_id):
+        return package_id in [
+            KnownPackageIds.amulet_0_1_0,
+            KnownPackageIds.amulet_0_1_1,
+            KnownPackageIds.amulet_0_1_2,
+            KnownPackageIds.amulet_0_1_3,
+            KnownPackageIds.amulet_0_1_4,
+            KnownPackageIds.amulet_0_1_5,
+            KnownPackageIds.amulet_0_1_6,
+            KnownPackageIds.amulet_0_1_7,
+            KnownPackageIds.amulet_0_1_8,
+            KnownPackageIds.amulet_0_1_9,
+            KnownPackageIds.amulet_0_1_10,
+            KnownPackageIds.amulet_0_1_11,
+            KnownPackageIds.amulet_0_1_12,
+            KnownPackageIds.amulet_0_1_13,
         ]
 
 
@@ -1413,7 +1426,10 @@ class TransferInputs:
 
         return (output, effective_inputs, total_cc, all_inputs)
 
-    def summary(self, subtract_holding_fees_per_round):
+    def summary(self, exercised_event):
+        subtract_holding_fees_per_round = KnownPackageIds.deducts_holding_fees(
+            exercised_event.template_id.package_id
+        )
         output = []
         effective_inputs = []
         unfeatured_app_rewards = {}
@@ -1568,7 +1584,8 @@ class EffectiveAmount:
         # kept for backwards-compatibility (important for compatibility tests)
         if subtract_holding_fees_per_round:
             effective_amount = max(
-                initial_amount - DamlDecimal(round_diff) * rate_per_round, DamlDecimal("0")
+                initial_amount - DamlDecimal(round_diff) * rate_per_round,
+                DamlDecimal("0"),
             )
         else:
             effective_amount = initial_amount
@@ -2227,6 +2244,12 @@ class State:
                         round_number, []
                     ).append(validator_liveness_activity_record)
                     del self.active_contracts[cid]
+                case "InputUnclaimedActivityRecord":
+                    cid = value.get_contract_id()
+                    del self.active_contracts[cid]
+                case "InputDevelopmentFundCoupon":
+                    cid = value.get_contract_id()
+                    del self.active_contracts[cid]
                 case _:
                     self._fail(transaction, f"Unexpected transfer input: {tag}")
         return TransferInputs(
@@ -2389,7 +2412,7 @@ class State:
             initial_amulet_cc_input,
             amulet_cc_input,
             all_inputs,
-        ) = transfer_inputs.summary(self.args.subtract_holding_fees_per_round)
+        ) = transfer_inputs.summary(event)
         output_amulets_cids = res.get_transfer_result_created_amulets()
         output_fees = res.get_transfer_result_output_fees()
         sender_change_amulet_cid = res.get_transfer_result_sender_change_amulet()
@@ -2599,7 +2622,7 @@ class State:
             initial_amulet_cc_input,
             amulet_cc_input,
             all_inputs,
-        ) = transfer_inputs.summary(self.args.subtract_holding_fees_per_round)
+        ) = transfer_inputs.summary(event)
         amulet_paid = res.get_buy_member_traffic_result_amulet_paid()
         sender_change_cid = res.get_buy_member_traffic_result_sender_change_amulet()
         transfer_summary = res.get_buy_member_traffic_result_transfer_summary()
@@ -2811,7 +2834,7 @@ class State:
             initial_amulet_cc_input,
             amulet_cc_input,
             all_inputs,
-        ) = transfer_inputs.summary(self.args.subtract_holding_fees_per_round)
+        ) = transfer_inputs.summary(event)
         sender_change_cid = transfer_result.get_transfer_result_sender_change_amulet()
         output_fees = transfer_result.get_transfer_result_output_fees()
         if sender_change_cid:
@@ -3709,6 +3732,21 @@ class State:
         # Unlocking is skipped, if the LockedAmulet was already archived.
         return HandleTransactionResult.empty()
 
+    def handle_allocation_cancel(self, transaction, event):
+        for event_id in event.child_event_ids:
+            child_event = transaction.events_by_id[event_id]
+            if (
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "LockedAmulet_Unlock"
+            ):
+                return self.handle_locked_amulet_unlock(
+                    transaction,
+                    child_event,
+                    log_prefix="Token standard: allocation cancelled - return locked funds",
+                )
+        # Unlocking is skipped, if the LockedAmulet was already archived.
+        return HandleTransactionResult.empty()
+
     def handle_root_exercised_event(self, transaction, event):
         LOG.debug(f"Root exercise: {event.choice_name}")
         match event.choice_name:
@@ -3745,6 +3783,8 @@ class State:
             case "TransferPreapproval_Send":
                 return self.handle_transfer_preapproval_send(transaction, event)
             case "TransferPreapproval_Cancel":
+                return HandleTransactionResult.empty()
+            case "DsoRules_ExpireTransferPreapproval":
                 return HandleTransactionResult.empty()
             case "TransferCommand_Send":
                 return self.handle_transfer_command_send(transaction, event)
@@ -3820,7 +3860,7 @@ class State:
             case "DsoRules_ExpireUnallocatedUnclaimedActivityRecord":
                 return HandleTransactionResult.empty()
             case "DsoRules_ExpireUnclaimedActivityRecord":
-                return HandleTransactionResult.empty()
+                return self.handle_unclaimed_reward_create_archive(transaction, event)
             case "AmuletRules_Fetch":
                 return HandleTransactionResult.empty()
             case "OpenMiningRound_Fetch":
@@ -3857,6 +3897,14 @@ class State:
                 return HandleTransactionResult.empty()
             case "DsoRules_MergeValidatorLicense":
                 return HandleTransactionResult.empty()
+            case "DsoRules_MergeUnclaimedDevelopmentFundCoupons":
+                return HandleTransactionResult.empty()
+            case "DsoRules_ExpireDevelopmentFundCoupon":
+                return HandleTransactionResult.empty()
+            case "AmuletRules_AllocateDevelopmentFundCoupon":
+                return HandleTransactionResult.empty()
+            case "DevelopmentFundCoupon_Withdraw":
+                return HandleTransactionResult.empty()
             case "ExternalPartyAmuletRules_CreateTransferCommand":
                 return HandleTransactionResult.empty()
             case "FeaturedAppRight_CreateActivityMarker":
@@ -3885,6 +3933,10 @@ class State:
             case "Allocation_Withdraw":
                 return self.handle_allocation_withdraw(transaction, event)
             case "AmuletConversionRateFeed_Update":
+                return HandleTransactionResult.empty()
+            case "Allocation_Cancel":
+                return self.handle_allocation_cancel(transaction, event)
+            case "BatchedMarkersProxy_CreateMarkers":
                 return HandleTransactionResult.empty()
             # case "AllocationInstruction_Withdraw": -- intentionally not handled, as it is not used by Amulet
             # case "AllocationInstruction_Update": -- intentionally not handled, as it is not used by Amulet
@@ -3954,7 +4006,9 @@ class PerPartyBalance:
     def sum_amounts(self):
         total = DamlDecimal("0")
         for amulet in self.amulets:
-            total += amulet.payload.get_amulet_amount().get_expiring_amount_initial_amount()
+            total += (
+                amulet.payload.get_amulet_amount().get_expiring_amount_initial_amount()
+            )
         for locked_amulet in self.locked_amulets:
             amulet = locked_amulet.payload.get_locked_amulet_amulet()
             total += amulet.get_amulet_amount().get_expiring_amount_initial_amount()
@@ -3964,32 +4018,23 @@ class PerPartyBalance:
 @dataclass
 class AppState:
     state: State
-    per_round_states: dict[int, State]
     pagination_key: Optional[PaginationKey]
 
     @classmethod
     def empty(cls, args, csv_report):
         state = State(args, {}, None, None, csv_report, DamlDecimal(0), DamlDecimal(0))
-        return cls(state, {}, None)
+        return cls(state, None)
 
     @classmethod
     def from_json(cls, args, data, csv_report):
         return cls(
             State.from_json(args, data["state"], csv_report),
-            {
-                int(round_number): State.from_json(args, round_data, csv_report)
-                for round_number, round_data in data["per_round_states"].items()
-            },
             PaginationKey.from_json(data["pagination_key"]),
         )
 
     def to_json(self):
         return {
             "state": self.state.to_json(),
-            "per_round_states": {
-                str(round_number): round_state.to_json()
-                for round_number, round_state in self.per_round_states.items()
-            },
             "pagination_key": (
                 None if self.pagination_key is None else self.pagination_key.to_json()
             ),
@@ -4087,11 +4132,6 @@ def _parse_cli_args():
     )
     parser.add_argument("--loglevel", help="Sets the log level", default="INFO")
     parser.add_argument(
-        "--scan-balance-assertions",
-        help="Enable comparison against end of round balances reported by scan.",
-        action="store_true",
-    )
-    parser.add_argument(
         "--cache-file-path",
         help="File path to save application state to. "
         "If the file exists, processing will resume from the persisted state."
@@ -4161,11 +4201,6 @@ def _parse_cli_args():
         help="Compares the ACS at the end of the script with the ACS snapshot of the given record_time",
     )
     parser.add_argument(
-        "--subtract-holding-fees-per-round",
-        help="Before CIP 78, holding fees reduce the value of Amulets every round. After it, they do not. This flag enables the old behavior.",
-        action="store_true",
-    )
-    parser.add_argument(
         "--compare-balances-with-total-supply",
         help="Whether to compare the balances with those computed in the Token Standard 'getInstrument' endpoint",
         action="store_true",
@@ -4185,78 +4220,12 @@ def _log_uncaught_exceptions():
     sys.excepthook = handle_exception
 
 
-async def _check_scan_balance_assertions(
-    scan_client, transaction, previous_state, app_state, result
-):
-    for round_number in result.new_open_rounds:
-        app_state.per_round_states[round_number] = previous_state.clone_for_round(
-            round_number
-        )
-
-    if result.for_open_round != None:
-        for (
-            round_number,
-            per_round_state,
-        ) in app_state.per_round_states.items():
-            if round_number >= result.for_open_round:
-                per_round_state.handle_transaction(transaction)
-
-    if result.new_closed_round:
-        closed_round = result.new_closed_round
-        msg = f"Closing round {closed_round}, current rounds: {list(app_state.per_round_states.keys())}"
-        LOG.info(msg)
-        round_state = app_state.per_round_states[closed_round]
-        del app_state.per_round_states[closed_round]
-        balances = round_state.get_per_party_balances()
-        lines = [msg, f"effective balances for closed round: {closed_round}"]
-        matches = True
-        scan_party_balances = await scan_client.party_balances(
-            closed_round, balances.keys()
-        )
-        for party, balance in sorted(balances.items()):
-            if not _party_enabled(app_state.state.args, party):
-                continue
-
-            computed_balance = balance.effective_for_round(closed_round)
-            scan_balance = scan_party_balances[party]
-            matches_for_party = scan_balance == computed_balance
-            matches &= matches_for_party
-
-            app_state.state._report_line(
-                transaction,
-                "BALANCE",
-                {
-                    "update_id": transaction.update_id,
-                    "record_time": transaction.record_time,
-                    "round": closed_round,
-                    "owner": party,
-                    "computed_balance": computed_balance,
-                    "scan_balance": scan_balance,
-                },
-            )
-
-            lines += [
-                f"  {party}: {computed_balance}, scan: {scan_balance}, matches: {matches_for_party}"
-            ]
-        log = "\n".join(lines)
-        if matches:
-            LOG.info(log)
-        else:
-            LOG.error(log)
-
-
 async def _process_transaction(args, app_state, scan_client, transaction):
     LOG.debug(
         f"Processing transaction {transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
     )
 
-    previous_state = app_state.state.clone()
-    result = app_state.state.handle_transaction(transaction)
-
-    if args.scan_balance_assertions:
-        await _check_scan_balance_assertions(
-            scan_client, transaction, previous_state, app_state, result
-        )
+    app_state.state.handle_transaction(transaction)
 
 
 async def main():
@@ -4313,7 +4282,9 @@ async def main():
                     TransactionTree.parse(tx)
                     for tx in json_batch
                     if (stop_at_record_time is None)
-                    or (datetime.fromisoformat(tx["record_time"]) < stop_at_record_time)
+                    or (
+                        datetime.fromisoformat(tx["record_time"]) <= stop_at_record_time
+                    )
                 ]
                 LOG.debug(
                     f"Processing batch of size {len(batch)} starting at {app_state.pagination_key}"
@@ -4373,12 +4344,18 @@ async def main():
                 if args.compare_balances_with_total_supply:
                     # this will only work if a snapshot was taken, which is guaranteed by compare_acs_with_snapshot=True
                     token_metadata = await scan_client.get_amulet_token_metadata()
-                    latest_per_party_balances = app_state.state.get_per_party_balances().values()
+                    latest_per_party_balances = (
+                        app_state.state.get_per_party_balances().values()
+                    )
                     # sum up all balances
-                    total_balance = sum([p.sum_amounts() for p in latest_per_party_balances], DamlDecimal(0))
-                    if DamlDecimal(token_metadata['totalSupply']) != total_balance:
-                        LOG.error(f"Total supply mismatch: {token_metadata['totalSupply']} in metadata (as of {token_metadata['totalSupplyAsOf']}), {total_balance} in computed balances (as of {app_state.state.record_time})")
-
+                    total_balance = sum(
+                        [p.sum_amounts() for p in latest_per_party_balances],
+                        DamlDecimal(0),
+                    )
+                    if DamlDecimal(token_metadata["totalSupply"]) != total_balance:
+                        LOG.error(
+                            f"Total supply mismatch: {token_metadata['totalSupply']} in metadata (as of {token_metadata['totalSupplyAsOf']}), {total_balance} in computed balances (as of {app_state.state.record_time})"
+                        )
 
         duration = time.time() - begin_t
         LOG.info(

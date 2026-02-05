@@ -193,9 +193,9 @@ class WalletIntegrationTest
               beginOffset = offsetBefore,
             )
         val createdAmuletsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(amuletCodegen.Amulet.COMPANION)(_).size)
+          txs.map(DecodeUtil.decodeAllCreated(amuletCodegen.Amulet.COMPANION)(_).size)
         val createdLockedAmuletsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(amuletCodegen.LockedAmulet.COMPANION)(_).size)
+          txs.map(DecodeUtil.decodeAllCreated(amuletCodegen.LockedAmulet.COMPANION)(_).size)
 
         // in rare cases all 3 commands get batched in one transaction,
         // so we only check if the 3 commands are included in the 2 transactions
@@ -250,9 +250,9 @@ class WalletIntegrationTest
               beginOffset = offsetBefore,
             )
         val createdAmuletsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(amuletCodegen.Amulet.COMPANION)(_).size)
+          txs.map(DecodeUtil.decodeAllCreated(amuletCodegen.Amulet.COMPANION)(_).size)
         val createdLockedAmuletsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(amuletCodegen.LockedAmulet.COMPANION)(_).size)
+          txs.map(DecodeUtil.decodeAllCreated(amuletCodegen.LockedAmulet.COMPANION)(_).size)
 
         // all operations are contained in at most 3 transactions
         createdAmuletsInTx.sum shouldBe (batchSize.toLong + 2)
@@ -572,7 +572,7 @@ class WalletIntegrationTest
         sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
         val (_, cid) = actAndCheck(
           "Create TransferPreapproval",
-          createTransferPreapprovalIfNotExists(aliceWalletClient),
+          createTransferPreapprovalEnsuringItExists(aliceWalletClient, aliceValidatorBackend),
         )(
           "Scan lookup returns TransferPreapproval",
           c => {
@@ -719,7 +719,7 @@ class WalletIntegrationTest
         aliceValidatorWalletClient.tap(10.0)
         actAndCheck(
           "Create TransferPreapproval for end user",
-          createTransferPreapprovalIfNotExists(aliceWalletClient),
+          createTransferPreapprovalEnsuringItExists(aliceWalletClient, aliceValidatorBackend),
         )(
           "Scan lookup returns TransferPreapproval for end user",
           c => {
@@ -730,7 +730,10 @@ class WalletIntegrationTest
         )
         actAndCheck(
           "Create TransferPreapproval for validator operator",
-          createTransferPreapprovalIfNotExists(aliceValidatorWalletClient),
+          createTransferPreapprovalEnsuringItExists(
+            aliceValidatorWalletClient,
+            aliceValidatorBackend,
+          ),
         )(
           "Scan lookup returns TransferPreapproval",
           c => {
@@ -824,5 +827,31 @@ class WalletIntegrationTest
       )
     }
 
+    "upload all splice-util-featured-app-proxies.dar files w/o error" in { implicit env =>
+      import better.files.*
+      import scala.util.matching.Regex
+      val proxiesDarCurrentPath = File(
+        "daml/splice-util-featured-app-proxies/src/main/resources/dar/splice-util-featured-app-proxies-current.dar"
+      )
+      val walletDarCurrentPath = File(
+        "daml/splice-util-token-standard-wallet/src/main/resources/dar/splice-util-token-standard-wallet-current.dar"
+      )
+      val darPattern: Regex =
+        """splice-util-(featured-app-proxies|token-standard-wallet).*\.dar""".r
+
+      val darPaths = File("daml/dars").listRecursively
+        .filter(f => f.isRegularFile && darPattern.matches(f.name))
+        .toSeq
+        .appended(proxiesDarCurrentPath)
+        .appended(walletDarCurrentPath)
+
+      darPaths
+        .foreach { f =>
+          aliceValidatorBackend.participantClientWithAdminToken.upload_dar_unless_exists(
+            f.toString()
+          )
+        }
+    }
   }
+
 }

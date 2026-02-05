@@ -105,7 +105,6 @@ class WalletPaymentFrontendIntegrationTest
             _ => {
               matchLockAndTransfer(
                 expectedLockedAmount = BigDecimal("-1.5"),
-                provider = expectedAns(aliceUserParty, aliceEntryName),
                 charlieUserParty,
                 charlieEntryName,
                 BigDecimal("0"),
@@ -186,7 +185,6 @@ class WalletPaymentFrontendIntegrationTest
             _ => {
               matchLockAndTransfer(
                 expectedLockedAmount = BigDecimal("-2.75"),
-                provider = expectedAns(aliceUserParty, aliceEntryName),
                 charlieUserParty,
                 charlieEntryName,
                 BigDecimal("0"),
@@ -274,7 +272,6 @@ class WalletPaymentFrontendIntegrationTest
             _ => {
               matchLockAndTransfer(
                 expectedLockedAmount = BigDecimal("-4"),
-                provider = expectedAns(aliceUserParty, aliceEntryName),
                 charlieUserParty,
                 charlieEntryName,
                 BigDecimal("1.5"), // that's what Alice receives
@@ -358,7 +355,6 @@ class WalletPaymentFrontendIntegrationTest
             _ => {
               matchLockAndTransfer(
                 expectedLockedAmount = BigDecimal("-2"),
-                provider = expectedAns(aliceUserParty, aliceEntryName),
                 charlieUserParty,
                 charlieEntryName,
                 BigDecimal("0.75"), // that's what Alice receives
@@ -442,7 +438,6 @@ class WalletPaymentFrontendIntegrationTest
             _ => {
               matchLockAndTransfer(
                 expectedLockedAmount = BigDecimal("-2.75"),
-                provider = expectedAns(aliceUserParty, aliceEntryName),
                 charlieUserParty,
                 charlieEntryName,
                 BigDecimal("1.5"), // that's what Alice receives
@@ -582,7 +577,6 @@ class WalletPaymentFrontendIntegrationTest
     */
   private def matchLockAndTransfer(
       expectedLockedAmount: BigDecimal,
-      provider: String,
       receiverPartyId: PartyId,
       expectedEntryName: String,
       balanceChangeForSender: BigDecimal,
@@ -592,7 +586,7 @@ class WalletPaymentFrontendIntegrationTest
         amuletPrice,
         "Sent",
         "App Payment Accepted",
-        Some(s"Automation ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"),
+        Some(s"Automation"),
         expectedLockedAmount,
       )
 
@@ -600,7 +594,7 @@ class WalletPaymentFrontendIntegrationTest
         amuletPrice,
         "Sent",
         "App Payment Collected",
-        Some(s"${expectedAns(receiverPartyId, expectedEntryName)} $provider"),
+        Some(s"${expectedAns(receiverPartyId, expectedEntryName)}"),
         balanceChangeForSender,
       )
     }

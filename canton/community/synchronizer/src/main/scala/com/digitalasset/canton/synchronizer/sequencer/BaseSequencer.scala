@@ -6,6 +6,7 @@ package com.digitalasset.canton.synchronizer.sequencer
 import cats.data.EitherT
 import com.digitalasset.canton.crypto.HashPurpose
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.error.CantonBaseError
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.protocol.SequencerErrors.SubmissionRequestRefused
@@ -55,7 +56,7 @@ abstract class BaseSequencer(
 
   override def sendAsyncSigned(signedSubmission: SignedContent[SubmissionRequest])(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit] =
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit] =
     withSpan("Sequencer.sendAsyncSigned") { implicit traceContext => span =>
       val submission = signedSubmission.content
       span.setAttribute("sender", submission.sender.toString)
@@ -128,18 +129,18 @@ abstract class BaseSequencer(
 
   protected def sendAsyncInternal(submission: SubmissionRequest)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit]
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit]
 
   protected def sendAsyncSignedInternal(signedSubmission: SignedContent[SubmissionRequest])(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerDeliverError, Unit]
+  ): EitherT[FutureUnlessShutdown, CantonBaseError, Unit]
 
-  override def readV2(member: Member, timestamp: Option[CantonTimestamp])(implicit
+  override def read(member: Member, timestamp: Option[CantonTimestamp])(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CreateSubscriptionError, Sequencer.SequencedEventSource] =
-    readInternalV2(member, timestamp)
+    readInternal(member, timestamp)
 
-  protected def readInternalV2(member: Member, timestamp: Option[CantonTimestamp])(implicit
+  protected def readInternal(member: Member, timestamp: Option[CantonTimestamp])(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CreateSubscriptionError, Sequencer.SequencedEventSource]
 

@@ -4,81 +4,109 @@
 import {
   Box,
   Typography,
-  Paper,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Button,
-  Alert,
+  Stack,
+  TypographyProps,
 } from '@mui/material';
-import ArrowForward from '@mui/icons-material/ArrowForward';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
-import { Link as RouterLink } from 'react-router-dom';
+import { useNavigate } from 'react-router';
+import { CopyableIdentifier, PageSectionHeader, VoteStats } from '../../components/beta';
 import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
+import { InfoOutlined } from '@mui/icons-material';
+import dayjs from 'dayjs';
+
+export type ProposalSortOrder = 'effectiveAtAsc' | 'effectiveAtDesc';
 
 interface ProposalListingSectionProps {
   sectionTitle: string;
   data: ProposalListingData[];
+  noDataMessage: string;
   uniqueId: string;
   showThresholdDeadline?: boolean;
   showVoteStats?: boolean;
-  showAcceptanceThreshold?: boolean;
   showStatus?: boolean;
+  sortOrder?: ProposalSortOrder;
 }
+
+const getTotalVotes = (item: ProposalListingData): number =>
+  item.voteStats['accepted'] + item.voteStats['rejected'];
+
+const getEffectiveDate = (item: ProposalListingData): dayjs.Dayjs =>
+  item.voteTakesEffect === 'Threshold' ? dayjs(0) : dayjs(item.voteTakesEffect);
+
+// Using stable sort: chain sorts from least to most significant criterion
+const sortProposals = (
+  data: ProposalListingData[],
+  sortOrder?: ProposalSortOrder
+): ProposalListingData[] => {
+  if (!sortOrder) return data;
+
+  if (sortOrder === 'effectiveAtDesc') {
+    return data.toSorted((a, b) => dayjs(b.voteTakesEffect).diff(dayjs(a.voteTakesEffect)));
+  }
+
+  // For effectiveAtAsc (Inflight Votes):
+  // Threshold items first (by votes desc, then deadline asc), then dated items (by effective date asc)
+  return data
+    .toSorted((a, b) => dayjs(a.votingThresholdDeadline).diff(dayjs(b.votingThresholdDeadline)))
+    .toSorted((a, b) => getTotalVotes(b) - getTotalVotes(a))
+    .toSorted((a, b) => getEffectiveDate(a).diff(getEffectiveDate(b)));
+};
+
+const getColumnsCount = (...shown: (boolean | undefined)[]) => 4 + shown.filter(Boolean).length;
+
+const getGridTemplate = (columnsCount: number) =>
+  `minmax(0, 1fr) minmax(0, 0.7fr) ${'1fr '.repeat(columnsCount - 2).trim()}`;
 
 export const ProposalListingSection: React.FC<ProposalListingSectionProps> = props => {
   const {
     sectionTitle,
     data,
+    noDataMessage,
     uniqueId,
     showThresholdDeadline,
     showVoteStats,
-    showAcceptanceThreshold,
     showStatus,
+    sortOrder,
   } = props;
+
+  const sortedData = sortProposals(data, sortOrder);
+
+  const columnsCount = getColumnsCount(showThresholdDeadline, showStatus, showVoteStats);
+  const gridTemplate = getGridTemplate(columnsCount);
 
   return (
     <Box sx={{ mb: 6 }} data-testid={`${uniqueId}-section`}>
-      <Typography variant="h5" sx={{ mb: 2 }} data-testid={`${uniqueId}-section-title`}>
-        {sectionTitle}
-      </Typography>
+      <PageSectionHeader title={sectionTitle} data-testid={`${uniqueId}-section`} />
 
-      {data.length === 0 ? (
-        <Alert severity="info" data-testid={`${uniqueId}-section-info`}>
-          No {sectionTitle} available
-        </Alert>
+      {sortedData.length === 0 ? (
+        <InfoBox info={noDataMessage} data-testid={`${uniqueId}-section-info`} />
       ) : (
-        <TableContainer component={Paper} data-testid={`${uniqueId}-section-table`}>
+        <TableContainer data-testid={`${uniqueId}-section-table`}>
           <Table>
             <TableHead>
-              <TableRow>
-                <TableCell sx={{ width: '15%' }}>Action</TableCell>
-                {showThresholdDeadline && (
-                  <TableCell sx={{ width: '15%' }}>Threshold Deadline</TableCell>
-                )}
-                <TableCell sx={{ width: '15%' }}>Effect At</TableCell>
-
-                {showVoteStats && <TableCell sx={{ width: '20%' }}>Votes</TableCell>}
-                {showAcceptanceThreshold && (
-                  <TableCell sx={{ width: '10%' }}>Acceptance Threshold</TableCell>
-                )}
-                {showStatus && <TableCell sx={{ width: '10%' }}>Status</TableCell>}
-
-                <TableCell sx={{ width: '15%' }}>Your Vote</TableCell>
-                <TableCell sx={{ width: '15%' }} align="right"></TableCell>
+              <TableRow sx={{ display: 'grid', gridTemplateColumns: gridTemplate }}>
+                <TableCell>ACTION</TableCell>
+                <TableCell>CONTRACT ID</TableCell>
+                {showThresholdDeadline && <TableCell>THRESHOLD DEADLINE</TableCell>}
+                <TableCell>EFFECTIVE AT</TableCell>
+                {showStatus && <TableCell>STATUS</TableCell>}
+                {showVoteStats && <TableCell>VOTES</TableCell>}
+                <TableCell>YOUR VOTE</TableCell>
               </TableRow>
             </TableHead>
-            <TableBody>
-              {data.map((vote, index) => (
+            <TableBody sx={{ display: 'contents' }}>
+              {sortedData.map((vote, index) => (
                 <VoteRow
                   key={index}
                   actionName={vote.actionName}
+                  description={vote.description}
                   contractId={vote.contractId}
                   uniqueId={uniqueId}
                   votingThresholdDeadline={vote.votingThresholdDeadline}
@@ -86,9 +114,8 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
                   yourVote={vote.yourVote}
                   status={vote.status}
                   voteStats={vote.voteStats}
-                  acceptanceThreshold={vote.acceptanceThreshold}
+                  gridTemplate={gridTemplate}
                   showVoteStats={showVoteStats}
-                  showAcceptanceThreshold={showAcceptanceThreshold}
                   showThresholdDeadline={showThresholdDeadline}
                   showStatus={showStatus}
                 />
@@ -101,9 +128,38 @@ export const ProposalListingSection: React.FC<ProposalListingSectionProps> = pro
   );
 };
 
+interface InfoBoxProps {
+  info: string;
+  'data-testid': string;
+}
+
+const InfoBox: React.FC<InfoBoxProps> = ({ info, 'data-testid': testId }) => {
+  return (
+    <Stack
+      gap={1}
+      direction="row"
+      alignItems="center"
+      sx={{
+        width: 'max-content',
+        borderColor: 'secondary.main',
+        borderWidth: '2px',
+        borderStyle: 'solid',
+        borderRadius: '4px',
+        p: 2,
+      }}
+      data-testid={testId}
+    >
+      <InfoOutlined color="secondary" fontSize="small" />
+      <Typography fontWeight="bold" fontSize={14}>
+        {info}
+      </Typography>
+    </Stack>
+  );
+};
+
 interface VoteRowProps {
-  acceptanceThreshold: bigint;
   actionName: string;
+  description?: string;
   contractId: ContractId<VoteRequest>;
   status: ProposalListingStatus;
   uniqueId: string;
@@ -111,16 +167,16 @@ interface VoteRowProps {
   voteTakesEffect: string;
   votingThresholdDeadline: string;
   yourVote: YourVoteStatus;
+  gridTemplate: string;
   showThresholdDeadline?: boolean;
-  showAcceptanceThreshold?: boolean;
   showStatus?: boolean;
   showVoteStats?: boolean;
 }
 
 const VoteRow: React.FC<VoteRowProps> = props => {
   const {
-    acceptanceThreshold,
     actionName,
+    description,
     contractId,
     status,
     uniqueId,
@@ -128,68 +184,131 @@ const VoteRow: React.FC<VoteRowProps> = props => {
     voteTakesEffect,
     votingThresholdDeadline,
     yourVote,
+    gridTemplate,
     showThresholdDeadline,
-    showAcceptanceThreshold,
     showStatus,
     showVoteStats,
   } = props;
 
+  const navigate = useNavigate();
+
   return (
-    <TableRow data-testid={`${uniqueId}-row`}>
-      <TableCell data-testid={`${uniqueId}-row-action-name`}>{actionName}</TableCell>
-      {showThresholdDeadline && (
-        <TableCell data-testid={`${uniqueId}-row-voting-threshold-deadline`}>
-          {votingThresholdDeadline}
-        </TableCell>
-      )}
-      <TableCell data-testid={`${uniqueId}-row-vote-takes-effect`}>{voteTakesEffect}</TableCell>
-
-      {showVoteStats && (
-        <TableCell data-testid={`${uniqueId}-row-vote-stats`}>
-          {voteStats['accepted']} Accepted / {voteStats['rejected']} Rejected
-        </TableCell>
-      )}
-      {showAcceptanceThreshold && (
-        <TableCell data-testid={`${uniqueId}-row-acceptance-threshold`}>
-          {acceptanceThreshold.toString()}
-        </TableCell>
-      )}
-
-      {showStatus && <TableCell data-testid={`${uniqueId}-row-status`}>{status}</TableCell>}
-      <TableCell data-testid={`${uniqueId}-row-your-vote`}>
-        {yourVote === 'accepted' ? (
-          <>
-            <CheckCircleOutlineIcon
-              fontSize="small"
-              color="success"
-              data-testid={`${uniqueId}-row-your-vote-accepted-icon`}
-            />
-            <Typography>Accepted</Typography>
-          </>
-        ) : yourVote === 'rejected' ? (
-          <>
-            <CancelOutlinedIcon
-              fontSize="small"
-              color="error"
-              data-testid={`${uniqueId}-row-your-vote-rejected-icon`}
-            />
-            <Typography>Rejected</Typography>
-          </>
-        ) : (
-          <Typography sx={{ opacity: 0.5 }}>No Vote</Typography>
+    <TableRow
+      onClick={() => navigate(`/governance-beta/proposals/${contractId}`)}
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: gridTemplate,
+        alignItems: 'center',
+        borderRadius: '4px',
+        border: '1px solid #4F4F4F',
+        paddingBlock: '10px',
+        cursor: 'pointer',
+        '&:hover': { backgroundColor: '#363636' },
+      }}
+      data-testid={`${uniqueId}-row`}
+    >
+      <TableCell data-testid={`${uniqueId}-row-action-name`} sx={{ overflow: 'hidden' }}>
+        <Typography
+          {...tableBodyTypography}
+          sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        >
+          {actionName}
+        </Typography>
+        {description && (
+          <Typography
+            data-testid={`${uniqueId}-row-description`}
+            sx={{
+              fontSize: 12,
+              color: 'text.secondary',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              lineHeight: 1.4,
+            }}
+          >
+            {description}
+          </Typography>
         )}
       </TableCell>
-
-      <TableCell align="right" data-testid={`${uniqueId}-row-view-details`}>
-        <Button
-          component={RouterLink}
-          to={`/governance-beta/proposals/${contractId}`}
+      <TableCell data-testid={`${uniqueId}-row-contract-id`}>
+        <CopyableIdentifier
+          value={contractId}
           size="small"
-          endIcon={<ArrowForward fontSize="small" />}
-        >
-          Details
-        </Button>
+          data-testid={`${uniqueId}-row-contract-id-value`}
+        />
+      </TableCell>
+      {showThresholdDeadline && (
+        <TableCell data-testid={`${uniqueId}-row-voting-threshold-deadline`}>
+          <TableBodyTypography>{votingThresholdDeadline}</TableBodyTypography>
+        </TableCell>
+      )}
+      <TableCell data-testid={`${uniqueId}-row-vote-takes-effect`}>
+        <TableBodyTypography>{voteTakesEffect}</TableBodyTypography>
+      </TableCell>
+
+      {showStatus && (
+        <TableCell data-testid={`${uniqueId}-row-status`}>
+          <TableBodyTypography>{status}</TableBodyTypography>
+        </TableCell>
+      )}
+      {showVoteStats && (
+        <TableCell data-testid={`${uniqueId}-row-all-votes`}>
+          <AllVotes
+            acceptedVotes={voteStats['accepted']}
+            rejectedVotes={voteStats['rejected']}
+            data-testid={`${uniqueId}-row-all-votes-stats`}
+          />
+        </TableCell>
+      )}
+      <TableCell data-testid={`${uniqueId}-row-your-vote`}>
+        <VoteStats
+          vote={yourVote}
+          typography={tableBodyTypography}
+          data-testid={`${uniqueId}-row-your-vote-stats`}
+        />
       </TableCell>
     </TableRow>
   );
 };
+
+interface AllVotesProps {
+  acceptedVotes: number;
+  rejectedVotes: number;
+  'data-testid': string;
+}
+
+const AllVotes: React.FC<AllVotesProps> = ({
+  acceptedVotes,
+  rejectedVotes,
+  'data-testid': testId,
+}) => {
+  return (
+    <Stack>
+      <VoteStats
+        vote="accepted"
+        count={acceptedVotes}
+        typography={tableBodyTypography}
+        data-testid={`${testId}-accepted`}
+      />
+      <VoteStats
+        vote="rejected"
+        count={rejectedVotes}
+        typography={tableBodyTypography}
+        data-testid={`${testId}-rejected`}
+      />
+    </Stack>
+  );
+};
+
+const tableBodyTypography: TypographyProps = {
+  fontFamily: 'lato',
+  fontSize: 14,
+  lineHeight: 2,
+  color: 'text.light',
+};
+
+const TableBodyTypography: React.FC<React.PropsWithChildren> = ({ children }) => (
+  <Typography {...tableBodyTypography}>{children}</Typography>
+);

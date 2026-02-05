@@ -21,6 +21,7 @@ message LocalVerdict {
     VERDICT_CODE_LOCAL_APPROVE = 1;
     VERDICT_CODE_LOCAL_REJECT = 2;
     VERDICT_CODE_LOCAL_MALFORMED = 3;
+    VERDICT_CODE_LOCAL_ABSTAIN = 4;
   }
 }
 
@@ -34,7 +35,7 @@ message ConfirmationResponses {
   option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
   int64 request_id = 1; // in microseconds of UTC time since Unix epoch
   bytes root_hash = 2; // required since DAML 3.0
-  string synchronizer_id = 3;
+  string physical_synchronizer_id = 3;
   string sender = 4;
   repeated ConfirmationResponse responses = 5;
 }

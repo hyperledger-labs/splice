@@ -22,6 +22,7 @@ import com.digitalasset.canton.topology.{
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 
+import java.time.{OffsetDateTime, ZoneOffset}
 import scala.util.matching.Regex
 
 /** Trait for values used in our requests.
@@ -72,7 +73,7 @@ object Codec {
   )(e: String): TCid =
     decodeJavaContractId(companion)(e)
       .fold(err => failedToDecode(err), identity)
-  def encodeContractId[TCid <: JavaContractId[_]](d: TCid): String = d.contractId
+  def encodeContractId[TCid <: JavaContractId[?]](d: TCid): String = d.contractId
 
   def decodeJavaContractIdInterface[I, Id, View](companion: InterfaceCompanion[I, Id, View])(
       e: String
@@ -164,6 +165,19 @@ object Codec {
   object Timestamp extends CodecCompanion[CantonTimestamp] {
     type Enc = Long
     def instance = timestampValue
+  }
+
+  private val timestampOffsetDateTimeValue: Codec[CantonTimestamp, OffsetDateTime] =
+    new Codec[CantonTimestamp, OffsetDateTime] {
+      def encode(d: CantonTimestamp) = d.toInstant.atOffset(ZoneOffset.UTC)
+      def decode(t: OffsetDateTime) = {
+        CantonTimestamp.fromInstant(t.toInstant)
+      }
+    }
+
+  object OffsetDateTime extends CodecCompanion[CantonTimestamp] {
+    type Enc = OffsetDateTime
+    def instance = timestampOffsetDateTimeValue
   }
 
   implicit val synchronizerIdValue: Codec[topology.SynchronizerId, String] =

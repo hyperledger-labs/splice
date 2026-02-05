@@ -17,7 +17,7 @@ import com.digitalasset.canton.participant.store.AcsInspection.*
 import com.digitalasset.canton.participant.util.TimeOfChange
 import com.digitalasset.canton.protocol.ContractIdSyntax.orderingLfContractId
 import com.digitalasset.canton.protocol.messages.HasSynchronizerId
-import com.digitalasset.canton.protocol.{LfContractId, SerializableContract}
+import com.digitalasset.canton.protocol.{ContractInstance, LfContractId}
 import com.digitalasset.canton.pruning.PruningStatus
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClient
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
@@ -30,6 +30,7 @@ import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 
+// TODO(#24610) – Revise based on moving to ACS export based on LAPI offset
 class AcsInspection(
     synchronizerId: SynchronizerId,
     val activeContractStore: ActiveContractStore,
@@ -44,23 +45,28 @@ class AcsInspection(
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
-  ): FutureUnlessShutdown[List[(Boolean, SerializableContract)]] =
+  ): FutureUnlessShutdown[List[(Boolean, ContractInstance)]] =
     getCurrentSnapshot()
       .flatMap(_.traverse { acs =>
         contractStore
           .find(exactId, filterPackage, filterTemplate, limit)
-          .map(_.map(sc => (acs.snapshot.contains(sc.contractId), sc)))
+          .map(_.map(c => (acs.snapshot.contains(c.contractId), c)))
       })
       .map(_.getOrElse(Nil))
 
   def findContractPayloads(
-      contractIds: NonEmpty[Seq[LfContractId]],
-      limit: Int,
+      contractIds: NonEmpty[Seq[LfContractId]]
   )(implicit
-      traceContext: TraceContext
+      traceContext: TraceContext,
+      ec: ExecutionContext,
   ): FutureUnlessShutdown[
-    Map[LfContractId, SerializableContract]
-  ] = contractStore.findWithPayload(contractIds, limit)
+    Map[LfContractId, ContractInstance]
+  ] =
+    contractStore.findWithPayload(contractIds).map { contracts =>
+      contracts.view.map { case (cid, contract) =>
+        cid -> contract
+      }.toMap
+    }
 
   def hasActiveContracts(partyId: PartyId)(implicit
       traceContext: TraceContext,
@@ -136,8 +142,9 @@ class AcsInspection(
               toc,
             )
         } else EitherT.pure[FutureUnlessShutdown, AcsInspectionError](())
-      snapshot <- EitherT
-        .right(activeContractStore.snapshot(toc))
+
+      snapshot <- EitherT.right(activeContractStore.snapshot(toc))
+
       // check after getting the snapshot in case a pruning was happening concurrently
       _ <- TimestampValidation.afterPruning(
         synchronizerId,
@@ -164,15 +171,10 @@ class AcsInspection(
     val maybeSnapshotET: EitherT[FutureUnlessShutdown, AcsInspectionError, MaybeSnapshot] =
       timeOfSnapshotO match {
         case Some(toc) =>
-          getSnapshotAt(synchronizerId)(
-            toc,
-            skipCleanTocCheck = skipCleanTocCheck,
-          )
-            .map(Some(_))
+          getSnapshotAt(synchronizerId)(toc, skipCleanTocCheck = skipCleanTocCheck).map(Some(_))
 
         case None =>
-          EitherT
-            .right[AcsInspectionError](getCurrentSnapshot())
+          EitherT.right[AcsInspectionError](getCurrentSnapshot())
       }
 
     maybeSnapshotET.map(
@@ -182,9 +184,7 @@ class AcsInspection(
             cid -> reassignmentCounter
           }
           .toSeq
-          .grouped(
-            BatchSize.value
-          ) // TODO(#14818): Batching should be done by the caller not here))
+          .grouped(BatchSize.value)
 
         AcsSnapshot(groupedSnapshot, toc)
       }
@@ -235,7 +235,7 @@ class AcsInspection(
       parties: Set[LfPartyId],
       timeOfSnapshotO: Option[TimeOfChange],
       skipCleanTocCheck: Boolean = false,
-  )(f: (SerializableContract, ReassignmentCounter) => Either[AcsInspectionError, Unit])(implicit
+  )(f: (ContractInstance, ReassignmentCounter) => Either[AcsInspectionError, Unit])(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): EitherT[FutureUnlessShutdown, AcsInspectionError, Option[(Set[LfPartyId], TimeOfChange)]] =
@@ -263,7 +263,7 @@ class AcsInspection(
   private def forEachBatch(
       synchronizerId: SynchronizerId,
       parties: Set[LfPartyId],
-      f: (SerializableContract, ReassignmentCounter) => Either[AcsInspectionError, Unit],
+      f: (ContractInstance, ReassignmentCounter) => Either[AcsInspectionError, Unit],
   )(batch: Seq[(LfContractId, ReassignmentCounter)])(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
@@ -283,7 +283,7 @@ class AcsInspection(
 
       stakeholdersE = contractsWithReassignmentCounter
         .traverse_ { case (contract, reassignmentCounter) =>
-          if (parties.exists(contract.metadata.stakeholders)) {
+          if (parties.isEmpty || contract.metadata.stakeholders.exists(parties)) {
             allStakeholders ++= contract.metadata.stakeholders
             f(contract, reassignmentCounter)
           } else

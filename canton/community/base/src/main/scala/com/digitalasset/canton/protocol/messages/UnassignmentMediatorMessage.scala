@@ -11,9 +11,10 @@ import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.util.ReassignmentTag.Source
 import com.digitalasset.canton.version.{
+  HasProtocolVersionedWrapper,
   ProtoVersion,
   ProtocolVersion,
   ProtocolVersionValidation,
@@ -38,7 +39,8 @@ final case class UnassignmentMediatorMessage(
     val representativeProtocolVersion: RepresentativeProtocolVersion[
       UnassignmentMediatorMessage.type
     ]
-) extends ReassignmentMediatorMessage {
+) extends ReassignmentMediatorMessage
+    with HasProtocolVersionedWrapper[UnassignmentMediatorMessage] {
   require(tree.commonData.isFullyUnblinded, "The unassignment common data must be unblinded")
   require(tree.view.isBlinded, "The unassignment view must be blinded")
 
@@ -46,7 +48,7 @@ final case class UnassignmentMediatorMessage(
 
   override def submittingParticipant: ParticipantId = tree.submittingParticipant
 
-  override def synchronizerId: SynchronizerId = commonData.sourceSynchronizerId.unwrap
+  override def psid: PhysicalSynchronizerId = commonData.sourceSynchronizerId.unwrap
 
   override def mediator: MediatorGroupRecipient = commonData.sourceMediatorGroup
 
@@ -78,7 +80,7 @@ object UnassignmentMediatorMessage
     ] {
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(
       v30.UnassignmentMediatorMessage
     )(
       supportedProtoVersion(_)((context, proto) => fromProtoV30(context)(proto)),

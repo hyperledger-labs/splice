@@ -8,10 +8,12 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcConnectionState
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.{
   P2PEndpoint,
   PlainTextP2PEndpoint,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.endpointToTestBftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Module.{
   SystemInitializationResult,
   SystemInitializer,
@@ -20,6 +22,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Consensus,
   Output,
   P2PNetworkOut,
+  Pruning,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.*
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.SimulationModuleSystem.SimulationInitializer
@@ -29,6 +32,9 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Module,
   ModuleName,
   ModuleRef,
+  P2PAddress,
+  P2PConnectionEventListener,
+  P2PNetworkManager,
   P2PNetworkRef,
 }
 import com.digitalasset.canton.time.SimClock
@@ -53,12 +59,13 @@ final case class PingHelper[E <: Env[E]](
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
 ) extends Module[E, String] {
+  private implicit val metricsContext: MetricsContext = MetricsContext.Empty
 
   override protected def receiveInternal(
       message: String
   )(implicit context: E#ActorContextT[String], traceContext: TraceContext): Unit = message match {
     case "tick" =>
-      ping.asyncSend("tick-ack")(MetricsContext.Empty)
+      ping.asyncSend("tick-ack")
       context.stop()
       recorder.pingHelperActorStopped = true
     case _ => sys.error(s"Unexpected message: $message")
@@ -87,7 +94,7 @@ final case class Ping[E <: Env[E]](
         context.delayedEvent(5.seconds, "tick")
         otherNode.asyncP2PSend(_ => "ping")
       case "tick" =>
-        val helperRef = context.newModuleRef[String](ModuleName("ping-helper"))
+        val helperRef = context.newModuleRef[String](ModuleName("ping-helper"))()
         val helper = PingHelper[E](context.self, recorder, loggerFactory, timeouts)
         context.setModule(helperRef, helper)
         helper.ready(helperRef)
@@ -157,59 +164,79 @@ final case class PingerClient[E <: Env[E]](
 
 object TestSystem {
 
-  def mkPinger[E <: Env[E]](
+  def mkPinger[
+      E <: Env[E],
+      P2PNetworkManagerT <: P2PNetworkManager[E, String],
+  ](
       pongerEndpoint: P2PEndpoint,
       recorder: Recorder,
       loggerFactory: NamedLoggerFactory,
       timeouts: ProcessingTimeout,
-  ): SystemInitializer[E, String, String] =
-    (system, network) => {
-      val pongerRef = network.createNetworkRef(
+  ): SystemInitializer[E, P2PNetworkManagerT, String, String] =
+    (system, createP2PNetworkManager) => {
+      val inputModuleRef = system.newModuleRef[String](ModuleName("ping"))()
+      val p2pNetworkManager =
+        createP2PNetworkManager(P2PConnectionEventListener.NoOp, inputModuleRef)
+      val pongerRef = p2pNetworkManager.createNetworkRef(
         system.rootActorContext,
-        pongerEndpoint,
-      )((_, _) => ())
+        P2PAddress.Endpoint(pongerEndpoint),
+      )(TraceContext.empty)
       val module = Ping[E](pongerRef, recorder, loggerFactory, timeouts)
-      val ref = system.newModuleRef[String](ModuleName("ping"))
-      system.setModule[String](ref, module)
-      val p2PAdminModuleRef = system.newModuleRef[P2PNetworkOut.Admin](ModuleName("p2PAdminModule"))
+      system.setModule[String](inputModuleRef, module)
+      val p2PAdminModuleRef =
+        system.newModuleRef[P2PNetworkOut.Admin](ModuleName("p2PAdminModule"))()
       val consensusAdminModuleRef =
-        system.newModuleRef[Consensus.Admin](ModuleName("consensusAdminModule"))
+        system.newModuleRef[Consensus.Admin](ModuleName("consensusAdminModule"))()
       val outputModuleRef =
-        system.newModuleRef[Output.SequencerSnapshotMessage](ModuleName("outputModule"))
+        system.newModuleRef[Output.Message[E]](ModuleName("outputModule"))()
+      val pruningModuleRef =
+        system.newModuleRef[Pruning.Message](ModuleName("pruningModule"))()
       SystemInitializationResult(
-        ref,
-        ref,
+        inputModuleRef,
+        inputModuleRef,
         p2PAdminModuleRef,
         consensusAdminModuleRef,
         outputModuleRef,
+        pruningModuleRef,
+        p2pNetworkManager,
       )
     }
 
-  def mkPonger[E <: Env[E]](
+  def mkPonger[
+      E <: Env[E],
+      P2PNetworkManagerT <: P2PNetworkManager[E, String],
+  ](
       pingerEndpoint: P2PEndpoint,
       recorder: Recorder,
       loggerFactory: NamedLoggerFactory,
       timeouts: ProcessingTimeout,
-  ): SystemInitializer[E, String, String] =
-    (system, network) => {
-      val pingerRef = network.createNetworkRef(
+  ): SystemInitializer[E, P2PNetworkManagerT, String, String] =
+    (system, createP2PNetworkManager) => {
+      val inputModuleRef = system.newModuleRef[String](ModuleName("pong"))()
+      val p2pNetworkManager =
+        createP2PNetworkManager(P2PConnectionEventListener.NoOp, inputModuleRef)
+      val pingerRef = p2pNetworkManager.createNetworkRef(
         system.rootActorContext,
-        pingerEndpoint,
-      )((_, _) => ())
+        P2PAddress.Endpoint(pingerEndpoint),
+      )(TraceContext.empty)
       val module = Pong[E](pingerRef, recorder, loggerFactory, timeouts)
-      val ref = system.newModuleRef[String](ModuleName("pong"))
-      system.setModule[String](ref, module)
-      val p2PAdminModuleRef = system.newModuleRef[P2PNetworkOut.Admin](ModuleName("p2PAdminModule"))
+      system.setModule[String](inputModuleRef, module)
+      val p2PAdminModuleRef =
+        system.newModuleRef[P2PNetworkOut.Admin](ModuleName("p2PAdminModule"))()
       val consensusAdminModuleRef =
-        system.newModuleRef[Consensus.Admin](ModuleName("consensusAdminModule"))
+        system.newModuleRef[Consensus.Admin](ModuleName("consensusAdminModule"))()
       val outputModuleRef =
-        system.newModuleRef[Output.SequencerSnapshotMessage](ModuleName("outputModule"))
+        system.newModuleRef[Output.Message[E]](ModuleName("outputModule"))()
+      val pruningModuleRef =
+        system.newModuleRef[Pruning.Message](ModuleName("pruningModule"))()
       SystemInitializationResult(
-        ref,
-        ref,
+        inputModuleRef,
+        inputModuleRef,
         p2PAdminModuleRef,
         consensusAdminModuleRef,
         outputModuleRef,
+        pruningModuleRef,
+        p2pNetworkManager,
       )
     }
 
@@ -218,11 +245,13 @@ object TestSystem {
       timeout: ProcessingTimeout,
   ): SimulationClient.Initializer[E, Unit, String] =
     new SimulationClient.Initializer[E, Unit, String] {
+      private implicit val metricsContext: MetricsContext = MetricsContext.Empty
+
       override def createClient(systemRef: ModuleRef[String]): Module[E, Unit] =
         PingerClient(systemRef, loggerFactory, timeout)
 
       override def init(context: E#ActorContextT[Unit]): Unit =
-        context.delayedEvent(0.seconds, ())(MetricsContext.Empty)
+        context.delayedEventNoTrace(0.seconds, ())
     }
 }
 
@@ -230,12 +259,8 @@ class PingPongSimulationTest extends AnyFlatSpec with BaseTest {
 
   it should "simple test" in {
     val simSettings = SimulationSettings(
-      localSettings = LocalSettings(
-        randomSeed = 4
-      ),
-      networkSettings = NetworkSettings(
-        randomSeed = 4
-      ),
+      localSettings = LocalSettings(randomSeed = 4),
+      networkSettings = NetworkSettings(randomSeed = 4),
       durationOfFirstPhaseWithFaults = 2.minutes,
     )
 
@@ -248,13 +273,15 @@ class PingPongSimulationTest extends AnyFlatSpec with BaseTest {
       pingerEndpoint -> SimulationInitializer[Unit, String, String, Unit](
         (_: Unit) => TestSystem.mkPinger(pongerEndpoint, recorder, loggerFactory, timeouts),
         TestSystem.pingerClient(loggerFactory, timeouts),
+        new P2PGrpcConnectionState(endpointToTestBftNodeId(pingerEndpoint), loggerFactory),
       ),
       pongerEndpoint -> SimulationInitializer
         .noClient[String, String, Unit](
           loggerFactory,
           timeouts,
         )(
-          TestSystem.mkPonger(pingerEndpoint, recorder, loggerFactory, timeouts)
+          TestSystem.mkPonger(pingerEndpoint, recorder, loggerFactory, timeouts),
+          new P2PGrpcConnectionState(endpointToTestBftNodeId(pongerEndpoint), loggerFactory),
         ),
     )
     val simulation =

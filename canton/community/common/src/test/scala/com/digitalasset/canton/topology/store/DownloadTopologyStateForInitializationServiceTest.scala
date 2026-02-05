@@ -4,24 +4,28 @@
 package com.digitalasset.canton.topology.store
 
 import cats.syntax.option.*
-import com.digitalasset.canton.FailOnShutdown
 import com.digitalasset.canton.config.CantonRequireTypes.String300
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.PhysicalSynchronizerId
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions.GenericStoredTopologyTransactions
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
+import com.digitalasset.canton.{FailOnShutdown, HasActorSystem}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.scalatest.wordspec.AsyncWordSpec
 
 trait DownloadTopologyStateForInitializationServiceTest
     extends AsyncWordSpec
     with TopologyStoreTestBase
-    with FailOnShutdown {
+    with FailOnShutdown
+    with HasActorSystem {
 
   protected def mkStore(
-      synchronizerId: SynchronizerId
+      synchronizerId: PhysicalSynchronizerId,
+      testName: String,
   ): TopologyStore[SynchronizerStore]
 
   val testData = new TopologyStoreTestData(testedProtocolVersion, loggerFactory, executionContext)
@@ -72,7 +76,7 @@ trait DownloadTopologyStateForInitializationServiceTest
   private def initializeStore(
       storedTransactions: GenericStoredTopologyTransactions
   ): FutureUnlessShutdown[TopologyStore[SynchronizerStore]] = {
-    val store = mkStore(synchronizer1_p1p2_synchronizerId)
+    val store = mkStore(synchronizer1_p1p2_physicalSynchronizerId, "download")
     val groupedBySequencedTime =
       storedTransactions.result.groupBy(tx => (tx.sequenced, tx.validFrom)).toSeq.sortBy {
         case (sequenced, _) => sequenced
@@ -83,23 +87,30 @@ trait DownloadTopologyStateForInitializationServiceTest
         store.update(
           sequencedTime,
           effective = EffectiveTime(effectiveTime.value),
-          removeMapping = transactions.map(tx => tx.mapping.uniqueKey -> tx.serial).toMap,
-          removeTxs = transactions.map(_.hash).toSet,
+          removals = transactions.groupBy(_.mapping.uniqueKey).map { case (k, txs) =>
+            (k, (txs.map(_.serial).maxOption, Set.empty))
+          },
           additions = transactions.map(stored => ValidatedTopologyTransaction(stored.transaction)),
         )
       }
       .map(_ => store)
   }
 
+  private def toFuture[A](source: Source[A, NotUsed]): FutureUnlessShutdown[Seq[A]] =
+    FutureUnlessShutdown.outcomeF(source.runWith(Sink.seq[A]))
+
   "DownloadTopologyStateForInitializationService" should {
     "return a valid topology state" when {
       "there's only one SynchronizerTrustCertificate" in {
         for {
           store <- initializeStore(bootstrapTransactions)
-          service = new StoreBasedTopologyStateForInitializationService(store, loggerFactory)
-          storedTxs <- service.initialSnapshot(dtc_p2_synchronizer1.mapping.participantId)
+          service = new StoreBasedTopologyStateForInitializationService(
+            store,
+            sequencingTimeLowerBoundExclusive = None,
+            loggerFactory,
+          )
+          result <- toFuture(service.initialSnapshot(dtc_p2_synchronizer1.mapping.participantId))
         } yield {
-          import storedTxs.result
           // all transactions should be valid and not expired
           result.foreach(_.validUntil shouldBe empty)
           result.map(_.transaction) shouldBe Seq(dnd_p1seq, ptp_fred_p1, dtc_p2_synchronizer1)
@@ -108,10 +119,13 @@ trait DownloadTopologyStateForInitializationServiceTest
       "the first SynchronizerTrustCertificate is superseded by another one" in {
         for {
           store <- initializeStore(bootstrapTransactionsWithUpdates)
-          service = new StoreBasedTopologyStateForInitializationService(store, loggerFactory)
-          storedTxs <- service.initialSnapshot(dtc_p2_synchronizer1.mapping.participantId)
+          service = new StoreBasedTopologyStateForInitializationService(
+            store,
+            sequencingTimeLowerBoundExclusive = None,
+            loggerFactory,
+          )
+          result <- toFuture(service.initialSnapshot(dtc_p2_synchronizer1.mapping.participantId))
         } yield {
-          import storedTxs.result
           // all transactions should be valid and not expired
           result.foreach(_.validUntil shouldBe empty)
           result.map(_.transaction) shouldBe Seq(dnd_p1seq, ptp_fred_p1, dtc_p2_synchronizer1)
@@ -119,13 +133,35 @@ trait DownloadTopologyStateForInitializationServiceTest
         }
       }
 
+      "the sequencer was started with a configured minimum sequencing time" in {
+        for {
+          store <- initializeStore(bootstrapTransactionsWithUpdates)
+          service = new StoreBasedTopologyStateForInitializationService(
+            store,
+            sequencingTimeLowerBoundExclusive = Some(ts6),
+            loggerFactory,
+          )
+          result <- toFuture(service.initialSnapshot(dtc_p2_synchronizer1.mapping.participantId))
+        } yield {
+          // all transactions should have a validUntil <= ts6
+          forAll(result)(_.validUntil.map(_.value) should be <= Option(ts6))
+          result shouldBe bootstrapTransactionsWithUpdates
+            .filter(_.validFrom.value <= ts6)
+            .asSnapshotAtMaxEffectiveTime
+            .result
+        }
+      }
+
       "there's only one MediatorSynchronizerState" in {
         for {
           store <- initializeStore(bootstrapTransactions)
-          service = new StoreBasedTopologyStateForInitializationService(store, loggerFactory)
-          storedTxs <- service.initialSnapshot(med1Id)
+          service = new StoreBasedTopologyStateForInitializationService(
+            store,
+            sequencingTimeLowerBoundExclusive = None,
+            loggerFactory,
+          )
+          result <- toFuture(service.initialSnapshot(med1Id))
         } yield {
-          import storedTxs.result
           // all transactions should be valid and not expired
           result.foreach(_.validUntil shouldBe empty)
           result.map(_.transaction) shouldBe Seq(
@@ -140,10 +176,13 @@ trait DownloadTopologyStateForInitializationServiceTest
       "the first MediatorSynchronizerState is superseded by another one" in {
         for {
           store <- initializeStore(bootstrapTransactionsWithUpdates)
-          service = new StoreBasedTopologyStateForInitializationService(store, loggerFactory)
-          storedTxs <- service.initialSnapshot(med1Id)
+          service = new StoreBasedTopologyStateForInitializationService(
+            store,
+            sequencingTimeLowerBoundExclusive = None,
+            loggerFactory,
+          )
+          result <- toFuture(service.initialSnapshot(med1Id))
         } yield {
-          import storedTxs.result
           // all transactions should be valid and not validUntil capped at ts6
           result.foreach(_.validUntil.foreach(_.value should be <= ts6))
           result.map(_.transaction) shouldBe Seq(
@@ -184,10 +223,13 @@ trait DownloadTopologyStateForInitializationServiceTest
       )
       for {
         store <- initializeStore(snapshot)
-        service = new StoreBasedTopologyStateForInitializationService(store, loggerFactory)
-        storedTxs <- service.initialSnapshot(p2Id)
+        service = new StoreBasedTopologyStateForInitializationService(
+          store,
+          sequencingTimeLowerBoundExclusive = None,
+          loggerFactory,
+        )
+        result <- toFuture(service.initialSnapshot(p2Id))
       } yield {
-        import storedTxs.result
         // all transactions should be valid and not expired
         result.foreach(_.validUntil.foreach(_.value should be < ts6))
         result

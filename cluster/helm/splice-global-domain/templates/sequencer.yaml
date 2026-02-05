@@ -32,19 +32,6 @@ spec:
         {{- end }}
     spec:
       {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
-      {{- if $.Values.enableAntiAffinity }}
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: splice-component
-                    operator: In
-                    values:
-                      - sequencer
-              topologyKey: kubernetes.io/hostname
-              namespaceSelector: {} # search in all namespaces
-      {{- end }}
       containers:
         - name: sequencer
         {{- if eq .Values.sequencer.driver.type "cometbft"}}
@@ -95,7 +82,7 @@ spec:
                   config {
                     cometbft-node-host = {{ .Values.sequencer.driver.host }}
                     cometbft-node-port = {{ .Values.sequencer.driver.port }}
-                    health-check-attempts = 20
+                    health-check-attempts = 100000
                   }
                   type = "CometBFT"
                 }
@@ -199,10 +186,7 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "splice-util-lib.affinity" (set .Values "app" "sequencer") | nindent 6 }}
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}

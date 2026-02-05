@@ -16,7 +16,6 @@ import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.ContractId
 
 import scala.concurrent.Future
-import scala.util.chaining.scalaUtilChainingOps
 
 class ContractStoreBasedMaximumLedgerTimeService(
     contractStore: ContractStore,
@@ -46,10 +45,8 @@ class ContractStoreBasedMaximumLedgerTimeService(
                 Future.successful(MaximumLedgerTime.Archived(Set(contractId)))
 
               case active: ContractState.Active =>
-                val newMaximumLedgerTime = resultSoFar
-                  .getOrElse(Timestamp.MinValue)
-                  .pipe(Ordering[Timestamp].max(_, active.ledgerEffectiveTime))
-                  .pipe(Some(_))
+                val createdAt = Some(active.contractInstance.createdAt.time)
+                val newMaximumLedgerTime = Ordering[Option[Timestamp]].max(resultSoFar, createdAt)
                 goAsync(newMaximumLedgerTime, otherContractIds)
             }(directEc)
       }

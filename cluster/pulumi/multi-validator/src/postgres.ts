@@ -4,13 +4,18 @@ import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
 import {
   activeVersion,
+  appsAffinityAndTolerations,
   CnInput,
   ExactNamespace,
-  installSpliceRunbookHelmChart,
-  installPostgresPasswordSecret,
   InstalledHelmChart,
+  installPostgresPasswordSecret,
+  installSpliceRunbookHelmChart,
+  spliceConfig,
+  standardStorageClassName,
+  createVolumeSnapshot,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 
+import { hyperdiskSupportConfig } from '../../common/src/config/hyperdiskSupportConfig';
 import { multiValidatorConfig } from './config';
 
 export function installPostgres(
@@ -31,16 +36,52 @@ export function installPostgres(
   }
   const config = multiValidatorConfig!;
 
+  let hyperdiskMigrationValues = {};
+  if (
+    hyperdiskSupportConfig.hyperdiskSupport.enabled &&
+    hyperdiskSupportConfig.hyperdiskSupport.migrating
+  ) {
+    const { dataSource } = createVolumeSnapshot({
+      resourceName: `pg-data-${xns.logicalName}-${name}-snapshot`,
+      snapshotName: `pg-data-${name}-snapshot`,
+      namespace: xns.logicalName,
+      pvcName: `pg-data-${name}-0`,
+    });
+    hyperdiskMigrationValues = { dataSource };
+  }
   return installSpliceRunbookHelmChart(
     xns,
     name,
     'splice-postgres',
     {
       persistence: { secretName },
-      db: { volumeSize: config.postgresPvcSize, maxConnections: 1000 },
+      db: {
+        volumeSize: config.postgresPvcSize,
+        maxConnections: 1000,
+        ...(hyperdiskSupportConfig.hyperdiskSupport.enabled
+          ? {
+              volumeStorageClass: standardStorageClassName,
+              pvcTemplateName: 'pg-data-hd',
+              ...hyperdiskMigrationValues,
+            }
+          : {}),
+      },
       resources: config.resources?.postgres,
+      appsAffinityAndTolerations,
     },
     activeVersion,
-    { dependsOn: [passwordSecret, ...dependsOn] }
+    {
+      dependsOn: [passwordSecret, ...dependsOn],
+      ...((hyperdiskSupportConfig.hyperdiskSupport.enabled &&
+        // during the migration we first delete the stateful set, which keeps the old pvcs, and the recreate with the new pvcs
+        // the stateful sets are immutable so they need to be recreated to force the change of the pvcs
+        hyperdiskSupportConfig.hyperdiskSupport.migrating) ||
+      spliceConfig.pulumiProjectConfig.replacePostgresStatefulSetOnChanges
+        ? {
+            replaceOnChanges: ['*'],
+            deleteBeforeReplace: true,
+          }
+        : {}),
+    }
   );
 }

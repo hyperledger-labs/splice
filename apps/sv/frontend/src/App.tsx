@@ -19,8 +19,9 @@ import {
   RouterProvider,
   createBrowserRouter,
   createRoutesFromElements,
+  useLocation,
   useNavigate,
-} from 'react-router-dom';
+} from 'react-router';
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers';
@@ -28,6 +29,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 import { SvAdminClientProvider } from './contexts/SvAdminServiceContext';
 import { SvAppVotesHooksProvider } from './contexts/SvAppVotesHooksContext';
+import { betaTheme } from './beta-theme';
 import AmuletPrice from './routes/amuletPrice';
 import AuthCheck from './routes/authCheck';
 import Dso from './routes/dso';
@@ -73,6 +75,20 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   );
 };
 
+const ConditionalThemeProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const location = useLocation();
+  const isBeta = location.pathname.startsWith('/governance-beta');
+
+  const currentTheme = isBeta ? betaTheme : theme;
+
+  return (
+    <ThemeProvider theme={currentTheme}>
+      <CssBaseline />
+      {children}
+    </ThemeProvider>
+  );
+};
+
 const App: React.FC = () => {
   const config = useSvConfig();
   const router = createBrowserRouter(
@@ -81,7 +97,9 @@ const App: React.FC = () => {
         errorElement={<ErrorRouterPage />}
         element={
           <Providers>
-            <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
+            <ConditionalThemeProvider>
+              <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
+            </ConditionalThemeProvider>
           </Providers>
         }
       >
@@ -105,17 +123,14 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider theme={theme}>
-        <HelmetProvider>
-          <Helmet>
-            <title>Super Validator Operations</title>
-            <meta name="description" content="Super Validator Operations" />
-            <link rel="icon" href={config.spliceInstanceNames.networkFaviconUrl} />
-          </Helmet>
-          <CssBaseline />
-          <RouterProvider router={router} />
-        </HelmetProvider>
-      </ThemeProvider>
+      <HelmetProvider>
+        <Helmet>
+          <title>Super Validator Operations</title>
+          <meta name="description" content="Super Validator Operations" />
+          <link rel="icon" href={config.spliceInstanceNames.networkFaviconUrl} />
+        </Helmet>
+        <RouterProvider router={router} />
+      </HelmetProvider>
     </ErrorBoundary>
   );
 };

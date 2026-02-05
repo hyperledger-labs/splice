@@ -29,7 +29,7 @@ Generally the guidance is to create a ``FeaturedAppActivityMarker`` for any econ
 
 - Mint or burn tokens.
 
-However, it should not be created for any intermediate steps or a `propose step <https://docs.digitalasset.com/build/3.3/sdlc-howtos/smart-contracts/develop/patterns/propose-accept.html>`__.
+However, it should not be created for any intermediate steps or a `propose step <https://docs.digitalasset.com/build/3.4/sdlc-howtos/smart-contracts/develop/patterns/propose-accept.html>`__.
 
 A ``FeaturedAppActivityMarker`` is immediately converted into an
 :ref:`AppRewardCoupon <type-splice-amulet-apprewardcoupon-57229>` by the automation run by the Super Validators.

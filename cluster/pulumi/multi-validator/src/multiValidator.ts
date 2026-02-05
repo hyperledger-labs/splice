@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import {
   DecentralizedSynchronizerMigrationConfig,
@@ -9,6 +10,7 @@ import {
   DecentralizedSynchronizerUpgradeConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 
+import { pvcSuffix, standardStorageClassName } from '../../common/src/storage/storageClass';
 import { multiValidatorConfig } from './config';
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';
 
@@ -24,7 +26,43 @@ const decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigration
 export class MultiValidator extends MultiNodeDeployment {
   constructor(name: string, args: MultiValidatorArgs, opts?: pulumi.ComponentResourceOptions) {
     const ports = generatePortSequence(5000, numNodesPerInstance, [{ name: 'val', id: 3 }]);
+    // TODO(#2773) consider making this optional so we don't pay for the extra PVCs when we don't anticipate a HDM
+    const domainMigrationPvc = new k8s.core.v1.PersistentVolumeClaim(
+      `${name}-domain-migration-pvc`,
+      {
+        metadata: {
+          namespace: args.namespace.metadata.name,
+          name: `${name}-domain-migration-${pvcSuffix}`,
+        },
+        spec: {
+          accessModes: ['ReadWriteOnce'],
+          resources: {
+            requests: {
+              storage: '20G',
+            },
+          },
+          storageClassName: standardStorageClassName,
+        },
+      },
+      opts
+    );
 
+    const migrationEnvVars =
+      decentralizedSynchronizerUpgradeConfig.migratingFromActiveId !== undefined
+        ? [
+            {
+              name: 'MULTI_VALIDATOR_ADDITIONAL_CONFIG_INIT_MIGRATION',
+              value:
+                'canton.validator-apps.validator_backend_INDEX.restore-from-migration-dump = "/domain-upgrade-dump/INDEX/domain_migration_dump.json"',
+            },
+          ]
+        : [
+            {
+              name: 'MULTI_VALIDATOR_ADDITIONAL_CONFIG_MIGRATION_DUMP_PATH',
+              value:
+                'canton.validator-apps.validator_backend_INDEX.domain-migration-dump-path = "/domain-upgrade-dump/INDEX/domain_migration_dump.json"',
+            },
+          ];
     super(
       name,
       {
@@ -98,7 +136,7 @@ export class MultiValidator extends MultiNodeDeployment {
               name: 'LOG_LEVEL_STDOUT',
               value: multiValidatorConfig?.logLevel,
             },
-          ],
+          ].concat(migrationEnvVars),
           ports: ports.map(port => ({
             name: port.name,
             containerPort: port.port,
@@ -123,7 +161,21 @@ export class MultiValidator extends MultiNodeDeployment {
             timeoutSeconds: 10,
           },
           resources: multiValidatorConfig?.resources?.validator,
+          volumeMounts: [
+            {
+              name: 'domain-upgrade-dump-volume',
+              mountPath: '/domain-upgrade-dump',
+            },
+          ],
         },
+        volumes: [
+          {
+            name: 'domain-upgrade-dump-volume',
+            persistentVolumeClaim: {
+              claimName: domainMigrationPvc.metadata.name,
+            },
+          },
+        ],
         serviceSpec: { ports },
       },
       opts,

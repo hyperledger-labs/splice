@@ -29,6 +29,10 @@ spec:
         {{- end }}
     spec:
       {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
       containers:
       - name: participant
         image: "{{ .Values.imageRepo }}/canton-participant:{{ .Chart.AppVersion }}{{ ((.Values.imageDigests).canton_participant) }}"
@@ -44,12 +48,6 @@ spec:
           value: {{ .Values.persistence.port | quote }}
         - name: CANTON_PARTICIPANT_POSTGRES_SCHEMA
           value: {{ .Values.persistence.schema }}
-        - name: CANTON_PARTICIPANT_ADMIN_USER_NAME
-          valueFrom: {{ .Values.participantAdminUserNameFrom | toYaml | nindent 12 }}
-        - name: AUTH_JWKS_URL
-          value: {{ .Values.auth.jwksUrl }}
-        - name: AUTH_TARGET_AUDIENCE
-          value: {{ .Values.auth.targetAudience }}
         - name: CANTON_PARTICIPANT_POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -72,6 +70,24 @@ spec:
                 {{- include "splice-util-lib.render-nested-config" .Values.kms | trim | nindent 16 }}
               }
             }
+        {{- end }}
+        {{- if .Values.disableAuth }}
+        - name: CANTON_PARTICIPANT_ADMIN_USER_NAME
+          value: ledger-api-user
+        - name: ADDITIONAL_CONFIG_DISABLE_AUTH
+          value: |
+            canton.participants.participant.ledger-api.auth-services=[{
+              type = unsafe-jwt-hmac-256
+              target-audience = "https://ledger_api.example.com"
+              secret = "unsafe"
+            }]
+        {{- else }}
+        - name: CANTON_PARTICIPANT_ADMIN_USER_NAME
+          valueFrom: {{ .Values.participantAdminUserNameFrom | toYaml | nindent 12 }}
+        - name: AUTH_JWKS_URL
+          value: {{ .Values.auth.jwksUrl }}
+        - name: AUTH_TARGET_AUDIENCE
+          value: {{ .Values.auth.targetAudience }}
         {{- end }}
         {{- include "splice-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
         {{- include "splice-util-lib.log-level" .Values | indent 8}}
@@ -108,7 +124,7 @@ spec:
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
-        {{- if and .Values.extraVolumeMounts (gt (len .Values.extraVolumeMounts) 0) }}
+        {{- if or (and .Values.extraVolumeMounts (gt (len .Values.extraVolumeMounts) 0)) .Values.pvc }}
         volumeMounts:
           {{- range .Values.extraVolumeMounts }}
           - name: {{ .name }}
@@ -120,6 +136,10 @@ spec:
             readOnly: {{ .readOnly }}
             {{- end }}
           {{- end }}
+        {{- if .Values.pvc }}
+          - name: participant-volume
+            mountPath: /persistent-data
+        {{- end }}
         {{- end }}
       {{- if or (.Values.persistence.enablePgInitContainer) (.Values.extraInitContainers) }}
       initContainers:
@@ -162,7 +182,7 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if and .Values.extraVolumes (gt (len .Values.extraVolumes) 0) }}
+      {{- if or (and .Values.extraVolumes (gt (len .Values.extraVolumes) 0)) .Values.pvc }}
       volumes:
         {{- range .Values.extraVolumes }}
         - name: {{ .name }}
@@ -175,7 +195,31 @@ spec:
             claimName: {{ .persistentVolumeClaim.claimName }}
           {{- end }}
         {{- end }}
+        {{- if .Values.pvc }}
+        - name: participant-volume
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-participant-pvc
+        {{- end }}
       {{- end }}
+---
+{{-  if .Values.pvc }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-participant-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "splice-util-lib.default-labels" (set . "app" $.Release.Name) | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.pvc.size }}
+  storageClassName: {{ .Values.pvc.volumeStorageClass }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service

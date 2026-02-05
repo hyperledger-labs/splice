@@ -3,13 +3,13 @@
 
 package org.lfdecentralizedtrust.splice.setup
 
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 import org.lfdecentralizedtrust.splice.config.ParticipantBootstrapDumpConfig
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryProvider}
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{ParticipantId, UniqueIdentifier}
-import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
 
 import java.nio.file.Path
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -36,6 +36,28 @@ object ParticipantInitializer {
     )
     participantInitializer
       .ensureInitializedWithExpectedId()
+  }
+
+  def ensureInitializedWithRotatedOTK(
+      identifierName: String,
+      participantAdminConnection: ParticipantAdminConnection,
+      dumpConfig: Option[ParticipantBootstrapDumpConfig],
+      loggerFactory: NamedLoggerFactory,
+      retryProvider: RetryProvider,
+      synchronizerId: SynchronizerId,
+  )(implicit
+      ec: ExecutionContextExecutor,
+      tc: TraceContext,
+  ): Future[Unit] = {
+    val participantInitializer = new ParticipantInitializer(
+      identifierName,
+      dumpConfig,
+      loggerFactory,
+      retryProvider,
+      participantAdminConnection,
+    )
+    participantInitializer
+      .ensureInitializedWithRotatedOTK(synchronizerId)
   }
 
   def getDump(config: ParticipantBootstrapDumpConfig): Future[NodeIdentitiesDump] =
@@ -70,6 +92,9 @@ class ParticipantInitializer(
   private val nodeInitializer =
     new NodeInitializer(participantAdminConnection, retryProvider, loggerFactory)
 
+  def waitForNodeInitialized(): Future[Unit] =
+    nodeInitializer.waitForNodeInitialized()
+
   def ensureInitializedWithExpectedId(): Future[Unit] =
     dumpConfig match {
       case Some(c: ParticipantBootstrapDumpConfig.File) =>
@@ -92,6 +117,16 @@ class ParticipantInitializer(
         } yield {
           logger.info(s"Participant $identifierName is initialized")
         }
+    }
 
+  def ensureInitializedWithRotatedOTK(synchronizerId: SynchronizerId): Future[Unit] =
+    for {
+      _ <- nodeInitializer.rotateCantonNodesOTKIfNeeded(
+        identifierName,
+        ParticipantId.apply,
+        synchronizerId,
+      )
+    } yield {
+      logger.info(s"Participant $identifierName has signed keys")
     }
 }

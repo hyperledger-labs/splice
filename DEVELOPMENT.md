@@ -191,25 +191,26 @@ repository into small ones in the future.
 
 ## IntelliJ Setup
 
-* The following instructions work for recent IntelliJ installs (tested on "IntelliJ IDEA 2024.3 (Community Edition)").
+* The following instructions work for recent IntelliJ installs (tested on "IntelliJ IDEA 2025.2.3 (Community Edition)").
 * Install the Scala plugin in IntelliJ if you don't have it yet.
 * Clone the repository first, if you haven't yet, and setup `direnv`
   (otherwise the environment variables referenced below are not defined).
-* **Important**: start IntelliJ from the repo directory so that it has access to all the environment variables
+* Kill all existing `sbt` sessions. Use `jps` to find their process IDs.
+* Run `sbt` from the **repository root** in a new terminal and leave it running. This will start and SBT server that
+  IntelliJ will later connect to. Running it in the repository root makes sure that it has the right environment.
+* Start IntelliJ from the **repository root directory** so that it has access to all the environment variables
   and the `nix` packages defined using `direnv` .
   On macos, this can be done via the `open` command, for example: `open -a "IntelliJ IDEA CE"`.
 * Open the repository via "File -> Open".
-* IntelliJ should prompt you whether you want to import the `sbt` project. Answer yes. The import will fail
-  though as the JDK and sbt launcher are not yet setup.
-* Determine the path for the JDK by running `echo $JAVA_HOME` in the repo root and add it to IntelliJ using
-  the "Add JDK from disk" action (can be found using Ctrl-Shift-A).
-* Determine the path of the sbt launcher using `echo $SBT_LAUNCH_PATH` and add it
-  using the "&launcher (sbt launch.jar)" config (can be found using Ctrl-Shift-A).
-  See sbt explanations [here](https://www.jetbrains.com/help/idea/sbt.html) for more info.
-* Your sbt settings should in the end roughly look like the ones in this [screenshot](https://i.imgur.com/B3yWCZ9.png)
-
-You should then see a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code while using the
-same package references as nix. If IntelliJ asks you at the end if you want to overwrite any previous `.idea/*` files, say yes.
+* IntelliJ should prompt you whether you want to import the project through SBT or BSP. We prefer BSP, as it allows
+  using the `direnv` provided environment, as long as the `sbt` server is started from the repo root directory *before*
+  starting a build in IntelliJ.
+  This is particularly interesting when working on multiple codebases at the same time, provided you have enough RAM.
+* If IntelliJ complains that no JDK is configured determine its path by running `echo $JAVA_HOME` in the repository root
+  and add it to IntelliJ using the "Add JDK from disk" action (can be found using Ctrl-Shift-A or Command-Shift-A).
+* After IntelliJ imports the project the setup should be complete. You can use IntellIJ to build the full project
+  and navigate it. Test execution sadly does not yet work due to some classpath and working directory shenanignas.
+  Use the SBT shell started in previous steps to start test runs from the CLI; and where desired to issue build commands.
 
 ## VSCode Setup
 
@@ -231,14 +232,8 @@ There are a few extensions that improve the VS Code experience when working on v
 
 ### Configuring VS Code for Daml Development
 
-- Install the Daml open source SDK by running
-   ```
-   ./build-tools/install-daml-sdk.sh
-   ```
-   or by following the instructions at https://docs.daml.com/getting-started/installation.html,
-   while making sure that you install the version of the SDK referenced in `nix/canton-sources.json`.
-   - The Daml SDK is not required for building our repository, but it's required for the Daml extension in VS Code.
-- Install the Daml extension by running `daml studio` or by manually installing it from the VS Code extensions UI.
+See [below](#editing-daml) for instructions on how to set up VS Code for Daml development.
+
 
 ### Configuring VS Code for Scala Development
 
@@ -357,17 +352,29 @@ The implementation of the `sbt` plugin can be found in [`/project/DamlPlugin.sca
 
 To edit the files in a particular Daml project, for example, `/apps/wallet/daml`, proceed as follows:
 
-1. Start `sbt` in the repo root to get access to an `sbt` shell (or use the one in IntelliJ).
-2. Start `damlBuild` in your `sbt` shell to build the .dars for all Daml projects.
-3. Start `daml studio` in the repo root, which starts VS code.
-4. Open and edit the .daml files in `/apps/wallet/daml` in VS code. You should see them being typechecked on the fly.
-5. See `/apps/wallet/daml/daml.yaml` for the .dar dependencies of `/apps/wallet/daml`.
+1. As a setup step: install the specific version of the Daml SDK used in the Splice repo by running
+   ```
+   ./build-tools/install-daml-sdk.sh
+   ```
+   TODO(#2722): replace our legacy custom setup with standard Daml SDK installation instructions
+2. Start `sbt` in the repo root to get access to an `sbt` shell (or use the one in IntelliJ).
+3. Start `damlBuild` in your `sbt` shell to build the .dars for all Daml projects.
+4. Start `daml studio --replace=always` in the repo root, which starts VS code.
+   Note that we need `--replace=always`, as there's a bug in later versions of the Daml extension
+   which prevents them from working with the Daml SDK version used in this repo
+   ([issue](https://github.com/digital-asset/daml/issues/22398)).
+5. Open and edit the .daml files in `/apps/wallet/daml` in VS code.
+   You should see them being typechecked on the fly.
+6. See `/apps/wallet/daml/daml.yaml` for the .dar dependencies of `/apps/wallet/daml`.
    If you change any of them, then you can propagate these changes across the .dars as follows:
    1. redo Step 2
     3. use Ctrl-Shift-P "Developer: Reload Window" in VS code to restart the `daml studio` language server with the updated package dependencies.
 
 *Tip:* if `damlBuild` fails with weird errors, then that might be due to stale `damlBuild` outputs.
 Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and similar for the dependent project.
+Alternatively, use the "big hammer" and run `find -name ".daml" -type d -exec rm -rf {} \;`
+from the repo root to delete all `.daml` build directories.
+
 
 ## Daml Version Guards in Integration Tests
 

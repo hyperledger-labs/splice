@@ -28,6 +28,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyholding.DummyHolding
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummytwointerfaces.DummyTwoInterfaces
+import org.lfdecentralizedtrust.splice.migration.MigrationTimeInfo
+import org.lfdecentralizedtrust.splice.store.db.AcsRowData.HasIndexColumns
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
@@ -36,7 +38,7 @@ import scala.jdk.CollectionConverters.*
 
 abstract class MultiDomainAcsStoreTest[
     S <: MultiDomainAcsStore
-] extends StoreTest { this: HasActorSystem =>
+] extends StoreTestBase { this: HasActorSystem =>
 
   import MultiDomainAcsStore.*
 
@@ -47,10 +49,16 @@ abstract class MultiDomainAcsStoreTest[
     id
   }
 
-  case class GenericAcsRowData(contract: Contract[_, _]) extends AcsRowData.AcsRowDataFromContract {
+  case class GenericAcsRowData(contract: Contract[?, ?]) extends AcsRowData.AcsRowDataFromContract {
     override def contractExpiresAt: Option[Time.Timestamp] = None
 
-    override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
+  }
+  object GenericAcsRowData {
+    implicit val hasIndexColumns: HasIndexColumns[GenericAcsRowData] =
+      new HasIndexColumns[GenericAcsRowData] {
+        override def indexColumnNames: Seq[String] = Seq.empty
+      }
   }
 
   case class GenericInterfaceRowData(
@@ -58,6 +66,12 @@ abstract class MultiDomainAcsStoreTest[
       override val interfaceView: DamlRecord[?],
   ) extends AcsInterfaceViewRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
+  }
+  object GenericInterfaceRowData {
+    implicit val hasIndexColumns: HasIndexColumns[GenericInterfaceRowData] =
+      new HasIndexColumns[GenericInterfaceRowData] {
+        override def indexColumnNames: Seq[String] = Seq.empty
+      }
   }
 
   protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[
@@ -104,6 +118,7 @@ abstract class MultiDomainAcsStoreTest[
         GenericAcsRowData,
         GenericInterfaceRowData,
       ] = defaultContractFilter,
+      migrationTimeInfo: Option[MigrationTimeInfo] = None,
   ): Store
 
   protected type Store = S
@@ -111,7 +126,7 @@ abstract class MultiDomainAcsStoreTest[
   protected type CReady = AssignedContract[AppRewardCoupon.ContractId, AppRewardCoupon]
 
   protected def assertIncompleteReassignments(
-      incompleteReassignmentsById: Map[ContractId[_], NonEmpty[Set[ReassignmentId]]] = Map.empty
+      incompleteReassignmentsById: Map[ContractId[?], NonEmpty[Set[ReassignmentId]]] = Map.empty
   )(implicit store: Store) =
     for {
       actualIncompleteReassignmentsById <- store.listIncompleteReassignments()
@@ -151,7 +166,7 @@ abstract class MultiDomainAcsStoreTest[
     store.lookupContractById(AppRewardCoupon.COMPANION)(c.contractId)
 
   protected def assertReadyForAssign(
-      contractId: ContractId[_],
+      contractId: ContractId[?],
       reassignmentId: ReassignmentId,
       expected: Boolean,
   )(implicit
@@ -360,7 +375,7 @@ abstract class MultiDomainAcsStoreTest[
     "ingestion can be restarted at any time" in {
       implicit val store = mkStore()
       for {
-        _ <- initWithAcs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))
+        _ <- initWithAcs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))
         _ <- store.ingestionSink.initialize()
         _ <- d1.create(c(2))
         _ <- store.ingestionSink.initialize()
@@ -389,7 +404,7 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store = mkStore()
       for {
         _ <- initWithAcs(
-          activeContracts = Seq(StoreTest.AcsImportEntry(c(1), d1, 0L))
+          activeContracts = Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L))
         )
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
@@ -404,8 +419,8 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- initWithAcs(
           Seq(
-            StoreTest.AcsImportEntry(c(1), d1, 0L),
-            StoreTest.AcsImportEntry(cFeatured(2), d1, 0L),
+            StoreTestBase.AcsImportEntry(c(1), d1, 0L),
+            StoreTestBase.AcsImportEntry(cFeatured(2), d1, 0L),
           )
         )
         _ <- assertList(c(1) -> Some(d1))
@@ -613,7 +628,7 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- initWithAcs(
           incompleteOut = Seq(
-            StoreTest.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
+            StoreTestBase.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
           )
         )
         _ <- assertList(c(1) -> None)
@@ -630,7 +645,7 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- initWithAcs(
           incompleteIn = Seq(
-            StoreTest.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
+            StoreTestBase.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
           )
         )
         _ <- assertList(c(1) -> Some(d2))
@@ -674,7 +689,7 @@ abstract class MultiDomainAcsStoreTest[
       val tf0 = nextReassignmentId
       for {
         _ <- initWithAcs(
-          incompleteOut = Seq(StoreTest.AcsImportIncompleteEntry(cFeatured(1), d1, d2, tf0, 1L))
+          incompleteOut = Seq(StoreTestBase.AcsImportIncompleteEntry(cFeatured(1), d1, d2, tf0, 1L))
         )
         _ <- assertIncompleteReassignments()
       } yield succeed
@@ -690,7 +705,7 @@ abstract class MultiDomainAcsStoreTest[
         }
       def r(round: Int) = AssignedContract(c(round), d1)
       for {
-        _ <- initWithAcs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))
+        _ <- initWithAcs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1)))
         _ <- d1.create(c(2))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1), r(2)))
@@ -710,7 +725,7 @@ abstract class MultiDomainAcsStoreTest[
         }
       def r(round: Int) = AssignedContract(c(round), d1)
       for {
-        _ <- initWithAcs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))
+        _ <- initWithAcs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1)))
         _ <- d1.create(c(2))
         _ <- store.ingestionSink.initialize()
@@ -739,7 +754,7 @@ abstract class MultiDomainAcsStoreTest[
         // incomplete unassign
         _ <- initWithAcs(
           incompleteOut = Seq(
-            StoreTest.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
+            StoreTestBase.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
           )
         )
         _ = eventually()(transfers.get should have length 1)
@@ -781,8 +796,8 @@ abstract class MultiDomainAcsStoreTest[
       }
       for {
         _ <- initWithAcs(
-          activeContracts = Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)),
-          incompleteOut = Seq(StoreTest.AcsImportIncompleteEntry(c(2), d1, d2, tf2, 3L)),
+          activeContracts = Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)),
+          incompleteOut = Seq(StoreTestBase.AcsImportIncompleteEntry(c(2), d1, d2, tf2, 3L)),
         )
         _ = assertSize("Initial", 1)
         // unassign before assign
@@ -816,8 +831,8 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- initWithAcs(
           Seq(
-            StoreTest.AcsImportEntry(c(1), d1, 0L),
-            StoreTest.AcsImportEntry(cUpgraded(2), d1, 0L),
+            StoreTestBase.AcsImportEntry(c(1), d1, 0L),
+            StoreTestBase.AcsImportEntry(cUpgraded(2), d1, 0L),
           )
         )
         _ <- d1.create(c(3))
@@ -835,51 +850,6 @@ abstract class MultiDomainAcsStoreTest[
 
     "have 900-1000 test contracts for the mismatch test" in {
       MultiDomainAcsStoreTest.generatedCoids.value.size should (be >= 900 and be <= 1000)
-    }
-
-    "read assignment-mismatched contracts in a stable order" in {
-      import com.digitalasset.daml.lf.value.Value
-      import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
-        FeaturedAppRight,
-        AppRewardCoupon,
-      }
-      import MultiDomainAcsStore.ConstrainedTemplate
-
-      // the specific templates don't matter, we just need 2 of them
-      val sampleParticipantId = ParticipantId("foo")
-      val evenCompanion = FeaturedAppRight.COMPANION
-      val oddCompanion = AppRewardCoupon.COMPANION
-      def smallestContract(coid: Value.ContractId, ix: Int) =
-        if (ix % 2 == 0) featuredAppRight(dsoParty, coid.coid)
-        else appRewardCoupon(1, dsoParty, contractId = coid.coid)
-      val coids = MultiDomainAcsStoreTest.generatedCoids.value
-      val expectedOrder = reassignmentContractOrder(
-        coids,
-        sampleParticipantId,
-      )(_.coid)
-
-      val contractFilter = {
-        import MultiDomainAcsStore.mkFilter
-
-        MultiDomainAcsStore.SimpleContractFilter[GenericAcsRowData, GenericInterfaceRowData](
-          dsoParty,
-          templateFilters = Map(
-            mkFilter(evenCompanion)(_ => true)(GenericAcsRowData(_)),
-            mkFilter(oddCompanion)(_ => true)(GenericAcsRowData(_)),
-          ),
-          interfaceFilters = Map.empty,
-        )
-      }
-      implicit val store: Store = mkStore(0, Some(0), 0L, sampleParticipantId, contractFilter)
-      for {
-        _ <- initWithAcs(coids.zipWithIndex.map { case (coid, ix) =>
-          StoreTest.AcsImportEntry(smallestContract(coid, ix), dummyDomain, 0L)
-        })
-        contracts <- store.listAssignedContractsNotOnDomainN(
-          dummy2Domain,
-          Seq[ConstrainedTemplate](evenCompanion, oddCompanion),
-        )
-      } yield contracts.map(_.contractId.contractId) shouldBe expectedOrder.map(_.coid)
     }
 
     "ingest and return interface views for 1 interface 2 implementors" in {
@@ -1324,7 +1294,7 @@ abstract class MultiDomainAcsStoreTest[
           holdingView(owner, BigDecimal(n), dsoParty, "AMT")
       )
       val acs = Seq(
-        StoreTest.AcsImportEntry(
+        StoreTestBase.AcsImportEntry(
           aHolding._1,
           d1,
           0L,
@@ -1332,7 +1302,7 @@ abstract class MultiDomainAcsStoreTest[
             holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> aHolding._2.toValue
           ),
         ),
-        StoreTest.AcsImportEntry(
+        StoreTestBase.AcsImportEntry(
           aTwoInterfaces._1,
           d1,
           0L,
@@ -1341,7 +1311,7 @@ abstract class MultiDomainAcsStoreTest[
             allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> aTwoInterfaces._3.toValue,
           ),
         ),
-        StoreTest.AcsImportEntry(
+        StoreTestBase.AcsImportEntry(
           anExcludedHolding._1,
           d1,
           0L,
@@ -1354,7 +1324,7 @@ abstract class MultiDomainAcsStoreTest[
         _ <- initWithAcs(
           acs,
           incompleteOut = incompleteOutHoldings.map { case (contract, holdingView) =>
-            StoreTest.AcsImportIncompleteEntry(
+            StoreTestBase.AcsImportIncompleteEntry(
               contract,
               d1,
               d2,
@@ -1366,7 +1336,7 @@ abstract class MultiDomainAcsStoreTest[
             )
           },
           incompleteIn = incompleteInHolding.map { case (contract, holdingView) =>
-            StoreTest.AcsImportIncompleteEntry(
+            StoreTestBase.AcsImportIncompleteEntry(
               contract,
               d2,
               d1,
@@ -1601,23 +1571,94 @@ abstract class MultiDomainAcsStoreTest[
         _ <- assertList()
         _ <- d1.create(
           goodContract,
-          implementedInterfaces = Map(
-            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> goodView.toValue
-          ),
+          implementedInterfaces = goodImplementedInterfaces,
         )
         _ <- d1.create(
           badContract,
-          implementedInterfaces = Map(
-            new Identifier(
-              maliciousPackageId,
-              holdingv1.Holding.INTERFACE_ID.getModuleName,
-              holdingv1.Holding.INTERFACE_ID.getEntityName,
-            ) -> badView.toValue
+          implementedInterfaces = badImplementedInterfaces,
+        )
+        resultHolding <- store.listInterfaceViews(holdingv1.Holding.INTERFACE)
+        resultAmulet <- store.listContracts(Amulet.COMPANION)
+      } yield {
+        resultHolding.map(_.contractId.contractId) should contain theSameElementsAs Seq(
+          goodContract.contractId.contractId
+        )
+        resultAmulet.map(_.contractId.contractId) should contain theSameElementsAs Seq(
+          goodContract.contractId.contractId
+        )
+      }
+    }
+
+    "prevent against ingestion of same (moduleName, entityName) with different package name - via interface fallback" in {
+      val filter =
+        MultiDomainAcsStore.SimpleContractFilter[GenericAcsRowData, GenericInterfaceRowData](
+          dsoParty,
+          templateFilters = Map.empty,
+          interfaceFilters = Map(
+            mkFilterInterface(holdingv1.Holding.INTERFACE)(_ => true) { contract =>
+              GenericInterfaceRowData(contract.identifier, contract.payload)
+            }
           ),
         )
-        result <- store.listInterfaceViews(holdingv1.Holding.INTERFACE)
+      implicit val store = mkStore(
+        filter = filter
+      )
+      val owner = providerParty(1)
+      val goodContract = amulet(owner, BigDecimal(10), 1L, BigDecimal(0.00001), dso = dsoParty)
+      val goodView = holdingView(owner, BigDecimal(10), dsoParty, "AMT")
+      val goodImplementedInterfaces = Map(
+        holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> goodView.toValue
+      )
+      // like Splice's Amulet, but with different packageid
+      // that still implements the Holding interface
+      val fakeAmuletContract =
+        amulet(owner, BigDecimal(20), 2L, BigDecimal(0.00002), dso = dsoParty).copy(identifier =
+          new Identifier(
+            maliciousPackageId,
+            goodContract.identifier.getModuleName,
+            goodContract.identifier.getEntityName,
+          )
+        )
+      val fakeAmuletView = holdingView(owner, BigDecimal(20), dsoParty, "AMT")
+      val fakeAmuletImplementedInterfaces = Map(
+        holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> fakeAmuletView.toValue
+      )
+
+      filter.contains(
+        toCreatedEvent(
+          goodContract,
+          implementedInterfaces = goodImplementedInterfaces,
+        )
+      ) should be(true)
+
+      filter.contains(
+        toCreatedEvent(
+          fakeAmuletContract,
+          implementedInterfaces = fakeAmuletImplementedInterfaces,
+        )
+      ) should be(true) // as a Holding, it is included. But it should not be included as an Amulet.
+
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- d1.create(
+          goodContract,
+          implementedInterfaces = goodImplementedInterfaces,
+        )
+        _ <- d1.create(
+          fakeAmuletContract,
+          implementedInterfaces = fakeAmuletImplementedInterfaces,
+        )
+        resultHolding <- store.listInterfaceViews(holdingv1.Holding.INTERFACE)
+        resultAmulet <- store.listContracts(Amulet.COMPANION)
       } yield {
-        result.map(_.contractId.contractId) should contain theSameElementsAs Seq(
+        // fakeAmuletContract is a Holding
+        resultHolding.map(_.contractId.contractId) should contain theSameElementsAs Seq(
+          goodContract.contractId.contractId,
+          fakeAmuletContract.contractId.contractId,
+        )
+        // but it is not an Amulet
+        resultAmulet.map(_.contractId.contractId) should contain theSameElementsAs Seq(
           goodContract.contractId.contractId
         )
       }

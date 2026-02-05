@@ -70,7 +70,7 @@ import org.apache.pekko.{Done, NotUsed}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import java.util.{Timer, TimerTask}
 import scala.collection.concurrent.TrieMap
-import scala.collection.{immutable, mutable}
+import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 import scala.language.implicitConversions
@@ -176,6 +176,13 @@ object PekkoUtil extends HasLoggerName {
     Sink.ignore.mapMaterializedValue { future =>
       FutureUnlessShutdown.outcomeF(future)
     }
+
+  /** Convenience function that turns a Source[T] inside a FutureUnlessShutdown into a Source[T].
+    */
+  def futureSourceUS[T](sourceFUS: FutureUnlessShutdown[Source[T, NotUsed]])(implicit
+      ec: ExecutionContext
+  ): Source[T, NotUsed] =
+    Source.futureSource(sourceFUS.onShutdown(Source.empty)).mapMaterializedValue(_ => NotUsed)
 
   /** A version of [[org.apache.pekko.stream.scaladsl.FlowOps.mapAsync]] that additionally allows to
     * pass state of type `S` between every subsequent element. Unlike
@@ -896,7 +903,7 @@ object PekkoUtil extends HasLoggerName {
           maxBatchSize: Int,
           maxBatchCount: Int,
           catchUpMode: CatchUpMode = MaximizeConcurrency,
-      ): U#Repr[immutable.Iterable[A]] =
+      ): U#Repr[Iterable[A]] =
         graph.via(BatchN(maxBatchSize, maxBatchCount, catchUpMode))
 
       def dropIf(count: Int)(condition: A => Boolean): U#Repr[A] =

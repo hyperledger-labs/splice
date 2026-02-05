@@ -168,7 +168,9 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "gcpProjectId": "da-cn-example-project-id"
+    },
     "name": "da-cn-example-project-id",
     "provider": "",
     "type": "cn:gcp:project"
@@ -235,6 +237,16 @@
     "name": "grafana-keys",
     "provider": "",
     "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
   },
   {
     "custom": true,

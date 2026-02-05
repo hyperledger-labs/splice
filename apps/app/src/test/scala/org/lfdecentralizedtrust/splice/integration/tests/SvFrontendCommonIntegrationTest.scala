@@ -34,7 +34,7 @@ abstract class SvFrontendCommonIntegrationTest
     )
   }
 
-  def getParameterNamesFromClass(clazz: Class[_]): List[String] = {
+  def getParameterNamesFromClass(clazz: Class[?]): List[String] = {
     import java.lang.reflect.Modifier
     val fields = clazz.getDeclaredFields
     val parameterFields = fields.filterNot(f => Modifier.isStatic(f.getModifiers))

@@ -20,7 +20,7 @@ fi
 sha=$(git rev-parse HEAD)
 if ! (git branch -r --contains "$sha" | grep -q "\borigin/main\b"); then
     if [[ $(git branch -r --contains "$sha") =~ origin/release-line-[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-        branch=$(git branch -r --contains "$sha" | grep -o 'origin/release-line-.*' | head -n 1)
+        branch=$(git branch -r --contains "$sha" | grep -o 'origin/release-line-[0-9]\+\.[0-9]\+\.[0-9]\+' | head -n 1)
         echo "${branch#origin/release-line-}"
         exit 0
     fi

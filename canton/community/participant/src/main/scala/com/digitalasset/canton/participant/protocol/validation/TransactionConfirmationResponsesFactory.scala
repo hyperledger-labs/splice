@@ -5,32 +5,29 @@ package com.digitalasset.canton.participant.protocol.validation
 
 import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.TransactionError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.protocol.ProtocolProcessor.{
-  MalformedPayload,
-  WrongRecipientsDueToTopologyChange,
-}
+import com.digitalasset.canton.participant.protocol.ProcessingSteps
+import com.digitalasset.canton.participant.protocol.ProtocolProcessor.MalformedPayload
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfPartyId, checked}
 
 import scala.concurrent.ExecutionContext
 
 class TransactionConfirmationResponsesFactory(
     participantId: ParticipantId,
-    synchronizerId: SynchronizerId,
-    protocolVersion: ProtocolVersion,
+    synchronizerId: PhysicalSynchronizerId,
     protected val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
 
   import com.digitalasset.canton.util.ShowUtil.*
+
+  private val protocolVersion = synchronizerId.protocolVersion
 
   /** Takes a `transactionValidationResult` and computes the
     * [[protocol.messages.ConfirmationResponses]], to be sent to the mediator.
@@ -183,7 +180,9 @@ class TransactionConfirmationResponsesFactory(
                 .map(err =>
                   logged(
                     requestId,
-                    // TODO(i13513): Check whether a `Malformed` code is appropriate
+                    // Conceptually, a normal LocalReject for the admin party should suffice for rejecting replays.
+                    // However, we nevertheless use a `Malformed` rejection here so that the rejection preference sorting
+                    // ensures that this rejection or something at least as strong will make it to the mediator.
                     LocalRejectError.MalformedRejects.MalformedRequest.Reject(
                       err.format(viewPosition)
                     ),
@@ -274,7 +273,7 @@ class TransactionConfirmationResponsesFactory(
                 ConfirmationResponses
                   .tryCreate(
                     requestId,
-                    transactionValidationResult.transactionId.toRootHash,
+                    transactionValidationResult.updateId.toRootHash,
                     synchronizerId,
                     participantId,
                     _,
@@ -286,10 +285,13 @@ class TransactionConfirmationResponsesFactory(
 
     if (malformedPayloads.nonEmpty) {
       FutureUnlessShutdown.pure(
-        createConfirmationResponsesForMalformedPayloads(
-          requestId,
-          transactionValidationResult.transactionId.toRootHash,
-          malformedPayloads,
+        ProcessingSteps.constructResponsesForMalformedPayloads(
+          requestId = requestId,
+          rootHash = transactionValidationResult.updateId.toRootHash,
+          malformedPayloads = malformedPayloads,
+          synchronizerId = synchronizerId,
+          participantId = participantId,
+          protocolVersion = protocolVersion,
         )
       )
     } else {
@@ -304,41 +306,4 @@ class TransactionConfirmationResponsesFactory(
     err
   }
 
-  def createConfirmationResponsesForMalformedPayloads(
-      requestId: RequestId,
-      rootHash: RootHash,
-      malformedPayloads: Seq[MalformedPayload],
-  )(implicit traceContext: TraceContext): Option[ConfirmationResponses] = {
-    val rejectError = LocalRejectError.MalformedRejects.Payloads.Reject(malformedPayloads.toString)
-
-    val dueToTopologyChange = malformedPayloads.forall {
-      case WrongRecipientsDueToTopologyChange(_) => true
-      case _ => false
-    }
-    if (!dueToTopologyChange) logged(requestId, rejectError).discard
-
-    checked(
-      Some(
-        ConfirmationResponses
-          .tryCreate(
-            requestId,
-            rootHash,
-            synchronizerId,
-            participantId,
-            NonEmpty.mk(
-              Seq,
-              ConfirmationResponse.tryCreate(
-                // We don't have to specify a viewPosition.
-                // The mediator will interpret this as a rejection
-                // for all views and on behalf of all declared confirming parties hosted by the participant.
-                None,
-                rejectError.toLocalReject(protocolVersion),
-                Set.empty,
-              ),
-            ),
-            protocolVersion,
-          )
-      )
-    )
-  }
 }

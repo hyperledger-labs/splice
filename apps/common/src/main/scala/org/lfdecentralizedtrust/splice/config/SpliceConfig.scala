@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.config
 
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.StartupMemoryCheckConfig.ReportingLevel.Warn
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
@@ -34,14 +35,15 @@ abstract class GrpcClientConfig extends NodeConfig {}
 abstract class HttpClientConfig extends NetworkAppNodeConfig {}
 
 final case class CircuitBreakerConfig(
-    // TODO(hyperledger-labs/splice#2462) Revert back to lower values once we also reset failures after some time of inactivity
-    maxFailures: Int = 40,
+    maxFailures: Int = 20,
     callTimeout: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(0), // disable timeout
     resetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
     maxResetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
     exponentialBackoffFactor: Double = 2.0,
     randomFactor: Double = 0.2,
+    // If the last failure was more than resetFailuresAfter ago, reset the failures to 0.
+    resetFailuresAfter: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(15),
 )
 
 final case class CircuitBreakersConfig(
@@ -49,13 +51,11 @@ final case class CircuitBreakersConfig(
       maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(2)
     ),
     mediumPriority: CircuitBreakerConfig = CircuitBreakerConfig(
-      // TODO(hyperledger-labs/splice#2462) Revert back to lower values once we also reset failures after some time of inactivity
-      maxFailures = 20,
+      maxFailures = 10,
       maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(3),
     ),
     lowPriority: CircuitBreakerConfig = CircuitBreakerConfig(
-      // TODO(hyperledger-labs/splice#2462) Revert back to lower values once we also reset failures after some time of inactivity
-      maxFailures = 10,
+      maxFailures = 5,
       maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(7),
     ),
     // Amulet expiry is different from essentially any other trigger run in the SV app in that for it to complete successfully
@@ -66,6 +66,11 @@ final case class CircuitBreakersConfig(
       maxFailures = 5,
       maxResetTimeout = NonNegativeFiniteDuration.ofMinutes(7),
     ),
+)
+
+final case class EnabledFeaturesConfig(
+    enableNewAcsExport: Boolean = true,
+    newSequencerConnectionPool: Boolean = true,
 )
 
 /** This class aggregates binary-level configuration options that are shared between each Splice app instance.
@@ -86,6 +91,7 @@ case class SharedSpliceAppParameters(
     requestTimeout: NonNegativeDuration,
     upgradesConfig: UpgradesConfig = UpgradesConfig(),
     circuitBreakers: CircuitBreakersConfig = CircuitBreakersConfig(),
+    enabledFeatures: EnabledFeaturesConfig = EnabledFeaturesConfig(),
     // TODO(DACH-NY/canton-network-node#736): likely remove all of the following:
     override val cachingConfigs: CachingConfigs,
     override val enableAdditionalConsistencyChecks: Boolean,
@@ -111,6 +117,5 @@ case class SharedSpliceAppParameters(
 
   override def startupMemoryCheckConfig: StartupMemoryCheckConfig = StartupMemoryCheckConfig(Warn)
 
-  // not applicable
-  override def sessionSigningKeys: SessionSigningKeysConfig = ???
+  def dispatchQueueBackpressureLimit: NonNegativeInt = ???
 }
