@@ -172,7 +172,6 @@ object TxLogEntry extends StoreErrors {
         transactionSubtype = toSubtypeReponseItem(subtype),
         eventId = entry.eventId,
         date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
-        provider = entry.provider,
         sender = httpDef.PartyAndAmount(sender.party, Codec.encode(sender.amount)),
         receivers = entry.receivers
           .map(r => httpDef.PartyAndAmount(r.party, Codec.encode(r.amount)))
@@ -213,7 +212,6 @@ object TxLogEntry extends StoreErrors {
         eventId = item.eventId,
         subtype = Some(subtype),
         date = Some(item.date.toInstant),
-        provider = item.provider,
         sender = Some(PartyAndAmount(sender.party, senderAmount)),
         receivers = receivers,
         senderHoldingFees = senderHoldingFees,

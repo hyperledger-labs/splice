@@ -504,7 +504,6 @@ object ScanTxLogParser {
         eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
         domainId = synchronizerId,
         date = Some(tx.getEffectiveAt),
-        provider = PartyId.tryFromProtoPrimitive(node.argument.value.transfer.provider),
         sender = Some(sender),
         receivers = receivers,
         balanceChanges = Seq.empty,

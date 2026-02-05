@@ -138,7 +138,6 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
               '009a97ffdf201d323d12a428187d9118d985678c37c6c1081f848269943f0da8bbca1112207e4b3e9a65879126e8b8103714f0144e1e0218fa98fb5231c63be74a0bb40402',
 
             // the openapi generator seems to generate a garbage type so there are a bunch of non-sense fields we need to fill in
-            provider: '',
             sender: { party: '', amount: '' },
             holding_fees: '',
             app_rewards_used: '',
@@ -156,7 +155,6 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
             },
             event_id: '#u3:0',
             date: new Date('2025-05-21T12:14:12Z'),
-            provider: alicePartyId,
             sender: { party: bobPartyId, amount: '-42.0' },
             receivers: [{ party: alicePartyId, amount: '0.0' }],
             holding_fees: '0.0',
@@ -180,7 +178,6 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
             },
             event_id: '#u2:0',
             date: new Date('2025-05-21T12:12:12Z'),
-            provider: alicePartyId,
             sender: { party: alicePartyId, amount: '23.0' },
             receivers: [],
             holding_fees: '0.0',
@@ -202,7 +199,6 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
             },
             event_id: '#u1:0',
             date: new Date('2025-05-21T12:10:12Z'),
-            provider: alicePartyId,
             sender: { party: alicePartyId, amount: '-42.0' },
             receivers: [],
             holding_fees: '0.0',
