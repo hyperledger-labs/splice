@@ -110,6 +110,19 @@ abstract class AcsSnapshotTriggerBase(
       currentSnapshot.isEmpty
   }
 
+  /** @return True if the passed migration id was fully backfilled.
+    *         This applies to the current migration id, where it either didn't need to backfill,
+    *         or backfilled because it joined late.
+    *         And also for past migrations, whether the SV was present in them or not.
+    */
+  protected def isHistoryBackfilled(
+      migrationId: Long
+  )(implicit tc: TraceContext): Future[Boolean] = {
+    updateHistory.sourceHistory
+      .migrationInfo(migrationId)
+      .map(_.exists(i => i.complete && i.importUpdatesComplete))
+  }
+
   protected def getLatestSnapshot(migrationId: Long)(implicit
       tc: TraceContext
   ): Future[Option[AcsSnapshot]] = {
@@ -187,10 +200,7 @@ object AcsSnapshotTriggerBase {
                   case Some(range) =>
                     val emptySnapshotRecordTime = range.min.minusSeconds(1L)
                     val nextSnapshotTime =
-                      storageConfig.computeSnapshotTimeAfter(
-                        range.min,
-                        storageConfig.dbAcsSnapshotPeriodHours,
-                      )
+                      storageConfig.computeDbSnapshotTimeAfter(range.min)
                     // Note: since there is a non-import update, we know that we have finished
                     // ingesting import updates for this migration. It's safe to initialize
                     // the snapshot from import updates now.
