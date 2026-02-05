@@ -692,7 +692,6 @@ abstract class ScanStoreTest
             eventId = s"$i",
             domainId = dummyDomain,
             date = Some(now),
-            provider = user1,
             sender = Some(
               SenderAmount(
                 user1,
