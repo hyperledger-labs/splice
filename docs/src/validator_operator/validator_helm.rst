@@ -377,8 +377,6 @@ Additionally, please modify the file ``splice-node/examples/sv-helm/standalone-p
 
 - Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on the network you are connecting to (devnet/testnet/mainnet).
 
-To configure the validator app, please modify the file ``splice-node/examples/sv-helm/validator-values.yaml`` as follows:
-
 You need to configure how your validator connects to the network's **scan** services by defining a ``scanClient`` block in your ``standalone-validator-values.yaml``.
 There are three modes of ``scanClient``:
 
@@ -387,7 +385,7 @@ There are three modes of ``scanClient``:
 - ``trust-single``: connects to one specific trusted scan.
 
 
-For each scanClient type, replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator. For example, the GSF scan URL, |gsf_scan_url|. For ``bft-custom`` and ``bft`` modes of ``scanClient``, you can specify more than one scan seed URL by separating them with commas.
+For your selected ``scanClient`` type, replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you host or trust that is reachable by your Validator. For example, the GSF scan URL, |gsf_scan_url|. For ``bft-custom`` and ``bft`` modes of ``scanClient``, you can specify more than one scan seed URL by separating them with commas.
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
     :language: yaml
@@ -401,7 +399,7 @@ For each scanClient type, replace ``TRUSTED_SCAN_URL`` with a URL of a Scan you 
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. Note that this contact information will be publicly visible. If you do not want to share contact information, you can put an empty string.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
-You need to configure how your validator's participant connects to **sequencers** by defining a ``synchronizer`` config in your ``validator-values.yaml``.
+You need to configure how your validator's participant connects to **sequencers** by defining a ``synchronizer`` config in your ``standalone-validator-values.yaml``.
 ``synchronizer`` supports three modes of operation:
 
 - ``bft``:  (default mode) connects to all available sequencers and validates responses via majority agreement.
