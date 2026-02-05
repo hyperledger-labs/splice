@@ -420,16 +420,30 @@ class HttpSvOperatorHandler(
     withSpan(s"$workflowId.getPartyToParticipant") { _ => _ =>
       withSequencerConnectionOrNotFound(respond.NotFound) { sequencerConnection =>
         for {
+          party <- PartyId.fromProtoPrimitive(partyId, "partyId") match {
+            case Right(party) => Future.successful(party)
+            case Left(error) => Future.failed(HttpErrorHandler.badRequest(error))
+          }
           dsoRules <- dsoStore.getDsoRules()
           partyToParticipant <- sequencerConnection
             .getPartyToParticipant(
               dsoRules.domain,
-              PartyId.tryFromProtoPrimitive(partyId),
+              party,
             )
+          participantId <- partyToParticipant.mapping.participants match {
+            case Seq(participant) => Future.successful(participant.participantId.toProtoPrimitive)
+            case Seq() =>
+              Future.failed(
+                HttpErrorHandler.notFound(s"No participant id found hosting party: $partyId")
+              )
+            case _ =>
+              Future.failed(
+                HttpErrorHandler.internalServerError(
+                  s"Party $partyId is hosted on multiple participants, which is not currently supported"
+                )
+              )
+          }
         } yield {
-          val participantId = partyToParticipant.mapping.participants.headOption
-            .map(_.participantId.toProtoPrimitive)
-            .getOrElse("")
           r0.GetPartyToParticipantResponse.OK(
             definitions.GetPartyToParticipantResponse(participantId)
           )
