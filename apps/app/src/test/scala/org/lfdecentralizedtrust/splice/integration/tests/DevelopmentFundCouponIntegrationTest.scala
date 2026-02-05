@@ -9,8 +9,12 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
+import org.lfdecentralizedtrust.splice.console.ScanAppBackendReference
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
+  AdvanceOpenMiningRoundTrigger,
+  ExpiredDevelopmentFundCouponTrigger,
+}
 import org.lfdecentralizedtrust.splice.util.{TriggerTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 
@@ -336,6 +340,78 @@ class DevelopmentFundCouponIntegrationTest
     }
   }
 
+  "Expiring a development fund coupon" in { implicit env =>
+    val sv1UserId = sv1WalletClient.config.ledgerApiUser
+    val aliceValidatorParty = onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
+    val fundManager = aliceValidatorParty
+    val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+    val beneficiary = bobParty
+    val developmentFundCouponAmount = BigDecimal(40.0)
+    val expiresAt = CantonTimestamp.now().plus(Duration.ofSeconds(5))
+    val reason = "Bob has contributed to the Daml repo"
+
+    val bobUserName = bobWalletClient.config.ledgerApiUser
+    val bobMergeAmuletsTrigger =
+      bobValidatorBackend
+        .userWalletAutomation(bobUserName)
+        .futureValue
+        .trigger[CollectRewardsAndMergeAmuletsTrigger]
+
+    val expiredDevelopmentFundCouponTriggers =
+      activeSvs.map(
+        _.dsoDelegateBasedAutomation.trigger[ExpiredDevelopmentFundCouponTrigger]
+      )
+
+    setTriggersWithin(
+      triggersToPauseAtStart = Seq(bobMergeAmuletsTrigger)
+    ) {
+      val unclaimedDevelopmentFundCouponTotal = setTriggersWithin(
+        triggersToPauseAtStart = expiredDevelopmentFundCouponTriggers
+      ) {
+        actAndCheck(
+          "Mint one development fund coupon", {
+            createDevelopmentFundCoupon(
+              sv1ValidatorBackend.participantClientWithAdminToken,
+              sv1UserId,
+              beneficiary,
+              fundManager,
+              developmentFundCouponAmount,
+              expiresAt,
+              reason,
+            )
+          },
+        )(
+          "A coupon is created",
+          _ => {
+            aliceValidatorWalletClient
+              .listActiveDevelopmentFundCoupons()
+              .length shouldBe 1
+          },
+        )
+        getUnclaimedDevelopmentFundCouponTotal(sv1ScanBackend)
+      }
+
+      clue(
+        "The coupon is archived"
+      ) {
+        eventually() {
+          aliceValidatorWalletClient
+            .listActiveDevelopmentFundCoupons() shouldBe empty
+        }
+      }
+
+      clue(
+        "The total unclaimed development fund coupon amount increases by the expired coupon amount"
+      ) {
+        eventually() {
+          val newUnclaimedDevelopmentFundCouponTotal =
+            getUnclaimedDevelopmentFundCouponTotal(sv1ScanBackend)
+          newUnclaimedDevelopmentFundCouponTotal shouldBe (unclaimedDevelopmentFundCouponTotal + developmentFundCouponAmount)
+        }
+      }
+    }
+  }
+
   private def assertUnclaimedDevelopmentCouponAmounts(
       expectedAmounts: Seq[BigDecimal]
   )(implicit env: FixtureParam) =
@@ -343,5 +419,11 @@ class DevelopmentFundCouponIntegrationTest
       .listUnclaimedDevelopmentFundCoupons()
       .map(co => BigDecimal(co.payload.amount))
       .sorted shouldBe expectedAmounts
+
+  private def getUnclaimedDevelopmentFundCouponTotal(scanAppRef: ScanAppBackendReference) =
+    scanAppRef
+      .listUnclaimedDevelopmentFundCoupons()
+      .map(co => BigDecimal(co.contract.payload.amount))
+      .sum
 
 }

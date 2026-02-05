@@ -79,7 +79,9 @@
         "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1252,7 +1254,9 @@
   "preload": false,
   "refresh": "",
   "schemaVersion": 41,
-  "tags": ["jvm"],
+  "tags": [
+    "jvm"
+  ],
   "templating": {
     "list": [
       {
@@ -1270,8 +1274,12 @@
       },
       {
         "current": {
-          "text": ["sv-1"],
-          "value": ["sv-1"]
+          "text": [
+            "sv-1"
+          ],
+          "value": [
+            "sv-1"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -1296,8 +1304,12 @@
       {
         "allValue": ".*",
         "current": {
-          "text": ["All"],
-          "value": ["$__all"]
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -1324,7 +1336,9 @@
         "allValue": ".*",
         "current": {
           "text": "All",
-          "value": ["$__all"]
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -1351,7 +1365,9 @@
         "allValue": ".*",
         "current": {
           "text": "All",
-          "value": ["$__all"]
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "type": "prometheus",

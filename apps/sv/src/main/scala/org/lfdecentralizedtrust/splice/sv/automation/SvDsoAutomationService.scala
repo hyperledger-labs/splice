@@ -119,17 +119,6 @@ class SvDsoAutomationService(
       config.onboardingPollingInterval.getOrElse(wallClockTriggerContext.config.pollingInterval)
     )
 
-  // Trigger that starts only after the SV namespace is added to the decentralized namespace
-  def registerSvNamespaceMembershipTrigger(): Unit = {
-    registerTrigger(
-      new SvNamespaceMembershipTrigger(
-        onboardingTriggerContext,
-        dsoStore,
-        participantAdminConnection,
-      )
-    )
-  }
-
   // Triggers that require namespace permissions and the existence of the DsoRules and AmuletRules contracts
   def registerPostOnboardingTriggers(): Unit = {
     registerTrigger(
@@ -206,6 +195,14 @@ class SvDsoAutomationService(
     )
     registerTrigger(
       new SvOnboardingMediatorProposalTrigger(
+        onboardingTriggerContext,
+        dsoStore,
+        participantAdminConnection,
+      )
+    )
+
+    registerTrigger(
+      new SvNamespaceMembershipTrigger(
         onboardingTriggerContext,
         dsoStore,
         participantAdminConnection,

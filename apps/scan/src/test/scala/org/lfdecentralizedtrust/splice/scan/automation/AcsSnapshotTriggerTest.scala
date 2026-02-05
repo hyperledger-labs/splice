@@ -3,6 +3,7 @@ package org.lfdecentralizedtrust.splice.scan.automation
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.Transaction
 import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.automation.{TriggerContext, TriggerEnabledSynchronization}
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
@@ -570,6 +571,7 @@ class AcsSnapshotTriggerTest
   ) {
     final def storageConfig = ScanStorageConfig(
       dbAcsSnapshotPeriodHours = 1,
+      1, // ignored in this test
       0, // ignored in this test
       0L, // ignored in this test
     )
@@ -595,6 +597,7 @@ class AcsSnapshotTriggerTest
           dummyDomain.toProtoPrimitive,
           TraceContextOuterClass.TraceContext.getDefaultInstance,
           recordTime.toInstant,
+          ByteString.EMPTY,
         )
       )
     }

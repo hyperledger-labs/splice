@@ -838,7 +838,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Sequencer Connection Pool",
   "uid": "50503893-d05f-4ece-9ebf-36fd20ffb06f",
   "version": 9

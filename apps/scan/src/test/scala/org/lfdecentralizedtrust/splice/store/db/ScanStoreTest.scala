@@ -71,7 +71,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.I
 }
 
 abstract class ScanStoreTest
-    extends StoreTest
+    extends StoreTestBase
     with HasExecutionContext
     with StoreErrors
     with AmuletTransferUtil {
@@ -1547,7 +1547,7 @@ abstract class ScanStoreTest
     }
   }
 }
-trait AmuletTransferUtil { self: StoreTest =>
+trait AmuletTransferUtil { self: StoreTestBase =>
   def mkInputAmulet() = {
     new splice.amuletrules.transferinput.InputAmulet(
       new splice.amulet.Amulet.ContractId(nextCid())

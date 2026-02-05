@@ -222,6 +222,13 @@ function _pulumi_automation_run_up() {
     fi
 }
 
+subcommand_whitelist[gha_preview]='Preview the changes for the GitHub Actions Pulumi stack.'
+function subcmd_gha_preview() {
+  _info "Previewing GitHub Actions Pulumi stack"
+
+  _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi/gha" run preview --preview
+}
+
 ###
 
 subcommand_whitelist[reset]='Reset the state of the cluster to a fully blank state. Clears all data.'

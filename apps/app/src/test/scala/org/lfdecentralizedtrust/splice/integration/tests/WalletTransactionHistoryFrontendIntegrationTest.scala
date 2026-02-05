@@ -181,13 +181,15 @@ class WalletTransactionHistoryFrontendIntegrationTest
             )
         }
 
-        txs.map(row => {
-          val updateId = readTransactionFromRow(row).updateId
-          updateId should not be empty
-          updateId
-        })
+        txs
+          .map(row => {
+            val updateId = readTransactionFromRow(row).updateId
+            updateId should not be empty
+            updateId
+          })
+          // remove the balance change tx for scan comparison
+          .init
       }
-
       withFrontEnd("scan") { implicit webDriver =>
         actAndCheck(
           "Go to Scan",
@@ -208,7 +210,6 @@ class WalletTransactionHistoryFrontendIntegrationTest
           },
         )
       }
-
       clue("update IDs from the UI can be used for querying scan") {
         updateIds.foreach(updateId =>
           eventuallySucceeds() {

@@ -1421,6 +1421,9 @@
           "port": 26316
         },
         "logLevel": "debug",
+        "mempool": {
+          "size": 4000
+        },
         "metrics": {
           "enable": true,
           "labels": [
@@ -1527,6 +1530,9 @@
           "port": 26416
         },
         "logLevel": "debug",
+        "mempool": {
+          "size": 4000
+        },
         "metrics": {
           "enable": true,
           "labels": [
@@ -1988,6 +1994,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2054,6 +2064,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -2122,6 +2136,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2188,6 +2206,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -2256,6 +2278,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2323,6 +2349,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2389,6 +2419,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -2557,6 +2591,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2724,6 +2762,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2790,6 +2832,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -2858,6 +2904,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2924,6 +2974,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -3425,6 +3479,9 @@
           "port": 26306
         },
         "logLevel": "debug",
+        "mempool": {
+          "size": 4000
+        },
         "metrics": {
           "enable": true,
           "labels": [
@@ -3528,6 +3585,9 @@
           "port": 26406
         },
         "logLevel": "debug",
+        "mempool": {
+          "size": 4000
+        },
         "metrics": {
           "enable": true,
           "labels": [
@@ -3631,6 +3691,9 @@
           "port": 26326
         },
         "logLevel": "debug",
+        "mempool": {
+          "size": 4000
+        },
         "metrics": {
           "enable": true,
           "labels": [
@@ -3737,6 +3800,9 @@
           "port": 26426
         },
         "logLevel": "debug",
+        "mempool": {
+          "size": 4000
+        },
         "metrics": {
           "enable": true,
           "labels": [
@@ -4198,6 +4264,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -4264,6 +4334,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -4332,6 +4406,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -4398,6 +4476,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -4466,6 +4548,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -4533,6 +4619,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -4599,6 +4689,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -4792,6 +4886,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -4984,6 +5082,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -5050,6 +5152,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -5118,6 +5224,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -5184,6 +5294,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -5884,6 +5998,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -5950,6 +6068,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -6018,6 +6140,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -6084,6 +6210,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -6152,6 +6282,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -6219,6 +6353,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -6285,6 +6423,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -6453,6 +6595,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -6620,6 +6766,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -6686,6 +6836,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -6754,6 +6908,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -6820,6 +6978,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"

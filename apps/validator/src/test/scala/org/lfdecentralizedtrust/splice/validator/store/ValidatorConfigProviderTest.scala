@@ -9,7 +9,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import org.lfdecentralizedtrust.splice.store.{KeyValueStore, StoreTest}
+import org.lfdecentralizedtrust.splice.store.{KeyValueStore, StoreTestBase}
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorConfigProvider.ScanUrlInternalConfig
 import org.scalatest.matchers.should.Matchers
@@ -17,7 +17,7 @@ import org.scalatest.matchers.should.Matchers
 import scala.concurrent.Future
 
 abstract class ValidatorConfigProviderTest
-    extends StoreTest
+    extends StoreTestBase
     with Matchers
     with HasExecutionContext {
 

@@ -645,7 +645,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Onboarded Parties",
   "uid": "fc6185ce-0c37-48e7-960b-839a037d47bf",
   "version": 1

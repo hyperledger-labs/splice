@@ -108,6 +108,9 @@ lazy val root: Project = (project in file("."))
     `splice-util-featured-app-proxies-test-daml`,
     `splice-util-token-standard-wallet-daml`,
     `splice-util-token-standard-wallet-test-daml`,
+    `splice-util-token-standard-wallet-test-daml`,
+    `splice-util-batched-markers-daml`,
+    `splice-util-batched-markers-test-daml`,
     `splitwell-daml`,
     `splitwell-test-daml`,
     `splice-dso-governance-daml`,
@@ -840,6 +843,28 @@ lazy val `splice-util-token-standard-wallet-test-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
+lazy val `splice-util-batched-markers-daml` =
+  project
+    .in(file("daml/splice-util-batched-markers"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `splice-util-batched-markers-test-daml` =
+  project
+    .in(file("daml/splice-util-batched-markers-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`splice-util-batched-markers-daml` / Compile / damlBuild).value ++
+        (`splice-token-standard-test-daml` / Compile / damlBuild).value,
+      Compile / damlEnableJavaCodegen := false,
+    )
+    .dependsOn(`canton-bindings-java`)
+
 lazy val `splice-wallet-test-daml` =
   project
     .in(file("daml/splice-wallet-test"))
@@ -923,6 +948,7 @@ lazy val `apps-common` =
       `splice-token-test-dummy-holding-daml`,
       `splice-token-test-trading-app-daml`,
       `splice-featured-app-api-v1-daml`,
+      `splice-util-batched-markers-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
     .settings(
@@ -1429,7 +1455,7 @@ lazy val `apps-splitwell-frontend` = {
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "splitwell-frontend",
+      frontendWorkspace := "@lfdecentralizedtrust/splice-splitwell-frontend",
       sharedFrontendSettings,
     )
 }

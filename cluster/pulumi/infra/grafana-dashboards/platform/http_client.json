@@ -91,7 +91,9 @@
       "id": 1,
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -286,7 +288,9 @@
       "id": 4,
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -379,7 +383,9 @@
       "id": 3,
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -412,8 +418,12 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": ["validator1"],
-          "value": ["validator1"]
+          "text": [
+            "validator1"
+          ],
+          "value": [
+            "validator1"
+          ]
         },
         "definition": "label_values(daml_http_client_requests_duration_seconds,namespace)",
         "includeAll": true,
@@ -474,7 +484,9 @@
       {
         "current": {
           "text": "All",
-          "value": ["$__all"]
+          "value": [
+            "$__all"
+          ]
         },
         "definition": "label_values(daml_http_client_requests_duration_seconds{namespace=~\"$namespace\", job=~\"$job\"},http_client)",
         "includeAll": true,
@@ -523,7 +535,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "UTC",
+  "timezone": "",
   "title": "Http Client",
   "uid": "a8a3113a-bccf-4728-b752-dd7a5d6f9bda",
   "version": 3

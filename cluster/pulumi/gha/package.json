@@ -13,7 +13,8 @@
     "format:fix": "prettier --write -- src",
     "format:check": "prettier --check -- src",
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
-    "lint:check": "eslint --max-warnings=0 -- src"
+    "lint:check": "eslint --max-warnings=0 -- src",
+    "preview": "PULUMI_CONFIG_PASSPHRASE= ts-node ./pulumiPreview.ts"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.5"

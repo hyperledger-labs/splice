@@ -439,7 +439,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
+  "timezone": "",
   "title": "Splice Rate Limiting",
   "uid": "splice-rate-limit-db",
   "version": 3
