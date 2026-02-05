@@ -35,8 +35,10 @@ export function valuesForSvValidatorApp(
     ...(bftSequencerConnection
       ? {}
       : {
-          decentralizedSynchronizerUrl: decentralizedSynchronizerUrl,
-          useSequencerConnectionsFromScan: false,
+          synchronizer: {
+            connectionType: 'trust-single',
+            url: decentralizedSynchronizerUrl,
+          },
         }),
     additionalEnvVars: [
       ...(bftSequencerConnection
