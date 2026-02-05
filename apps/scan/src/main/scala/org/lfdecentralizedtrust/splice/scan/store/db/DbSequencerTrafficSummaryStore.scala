@@ -15,6 +15,8 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import slick.jdbc.PostgresProfile
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import io.circe.Json
+import io.circe.syntax.*
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
@@ -28,21 +30,15 @@ object DbSequencerTrafficSummaryStore {
       viewHashes: Seq[String],
   )
 
-  /** Delimiter used to encode view hashes as a single string in the database.
-    * Using pipe character as it's unlikely to appear in hash values.
-    */
-  private val ViewHashDelimiter = "|"
-
   object EnvelopeT {
 
-    /** Encode view hashes as a pipe-delimited string for database storage */
-    def encodeViewHashes(viewHashes: Seq[String]): String =
-      viewHashes.mkString(ViewHashDelimiter)
+    /** Encode view hashes as JSON for database storage */
+    def encodeViewHashes(envelopes: Seq[Seq[String]]): Json =
+      envelopes.asJson
 
-    /** Decode view hashes from a pipe-delimited string */
-    def decodeViewHashes(encoded: String): Seq[String] =
-      if (encoded.isEmpty) Seq.empty
-      else encoded.split(ViewHashDelimiter, -1).toSeq
+    /** Decode view hashes from JSON */
+    def decodeViewHashes(json: Json): Seq[Seq[String]] =
+      json.as[Seq[Seq[String]]].getOrElse(Seq.empty)
   }
 
   final case class TrafficSummaryT(
@@ -106,19 +102,20 @@ class DbSequencerTrafficSummaryStore(
   type EnvelopeT = DbSequencerTrafficSummaryStore.EnvelopeT
   val EnvelopeT = DbSequencerTrafficSummaryStore.EnvelopeT
 
-  /** Reconstruct envelopes from parallel arrays of traffic costs and encoded view hashes */
+  /** Reconstruct envelopes from parallel arrays of traffic costs and view hashes JSON */
   private def parseEnvelopes(
       trafficCosts: Array[Long],
-      viewHashes: Array[String],
+      viewHashesJson: Json,
   ): Seq[EnvelopeT] = {
+    val viewHashes = EnvelopeT.decodeViewHashes(viewHashesJson)
     require(
       trafficCosts.length == viewHashes.length,
       s"Mismatched array lengths: trafficCosts=${trafficCosts.length}, viewHashes=${viewHashes.length}",
     )
     trafficCosts
       .zip(viewHashes)
-      .map { case (cost, encodedHashes) =>
-        EnvelopeT(cost, EnvelopeT.decodeViewHashes(encodedHashes))
+      .map { case (cost, hashes) =>
+        EnvelopeT(cost, hashes)
       }
       .toSeq
   }
@@ -134,14 +131,14 @@ class DbSequencerTrafficSummaryStore(
       <<[Long], // total_traffic_cost
       parseEnvelopes(
         <<[Array[Long]],
-        <<[Array[String]],
+        <<[Json],
       ), // envelope_traffic_costs, envelope_view_hashes
     )
   }
 
   private def sqlInsertTrafficSummary(row: TrafficSummaryT) = {
     val trafficCosts = row.envelopes.map(_.trafficCost)
-    val viewHashes = row.envelopes.map(e => EnvelopeT.encodeViewHashes(e.viewHashes))
+    val viewHashesJson = EnvelopeT.encodeViewHashes(row.envelopes.map(_.viewHashes))
     sql"""
       insert into #${Tables.trafficSummaries}(
         history_id,
@@ -160,7 +157,7 @@ class DbSequencerTrafficSummaryStore(
         ${row.sender},
         ${row.totalTrafficCost},
         $trafficCosts,
-        $viewHashes
+        $viewHashesJson
       )
       on conflict (history_id, sequencing_time) do nothing
     """.asUpdate

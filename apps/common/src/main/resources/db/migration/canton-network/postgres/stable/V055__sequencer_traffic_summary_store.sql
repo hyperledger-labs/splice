@@ -18,9 +18,9 @@ create table sequencer_traffic_summary_store
     total_traffic_cost          bigint not null,
     -- Traffic cost per envelope (parallel array with envelope_view_hashes)
     envelope_traffic_costs      bigint[] not null,
-    -- View hashes per envelope, stored as pipe-delimited strings (parallel array with envelope_traffic_costs)
-    -- Each element contains view hashes for one envelope, e.g., 'hash1|hash2|hash3'
-    envelope_view_hashes        text[] not null,
+    -- View hashes per envelope, stored as JSONB array of arrays (parallel array with envelope_traffic_costs)
+    -- Each element contains view hashes for one envelope, e.g., [["hash1","hash2"],["hash3"]]
+    envelope_view_hashes        jsonb not null,
     constraint sequencer_traffic_summary_store_pkey primary key (row_id),
     -- Unique constraint for deduplication during ingestion (sequencing_time is unique per history)
     constraint sequencer_traffic_summary_unique unique (history_id, sequencing_time)

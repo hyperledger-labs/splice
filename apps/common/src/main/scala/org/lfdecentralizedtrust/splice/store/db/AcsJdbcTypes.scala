@@ -161,13 +161,6 @@ trait AcsJdbcTypes {
   protected implicit lazy val stringSeqOptGetResult: GetResult[Option[Seq[String]]] =
     stringArrayOptGetResult.andThen(_.map(_.toSeq))
 
-  protected implicit lazy val stringSeqSetParameter: SetParameter[Seq[String]] =
-    (strings: Seq[String], pp: PositionedParameters) =>
-      pp.setObject(
-        pp.ps.getConnection.createArrayOf("text", strings.toArray),
-        JDBCType.ARRAY.getVendorTypeNumber,
-      )
-
   protected implicit lazy val longArrayGetResult: GetResult[Array[Long]] = (r: PositionedResult) =>
     {
       val sqlArray = r.rs.getArray(r.skip.currentPos)
