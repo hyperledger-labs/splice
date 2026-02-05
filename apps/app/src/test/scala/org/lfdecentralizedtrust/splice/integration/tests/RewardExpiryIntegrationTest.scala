@@ -105,6 +105,15 @@ class RewardExpiryIntegrationTest extends IntegrationTest with TriggerTestUtil {
           .packages
           .map(_.packageId) should contain(DarResources.dsoGovernance.latest.packageId),
     )
+    clue("Wait for Alice to create the validator liveness activity record") {
+      eventually() {
+        aliceValidatorBackend.participantClient.ledger_api_extensions.acs
+          .filterJava(ValidatorLivenessActivityRecord.COMPANION)(
+            aliceValidatorBackend.getValidatorPartyId(),
+            _.data.round.number == 0,
+          ) should have size (1)
+      }
+    }
     actAndCheck("Advance by one tick", advanceRoundsByOneTickViaAutomation())(
       "Round 0 is closed",
       _ => {
@@ -144,11 +153,6 @@ class RewardExpiryIntegrationTest extends IntegrationTest with TriggerTestUtil {
         DarResources.amulet.latest.packageId should not be initialAmuletPackage.packageId
       },
     )
-    aliceValidatorBackend.participantClient.ledger_api_extensions.acs
-      .filterJava(ValidatorLivenessActivityRecord.COMPANION)(
-        aliceValidatorBackend.getValidatorPartyId(),
-        _.data.round.number == 0,
-      ) should have size (1)
     actAndCheck(
       "Resume reward expiry trigger",
       sv1Backend.dsoDelegateBasedAutomation
