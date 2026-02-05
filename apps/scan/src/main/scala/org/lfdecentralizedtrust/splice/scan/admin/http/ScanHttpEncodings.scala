@@ -479,6 +479,7 @@ object ScanHttpEncodings {
           informees = v.informees.toVector,
           confirmingParties = quorums,
           subViews = v.subViews.toVector,
+          viewHash = v.viewHash.getOrElse(""),
         )
       }
 
