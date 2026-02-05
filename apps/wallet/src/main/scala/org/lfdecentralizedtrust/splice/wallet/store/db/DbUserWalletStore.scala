@@ -20,15 +20,23 @@ import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
   AcsQueries,
   AcsTables,
-  DbTxLogAppStore,
   DbTransferInputQueries,
+  DbTxLogAppStore,
   TxLogQueries,
 }
-import org.lfdecentralizedtrust.splice.store.{Limit, LimitHelpers, PageLimit, TxLogStore}
+import org.lfdecentralizedtrust.splice.store.{
+  Limit,
+  LimitHelpers,
+  PageLimit,
+  ResultsPage,
+  TxLogStore,
+}
 import org.lfdecentralizedtrust.splice.util.{Contract, QualifiedName, TemplateJsonDecoder}
 import org.lfdecentralizedtrust.splice.wallet.store
 import org.lfdecentralizedtrust.splice.wallet.store.{
   BuyTrafficRequestTxLogEntry,
+  DevelopmentFundCouponArchivedTxLogEntry,
+  DevelopmentFundCouponCreatedTxLogEntry,
   TransferOfferTxLogEntry,
   TxLogEntry,
   UserWalletStore,
@@ -46,6 +54,7 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
+import org.lfdecentralizedtrust.splice.util.PrettyInstances.PrettyContractId
 
 import scala.concurrent.*
 import scala.jdk.OptionConverters.*
@@ -442,4 +451,122 @@ class DbUserWalletStore(
         ),
       )
     }
+
+  override def listDevelopmentFundCouponHistory(after: Option[Long], limit: PageLimit)(implicit
+      lc: TraceContext
+  ): Future[
+    ResultsPage[
+      (DevelopmentFundCouponCreatedTxLogEntry, DevelopmentFundCouponArchivedTxLogEntry.Status)
+    ]
+  ] = {
+    val opName = "listDevelopmentFundCouponHistory"
+
+    def afterFilter(a: Option[Long]) =
+      a.fold(sql"")(x => sql" and entry_number < $x")
+
+    waitUntilAcsIngested {
+      for {
+        // 1) PAGE OVER ARCHIVED (includes status; stateless across requests)
+        archivedRows <- storage.query(
+          selectFromTxLogTable(
+            WalletTables.txLogTableName,
+            txLogStoreId,
+            where =
+              sql"tx_log_id = ${TxLogEntry.EntryType.DevelopmentFundCouponArchivedTxLogEntry}" ++
+                afterFilter(after),
+            orderLimit = sql"order by entry_number desc limit ${sqlLimit(limit)}",
+          ),
+          opName,
+        )
+
+        archivedLimited = applyLimit(opName, limit, archivedRows)
+        nextPageToken = archivedLimited.lastOption.map(_.entryNumber)
+
+        resultPage <- archivedLimited.headOption match {
+          case None =>
+            // no archived => no results, no next token
+            Future.successful(
+              ResultsPage(
+                Seq.empty[
+                  (
+                      DevelopmentFundCouponCreatedTxLogEntry,
+                      DevelopmentFundCouponArchivedTxLogEntry.Status,
+                  )
+                ],
+                None,
+              )
+            )
+          case Some(maxArchivedRowInPage) =>
+            val archivedEntries =
+              archivedLimited.map(
+                txLogEntryFromRow[DevelopmentFundCouponArchivedTxLogEntry](txLogConfig)
+              )
+            val targetCids: Set[String] = archivedEntries.map(_.contractId).toSet
+            // Start scanning CREATED from just ABOVE the max archived entry_number in this page
+            // so we don't skip created entries interleaved between archived entries.
+            val createdScanStartAfter: Option[Long] =
+              Some(maxArchivedRowInPage.entryNumber + 1L)
+            // Batch size for scanning created. Adjust multiplier if needed.
+            val createdBatchSize: PageLimit = {
+              val raw = math.min(limit.maxPageSize, math.max(limit.limit * 20, limit.limit))
+              PageLimit.tryCreate(raw, limit.maxPageSize)
+            }
+
+            def fetchCreatedBatch(scanAfter: Option[Long]) =
+              storage.query(
+                selectFromTxLogTable(
+                  WalletTables.txLogTableName,
+                  txLogStoreId,
+                  where =
+                    sql"tx_log_id = ${TxLogEntry.EntryType.DevelopmentFundCouponCreatedTxLogEntry}" ++
+                      afterFilter(scanAfter),
+                  orderLimit = sql"order by entry_number desc limit ${sqlLimit(createdBatchSize)}",
+                ),
+                s"$opName:fetchCreatedBatch",
+              )
+
+            def collectCreated(
+                scanAfter: Option[Long],
+                found: Map[String, DevelopmentFundCouponCreatedTxLogEntry], // cid -> created
+            ): Future[Map[String, DevelopmentFundCouponCreatedTxLogEntry]] = {
+              if (found.size >= targetCids.size || scanAfter.isEmpty) {
+                Future.successful(found)
+              } else {
+                fetchCreatedBatch(scanAfter).flatMap { rows =>
+                  val nextScanAfter = rows.lastOption.map(_.entryNumber)
+                  val foundUpdated = rows.foldLeft(found) { (foundSoFar, row) =>
+                    val created =
+                      txLogEntryFromRow[DevelopmentFundCouponCreatedTxLogEntry](txLogConfig)(row)
+                    val cid = created.contractId
+                    if (targetCids.contains(cid) && !foundSoFar.contains(cid))
+                      foundSoFar.updated(cid, created)
+                    else
+                      foundSoFar
+                  }
+                  collectCreated(nextScanAfter, foundUpdated)
+                }
+              }
+            }
+
+            for {
+              createdByCid <- collectCreated(createdScanStartAfter, Map.empty)
+              // Keep the order of ARCHIVED page (DESC by archived entry_number)
+              zipped = archivedEntries.map { a =>
+                createdByCid.get(a.contractId) match {
+                  case Some(c) => c -> a.status
+                  case None =>
+                    // should not happen if invariant holds (every archived has a created)
+                    throw contractIdNotFound(
+                      PrettyContractId(
+                        amuletCodegen.DevelopmentFundCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+                        a.contractId,
+                      )
+                    )
+                }
+              }
+            } yield ResultsPage(zipped, nextPageToken)
+        }
+      } yield resultPage
+    }
+  }
 }

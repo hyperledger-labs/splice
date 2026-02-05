@@ -19,6 +19,7 @@ import org.lfdecentralizedtrust.splice.history.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpDef
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  ArchivedDevelopmentFundCouponStatus,
   GetBuyTrafficRequestStatusResponse,
   GetTransferOfferStatusResponse,
 }
@@ -44,6 +45,10 @@ object TxLogEntry extends StoreErrors {
       case _: NotificationTxLogEntry => EntryType.NotificationTxLogEntry
       case _: TransferOfferTxLogEntry => EntryType.TransferOfferTxLogEntry
       case _: BuyTrafficRequestTxLogEntry => EntryType.BuyTrafficRequestTxLogEntry
+      case _: DevelopmentFundCouponCreatedTxLogEntry =>
+        EntryType.DevelopmentFundCouponCreatedTxLogEntry
+      case _: DevelopmentFundCouponArchivedTxLogEntry =>
+        EntryType.DevelopmentFundCouponArchivedTxLogEntry
       case _ => throw txEncodingFailed()
     }
     val jsonValue = entry match {
@@ -63,6 +68,10 @@ object TxLogEntry extends StoreErrors {
         case EntryType.NotificationTxLogEntry => from[NotificationTxLogEntry](json)
         case EntryType.TransferOfferTxLogEntry => from[TransferOfferTxLogEntry](json)
         case EntryType.BuyTrafficRequestTxLogEntry => from[BuyTrafficRequestTxLogEntry](json)
+        case EntryType.DevelopmentFundCouponCreatedTxLogEntry =>
+          from[DevelopmentFundCouponCreatedTxLogEntry](json)
+        case EntryType.DevelopmentFundCouponArchivedTxLogEntry =>
+          from[DevelopmentFundCouponArchivedTxLogEntry](json)
         case _ => throw txDecodingFailed()
       }
     } catch {
@@ -80,6 +89,8 @@ object TxLogEntry extends StoreErrors {
     val TransactionHistoryTxLog: String3 = String3.tryCreate("txh")
     val TransferOfferTxLog: String3 = String3.tryCreate("tof")
     val BuyTrafficRequestTxLog: String3 = String3.tryCreate("btr")
+    val DevelopmentFundCouponCreatedTxLog: String3 = String3.tryCreate("fcc")
+    val DevelopmentFundCouponArchivedTxLog: String3 = String3.tryCreate("fca")
   }
 
   object EntryType {
@@ -89,6 +100,8 @@ object TxLogEntry extends StoreErrors {
     val TransferTxLogEntry: String3 = String3.tryCreate("tra")
     val BalanceChangeTxLogEntry: String3 = String3.tryCreate("bal")
     val NotificationTxLogEntry: String3 = String3.tryCreate("not")
+    val DevelopmentFundCouponCreatedTxLogEntry: String3 = String3.tryCreate("fcc")
+    val DevelopmentFundCouponArchivedTxLogEntry: String3 = String3.tryCreate("fca")
   }
 
   object Http {
@@ -427,6 +440,65 @@ object TxLogEntry extends StoreErrors {
       httpDef.BuyTrafficRequestFailedResponse(
         status = BuyTrafficRequestStatus.Failed,
         failureReason = httpDef.BuyTrafficRequestFailedResponse.FailureReason.Expired,
+      )
+    }
+
+    def toArchivedDevelopmentFundCoupon(
+        entry: DevelopmentFundCouponCreatedTxLogEntry,
+        status: DevelopmentFundCouponArchivedTxLogEntry.Status,
+    ): httpDef.ArchivedDevelopmentFundCoupon = {
+      val expiresAt = entry.expiresAt.getOrElse(throw txMissingField())
+      httpDef.ArchivedDevelopmentFundCoupon(
+        beneficiary = entry.beneficiary,
+        fundManager = entry.fundManager,
+        amount = Codec.encode(entry.amount),
+        expiresAt = java.time.OffsetDateTime.ofInstant(expiresAt, ZoneOffset.UTC),
+        reason = entry.reason,
+        status = httpDef.ArchivedDevelopmentFundCouponStatus(toStatusResponse(status)),
+      )
+    }
+
+    private def toStatusResponse(
+        status: DevelopmentFundCouponArchivedTxLogEntry.Status
+    ): ArchivedDevelopmentFundCouponStatus = status match {
+      case DevelopmentFundCouponArchivedTxLogEntry.Status.Empty => throw txMissingField()
+      case _: DevelopmentFundCouponArchivedTxLogEntry.Status.Claimed =>
+        toArchivedDevelopmentFundClaimedStatus
+      case _: DevelopmentFundCouponArchivedTxLogEntry.Status.Expired =>
+        toArchivedDevelopmentFundExpiredStatus
+      case status: DevelopmentFundCouponArchivedTxLogEntry.Status.Rejected =>
+        toArchivedDevelopmentFundRejectedStatus(status.value.reason)
+      case status: DevelopmentFundCouponArchivedTxLogEntry.Status.Withdrawn =>
+        toArchivedDevelopmentFundWithdrawnStatus(status.value.reason)
+    }
+
+    private def toArchivedDevelopmentFundClaimedStatus
+        : httpDef.ArchivedDevelopmentFundCouponStatus = {
+      httpDef.ArchivedDevelopmentFundCouponStatus(
+        httpDef.ArchivedDevelopmentFundCouponClaimedStatus()
+      )
+    }
+
+    private def toArchivedDevelopmentFundExpiredStatus
+        : httpDef.ArchivedDevelopmentFundCouponStatus = {
+      httpDef.ArchivedDevelopmentFundCouponStatus(
+        httpDef.ArchivedDevelopmentFundCouponExpiredStatus()
+      )
+    }
+
+    private def toArchivedDevelopmentFundRejectedStatus(
+        reason: String
+    ): httpDef.ArchivedDevelopmentFundCouponStatus = {
+      httpDef.ArchivedDevelopmentFundCouponStatus(
+        httpDef.ArchivedDevelopmentFundCouponRejectedStatus(reason)
+      )
+    }
+
+    private def toArchivedDevelopmentFundWithdrawnStatus(
+        reason: String
+    ): httpDef.ArchivedDevelopmentFundCouponStatus = {
+      httpDef.ArchivedDevelopmentFundCouponStatus(
+        httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus(reason)
       )
     }
   }

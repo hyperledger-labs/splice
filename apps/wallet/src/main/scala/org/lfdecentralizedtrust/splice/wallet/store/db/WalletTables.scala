@@ -14,6 +14,8 @@ import org.lfdecentralizedtrust.splice.store.db.{
 import org.lfdecentralizedtrust.splice.util.Contract
 import org.lfdecentralizedtrust.splice.wallet.store.{
   BuyTrafficRequestTxLogEntry,
+  DevelopmentFundCouponArchivedTxLogEntry,
+  DevelopmentFundCouponCreatedTxLogEntry,
   TransferOfferTxLogEntry,
   TxLogEntry,
 }
@@ -119,6 +121,16 @@ object WalletTables extends AcsTables {
             entry,
             TxLogEntry.LogId.TransferOfferTxLog,
             trackingId = Some(e.trackingId),
+          )
+        case _: DevelopmentFundCouponCreatedTxLogEntry =>
+          UserWalletTxLogStoreRowData(
+            entry,
+            TxLogEntry.LogId.DevelopmentFundCouponCreatedTxLog,
+          )
+        case _: DevelopmentFundCouponArchivedTxLogEntry =>
+          UserWalletTxLogStoreRowData(
+            entry,
+            TxLogEntry.LogId.DevelopmentFundCouponArchivedTxLog,
           )
         case e => throw new RuntimeException(s"Unknown TxLogEntry $e")
       }

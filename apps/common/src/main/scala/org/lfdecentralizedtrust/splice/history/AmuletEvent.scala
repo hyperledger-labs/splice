@@ -6,13 +6,15 @@ package org.lfdecentralizedtrust.splice.history
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules as externalPartyAmuletRulesCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.{
+  amulet as amuletCodegen,
+  ans as ansCodegen,
+  externalpartyamuletrules as externalPartyAmuletRulesCodegen,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
   OpenMiningRound,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ExerciseNode,
@@ -269,6 +271,30 @@ object AmuletExpire
     extends ExerciseNodeCompanion.Mk(
       template = amuletCodegen.Amulet.COMPANION,
       choice = amuletCodegen.Amulet.CHOICE_Amulet_Expire,
+    )
+
+object AmuletRules_AllocateDevelopmentFundCoupon
+    extends ExerciseNodeCompanion.Mk(
+      template = splice.amuletrules.AmuletRules.COMPANION,
+      choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_AllocateDevelopmentFundCoupon,
+    )
+
+case object DevelopmentFundCoupon_Withdraw
+    extends ExerciseNodeCompanion.Mk(
+      template = amuletCodegen.DevelopmentFundCoupon.COMPANION,
+      choice = amuletCodegen.DevelopmentFundCoupon.CHOICE_DevelopmentFundCoupon_Withdraw,
+    )
+
+case object DevelopmentFundCoupon_Expire
+    extends ExerciseNodeCompanion.Mk(
+      template = amuletCodegen.DevelopmentFundCoupon.COMPANION,
+      choice = amuletCodegen.DevelopmentFundCoupon.CHOICE_DevelopmentFundCoupon_DsoExpire,
+    )
+
+case object DevelopmentFundCoupon_Reject
+    extends ExerciseNodeCompanion.Mk(
+      template = amuletCodegen.DevelopmentFundCoupon.COMPANION,
+      choice = amuletCodegen.DevelopmentFundCoupon.CHOICE_DevelopmentFundCoupon_Reject,
     )
 
 // TODO(DACH-NY/canton-network-node#2930): This is not really a Amulet event - consider either renaming the file, or splitting it into different ones based on event "types"

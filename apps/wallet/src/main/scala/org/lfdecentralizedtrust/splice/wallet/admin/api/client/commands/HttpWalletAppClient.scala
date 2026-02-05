@@ -1443,6 +1443,30 @@ object HttpWalletAppClient {
     }
   }
 
+  final case class ListDevelopmentFundCouponHistory(
+      after: Option[Long] = None,
+      limit: Int,
+  ) extends InternalBaseCommand[
+        http.ListDevelopmentFundCouponHistoryResponse,
+        definitions.ListDevelopmentFundCouponHistoryResponse,
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[
+      Future,
+      Either[Throwable, HttpResponse],
+      http.ListDevelopmentFundCouponHistoryResponse,
+    ] =
+      client.listDevelopmentFundCouponHistory(after, limit, headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListDevelopmentFundCouponHistoryResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
   case class ListMintingDelegationProposals(
       after: Option[Long] = None,
       limit: Option[Int] = None,

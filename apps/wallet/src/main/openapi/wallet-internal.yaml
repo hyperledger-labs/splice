@@ -911,6 +911,37 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/wallet/development-fund-coupons/history:
+    get:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "listDevelopmentFundCouponHistory"
+      parameters:
+        - name: "after"
+          description: |
+            A `next_page_token` from a prior response; if absent, return the first page.
+          in: "query"
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: "limit"
+          description: Maximum number of elements to return.
+          in: "query"
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListDevelopmentFundCouponHistoryResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/wallet/development-fund-coupons/{contract_id}/withdraw:
     post:
       tags: [ wallet ]
@@ -1858,6 +1889,81 @@ components:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListDevelopmentFundCouponHistoryResponse:
+      type: object
+      required:
+        - development_fund_coupon_history
+      properties:
+        development_fund_coupon_history:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArchivedDevelopmentFundCoupon"
+        next_page_token:
+          type: integer
+          format: int64
+          description: |
+            Cursor for pagination. Use as `after` to continue.
+            The end is reached when a page returns no results.
+
+    ArchivedDevelopmentFundCoupon:
+      type: object
+      required:
+        - beneficiary
+        - fund_manager
+        - amount
+        - expiresAt
+        - reason
+        - status
+      properties:
+        beneficiary:
+          type: string
+        fund_manager:
+          type: string
+        amount:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        status:
+          $ref: "#/components/schemas/ArchivedDevelopmentFundCouponStatus"
+
+    ArchivedDevelopmentFundCouponStatus:
+      oneOf:
+        - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponClaimedStatus"
+        - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponExpiredStatus"
+        - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponWithdrawnStatus"
+        - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponRejectedStatus"
+
+    ArchivedDevelopmentFundCouponClaimedStatus:
+      type: object
+      properties:
+        dummy: # cannot define an empty object for some reason
+          type: object
+
+    ArchivedDevelopmentFundCouponExpiredStatus:
+      type: object
+      properties:
+        dummy: # cannot define an empty object for some reason
+          type: object
+
+    ArchivedDevelopmentFundCouponWithdrawnStatus:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+
+    ArchivedDevelopmentFundCouponRejectedStatus:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
 
     WithdrawDevelopmentFundCouponRequest:
       type: object
