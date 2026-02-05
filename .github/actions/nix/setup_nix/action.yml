@@ -37,8 +37,6 @@ inputs:
     description: "The service account to use for uploading the cache"
     required: false
     default: ""
-env:
-  
 
 runs:
   using: "composite"
