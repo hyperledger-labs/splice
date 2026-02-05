@@ -932,6 +932,7 @@ class ScanEventStoreTest extends StoreTestBase with HasExecutionContext with Spl
           informees = informees.map(_.toProtoPrimitive),
           confirmingParties = Json.arr(),
           subViews = Seq.empty,
+          viewHash = Some(s"hash-$viewId"),
         )
       )
     }
