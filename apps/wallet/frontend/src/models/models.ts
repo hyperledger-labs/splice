@@ -37,7 +37,6 @@ export interface Transfer {
   transactionSubtype: TransactionSubtype;
   receivers: TransactionReceiver[]; // will be empty for e.g. mergers & self-transfers
   senderId: Party;
-  providerId: Party;
   senderAmountCC: BigNumber; // this includes all amounts of receivers + fees
   date: Date;
   amuletPrice: BigNumber;

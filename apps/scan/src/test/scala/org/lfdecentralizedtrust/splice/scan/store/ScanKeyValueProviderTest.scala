@@ -8,7 +8,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.store.{StoreTest, TimestampWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.{StoreTestBase, TimestampWithMigrationId}
 import org.lfdecentralizedtrust.splice.store.db.SplicePostgresTest
 import org.scalatest.matchers.should.Matchers
 
@@ -16,7 +16,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 class ScanKeyValueProviderTest
-    extends StoreTest
+    extends StoreTestBase
     with Matchers
     with HasExecutionContext
     with SplicePostgresTest {

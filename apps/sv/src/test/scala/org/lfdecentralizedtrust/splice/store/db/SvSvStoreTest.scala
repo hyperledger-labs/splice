@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.U
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.store.StoreTest
+import org.lfdecentralizedtrust.splice.store.StoreTestBase
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvSvStore
 import org.lfdecentralizedtrust.splice.sv.store.{SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
@@ -21,7 +21,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 
-abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
+abstract class SvSvStoreTest extends StoreTestBase with HasExecutionContext {
 
   "SvSvStore" should {
 

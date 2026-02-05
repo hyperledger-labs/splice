@@ -19,3 +19,11 @@
    - SV app
 
     - Add a new trigger, ``ExpiredDevelopmentFundCouponTrigger`` for expiring development fund coupons.
+
+   - Wallet UI
+
+     - Remove the provider field from transaction history.
+
+   - Scan UI
+
+     - Remove the provider field from transaction history. The update API continues to expose it.
