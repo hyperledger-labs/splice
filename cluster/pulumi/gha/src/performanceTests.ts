@@ -3,14 +3,8 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
-import {
-  CloudSqlConfigSchema,
-  CLUSTER_BASENAME,
-  ExactNamespace,
-  GCP_REGION,
-  GCP_ZONE,
-  installPostgresPasswordSecret,
-} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CloudSqlConfigSchema, CLUSTER_BASENAME, config, ExactNamespace, GCP_REGION, GCP_ZONE, installPostgresPasswordSecret } from '@lfdecentralizedtrust/splice-pulumi-common';
+
 
 export interface PerformanceTestDb {
   db: gcp.sql.Database;
@@ -28,6 +22,7 @@ export function createCloudSQLInstanceForPerformanceTests(
     tier: 'db-custom-4-9728',
     enterprisePlus: false,
   });
+  const zone = GCP_ZONE || config.requireEnv('DB_CLOUDSDK_COMPUTE_ZONE');
   const instance = new gcp.sql.DatabaseInstance('performance-tests-db', {
     databaseVersion: 'POSTGRES_14',
     deletionProtection: false,
@@ -57,8 +52,7 @@ export function createCloudSQLInstanceForPerformanceTests(
         cluster: CLUSTER_BASENAME,
       },
       locationPreference: {
-        // same zone as the GKE nodes
-        zone: GCP_ZONE,
+        zone,
       },
       maintenanceWindow: { day: 7, hour: 12 }, // sunday at 12 UTC while there are no tests running
     },
