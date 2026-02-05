@@ -31,10 +31,11 @@ import org.lfdecentralizedtrust.splice.setup.NodeInitializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.{Minutes, Span}
 
 import java.net.URI
-import java.time.Duration
+import java.time.{Duration, Instant}
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 import scala.collection.parallel.CollectionConverters.seqIsParallelizable
@@ -214,7 +215,15 @@ class LogicalSynchronizerUpgradeIntegrationTest
     }
     val allBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
     val allNewBackends = Seq(sv1LocalBackend, sv2LocalBackend, sv3LocalBackend, sv4LocalBackend)
-    val upgradeTime = CantonTimestamp.now().plusSeconds(60)
+    val upgradeTimeInstant = Instant
+      .now()
+      .plusSeconds(60)
+      .truncatedTo(
+        ChronoUnit.SECONDS
+      )
+    val upgradeTime = CantonTimestamp.tryFromInstant(
+      upgradeTimeInstant
+    )
     withCantonSvNodes(
       (
         None,
@@ -225,9 +234,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       participants = false,
       logSuffix = "global-domain-migration",
       extraSequencerConfig = Seq(
-        s"""parameters.sequencing-time-lower-bound-exclusive=${upgradeTime.toInstant.truncatedTo(
-            ChronoUnit.SECONDS
-          )}"""
+        s"""parameters.sequencing-time-lower-bound-exclusive=$upgradeTimeInstant"""
       ),
     )() {
 
@@ -363,7 +370,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
               },
             upgradeTime,
           )
-          .futureValueUS
+          .futureValueUS(Timeout(2.minutes))
       }
 
       clue("Announce new sequencer urls") {
