@@ -10,7 +10,7 @@ inputs:
   nix_path:
     description: "The path to nix flake directory"
     required: false
-    default: ${{ format('{0}/nix'), github.repository == 'hyperledger-labs/splice' && '.' || 'splice' }}
+    default: ${{ format('{0}/nix', github.repository == 'hyperledger-labs/splice' && '.' || 'splice') }}
   target:
     description: "Choose nix target: oss - restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts), static_tests - for static tests, default - for enterprise dependencies"
     type: choice
