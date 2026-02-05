@@ -20,6 +20,8 @@ cluster:
       minNodes: 1
       nodeType: 'e2-standard-8'
 infra:
+  gkeGateway:
+    proxyForIstioHttp: false
   istio:
     enableIngressAccessLogging: true
   prometheus:
