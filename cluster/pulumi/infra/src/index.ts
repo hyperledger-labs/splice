@@ -39,8 +39,8 @@ const cloudArmorSecurityPolicy = configureCloudArmorPolicy(cloudArmorConfig);
 const useGKEL7Gateway = infraConfig.gkeGateway.proxyForIstioHttp;
 
 if (!useGKEL7Gateway && cloudArmorSecurityPolicy) {
-  void pulumiLog.warn(
-    'Cloud Armor requires gkeGateway.proxyForIstioHttp to be enabled to take effect'
+  throw new Error(
+    'Cloud Armor requires infra.gkeGateway.proxyForIstioHttp to be enabled to take effect'
   );
 }
 
