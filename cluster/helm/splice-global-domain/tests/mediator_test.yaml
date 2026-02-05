@@ -152,3 +152,41 @@ tests:
             limits:
               cpu: 200m
               memory: 1Gi
+  - it: "uses top-level affinity when set and mediator.affinity is not set"
+    set:
+      affinity:
+        nodeAffinity:
+          topLevel: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - exists:
+          path: spec.template.spec.affinity.nodeAffinity.topLevel
+  - it: "uses mediator.affinity when set (component-specific overrides top-level)"
+    set:
+      affinity:
+        nodeAffinity:
+          topLevelOnly: true
+      mediator:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: workload-type
+                      operator: In
+                      values:
+                        - mediator
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: workload-type
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]
+          value: mediator
+      - notExists:
+          path: spec.template.spec.affinity.nodeAffinity.topLevelOnly

@@ -168,3 +168,31 @@ tests:
     asserts:
       - notExists:
           path: spec.template.spec.affinity
+  - it: "uses sequencer.affinity when set (component-specific overrides top-level)"
+    set:
+      enableAntiAffinity: false
+      affinity:
+        nodeAffinity:
+          topLevelOnly: true
+      sequencer:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: workload-type
+                      operator: In
+                      values:
+                        - sequencer
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: workload-type
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]
+          value: sequencer
+      - notExists:
+          path: spec.template.spec.affinity.nodeAffinity.topLevelOnly
