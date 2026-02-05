@@ -445,10 +445,6 @@ const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transactio
   return (
     <Stack direction="column" className="tx-party">
       {senderOrReceiver}
-      <Stack direction="row" alignItems="center" spacing={1}>
-        <Typography variant="caption">via </Typography>
-        <BftAnsEntry className="provider-id" partyId={transaction.providerId} variant="caption" />
-      </Stack>
     </Stack>
   );
 };

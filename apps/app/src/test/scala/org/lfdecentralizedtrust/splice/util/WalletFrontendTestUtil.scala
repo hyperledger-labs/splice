@@ -109,12 +109,9 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
   def readPartyDescriptionFromRow(
       transactionRow: Element
   ): Option[String] =
-    for {
-      senderOrReceiver <- transactionRow
-        .findChildElement(className("sender-or-receiver"))
-        .map(seleniumText)
-      providerId <- transactionRow.findChildElement(className("provider-id")).map(seleniumText)
-    } yield s"${senderOrReceiver} ${providerId}"
+    transactionRow
+      .findChildElement(className("sender-or-receiver"))
+      .map(seleniumText)
 
   protected def readTransactionFromRow(
       transactionRow: Element

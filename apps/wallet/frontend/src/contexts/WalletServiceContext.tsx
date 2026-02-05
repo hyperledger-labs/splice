@@ -233,8 +233,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
               id,
               date,
               receivers,
-              // sender and provider MUST be available for transfer
-              providerId: item.provider!,
+              // sender MUST be available for transfer
               senderId: item.sender!.party,
               senderAmountCC: new BigNumber(item.sender!.amount),
               amuletPrice,
