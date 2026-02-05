@@ -379,10 +379,8 @@ class SV1Initializer(
       _ = dsoAutomation.registerPostOnboardingTriggers()
       _ = dsoAutomation.registerTrafficReconciliationTriggers()
       _ = dsoAutomation.registerPostUnlimitedTrafficTriggers()
-      _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
-        dsoAutomation,
-        dsoStore,
-        synchronizerId,
+      _ <- checkIsOnboardedAndInDecentralizedNamespace(
+        dsoStore
       )
       // The previous foundDso step will set the domain node config if DsoRules is not yet bootstrapped.
       // This is for the case that DsoRules is already bootstrapped but setting the domain node config is required,
@@ -410,10 +408,8 @@ class SV1Initializer(
     )
   }
 
-  private def checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
-      dsoAutomation: SvDsoAutomationService,
-      dsoStore: SvDsoStore,
-      synchronizerId: SynchronizerId,
+  private def checkIsOnboardedAndInDecentralizedNamespace(
+      dsoStore: SvDsoStore
   )(implicit traceContext: TraceContext) =
     retryProvider
       .ensureThatB(
@@ -425,10 +421,8 @@ class SV1Initializer(
         logger,
       )
       .flatMap { _ =>
-        checkIsInDecentralizedNamespaceAndStartTrigger(
-          dsoAutomation,
-          dsoStore,
-          synchronizerId,
+        checkIsInDecentralizedNamespace(
+          dsoStore
         )
       }
 
