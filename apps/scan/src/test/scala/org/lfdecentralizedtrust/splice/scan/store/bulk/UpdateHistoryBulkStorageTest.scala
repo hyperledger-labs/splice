@@ -175,6 +175,18 @@ class UpdateHistoryBulkStorageTest
           // First 2000 events end up 08:07:10, so the last full segment is the one up to 08:00
           probe.expectNoMessage(20.seconds)
 
+          mockStore.mockIngestion(2000)
+          probe.request(2)
+          probe.expectNext(20.seconds) shouldBe TimestampWithMigrationId(
+            CantonTimestamp.tryFromInstant(genesisDate.atTime(10, 0).toInstant(ZoneOffset.UTC)),
+            0,
+          )
+          probe.expectNext(20.seconds) shouldBe TimestampWithMigrationId(
+            CantonTimestamp.tryFromInstant(genesisDate.atTime(12, 0).toInstant(ZoneOffset.UTC)),
+            0,
+          )
+          probe.expectNoMessage(20.seconds)
+
           killSwitch.shutdown()
           succeed
         }
