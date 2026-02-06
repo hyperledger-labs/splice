@@ -23,4 +23,4 @@
     "lint:check": "eslint --max-warnings=0 -- src",
     "dump-config": "env -u KUBECONFIG ts-node ./dump-config.ts"
   }
-}
+}a
