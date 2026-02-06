@@ -111,18 +111,10 @@ def create_branch_and_push():
     origin.push()
 
 def create_pr():
-    # 1. Authenticate
-    # Replace 'your_token' with your actual Personal Access Token
     g = Github(os.environ['GITHUB_TOKEN'])
-    github_url = re.search(r"[:/]([^/]+/[^/]+)\.git$", repo.remotes.origin.url)
-    print(f"github url: ${github_url}")
-    github_repo = g.get_repo(github_url)
+    github_repo_name = re.search(r"[:/]([^/]+/[^/]+)\.git$", repo.remotes.origin.url).group(1)
+    github_repo = g.get_repo(github_repo_name)
 
-    # 3. Create the Pull Request
-    # title: The name of your PR
-    # body: The description/markdown content
-    # base: The branch you are merging INTO (e.g., 'main')
-    # head: The branch you are merging FROM (e.g., 'feature-branch')
     pr = github_repo.create_pull(
         title="Release Notes for " + new_version,
         base="main",
