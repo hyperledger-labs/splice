@@ -569,4 +569,42 @@ object SequencerAdminCommands {
         SequencerStatus.fromProtoV30(response).leftMap(_.message)
     }
   }
+
+  final case object GetLsuTrafficControlState
+      extends BaseSequencerAdministrationCommand[
+        proto.GetLsuTrafficControlStateRequest,
+        proto.GetLsuTrafficControlStateResponse,
+        ByteString,
+      ] {
+    override protected def createRequest(): Either[String, proto.GetLsuTrafficControlStateRequest] =
+      Right(proto.GetLsuTrafficControlStateRequest())
+    override protected def submitRequest(
+        service: proto.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
+        request: proto.GetLsuTrafficControlStateRequest,
+    ): Future[proto.GetLsuTrafficControlStateResponse] =
+      service.getLsuTrafficControlState(request)
+    override protected def handleResponse(
+        response: proto.GetLsuTrafficControlStateResponse
+    ): Either[String, ByteString] =
+      Right(response.lsuTrafficState)
+  }
+
+  final case class SetLsuTrafficControlState(
+      membersTraffic: ByteString
+  ) extends BaseSequencerAdministrationCommand[
+        proto.SetLsuTrafficControlStateRequest,
+        proto.SetLsuTrafficControlStateResponse,
+        Unit,
+      ] {
+    override protected def createRequest(): Either[String, proto.SetLsuTrafficControlStateRequest] =
+      Right(proto.SetLsuTrafficControlStateRequest(membersTraffic))
+    override protected def submitRequest(
+        service: proto.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
+        request: proto.SetLsuTrafficControlStateRequest,
+    ): Future[proto.SetLsuTrafficControlStateResponse] =
+      service.setLsuTrafficControlState(request)
+    override protected def handleResponse(
+        response: proto.SetLsuTrafficControlStateResponse
+    ): Either[String, Unit] = Either.unit
+  }
 }

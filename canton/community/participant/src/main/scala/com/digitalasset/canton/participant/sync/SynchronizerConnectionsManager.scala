@@ -34,7 +34,7 @@ import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.*
 import com.digitalasset.canton.participant.admin.*
-import com.digitalasset.canton.participant.admin.data.ManualLSURequest
+import com.digitalasset.canton.participant.admin.data.ManualLsuRequest
 import com.digitalasset.canton.participant.admin.party.{
   OnboardingClearanceScheduler,
   PartyReplicationTopologyWorkflow,
@@ -500,8 +500,9 @@ private[sync] class SynchronizerConnectionsManager(
 
   /** Attempt to connect to the synchronizer
     * @return
-    *   Left if connection failed in a non-retriable way Right(None)) if connection failed and can
-    *   be retried Right(Some(psid)) if connection succeeded
+    *   - Left if connection failed in a non-retriable way
+    *   - Right(None)) if connection failed and can be retried
+    *   - Right(Some(psid)) if connection succeeded
     */
   private def attemptSynchronizerConnection(
       synchronizerAlias: SynchronizerAlias,
@@ -732,17 +733,16 @@ private[sync] class SynchronizerConnectionsManager(
   /** Perform a handshake with the given synchronizer.
     * @param psid
     *   the physical synchronizer id of the synchronizer.
-    * @return
     */
   def connectToPSIdWithHandshake(
       psid: PhysicalSynchronizerId
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SyncServiceError, PhysicalSynchronizerId] =
+  ): EitherT[FutureUnlessShutdown, SyncServiceError, Unit] =
     connectQueue.executeEUS(
       if (connectedSynchronizers.isConnected(psid)) {
         logger.debug(s"Already connected to $psid, no need to register $psid")
-        EitherT.rightT(psid)
+        EitherT.rightT(())
       } else {
         logger.debug(s"About to perform handshake with synchronizer: $psid")
 
@@ -775,7 +775,7 @@ private[sync] class SynchronizerConnectionsManager(
 
           _ = syncCrypto.remove(psid)
           _ = synchronizerHandle.close()
-        } yield psid
+        } yield ()
       },
       s"handshake with physical synchronizer $psid",
     )
@@ -998,23 +998,22 @@ private[sync] class SynchronizerConnectionsManager(
                   psid: PhysicalSynchronizerId
               )(implicit
                   traceContext: TraceContext
-              ): EitherT[FutureUnlessShutdown, SyncServiceError, PhysicalSynchronizerId] =
+              ): EitherT[FutureUnlessShutdown, SyncServiceError, Unit] =
                 connectToPSIdWithHandshake(psid)
             },
-            automaticallyConnectToUpgradedSynchronizer =
-              parameters.automaticallyPerformLogicalSynchronizerUpgrade,
+            automaticallyConnectToUpgradedSynchronizer = parameters.automaticallyPerformLsu,
             loggerFactory,
           )
 
           lsuCallback =
-            if (parameters.automaticallyPerformLogicalSynchronizerUpgrade)
-              new LogicalSynchronizerUpgradeCallbackImpl(
+            if (parameters.automaticallyPerformLsu)
+              new LsuCallbackImpl(
                 psid,
                 ephemeral.timeTracker,
                 this,
                 loggerFactory,
               )
-            else LogicalSynchronizerUpgradeCallback.NoOp
+            else LsuCallback.NoOp
 
           connectedSynchronizer <- EitherT.right(
             connectedSynchronizerFactory.create(
@@ -1310,7 +1309,7 @@ private[sync] class SynchronizerConnectionsManager(
     * synchronizer.
     */
   def manuallyUpgradeSynchronizerTo(
-      request: ManualLSURequest
+      request: ManualLsuRequest
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] =
     for {
       _ <- validateSequencerConnection(

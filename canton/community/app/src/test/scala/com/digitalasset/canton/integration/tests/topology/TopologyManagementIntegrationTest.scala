@@ -221,6 +221,7 @@ trait TopologyManagementIntegrationTest
       )
       // propose a decentralized namespace with many owners, so that we have multiple
       // transactions with the same hash. This should not trip up the idempotent import.
+
       val dns = nodes.all
         .map { node =>
           node.topology.decentralized_namespaces
@@ -228,6 +229,7 @@ trait TopologyManagementIntegrationTest
               nodes.all.map(_.namespace).toSet,
               PositiveInt.tryCreate(nodes.all.size),
               daId,
+              synchronize = None,
             )
             .mapping
         }
@@ -1556,7 +1558,7 @@ trait TopologyManagementIntegrationTest
 
       val announcementMapping = synchronizerOwners1
         .map { owner =>
-          owner.topology.synchronizer_upgrade.announcement.propose(
+          owner.topology.lsu.announcement.propose(
             PhysicalSynchronizerId(daId, NonNegativeInt.two, testedProtocolVersion),
             upgradeTime,
           )
@@ -1568,7 +1570,7 @@ trait TopologyManagementIntegrationTest
       eventually() {
         forAll(
           synchronizerOwners1.map(
-            _.topology.synchronizer_upgrade.announcement
+            _.topology.lsu.announcement
               .list(daId)
               .loneElement
               .item
@@ -1576,7 +1578,7 @@ trait TopologyManagementIntegrationTest
         )(result => result shouldBe announcementMapping)
       }
       synchronizerOwners1.foreach(
-        _.topology.synchronizer_upgrade.announcement.revoke(
+        _.topology.lsu.announcement.revoke(
           PhysicalSynchronizerId(daId, NonNegativeInt.two, testedProtocolVersion),
           upgradeTime,
         )

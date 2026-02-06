@@ -127,6 +127,7 @@ class NodesTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContex
       healthMetrics: HealthMetrics = LedgerApiServerMetrics.ForTesting.health,
       storageMetrics: DbStorageMetrics = CommonMockMetrics.dbStorage,
   ) extends BaseMetrics {
+
     override val declarativeApiMetrics: DeclarativeApiMetrics =
       new DeclarativeApiMetrics(prefix, openTelemetryMetricsFactory)(MetricsContext.Empty)
   }

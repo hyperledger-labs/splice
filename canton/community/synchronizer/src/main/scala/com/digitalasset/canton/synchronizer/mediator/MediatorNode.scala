@@ -592,7 +592,7 @@ class MediatorNodeBootstrap(
         EitherT
           .right(
             TopologyTransactionProcessor
-              .createProcessorAndClientForSynchronizerWithWriteThroughCache(
+              .createProcessorAndClientForSynchronizer(
                 synchronizerTopologyStore,
                 synchronizerUpgradeTime = None,
                 crypto.pureCrypto,
@@ -600,6 +600,7 @@ class MediatorNodeBootstrap(
                 arguments.config.topology,
                 arguments.clock,
                 staticSynchronizerParameters,
+                arguments.metrics.topologyCache,
                 arguments.futureSupervisor,
                 synchronizerLoggerFactory,
               )()

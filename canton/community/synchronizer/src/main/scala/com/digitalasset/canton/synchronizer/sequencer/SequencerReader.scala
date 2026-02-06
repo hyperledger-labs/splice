@@ -830,14 +830,14 @@ class SequencerReader(
             val memberGroupRecipients = resolvedGroupAddresses.collect {
               case (groupRecipient, groupMembers) if groupMembers.contains(member) => groupRecipient
             }.toSet
-            val previousTimestampWithLSUOffset =
+            val previousTimestampWithLsuOffset =
               synchronizerUpgradeO.fold(previousTimestamp)(_.maybeOffsetTime(previousTimestamp))
-            val timestampWithLSUOffset =
+            val timestampWithLsuOffset =
               synchronizerUpgradeO.fold(timestamp)(_.maybeOffsetTime(timestamp))
             val filteredBatch = Batch.filterClosedEnvelopesFor(batch, member, memberGroupRecipients)
             val deliver = Deliver.create[ClosedEnvelope](
-              previousTimestampWithLSUOffset,
-              timestampWithLSUOffset,
+              previousTimestampWithLsuOffset,
+              timestampWithLsuOffset,
               psid,
               messageIdO,
               filteredBatch,
@@ -857,8 +857,8 @@ class SequencerReader(
                 "Delivering an empty event instead of the original, because it was sequenced at or after the upgrade time."
               )
               Deliver.create[ClosedEnvelope](
-                previousTimestampWithLSUOffset,
-                timestampWithLSUOffset,
+                previousTimestampWithLsuOffset,
+                timestampWithLsuOffset,
                 psid,
                 None,
                 emptyBatch,
@@ -981,7 +981,7 @@ object SequencerReader {
       eventTraceContext: TraceContext,
   )
 
-  private[SequencerReader] final case class OngoingSynchronizerUpgrade(
+  private[sequencer] final case class OngoingSynchronizerUpgrade(
       successor: SynchronizerSuccessor,
       announcementEffectiveTime: EffectiveTime,
       override val loggerFactory: NamedLoggerFactory,
@@ -990,6 +990,7 @@ object SequencerReader {
     private lazy val postUpgradeTimeOffset: AtomicReference[Option[NonNegativeFiniteDuration]] =
       new AtomicReference(None)
 
+    @nowarn("cat=deprecation")
     def computeAndCacheTimeOffset(
         syncCrypto: SyncCryptoClient[SyncCryptoApi],
         currentTimestamp: CantonTimestamp,
