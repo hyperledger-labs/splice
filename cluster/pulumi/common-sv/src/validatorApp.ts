@@ -11,8 +11,10 @@ export function valuesForSvValidatorApp(
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   config: SingleSvConfiguration
 ): {
-  decentralizedSynchronizerUrl?: string;
-  useSequencerConnectionsFromScan?: boolean;
+  synchronizer?: {
+    connectionType: string;
+    url: string;
+  };
   additionalEnvVars: EnvVarConfig[];
 } {
   const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.sv-2.${CLUSTER_HOSTNAME}`;
