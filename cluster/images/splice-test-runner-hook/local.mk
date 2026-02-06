@@ -13,7 +13,7 @@ $(dir)/target/LICENSE: ${SPLICE_ROOT}/cluster/images/LICENSE | $(dir)/target
 
 $(dir)/target/.npm_installed: $(package_files) | $(dir)/target
 	touch $@
-	npm install --prefix $(src_dir)
+	npm ci --prefix $(src_dir)
 	npm run bootstrap --prefix $(src_dir)
 
 $(dir)/target/index.js: $(source_files) $(dir)/target/.npm_installed | $(dir)/target
