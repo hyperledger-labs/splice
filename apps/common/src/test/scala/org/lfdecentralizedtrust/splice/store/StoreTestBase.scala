@@ -1075,6 +1075,10 @@ abstract class StoreTestBase extends AsyncWordSpec with BaseTest {
 
     override def makeAcsIngestor(): AcsIngestor = new AcsIngestor {
       val underlyingIngestor = underlying.makeAcsIngestor()
+
+      override def deleteExistingAcs()(implicit traceContext: TraceContext): Future[Unit] =
+        underlyingIngestor.deleteExistingAcs()
+
       override def ingestAcsBatch(
           offset: Long,
           acs: Seq[ActiveContract],

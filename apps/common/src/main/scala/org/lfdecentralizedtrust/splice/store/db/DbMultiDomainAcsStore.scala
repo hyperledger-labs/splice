@@ -1105,6 +1105,21 @@ final class DbMultiDomainAcsStore[TXE](
       // TODO: this is still loading everything into memory
       private val summaryState = MutableIngestionSummary.empty
 
+      override def deleteExistingAcs()(implicit traceContext: TraceContext): Future[Unit] = storage
+        .update(
+          sqlu"delete from #$acsTableName where store_id = $acsStoreId and migration_id = $domainMigrationId",
+          "deleteExistingAcs",
+        )
+        .map { nDeleted =>
+          if (nDeleted > 0) {
+            logger.warn(
+              s"Deleted $nDeleted rows from ACS table for store $acsStoreId and migration $domainMigrationId. " +
+                "This should only happen if the store already had some data, but was not marked as having ingested the ACS " +
+                "(because of a previous failed ACS ingestion attempt)."
+            )
+          }
+        }
+
       override def markAcsIngestedAsOf(offset: Long)(implicit
           traceContext: TraceContext
       ): Future[Unit] = {

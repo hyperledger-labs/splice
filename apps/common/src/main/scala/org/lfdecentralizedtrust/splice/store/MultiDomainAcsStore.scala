@@ -754,6 +754,7 @@ object MultiDomainAcsStore extends StoreErrors {
     )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
       val acsIngestor = makeAcsIngestor()
       for {
+        _ <- acsIngestor.deleteExistingAcs()
         _ <- acsIngestor.ingestAcsBatch(offset, acs, incompleteOut, incompleteIn)
         _ <- acsIngestor.markAcsIngestedAsOf(offset)
       } yield ()
@@ -762,6 +763,8 @@ object MultiDomainAcsStore extends StoreErrors {
     def makeAcsIngestor(): AcsIngestor
 
     trait AcsIngestor {
+      def deleteExistingAcs()(implicit traceContext: TraceContext): Future[Unit]
+
       def ingestAcsBatch(
           offset: Long,
           acs: Seq[ActiveContract],

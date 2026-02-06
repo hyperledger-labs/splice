@@ -107,21 +107,22 @@ class UpdateIngestionService(
       offset: Long
   )(implicit traceContext: TraceContext): Future[Unit] = {
     val acsIngestor = ingestionSink.makeAcsIngestor()
-    batchSource(connection.activeContracts(filter, offset))
-      .runWith(Sink.foreachAsync(parallelism = 1) { batch =>
-        acsIngestor.ingestAcsBatch(
-          offset,
-          batch.collect { case ActiveContractsItem.ActiveContract(contract) => contract },
-          batch.collect { case ActiveContractsItem.IncompleteUnassign(unassign) => unassign },
-          batch.collect { case ActiveContractsItem.IncompleteAssign(assign) => assign },
-        )
-      })
-      .flatMap { _ =>
-        // A store is considered initialized if the last ingested offset is set
-        // Therefore, we must do that after the ACS is ingested,
-        // so that in case of failure the whole ACS ingestion will be retried.
-        acsIngestor.markAcsIngestedAsOf(offset)
-      }
+    for {
+      _ <- acsIngestor.deleteExistingAcs()
+      _ <- batchSource(connection.activeContracts(filter, offset))
+        .runWith(Sink.foreachAsync(parallelism = 1) { batch =>
+          acsIngestor.ingestAcsBatch(
+            offset,
+            batch.collect { case ActiveContractsItem.ActiveContract(contract) => contract },
+            batch.collect { case ActiveContractsItem.IncompleteUnassign(unassign) => unassign },
+            batch.collect { case ActiveContractsItem.IncompleteAssign(assign) => assign },
+          )
+        })
+      // A store is considered initialized if the last ingested offset is set
+      // Therefore, we must do that after the ACS is ingested,
+      // so that in case of failure the whole ACS ingestion will be retried.
+      _ <- acsIngestor.markAcsIngestedAsOf(offset)
+    } yield ()
   }
 
   private def batchSource[T](source: Source[T, NotUsed]): Source[Vector[T], NotUsed] =

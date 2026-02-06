@@ -330,6 +330,9 @@ class UpdateHistory(
         }
 
         // same as above
+        override def deleteExistingAcs()(implicit traceContext: TraceContext): Future[Unit] =
+          Future.unit
+
         override def markAcsIngestedAsOf(offset: Long)(implicit
             traceContext: TraceContext
         ): Future[Unit] = Future.unit
