@@ -66,3 +66,7 @@ create_component_instance() {
 
     echo "$component_instance"
 }
+
+function get_resolved_config() {
+  "${SPLICE_ROOT}/cluster/scripts/get-resolved-config.sh"
+}
