@@ -163,6 +163,7 @@ message DevelopmentFundCouponCreatedTxLogEntry {
   string amount = 4 [(scalapb.field).type = "scala.math.BigDecimal"];
   google.protobuf.Timestamp expires_at = 5 [(scalapb.field).type = "java.time.Instant"];
   string reason = 6;
+  google.protobuf.Timestamp created_at = 7 [(scalapb.field).type = "java.time.Instant"];
 }
 
 message DevelopmentFundCouponStatusClaimed {
@@ -179,7 +180,6 @@ message DevelopmentFundCouponStatusRejected {
   string reason = 1;
 }
 
-
 message DevelopmentFundCouponArchivedTxLogEntry {
   option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry";
   option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
@@ -191,4 +191,5 @@ message DevelopmentFundCouponArchivedTxLogEntry {
     DevelopmentFundCouponStatusExpired expired = 4;
     DevelopmentFundCouponStatusRejected rejected = 5;
   };
+  google.protobuf.Timestamp archived_at = 6 [(scalapb.field).type = "java.time.Instant"];
 }

@@ -456,7 +456,7 @@ class DbUserWalletStore(
       lc: TraceContext
   ): Future[
     ResultsPage[
-      (DevelopmentFundCouponCreatedTxLogEntry, DevelopmentFundCouponArchivedTxLogEntry.Status)
+      (DevelopmentFundCouponCreatedTxLogEntry, DevelopmentFundCouponArchivedTxLogEntry)
     ]
   ] = {
     val opName = "listDevelopmentFundCouponHistory"
@@ -490,7 +490,7 @@ class DbUserWalletStore(
                 Seq.empty[
                   (
                       DevelopmentFundCouponCreatedTxLogEntry,
-                      DevelopmentFundCouponArchivedTxLogEntry.Status,
+                      DevelopmentFundCouponArchivedTxLogEntry,
                   )
                 ],
                 None,
@@ -553,7 +553,7 @@ class DbUserWalletStore(
               // Keep the order of ARCHIVED page (DESC by archived entry_number)
               zipped = archivedEntries.map { a =>
                 createdByCid.get(a.contractId) match {
-                  case Some(c) => c -> a.status
+                  case Some(c) => c -> a
                   case None =>
                     // should not happen if invariant holds (every archived has a created)
                     throw contractIdNotFound(

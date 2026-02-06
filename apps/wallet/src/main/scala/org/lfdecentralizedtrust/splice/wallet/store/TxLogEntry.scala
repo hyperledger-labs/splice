@@ -444,17 +444,21 @@ object TxLogEntry extends StoreErrors {
     }
 
     def toArchivedDevelopmentFundCoupon(
-        entry: DevelopmentFundCouponCreatedTxLogEntry,
-        status: DevelopmentFundCouponArchivedTxLogEntry.Status,
+        createdEntry: DevelopmentFundCouponCreatedTxLogEntry,
+        archivedEntry: DevelopmentFundCouponArchivedTxLogEntry,
     ): httpDef.ArchivedDevelopmentFundCoupon = {
-      val expiresAt = entry.expiresAt.getOrElse(throw txMissingField())
+      val createdAt = createdEntry.createdAt.getOrElse(throw txMissingField())
+      val archivedAt = archivedEntry.archivedAt.getOrElse(throw txMissingField())
+      val expiresAt = createdEntry.expiresAt.getOrElse(throw txMissingField())
       httpDef.ArchivedDevelopmentFundCoupon(
-        beneficiary = entry.beneficiary,
-        fundManager = entry.fundManager,
-        amount = Codec.encode(entry.amount),
+        createdAt = java.time.OffsetDateTime.ofInstant(createdAt, ZoneOffset.UTC),
+        archivedAt = java.time.OffsetDateTime.ofInstant(archivedAt, ZoneOffset.UTC),
+        beneficiary = createdEntry.beneficiary,
+        fundManager = createdEntry.fundManager,
+        amount = Codec.encode(createdEntry.amount),
         expiresAt = java.time.OffsetDateTime.ofInstant(expiresAt, ZoneOffset.UTC),
-        reason = entry.reason,
-        status = httpDef.ArchivedDevelopmentFundCouponStatus(toStatusResponse(status)),
+        reason = createdEntry.reason,
+        status = httpDef.ArchivedDevelopmentFundCouponStatus(toStatusResponse(archivedEntry.status)),
       )
     }
 

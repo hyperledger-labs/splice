@@ -1909,6 +1909,8 @@ components:
     ArchivedDevelopmentFundCoupon:
       type: object
       required:
+        - createdAt
+        - archivedAt
         - beneficiary
         - fund_manager
         - amount
@@ -1916,6 +1918,12 @@ components:
         - reason
         - status
       properties:
+        createdAt:
+          type: string
+          format: date-time
+        archivedAt:
+          type: string
+          format: date-time
         beneficiary:
           type: string
         fund_manager:

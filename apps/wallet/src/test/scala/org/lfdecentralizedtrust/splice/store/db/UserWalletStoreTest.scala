@@ -1313,13 +1313,14 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
           .listDevelopmentFundCouponHistory(after, PageLimit.tryCreate(3))(TraceContext.empty)
           .futureValue
 
+        // TODOV: maybe use archivedAt for checking the order
         def assertPage(
             after: Option[Long],
             expected: Seq[(Double, DevelopmentFundCouponArchivedTxLogEntry.Status)],
         ) = {
           val page = listDevelopmentFundCouponHistory(after)
-          page.resultsInPage.map { case (entry, status) =>
-            entry.amount -> status
+          page.resultsInPage.map { case (createdEntry, archivedEntry) =>
+            createdEntry.amount -> archivedEntry.status
           } shouldBe expected
           page
         }

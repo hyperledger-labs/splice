@@ -799,13 +799,13 @@ class UserWalletTxLogParser(
             now(State.fromAllocateDevelopmentFundCoupon(node, tree))
 
           case DevelopmentFundCoupon_Withdraw(node) =>
-            now(State.fromDevelopmentFundCouponWithdraw(node, exercised))
+            now(State.fromDevelopmentFundCouponWithdraw(tree, node, exercised))
 
           case DevelopmentFundCoupon_Expire(node) =>
-            now(State.fromDevelopmentFundCouponExpire(exercised))
+            now(State.fromDevelopmentFundCouponExpire(tree, exercised))
 
           case DevelopmentFundCoupon_Reject(node) =>
-            now(State.fromDevelopmentFundCouponReject(node, exercised))
+            now(State.fromDevelopmentFundCouponReject(tree, node, exercised))
 
           // ------------------------------------------------------------------
           // Other
@@ -1289,6 +1289,7 @@ object UserWalletTxLogParser {
             DevelopmentFundCouponArchivedTxLogEntry.Status.Claimed(
               DevelopmentFundCouponStatusClaimed()
             ),
+            tx.getEffectiveAt,
           )
       }
 
@@ -1568,6 +1569,7 @@ object UserWalletTxLogParser {
         amount = developmentFundCoupon.amount,
         expiresAt = Some(developmentFundCoupon.expiresAt),
         reason = developmentFundCoupon.reason,
+        createdAt = Some(tx.getEffectiveAt),
       )
       State(
         entries = immutable.Queue(newEntry)
@@ -1575,6 +1577,7 @@ object UserWalletTxLogParser {
     }
 
     def fromDevelopmentFundCouponWithdraw(
+        tx: Transaction,
         node: ExerciseNode[
           DevelopmentFundCoupon_Withdraw.Arg,
           DevelopmentFundCoupon_Withdraw.Res,
@@ -1586,19 +1589,22 @@ object UserWalletTxLogParser {
         DevelopmentFundCouponArchivedTxLogEntry.Status.Withdrawn(
           DevelopmentFundCouponStatusWithdrawn(node.argument.value.reason)
         ),
+        tx.getEffectiveAt,
       )
     }
 
-    def fromDevelopmentFundCouponExpire(event: ExercisedEvent): State = {
+    def fromDevelopmentFundCouponExpire(tx: Transaction, event: ExercisedEvent): State = {
       fromDevelopmentFundCouponOperation(
         event.getContractId,
         DevelopmentFundCouponArchivedTxLogEntry.Status.Expired(
           DevelopmentFundCouponStatusExpired()
         ),
+        tx.getEffectiveAt,
       )
     }
 
     def fromDevelopmentFundCouponReject(
+        tx: Transaction,
         node: ExerciseNode[
           DevelopmentFundCoupon_Reject.Arg,
           DevelopmentFundCoupon_Reject.Res,
@@ -1610,16 +1616,19 @@ object UserWalletTxLogParser {
         DevelopmentFundCouponArchivedTxLogEntry.Status.Rejected(
           DevelopmentFundCouponStatusRejected(node.argument.value.reason)
         ),
+        tx.getEffectiveAt,
       )
     }
 
     private def fromDevelopmentFundCouponOperation(
         contractId: String,
         status: DevelopmentFundCouponArchivedTxLogEntry.Status,
+        archivedAt: Instant,
     ) = {
       val newEntry = DevelopmentFundCouponArchivedTxLogEntry(
         contractId = contractId,
         status = status,
+        archivedAt = Some(archivedAt),
       )
       State(entries = immutable.Queue(newEntry))
     }
