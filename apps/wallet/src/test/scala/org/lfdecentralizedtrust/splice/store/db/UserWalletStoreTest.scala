@@ -1313,7 +1313,6 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
           .listDevelopmentFundCouponHistory(after, PageLimit.tryCreate(3))(TraceContext.empty)
           .futureValue
 
-        // TODOV: maybe use archivedAt for checking the order
         def assertPage(
             after: Option[Long],
             expected: Seq[(Double, DevelopmentFundCouponArchivedTxLogEntry.Status)],
@@ -1360,6 +1359,11 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
         val page4 = listDevelopmentFundCouponHistory(page3.nextPageToken)
         page4.resultsInPage shouldBe empty
         page4.nextPageToken should not be defined
+
+        val allArchivedAt =
+          (page1.resultsInPage ++ page2.resultsInPage ++ page3.resultsInPage)
+            .flatMap(_._2.archivedAt)
+        allArchivedAt shouldBe allArchivedAt.sorted(Ordering[Instant].reverse)
       }
     }
   }
