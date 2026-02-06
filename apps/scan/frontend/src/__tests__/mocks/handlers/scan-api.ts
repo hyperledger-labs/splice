@@ -373,8 +373,6 @@ export const buildScanMock = (baseScanUrl: string): RestHandler[] => {
               amulet_price: '1.0000000000',
               round: 1,
               transfer: {
-                provider:
-                  'alice__validator__user::12200d3c885d2cb51226911f828da25f7f0fc0d06b8c6bf00c714266729033f138f7',
                 sender: {
                   party:
                     'charlie__wallet__user::12200d3c885d2cb51226911f828da25f7f0fc0d06b8c6bf00c714266729033f138f7',

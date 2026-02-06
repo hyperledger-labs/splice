@@ -445,6 +445,18 @@ class ExternalPartySetupProposalIntegrationTest
         },
       )
 
+      val txs = sv1ScanBackend.listActivity(None, 1000)
+      // Alice transfers twice (1000, and then 500 to bob)
+      forExactly(2, txs) { tx =>
+        // Test that the tx history for the TransferCommand_Send exercise gets parsed properly.
+        val transfer = tx.transfer.value
+        transfer.sender.party shouldBe aliceParty.toProtoPrimitive
+        transfer.transferKind shouldBe Some(
+          definitions.Transfer.TransferKind.members.PreapprovalSend
+        )
+        transfer.description shouldBe Some("transfer-command-description")
+      }
+
       // Check that transfer command gets archived if preapproval does not exist.
       val sv1Party = sv1Backend.getDsoInfo().svParty
       val now = env.environment.clock.now.toInstant

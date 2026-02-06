@@ -1,6 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as automation from '@pulumi/pulumi/automation';
+import { UpOptions } from '@pulumi/pulumi/automation/stack';
 import util from 'node:util';
 
 import {
@@ -9,7 +10,6 @@ import {
   PulumiAbortController,
   pulumiOptsWithPrefix,
 } from './pulumi';
-import {UpOptions} from "@pulumi/pulumi/automation/stack";
 
 export function refreshOperation(
   stack: automation.Stack,
@@ -73,10 +73,23 @@ export async function upStack(
   abortController: PulumiAbortController
 ): Promise<void> {
   const name = stack.name;
-  return stack.up(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)).then(
+  return abortableStackOperation(stack, abortController, stack.up(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)), result => result.summary);
+}
+
+export async function previewStack(
+  stack: automation.Stack,
+  abortController: PulumiAbortController
+): Promise<void> {
+  const name = stack.name;
+  return abortableStackOperation(stack, abortController, stack.preview(pulumiOptsWithPrefix(`[${name}]`, abortController.signal)), result => result.changeSummary);
+}
+
+function abortableStackOperation<T>(stack: automation.Stack, abortController: PulumiAbortController, op: Promise<T>, resultToSummary: (t: T) => unknown): Promise<void> {
+  const name = stack.name;
+  return op.then(
     result => {
       console.log(
-        `${stack.name} success - ${util.inspect(result.summary, {
+        `${name} success - ${util.inspect(resultToSummary(result), {
           colors: true,
           depth: null,
           maxStringLength: null,
@@ -86,10 +99,17 @@ export async function upStack(
       return;
     },
     e => {
-      abortController.abort(`${stack.name} - Aborting because of caught exception`);
+      abortController.abort(`${name} - Aborting because of caught exception`);
       throw e;
     }
   );
+}
+
+export function previewOperation(
+  stack: automation.Stack,
+  abortController: PulumiAbortController
+): Operation {
+  return operation(`preview-${stack.name}`, previewStack(stack, abortController));
 }
 
 export function operation(name: string, promise: Promise<void>): Operation {

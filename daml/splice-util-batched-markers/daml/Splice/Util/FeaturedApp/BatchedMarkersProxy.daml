@@ -1,0 +1,45 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | This module provides a BatchedMarkersProxy that can be used
+-- to create multiple markers in one view.
+module Splice.Util.FeaturedApp.BatchedMarkersProxy where
+
+import Splice.Api.FeaturedAppRightV1
+
+data BatchedMarkersProxy_CreateMarkersResult = BatchedMarkersProxy_CreateMarkersResult
+  with
+    results : [[FeaturedAppRight_CreateActivityMarkerResult]]
+
+data RewardBatch = RewardBatch
+  with
+    beneficiaries : [AppRewardBeneficiary]
+    numMarkers : Int
+  deriving (Show, Eq)
+
+template BatchedMarkersProxy with
+    provider : Party
+    dso : Party
+  where
+    signatory provider
+
+    nonconsuming choice BatchedMarkersProxy_CreateMarkers : BatchedMarkersProxy_CreateMarkersResult
+      with
+        featuredAppRightCid : ContractId FeaturedAppRight
+        batches : [RewardBatch]
+      observer dso :: concatMap (\b -> map (.beneficiary) b.beneficiaries) batches
+      controller provider
+      do require "numMarkers > 0" (all (\b -> b.numMarkers > 0) batches)
+         require "sum numMarkers <= 10000" (sum (map (.numMarkers) batches) <= 10000)
+         featuredAppRightView <- view <$> fetch featuredAppRightCid
+         require "DSO party on featured app right is correct" (featuredAppRightView.dso == dso)
+         results <- forA batches $ \batch -> forA [1..batch.numMarkers] $ \_ ->
+           exercise featuredAppRightCid FeaturedAppRight_CreateActivityMarker with
+             beneficiaries = batch.beneficiaries
+         pure BatchedMarkersProxy_CreateMarkersResult with results
+
+-- | Check whether a required condition is true. If it's not, abort the
+-- transaction with a message saying that the requirement was not met.
+require : CanAssert m => Text -> Bool -> m ()
+require msg invariant =
+  assertMsg ("The requirement '" <> msg <> "' was not met.") invariant

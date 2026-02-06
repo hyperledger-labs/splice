@@ -23,6 +23,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.{
   DecoderSpliceValidatorLifecycle,
   DecoderSpliceWallet,
   DecoderSpliceWalletPayments,
+  DecoderBatchedMarkers,
 }
 
 import scala.jdk.CollectionConverters.*
@@ -53,6 +54,7 @@ object ContractCompanions {
     DecoderSpliceValidatorLifecycle.contractDecoder,
     DecoderSpliceWallet.contractDecoder,
     DecoderSpliceWalletPayments.contractDecoder,
+    DecoderBatchedMarkers.contractDecoder,
   )
 
   // Unfortunately interfaces need to be declared explicitly, as there's no auto-generated list of decoders

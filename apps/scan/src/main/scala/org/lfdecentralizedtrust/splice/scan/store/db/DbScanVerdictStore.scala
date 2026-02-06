@@ -32,6 +32,7 @@ object DbScanVerdictStore {
       informees: Seq[String],
       confirmingParties: Json,
       subViews: Seq[Int],
+      viewHash: Option[String],
   )
 
   final case class VerdictT(
@@ -146,6 +147,7 @@ class DbScanVerdictStore(
       stringArrayGetResult(prs).toSeq,
       <<[Json],
       intArrayGetResult(prs).toSeq,
+      <<[Option[String]],
     )
   }
 
@@ -186,13 +188,15 @@ class DbScanVerdictStore(
            view_id,
            informees,
            confirming_parties,
-           sub_views
+           sub_views,
+           view_hash
         ) values (
           ${row.verdictRowId},
           ${row.viewId},
           ${row.informees.map(lengthLimited).toSeq},
           ${row.confirmingParties},
-          ${row.subViews.toSeq}
+          ${row.subViews.toSeq},
+          ${row.viewHash}
         )
       """.asUpdate
   }
@@ -355,7 +359,8 @@ class DbScanVerdictStore(
              view_id,
              informees,
              confirming_parties,
-             sub_views
+             sub_views,
+             view_hash
            from #${Tables.views}
            where verdict_row_id = $verdictRowId
            order by view_id asc

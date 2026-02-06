@@ -12,8 +12,10 @@ export function installNodePools(): void {
     ? `projects/${GCP_PROJECT}/locations/${config.requireEnv('CLOUDSDK_COMPUTE_ZONE')}/clusters/${clusterName}`
     : clusterName;
 
+  const nodepoolLocation = config.optionalEnv('CLOUDSDK_HYPERDISK_NODEPOOL_COMPUTE_ZONE');
+
   if (gkeClusterConfig.nodePools.hyperdiskApps) {
-    hyperdiskNodePool(cluster, gkeClusterConfig.nodePools.hyperdiskApps);
+    hyperdiskNodePool(cluster, gkeClusterConfig.nodePools.hyperdiskApps, nodepoolLocation);
   }
   const appsNodePoolConfig = gkeClusterConfig.nodePools.apps;
 
@@ -21,11 +23,12 @@ export function installNodePools(): void {
     hyperdiskSupportConfig.hyperdiskSupport.enabled &&
     !hyperdiskSupportConfig.hyperdiskSupport.migrating
   ) {
-    hyperdiskNodePool(cluster, appsNodePoolConfig);
+    hyperdiskNodePool(cluster, appsNodePoolConfig, nodepoolLocation);
   } else {
     appsNodePool(cluster, appsNodePoolConfig);
   }
 
+  const nodePoolComputeZone = config.optionalEnv('CLOUDSDK_NODEPOOL_COMPUTE_ZONE');
   new gcp.container.NodePool('cn-infra-node-pool', {
     cluster,
     nodeConfig: {
@@ -42,6 +45,7 @@ export function installNodePools(): void {
       },
       loggingVariant: 'DEFAULT',
     },
+    nodeLocations: nodePoolComputeZone ? [nodePoolComputeZone] : undefined,
     initialNodeCount: 1,
     autoscaling: {
       minNodeCount: gkeClusterConfig.nodePools.infra.minNodes,
@@ -50,7 +54,6 @@ export function installNodePools(): void {
   });
 
   new gcp.container.NodePool('gke-node-pool', {
-    name: 'gke-pool',
     cluster,
     nodeConfig: {
       machineType: 'e2-standard-4',
@@ -63,6 +66,7 @@ export function installNodePools(): void {
       ],
       loggingVariant: 'DEFAULT',
     },
+    nodeLocations: nodePoolComputeZone ? [nodePoolComputeZone] : undefined,
     initialNodeCount: 1,
     autoscaling: {
       minNodeCount: 1,
@@ -70,7 +74,7 @@ export function installNodePools(): void {
     },
   });
 }
-function hyperdiskNodePool(cluster: string, config: GkeNodePoolConfig) {
+function hyperdiskNodePool(cluster: string, config: GkeNodePoolConfig, location?: string) {
   new gcp.container.NodePool('cn-apps-node-pool-hd', {
     cluster,
     nodeConfig: {
@@ -91,6 +95,7 @@ function hyperdiskNodePool(cluster: string, config: GkeNodePoolConfig) {
       },
       loggingVariant: 'DEFAULT',
     },
+    nodeLocations: location ? [location] : undefined,
     initialNodeCount: 0,
     autoscaling: {
       minNodeCount: config.minNodes,

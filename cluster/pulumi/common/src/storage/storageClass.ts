@@ -6,11 +6,11 @@ export const standardStorageClassName = hyperdiskSupportConfig.hyperdiskSupport.
   ? 'hyperdisk-standard-rwo'
   : 'standard-rwo';
 
-export const infraStandardStorageClassName = hyperdiskSupportConfig.hyperdiskSupport.enabled
+export const infraStandardStorageClassName = hyperdiskSupportConfig.hyperdiskSupport.enabledForInfra
   ? 'hyperdisk-standard-rwo'
   : 'standard-rwo';
 
-export const infraPremiumStorageClassName = hyperdiskSupportConfig.hyperdiskSupport.enabled
+export const infraPremiumStorageClassName = hyperdiskSupportConfig.hyperdiskSupport.enabledForInfra
   ? 'hyperdisk-balanced-rwo'
   : 'premium-rwo';
 export const pvcSuffix = hyperdiskSupportConfig.hyperdiskSupport.enabled ? 'hd-pvc' : 'pvc';

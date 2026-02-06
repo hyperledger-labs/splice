@@ -50,6 +50,18 @@ import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import scala.concurrent.*
 import scala.jdk.OptionConverters.*
 
+class DbUserWalletTxLogStoreConfig(loggerFactory: NamedLoggerFactory, key: UserWalletStore.Key)
+    extends TxLogStore.Config[TxLogEntry] {
+  override val parser: org.lfdecentralizedtrust.splice.wallet.store.UserWalletTxLogParser =
+    new UserWalletTxLogParser(loggerFactory, key.endUserParty)
+  override def entryToRow: org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry => Option[
+    org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletTxLogStoreRowData
+  ] =
+    e => Some(WalletTables.UserWalletTxLogStoreRowData.fromTxLogEntry(e))
+  override def encodeEntry = TxLogEntry.encode
+  override def decodeEntry = TxLogEntry.decode
+}
+
 class DbUserWalletStore(
     override val key: UserWalletStore.Key,
     storage: DbStorage,
@@ -122,19 +134,7 @@ class DbUserWalletStore(
 
   override lazy val txLogConfig: org.lfdecentralizedtrust.splice.store.TxLogStore.Config[
     org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
-  ] {
-    val parser: org.lfdecentralizedtrust.splice.wallet.store.UserWalletTxLogParser;
-    def entryToRow
-        : org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry => org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletTxLogStoreRowData
-  } = new TxLogStore.Config[TxLogEntry] {
-    override val parser: org.lfdecentralizedtrust.splice.wallet.store.UserWalletTxLogParser =
-      new UserWalletTxLogParser(loggerFactory, key.endUserParty)
-    override def entryToRow
-        : org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry => org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletTxLogStoreRowData =
-      WalletTables.UserWalletTxLogStoreRowData.fromTxLogEntry
-    override def encodeEntry = TxLogEntry.encode
-    override def decodeEntry = TxLogEntry.decode
-  }
+  ] = new DbUserWalletTxLogStoreConfig(loggerFactory, key)
 
   def listSortedValidatorFaucets(
       issuingRoundsMap: Map[Round, IssuingMiningRound],

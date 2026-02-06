@@ -1426,7 +1426,6 @@ components:
         - $ref: "#/components/schemas/BaseListTransactionsResponseItem"
         - type: object
           required:
-            - provider
             - sender
             - receivers
             - holding_fees
@@ -1435,8 +1434,6 @@ components:
             - validator_rewards_used
             - sv_rewards_used
           properties:
-            provider:
-              type: string
             sender:
               $ref: "#/components/schemas/PartyAndAmount"
             receivers:

@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.automation
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
-import org.lfdecentralizedtrust.splice.store.{StoreErrors, StoreTest}
+import org.lfdecentralizedtrust.splice.store.{StoreErrors, StoreTestBase}
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.SuppressionRule
@@ -22,7 +22,7 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import scala.concurrent.Future
 
 class SqlIndexInitializationTriggerStoreTest
-    extends StoreTest
+    extends StoreTestBase
     with HasExecutionContext
     with StoreErrors
     with HasActorSystem

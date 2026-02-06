@@ -1994,6 +1994,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2060,6 +2064,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -2128,6 +2136,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2194,6 +2206,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -2262,6 +2278,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2329,6 +2349,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2395,6 +2419,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -2563,6 +2591,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2730,6 +2762,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2796,6 +2832,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -2864,6 +2904,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -2930,6 +2974,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -4216,6 +4264,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -4282,6 +4334,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -4350,6 +4406,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -4416,6 +4476,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -4484,6 +4548,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -4551,6 +4619,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -4617,6 +4689,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -4810,6 +4886,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -5002,6 +5082,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -5068,6 +5152,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -5136,6 +5224,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -5202,6 +5294,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -5902,6 +5998,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -5968,6 +6068,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -6036,6 +6140,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -6102,6 +6210,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -6170,6 +6282,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -6237,6 +6353,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -6303,6 +6423,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -6471,6 +6595,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -6638,6 +6766,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -6704,6 +6836,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -6772,6 +6908,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -6838,6 +6978,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"

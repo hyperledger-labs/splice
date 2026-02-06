@@ -23,13 +23,14 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 
 class UpdateHistoryBulkStorageTest
-    extends StoreTest
+    extends StoreTestBase
     with HasExecutionContext
     with HasActorSystem
     with HasS3Mock {
   val maxFileSize = 30000L
   val bulkStorageTestConfig = ScanStorageConfig(
     dbAcsSnapshotPeriodHours = 3,
+    bulkAcsSnapshotPeriodHours = 24,
     bulkDbReadChunkSize = 1000,
     maxFileSize,
   )

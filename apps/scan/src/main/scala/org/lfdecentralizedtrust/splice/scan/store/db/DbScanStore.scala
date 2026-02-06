@@ -84,6 +84,20 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
+class DbScanTxLogStoreConfig(loggerFactory: NamedLoggerFactory)
+    extends TxLogStore.Config[TxLogEntry] {
+  override val parser: org.lfdecentralizedtrust.splice.scan.store.ScanTxLogParser =
+    new ScanTxLogParser(
+      loggerFactory
+    )
+  override def entryToRow: org.lfdecentralizedtrust.splice.scan.store.TxLogEntry => Option[
+    org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.ScanTxLogRowData
+  ] =
+    ScanTables.ScanTxLogRowData.fromTxLogEntry
+  override def encodeEntry = TxLogEntry.encode
+  override def decodeEntry = TxLogEntry.decode
+}
+
 object DbScanStore {
   type CacheKey = java.lang.Long // caffeine metrics function demands AnyRefs
   type CacheValue = BigDecimal
@@ -151,21 +165,7 @@ class DbScanStore(
 
   override lazy val txLogConfig: org.lfdecentralizedtrust.splice.store.TxLogStore.Config[
     org.lfdecentralizedtrust.splice.scan.store.TxLogEntry
-  ] {
-    val parser: org.lfdecentralizedtrust.splice.scan.store.ScanTxLogParser;
-    def entryToRow
-        : org.lfdecentralizedtrust.splice.scan.store.TxLogEntry => org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.ScanTxLogRowData
-  } = new TxLogStore.Config[TxLogEntry] {
-    override val parser: org.lfdecentralizedtrust.splice.scan.store.ScanTxLogParser =
-      new ScanTxLogParser(
-        loggerFactory
-      )
-    override def entryToRow
-        : org.lfdecentralizedtrust.splice.scan.store.TxLogEntry => org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.ScanTxLogRowData =
-      ScanTables.ScanTxLogRowData.fromTxLogEntry
-    override def encodeEntry = TxLogEntry.encode
-    override def decodeEntry = TxLogEntry.decode
-  }
+  ] = new DbScanTxLogStoreConfig(loggerFactory)
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     implicit def traceContext: TraceContext = TraceContext.empty

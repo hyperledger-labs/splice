@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.store
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.StoreTest.testTxLogConfig
+import org.lfdecentralizedtrust.splice.store.StoreTestBase.testTxLogConfig
 import org.lfdecentralizedtrust.splice.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -37,7 +37,7 @@ import java.time.Instant
 import scala.concurrent.Future
 
 class TxLogBackfillingStoreTest
-    extends StoreTest
+    extends StoreTestBase
     with SplicePostgresTest
     with HasActorSystem
     with AcsJdbcTypes {

@@ -143,6 +143,19 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
     acceptExternalPartySetupProposal(provider, externalPartyOnboarding, proposal, verboseHashing)
   }
 
+  protected def onboardAndSetupExternalParty(
+      validatorBackend: ValidatorAppBackendReference,
+      partyHint: Option[String] = None,
+  )(implicit env: SpliceTestConsoleEnvironment): OnboardingResult = {
+    val onboarding = onboardExternalParty(validatorBackend, partyHint)
+    eventuallySucceeds() {
+      // While there is a server-side retry on this, it is not always sufficiently long in our tests,
+      // so we wrap it here in an eventuallySucceeds()
+      createAndAcceptExternalPartySetupProposal(validatorBackend, onboarding)
+    }
+    onboarding
+  }
+
   protected def createExternalPartySetupProposal(
       provider: ValidatorAppBackendReference,
       externalPartyOnboarding: OnboardingResult,

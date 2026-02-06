@@ -131,7 +131,7 @@ message TransferTxLogEntry {
   string offset = 2;
   string domain_id = 3 [(scalapb.field).type = "com.digitalasset.canton.topology.SynchronizerId"];
   google.protobuf.Timestamp date = 4 [(scalapb.field).type = "java.time.Instant"];
-  string provider = 5 [(scalapb.field).type = "com.digitalasset.canton.topology.PartyId"];
+  string provider = 5; // unused: reserved fields don't work well with the json en/decoding so we keep it here.
   SenderAmount sender = 6;
   repeated ReceiverAmount receivers = 7;
   repeated BalanceChange balance_changes = 8;

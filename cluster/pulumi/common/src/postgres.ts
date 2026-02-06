@@ -92,7 +92,9 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
           deletionProtectionEnabled: deletionProtection,
           activationPolicy: active ? 'ALWAYS' : 'NEVER',
           databaseFlags: [
-            { name: 'temp_file_limit', value: '2147483647' },
+            ...Object.keys(cloudSqlConfig.flags).map(name => {
+              return { name, value: cloudSqlConfig.flags[name] };
+            }),
             ...(opts.logicalDecoding ? [{ name: 'cloudsql.logical_decoding', value: 'on' }] : []),
           ],
           backupConfiguration: {

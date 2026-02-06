@@ -23,5 +23,6 @@ applications that are part of Splice.
    ../api/splice-wallet-payments/index
    ../api/splice-token-test-trading-app/index
    ../api/splice-token-standard-test/index
+   ../api/splice-util-batched-markers/index
 
 See :ref:`daml_code_architecture` for an overview of the apps and their relation.

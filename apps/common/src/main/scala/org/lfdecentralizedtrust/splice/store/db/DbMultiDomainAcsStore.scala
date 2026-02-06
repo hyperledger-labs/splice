@@ -1917,17 +1917,22 @@ final class DbMultiDomainAcsStore[TXE](
     // Note: lengthLimited() uses String2066 which throws an exception if the string is longer than 2066 characters.
     // Here we use String256M to support larger TxLogEntry payloads.
     val safeEntryData = String256M.tryCreate(entryData)
-    val rowData = txLogConfig.entryToRow(txe)
-    val indexColumnNames = getIndexColumnNames(rowData.indexColumns)
-    val indexColumnNameValues = getIndexColumnValues(rowData.indexColumns)
+    val rowDataO = txLogConfig.entryToRow(txe)
+    rowDataO match {
+      case Some(rowData) =>
+        val indexColumnNames = getIndexColumnNames(rowData.indexColumns)
+        val indexColumnNameValues = getIndexColumnValues(rowData.indexColumns)
 
-    summary.ingestedTxLogEntries.addOne((entryType, entryData))
-    (sql"""
-      insert into #$txLogTableName(store_id, migration_id, transaction_offset, record_time, domain_id,
-      entry_type, entry_data #$indexColumnNames)
-      values ($txLogStoreId, $migrationId, $safeOffset, $recordTime, $domainId,
-              $entryType, ${safeEntryData}::jsonb""" ++ indexColumnNameValues ++ sql""")
-    """).toActionBuilder.asUpdate
+        summary.ingestedTxLogEntries.addOne((entryType, entryData))
+        (sql"""
+        insert into #$txLogTableName(store_id, migration_id, transaction_offset, record_time, domain_id,
+        entry_type, entry_data #$indexColumnNames)
+        values ($txLogStoreId, $migrationId, $safeOffset, $recordTime, $domainId,
+                $entryType, ${safeEntryData}::jsonb""" ++ indexColumnNameValues ++ sql""")
+        """).toActionBuilder.asUpdate
+      case None =>
+        DBIO.successful(())
+    }
   }
 
   private def doUpdateFirstIngestedUpdate(

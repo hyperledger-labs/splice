@@ -101,6 +101,9 @@ export const InfraConfigSchema = z.object({
       retentionSize: z.string(),
       installPrometheusPushgateway: z.boolean().default(false),
     }),
+    gkeGateway: z.object({
+      proxyForIstioHttp: z.boolean(),
+    }),
     istio: z.object({
       enableIngressAccessLogging: z.boolean(),
       enableClusterAccessLogging: z.boolean().default(false),

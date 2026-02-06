@@ -43,7 +43,7 @@ message TransferTxLogEntry {
   string event_id = 1;
   TransactionSubtype subtype = 2;
   google.protobuf.Timestamp date = 3 [(scalapb.field).type = "java.time.Instant"];
-  string provider = 4;
+  string provider = 4; // unused: reserved fields don't work well with the json en/decoding so we keep it here.
   PartyAndAmount sender = 5;
   repeated PartyAndAmount receivers = 6;
   string sender_holding_fees = 7 [(scalapb.field).type = "scala.math.BigDecimal"];

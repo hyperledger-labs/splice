@@ -31,9 +31,13 @@ private class NamespaceMembership(
     val svDsoStore: SvDsoStore,
 ) extends DsoRulesTopologyStateReconciler[NamespaceDiff] {
 
+  private val ourSv = svDsoStore.key.svParty
+
   override def diffDsoRulesWithTopology(
       dsoRulesAndState: DsoRulesWithSvNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[NamespaceDiff]] = {
+    // To change the namespace we must first become a member of it. So the logic here will first ensure that
+    // and only then process any other change.
     val dsoRules = dsoRulesAndState.dsoRules
     participantAdminConnection
       .getDecentralizedNamespaceDefinition(
@@ -47,28 +51,45 @@ private class NamespaceMembership(
           .asScala
           .map(PartyId.tryFromProtoPrimitive)
           .toSeq
-        val namespaceAdditions = dsoRulesSvs
-          .filter(svParty => !decentralizedNamespace.mapping.owners.contains(svParty.uid.namespace))
-        // Parties are only hosted on participants with the same namespace which is also the namespace that is used in the decentralized namespace.
-        // Therefore we remove the namespace from the decentralized namespace only if
-        // a namespace is present in the offboardedSvs list and not present in the members list
-        val namespaceRemovals = dsoRules.contract.payload.offboardedSvs
-          .keySet()
-          .asScala
-          .map(PartyId.tryFromProtoPrimitive)
-          .toSeq
-          .filter(svParty =>
-            decentralizedNamespace.mapping.owners
-              .contains(svParty.uid.namespace) && !dsoRulesSvs
-              .map(_.uid.namespace)
-              .contains(svParty.uid.namespace)
+        if (
+          dsoRulesSvs
+            .contains(ourSv) && !decentralizedNamespace.mapping.owners.contains(ourSv.uid.namespace)
+        ) {
+          logger.info(
+            "We are an SV but not yet a namespace owner, first ensuring that we are a namespace owner before proposing other namespace change"
           )
-        namespaceAdditions.map[NamespaceDiff](
-          AddToNamespace(dsoRules.domain, _)
-        ) ++ namespaceRemovals
-          .map[NamespaceDiff](
-            RemoveFromNamespace(dsoRules.domain, _)
-          )
+          Seq(AddToNamespace(dsoRules.domain, ourSv))
+        } else if (decentralizedNamespace.mapping.owners.contains(ourSv.uid.namespace)) {
+          // Note that during offboarding we could be in the position where we are no longer in dso rules but still in the namespace. We err on the side of still processing stuff at that point.
+          val namespaceAdditions = dsoRulesSvs
+            .filter(svParty =>
+              !decentralizedNamespace.mapping.owners.contains(svParty.uid.namespace)
+            )
+          // Parties are only hosted on participants with the same namespace which is also the namespace that is used in the decentralized namespace.
+          // Therefore we remove the namespace from the decentralized namespace only if
+          // a namespace is present in the offboardedSvs list and not present in the members list
+          val namespaceRemovals = dsoRules.contract.payload.offboardedSvs
+            .keySet()
+            .asScala
+            .map(PartyId.tryFromProtoPrimitive)
+            .toSeq
+            .filter(svParty =>
+              decentralizedNamespace.mapping.owners
+                .contains(svParty.uid.namespace) && !dsoRulesSvs
+                .map(_.uid.namespace)
+                .contains(svParty.uid.namespace)
+            )
+
+          namespaceAdditions.map[NamespaceDiff](
+            AddToNamespace(dsoRules.domain, _)
+          ) ++ namespaceRemovals
+            .map[NamespaceDiff](
+              RemoveFromNamespace(dsoRules.domain, _)
+            )
+        } else {
+          // We're not an SV nor are we in the namespace, just do nothing.
+          Seq.empty
+        }
       }
   }
 

@@ -303,8 +303,6 @@ class ScanClient:
         response.raise_for_status()
         return await response.json()
 
-
-
     async def get_acs_snapshot_page_at(
         self, migration_id, record_time, templates, after
     ):
@@ -326,7 +324,9 @@ class ScanClient:
         return json
 
     async def get_amulet_token_metadata(self):
-        response = await self.session.get(f"{self.url}/registry/metadata/v1/instruments/Amulet")
+        response = await self.session.get(
+            f"{self.url}/registry/metadata/v1/instruments/Amulet"
+        )
         try:
             response.raise_for_status()
         except Exception as e:
@@ -336,7 +336,6 @@ class ScanClient:
 
         json = await response.json()
         return json
-
 
 
 # Daml Decimals have a precision of 38 and a scale of 10, i.e., 10 digits after the decimal point.
@@ -1428,7 +1427,9 @@ class TransferInputs:
         return (output, effective_inputs, total_cc, all_inputs)
 
     def summary(self, exercised_event):
-        subtract_holding_fees_per_round = KnownPackageIds.deducts_holding_fees(exercised_event.template_id.package_id)
+        subtract_holding_fees_per_round = KnownPackageIds.deducts_holding_fees(
+            exercised_event.template_id.package_id
+        )
         output = []
         effective_inputs = []
         unfeatured_app_rewards = {}
@@ -1583,7 +1584,8 @@ class EffectiveAmount:
         # kept for backwards-compatibility (important for compatibility tests)
         if subtract_holding_fees_per_round:
             effective_amount = max(
-                initial_amount - DamlDecimal(round_diff) * rate_per_round, DamlDecimal("0")
+                initial_amount - DamlDecimal(round_diff) * rate_per_round,
+                DamlDecimal("0"),
             )
         else:
             effective_amount = initial_amount
@@ -3734,8 +3736,8 @@ class State:
         for event_id in event.child_event_ids:
             child_event = transaction.events_by_id[event_id]
             if (
-                    isinstance(child_event, ExercisedEvent)
-                    and child_event.choice_name == "LockedAmulet_Unlock"
+                isinstance(child_event, ExercisedEvent)
+                and child_event.choice_name == "LockedAmulet_Unlock"
             ):
                 return self.handle_locked_amulet_unlock(
                     transaction,
@@ -3934,6 +3936,8 @@ class State:
                 return HandleTransactionResult.empty()
             case "Allocation_Cancel":
                 return self.handle_allocation_cancel(transaction, event)
+            case "BatchedMarkersProxy_CreateMarkers":
+                return HandleTransactionResult.empty()
             # case "AllocationInstruction_Withdraw": -- intentionally not handled, as it is not used by Amulet
             # case "AllocationInstruction_Update": -- intentionally not handled, as it is not used by Amulet
             # no handling of `AllocationRequest` choices as they are not visible to the DSO party
@@ -4002,7 +4006,9 @@ class PerPartyBalance:
     def sum_amounts(self):
         total = DamlDecimal("0")
         for amulet in self.amulets:
-            total += amulet.payload.get_amulet_amount().get_expiring_amount_initial_amount()
+            total += (
+                amulet.payload.get_amulet_amount().get_expiring_amount_initial_amount()
+            )
         for locked_amulet in self.locked_amulets:
             amulet = locked_amulet.payload.get_locked_amulet_amulet()
             total += amulet.get_amulet_amount().get_expiring_amount_initial_amount()
@@ -4214,8 +4220,6 @@ def _log_uncaught_exceptions():
     sys.excepthook = handle_exception
 
 
-
-
 async def _process_transaction(args, app_state, scan_client, transaction):
     LOG.debug(
         f"Processing transaction {transaction.update_id} at ({transaction.migration_id}, {transaction.record_time})"
@@ -4278,7 +4282,9 @@ async def main():
                     TransactionTree.parse(tx)
                     for tx in json_batch
                     if (stop_at_record_time is None)
-                    or (datetime.fromisoformat(tx["record_time"]) <= stop_at_record_time)
+                    or (
+                        datetime.fromisoformat(tx["record_time"]) <= stop_at_record_time
+                    )
                 ]
                 LOG.debug(
                     f"Processing batch of size {len(batch)} starting at {app_state.pagination_key}"
@@ -4338,12 +4344,18 @@ async def main():
                 if args.compare_balances_with_total_supply:
                     # this will only work if a snapshot was taken, which is guaranteed by compare_acs_with_snapshot=True
                     token_metadata = await scan_client.get_amulet_token_metadata()
-                    latest_per_party_balances = app_state.state.get_per_party_balances().values()
+                    latest_per_party_balances = (
+                        app_state.state.get_per_party_balances().values()
+                    )
                     # sum up all balances
-                    total_balance = sum([p.sum_amounts() for p in latest_per_party_balances], DamlDecimal(0))
-                    if DamlDecimal(token_metadata['totalSupply']) != total_balance:
-                        LOG.error(f"Total supply mismatch: {token_metadata['totalSupply']} in metadata (as of {token_metadata['totalSupplyAsOf']}), {total_balance} in computed balances (as of {app_state.state.record_time})")
-
+                    total_balance = sum(
+                        [p.sum_amounts() for p in latest_per_party_balances],
+                        DamlDecimal(0),
+                    )
+                    if DamlDecimal(token_metadata["totalSupply"]) != total_balance:
+                        LOG.error(
+                            f"Total supply mismatch: {token_metadata['totalSupply']} in metadata (as of {token_metadata['totalSupplyAsOf']}), {total_balance} in computed balances (as of {app_state.state.record_time})"
+                        )
 
         duration = time.time() - begin_t
         LOG.info(

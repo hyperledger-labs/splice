@@ -76,6 +76,8 @@ splice-util 0.1.2 3eb8f9ff160b782e0bf7ef0351072cfb6f186f086e082b35d9f7a0317e1633
 splice-util 0.1.3 a0538353ed6b7be1a596d94fe7c2acb4a89ea9abdc6cff3388b0eebe0452bafb
 splice-util 0.1.4 b7356fbb2cf8a3b22194d8c743c3c216d9c7527b257c8c38b257eb22942be358
 splice-util 0.1.5 5a58024e2cc488ca9e0c952ec7ef41da3a1ed0a78ba23bacd819e5b30afb5546
+splice-util-batched-markers 1.0.0 727c5e97457d3ff841680816eb70d55834827ef756bac8551cace5b961c9c1d2
+splice-util-batched-markers-test 1.0.0 366f24d0fbddd685e0f1012c6321afc950c033b23f51871695074df51ade0592
 splice-util-featured-app-proxies 1.0.0 48e0c4fe4ea05e3b740404ebe37004ddd741efbdcd665c1c3199a5d6d9d944d7
 splice-util-featured-app-proxies 1.1.0 81dd5a9e5c02d0de03208522a895fb85eeb12fbea4aca7c4ad0ad106f3b0bfce
 splice-util-featured-app-proxies 1.2.0 653c48879064332d34af5008bdfd8e349493460e67e62b85e8e7e3392831c842

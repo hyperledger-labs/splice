@@ -106,6 +106,13 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
     }
   }
 
+  def readPartyDescriptionFromRow(
+      transactionRow: Element
+  ): Option[String] =
+    transactionRow
+      .findChildElement(className("sender-or-receiver"))
+      .map(seleniumText)
+
   protected def readTransactionFromRow(
       transactionRow: Element
   )(implicit env: SpliceTestConsoleEnvironment): FrontendTransaction = {
@@ -115,12 +122,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
     FrontendTransaction(
       action = transactionRow.childElement(className("tx-action")).text,
       subtype = transactionRow.childElement(className("tx-subtype")).text.replaceAll("[()]", ""),
-      partyDescription = for {
-        senderOrReceiver <- transactionRow
-          .findChildElement(className("sender-or-receiver"))
-          .map(seleniumText)
-        providerId <- transactionRow.findChildElement(className("provider-id")).map(seleniumText)
-      } yield s"${senderOrReceiver} ${providerId}",
+      partyDescription = readPartyDescriptionFromRow(transactionRow),
       ccAmount = parseAmountText(
         transactionRow
           .childElement(className("tx-row-cell-balance-change"))

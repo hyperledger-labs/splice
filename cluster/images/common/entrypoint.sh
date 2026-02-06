@@ -33,6 +33,8 @@ if [ -n "${OVERRIDE_BOOTSTRAP_SCRIPT:-}" ]; then
 fi
 
 if [ -f /app/bootstrap.sc ]; then
+ # Rename file to avoid namespace confusion with canton console bootstrap object
+  cp /app/bootstrap.sc /app/user-bootstrap.sc
   ARGS+=( --bootstrap /app/bootstrap-entrypoint.sc )
 fi
 

@@ -20,6 +20,9 @@ class MultiHostValidatorOperatorIntegrationTest
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // TODO(#979) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
+      // Disable traffic topups as they can end up failing if we disconnect the node at the same time
+      // which then results in record order publishing issues on SV1's participant.
+      .withTrafficTopupsDisabled
 
   "validator operator can be multi-hosted and work with transfer preapprovals" in { implicit env =>
     val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)

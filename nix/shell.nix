@@ -116,6 +116,7 @@ let
     actionlint
     ammonite
     curl
+    daml2js
     git
     hub # Github CLI for todo checker
     jq

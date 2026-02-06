@@ -488,11 +488,7 @@ class JoiningNodeInitializer(
           )
           Future.unit
         }
-      _ <- checkIsInDecentralizedNamespaceAndStartTrigger(
-        dsoAutomationService,
-        dsoStore,
-        decentralizedSynchronizer,
-      )
+      _ <- checkIsInDecentralizedNamespace(dsoStore)
     } yield {
       ()
     }
@@ -807,14 +803,6 @@ class JoiningNodeInitializer(
             } yield dsoRules,
             logger,
           )
-          _ = logger.info("Adding member to the decentralized namespace.")
-          _ <- participantAdminConnection
-            .ensureDecentralizedNamespaceDefinitionProposalAccepted(
-              synchronizerId,
-              dsoParty.uid.namespace,
-              svParty.uid.namespace,
-              RetryFor.WaitingOnInitDependency,
-            )
         } yield ()
       }
 

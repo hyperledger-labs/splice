@@ -121,7 +121,6 @@ type RewardsCollected = { app?: BigNumber; validator?: BigNumber; sv?: BigNumber
 
 interface ActivityView {
   activityType: string;
-  provider: string;
   sender: string;
   receiver: string | 'Multiple' | 'None';
   feesBurnt: BigNumber;
@@ -181,8 +180,6 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
       rewardsCollected.sv = svRewards;
     }
 
-    const provider = transfer.provider;
-
     const nrReceivers = receivers.length;
     if (nrReceivers === 0) {
       receiver = 'None';
@@ -203,7 +200,6 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
 
     return {
       activityType: activityType,
-      provider: provider,
       sender: transfer.sender.party,
       receiver: receiver,
       feesBurnt: feesBurnt,
@@ -217,7 +213,6 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
   function getActivityFromMint(mint: AmuletAmount): ActivityView {
     return {
       activityType: 'Mint',
-      provider: mint.amulet_owner,
       sender: mint.amulet_owner,
       receiver: mint.amulet_owner,
       feesBurnt: BigNumber(0),
@@ -231,7 +226,6 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
   function getActivityFromTap(tap: AmuletAmount): ActivityView {
     return {
       activityType: 'Tap',
-      provider: tap.amulet_owner,
       sender: tap.amulet_owner,
       receiver: tap.amulet_owner,
       feesBurnt: BigNumber(0),
@@ -256,9 +250,6 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
         <Typography className="activity_type" variant="body1">
           {activity.activityType}
         </Typography>
-      </TableCell>
-      <TableCell>
-        <AnsEntry partyId={activity.provider} />
       </TableCell>
       <TableCell>
         <AnsEntry partyId={activity.sender} />

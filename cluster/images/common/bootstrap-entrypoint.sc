@@ -1,7 +1,7 @@
-import $file.bootstrap
+import $file.`user-bootstrap`
 
 logger.info("=== Bootstrapping application ===")
 
-bootstrap.main()
+`user-bootstrap`.main()
 
 logger.info("=== Bootstrapping complete ===")

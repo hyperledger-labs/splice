@@ -20,6 +20,8 @@ cluster:
       minNodes: 1
       nodeType: 'e2-standard-8'
 infra:
+  gkeGateway:
+    proxyForIstioHttp: false
   istio:
     enableIngressAccessLogging: true
   prometheus:
@@ -40,7 +42,7 @@ monitoring:
           rate: 3
         total:
           overMinutes: 5
-          rate: 15
+          rate: 25
       delegatelessContention:
         thresholdPerNamespace: 0.05
       ingestion:
