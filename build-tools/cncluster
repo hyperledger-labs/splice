@@ -529,6 +529,26 @@ function subcmd_gcloud_logs_ui() {
     open "$url"
 }
 
+subcommand_whitelist[gcloud_alert_logs_ui]='Open the gcloud logs viewer for this cluster, filtered to show only warnings that trigger alerts'
+
+function subcmd_gcloud_alert_logs_ui() {
+    _cluster_must_exist
+
+    base_query="resource.labels.cluster_name%3D%22${GCP_CLUSTER_NAME}%22"
+    cluster=$(basename "$PWD")
+    expected_file="../../expected/infra/expected-${cluster}.json"
+    _info "Using filter from $expected_file"
+    query=$(cat "${expected_file}" | jq '.[] | select(.name == "log_warnings") | .inputs.filter')
+    encoded_query=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote($query))")
+
+    url="https://console.cloud.google.com/logs/query?query=$encoded_query&project=$CLOUDSDK_CORE_PROJECT&duration=PT1H"
+    _info "Opening gcloud logs viewer: $url"
+    open "$url"
+}
+
+
+
+
 ###
 
 subcommand_whitelist[upgrade]='Upgrades the cluster to the latest GKE version'
