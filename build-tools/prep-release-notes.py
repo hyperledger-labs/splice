@@ -103,12 +103,12 @@ def move_upcoming_notes():
         fa.writelines(upcoming_header)
 
 def create_branch_and_push():
-    branch = repo.create_head(f"{os.getlogin()}/release-notes-{new_version}")
+    branch = repo.create_head(branch_name)
     repo.head.reference = branch
     repo.git.add(update=True)
     repo.index.commit(f"[static] release notes for {new_version}", skip_hooks=True)
     origin = repo.remote(name='origin')
-    origin.push()
+    origin.push(f"{branch_name}:{branch_name}")
 
 def create_pr():
     g = Github(os.environ['GITHUB_TOKEN'])
@@ -147,6 +147,7 @@ def main():
         elif choice == "2":
             open_in_editor(upcoming_notes_filename)
             print_release_notes_and_git_log()
+            break
         else:
             console.print("[bold red]Exiting. Goodbye![/bold red]")
             break
