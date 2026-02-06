@@ -67,7 +67,7 @@ import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidati
 import com.digitalasset.canton.{config, networking}
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.google.protobuf.ByteString
-import io.grpc.Context
+import io.grpc.{Context, Status}
 
 import java.net.URI
 import java.time.Duration
@@ -189,7 +189,7 @@ class TopologyAdministrationGroup(
       waitForReady,
     )
 
-  private def getIdCommand(): ConsoleCommandResult[UniqueIdentifier] =
+  private def getIdCommand(): ConsoleCommandResult[GetIdResult] =
     adminCommand(TopologyAdminCommands.Init.GetId())
 
   // small cache to avoid repetitive calls to fetchId (as the id is immutable once set)
@@ -202,15 +202,13 @@ class TopologyAdministrationGroup(
   private[console] def idHelper[T](
       apply: UniqueIdentifier => T
   ): T =
-    apply(idCache.get() match {
-      case Some(v) => v
-      case None =>
-        val r = consoleEnvironment.run {
-          getIdCommand()
-        }
-        idCache.set(Some(r))
-        r
-    })
+    maybeIdHelper(apply).getOrElse(
+      throw Status.UNAVAILABLE
+        .withDescription(
+          s"Node does not have an Id assigned yet."
+        )
+        .asRuntimeException()
+    )
 
   private[console] def maybeIdHelper[T](
       apply: UniqueIdentifier => T
@@ -218,14 +216,11 @@ class TopologyAdministrationGroup(
     (idCache.get() match {
       case Some(v) => Some(v)
       case None =>
-        consoleEnvironment.run {
-          CommandSuccessful(getIdCommand() match {
-            case CommandSuccessful(v) =>
-              idCache.set(Some(v))
-              Some(v)
-            case _: CommandError => None
-          })
+        val r = consoleEnvironment.run {
+          getIdCommand()
         }
+        r.uniqueIdentifier.foreach(id => idCache.set(Some(id)))
+        r.uniqueIdentifier
     }).map(apply)
 
   @Help.Summary("Topology synchronisation helpers", FeatureFlag.Preview)

@@ -77,8 +77,10 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
-
 import BlockSequencerFactory.OrderingTimeFixMode
+
+import java.util.concurrent.atomic.AtomicReference
+import scala.annotation.nowarn
 
 class BlockSequencer(
     blockOrderer: BlockOrderer,

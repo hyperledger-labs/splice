@@ -297,10 +297,10 @@ object SequencerAdminCommands {
   }
 
   final case class InitializeFromGenesisStateV2(
-      topologySnapshot: ByteString,
+      topologySnapshot: Seq[ByteString],
       synchronizerParameters: com.digitalasset.canton.protocol.StaticSynchronizerParameters,
   ) extends GrpcAdminCommand[
-        proto.InitializeSequencerFromGenesisStateV2Request,
+        Seq[proto.InitializeSequencerFromGenesisStateV2Request],
         proto.InitializeSequencerFromGenesisStateV2Response,
         InitializeSequencerResponse,
       ] {
@@ -314,24 +314,21 @@ object SequencerAdminCommands {
 
     override protected def submitRequest(
         service: proto.SequencerInitializationServiceGrpc.SequencerInitializationServiceStub,
-        request: proto.InitializeSequencerFromGenesisStateV2Request,
+        request: Seq[proto.InitializeSequencerFromGenesisStateV2Request],
     ): Future[proto.InitializeSequencerFromGenesisStateV2Response] =
-      GrpcStreamingUtils.streamToServer(
+      GrpcStreamingUtils.streamToServerChunked(
         service.initializeSequencerFromGenesisStateV2,
-        (topologySnapshot: Array[Byte]) =>
-          proto.InitializeSequencerFromGenesisStateV2Request(
-            topologySnapshot = ByteString.copyFrom(topologySnapshot),
-            Some(synchronizerParameters.toProtoV30),
-          ),
-        request.topologySnapshot,
+        request,
       )
 
     override protected def createRequest()
-        : Either[String, proto.InitializeSequencerFromGenesisStateV2Request] =
+        : Either[String, Seq[proto.InitializeSequencerFromGenesisStateV2Request]] =
       Right(
-        proto.InitializeSequencerFromGenesisStateV2Request(
-          topologySnapshot = topologySnapshot,
-          Some(synchronizerParameters.toProtoV30),
+        topologySnapshot.map(bytes =>
+          proto.InitializeSequencerFromGenesisStateV2Request(
+            topologySnapshot = bytes,
+            Some(synchronizerParameters.toProtoV30),
+          )
         )
       )
 

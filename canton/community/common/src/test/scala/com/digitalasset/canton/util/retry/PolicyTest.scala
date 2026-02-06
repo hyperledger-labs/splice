@@ -1106,6 +1106,7 @@ class PolicyTest extends AsyncFunSpec with BaseTest with HasExecutorService {
       val closeableEc = Threading.newExecutionContext(
         executionContextName,
         noTracingLogger,
+        None,
         Threading.detectNumberOfThreads(noTracingLogger),
         exitOnFatal = exitOnFatal,
       )

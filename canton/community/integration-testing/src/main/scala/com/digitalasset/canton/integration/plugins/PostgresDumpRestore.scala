@@ -4,7 +4,9 @@
 package com.digitalasset.canton.integration.plugins
 
 import better.files.File
+import com.digitalasset.canton.config.CantonConfig
 import com.digitalasset.canton.console.InstanceReference
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.TestConsoleEnvironment
 import com.digitalasset.canton.integration.util.CommandRunner
 import com.digitalasset.canton.store.db.DbStorageSetup.DbBasicConfig
@@ -33,7 +35,7 @@ sealed trait PostgresDumpRestore extends DbDumpRestore {
   protected implicit def executionContext: ExecutionContext
 
   def saveDump(node: InstanceReference, tempFile: TempFile)(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Future[Unit] = saveDump(node.name, tempFile)
 
   def saveDump(nodeName: String, tempFile: TempFile): Future[Unit] = for {
@@ -42,7 +44,7 @@ sealed trait PostgresDumpRestore extends DbDumpRestore {
   } yield ()
 
   def restoreDump(node: InstanceReference, dumpFileName: Path)(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Future[Unit] = restoreDump(node.name, dumpFileName)
 
   def restoreDump(nodeName: String, dumpFileName: Path): Future[Unit] = {

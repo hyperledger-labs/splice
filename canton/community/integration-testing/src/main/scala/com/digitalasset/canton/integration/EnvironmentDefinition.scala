@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration
@@ -21,12 +21,12 @@ import com.digitalasset.canton.config.{
   TestingConfigInternal,
 }
 import com.digitalasset.canton.console.{
-  ConsoleEnvironment,
+  CantonConsoleEnvironment,
   InstanceReference,
   SequencerReference,
   TestConsoleOutput,
 }
-import com.digitalasset.canton.environment.Environment
+import com.digitalasset.canton.environment.{CantonEnvironment, CommunityEnvironmentFactory}
 import com.digitalasset.canton.integration.bootstrap.{
   InitializedSynchronizer,
   NetworkBootstrapper,
@@ -57,21 +57,21 @@ import monocle.macros.syntax.lens.*
   *   making ports unique or some other specialization for the particular tests you're running)
   */
 final case class EnvironmentDefinition(
-    baseConfig: CantonConfig,
-    testingConfig: TestingConfigInternal =
+    override val baseConfig: CantonConfig,
+    override val testingConfig: TestingConfigInternal =
       TestingConfigInternal(warnOnAcsCommitmentDegradation = false),
-    setups: List[TestConsoleEnvironment => Unit] = Nil,
-    teardown: Unit => Unit = _ => (),
-    configTransforms: Seq[ConfigTransform] = ConfigTransforms.defaults,
+    override val setups: List[TestConsoleEnvironment[CantonConfig, CantonEnvironment] => Unit] =
+      Nil,
+    override val teardown: Unit => Unit = _ => (),
+    override val configTransforms: Seq[ConfigTransform] = ConfigTransforms.defaults,
     staticSynchronizerParametersMap: Map[String, StaticSynchronizerParameters] = Map.empty,
-) {
-
-  /** Create a canton configuration by applying the configTransforms to the base config. Some
-    * transforms may have side-effects (such as incrementing the next available port number) so only
-    * do before constructing an environment.
-    */
-  def generateConfig: CantonConfig =
-    configTransforms.foldLeft(baseConfig)((config, transform) => transform(config))
+) extends BaseEnvironmentDefinition[CantonConfig, CantonEnvironment](
+      baseConfig,
+      testingConfig,
+      setups,
+      teardown,
+      configTransforms,
+    ) {
 
   def withManualStart: EnvironmentDefinition =
     copy(baseConfig = baseConfig.focus(_.parameters.manualStart).replace(true))
@@ -104,14 +104,19 @@ final case class EnvironmentDefinition(
       }
     }
 
-  def withSetup(setup: TestConsoleEnvironment => Unit): EnvironmentDefinition =
+  def withSetup(
+      setup: TestConsoleEnvironment[CantonConfig, CantonEnvironment] => Unit
+  ): EnvironmentDefinition =
     copy(setups = setups :+ setup)
 
   def withTeardown(teardown: Unit => Unit): EnvironmentDefinition =
     copy(teardown = teardown)
 
   def withNetworkBootstrap(
-      networkBootstrapFactory: TestConsoleEnvironment => NetworkBootstrapper
+      networkBootstrapFactory: TestConsoleEnvironment[
+        CantonConfig,
+        CantonEnvironment,
+      ] => NetworkBootstrapper
   ): EnvironmentDefinition =
     withSetup(env => networkBootstrapFactory(env).bootstrap())
 
@@ -145,13 +150,18 @@ final case class EnvironmentDefinition(
     copy(staticSynchronizerParametersMap = map)
 
   def createTestConsole(
-      environment: Environment,
+      baseEnvironment: CantonEnvironment,
       loggerFactory: NamedLoggerFactory,
-  ): TestConsoleEnvironment =
-    new ConsoleEnvironment(
-      environment,
+  ): TestConsoleEnvironment[CantonConfig, CantonEnvironment] =
+    new CantonConsoleEnvironment(
+      baseEnvironment,
       new TestConsoleOutput(loggerFactory),
-    ) with TestEnvironment
+    ) with TestEnvironment[CantonConfig] {
+      override val actualConfig: CantonConfig = baseEnvironment.config
+    }
+
+  override lazy val environmentFactory =
+    CommunityEnvironmentFactory
 }
 
 /** Default testing environments for integration tests
@@ -183,7 +193,7 @@ final case class EnvironmentDefinition(
 object EnvironmentDefinition extends LazyLogging {
 
   def defaultStaticSynchronizerParameters(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): StaticSynchronizerParameters =
     StaticSynchronizerParameters.initialValues(
       env.environment.clock,
@@ -250,7 +260,9 @@ object EnvironmentDefinition extends LazyLogging {
   lazy val simpleTopology: EnvironmentDefinition =
     fromResource("examples/01-simple-topology/simple-topology.conf")
 
-  def S1M1(implicit env: TestConsoleEnvironment): NetworkTopologyDescription = {
+  def S1M1(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ): NetworkTopologyDescription = {
     import env.*
 
     NetworkTopologyDescription(
@@ -262,7 +274,9 @@ object EnvironmentDefinition extends LazyLogging {
     )
   }
 
-  private def S2M1(implicit env: TestConsoleEnvironment): NetworkTopologyDescription = {
+  private def S2M1(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ): NetworkTopologyDescription = {
     import env.*
 
     NetworkTopologyDescription(
@@ -274,7 +288,9 @@ object EnvironmentDefinition extends LazyLogging {
     )
   }
 
-  def S2M2(implicit env: TestConsoleEnvironment): NetworkTopologyDescription = {
+  def S2M2(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ): NetworkTopologyDescription = {
     import env.*
 
     NetworkTopologyDescription(
@@ -287,7 +303,7 @@ object EnvironmentDefinition extends LazyLogging {
   }
 
   private def S2M1_S2M1(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Seq[NetworkTopologyDescription] = {
     import env.*
 
@@ -309,7 +325,9 @@ object EnvironmentDefinition extends LazyLogging {
     )
   }
 
-  def S1M1_S1M1(implicit env: TestConsoleEnvironment): Seq[NetworkTopologyDescription] = {
+  def S1M1_S1M1(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ): Seq[NetworkTopologyDescription] = {
     import env.*
 
     Seq(
@@ -331,7 +349,7 @@ object EnvironmentDefinition extends LazyLogging {
   }
 
   private def S1M1_S1M1_S1M1(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Seq[NetworkTopologyDescription] = {
     import env.*
 
@@ -361,7 +379,7 @@ object EnvironmentDefinition extends LazyLogging {
   }
 
   private def S1M1_S1M1_S1M1_S1M1(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Seq[NetworkTopologyDescription] = {
     import env.*
 
@@ -439,7 +457,7 @@ object EnvironmentDefinition extends LazyLogging {
       numMediators = 2,
     )
 
-  lazy val P1S1M1_Config: EnvironmentDefinition = buildBaseEnvironmentDefinition(
+  lazy val P1S1M1_Config = buildBaseEnvironmentDefinition(
     numParticipants = 1,
     numSequencers = 1,
     numMediators = 1,
@@ -449,12 +467,6 @@ object EnvironmentDefinition extends LazyLogging {
     numParticipants = 1,
     numSequencers = 4,
     numMediators = 4,
-  )
-
-  lazy val P1S5M5_Config = buildBaseEnvironmentDefinition(
-    numParticipants = 1,
-    numSequencers = 5,
-    numMediators = 5,
   )
 
   /**   - 1 participant '''not''' connected to any synchronizer
@@ -699,7 +711,7 @@ object EnvironmentDefinition extends LazyLogging {
         )
     }
 
-  lazy val P3S1M1_Config: EnvironmentDefinition =
+  lazy val P3_S1M1_Config: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
       numParticipants = 3,
       numSequencers = 1,
@@ -724,7 +736,7 @@ object EnvironmentDefinition extends LazyLogging {
     *   - 1 synchronizer with 1 sequencer and 1 mediator
     */
   lazy val P3_S1M1: EnvironmentDefinition =
-    P3S1M1_Config.withNetworkBootstrap { implicit env =>
+    P3_S1M1_Config.withNetworkBootstrap { implicit env =>
       new NetworkBootstrapper(S1M1)
     }
 
@@ -732,8 +744,8 @@ object EnvironmentDefinition extends LazyLogging {
     *   - 1 synchronizer with 1 sequencer and 1 mediator
     *   - no initialized synchronizer
     */
-  lazy val P3S1M1_Manual: EnvironmentDefinition =
-    P3S1M1_Config.withManualStart
+  lazy val P3_S1M1_Manual: EnvironmentDefinition =
+    P3_S1M1_Config.withManualStart
 
   lazy val P3S2M2_Config: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
@@ -834,10 +846,9 @@ object EnvironmentDefinition extends LazyLogging {
     }
 
   /**   - 5 participants '''not''' connected to the synchronizer
-    *   - 2 sequencers
-    *   - 2 mediators
+    *   - 2 synchronizers with 1 sequencer and 1 mediator each
     */
-  lazy val P5S2M2_Config: EnvironmentDefinition =
+  lazy val P5_S1M1_S1M1_Config: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
       numParticipants = 5,
       numSequencers = 2,
@@ -848,12 +859,12 @@ object EnvironmentDefinition extends LazyLogging {
     *   - 2 synchronizers with 1 sequencer and 1 mediator each
     */
   lazy val P5_S1M1_S1M1: EnvironmentDefinition =
-    P5S2M2_Config.withNetworkBootstrap { implicit env =>
+    P5_S1M1_S1M1_Config.withNetworkBootstrap { implicit env =>
       NetworkBootstrapper(S1M1_S1M1)
     }
 
   lazy val P5_S1M1_S1M1_Manual: EnvironmentDefinition =
-    P5S2M2_Config.withManualStart
+    P5_S1M1_S1M1_Config.withManualStart
 
   /**   - 5 participants
     *   - 4 sequencers
@@ -872,7 +883,7 @@ object EnvironmentDefinition extends LazyLogging {
     *   - 1 mediators
     *   - no initialized synchronizer
     */
-  lazy val P1S2M1_Manual: EnvironmentDefinition =
+  lazy val P1_S2M1_Manual: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
       numParticipants = 1,
       numSequencers = 2,
@@ -917,7 +928,16 @@ object EnvironmentDefinition extends LazyLogging {
   /**   - 3 participants '''not''' connected to any synchronizer
     *   - 2 synchronizers with 1 sequencer and 1 mediator each
     */
-  lazy val P3_S1M1_S1M1: EnvironmentDefinition = P3S2M2_Config
+  lazy val P3_S1M1_S1M1_Config: EnvironmentDefinition = buildBaseEnvironmentDefinition(
+    numParticipants = 3,
+    numSequencers = 2,
+    numMediators = 2,
+  )
+
+  /**   - 3 participants '''not''' connected to any synchronizer
+    *   - 2 synchronizers with 1 sequencer and 1 mediator each
+    */
+  lazy val P3_S1M1_S1M1: EnvironmentDefinition = P3_S1M1_S1M1_Config
     .withNetworkBootstrap { implicit env =>
       NetworkBootstrapper(S1M1_S1M1)
     }

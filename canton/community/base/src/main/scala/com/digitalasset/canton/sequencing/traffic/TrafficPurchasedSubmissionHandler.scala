@@ -142,11 +142,11 @@ class TrafficPurchasedSubmissionHandler(
         threshold = sequencerGroup.threshold,
         protocolVersion,
       )
-      setTrafficPurchasedMessage = SetTrafficPurchasedMessage.apply(
-        member,
-        serial,
-        totalTrafficPurchased,
-        cryptoApi.psid,
+      setTrafficPurchasedMessage: SetTrafficPurchasedMessage = SetTrafficPurchasedMessage.apply(
+        member = member,
+        serial = serial,
+        totalTrafficPurchased = totalTrafficPurchased,
+        psid = cryptoApi.psid,
       )
       signedTrafficPurchasedMessage <- EitherT
         .liftF(
