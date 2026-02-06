@@ -1276,8 +1276,7 @@ object TopologyStateWriteThroughCache {
         tail.iterator.takeWhile(_.validUntil.exists(_.value >= asOf.value))
       headAndTail.filter { tx =>
         tx.isActiveAsOf(asOf = asOf, asOfInclusive = asOfInclusive) &&
-        !tx.transaction.isProposal && op == tx.transaction.operation
-        && tx.rejectionReason.isEmpty
+        !tx.transaction.isProposal && op == tx.transaction.operation && tx.rejectionReason.isEmpty
       }.toSeq
     }
 

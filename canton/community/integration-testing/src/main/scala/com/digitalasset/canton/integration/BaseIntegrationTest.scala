@@ -8,11 +8,13 @@ import com.digitalasset.canton.console.{BufferedProcessLogger, CommandFailure, P
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.{
+  config,
   BaseTest,
   RepeatableTestSuiteTest,
   TestPredicateFiltersFixtureAnyWordSpec,
-  config,
 }
+import com.digitalasset.canton.config.SharedCantonConfig
+import com.digitalasset.canton.environment.Environment
 import org.scalactic.source
 import org.scalactic.source.Position
 import org.scalatest.wordspec.FixtureAnyWordSpec
@@ -110,7 +112,7 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
         assertion(entry)
         entry.commandFailureMessage
         succeed
-      } *,
+      }*
     )
 
   /** Similar to [[com.digitalasset.canton.console.commands.ParticipantAdministration#ping]] But

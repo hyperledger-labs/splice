@@ -397,11 +397,13 @@ object BuildCommon {
       .dependsOn(
         `canton-wartremover-extension` % "compile->compile;test->test",
         `canton-util-observability`,
+        `canton-util-external` % "test",
       )
       .settings(
         sharedCantonSettings,
         libraryDependencies ++= Seq(
           scopt,
+          grpc_netty_shaded,
           apache_commons_io % "test",
         ),
       )

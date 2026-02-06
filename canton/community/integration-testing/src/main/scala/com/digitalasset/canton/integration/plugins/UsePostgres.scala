@@ -75,7 +75,7 @@ class UsePostgres(
     customMaxConnectionsByNode: Option[String => Option[PositiveInt]] = None,
     forceTestContainer: Boolean = false,
     dropDatabaseAfterTest: Boolean = true,
-) extends EnvironmentSetupPlugin
+) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
     with FlagCloseable
     with HasCloseContext
     with NoTracing {

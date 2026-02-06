@@ -66,7 +66,11 @@ class DbScanStoreMetrics(
   override protected def onClosed(): Unit = {
     LifeCycle.close(
       Seq(earliestAggregatedRound, latestAggregatedRound, history)
-        .map(cache => () => cache.close())*
+        .map(cache =>
+          new AutoCloseable {
+            def close(): Unit = cache.close()
+          }
+        )*
     )(logger)
     cacheOfMetrics.clear()
   }
