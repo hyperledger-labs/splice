@@ -28,14 +28,12 @@ class UpdateHistoryBulkStorage(
     extends NamedLogging {
 
   private def getMigrationIdForAcsSnapshot(snapshotTimestamp: CantonTimestamp): Future[Long] = {
-    // TODO: make sure to handle both cases:
-    //  1. this is an old migration, the next snapshot is known, and
-    //  2. we just completed a migration, the next snapshot is not yet known, but should be assumed to be the current, similarly to how we handle dumping a segment that started in the current
-    // I think that we should do here:
-    //   look for updates with record time > timestamp (any migration):
-    //      if exists, then return "lowest migration ID for which we have a tx with record time > timestamp"
-    //      else, return currentMigrationId
-    // But too tired right now to check my logic...
+    /* The migration ID in ACS snapshots is always the lowest migration that has updates with a later record time,
+       because we only create an ACS snapshot in an app if it has seen updates with a later timestamp.
+       If no such updates exist, then we assume that the current migration will be that of the snapshot. If a migration
+       happens before that time, then the app will restart with a higher migration, and therefore also restart dumping
+       this segment.
+     */
     updateHistory
       .getLowestMigrationForRecordTime(snapshotTimestamp)
       .map(_.getOrElse(currentMigrationId))
@@ -78,7 +76,6 @@ class UpdateHistoryBulkStorage(
           ).map(Some(_))
       }
     } yield {
-      // TODO: should we indicate genesis using something more explicit than (0,0) ?
       segmentEnd.map(UpdatesSegment(TimestampWithMigrationId(CantonTimestamp.MinValue, 0), _))
     }
 
@@ -133,7 +130,7 @@ class UpdateHistoryBulkStorage(
               s"Successfully completed dumping updates. Last update from the segment is from ${ts.migrationId}, ${ts.timestamp}"
             )
           case None =>
-            // TODO: really a warning? What happens with a long HDM?
+            // This might happen e.g. due to a long migration, but we at least want to warn about it
             logger.warn(s"Segment $segment contained no updates")
         }
         kvProvider.setLatestUpdatesSegmentInBulkStorage(segment).map(_ => segment)

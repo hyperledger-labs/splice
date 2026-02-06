@@ -90,7 +90,8 @@ class UpdateHistorySegmentBulkStorage(
           }
         } else {
           logger.debug(
-            s"Not enough updates yet (queried for ${config.bulkDbReadChunkSize}, found ${updates.length}. Last update is from ${updates.lastOption.map(_.update.update.recordTime)}, migration ${updates.lastOption.map(_.migrationId)}), sleeping..."
+            s"Not enough updates yet (queried for ${config.bulkDbReadChunkSize}, found ${updates.length}. Last update is from ${updates.lastOption
+                .map(_.update.update.recordTime)}, migration ${updates.lastOption.map(_.migrationId)}), sleeping..."
           )
           after(updatesPollingInterval, actorSystem.scheduler) {
             Future.successful(Some((afterTs, ByteString.empty)))

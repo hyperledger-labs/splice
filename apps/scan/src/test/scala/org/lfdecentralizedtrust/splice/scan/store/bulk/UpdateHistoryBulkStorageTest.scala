@@ -57,14 +57,6 @@ class UpdateHistoryBulkStorageTest
         val toTimestamp =
           CantonTimestamp.tryFromInstant(Instant.ofEpochMilli(segmentFromTimestamp + segmentSize))
 
-        clue("Wait for the store to be ready by getting the first update from it") {
-          eventually(2.minutes) {
-            mockStore.store
-              .getUpdatesWithoutImportUpdates(None, HardLimit.tryCreate(1))
-              .futureValue should not be Seq.empty
-          }
-        }
-
         val segment = UpdatesSegment(
           TimestampWithMigrationId(fromTimestamp, 0),
           TimestampWithMigrationId(toTimestamp, 0),
@@ -92,7 +84,9 @@ class UpdateHistoryBulkStorageTest
           "Ingest 1000 more events. Now the last timestamp will be beyond the segment, so the source will complete and emit the last timestamp"
         ) {
           mockStore.mockIngestion(1000)
-          probe.expectNext(20.seconds) should be((segment, Some(TimestampWithMigrationId(toTimestamp, 0))))
+          probe.expectNext(20.seconds) should be(
+            (segment, Some(TimestampWithMigrationId(toTimestamp, 0)))
+          )
           probe.expectComplete()
         }
 
@@ -143,7 +137,9 @@ class UpdateHistoryBulkStorageTest
         for {
           kvProvider <- mkProvider
         } yield {
-          def newUpdatesBulkStorageFlow(migrationId: Long): (UniqueKillSwitch, TestSubscriber.Probe[UpdatesSegment]) = {
+          def newUpdatesBulkStorageFlow(
+              migrationId: Long
+          ): (UniqueKillSwitch, TestSubscriber.Probe[UpdatesSegment]) = {
             new UpdateHistoryBulkStorage(
               bulkStorageTestConfig,
               mockStore.store,
@@ -164,19 +160,24 @@ class UpdateHistoryBulkStorageTest
             TimestampWithMigrationId(
               CantonTimestamp.tryFromInstant(genesisDate.atTime(4, 0).toInstant(ZoneOffset.UTC)),
               0,
-            )
+            ),
           )
           probe.expectNext(20.seconds) shouldBe seg1
-          def seg(fromHour: Int, fromMigration: Int, toHour: Int, toMigration: Int) = UpdatesSegment(
-            TimestampWithMigrationId(
-              CantonTimestamp.tryFromInstant(genesisDate.atTime(fromHour, 0).toInstant(ZoneOffset.UTC)),
-              fromMigration.toLong,
-            ),
-            TimestampWithMigrationId(
-              CantonTimestamp.tryFromInstant(genesisDate.atTime(toHour, 0).toInstant(ZoneOffset.UTC)),
-              toMigration.toLong,
-            ),
-          )
+          def seg(fromHour: Int, fromMigration: Int, toHour: Int, toMigration: Int) =
+            UpdatesSegment(
+              TimestampWithMigrationId(
+                CantonTimestamp.tryFromInstant(
+                  genesisDate.atTime(fromHour, 0).toInstant(ZoneOffset.UTC)
+                ),
+                fromMigration.toLong,
+              ),
+              TimestampWithMigrationId(
+                CantonTimestamp.tryFromInstant(
+                  genesisDate.atTime(toHour, 0).toInstant(ZoneOffset.UTC)
+                ),
+                toMigration.toLong,
+              ),
+            )
           probe.expectNext(20.seconds) shouldBe seg(4, 0, 6, 0)
           probe.expectNext(20.seconds) shouldBe seg(6, 0, 8, 0)
           // First 2000 events end up 08:07:10, so the last full segment is the one up to 08:00
@@ -194,12 +195,14 @@ class UpdateHistoryBulkStorageTest
           killSwitch.shutdown()
           val (killSwitch1, probe1) = newUpdatesBulkStorageFlow(1L)
           mockStore.mockMigration()
-          mockStore.mockIngestion(2000)
-          probe1.request(3)
-          probe1.expectNext(20.seconds) shouldBe seg(12, 0, 2, 1)
-          probe1.expectNext(20.seconds) shouldBe seg(2, 1, 4, 1)
-          probe1.expectNext(20.seconds) shouldBe seg(4, 1, 6, 1)
+          mockStore.mockIngestion(2000) // up to time 19:13:50
+
+          probe1.request(4)
+          probe1.expectNext(20.seconds) shouldBe seg(12, 0, 14, 1)
+          probe1.expectNext(20.seconds) shouldBe seg(14, 1, 16, 1)
+          probe1.expectNext(20.seconds) shouldBe seg(16, 1, 18, 1)
           probe1.expectNoMessage(20.seconds)
+          killSwitch1.shutdown()
 
           succeed
         }
@@ -226,7 +229,7 @@ class UpdateHistoryBulkStorageTest
       val curSize = data.size
       data = data ++ Seq.range(curSize, curSize + extraUpdates).map(_.toLong).map(genElement)
     }
-    def mockMigration(): Unit = currentMigration = currentMigration+1
+    def mockMigration(): Unit = currentMigration = currentMigration + 1
 
     def mockUpdateHistoryStore(): UpdateHistory = {
       val store = mock[UpdateHistory]
@@ -253,6 +256,15 @@ class UpdateHistoryBulkStorageTest
               )
               .take(limit.limit)
           )
+      }
+      when(
+        store.getLowestMigrationForRecordTime(
+          any[CantonTimestamp]
+        )(any[TraceContext])
+      ).thenAnswer { (recordTime: CantonTimestamp) =>
+        Future.successful(
+          data.filter(_.update.update.recordTime > recordTime).map(_.migrationId).minOption
+        )
       }
       store
     }
