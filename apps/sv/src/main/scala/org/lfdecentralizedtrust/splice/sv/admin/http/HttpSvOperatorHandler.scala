@@ -432,6 +432,15 @@ class HttpSvOperatorHandler(
               dsoRules.domain,
               party,
             )
+          _ <- {
+            if (partyToParticipant.mapping.partyId == party) {
+              Future.unit
+            } else {
+              Future.failed(
+                HttpErrorHandler.notFound(s"Party not found: $partyId")
+              )
+            }
+          }
           participantId <- partyToParticipant.mapping.participants match {
             case Seq(participant) => Future.successful(participant.participantId.toProtoPrimitive)
             case Seq() =>
