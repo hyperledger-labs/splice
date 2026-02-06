@@ -5,56 +5,35 @@ package com.digitalasset.canton.integration.tests
 
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt, PositiveLong}
-import com.digitalasset.canton.console.{LocalInstanceReference, LocalSequencerReference}
+import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.integration.TestConsoleEnvironment
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.topology.Member
-import org.scalatest.Assertion
 
 trait TrafficBalanceSupport extends BaseTest {
-
   protected def getTrafficForMember(
       member: Member
-  )(implicit env: TestConsoleEnvironment): Option[TrafficState] =
-    getTrafficForMember(member, env.sequencer1)
+  )(implicit env: TestConsoleEnvironment): Option[TrafficState] = {
+    import env.*
 
-  protected def getTrafficForMember(
-      member: Member,
-      sequencer: LocalSequencerReference,
-  ): Option[TrafficState] =
-    sequencer.traffic_control
+    sequencer1.traffic_control
       .traffic_state_of_members_approximate(Seq(member))
       .trafficStates
       .get(member)
+  }
 
   protected def updateBalanceForMember(
       instance: LocalInstanceReference,
       newBalance: PositiveLong,
       beforeCheck: () => Unit,
-  )(implicit env: TestConsoleEnvironment): Assertion =
-    updateBalanceForMember(
-      instance,
-      newBalance,
-      beforeCheck,
-      env.sequencer1,
-    )
-
-  protected def updateBalanceForMember(
-      instance: LocalInstanceReference,
-      newBalance: PositiveLong,
-      beforeCheck: () => Unit,
-      sequencer: LocalSequencerReference,
-  ): Assertion = {
+  )(implicit env: TestConsoleEnvironment) = {
     val member = instance.id.member
 
-    sendTopUp(member, newBalance.toNonNegative, sequencer, None)
+    sendTopUp(member, newBalance.toNonNegative)
 
     eventually() {
       beforeCheck()
-      getTrafficForMember(
-        member,
-        sequencer,
-      ).value.extraTrafficPurchased.value shouldBe newBalance.value
+      getTrafficForMember(member).value.extraTrafficPurchased.value shouldBe newBalance.value
     }
   }
 
@@ -64,21 +43,14 @@ trait TrafficBalanceSupport extends BaseTest {
       serialO: Option[PositiveInt] = None,
   )(implicit
       env: TestConsoleEnvironment
-  ): PositiveInt =
-    sendTopUp(member, newBalance, env.sequencer1, serialO)
-
-  protected def sendTopUp(
-      member: Member,
-      newBalance: NonNegativeLong,
-      sequencer: LocalSequencerReference,
-      serialO: Option[PositiveInt],
   ): PositiveInt = {
+    import env.*
 
     val serial = serialO
-      .orElse(getTrafficForMember(member, sequencer).flatMap(_.serial).map(_.increment))
+      .orElse(getTrafficForMember(member).flatMap(_.serial).map(_.increment))
       .getOrElse(PositiveInt.one)
 
-    sequencer.traffic_control.set_traffic_balance(member, serial, newBalance)
+    sequencer1.traffic_control.set_traffic_balance(member, serial, newBalance)
 
     serial
   }

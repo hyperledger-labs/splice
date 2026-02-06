@@ -112,9 +112,4 @@ trait TrafficConsumedStore extends AutoCloseable {
   def deleteRecordsPastTimestamp(
       timestampExclusive: CantonTimestamp
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit]
-
-  /** Truncates the entire traffic consumed store. To be used only on sequencer initialization to
-    * clean up partial state.
-    */
-  def truncate()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit]
 }

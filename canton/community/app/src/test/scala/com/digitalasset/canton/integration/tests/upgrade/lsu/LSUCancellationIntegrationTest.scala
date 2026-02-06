@@ -21,7 +21,6 @@ import com.digitalasset.canton.integration.plugins.{UseBftSequencer, UsePostgres
 import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.tests.upgrade.LogicalUpgradeUtils.SynchronizerNodes
 import com.digitalasset.canton.integration.tests.upgrade.lsu.LSUBase.Fixture
-import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.topology.{PartyId, TopologyManagerError}
 import com.digitalasset.canton.version.ProtocolVersion
 import monocle.macros.syntax.lens.*
@@ -221,12 +220,6 @@ final class LSUCancellationIntegrationTest extends LSUBase {
 
       eventually()(checkLSUOngoing(None))
 
-      // LSU traffic state returns an error
-      loggerFactory.assertThrowsAndLogs[CommandFailure](
-        sequencer1.traffic_control.get_lsu_state(),
-        _.shouldBeCantonErrorCode(SequencerError.NoOngoingLSU),
-      )
-
       sequencer2.stop()
       mediator2.stop()
 
@@ -237,12 +230,6 @@ final class LSUCancellationIntegrationTest extends LSUBase {
         .fetchTime()
         .futureValueUS should be < upgradeTime1.plus(
         dynamicSynchronizerParameters.decisionTimeout.asJava
-      )
-
-      // LSU traffic state returns an error
-      loggerFactory.assertThrowsAndLogs[CommandFailure](
-        sequencer1.traffic_control.get_lsu_state(),
-        _.shouldBeCantonErrorCode(SequencerError.NoOngoingLSU),
       )
 
       // Call should fail if no upgrade is ongoing

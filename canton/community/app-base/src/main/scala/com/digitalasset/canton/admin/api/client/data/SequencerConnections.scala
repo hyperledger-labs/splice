@@ -251,7 +251,7 @@ final case class SubmissionRequestAmplification(
     param("patience", _.patience),
   )
 
-  def toInternal: SubmissionRequestAmplificationInternal =
+  private[canton] def toInternal: SubmissionRequestAmplificationInternal =
     this.transformInto[SubmissionRequestAmplificationInternal]
 }
 

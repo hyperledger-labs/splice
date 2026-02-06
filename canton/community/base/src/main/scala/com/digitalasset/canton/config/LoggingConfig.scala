@@ -32,8 +32,7 @@ import com.digitalasset.canton.config
 final case class LoggingConfig(
     api: ApiLoggingConfig = ApiLoggingConfig(),
     eventDetails: Boolean = false,
-    // TODO(#10058) Make the Canton logic hide secrets and replace our own config dump by this.
-    logConfigOnStartup: Boolean = false,
+    logConfigOnStartup: Boolean = true,
     logConfigWithDefaults: Boolean = false,
     logSlowFutures: Boolean = false,
     delayLoggingThreshold: config.NonNegativeFiniteDuration =

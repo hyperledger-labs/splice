@@ -319,9 +319,8 @@ object FirstUnsafeOffsetComputation {
         safeCommitmentTick -> "ACS background reconciliation",
       ) ++ synchronizerIndex
         .flatMap(_.sequencerIndex)
-        .map(_.sequencerTimestamp -> "Synchronizer index crash recovery") ++ earliestInFlight.map(
-        _ -> "inFlightSubmissionTs"
-      )
+        .map(_.sequencerTimestamp -> "Synchronizer index crash recovery")
+        ++ earliestInFlight.map(_ -> "inFlightSubmissionTs")
 
       _ = errorLoggingContext.debug(
         s"Getting safe to prune timestamp for logical synchronizer $synchronizerId with data ${unsafeTimestamps.forgetNE}"

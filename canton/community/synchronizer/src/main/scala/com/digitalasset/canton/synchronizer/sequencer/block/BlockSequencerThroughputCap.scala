@@ -131,7 +131,7 @@ class BlockSequencerThroughputCap(
   @VisibleForTesting
   private[block] def addBlockUpdateInternal(
       submissions: Seq[SubmissionRequestEntry]
-  ): Unit = if (enabled.get()) (lock.exclusive {
+  ): Unit = if (enabled.get())(lock.exclusive {
     cancellable.foreach(_.cancel().discard)
 
     submissions.foreach { submission =>

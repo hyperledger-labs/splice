@@ -9,14 +9,14 @@ import com.digitalasset.canton.participant.ParticipantNodeBootstrapFactoryImpl
 import com.digitalasset.canton.synchronizer.mediator.MediatorNodeBootstrapFactoryImpl
 import com.digitalasset.canton.synchronizer.sequencer.SequencerNodeBootstrapFactoryImpl
 
-object CommunityEnvironmentFactory extends EnvironmentFactory[CantonConfig, CantonEnvironment] {
+object CommunityEnvironmentFactory extends EnvironmentFactory {
 
   override def create(
       config: CantonConfig,
       loggerFactory: NamedLoggerFactory,
       testingConfigInternal: TestingConfigInternal,
-  ): CantonEnvironment =
-    new CantonEnvironment(
+  ): Environment =
+    new Environment(
       config,
       testingConfigInternal,
       ParticipantNodeBootstrapFactoryImpl,

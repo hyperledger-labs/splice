@@ -6,24 +6,21 @@
   </contextListener>
 
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-    <encoder class="com.digitalasset.canton.logging.CantonJsonEncoder"/>
+    <encoder>
+      <!-- attempt to place the trace-id with a trailing space, however replace with an empty string if it's empty -->
+      <pattern>%highlight(%-5level %logger{10} %replace(tid:%mdc{trace-id} ){'tid: ', ''}- %msg%replace(, context: %marker){', context: $', ''}%replace( err-context:%mdc{err-context} ){' err-context: ', ''}%n)</pattern>
+    </encoder>
     <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-      <!-- For some reason our test setup depends on the STDOUT logger being defined. Without it the FILE logger
-           below does not log anything. We thus just turn the log level to OFF here to make
-           check-sbt-output.sh check for unexpected build problems only (see #3535).
-       -->
-      <level>OFF</level>
+      <level>WARN</level>
     </filter>
   </appender>
 
   <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-    <file>${LOG_FILE_NAME:-log/canton_network_test.clog}</file>
+    <file>${LOG_FILE_NAME:-log/canton_test.log}</file>
     <append>${LOG_APPEND:-true}</append>
-    <encoder class="com.digitalasset.canton.logging.CantonJsonEncoder">
-      <fieldNames>
-        <version>[ignore]</version>
-        <levelValue>[ignore]</levelValue>
-      </fieldNames>
+    <encoder>
+      <!-- attempt to place the trace-id with a trailing space, however replace with an empty string if it's empty -->
+      <pattern>%date [%thread] %-5level %logger{10} %replace(tid:%mdc{trace-id} ){'tid: ', ''}- %msg%replace(, context: %marker){', context: $', ''}%replace( err-context:%mdc{err-context} ){' err-context: ', ''}%n</pattern>
     </encoder>
   </appender>
 
@@ -33,8 +30,13 @@
   <property name="REWRITE_TESTING" value="true" />
   <include resource="rewrite-appender.xml"/>
 
+  <!-- Buffer errors for the last_errors command before passing them on to the rewrite appender -->
+  <appender name="LAST_ERRORS" class="com.digitalasset.canton.logging.LastErrorsAppender">
+    <appender-ref ref="REWRITE_LOG_LEVEL_SYNC"/>
+  </appender>
+
   <root level="INFO">
-    <appender-ref ref="REWRITE_LOG_LEVEL_SYNC" />
+    <appender-ref ref="LAST_ERRORS" />
   </root>
 
   <!-- Ensure everything is logged before the JVM exits -->
@@ -45,7 +47,6 @@
   -->
   <logger name="com.daml" level="${LOG_LEVEL_CANTON:-DEBUG}"/>
   <logger name="com.digitalasset" level="${LOG_LEVEL_CANTON:-DEBUG}"/>
-  <logger name="org.lfdecentralizedtrust.splice" level="${LOG_LEVEL_CANTON:-DEBUG}"/>
   <!-- The TransactionsReader is quite noisy. -->
   <logger name="com.digitalasset.canton.platform.store.dao.events.TransactionsReaderCanton" level="${LOG_LEVEL_CANTON:-INFO}"/>
   <!-- netty reports ssl errors on DEBUG level ... -->

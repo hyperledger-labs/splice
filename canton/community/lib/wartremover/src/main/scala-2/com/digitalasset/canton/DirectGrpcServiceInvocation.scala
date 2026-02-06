@@ -66,8 +66,8 @@ object DirectGrpcServiceInvocation extends WartTraverser {
         tree.symbol.annotations.exists(isGrpcServiceInvocationMethodAnnotation)
 
       def isMethodDefWithGrpcServiceInvocationMethodAnnotation(symbol: Symbol): Boolean =
-        symbol.annotations.exists(isGrpcServiceInvocationMethodAnnotation) || symbol.overrides
-          .exists(isMethodDefWithGrpcServiceInvocationMethodAnnotation)
+        symbol.annotations.exists(isGrpcServiceInvocationMethodAnnotation)
+          || symbol.overrides.exists(isMethodDefWithGrpcServiceInvocationMethodAnnotation)
 
       def isArtifactValDef(x: Tree): Boolean =
         x match {

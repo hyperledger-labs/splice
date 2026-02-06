@@ -8,13 +8,11 @@ import com.digitalasset.canton.console.{BufferedProcessLogger, CommandFailure, P
 import com.digitalasset.canton.logging.{LogEntry, SuppressionRule}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.{
-  config,
   BaseTest,
   RepeatableTestSuiteTest,
   TestPredicateFiltersFixtureAnyWordSpec,
+  config,
 }
-import com.digitalasset.canton.config.SharedCantonConfig
-import com.digitalasset.canton.environment.Environment
 import org.scalactic.source
 import org.scalactic.source.Position
 import org.scalatest.wordspec.FixtureAnyWordSpec
@@ -56,17 +54,22 @@ import scala.jdk.CollectionConverters.*
   * All integration tests must be located in package [[com.digitalasset.canton.integration.tests]]
   * or a subpackage thereof. This is required to correctly compute unit test coverage.
   */
-trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
+private[integration] trait BaseIntegrationTest
     extends FixtureAnyWordSpec
     with BaseTest
     with RepeatableTestSuiteTest
     with PartyTopologyUtils
     with TestPredicateFiltersFixtureAnyWordSpec {
-  this: EnvironmentSetup[C, E] =>
+  self: EnvironmentSetup =>
 
-  type FixtureParam = TestConsoleEnvironment[C, E]
+  type FixtureParam = TestConsoleEnvironment
 
   override protected def withFixture(test: OneArgTest): Outcome = {
+    val integrationTestPackage = "com.digitalasset.canton.integration.tests"
+    getClass.getName should startWith(
+      integrationTestPackage
+    ) withClue s"\nAll integration tests must be located in $integrationTestPackage or a subpackage thereof."
+
     super[RepeatableTestSuiteTest].withFixture(new TestWithSetup(test))
   }
 
@@ -95,7 +98,7 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
         assertion(entry)
         entry.commandFailureMessage
         succeed
-      }*
+      } *,
     )
 
   /** Version of [[com.digitalasset.canton.logging.SuppressingLogger.assertThrowsAndLogs]] that is
@@ -113,7 +116,7 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
         assertion(entry)
         entry.commandFailureMessage
         succeed
-      }*
+      } *,
     )
 
   def suppressPackageIdWarning[A](within: => A): A =
@@ -153,10 +156,10 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
     override val pos: Option[Position] = test.pos
 
     override def apply(): Outcome = {
-      val environment = provideEnvironment(test.name)
+      val environment = provideEnvironment
       val testOutcome =
         try test.toNoArgTest(environment)()
-        finally testFinished(test.name, environment)
+        finally testFinished(environment)
       testOutcome
     }
   }

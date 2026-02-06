@@ -297,10 +297,10 @@ object SequencerAdminCommands {
   }
 
   final case class InitializeFromGenesisStateV2(
-      topologySnapshot: Seq[ByteString],
+      topologySnapshot: ByteString,
       synchronizerParameters: com.digitalasset.canton.protocol.StaticSynchronizerParameters,
   ) extends GrpcAdminCommand[
-        Seq[proto.InitializeSequencerFromGenesisStateV2Request],
+        proto.InitializeSequencerFromGenesisStateV2Request,
         proto.InitializeSequencerFromGenesisStateV2Response,
         InitializeSequencerResponse,
       ] {
@@ -314,21 +314,24 @@ object SequencerAdminCommands {
 
     override protected def submitRequest(
         service: proto.SequencerInitializationServiceGrpc.SequencerInitializationServiceStub,
-        request: Seq[proto.InitializeSequencerFromGenesisStateV2Request],
+        request: proto.InitializeSequencerFromGenesisStateV2Request,
     ): Future[proto.InitializeSequencerFromGenesisStateV2Response] =
-      GrpcStreamingUtils.streamToServerChunked(
+      GrpcStreamingUtils.streamToServer(
         service.initializeSequencerFromGenesisStateV2,
-        request,
+        (topologySnapshot: Array[Byte]) =>
+          proto.InitializeSequencerFromGenesisStateV2Request(
+            topologySnapshot = ByteString.copyFrom(topologySnapshot),
+            Some(synchronizerParameters.toProtoV30),
+          ),
+        request.topologySnapshot,
       )
 
     override protected def createRequest()
-        : Either[String, Seq[proto.InitializeSequencerFromGenesisStateV2Request]] =
+        : Either[String, proto.InitializeSequencerFromGenesisStateV2Request] =
       Right(
-        topologySnapshot.map(bytes =>
-          proto.InitializeSequencerFromGenesisStateV2Request(
-            topologySnapshot = bytes,
-            Some(synchronizerParameters.toProtoV30),
-          )
+        proto.InitializeSequencerFromGenesisStateV2Request(
+          topologySnapshot = topologySnapshot,
+          Some(synchronizerParameters.toProtoV30),
         )
       )
 
@@ -565,42 +568,5 @@ object SequencerAdminCommands {
       ): Either[String, NodeStatus[SequencerStatus]] =
         SequencerStatus.fromProtoV30(response).leftMap(_.message)
     }
-  }
-
-  final case object GetLSUTrafficControlState
-      extends BaseSequencerAdministrationCommand[
-        proto.GetLSUTrafficControlStateRequest,
-        proto.GetLSUTrafficControlStateResponse,
-        ByteString,
-      ] {
-    override protected def createRequest(): Either[String, proto.GetLSUTrafficControlStateRequest] =
-      Right(proto.GetLSUTrafficControlStateRequest())
-    override protected def submitRequest(
-        service: proto.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
-        request: proto.GetLSUTrafficControlStateRequest,
-    ): Future[proto.GetLSUTrafficControlStateResponse] =
-      service.getLSUTrafficControlState(request)
-    override protected def handleResponse(
-        response: proto.GetLSUTrafficControlStateResponse
-    ): Either[String, ByteString] =
-      Right(response.lsuTrafficState)
-  }
-  final case class SetLSUTrafficControlState(
-      membersTraffic: ByteString
-  ) extends BaseSequencerAdministrationCommand[
-        proto.SetLSUTrafficControlStateRequest,
-        proto.SetLSUTrafficControlStateResponse,
-        Unit,
-      ] {
-    override protected def createRequest(): Either[String, proto.SetLSUTrafficControlStateRequest] =
-      Right(proto.SetLSUTrafficControlStateRequest(membersTraffic))
-    override protected def submitRequest(
-        service: proto.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub,
-        request: proto.SetLSUTrafficControlStateRequest,
-    ): Future[proto.SetLSUTrafficControlStateResponse] =
-      service.setLSUTrafficControlState(request)
-    override protected def handleResponse(
-        response: proto.SetLSUTrafficControlStateResponse
-    ): Either[String, Unit] = Either.unit
   }
 }

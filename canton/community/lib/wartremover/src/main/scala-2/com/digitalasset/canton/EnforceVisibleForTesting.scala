@@ -39,9 +39,9 @@ object EnforceVisibleForTesting extends WartTraverser {
       def currentlyVisitingParents(symbol: Symbol): Boolean =
         if (symbol == null || symbol == u.universe.NoSymbol || symbol.isPackage) false
         else
-          (symbol.owner != null && currentlyVisitingDefitions.contains(
-            symbol.owner.fullName
-          )) || currentlyVisitingParents(symbol.owner)
+          (symbol.owner != null
+            && currentlyVisitingDefitions.contains(symbol.owner.fullName))
+          || currentlyVisitingParents(symbol.owner)
 
       @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
       object AccessToMemberWithVisibleforTestingAnnotation {

@@ -384,7 +384,7 @@ class TopologyStateWriteThroughCache(
             .filter(tx =>
               tx.stored.transaction.isProposal && maxSerial.forall(_ < tx.stored.serial)
             )
-            .map(_.stored.transaction.transaction.hash)
+            .map(_.stored.transaction.transaction.hash),
         )
       }
 
