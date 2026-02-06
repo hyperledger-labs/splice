@@ -194,11 +194,17 @@ describe('Grant Featured App Form', () => {
     await user.type(urlInput, 'https://example.com');
 
     const providerInput = screen.getByTestId('grant-featured-app-idValue');
-    await user.type(providerInput, svPartyId);
+    await user.type(providerInput, 'a-party-id::1014912492');
 
     expect(screen.getByText('Review Proposal')).toBeInTheDocument();
     const submitButton = screen.getByTestId('submit-button');
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
+
+    await waitFor(() => {
+      expect(screen.queryByText('Validating provider...')).not.toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Provider party not found on ledger')).not.toBeInTheDocument();
 
     await waitFor(async () => {
       expect(submitButton).not.toBeDisabled();

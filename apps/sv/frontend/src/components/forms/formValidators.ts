@@ -38,7 +38,7 @@ export const expiryEffectiveDateSchema = z
     path: ['effectiveDate'],
   });
 
-export const grantRevokeFeaturedAppRightSchema = z.string().min(1, { message: 'Required' });
+export const revokeFeaturedAppRightSchema = z.string().min(1, { message: 'Required' });
 
 export const partyIdSchema = z
   .string()
@@ -140,8 +140,8 @@ export const validateUrl = (value: string): string | false => {
   return result.success ? false : result.error.issues[0].message;
 };
 
-export const validateGrantRevokeFeaturedAppRight = (value: string): string | false => {
-  const result = grantRevokeFeaturedAppRightSchema.safeParse(value);
+export const validateRevokeFeaturedAppRight = (value: string): string | false => {
+  const result = revokeFeaturedAppRightSchema.safeParse(value);
   return result.success ? false : result.error.issues[0].message;
 };
 

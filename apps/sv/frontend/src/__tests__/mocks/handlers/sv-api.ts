@@ -21,6 +21,7 @@ import {
   voteRequests,
   voteResultsAmuletRules,
   voteResultsDsoRules,
+  svPartyId,
 } from '../constants';
 import { ValidatorOnboarding } from '@daml.js/splice-validator-lifecycle/lib/Splice/ValidatorOnboarding/module';
 import { ContractId } from '@daml/types';
@@ -211,5 +212,18 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
         ],
       })
     );
+  }),
+
+  rest.get(`${svUrl}/v0/admin/sv/party-to-participant/:partyId`, (req, res, ctx) => {
+    const { partyId } = req.params;
+    if (partyId === 'a-party-id::1014912492' || partyId === svPartyId) {
+      return res(
+        ctx.json({
+          participant_id: svPartyId,
+        })
+      );
+    } else {
+      return res(ctx.status(404));
+    }
   }),
 ];
