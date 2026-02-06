@@ -25,7 +25,7 @@ export const operator = new k8s.helm.v3.Release(
   {
     name: 'pulumi-kubernetes-operator',
     chart: 'oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator',
-    version: '2.2.0',
+    version: '2.4.1',
     namespace: namespace.ns.metadata.name,
     values: {
       resources: {
