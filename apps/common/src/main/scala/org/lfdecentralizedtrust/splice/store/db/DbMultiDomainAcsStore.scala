@@ -1171,7 +1171,7 @@ final class DbMultiDomainAcsStore[TXE](
             contractFilter.ensureStakeholderOf(event.reassignmentEvent.createdEvent)
           }
 
-          // TODO: on conflict do nothing for retries
+          // TODO: on conflict do nothing doesn't work if the offset changes (which it will in InitializeAcsAtLatestOffset) because it misses archivals of previously inserted contracts
           val acsInserts = NonEmptyList
             .fromFoldable(todoAcs)
             .map(acs =>
@@ -1187,6 +1187,7 @@ final class DbMultiDomainAcsStore[TXE](
                   )
                 },
                 summaryState,
+                onConflictDoNothing = true,
               )
             )
 
@@ -1202,10 +1203,11 @@ final class DbMultiDomainAcsStore[TXE](
                   )
                 },
                 summaryState,
+                onConflictDoNothing = true,
               )
             }
             .toList ++ todoIncompleteOut.map { evt =>
-            // TODO (#989): batch inserts
+            // TODO (#3884): batch inserts
             doRegisterIncompleteReassignment(
               evt.createdEvent.getContractId,
               evt.reassignmentEvent.source,
@@ -1227,10 +1229,11 @@ final class DbMultiDomainAcsStore[TXE](
                   )
                 },
                 summaryState,
+                onConflictDoNothing = true,
               )
             }
             .toList ++ todoIncompleteIn.map { evt =>
-            // TODO (#989): batch inserts
+            // TODO (#3884): batch inserts
             doRegisterIncompleteReassignment(
               evt.reassignmentEvent.createdEvent.getContractId,
               evt.reassignmentEvent.source,
@@ -1646,7 +1649,10 @@ final class DbMultiDomainAcsStore[TXE](
     private def doIngestAcsInserts(
         entries: NonEmptyList[AcsInsertEntry],
         summary: MutableIngestionSummary,
+        onConflictDoNothing: Boolean = false,
     )(implicit tc: TraceContext) = {
+      val onConflictDoNothingClause =
+        if (onConflictDoNothing) sql" on conflict do nothing " else sql""
       DBIO.sequence(entries.grouped(ingestionConfig.maxEntriesPerInsert).map { entries =>
         val insertValues = entries
           .map(entry => entry.createdEvent.getContractId -> getInsertValues(entry))
@@ -1664,12 +1670,15 @@ final class DbMultiDomainAcsStore[TXE](
                                            assigned_domain, reassignment_counter, reassignment_target_domain,
                                            reassignment_source_domain, reassignment_submitter, reassignment_unassign_id
                                            #$acsIndexColumnNames)
-                values """ ++ joinedAcsTableValues ++ sql" returning contract_id, event_number").toActionBuilder
+                values """ ++ joinedAcsTableValues ++ onConflictDoNothingClause ++ sql" returning contract_id, event_number").toActionBuilder
             .asUpdateReturning[(String, Long)]
           rawContractIdToEventNumberMap = rawContractIdToEventNumber.toMap
           interfaceViewsValues = insertValues.toList.flatMap { case (contractId, insertValue) =>
-            val eventNumber = rawContractIdToEventNumberMap(contractId)
-            insertValue.interfaceViews(eventNumber)
+            // if the contract was inserted, so were its interface views
+            // if a new view is introduced, then the store_descriptor changed and the row cannot be already inserted
+            rawContractIdToEventNumberMap.get(contractId).toList.flatMap { eventNumber =>
+              insertValue.interfaceViews(eventNumber)
+            }
           }
           joinedInterfaceViewsValues = interfaceViewsValues.reduceLeftOption(_ ++ sql"," ++ _)
           _ <- joinedInterfaceViewsValues match {
@@ -1678,7 +1687,7 @@ final class DbMultiDomainAcsStore[TXE](
             case Some(interfaceViewValues) =>
               (sql"""
                 insert into #$interfaceViewsTableName(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view #$interfaceViewsIndexColumnNames)
-                values """ ++ interfaceViewValues).toActionBuilder.asUpdate
+                values """ ++ interfaceViewValues ++ onConflictDoNothingClause).toActionBuilder.asUpdate
           }
         } yield {
           summary.ingestedCreatedEvents.addAll(entries.map(_.createdEvent).toIterable)
