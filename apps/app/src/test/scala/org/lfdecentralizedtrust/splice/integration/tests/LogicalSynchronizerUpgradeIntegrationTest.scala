@@ -358,21 +358,6 @@ class LogicalSynchronizerUpgradeIntegrationTest
           .futureValue
       )
 
-      clue("Wait until upgrade time") {
-        wallClock
-          .scheduleAt(
-            _ =>
-              allNewBackends.zip(allBackends).par.map { case (newBackend, oldBackend) =>
-                clue(s"transfer traffic for  ${oldBackend.name}") {
-                  newBackend.sequencerClient.traffic_control
-                    .set_lsu_state(oldBackend.sequencerClient.traffic_control.get_lsu_state())
-                }
-              },
-            upgradeTime,
-          )
-          .futureValueUS(Timeout(2.minutes))
-      }
-
       clue("Announce new sequencer urls") {
         allBackends.zip(allNewBackends).par.map { case (oldBackend, newBackend) =>
           oldBackend.sequencerClient.topology.synchronizer_upgrade.sequencer_successors
@@ -387,6 +372,21 @@ class LogicalSynchronizerUpgradeIntegrationTest
               decentralizedSynchronizerId,
             )
         }
+      }
+
+      clue("Wait until upgrade time") {
+        wallClock
+          .scheduleAt(
+            _ =>
+              allNewBackends.zip(allBackends).par.map { case (newBackend, oldBackend) =>
+                clue(s"transfer traffic for  ${oldBackend.name}") {
+                  newBackend.sequencerClient.traffic_control
+                    .set_lsu_state(oldBackend.sequencerClient.traffic_control.get_lsu_state())
+                }
+              },
+            upgradeTime,
+          )
+          .futureValueUS(Timeout(2.minutes))
       }
 
       val newSequencerUrls = allNewBackends.map { newBackend =>
