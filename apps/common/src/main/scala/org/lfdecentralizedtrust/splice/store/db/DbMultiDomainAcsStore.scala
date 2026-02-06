@@ -597,7 +597,8 @@ final class DbMultiDomainAcsStore[TXE](
             Future.successful(
               DestinationHistory.InsertResult(
                 backfilledUpdates = 0L,
-                backfilledEvents = 0L,
+                backfilledCreatedEvents = 0L,
+                backfilledExercisedEvents = 0L,
                 lastBackfilledRecordTime =
                   items.headOption.map(_.update.recordTime).getOrElse(CantonTimestamp.MinValue),
               )
@@ -627,13 +628,15 @@ final class DbMultiDomainAcsStore[TXE](
                 "destinationHistory.insert",
               )
             } yield {
-          val ingestedEvents = IngestedEvents.eventCount(trees)DestinationHistory.InsertResult(
-              backfilledUpdates = trees.size.toLong,
-              backfilledExercisedEvents = ingestedEvents.numExercisedEvents,
+              val ingestedEvents = IngestedEvents.eventCount(trees)
+              DestinationHistory.InsertResult(
+                backfilledUpdates = trees.size.toLong,
+                backfilledExercisedEvents = ingestedEvents.numExercisedEvents,
                 backfilledCreatedEvents = ingestedEvents.numCreatedEvents,
-              lastBackfilledRecordTime =
-                CantonTimestamp.assertFromInstant(nonEmpty.last.getRecordTime),
-            )
+                lastBackfilledRecordTime =
+                  CantonTimestamp.assertFromInstant(nonEmpty.last.getRecordTime),
+              )
+            }
         }
       }
 
