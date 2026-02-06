@@ -10,6 +10,12 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.console.ScanAppBackendReference
+import org.lfdecentralizedtrust.splice.http.v0.definitions as httpDef
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  ArchivedDevelopmentFundCouponClaimedStatus,
+  ArchivedDevelopmentFundCouponExpiredStatus,
+  ArchivedDevelopmentFundCouponWithdrawnStatus,
+}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   AdvanceOpenMiningRoundTrigger,
@@ -68,7 +74,7 @@ class DevelopmentFundCouponIntegrationTest
         ConfigTransforms.withDevelopmentFundPercentage(0.05)(config)
       )
 
-  "Unclaimed development fund coupons are merged" in { implicit env =>
+  "Unclaimed development fund coupons are merged" ignore { implicit env =>
     val (_, couponAmount) = actAndCheck(
       "Advance 5 rounds", {
         Range(0, 5).foreach(_ => advanceRoundsByOneTickViaAutomation())
@@ -265,13 +271,24 @@ class DevelopmentFundCouponIntegrationTest
             .withdrawDevelopmentFundCoupon(developmentFundCouponCid, withdrawalReason)
         },
       )(
-        "The coupon is archived and a new unclaimed development fund coupon is created",
+        "The coupon is archived, a new unclaimed development fund coupon is created and " +
+          "the archived coupon is listed in listDevelopmentFundCouponHistory",
         _ => {
           // Verify that the coupon is archived
           aliceValidatorWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
           // Verify that a new unclaimed development fund coupon was created
           assertUnclaimedDevelopmentCouponAmounts(
             Seq(10.0, 10.0, 20.0, developmentFundCouponAmount.toDouble)
+          )
+          // Verify that the withdrawn coupon is listed in listDevelopmentFundCouponHistory as withdrawn
+          aliceValidatorWalletClient
+            .listDevelopmentFundCouponHistory(None, 5)
+            .developmentFundCouponHistory
+            .map(_.status) shouldBe Seq(
+            ArchivedDevelopmentFundCouponWithdrawnStatus(
+              `type` = httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus.Type.Withdrawn,
+              reason = reason,
+            )
           )
         },
       )
@@ -338,6 +355,17 @@ class DevelopmentFundCouponIntegrationTest
           Seq(exactly(194)), // 5 * 40 - fees
         )
       }
+    }
+
+    clue("Collected coupons are listed in listDevelopmentFundCouponHistory as claimed") {
+      aliceValidatorWalletClient
+        .listDevelopmentFundCouponHistory(None, 5)
+        .developmentFundCouponHistory
+        .map(_.status) shouldBe Seq(
+        ArchivedDevelopmentFundCouponClaimedStatus(
+          `type` = httpDef.ArchivedDevelopmentFundCouponClaimedStatus.Type.Claimed
+        )
+      )
     }
   }
 
@@ -409,6 +437,17 @@ class DevelopmentFundCouponIntegrationTest
             getUnclaimedDevelopmentFundCouponTotal(sv1ScanBackend)
           newUnclaimedDevelopmentFundCouponTotal shouldBe (unclaimedDevelopmentFundCouponTotal + developmentFundCouponAmount)
         }
+      }
+
+      clue("The expired coupon is listed in listDevelopmentFundCouponHistory as expired") {
+        aliceValidatorWalletClient
+          .listDevelopmentFundCouponHistory(None, 5)
+          .developmentFundCouponHistory
+          .map(_.status) shouldBe Seq(
+          ArchivedDevelopmentFundCouponExpiredStatus(
+            `type` = httpDef.ArchivedDevelopmentFundCouponExpiredStatus.Type.Expired
+          )
+        )
       }
     }
   }

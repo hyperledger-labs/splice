@@ -1939,37 +1939,63 @@ components:
           $ref: "#/components/schemas/ArchivedDevelopmentFundCouponStatus"
 
     ArchivedDevelopmentFundCouponStatus:
+      type: object
+      required: [ type ]
+      properties:
+        type:
+          type: string
       oneOf:
         - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponClaimedStatus"
         - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponExpiredStatus"
         - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponWithdrawnStatus"
         - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponRejectedStatus"
+      discriminator:
+        propertyName: type
+        mapping:
+          claimed: "#/components/schemas/ArchivedDevelopmentFundCouponClaimedStatus"
+          expired: "#/components/schemas/ArchivedDevelopmentFundCouponExpiredStatus"
+          withdrawn: "#/components/schemas/ArchivedDevelopmentFundCouponWithdrawnStatus"
+          rejected: "#/components/schemas/ArchivedDevelopmentFundCouponRejectedStatus"
 
     ArchivedDevelopmentFundCouponClaimedStatus:
       type: object
+      required:
+        - type
       properties:
-        dummy: # cannot define an empty object for some reason
-          type: object
+        type:
+          type: string
+          enum: [ claimed ]
 
     ArchivedDevelopmentFundCouponExpiredStatus:
       type: object
+      required:
+        - type
       properties:
-        dummy: # cannot define an empty object for some reason
-          type: object
+        type:
+          type: string
+          enum: [ expired ]
 
     ArchivedDevelopmentFundCouponWithdrawnStatus:
       type: object
       required:
+        - type
         - reason
       properties:
+        type:
+          type: string
+          enum: [ withdrawn ]
         reason:
           type: string
 
     ArchivedDevelopmentFundCouponRejectedStatus:
       type: object
       required:
+        - type
         - reason
       properties:
+        type:
+          type: string
+          enum: [ rejected ]
         reason:
           type: string
 

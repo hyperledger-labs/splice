@@ -458,7 +458,7 @@ object TxLogEntry extends StoreErrors {
         amount = Codec.encode(createdEntry.amount),
         expiresAt = java.time.OffsetDateTime.ofInstant(expiresAt, ZoneOffset.UTC),
         reason = createdEntry.reason,
-        status = httpDef.ArchivedDevelopmentFundCouponStatus(toStatusResponse(archivedEntry.status)),
+        status = toStatusResponse(archivedEntry.status),
       )
     }
 
@@ -477,34 +477,32 @@ object TxLogEntry extends StoreErrors {
     }
 
     private def toArchivedDevelopmentFundClaimedStatus
-        : httpDef.ArchivedDevelopmentFundCouponStatus = {
-      httpDef.ArchivedDevelopmentFundCouponStatus(
-        httpDef.ArchivedDevelopmentFundCouponClaimedStatus()
+        : httpDef.ArchivedDevelopmentFundCouponStatus =
+      httpDef.ArchivedDevelopmentFundCouponClaimedStatus(
+        `type` = httpDef.ArchivedDevelopmentFundCouponClaimedStatus.Type.Claimed
       )
-    }
 
     private def toArchivedDevelopmentFundExpiredStatus
-        : httpDef.ArchivedDevelopmentFundCouponStatus = {
-      httpDef.ArchivedDevelopmentFundCouponStatus(
-        httpDef.ArchivedDevelopmentFundCouponExpiredStatus()
+        : httpDef.ArchivedDevelopmentFundCouponStatus =
+      httpDef.ArchivedDevelopmentFundCouponExpiredStatus(
+        `type` = httpDef.ArchivedDevelopmentFundCouponExpiredStatus.Type.Expired
       )
-    }
-
-    private def toArchivedDevelopmentFundRejectedStatus(
-        reason: String
-    ): httpDef.ArchivedDevelopmentFundCouponStatus = {
-      httpDef.ArchivedDevelopmentFundCouponStatus(
-        httpDef.ArchivedDevelopmentFundCouponRejectedStatus(reason)
-      )
-    }
 
     private def toArchivedDevelopmentFundWithdrawnStatus(
         reason: String
-    ): httpDef.ArchivedDevelopmentFundCouponStatus = {
-      httpDef.ArchivedDevelopmentFundCouponStatus(
-        httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus(reason)
+    ): httpDef.ArchivedDevelopmentFundCouponStatus =
+      httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus(
+        `type` = httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus.Type.Withdrawn,
+        reason = reason,
       )
-    }
+
+    private def toArchivedDevelopmentFundRejectedStatus(
+        reason: String
+    ): httpDef.ArchivedDevelopmentFundCouponStatus =
+      httpDef.ArchivedDevelopmentFundCouponRejectedStatus(
+        `type` = httpDef.ArchivedDevelopmentFundCouponRejectedStatus.Type.Rejected,
+        reason = reason,
+      )
   }
 
   sealed abstract class TransactionSubtypeDef(
