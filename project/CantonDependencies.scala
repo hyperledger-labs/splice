@@ -6,8 +6,8 @@ import sbt.*
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.5.0-snapshot.20260108.14534.0.vc8a0078c"
-  val canton_library_version = "3.5.0-snapshot.20260204.17946.0.vf68c06b5"
+  val version: String = "3.5.0-snapshot.20260127.14547.0.v5f754737"
+  val canton_library_version = "3.5.0-snapshot.20260206.17966.0.va5798b31"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -100,6 +100,8 @@ object CantonDependencies {
 
   lazy val canton_java_bindings = "com.daml" % "bindings-java" % canton_library_version
   lazy val canton_ledger_api_scala = "com.daml" %% "ledger-api-scala" % canton_library_version
+  lazy val canton_observability_metrics =
+    "com.daml" %% "observability-metrics" % canton_library_version
 
   lazy val canton_transcode_json = "com.daml" % "transcode-codec-json_3" % canton_library_version
   lazy val canton_transcode_proto_scala =
@@ -124,13 +126,10 @@ object CantonDependencies {
   lazy val daml_metrics_test_lib = "com.daml" %% "metrics-test-lib" % daml_libraries_version
   lazy val daml_contextualized_logging =
     "com.daml" %% "contextualized-logging" % daml_libraries_version
-  lazy val daml_metrics = "com.daml" %% "metrics" % daml_libraries_version
-  lazy val daml_pekko_http_metrics = "com.daml" %% "pekko-http-metrics" % daml_libraries_version
   lazy val daml_tracing = "com.daml" %% "tracing" % daml_libraries_version
   lazy val daml_tracing_test_lib = "com.daml" %% "tracing-test-lib" % daml_libraries_version
   lazy val daml_executors = "com.daml" %% "executors" % daml_libraries_version
   lazy val daml_ports = "com.daml" %% "ports" % daml_libraries_version
-  lazy val daml_struct_spray_json = "com.daml" %% "struct-spray-json" % daml_libraries_version
   lazy val daml_ledger_resources = "com.daml" %% "ledger-resources" % daml_libraries_version
   lazy val daml_ledger_api_value_proto =
     "com.daml" % "ledger-api-value-proto" % daml_libraries_version
@@ -139,7 +138,6 @@ object CantonDependencies {
   lazy val daml_ledger_api_value_java =
     "com.daml" % "ledger-api-value-java-proto" % daml_libraries_version
   lazy val daml_timer_utils = "com.daml" %% "timer-utils" % daml_libraries_version
-  lazy val daml_libs_struct_spray_json = "com.daml" %% "struct-spray-json" % daml_libraries_version
   lazy val daml_rs_grpc_pekko = "com.daml" %% "rs-grpc-pekko" % daml_libraries_version
   lazy val daml_rs_grpc_testing_utils =
     "com.daml" %% "rs-grpc-testing-utils" % daml_libraries_version
