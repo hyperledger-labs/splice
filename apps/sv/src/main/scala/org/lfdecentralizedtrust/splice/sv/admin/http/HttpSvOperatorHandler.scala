@@ -17,8 +17,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ErrorUtil
-import io.grpc.Status
-import io.grpc.StatusRuntimeException
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice as spliceCodegen
@@ -422,7 +421,10 @@ class HttpSvOperatorHandler(
         for {
           party <- PartyId.fromProtoPrimitive(partyId, "partyId") match {
             case Right(party) => Future.successful(party)
-            case Left(error) => Future.failed(HttpErrorHandler.badRequest(error))
+            case Left(error) =>
+              Future.failed(
+                HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
+              )
           }
           dsoRules <- dsoStore.getDsoRules()
           partyToParticipant <- sequencerConnection

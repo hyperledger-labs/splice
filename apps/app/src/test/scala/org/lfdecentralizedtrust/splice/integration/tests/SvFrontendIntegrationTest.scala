@@ -1389,7 +1389,6 @@ class SvFrontendIntegrationTest
     }
 
     "NEW UI: Grant and Revoke Featured App Right" in { implicit env =>
-      // Use a real party ID that exists on the network so the async validator passes
       val providerPartyId = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
 
       // First, create a Grant proposal and capture the contract ID
