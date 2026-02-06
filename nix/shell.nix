@@ -80,6 +80,7 @@ let
     python3Packages.pyyaml
     python3Packages.regex
     python3Packages.requests
+    python3Packages.rich
     python3Packages.google-cloud-storage
     python3Packages.requests_toolbelt
     python3Packages.semver
