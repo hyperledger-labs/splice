@@ -45,6 +45,7 @@
       a batch of ``FeaturedAppActivityMarkers`` in a transaction with a single view,
       which is more efficient to process. Note that this package is not yet uploaded
       automatically to validator (or super validator) nodes.
+      See the :ref:`package docs <package-batched-markers>` for more details.
 
 
 .. release-notes:: 0.5.9
