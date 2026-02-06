@@ -8,18 +8,45 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.table import Table
 from rich.panel import Panel
+from rich.prompt import Prompt
 import pypandoc
 import git
+import shutil
+import subprocess
 
-def main():
-    with open(f"{os.environ['SPLICE_ROOT']}/VERSION", "r") as f:
-        new_version = f.read().strip()
-    with open(f"{os.environ['SPLICE_ROOT']}/LATEST_RELEASE", "r") as f:
-        prev_version = f.read().strip()
-    with open(f"{os.environ['SPLICE_ROOT']}/docs/src/release_notes_upcoming.rst", "r") as f:
-        release_notes = f.read()
+upcoming_notes_filename = f"{os.environ['SPLICE_ROOT']}/docs/src/release_notes_upcoming.rst"
+with open(f"{os.environ['SPLICE_ROOT']}/VERSION", "r") as f:
+    new_version = f.read().strip()
+with open(f"{os.environ['SPLICE_ROOT']}/LATEST_RELEASE", "r") as f:
+    prev_version = f.read().strip()
+with open(upcoming_notes_filename, "r") as f:
+    release_notes = f.read()
+console = Console()
 
-    console = Console()
+def open_in_editor(filepath):
+    # 1. Check if 'sensible-editor' exists on the system path
+    sensible_editor = shutil.which("sensible-editor")
+
+    if sensible_editor:
+        # Use the Ubuntu/Debian helper
+        editor_cmd = [sensible_editor, filepath]
+    else:
+        # 2. Fallback to $EDITOR or a hardcoded default (like 'nano' or 'vi')
+        editor_env = os.environ.get("EDITOR")
+        if editor_env:
+            editor_cmd = [editor_env, filepath]
+        else:
+            # Final fallback if no env var is set
+            editor_cmd = ["nano", filepath]
+
+    try:
+        # Run the command
+        subprocess.run(editor_cmd, check=True)
+    except FileNotFoundError:
+        print(f"Error: Could not find an editor to open {filepath}")
+
+def print_release_notes_and_git_log():
+
     release_notes_md = pypandoc.convert_text(release_notes, 'md', format='rst')
 
 
@@ -36,11 +63,42 @@ def main():
     # 2. Add the content
     # We can even wrap them in Panels for better visual separation
     layout_grid.add_row(
-        Panel(log_text, title="Column B", border_style="green"),
-        Panel(Markdown(release_notes_md), title="Column A", border_style="blue")
+        Panel(log_text, title="Git log since `main`", border_style="green"),
+        Panel(Markdown(release_notes_md), title="Upcoming release notes", border_style="blue")
     )
 
     console.print(layout_grid)
+
+
+def main():
+
+    print_release_notes_and_git_log()
+
+    while True:
+        actions = '''
+    1. All good! Create the PR (coming soon...)
+    2. Edit release notes
+    3. Cancel
+    '''
+
+        console.print(Panel(actions, title="Actions"))
+
+        # 3. Get user input with validation
+        choice = Prompt.ask(
+            "Please select an option",
+            choices=["1", "2", "3"],
+            default="3"
+        )
+
+        # 4. Handle the logic
+        if choice == "1":
+            console.print("Coming soon...")
+        elif choice == "2":
+            open_in_editor(upcoming_notes_filename)
+            print_release_notes_and_git_log()
+        else:
+            console.print("[bold red]Exiting. Goodbye![/bold red]")
+            break
 
 if __name__ == "__main__":
     main()
