@@ -88,6 +88,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
           },
           adaptiveScenario: loadTesterConfig.adaptiveScenario,
         }),
+        ...(loadTesterConfig.resources ? { resources: loadTesterConfig.resources } : {}),
       },
       loadTesterConfig.chartVersion
         ? CnChartVersion.parse(loadTesterConfig.chartVersion)
