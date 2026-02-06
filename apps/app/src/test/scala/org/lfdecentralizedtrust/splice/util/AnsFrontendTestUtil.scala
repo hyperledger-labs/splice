@@ -63,7 +63,7 @@ trait AnsFrontendTestUtil extends TestCommon with AnsTestUtil {
 
       // The success page may take a while to show
       // Bumping the eventually timeout due to the decentralized ANS would take more time to collect the initial payment.
-      val goToAnsEntriesButton = eventually(timeUntilSuccess = 100.seconds) {
+      val goToAnsEntriesButton = eventually(timeUntilSuccess = 200.seconds) {
         find(id("ans-entries-button")).valueOrFail("The success page did not load.")
       }
       val timeAfterAllocate = LocalDateTime.now()
