@@ -286,7 +286,7 @@ class DevelopmentFundCouponIntegrationTest
             .developmentFundCouponHistory
             .map(_.status) shouldBe Seq(
             ArchivedDevelopmentFundCouponWithdrawnStatus(
-              `type` = httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus.Type.Withdrawn,
+              status = httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus.Status.Withdrawn,
               reason = reason,
             )
           )
@@ -363,7 +363,7 @@ class DevelopmentFundCouponIntegrationTest
         .developmentFundCouponHistory
         .map(_.status) shouldBe Seq(
         ArchivedDevelopmentFundCouponClaimedStatus(
-          `type` = httpDef.ArchivedDevelopmentFundCouponClaimedStatus.Type.Claimed
+          status = httpDef.ArchivedDevelopmentFundCouponClaimedStatus.Status.Claimed
         )
       )
     }
@@ -445,7 +445,7 @@ class DevelopmentFundCouponIntegrationTest
           .developmentFundCouponHistory
           .map(_.status) shouldBe Seq(
           ArchivedDevelopmentFundCouponExpiredStatus(
-            `type` = httpDef.ArchivedDevelopmentFundCouponExpiredStatus.Type.Expired
+            status = httpDef.ArchivedDevelopmentFundCouponExpiredStatus.Status.Expired
           )
         )
       }

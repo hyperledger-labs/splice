@@ -1939,49 +1939,19 @@ components:
           $ref: "#/components/schemas/ArchivedDevelopmentFundCouponStatus"
 
     ArchivedDevelopmentFundCouponStatus:
-      type: object
-      required: [ type ]
-      properties:
-        type:
-          type: string
       oneOf:
-        - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponClaimedStatus"
-        - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponExpiredStatus"
         - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponWithdrawnStatus"
         - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponRejectedStatus"
-      discriminator:
-        propertyName: type
-        mapping:
-          claimed: "#/components/schemas/ArchivedDevelopmentFundCouponClaimedStatus"
-          expired: "#/components/schemas/ArchivedDevelopmentFundCouponExpiredStatus"
-          withdrawn: "#/components/schemas/ArchivedDevelopmentFundCouponWithdrawnStatus"
-          rejected: "#/components/schemas/ArchivedDevelopmentFundCouponRejectedStatus"
-
-    ArchivedDevelopmentFundCouponClaimedStatus:
-      type: object
-      required:
-        - type
-      properties:
-        type:
-          type: string
-          enum: [ claimed ]
-
-    ArchivedDevelopmentFundCouponExpiredStatus:
-      type: object
-      required:
-        - type
-      properties:
-        type:
-          type: string
-          enum: [ expired ]
+        - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponClaimedStatus"
+        - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponExpiredStatus"
 
     ArchivedDevelopmentFundCouponWithdrawnStatus:
       type: object
       required:
-        - type
+        - status
         - reason
       properties:
-        type:
+        status:
           type: string
           enum: [ withdrawn ]
         reason:
@@ -1990,14 +1960,32 @@ components:
     ArchivedDevelopmentFundCouponRejectedStatus:
       type: object
       required:
-        - type
+        - status
         - reason
       properties:
-        type:
+        status:
           type: string
           enum: [ rejected ]
         reason:
           type: string
+
+    ArchivedDevelopmentFundCouponClaimedStatus:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [ claimed ]
+
+    ArchivedDevelopmentFundCouponExpiredStatus:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [ expired ]
 
     WithdrawDevelopmentFundCouponRequest:
       type: object

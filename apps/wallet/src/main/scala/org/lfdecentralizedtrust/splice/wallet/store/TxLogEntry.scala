@@ -477,32 +477,44 @@ object TxLogEntry extends StoreErrors {
     }
 
     private def toArchivedDevelopmentFundClaimedStatus
-        : httpDef.ArchivedDevelopmentFundCouponStatus =
-      httpDef.ArchivedDevelopmentFundCouponClaimedStatus(
-        `type` = httpDef.ArchivedDevelopmentFundCouponClaimedStatus.Type.Claimed
+        : httpDef.ArchivedDevelopmentFundCouponStatus = {
+      httpDef.ArchivedDevelopmentFundCouponStatus(
+        httpDef.ArchivedDevelopmentFundCouponClaimedStatus(
+          status = httpDef.ArchivedDevelopmentFundCouponClaimedStatus.Status.Claimed
+        )
       )
+    }
 
     private def toArchivedDevelopmentFundExpiredStatus
-        : httpDef.ArchivedDevelopmentFundCouponStatus =
-      httpDef.ArchivedDevelopmentFundCouponExpiredStatus(
-        `type` = httpDef.ArchivedDevelopmentFundCouponExpiredStatus.Type.Expired
+        : httpDef.ArchivedDevelopmentFundCouponStatus = {
+      httpDef.ArchivedDevelopmentFundCouponStatus(
+        httpDef.ArchivedDevelopmentFundCouponExpiredStatus(
+          status = httpDef.ArchivedDevelopmentFundCouponExpiredStatus.Status.Expired
+        )
       )
+    }
 
     private def toArchivedDevelopmentFundWithdrawnStatus(
         reason: String
-    ): httpDef.ArchivedDevelopmentFundCouponStatus =
-      httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus(
-        `type` = httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus.Type.Withdrawn,
-        reason = reason,
+    ): httpDef.ArchivedDevelopmentFundCouponStatus = {
+      httpDef.ArchivedDevelopmentFundCouponStatus(
+        httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus(
+          status = httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus.Status.Withdrawn,
+          reason = reason,
+        )
       )
+    }
 
     private def toArchivedDevelopmentFundRejectedStatus(
         reason: String
-    ): httpDef.ArchivedDevelopmentFundCouponStatus =
-      httpDef.ArchivedDevelopmentFundCouponRejectedStatus(
-        `type` = httpDef.ArchivedDevelopmentFundCouponRejectedStatus.Type.Rejected,
-        reason = reason,
+    ): httpDef.ArchivedDevelopmentFundCouponStatus = {
+      httpDef.ArchivedDevelopmentFundCouponStatus(
+        httpDef.ArchivedDevelopmentFundCouponRejectedStatus(
+          status = httpDef.ArchivedDevelopmentFundCouponRejectedStatus.Status.Rejected,
+          reason = reason,
+        )
       )
+    }
   }
 
   sealed abstract class TransactionSubtypeDef(
