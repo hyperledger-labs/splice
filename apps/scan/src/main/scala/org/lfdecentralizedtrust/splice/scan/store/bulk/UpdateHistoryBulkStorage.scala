@@ -63,7 +63,7 @@ class UpdateHistoryBulkStorage(
 
   /** Gets the very first updates segment for this network after genesis
     * May return None if unknown yet. This could happen if no updates have been ingested,
-    * so we do not know the genesis record time yet. The caller should then sleep and retry.
+    * so we do not know the genesis record time yet. The caller should then schedule a retry.
     */
   private def getFirstSegmentFromGenesis: Future[Option[UpdatesSegment]] =
     for {
@@ -108,7 +108,7 @@ class UpdateHistoryBulkStorage(
             logger.info(s"Dumping next updates segment: $next")
             Future.successful(Some((Some(next), Some(next))))
           case None =>
-            logger.debug(s"Next segment after $current not known yet, sleeping...")
+            logger.debug(s"Next segment after $current not known yet, scheduling next attempt...")
             after(5.seconds, actorSystem.scheduler)(
               Future.successful(Some((current, None)))
             )
