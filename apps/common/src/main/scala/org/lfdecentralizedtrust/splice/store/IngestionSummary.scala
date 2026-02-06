@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.store
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
+import com.daml.metrics.api.MetricsContext
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{
   ContractStateEvent,
   ReassignmentId,
@@ -14,6 +15,8 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
 import com.digitalasset.canton.topology.SynchronizerId
+
+import scala.collection.mutable
 
 final case class IngestionSummary(
     updateId: Option[String],
@@ -98,4 +101,86 @@ private[store] object IngestionSummary {
       param("source", _.source),
       param[ReassignmentId, String]("id", _.id)(prettyString),
     )
+}
+
+/** Like [[IngestionSummary]], but with all fields mutable to simplify collecting the content from helper methods */
+@SuppressWarnings(Array("org.wartremover.warts.Var"))
+case class MutableIngestionSummary(
+    ingestedCreatedEvents: mutable.ArrayBuffer[CreatedEvent],
+    var numFilteredCreatedEvents: Int,
+    ingestedArchivedEvents: mutable.ArrayBuffer[ExercisedEvent],
+    var numFilteredArchivedEvents: Int,
+    updatedContractStates: mutable.ArrayBuffer[ContractStateEvent],
+    addedAssignEvents: mutable.ArrayBuffer[(ContractId[?], ReassignmentId)],
+    var numFilteredAssignEvents: Int,
+    removedAssignEvents: mutable.ArrayBuffer[(ContractId[?], ReassignmentId)],
+    addedUnassignEvents: mutable.ArrayBuffer[(ContractId[?], ReassignmentId)],
+    var numFilteredUnassignEvents: Int,
+    removedUnassignEvents: mutable.ArrayBuffer[(ContractId[?], ReassignmentId)],
+    prunedContracts: mutable.ArrayBuffer[ContractId[?]],
+    ingestedTxLogEntries: mutable.ArrayBuffer[(String3, String)],
+) {
+  def acsSizeDiff: Int = ingestedCreatedEvents.size - ingestedArchivedEvents.size
+
+  def toIngestionSummary(
+      updateId: Option[String],
+      synchronizerIdToRecordTime: Map[SynchronizerId, CantonTimestamp],
+      offset: Long,
+      newAcsSize: Int,
+      metrics: StoreMetrics,
+  ): IngestionSummary = {
+    // We update the metrics in here as it's the easiest way
+    // to not miss any place that might need updating.
+    metrics.acsSize.updateValue(newAcsSize.toLong)
+    metrics.ingestedTxLogEntries.mark(ingestedTxLogEntries.size.toLong)(MetricsContext.Empty)
+    metrics.eventCount.inc(this.ingestedCreatedEvents.length.toLong)(
+      MetricsContext("event_type" -> "created")
+    )
+    metrics.eventCount.inc(this.ingestedArchivedEvents.length.toLong)(
+      MetricsContext("event_type" -> "archived")
+    )
+    metrics.completedIngestions.mark()
+    synchronizerIdToRecordTime.foreach { case (synchronizer, recordTime) =>
+      metrics
+        .getLastIngestedRecordTimeMsForSynchronizer(synchronizer)
+        .updateValue(recordTime.toEpochMilli)
+    }
+    IngestionSummary(
+      updateId = updateId,
+      offset = Some(offset),
+      synchronizerIdToRecordTime = synchronizerIdToRecordTime,
+      newAcsSize = newAcsSize,
+      ingestedCreatedEvents = this.ingestedCreatedEvents.toVector,
+      numFilteredCreatedEvents = this.numFilteredCreatedEvents,
+      ingestedArchivedEvents = this.ingestedArchivedEvents.toVector,
+      numFilteredArchivedEvents = this.numFilteredArchivedEvents,
+      updatedContractStates = this.updatedContractStates.toVector,
+      addedAssignEvents = this.addedAssignEvents.toVector,
+      numFilteredAssignEvents = this.numFilteredAssignEvents,
+      removedAssignEvents = this.removedAssignEvents.toVector,
+      addedUnassignEvents = this.addedUnassignEvents.toVector,
+      numFilteredUnassignEvents = this.numFilteredUnassignEvents,
+      removedUnassignEvents = this.removedUnassignEvents.toVector,
+      prunedContracts = Vector.empty,
+      ingestedTxLogEntries = this.ingestedTxLogEntries.toSeq,
+    )
+  }
+}
+
+object MutableIngestionSummary {
+  def empty: MutableIngestionSummary = MutableIngestionSummary(
+    mutable.ArrayBuffer.empty,
+    0,
+    mutable.ArrayBuffer.empty,
+    0,
+    mutable.ArrayBuffer.empty,
+    mutable.ArrayBuffer.empty,
+    0,
+    mutable.ArrayBuffer.empty,
+    mutable.ArrayBuffer.empty,
+    0,
+    mutable.ArrayBuffer.empty,
+    mutable.ArrayBuffer.empty,
+    mutable.ArrayBuffer.empty,
+  )
 }
