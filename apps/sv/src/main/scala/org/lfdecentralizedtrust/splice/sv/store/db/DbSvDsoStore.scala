@@ -519,12 +519,12 @@ class DbSvDsoStore(
         companion match {
           case SvRewardCoupon.COMPANION =>
             // only SV reward coupons have a beneficiary field
-            (sql"and reward_party not in " ++ inClause(ignoredParties) ++
-              sql" and create_arguments ->> 'beneficiary' not in " ++ inClause(
+            (sql"and reward_party not in " ++ sqlValueList(ignoredParties) ++
+              sql" and create_arguments ->> 'beneficiary' not in " ++ sqlValueList(
                 ignoredParties
               )).toActionBuilder
           case _ =>
-            (sql"and reward_party not in " ++ inClause(ignoredParties)).toActionBuilder
+            (sql"and reward_party not in " ++ sqlValueList(ignoredParties)).toActionBuilder
         }
       else sql""
     waitUntilAcsIngested {
@@ -834,7 +834,7 @@ class DbSvDsoStore(
       ignoredParties: Set[PartyId]
   ): ListExpiredContracts[splice.amulet.Amulet.ContractId, splice.amulet.Amulet] = {
     val filterClause = if (ignoredParties.nonEmpty) {
-      (sql" and create_arguments->>'owner' not in " ++ inClause(ignoredParties)).toActionBuilder
+      (sql" and create_arguments->>'owner' not in " ++ sqlValueList(ignoredParties)).toActionBuilder
     } else {
       sql""
     }
@@ -854,7 +854,7 @@ class DbSvDsoStore(
           JDBCType.ARRAY.getVendorTypeNumber,
         )
     val filterClause = if (ignoredParties.nonEmpty) {
-      (sql" and create_arguments->'amulet'->>'owner' not in " ++ inClause(ignoredParties) ++
+      (sql" and create_arguments->'amulet'->>'owner' not in " ++ sqlValueList(ignoredParties) ++
         sql" and not (create_arguments->'lock'->'holders' ??| ${ignoredParties.map(_.toProtoPrimitive).toArray: Array[String]})").toActionBuilder
     } else {
       sql""
@@ -930,7 +930,7 @@ class DbSvDsoStore(
     import scala.jdk.CollectionConverters.*
     for {
       dsoRules <- getDsoRules()
-      voterParties = inClause(
+      voterParties = sqlValueList(
         dsoRules.payload.svs.asScala
           .map { case (party, _) =>
             lengthLimited(party)
@@ -1326,7 +1326,7 @@ class DbSvDsoStore(
     if (roundNumbers.isEmpty)
       Future.successful(Seq.empty)
     else {
-      val roundNumbersClause = inClause(roundNumbers)
+      val roundNumbersClause = sqlValueList(roundNumbers)
       waitUntilAcsIngested {
         for {
           result <- storage

@@ -219,7 +219,7 @@ class DbScanVerdictStore(
                select update_id
                from #${Tables.verdicts}
                where history_id = $historyId
-                 and update_id IN """ ++ inClause(items.map(_._1.updateId))).as[String]
+                 and update_id IN """ ++ sqlValueList(items.map(_._1.updateId))).as[String]
 
       val action: DBIO[Unit] = for {
         alreadyExisting <- checkExist.map(_.toSet)

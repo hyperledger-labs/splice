@@ -104,7 +104,7 @@ trait DbVotesAcsStoreQueryBuilder extends AcsQueries with LimitHelpers with Name
   ): SqlStreamingAction[Vector[
     AcsQueries.SelectFromAcsTableResult
   ], AcsQueries.SelectFromAcsTableResult, Effect.Read] = {
-    val voteRequestTrackingCidsSql = inClause(trackingCids)
+    val voteRequestTrackingCidsSql = sqlValueList(trackingCids)
     selectFromAcsTable(
       acsTableName,
       acsStoreId,

@@ -6,79 +6,38 @@ package org.lfdecentralizedtrust.splice.scan.store.db
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.{
-  AsyncCloseable,
-  AsyncOrSyncCloseable,
-  CloseContext,
-  FlagCloseableAsync,
-  SyncCloseable,
-}
+import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, CloseContext, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
-  AmuletRules,
-  TransferPreapproval,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{AmuletRules, TransferPreapproval}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.{AnsEntry, AnsRules}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
-  DsoRules_CloseVoteRequestResult,
-  VoteRequest,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{
-  ExternalPartyAmuletRules,
-  TransferCommand,
-  TransferCommandCounter,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{DsoRules_CloseVoteRequestResult, VoteRequest}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.{ExternalPartyAmuletRules, TransferCommand, TransferCommandCounter}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.EntryType
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.txLogTableName
-import org.lfdecentralizedtrust.splice.scan.store.{
-  OpenMiningRoundTxLogEntry,
-  ScanStore,
-  ScanTxLogParser,
-  TransferCommandTxLogEntry,
-  TxLogEntry,
-  VoteRequestTxLogEntry,
-}
+import org.lfdecentralizedtrust.splice.scan.store.{OpenMiningRoundTxLogEntry, ScanStore, ScanTxLogParser, TransferCommandTxLogEntry, TxLogEntry, VoteRequestTxLogEntry}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
 import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
-import org.lfdecentralizedtrust.splice.store.db.{
-  AcsQueries,
-  AcsTables,
-  DbTxLogAppStore,
-  TxLogQueries,
-}
-import org.lfdecentralizedtrust.splice.store.{
-  DbVotesAcsStoreQueryBuilder,
-  DbVotesTxLogStoreQueryBuilder,
-  Limit,
-  PageLimit,
-  SortOrder,
-  TxLogStore,
-  UpdateHistory,
-}
-import org.lfdecentralizedtrust.splice.util.{
-  Contract,
-  ContractWithState,
-  PackageQualifiedName,
-  QualifiedName,
-  TemplateJsonDecoder,
-}
+import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbTxLogAppStore, TxLogQueries}
+import org.lfdecentralizedtrust.splice.store.{DbVotesAcsStoreQueryBuilder, DbVotesTxLogStoreQueryBuilder, Limit, PageLimit, SortOrder, TxLogStore, UpdateHistory}
+import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, PackageQualifiedName, QualifiedName, TemplateJsonDecoder}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
+import slick.jdbc.canton.SQLActionBuilder
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -440,12 +399,14 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[TxLogEntry.TransactionTxLogEntry]] =
     waitUntilAcsIngested {
-      val entryTypeCondition = sql"""entry_type in (
-                  ${EntryType.TransferTxLogEntry},
-                  ${EntryType.TapTxLogEntry},
-                  ${EntryType.MintTxLogEntry},
-                  ${EntryType.AbortTransferInstructionTxLogEntry}
-                )"""
+      val entryTypeCondition: SQLActionBuilder = (sql"entry_type in " ++ sqlValueList(
+        List(
+          EntryType.TransferTxLogEntry,
+          EntryType.TapTxLogEntry,
+          EntryType.MintTxLogEntry,
+          EntryType.AbortTransferInstructionTxLogEntry,
+        )
+      )).toActionBuilder
       // Literal sort order since Postgres complains when trying to bind it to a parameter
       val (compareEntryNumber, orderLimit) = sortOrder match {
         case SortOrder.Ascending =>
@@ -740,7 +701,7 @@ class DbScanStore(
   override def getValidatorLicenseByValidator(validators: Vector[PartyId])(implicit
       tc: TraceContext
   ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]] = waitUntilAcsIngested {
-    val validatorPartyIds = inClause(validators)
+    val validatorPartyIds = sqlValueList(validators)
     for {
       rows <- storage
         .query(

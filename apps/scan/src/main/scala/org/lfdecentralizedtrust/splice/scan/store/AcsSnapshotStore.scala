@@ -278,12 +278,12 @@ class AcsSnapshotStore(
       partyIdsFilter = partyIds match {
         case Nil => sql""
         case partyIds =>
-          (sql" and stakeholder in " ++ inClause(partyIds)).toActionBuilder
+          (sql" and stakeholder in " ++ sqlValueList(partyIds)).toActionBuilder
       }
       templatesFilter = templates match {
         case Nil => sql""
         case _ =>
-          (sql" and template_id in " ++ inClause(
+          (sql" and template_id in " ++ sqlValueList(
             templates.map(t =>
               lengthLimited(
                 s"${t.packageName}:${t.qualifiedName.moduleName}:${t.qualifiedName.entityName}"

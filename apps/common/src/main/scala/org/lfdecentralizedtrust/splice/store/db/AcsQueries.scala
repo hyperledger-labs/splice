@@ -266,7 +266,7 @@ trait AcsQueries extends AcsJdbcTypes {
   }
 
   /** Constructions like `seq.mkString("(", ",", ")")` are dangerous because they can lead to SQL injection.
-    * Prefer using this instead, or [[inClause]] when in a `WHERE x IN`.
+    * Prefer using this instead, or [[sqlValueList]] when in a `WHERE x IN`.
     */
   protected def sqlCommaSeparated(
       seq: Iterable[SQLActionBuilder]
@@ -279,7 +279,7 @@ trait AcsQueries extends AcsJdbcTypes {
       .getOrElse(SQLActionBuilderChain(sql""))
   }
 
-  protected def inClause[V: SetParameter](seq: Iterable[V]): SQLActionBuilderChain =
+  protected def sqlValueList[V: SetParameter](seq: Iterable[V]): SQLActionBuilderChain =
     sql"(" ++ sqlCommaSeparated(seq.map(v => sql"$v")) ++ sql")"
 
   protected def contractFromRow[C, TCId <: ContractId[?], T](companion: C)(
