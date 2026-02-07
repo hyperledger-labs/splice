@@ -122,17 +122,23 @@ class UpdateHistoryBulkStorage(
           s3Connection,
           loggerFactory,
         )
+        // emits pairs (segment, s3 object key) as objects are written
       )
-      .mapAsync(1) { case (segment, lastUpdate) =>
-        lastUpdate match {
-          case Some(ts) =>
-            logger.info(
-              s"Successfully completed dumping updates. Last update from the segment is from ${ts.migrationId}, ${ts.timestamp}"
-            )
-          case None =>
-            // This might happen e.g. due to a long migration, but we at least want to warn about it
-            logger.warn(s"Segment $segment contained no updates")
-        }
+      .statefulMap(() => None: Option[UpdatesSegment])(
+        {
+          case (lastSegment, (segment, objKey))
+            if lastSegment.isDefined && segment != lastSegment.getOrElse(throw new RuntimeException()) =>
+            logger.info(s"Wrote object $objKey (first object in a new segment, closing segment $lastSegment)")
+            (Some(segment), lastSegment)
+          case (_, (segment, objKey)) =>
+            logger.info(s"Wrote object $objKey")
+            (Some(segment), None)
+        },
+        onComplete = _ => None // Should never complete
+        // TODO: consider if we're handling correctly the case of a segment with no updates
+      )
+      .collect{case Some(segment) => segment}
+      .mapAsync(1) { segment =>
         kvProvider.setLatestUpdatesSegmentInBulkStorage(segment).map(_ => segment)
       }
   }
