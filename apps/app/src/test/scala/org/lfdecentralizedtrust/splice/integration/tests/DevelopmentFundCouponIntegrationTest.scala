@@ -69,7 +69,7 @@ class DevelopmentFundCouponIntegrationTest
         ConfigTransforms.withDevelopmentFundPercentage(0.05)(config)
       )
 
-  "Unclaimed development fund coupons are merged" ignore { implicit env =>
+  "Unclaimed development fund coupons are merged" in { implicit env =>
     val (_, couponAmount) = actAndCheck(
       "Advance 5 rounds", {
         Range(0, 5).foreach(_ => advanceRoundsByOneTickViaAutomation())
@@ -122,7 +122,7 @@ class DevelopmentFundCouponIntegrationTest
     )
   }
 
-  "Development fund coupons management flow" ignore { implicit env =>
+  "Development fund coupons management flow" in { implicit env =>
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
     val unclaimedDevelopmentFundCouponsToMint = Seq(10.0, 10.0, 30.0, 30.0).map(BigDecimal(_))
     val unclaimedDevelopmentFundCouponTotal = unclaimedDevelopmentFundCouponsToMint.sum
@@ -379,7 +379,7 @@ class DevelopmentFundCouponIntegrationTest
     }
   }
 
-  "Expiring a development fund coupon" ignore { implicit env =>
+  "Expiring a development fund coupon" in { implicit env =>
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
     onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
     val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
