@@ -600,7 +600,7 @@ abstract class WalletAppReference(
   @Help.Description(
     "Exercises the choice AllocationRequest_Reject from the Token Standard on the passed contract id."
   )
-  def rejectAllocationRequest(id: AllocationRequest.ContractId) = {
+  def rejectAllocationRequest(id: AllocationRequest.ContractId): Unit = {
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.TokenStandard.RejectAllocationRequest(id))
     }
