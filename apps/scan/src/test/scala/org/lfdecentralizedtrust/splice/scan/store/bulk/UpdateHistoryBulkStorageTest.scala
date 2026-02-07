@@ -40,6 +40,7 @@ class UpdateHistoryBulkStorageTest
     dbAcsSnapshotPeriodHours = 1,
     bulkAcsSnapshotPeriodHours = 2,
     bulkDbReadChunkSize = 1000,
+    bulkZstdChunkSize = 10000L,
     maxFileSize,
   )
 
@@ -69,7 +70,7 @@ class UpdateHistoryBulkStorageTest
             segment,
             loggerFactory,
           )
-          .toMat(TestSink.probe[(UpdatesSegment, Option[TimestampWithMigrationId])])(Keep.right)
+          .toMat(TestSink.probe[(UpdatesSegment, String)])(Keep.right)
           .run()
 
         probe.request(2)

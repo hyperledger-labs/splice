@@ -19,6 +19,7 @@ case class ScanStorageConfig(
     dbAcsSnapshotPeriodHours: Int, // Period between two consecutive acs snapshots to be computed and stored in the DB
     bulkAcsSnapshotPeriodHours: Int, // Period between two consecutive acs snapshots to be dumped to bulk storage (currently must be <=24 hr, and a multiple of dbAcsSnapshotPeriodHours)
     bulkDbReadChunkSize: Int, // Chunk size to read from the DB for copying to bulk storage
+    bulkZstdChunkSize: Long,
     bulkMaxFileSize: Long, // Max file size (estimated, may end up being slightly bigger) for bulk storage objects
 ) {
   require(
