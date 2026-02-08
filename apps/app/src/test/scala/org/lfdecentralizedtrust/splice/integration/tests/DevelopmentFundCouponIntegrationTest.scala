@@ -338,9 +338,12 @@ class DevelopmentFundCouponIntegrationTest
           aliceValidatorWalletClient
             .listActiveDevelopmentFundCoupons()
             .map(_.payload.expiresAt) should not be empty
-          getUnclaimedDevelopmentFundCouponTotal(
+          val unclaimedDevelopmentFundCouponTotal = getUnclaimedDevelopmentFundCouponTotal(
             sv1ScanBackend
           )
+          unclaimedDevelopmentFundCouponTotal shouldBe
+            (initialUnclaimedDevelopmentFundCouponAmount - developmentFundCouponAmount)
+          unclaimedDevelopmentFundCouponTotal
         },
       )
     }
@@ -433,9 +436,12 @@ class DevelopmentFundCouponIntegrationTest
             aliceValidatorWalletClient
               .listActiveDevelopmentFundCoupons()
               .length shouldBe 1
-            getUnclaimedDevelopmentFundCouponTotal(
+            val unclaimedDevelopmentFundCouponTotal = getUnclaimedDevelopmentFundCouponTotal(
               sv1ScanBackend
             )
+            unclaimedDevelopmentFundCouponTotal shouldBe
+              (initialUnclaimedDevelopmentFundCouponAmount - developmentFundCouponAmount)
+            unclaimedDevelopmentFundCouponTotal
           },
         )
       }
@@ -525,6 +531,8 @@ class DevelopmentFundCouponIntegrationTest
             val unclaimedDevelopmentFundCouponTotal = getUnclaimedDevelopmentFundCouponTotal(
               sv1ScanBackend
             )
+            unclaimedDevelopmentFundCouponTotal shouldBe
+              (initialUnclaimedDevelopmentFundCouponAmount - developmentFundCouponAmount)
             (developmentFundCoupons.head.contractId, unclaimedDevelopmentFundCouponTotal)
           },
         )
