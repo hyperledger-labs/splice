@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.console.ScanAppBackendReference
+import org.lfdecentralizedtrust.splice.console.{ScanAppBackendReference, WalletAppClientReference}
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpDef
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
@@ -69,7 +69,7 @@ class DevelopmentFundCouponIntegrationTest
         ConfigTransforms.withDevelopmentFundPercentage(0.05)(config)
       )
 
-  "Issuing and merging unclaimed development fund coupons" ignore { implicit env =>
+  "Issuing and merging unclaimed development fund coupons" in { implicit env =>
     val (_, couponAmount) = actAndCheck(
       "Advance 5 rounds", {
         Range(0, 5).foreach(_ => advanceRoundsByOneTickViaAutomation())
@@ -122,7 +122,7 @@ class DevelopmentFundCouponIntegrationTest
     )
   }
 
-  "Managing development fund coupons" ignore { implicit env =>
+  "Managing development fund coupons" in { implicit env =>
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
     val unclaimedDevelopmentFundCouponsToMint = Seq(10.0, 10.0, 30.0, 30.0).map(BigDecimal(_))
     val unclaimedDevelopmentFundCouponTotal = unclaimedDevelopmentFundCouponsToMint.sum
@@ -283,22 +283,19 @@ class DevelopmentFundCouponIntegrationTest
               reason = withdrawalReason,
             )
           )
-          // As the fund manager, Alice can view the withdrawn coupon
-          aliceValidatorWalletClient
-            .listDevelopmentFundCouponHistory(None, 5)
-            .developmentFundCouponHistory
-            .map(_.status) shouldBe Seq(expectedStatus)
-          // As the beneficiary, Bob can view the withdrawn coupon
-          bobWalletClient
-            .listDevelopmentFundCouponHistory(None, 5)
-            .developmentFundCouponHistory
-            .map(_.status) shouldBe Seq(expectedStatus)
+          // As the fund manager, Alice can view the claimed coupon
+          assertListDevelopmentFundCouponHistoryStatuses(
+            aliceValidatorWalletClient,
+            Seq(expectedStatus),
+          )
+          // As the beneficiary, Bob can view the claimed coupon
+          assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, Seq(expectedStatus))
         },
       )
     }
   }
 
-  "Claiming development fund coupons" ignore { implicit env =>
+  "Claiming development fund coupons" in { implicit env =>
     onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
     val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
@@ -376,19 +373,16 @@ class DevelopmentFundCouponIntegrationTest
         )
       )
       // As the fund manager, Alice can view the claimed coupon
-      aliceValidatorWalletClient
-        .listDevelopmentFundCouponHistory(None, 10)
-        .developmentFundCouponHistory
-        .map(_.status) shouldBe Seq(expectedStatus)
+      assertListDevelopmentFundCouponHistoryStatuses(
+        aliceValidatorWalletClient,
+        Seq(expectedStatus),
+      )
       // As the beneficiary, Bob can view the claimed coupon
-      bobWalletClient
-        .listDevelopmentFundCouponHistory(None, 10)
-        .developmentFundCouponHistory
-        .map(_.status) shouldBe Seq(expectedStatus)
+      assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, Seq(expectedStatus))
     }
   }
 
-  "Expiring a development fund coupon" ignore { implicit env =>
+  "Expiring a development fund coupon" in { implicit env =>
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
     onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
     val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
@@ -472,15 +466,12 @@ class DevelopmentFundCouponIntegrationTest
           )
         )
         // As the fund manager, Alice can view the claimed coupon
-        aliceValidatorWalletClient
-          .listDevelopmentFundCouponHistory(None, 10)
-          .developmentFundCouponHistory
-          .map(_.status) shouldBe Seq(expectedStatus)
+        assertListDevelopmentFundCouponHistoryStatuses(
+          aliceValidatorWalletClient,
+          Seq(expectedStatus),
+        )
         // As the beneficiary, Bob can view the claimed coupon
-        bobWalletClient
-          .listDevelopmentFundCouponHistory(None, 10)
-          .developmentFundCouponHistory
-          .map(_.status) shouldBe Seq(expectedStatus)
+        assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, Seq(expectedStatus))
       }
     }
   }
@@ -567,20 +558,17 @@ class DevelopmentFundCouponIntegrationTest
           )
         )
         // As the fund manager, Alice can view the claimed coupon
-        aliceValidatorWalletClient
-          .listDevelopmentFundCouponHistory(None, 10)
-          .developmentFundCouponHistory
-          .map(_.status) shouldBe Seq(expectedStatus)
+        assertListDevelopmentFundCouponHistoryStatuses(
+          aliceValidatorWalletClient,
+          Seq(expectedStatus),
+        )
         // As the beneficiary, Bob can view the claimed coupon
-        bobWalletClient
-          .listDevelopmentFundCouponHistory(None, 10)
-          .developmentFundCouponHistory
-          .map(_.status) shouldBe Seq(expectedStatus)
+        assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, Seq(expectedStatus))
       }
     }
   }
 
-  "Listing active development fund coupons" ignore { implicit env =>
+  "Listing active development fund coupons" in { implicit env =>
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
     val developmentFundCouponExpirations = Seq(
       CantonTimestamp.now().plus(Duration.ofDays(3)),
@@ -632,7 +620,7 @@ class DevelopmentFundCouponIntegrationTest
     }
   }
 
-  "Listing history of development fund coupons" ignore { implicit env =>
+  "Listing history of development fund coupons" in { implicit env =>
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
     val aliceValidatorParty = onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
     val fundManager = aliceValidatorParty
@@ -746,5 +734,15 @@ class DevelopmentFundCouponIntegrationTest
       .listUnclaimedDevelopmentFundCoupons()
       .map(co => BigDecimal(co.contract.payload.amount))
       .sum
+
+  private def assertListDevelopmentFundCouponHistoryStatuses(
+      walletClient: WalletAppClientReference,
+      expectedStatuses: Seq[httpDef.ArchivedDevelopmentFundCouponStatus],
+      limit: Int = 10,
+  ) =
+    walletClient
+      .listDevelopmentFundCouponHistory(None, limit)
+      .developmentFundCouponHistory
+      .map(_.status) shouldBe expectedStatuses
 
 }
