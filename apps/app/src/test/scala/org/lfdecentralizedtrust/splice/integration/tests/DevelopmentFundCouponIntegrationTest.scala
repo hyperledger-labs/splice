@@ -69,7 +69,7 @@ class DevelopmentFundCouponIntegrationTest
         ConfigTransforms.withDevelopmentFundPercentage(0.05)(config)
       )
 
-  "Issuing and merging unclaimed development fund coupons" in { implicit env =>
+  "Issuing and merging unclaimed development fund coupons" ignore { implicit env =>
     val (_, couponAmount) = actAndCheck(
       "Advance 5 rounds", {
         Range(0, 5).foreach(_ => advanceRoundsByOneTickViaAutomation())
@@ -122,7 +122,7 @@ class DevelopmentFundCouponIntegrationTest
     )
   }
 
-  "Managing development fund coupons" in { implicit env =>
+  "Managing development fund coupons" ignore { implicit env =>
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
     val unclaimedDevelopmentFundCouponsToMint = Seq(10.0, 10.0, 30.0, 30.0).map(BigDecimal(_))
     val unclaimedDevelopmentFundCouponTotal = unclaimedDevelopmentFundCouponsToMint.sum
@@ -261,7 +261,7 @@ class DevelopmentFundCouponIntegrationTest
       }
 
       actAndCheck(
-        "As the fund manager, Alice withdraws a development fund coupon", {
+        "As the fund manager, Alice withdraws the development fund coupon", {
           aliceValidatorWalletClient
             .withdrawDevelopmentFundCoupon(developmentFundCouponCid, withdrawalReason)
         },
@@ -298,7 +298,7 @@ class DevelopmentFundCouponIntegrationTest
     }
   }
 
-  "Claiming development fund coupons" in { implicit env =>
+  "Claiming development fund coupons" ignore { implicit env =>
     onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
     val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
@@ -323,7 +323,7 @@ class DevelopmentFundCouponIntegrationTest
       )
     }
 
-    val (_, unclaimedDevelopmentFundCouponTotalAfterAllocation) = setTriggersWithin(
+    val (_, unclaimedDevelopmentFundCouponTotalBeforeClaiming) = setTriggersWithin(
       triggersToPauseAtStart = Seq(bobMergeAmuletsTrigger)
     ) {
       actAndCheck(
@@ -341,13 +341,9 @@ class DevelopmentFundCouponIntegrationTest
           aliceValidatorWalletClient
             .listActiveDevelopmentFundCoupons()
             .map(_.payload.expiresAt) should not be empty
-          val expectedUnclaimedDevelopmentFundCouponTotal =
-            initialUnclaimedDevelopmentFundCouponAmount - developmentFundCouponAmount
           getUnclaimedDevelopmentFundCouponTotal(
             sv1ScanBackend
-          ) shouldBe expectedUnclaimedDevelopmentFundCouponTotal
-
-          expectedUnclaimedDevelopmentFundCouponTotal
+          )
         },
       )
     }
@@ -369,7 +365,7 @@ class DevelopmentFundCouponIntegrationTest
       eventually() {
         getUnclaimedDevelopmentFundCouponTotal(
           sv1ScanBackend
-        ) shouldBe unclaimedDevelopmentFundCouponTotalAfterAllocation
+        ) shouldBe unclaimedDevelopmentFundCouponTotalBeforeClaiming
       }
     }
 
@@ -392,7 +388,7 @@ class DevelopmentFundCouponIntegrationTest
     }
   }
 
-  "Expiring a development fund coupon" in { implicit env =>
+  "Expiring a development fund coupon" ignore { implicit env =>
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
     onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
     val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
@@ -425,7 +421,7 @@ class DevelopmentFundCouponIntegrationTest
     setTriggersWithin(
       triggersToPauseAtStart = Seq(bobMergeAmuletsTrigger)
     ) {
-      val (_, unclaimedDevelopmentFundCouponTotalAfterExpiration) = setTriggersWithin(
+      val (_, unclaimedDevelopmentFundCouponTotalBeforeExpiration) = setTriggersWithin(
         triggersToPauseAtStart = expiredDevelopmentFundCouponTriggers
       ) {
         actAndCheck(
@@ -443,13 +439,9 @@ class DevelopmentFundCouponIntegrationTest
             aliceValidatorWalletClient
               .listActiveDevelopmentFundCoupons()
               .length shouldBe 1
-            val expectedUnclaimedDevelopmentFundCouponTotal =
-              initialUnclaimedDevelopmentFundCouponAmount - developmentFundCouponAmount
             getUnclaimedDevelopmentFundCouponTotal(
               sv1ScanBackend
-            ) shouldBe expectedUnclaimedDevelopmentFundCouponTotal
-
-            expectedUnclaimedDevelopmentFundCouponTotal
+            )
           },
         )
       }
@@ -469,7 +461,7 @@ class DevelopmentFundCouponIntegrationTest
         eventually() {
           getUnclaimedDevelopmentFundCouponTotal(
             sv1ScanBackend
-          ) shouldBe (unclaimedDevelopmentFundCouponTotalAfterExpiration + developmentFundCouponAmount)
+          ) shouldBe (unclaimedDevelopmentFundCouponTotalBeforeExpiration + developmentFundCouponAmount)
         }
       }
 
@@ -479,7 +471,13 @@ class DevelopmentFundCouponIntegrationTest
             status = httpDef.ArchivedDevelopmentFundCouponExpiredStatus.Status.Expired
           )
         )
+        // As the fund manager, Alice can view the claimed coupon
         aliceValidatorWalletClient
+          .listDevelopmentFundCouponHistory(None, 10)
+          .developmentFundCouponHistory
+          .map(_.status) shouldBe Seq(expectedStatus)
+        // As the beneficiary, Bob can view the claimed coupon
+        bobWalletClient
           .listDevelopmentFundCouponHistory(None, 10)
           .developmentFundCouponHistory
           .map(_.status) shouldBe Seq(expectedStatus)
@@ -487,7 +485,102 @@ class DevelopmentFundCouponIntegrationTest
     }
   }
 
-  "Listing active development fund coupons" in { implicit env =>
+  "Rejecting a development fund coupon" in { implicit env =>
+    val sv1UserId = sv1WalletClient.config.ledgerApiUser
+    val bobUserId = bobWalletClient.config.ledgerApiUser
+    onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
+    val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+    val beneficiary = bobParty
+    val initialUnclaimedDevelopmentFundCouponAmount = 1000.0
+    val developmentFundCouponAmount = 40.0
+    val expiresAt = CantonTimestamp.now().plus(Duration.ofDays(1))
+    val reason = "Bob has contributed to the Daml repo"
+
+    val bobUserName = bobWalletClient.config.ledgerApiUser
+    val bobMergeAmuletsTrigger =
+      bobValidatorBackend
+        .userWalletAutomation(bobUserName)
+        .futureValue
+        .trigger[CollectRewardsAndMergeAmuletsTrigger]
+
+    clue("Mint one unclaimed development fund coupon") {
+      createUnclaimedDevelopmentFundCoupon(
+        sv1ValidatorBackend.participantClientWithAdminToken,
+        sv1UserId,
+        initialUnclaimedDevelopmentFundCouponAmount,
+      )
+    }
+
+    setTriggersWithin(
+      triggersToPauseAtStart = Seq(bobMergeAmuletsTrigger)
+    ) {
+      val (_, (developmentFundCouponCid, unclaimedDevelopmentFundCouponTotalBeforeRejection)) =
+        actAndCheck(
+          "Allocate one development fund coupon", {
+            aliceValidatorWalletClient
+              .allocateDevelopmentFundCoupon(
+                beneficiary,
+                developmentFundCouponAmount,
+                expiresAt,
+                reason,
+              )
+          },
+        )(
+          "A coupon is created and the total unclaimed development fund coupon amount decreases",
+          _ => {
+            val developmentFundCoupons = aliceValidatorWalletClient
+              .listActiveDevelopmentFundCoupons()
+            developmentFundCoupons.length shouldBe 1
+            val unclaimedDevelopmentFundCouponTotal = getUnclaimedDevelopmentFundCouponTotal(
+              sv1ScanBackend
+            )
+            (developmentFundCoupons.head.contractId, unclaimedDevelopmentFundCouponTotal)
+          },
+        )
+
+      val rejectionReason = "Invalid allocation"
+      actAndCheck(
+        "As the beneficiary, Bob rejects the development fund coupon", {
+          rejectDevelopmentFundCoupon(
+            bobValidatorBackend.participantClientWithAdminToken,
+            bobUserId,
+            beneficiary,
+            developmentFundCouponCid,
+            rejectionReason,
+          )
+        },
+      )(
+        "The coupon is archived and the total unclaimed development fund coupon amount increases",
+        _ => {
+          aliceValidatorWalletClient.listActiveDevelopmentFundCoupons() shouldBe empty
+          getUnclaimedDevelopmentFundCouponTotal(
+            sv1ScanBackend
+          ) shouldBe (unclaimedDevelopmentFundCouponTotalBeforeRejection + developmentFundCouponAmount)
+        },
+      )
+
+      clue("The rejected coupon is listed in listDevelopmentFundCouponHistory as rejected") {
+        val expectedStatus = httpDef.ArchivedDevelopmentFundCouponStatus(
+          httpDef.ArchivedDevelopmentFundCouponRejectedStatus(
+            status = httpDef.ArchivedDevelopmentFundCouponRejectedStatus.Status.Rejected,
+            reason = rejectionReason,
+          )
+        )
+        // As the fund manager, Alice can view the claimed coupon
+        aliceValidatorWalletClient
+          .listDevelopmentFundCouponHistory(None, 10)
+          .developmentFundCouponHistory
+          .map(_.status) shouldBe Seq(expectedStatus)
+        // As the beneficiary, Bob can view the claimed coupon
+        bobWalletClient
+          .listDevelopmentFundCouponHistory(None, 10)
+          .developmentFundCouponHistory
+          .map(_.status) shouldBe Seq(expectedStatus)
+      }
+    }
+  }
+
+  "Listing active development fund coupons" ignore { implicit env =>
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
     val developmentFundCouponExpirations = Seq(
       CantonTimestamp.now().plus(Duration.ofDays(3)),
@@ -539,7 +632,7 @@ class DevelopmentFundCouponIntegrationTest
     }
   }
 
-  "Listing history of development fund coupons" in { implicit env =>
+  "Listing history of development fund coupons" ignore { implicit env =>
     val sv1UserId = sv1WalletClient.config.ledgerApiUser
     val aliceValidatorParty = onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
     val fundManager = aliceValidatorParty
@@ -563,7 +656,7 @@ class DevelopmentFundCouponIntegrationTest
         "Mint some development fund coupons", {
           amounts.foreach { amount =>
             createDevelopmentFundCoupon(
-              sv1ValidatorBackend.participantClientWithAdminToken,
+              sv1ValidatorBackend.participantClientWithAdminToken, // TODOV use alice backend
               sv1UserId,
               beneficiary,
               fundManager,

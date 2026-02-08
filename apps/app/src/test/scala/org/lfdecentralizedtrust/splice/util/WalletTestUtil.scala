@@ -1127,6 +1127,28 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     created.contractId
   }
 
+  def rejectDevelopmentFundCoupon(
+      participantClient: ParticipantClientReference,
+      userId: String,
+      userParty: PartyId,
+      developmentFuncCouponCid: amuletCodegen.DevelopmentFundCoupon.ContractId,
+      reason: String,
+      synchronizerId: Option[SynchronizerId] = None,
+  ): amuletCodegen.UnclaimedDevelopmentFundCoupon.ContractId = {
+    participantClient.ledger_api_extensions.commands
+      .submitWithResult(
+        userId = userId,
+        actAs = Seq(userParty),
+        readAs = Seq(),
+        update = developmentFuncCouponCid.exerciseDevelopmentFundCoupon_Reject(
+          reason
+        ),
+        synchronizerId = synchronizerId,
+      )
+      .exerciseResult
+      .unclaimedDevelopmentFundCouponCid
+  }
+
   protected def retryCommandSubmission[T](f: => T) = {
     eventually() {
       try {
