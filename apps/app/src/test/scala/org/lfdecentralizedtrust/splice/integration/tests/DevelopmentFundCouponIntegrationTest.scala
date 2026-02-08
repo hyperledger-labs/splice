@@ -539,6 +539,107 @@ class DevelopmentFundCouponIntegrationTest
     }
   }
 
+  "Listing history of development fund coupons" in { implicit env =>
+    val sv1UserId = sv1WalletClient.config.ledgerApiUser
+    val aliceValidatorParty = onboardWalletUser(aliceValidatorWalletClient, aliceValidatorBackend)
+    val fundManager = aliceValidatorParty
+    val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+    val beneficiary = bobParty
+    val amounts = Seq(10.0, 20.0, 30.0, 40.0, 50.0, 60.0)
+    val expiresAt = CantonTimestamp.now().plus(Duration.ofDays(1))
+    val reason = "Bob has contributed to the Daml repo"
+
+    val bobUserName = bobWalletClient.config.ledgerApiUser
+    val bobMergeAmuletsTrigger =
+      bobValidatorBackend
+        .userWalletAutomation(bobUserName)
+        .futureValue
+        .trigger[CollectRewardsAndMergeAmuletsTrigger]
+
+    setTriggersWithin(
+      triggersToPauseAtStart = Seq(bobMergeAmuletsTrigger)
+    ) {
+      val (_, developmentFundCouponCidsSortedByAmount) = actAndCheck(
+        "Mint some development fund coupons", {
+          amounts.foreach { amount =>
+            createDevelopmentFundCoupon(
+              sv1ValidatorBackend.participantClientWithAdminToken,
+              sv1UserId,
+              beneficiary,
+              fundManager,
+              amount,
+              expiresAt,
+              reason,
+            )
+          }
+        },
+      )(
+        "Coupons are created",
+        _ => {
+          val developmentFundCoupons = aliceValidatorWalletClient
+            .listActiveDevelopmentFundCoupons()
+          developmentFundCoupons.length shouldBe 6
+
+          developmentFundCoupons.sortBy(_.payload.amount).map(_.contractId)
+        },
+      )
+
+      // Note: withdrawal is used to reduce the chance of identical archival timestamps.
+      // Other archival flows (e.g. expiration or claiming) are covered by separate tests
+      // in this test suite. This test focuses on pagination and ordering by archival time.
+      val withdrawalReason = "Bob's PR in the Daml repo broke CI"
+      actAndCheck(
+        "As the fund manager, Alice withdraws the five smallest development fund coupons", {
+          developmentFundCouponCidsSortedByAmount.toList.init.foreach { cid =>
+            aliceValidatorWalletClient
+              .withdrawDevelopmentFundCoupon(cid, withdrawalReason)
+          }
+        },
+      )(
+        "The coupons are withdrawn and appear in listDevelopmentFundCouponHistory in the correct order",
+        _ => {
+          // Verify that five coupons have been archived
+          aliceValidatorWalletClient.listActiveDevelopmentFundCoupons().length shouldBe 1
+
+          val limit = 2
+          val pages =
+            LazyList
+              .unfold(Option.empty[Long]) { tokenOpt =>
+                val page =
+                  aliceValidatorWalletClient.listDevelopmentFundCouponHistory(tokenOpt, limit)
+                if (page.developmentFundCouponHistory.isEmpty) None
+                else Some((page, page.nextPageToken))
+              }
+              .toList
+
+          // Verify that coupons are sorted by archival time descending
+          val history = pages.flatMap(_.developmentFundCouponHistory)
+          history.length shouldBe 5
+          pages.map(_.developmentFundCouponHistory.length) shouldBe List(2, 2, 1)
+          history shouldBe history
+            .sortBy(_.archivedAt)
+            .reverse
+
+          // Verify data
+          val expectedAmounts = amounts.sorted.init
+          history.map(_.amount.toDouble).sorted shouldBe expectedAmounts
+          val expectedStatus = httpDef.ArchivedDevelopmentFundCouponStatus(
+            httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus(
+              status = httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus.Status.Withdrawn,
+              reason = withdrawalReason,
+            )
+          )
+          history.foreach { coupon =>
+            coupon.fundManager shouldBe fundManager.toProtoPrimitive
+            coupon.beneficiary shouldBe beneficiary.toProtoPrimitive
+            coupon.reason shouldBe reason
+            coupon.status shouldBe expectedStatus
+          }
+        },
+      )
+    }
+  }
+
   private def assertUnclaimedDevelopmentCouponAmounts(
       expectedAmounts: Seq[BigDecimal]
   )(implicit env: FixtureParam) =
