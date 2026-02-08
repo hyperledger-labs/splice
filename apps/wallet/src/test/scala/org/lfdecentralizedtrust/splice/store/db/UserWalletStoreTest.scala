@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.store.db
 
+import com.daml.ledger.javaapi.data.{DamlRecord, Unit as damlUnit}
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
@@ -58,7 +59,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.DevelopmentFundCoupon
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferInput
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.damlDecimal
 import org.scalatest.{Assertion, Succeeded}
@@ -1127,26 +1127,42 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
           store.multiDomainAcsStore
         )
 
-      def mkTransferTransactionWithInputDevelopmentFundCoupon(
+      def mkTransferTransactionWithDevelopmentFundCouponArchive(
           contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
           beneficiary: PartyId,
+//          fundManager: PartyId,
+//          amount: Double,
+//          expiresAt: CantonTimestamp,
+//          reason: String,
       )(offset: Long) = {
-        transferTransactionWithInputDevelopmentFundCouponTx(
+        mkTransferTransactionWithDevelopmentFundCouponArchiveTx(
           offset,
           contractId,
           beneficiary,
+//          fundManager,
+//          amount,
+//          expiresAt,
+//          reason,
         )
       }
 
-      def ingestTransferTransactionWithInputDevelopmentFundCoupon(
+      def ingestTransferTransactionWithDevelopmentFundCouponArchive(
           store: UserWalletStore,
           contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
           beneficiary: PartyId,
+//          fundManager: PartyId,
+//          amount: Double,
+//          expiresAt: CantonTimestamp,
+//          reason: String,
       ) =
         dummyDomain.ingest(
-          mkTransferTransactionWithInputDevelopmentFundCoupon(
+          mkTransferTransactionWithDevelopmentFundCouponArchive(
             contractId,
             beneficiary,
+//            fundManager,
+//            amount,
+//            expiresAt,
+//            reason,
           )
         )(
           store.multiDomainAcsStore
@@ -1276,34 +1292,35 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
           coupon2Cid,
           coupon2RejectionReason,
         )
-        _ <- ingestTransferTransactionWithInputDevelopmentFundCoupon(
-          fundManagerStore,
-          coupon1Cid,
-          beneficiary,
-        )
+        _ <-
+          ingestTransferTransactionWithDevelopmentFundCouponArchive(
+            fundManagerStore,
+            coupon1Cid,
+            beneficiary,
+          )
         coupon3WithdrawalReason = "coupon_3_withdrawal_reason"
         _ <- ingestDevelopmentFundCouponWithdraw(
           fundManagerStore,
           coupon3Cid,
           coupon3WithdrawalReason,
         )
-        _ <- ingestTransferTransactionWithInputDevelopmentFundCoupon(
+        _ <- ingestTransferTransactionWithDevelopmentFundCouponArchive(
           fundManagerStore,
           coupon5Cid,
           beneficiary,
         )
         _ <- ingestDevelopmentFundCouponDsoExpire(fundManagerStore, coupon4Cid)
-        _ <- ingestTransferTransactionWithInputDevelopmentFundCoupon(
+        _ <- ingestTransferTransactionWithDevelopmentFundCouponArchive(
           fundManagerStore,
           coupon7Cid,
           beneficiary,
         )
-        _ <- ingestTransferTransactionWithInputDevelopmentFundCoupon(
+        _ <- ingestTransferTransactionWithDevelopmentFundCouponArchive(
           fundManagerStore,
           coupon6Cid,
           beneficiary,
         )
-        _ <- ingestTransferTransactionWithInputDevelopmentFundCoupon(
+        _ <- ingestTransferTransactionWithDevelopmentFundCouponArchive(
           fundManagerStore,
           coupon8Cid,
           beneficiary,
@@ -2008,7 +2025,7 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
     )
   }
 
-  private def transferTransactionWithInputDevelopmentFundCouponTx(
+  private def mkTransferTransactionWithDevelopmentFundCouponArchiveTx(
       offset: Long,
       developmentFundCouponCid: amuletCodegen.DevelopmentFundCoupon.ContractId,
       beneficiary: PartyId,
@@ -2018,7 +2035,8 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
 
     mkExerciseTx(
       offset,
-      // Note: Mocked transfer; it was not made fully consistent, as we only care about InputDevelopmentFundCoupon
+      // Note: This is a mocked transfer and is intentionally not fully consistent;
+      // the test only cares about the coupon archival
       exercisedEvent(
         amuletRulesCid,
         amuletRulesCodegen.AmuletRules.TEMPLATE_ID_WITH_PACKAGE_ID,
@@ -2029,11 +2047,7 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
           new amuletRulesCodegen.Transfer(
             beneficiary.toProtoPrimitive,
             beneficiary.toProtoPrimitive,
-            Seq(
-              new amuletRulesCodegen.transferinput.InputDevelopmentFundCoupon(
-                developmentFundCouponCid
-              ): TransferInput
-            ).asJava,
+            Seq().asJava,
             Seq().asJava,
             Optional.empty(),
           ),
@@ -2067,7 +2081,17 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
           Optional.empty(),
         ).toValue,
       ),
-      Seq(),
+      Seq(
+        exercisedEvent(
+          developmentFundCouponCid.contractId,
+          amuletCodegen.DevelopmentFundCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
+          None,
+          amuletCodegen.DevelopmentFundCoupon.CHOICE_Archive.name,
+          consuming = true,
+          new DamlRecord(),
+          damlUnit.getInstance(),
+        )
+      ),
       dummyDomain,
     )
   }

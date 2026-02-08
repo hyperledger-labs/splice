@@ -273,11 +273,21 @@ object AmuletExpire
       choice = amuletCodegen.Amulet.CHOICE_Amulet_Expire,
     )
 
-object AmuletRules_AllocateDevelopmentFundCoupon
-    extends ExerciseNodeCompanion.Mk(
-      template = splice.amuletrules.AmuletRules.COMPANION,
-      choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_AllocateDevelopmentFundCoupon,
-    )
+// Note: We use the DevelopmentFundCoupon create event instead of AmuletRules_AllocateDevelopmentFundCoupon because
+// the allocation choice is only visible to the fundManager, while the coupon creation
+// is visible to all coupon stakeholders, allowing the beneficiary to track its lifecycle.
+object DevelopmentFundCouponCreate {
+  type TCid = amuletCodegen.DevelopmentFundCoupon.ContractId
+  type T = amuletCodegen.DevelopmentFundCoupon
+  type ContractType = Contract[TCid, T]
+  val companion = amuletCodegen.DevelopmentFundCoupon.COMPANION
+
+  def unapply(
+      event: CreatedEvent
+  ): Option[ContractType] = {
+    Contract.fromCreatedEvent(companion)(event)
+  }
+}
 
 case object DevelopmentFundCoupon_Withdraw
     extends ExerciseNodeCompanion.Mk(
@@ -295,6 +305,17 @@ case object DevelopmentFundCoupon_Reject
     extends ExerciseNodeCompanion.Mk(
       template = amuletCodegen.DevelopmentFundCoupon.COMPANION,
       choice = amuletCodegen.DevelopmentFundCoupon.CHOICE_DevelopmentFundCoupon_Reject,
+    )
+
+// Note: We use the DevelopmentFundCoupon Archive exercise instead of AmuletRules_Transfer because
+// AmuletRules_Transfer is not visible to the fundManager. The coupon Archive exercise is visible to
+// coupon stakeholders (fundManager and beneficiary are observers), so both stores can derive the
+// corresponding ArchivedTxLogEntry.
+// This Archive event corresponds to the coupon being collected via AmuletRules_Transfer.
+case object DevelopmentFundCoupon_Archive
+    extends ExerciseNodeCompanion.Mk(
+      template = amuletCodegen.DevelopmentFundCoupon.COMPANION,
+      choice = amuletCodegen.DevelopmentFundCoupon.CHOICE_Archive,
     )
 
 // TODO(DACH-NY/canton-network-node#2930): This is not really a Amulet event - consider either renaming the file, or splitting it into different ones based on event "types"

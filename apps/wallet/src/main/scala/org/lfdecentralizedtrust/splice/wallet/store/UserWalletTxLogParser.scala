@@ -4,12 +4,11 @@
 package org.lfdecentralizedtrust.splice.wallet.store
 
 import cats.{Eval, Monoid}
-import cats.implicits.catsSyntaxSemigroup
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AmuletCreateSummary
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   InvalidTransferReason,
@@ -21,7 +20,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.invalidtr
   ITR_Other,
   ITR_UnknownSynchronizer,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.transferinput.InputDevelopmentFundCoupon
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.buytrafficrequest.BuyTrafficRequestTrackingInfo
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation.{
   CO_AcceptTransferPreapprovalProposal,
@@ -55,13 +53,14 @@ import org.lfdecentralizedtrust.splice.history.{
   AmuletArchive,
   AmuletCreate,
   AmuletExpire,
-  AmuletRules_AllocateDevelopmentFundCoupon,
   AmuletRules_BuyMemberTraffic,
   AmuletRules_CreateExternalPartySetupProposal,
   AmuletRules_CreateTransferPreapproval,
   AnsRules_CollectEntryRenewalPayment,
   AnsRules_CollectInitialEntryPayment,
   CreateTokenStandardTransferInstruction,
+  DevelopmentFundCouponCreate,
+  DevelopmentFundCoupon_Archive,
   DevelopmentFundCoupon_Expire,
   DevelopmentFundCoupon_Reject,
   DevelopmentFundCoupon_Withdraw,
@@ -658,8 +657,36 @@ class UserWalletTxLogParser(
             }
 
           case Transfer(node) =>
-            // Note: we do not parse the child events, as we can extract all information about the transfer from this node
-            now(State.fromTransfer(tree, exercised, node, TransferTransactionSubtype.Transfer))
+            // Note: we generally do not parse child events, as all transfer-related information
+            // can be extracted from this node. The only exception is DevelopmentFundCoupon Archive
+            // child events, which must be processed to correctly build the coupon history.
+            for {
+              stateFromTransfer <- now(
+                State.fromTransfer(tree, exercised, node, TransferTransactionSubtype.Transfer)
+              )
+
+              stateFromDevelopmentFundCouponArchives <- defer {
+                val start = exercised.getNodeId.intValue()
+                val end = exercised.getLastDescendantNodeId.intValue()
+                val developmentFundCouponArchiveNodeIds: List[Integer] =
+                  tree.getEventsById.asScala.collect {
+                    case (nodeId, ex: ExercisedEvent)
+                        if nodeId.intValue() >= start &&
+                          nodeId.intValue() <= end &&
+                          ex.getChoice == amuletCodegen.DevelopmentFundCoupon.CHOICE_Archive.name &&
+                          ex.getTemplateId == amuletCodegen.DevelopmentFundCoupon.COMPANION.TEMPLATE_ID_WITH_PACKAGE_ID =>
+                      nodeId
+                  }.toList
+
+                if (developmentFundCouponArchiveNodeIds.isEmpty) now(State.empty)
+                else
+                  parseTrees(
+                    tree,
+                    developmentFundCouponArchiveNodeIds,
+                    synchronizerId,
+                  )
+              }
+            } yield stateFromTransfer.appended(stateFromDevelopmentFundCouponArchives)
 
           // ------------------------------------------------------------------
           // Minting new amulets
@@ -795,17 +822,17 @@ class UserWalletTxLogParser(
           // Development fund coupons
           // ------------------------------------------------------------------
 
-          case AmuletRules_AllocateDevelopmentFundCoupon(node) =>
-            now(State.fromAllocateDevelopmentFundCoupon(node, tree))
-
           case DevelopmentFundCoupon_Withdraw(node) =>
             now(State.fromDevelopmentFundCouponWithdraw(tree, node, exercised))
 
-          case DevelopmentFundCoupon_Expire(node) =>
+          case DevelopmentFundCoupon_Expire(_) =>
             now(State.fromDevelopmentFundCouponExpire(tree, exercised))
 
           case DevelopmentFundCoupon_Reject(node) =>
             now(State.fromDevelopmentFundCouponReject(tree, node, exercised))
+
+          case DevelopmentFundCoupon_Archive(_) =>
+            now(State.fromDevelopmentFundCouponArchive(tree, exercised))
 
           // ------------------------------------------------------------------
           // Other
@@ -862,6 +889,9 @@ class UserWalletTxLogParser(
               transferInstructionCid = create.contractId.contractId,
             )
             now(State(entries = immutable.Queue[TxLogEntry](entry)))
+
+          case DevelopmentFundCouponCreate(create) =>
+            now(State.fromDevelopmentFundCouponCreate(tree, create, created))
 
           case _ =>
             now(State.empty)
@@ -1269,6 +1299,7 @@ object UserWalletTxLogParser {
           eventId = EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId),
           subtype = Some(transactionSubtype.toProto),
           date = Some(tx.getEffectiveAt),
+          provider = node.argument.value.transfer.provider,
           sender = Some(sender),
           receivers = receivers,
           senderHoldingFees = node.result.value.summary.holdingFees,
@@ -1277,23 +1308,8 @@ object UserWalletTxLogParser {
           validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
           svRewardsUsed = Some(BigDecimal(node.result.value.summary.inputSvRewardAmount)),
         )
-      val transferEntryState = State(entries = immutable.Queue[TxLogEntry](transferEntry))
 
-      val developmentFundCouponClaimedCids = node.argument.value.transfer.inputs.asScala.collect {
-        case i: InputDevelopmentFundCoupon => i.contractIdValue
-      } toList
-      val developmentFundCouponsClaimedEntryState = developmentFundCouponClaimedCids.foldMap {
-        cid =>
-          fromDevelopmentFundCouponOperation(
-            cid.contractId,
-            DevelopmentFundCouponArchivedTxLogEntry.Status.Claimed(
-              DevelopmentFundCouponStatusClaimed()
-            ),
-            tx.getEffectiveAt,
-          )
-      }
-
-      transferEntryState |+| developmentFundCouponsClaimedEntryState
+      State(entries = immutable.Queue[TxLogEntry](transferEntry))
     }
 
     def fromCreateBuyTrafficRequest(
@@ -1546,29 +1562,18 @@ object UserWalletTxLogParser {
       )
     )
 
-    def fromAllocateDevelopmentFundCoupon(
-        node: ExerciseNode[
-          AmuletRules_AllocateDevelopmentFundCoupon.Arg,
-          AmuletRules_AllocateDevelopmentFundCoupon.Res,
-        ],
+    def fromDevelopmentFundCouponCreate(
         tx: Transaction,
+        create: DevelopmentFundCouponCreate.ContractType,
+        createdEvent: CreatedEvent,
     ): State = {
-      val developmentFundCouponCid = node.result.value.developmentFundCouponCid
-      val developmentFundCoupon =
-        tx.findCreation(amuletCodegen.DevelopmentFundCoupon.COMPANION, developmentFundCouponCid)
-          .map(_.payload)
-          .getOrElse {
-            throw new RuntimeException(
-              s"Expected transaction to contain a DevelopmentFundCoupon $developmentFundCouponCid"
-            )
-          }
       val newEntry = DevelopmentFundCouponCreatedTxLogEntry(
-        contractId = developmentFundCouponCid.contractId,
-        beneficiary = developmentFundCoupon.beneficiary,
-        fundManager = developmentFundCoupon.fundManager,
-        amount = developmentFundCoupon.amount,
-        expiresAt = Some(developmentFundCoupon.expiresAt),
-        reason = developmentFundCoupon.reason,
+        contractId = createdEvent.getContractId,
+        beneficiary = create.payload.beneficiary,
+        fundManager = create.payload.fundManager,
+        amount = create.payload.amount,
+        expiresAt = Some(create.payload.expiresAt),
+        reason = create.payload.reason,
         createdAt = Some(tx.getEffectiveAt),
       )
       State(
@@ -1615,6 +1620,19 @@ object UserWalletTxLogParser {
         event.getContractId,
         DevelopmentFundCouponArchivedTxLogEntry.Status.Rejected(
           DevelopmentFundCouponStatusRejected(node.argument.value.reason)
+        ),
+        tx.getEffectiveAt,
+      )
+    }
+
+    def fromDevelopmentFundCouponArchive(
+        tx: Transaction,
+        event: ExercisedEvent,
+    ): State = {
+      fromDevelopmentFundCouponOperation(
+        event.getContractId,
+        DevelopmentFundCouponArchivedTxLogEntry.Status.Claimed(
+          DevelopmentFundCouponStatusClaimed()
         ),
         tx.getEffectiveAt,
       )
