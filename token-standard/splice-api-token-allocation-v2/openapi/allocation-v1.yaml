@@ -1,0 +1,202 @@
+# Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+openapi: 3.0.0
+info:
+  title: allocation off-ledger API
+  description: |
+    Implemented by token registries for the purpose of the use and management of
+    allocations by wallets and apps orchestrating the settlement of asset transfers.
+  version: 1.0.0
+paths:
+
+  /registry/allocations/v1/{allocationId}/choice-contexts/execute-transfer:
+    post:
+      operationId: "getAllocationTransferContext"
+      description: |
+        Get the choice context to execute a transfer on an allocation.
+      parameters:
+        - name: allocationId
+          description: "The contract ID of the allocation whose transfer the caller wants to execute."
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+
+  /registry/allocations/v1/{allocationId}/choice-contexts/withdraw:
+    post:
+      operationId: "getAllocationWithdrawContext"
+      description: |
+        Get the choice context to withdraw an allocation.
+      parameters:
+        - name: allocationId
+          description: "The contract ID of the allocation to withdraw."
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+
+  /registry/allocations/v1/{allocationId}/choice-contexts/cancel:
+    post:
+      operationId: "getAllocationCancelContext"
+      description: |
+        Get the choice context to cancel an allocation.
+      parameters:
+        - name: allocationId
+          description: "The contract ID of the allocation to cancel."
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetChoiceContextRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+
+components:
+  responses:
+    "400":
+      description: "bad request"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    "404":
+      description: "not found"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    GetChoiceContextRequest:
+      description: |
+        A request to get the context for executing a choice on a contract.
+      type: object
+      properties:
+        meta:
+          description: |
+            Metadata that will be passed to the choice, and should be incorporated
+            into the choice context. Provided for extensibility.
+          type: object
+          additionalProperties:
+            type: string
+
+    ChoiceContext:
+      description: |
+        The context required to exercise a choice on a contract via an interface.
+        Used to retrieve additional reference date that is passed in via disclosed contracts,
+        which are in turn referred to via their contract ID in the `choiceContextData`.
+      type: object
+      properties:
+        choiceContextData:
+          description: "The additional data to use when exercising the choice."
+          type: object
+        disclosedContracts:
+          description: |
+            The contracts that are required to be disclosed to the participant node for exercising
+            the choice.
+          type: array
+          items:
+            $ref: "#/components/schemas/DisclosedContract"
+      required:
+        [
+          "choiceContextData",
+          "disclosedContracts",
+        ]
+
+    # Note: intentionally not shared with the other APIs to keep the self-contained, and because not all OpenAPI codegens support such shared definitions.
+    DisclosedContract:
+      type: object
+      properties:
+        templateId:
+          type: string
+        contractId:
+          type: string
+        createdEventBlob:
+          type: string
+        synchronizerId:
+          description: |
+            The synchronizer to which the contract is currently assigned.
+            If the contract is in the process of being reassigned, then a "409" response is returned.
+          type: string
+        debugPackageName:
+          description: |
+            The name of the Daml package that was used to create the contract.
+            Use this data only if you trust the provider, as it might not match the data in the
+            `createdEventBlob`.
+          type: string
+        debugPayload:
+          description: |
+            The contract arguments that were used to create the contract.
+            Use this data only if you trust the provider, as it might not match the data in the
+            `createdEventBlob`.
+          type: object
+        debugCreatedAt:
+          description: |
+            The ledger effective time at which the contract was created.
+            Use this data only if you trust the provider, as it might not match the data in the
+            `createdEventBlob`.
+          type: string
+          format: date-time
+      required:
+        [
+          "templateId",
+          "contractId",
+          "createdEventBlob",
+          "synchronizerId"
+        ]
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string

@@ -6,6 +6,7 @@ module Splice.Expiry
   ( BoundedSet(..)
   , TimeLock(..)
   , doesLockExpireBeforeAmulet
+  , maxExpiry
   , isAmuletExpired
   -- for testing
   , amountExpiresAt
@@ -134,11 +135,11 @@ addBoundedRelTime d (Singleton rt)
   | otherwise = Singleton (addRelTime d rt)
 addBoundedRelTime _ AfterMaxBound = AfterMaxBound
 
--- | Check if a time is less than a bounded set.
+-- | Check if a time is less or equal than a bounded set.
 -- If the bounded set is a `AfterMaxBound`, it will already return true.
-boundedLessTime : Time -> BoundedSet Time -> Bool
-boundedLessTime t1 (Singleton t2) = t1 < t2
-boundedLessTime _ AfterMaxBound = True
+boundedLessEqTime : Time -> BoundedSet Time -> Bool
+boundedLessEqTime t1 (Singleton t2) = t1 < t2
+boundedLessEqTime _ AfterMaxBound = True
 
 
 -- Amount expiry
@@ -193,7 +194,27 @@ doesLockExpireBeforeAmulet currentOpenRound lock e tickDuration =
       optAmuletExpiresAt = estimateOpenRoundCreatedAt tickDuration currentOpenRound expiringRound
   in case optAmuletExpiresAt of
     None -> False -- as the amulet is already expired
-    Some amuletExpiresAt -> lock.expiresAt `boundedLessTime` amuletExpiresAt
+    Some amuletExpiresAt -> lock.expiresAt `boundedLessEqTime` amuletExpiresAt
+
+-- | `maxExpiry` computes the maximum expiry time for a `TimeLock` for a given `ExpiringAmount`.
+maxExpiry : OpenMiningRound -> Decimal -> Time
+maxExpiry currentOpenRound initialAmount =
+  let 
+      ratePerRound = scaleRatePerRound (1.0 / currentOpenRound.amuletPrice) currentOpenRound.transferConfigUsd.holdingFee
+      e = ExpiringAmount with 
+        initialAmount
+        createdAt = currentOpenRound.round 
+        ratePerRound
+      r = amountExpiresAt e
+      -- Note: we exploit that there are exactly three open rounds active at any
+      -- point in time;(Singleton  and we ensure that a amulet can be expired as soon as it can
+      -- definitely not be used as an input to transfer anymore.
+      expiringRound = addToBoundedRound r (RelRound 2)
+      optAmuletExpiresAt = estimateOpenRoundCreatedAt currentOpenRound.tickDuration currentOpenRound expiringRound
+  in case optAmuletExpiresAt of
+    None -> currentOpenRound.opensAt -- as the amulet is already expired
+    Some (Singleton t) -> t
+    Some (AfterMaxBound) -> maxTime
 
 -- | `isAmuletExpired openRound amuletAmount` computes whether the expiring `amuletAmount`
 -- is definitely expired in case the `openRound` is open.

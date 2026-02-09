@@ -1,0 +1,627 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Conversion functions and standard implementations used to
+-- implement the V1 interfaces from the V2 interfaces.
+module Splice.Api.Token.UtilsV2 where
+
+import DA.TextMap qualified as TextMap
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+import Splice.Api.Token.HoldingV2 qualified as HoldingV2
+import Splice.Api.Token.AllocationV1 qualified as AllocationV1
+import Splice.Api.Token.AllocationV2 qualified as AllocationV2
+import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructionV1
+import Splice.Api.Token.AllocationInstructionV2 qualified as AllocationInstructionV2
+import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
+import Splice.Api.Token.TransferInstructionV2 qualified as TransferInstructionV2
+import DA.Time
+import DA.Date
+import DA.Text (parseInt)
+import DA.Optional (fromSome, fromOptional)
+import Splice.Api.Token.HoldingV2 (basicAccount)
+
+-- Utils
+--------
+epoch : Time
+epoch = time (date 1970 Jan 1) 0 0 0
+
+maxTime : Time
+maxTime = time (date 9999 Dec 31) 23 59 59
+
+encodeTime : Time -> Text
+encodeTime t = show (convertRelTimeToMicroseconds(t `subTime` epoch))
+
+decodeTime : Text -> Time
+decodeTime t = case parseInt t of
+  Some i -> epoch `addRelTime` (convertMicrosecondsToRelTime i)
+  None -> error ("Cannot parse time " <> t)
+
+insertOptional : Text -> Optional a -> TextMap.TextMap a -> TextMap.TextMap a
+insertOptional k ov m = case ov of
+  None -> m
+  Some v -> TextMap.insert k v m
+-- Holding
+----------
+
+-- Upcast
+instrumentId_v1_to_v2 : HoldingV1.InstrumentId -> HoldingV2.InstrumentId
+instrumentId_v1_to_v2 HoldingV1.InstrumentId{..} = HoldingV2.InstrumentId with ..
+
+lock_v1_to_v2 : HoldingV1.Lock -> HoldingV2.Lock
+lock_v1_to_v2 HoldingV1.Lock{..} = HoldingV2.Lock with ..
+
+holdingv1_to_v2 : HoldingV1.HoldingView -> HoldingV2.HoldingView
+holdingv1_to_v2 v1 = v2
+  where
+    v2 = HoldingV2.HoldingView with
+      account = HoldingV2.Account with
+        provider = (TextMap.lookup "canton.network/account.provider" v1.meta.values) >>= partyFromText
+        id = TextMap.lookup "canton.network/account.id" v1.meta.values
+        owner = v1.owner
+      instrumentId = instrumentId_v1_to_v2 v1.instrumentId
+      amount = v1.amount
+      lock = fmap lock_v1_to_v2 v1.lock
+      meta = v1.meta
+
+-- Downcast
+instrumentId_v2_to_v1 : HoldingV2.InstrumentId -> HoldingV1.InstrumentId
+instrumentId_v2_to_v1 HoldingV2.InstrumentId{..} = HoldingV1.InstrumentId with ..
+
+lock_v2_to_v1 : HoldingV2.Lock -> HoldingV1.Lock
+lock_v2_to_v1 HoldingV2.Lock{..} = HoldingV1.Lock with ..
+
+holding_v2_to_v1 : HoldingV2.HoldingView -> HoldingV1.HoldingView
+holding_v2_to_v1 v2 = v1
+  where
+    meta' = Metadata with 
+      values = 
+        insertOptional "canton.network/account.provider" (partyToText <$> v2.account.provider) $
+        insertOptional "canton.network/account.id" (v2.account.id) $
+        v2.meta.values
+    v1 = HoldingV1.HoldingView with
+      owner = v2.account.owner
+      instrumentId = instrumentId_v2_to_v1 v2.instrumentId
+      amount = v2.amount
+      lock = fmap lock_v2_to_v1 v2.lock
+      meta = meta'
+
+-- Allocation
+-------------
+
+-- Upcast
+reference_v1_to_v2 : AllocationV1.Reference -> AllocationV2.Reference
+reference_v1_to_v2 AllocationV1.Reference{..} = AllocationV2.Reference with ..
+
+settlement_info_v1_to_v2 : AllocationV1.SettlementInfo -> AllocationV2.SettlementInfo
+settlement_info_v1_to_v2 AllocationV1.SettlementInfo{..} = v2
+  where
+    controllerOverride = case TextMap.lookup "canton.network/controllerOverride" meta.values of
+      None -> None
+      Some co -> None -- TODO: Parse controller override.
+    v2 = AllocationV2.SettlementInfo with
+      executor
+      settlementRef = reference_v1_to_v2 settlementRef
+      requestedAt
+      settleAt = allocateBefore
+      meta
+      controllerOverride
+      settlementDeadline = if settleBefore == maxTime then None else Some settleBefore
+
+transfer_leg_v1_to_v2 : AllocationV1.TransferLeg -> AllocationV2.TransferLeg
+transfer_leg_v1_to_v2 AllocationV1.TransferLeg{..} = 
+  AllocationV2.TransferLeg with
+    instrumentId = instrumentId_v1_to_v2 instrumentId
+    sender = senderAccount
+    receiver = receiverAccount
+    ..
+  where
+    senderAccount = HoldingV2.Account
+      with
+        provider = (TextMap.lookup "canton.network/sender.provider" meta.values) >>= partyFromText
+        id = TextMap.lookup "canton.network/sender.id" meta.values
+        owner = sender
+    receiverAccount = HoldingV2.Account
+      with
+        provider = (TextMap.lookup "canton.network/receiver.provider" meta.values) >>= partyFromText
+        id = TextMap.lookup "canton.network/receiver.id" meta.values
+        owner = receiver
+
+
+allocation_specification_v1_to_v2 : AllocationV1.AllocationSpecification -> AllocationV2.AllocationSpecification
+allocation_specification_v1_to_v2 AllocationV1.AllocationSpecification{..} = 
+  AllocationV2.AllocationSpecification with
+    settlement = settlement_info_v1_to_v2 settlement
+    transferLegs = TextMap.fromList ((transferLegId, transfer_leg_v1_to_v2 transferLeg)::otherLegs)
+  where
+    otherLegs = case TextMap.lookup "canton.network/otherLegs" transferLeg.meta.values of
+      None -> []
+      Some ol -> [] -- TODO: Parse other legs.
+
+allocation_view_v1_to_v2 : AllocationV1.AllocationView -> AllocationV2.AllocationView
+allocation_view_v1_to_v2 AllocationV1.AllocationView{..} = 
+  AllocationV2.AllocationView with
+    allocation = allocation_specification_v1_to_v2 allocation
+    holdingCids = map coerceInterfaceContractId holdingCids
+    meta
+    senders
+    requiredReceiverAuth
+    expiresAt
+  where
+    numExtraSenders = TextMap.lookup "canton.network/numExtraSenders" meta.values >>= parseInt
+    sender = HoldingV2.Account with
+      owner = allocation.transferLeg.sender
+      provider = TextMap.lookup "canton.network/sender.provider" meta.values >>= partyFromText
+      id = TextMap.lookup "canton.network/sender.id" meta.values
+    extraSenders = case numExtraSenders of 
+      None -> []
+      Some num -> map
+        (\n -> HoldingV2.Account with
+          owner = fromSome $ TextMap.lookup ("canton.network/sender[" <> show n <> "].owner") meta.values >>= partyFromText
+          provider = TextMap.lookup ("canton.network/sender[" <> show n <> "].provider") meta.values >>= partyFromText
+          id = TextMap.lookup ("canton.network/sender[" <> show n <> "].id") meta.values)
+        [1..num]
+    senders = sender::extraSenders
+    requiredReceiverAuth = case TextMap.lookup "canton.network/requiredReceiverAuth" meta.values of
+      None -> []
+      Some ol -> [] -- TODO: Parse extra auth list.
+    expiresAt = Some $ optional 
+      (allocation.settlement.settleBefore)
+      decodeTime
+      (TextMap.lookup "canton.network/expiresAt" meta.values)
+
+      
+-- Downcast
+reference_v2_to_v1 : AllocationV2.Reference -> AllocationV1.Reference
+reference_v2_to_v1 AllocationV2.Reference{..} = AllocationV1.Reference with ..
+
+settlement_info_v2_to_v1 : AllocationV2.SettlementInfo -> AllocationV1.SettlementInfo
+settlement_info_v2_to_v1 AllocationV2.SettlementInfo{..} = v1
+  where
+    meta' = Metadata with 
+      values = 
+        TextMap.insert "canton.network/version" "v2" $
+        TextMap.insert "canton.network/controllerOverride" (show controllerOverride) $
+        meta.values
+
+    v1 = AllocationV1.SettlementInfo with
+      executor
+      settlementRef = reference_v2_to_v1 settlementRef
+      requestedAt
+      allocateBefore = settleAt
+      settleBefore = fromOptional maxTime settlementDeadline
+      meta = meta'
+
+transfer_leg_v2_to_v1 : AllocationV2.TransferLeg -> AllocationV1.TransferLeg
+transfer_leg_v2_to_v1 AllocationV2.TransferLeg{..} = 
+  AllocationV1.TransferLeg with
+    instrumentId = instrumentId_v2_to_v1 instrumentId
+    sender = sender.owner
+    receiver = receiver.owner
+    meta = meta'
+    ..
+  where
+   meta' = Metadata with 
+      values = 
+        insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $
+        insertOptional "canton.network/sender.id" (sender.id) $
+        insertOptional "canton.network/receiver.provider" (partyToText <$> receiver.provider) $
+        insertOptional "canton.network/receiver.id" (receiver.id) $
+        meta.values
+
+allocation_specification_v2_to_v1 : AllocationV2.AllocationSpecification -> AllocationV1.AllocationSpecification
+allocation_specification_v2_to_v1 AllocationV2.AllocationSpecification{..} = 
+  AllocationV1.AllocationSpecification with
+    settlement = settlement_info_v2_to_v1 settlement
+    transferLegId
+    transferLeg = transfer_leg_v2_to_v1 transferLeg
+  where
+    (transferLegId, transferLeg')::other = if TextMap.size transferLegs > 0
+      then TextMap.toList transferLegs
+      else error "Cannot downcast an allocation specification without any legs."
+    meta = Metadata with 
+      values =
+        TextMap.insert "canton.network/version" "v2" $
+        TextMap.insert "canton.network/otherLegs" (show other) $
+        transferLeg'.meta.values
+    transferLeg = transferLeg' with meta
+
+allocation_view_v2_to_v1 : AllocationV2.AllocationView -> AllocationV1.AllocationView
+allocation_view_v2_to_v1 AllocationV2.AllocationView{..} = 
+  AllocationV1.AllocationView with
+    allocation = allocation_specification_v2_to_v1 allocation
+    holdingCids = map coerceInterfaceContractId holdingCids
+    meta = meta'
+  where 
+    sender::extraSenders = senders
+    meta0 = Metadata with
+      values =
+        TextMap.insert "canton.network/version" "v2" $
+        insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $ 
+        insertOptional "canton.network/sender.id" (sender.id) $ 
+        TextMap.insert "canton.network/requiredReceiverAuth" (show requiredReceiverAuth) $
+        insertOptional "canton.network/expiresAt" (fmap encodeTime expiresAt) $
+        meta.values
+    meta' = Metadata with
+      values = foldl
+        (\acc (s, n) ->
+          TextMap.insert ("canton.network/sender[" <> show n <> "].owner") (partyToText s.owner) $
+          insertOptional ("canton.network/sender[" <> show n <> "].provider") (partyToText <$> s.provider) $
+          insertOptional ("canton.network/sender[" <> show n <> "].id") (s.id) $
+          acc
+        )
+        meta0.values
+        (zip extraSenders [1..(length extraSenders)])
+      
+
+-- Choices
+
+allocation_execute_transfer_v1_to_v2 : AllocationV1.Allocation_ExecuteTransfer -> AllocationV2.Allocation_ExecuteTransfer
+allocation_execute_transfer_v1_to_v2 AllocationV1.Allocation_ExecuteTransfer{..} =
+  AllocationV2.Allocation_ExecuteTransfer with
+    extraAuth = []
+    ..
+
+allocation_transfer_result_v2_to_v1 : AllocationV2.Allocation_ExecuteTransferResult -> AllocationV1.Allocation_ExecuteTransferResult
+allocation_transfer_result_v2_to_v1 AllocationV2.Allocation_ExecuteTransferResult {..} =
+  AllocationV1.Allocation_ExecuteTransferResult with
+    senderHoldingCids = map coerceInterfaceContractId senderHoldingCids
+    receiverHoldingCids = map coerceInterfaceContractId receiverHoldingCids
+    meta
+
+allocation_v1_executeTransferImpl : AllocationV2.Allocation -> ContractId AllocationV1.Allocation -> AllocationV1.Allocation_ExecuteTransfer -> Update AllocationV1.Allocation_ExecuteTransferResult
+allocation_v1_executeTransferImpl this self execv1 = do
+  resv2 <- AllocationV2.allocation_executeTransferImpl 
+    this
+    (coerceInterfaceContractId @AllocationV2.Allocation self) 
+    (allocation_execute_transfer_v1_to_v2 execv1)
+  return (allocation_transfer_result_v2_to_v1 resv2)
+
+
+allocation_withdraw_result_v2_to_v1 : AllocationV2.Allocation_WithdrawResult -> AllocationV1.Allocation_WithdrawResult
+allocation_withdraw_result_v2_to_v1 AllocationV2.Allocation_WithdrawResult {..} =
+  AllocationV1.Allocation_WithdrawResult with
+    senderHoldingCids = map coerceInterfaceContractId senderHoldingCids
+    meta
+
+allocation_v1_withdrawImpl : AllocationV2.Allocation -> ContractId AllocationV1.Allocation -> AllocationV1.Allocation_Withdraw -> Update AllocationV1.Allocation_WithdrawResult
+allocation_v1_withdrawImpl this self AllocationV1.Allocation_Withdraw{..} = do
+  resv2 <- AllocationV2.allocation_withdrawImpl 
+    this
+    (coerceInterfaceContractId @AllocationV2.Allocation self) 
+    AllocationV2.Allocation_Withdraw {..}
+  return (allocation_withdraw_result_v2_to_v1 resv2)
+
+
+allocation_cancel_result_v2_to_v1 : AllocationV2.Allocation_CancelResult -> AllocationV1.Allocation_CancelResult
+allocation_cancel_result_v2_to_v1 AllocationV2.Allocation_CancelResult {..} =
+  AllocationV1.Allocation_CancelResult with
+    senderHoldingCids = map coerceInterfaceContractId senderHoldingCids
+    meta
+
+allocation_v1_cancelImpl : AllocationV2.Allocation -> ContractId AllocationV1.Allocation -> AllocationV1.Allocation_Cancel -> Update AllocationV1.Allocation_CancelResult
+allocation_v1_cancelImpl this self AllocationV1.Allocation_Cancel{..} = do
+  resv2 <- AllocationV2.allocation_cancelImpl 
+   this
+    (coerceInterfaceContractId @AllocationV2.Allocation self) 
+    AllocationV2.Allocation_Cancel {..}
+  return (allocation_cancel_result_v2_to_v1 resv2)
+
+
+-- AllocationInstruction
+------------------------
+
+-- Upcast
+allocation_instruction_view_v1_to_v2 : AllocationInstructionV1.AllocationInstructionView -> AllocationInstructionV2.AllocationInstructionView
+allocation_instruction_view_v1_to_v2 AllocationInstructionV1.AllocationInstructionView{..} = 
+  AllocationInstructionV2.AllocationInstructionView with
+    originalInstructionCid = fmap coerceInterfaceContractId originalInstructionCid
+    allocation = allocation_specification_v1_to_v2 allocation
+    pendingActions
+    requestedAt
+    inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
+    senders
+    meta
+  where
+    numExtraSenders = TextMap.lookup "canton.network/numExtraSenders" meta.values >>= parseInt
+    sender = HoldingV2.Account with
+      owner = allocation.transferLeg.sender
+      provider = TextMap.lookup "canton.network/sender.provider" meta.values >>= partyFromText
+      id = TextMap.lookup "canton.network/sender.id" meta.values
+    extraSenders = case numExtraSenders of 
+      None -> []
+      Some num -> map
+        (\n -> HoldingV2.Account with
+          owner = fromSome $ TextMap.lookup ("canton.network/sender[" <> show n <> "].owner") meta.values >>= partyFromText
+          provider = TextMap.lookup ("canton.network/sender[" <> show n <> "].provider") meta.values >>= partyFromText
+          id = TextMap.lookup ("canton.network/sender[" <> show n <> "].id") meta.values)
+        [1..num]
+    senders = sender::extraSenders
+
+-- Downcast
+allocation_instruction_view_v2_to_v1 : AllocationInstructionV2.AllocationInstructionView -> AllocationInstructionV1.AllocationInstructionView
+allocation_instruction_view_v2_to_v1 AllocationInstructionV2.AllocationInstructionView{..} = 
+  AllocationInstructionV1.AllocationInstructionView with
+    originalInstructionCid = fmap coerceInterfaceContractId originalInstructionCid
+    allocation = allocation_specification_v2_to_v1 allocation
+    pendingActions
+    requestedAt
+    inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
+    meta = meta'
+  where 
+    sender::extraSenders = senders
+    meta0 = Metadata with
+      values =
+        TextMap.insert "canton.network/version" "v2" $
+        insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $ 
+        insertOptional "canton.network/sender.id" (sender.id) $
+        meta.values
+    meta' = Metadata with
+      values = foldl
+        (\acc (s, n) ->
+          TextMap.insert ("canton.network/sender[" <> show n <> "].owner") (partyToText s.owner) $
+          insertOptional ("canton.network/sender[" <> show n <> "].provider") (partyToText <$> s.provider) $
+          insertOptional ("canton.network/sender[" <> show n <> "].id") (s.id) $
+          acc
+        )
+        meta0.values
+        (zip extraSenders [1..(length extraSenders)])
+
+-- Choices
+
+allocation_instruction_result_output_v2_to_v1 : AllocationInstructionV2.AllocationInstructionResult_Output -> AllocationInstructionV1.AllocationInstructionResult_Output
+allocation_instruction_result_output_v2_to_v1 iro = 
+  case iro of
+    AllocationInstructionV2.AllocationInstructionResult_Pending cid -> 
+      AllocationInstructionV1.AllocationInstructionResult_Pending (coerceInterfaceContractId cid)
+    AllocationInstructionV2.AllocationInstructionResult_Completed cid -> 
+      AllocationInstructionV1.AllocationInstructionResult_Completed (coerceInterfaceContractId cid)
+    AllocationInstructionV2.AllocationInstructionResult_Failed -> 
+      AllocationInstructionV1.AllocationInstructionResult_Failed
+
+allocation_instruction_result_v2_to_v1 : AllocationInstructionV2.AllocationInstructionResult -> AllocationInstructionV1.AllocationInstructionResult
+allocation_instruction_result_v2_to_v1 AllocationInstructionV2.AllocationInstructionResult{..} = 
+  AllocationInstructionV1.AllocationInstructionResult with
+    output = allocation_instruction_result_output_v2_to_v1 output
+    senderChangeCids = map coerceInterfaceContractId senderChangeCids
+    meta
+
+allocationInstruction_v1_withdrawImpl : AllocationInstructionV2.AllocationInstruction -> ContractId AllocationInstructionV1.AllocationInstruction -> AllocationInstructionV1.AllocationInstruction_Withdraw -> Update AllocationInstructionV1.AllocationInstructionResult
+allocationInstruction_v1_withdrawImpl this self AllocationInstructionV1.AllocationInstruction_Withdraw{..} = do
+  resv2 <- AllocationInstructionV2.allocationInstruction_withdrawImpl 
+    this
+    (coerceInterfaceContractId @AllocationInstructionV2.AllocationInstruction self) 
+    AllocationInstructionV2.AllocationInstruction_Withdraw {..}
+  return (allocation_instruction_result_v2_to_v1 resv2)
+
+
+allocationInstruction_v1_updateImpl : AllocationInstructionV2.AllocationInstruction -> ContractId AllocationInstructionV1.AllocationInstruction -> AllocationInstructionV1.AllocationInstruction_Update -> Update AllocationInstructionV1.AllocationInstructionResult
+allocationInstruction_v1_updateImpl this self AllocationInstructionV1.AllocationInstruction_Update{..} = do
+  resv2 <- AllocationInstructionV2.allocationInstruction_updateImpl 
+    this
+    (coerceInterfaceContractId @AllocationInstructionV2.AllocationInstruction self) 
+    AllocationInstructionV2.AllocationInstruction_Update {..}
+  return (allocation_instruction_result_v2_to_v1 resv2)
+
+
+-- AllocationFactory
+--------------------
+
+-- Upcast
+allocation_factory_view_v1_to_v2 : AllocationInstructionV1.AllocationFactoryView -> AllocationInstructionV2.AllocationFactoryView
+allocation_factory_view_v1_to_v2 AllocationInstructionV1.AllocationFactoryView{..} = 
+  AllocationInstructionV2.AllocationFactoryView with
+    admin
+    meta
+
+-- Downcast
+allocation_factory_view_v2_to_v1 : AllocationInstructionV2.AllocationFactoryView -> AllocationInstructionV1.AllocationFactoryView
+allocation_factory_view_v2_to_v1 AllocationInstructionV2.AllocationFactoryView{..} = 
+  AllocationInstructionV1.AllocationFactoryView with
+    admin
+    meta
+
+-- Choices
+
+allocation_factory_allocate_v1_to_v2 : AllocationInstructionV1.AllocationFactory_Allocate -> AllocationInstructionV2.AllocationFactory_Allocate
+allocation_factory_allocate_v1_to_v2 AllocationInstructionV1.AllocationFactory_Allocate{..} =
+   AllocationInstructionV2.AllocationFactory_Allocate with
+     expectedAdmin
+     allocation = allocation_specification_v1_to_v2 allocation
+     requestedAt
+     inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
+     extraArgs
+     creator = allocation.transferLeg.sender
+
+allocationFactory_v1_allocateImpl : AllocationInstructionV2.AllocationFactory -> ContractId AllocationInstructionV1.AllocationFactory -> AllocationInstructionV1.AllocationFactory_Allocate -> Update AllocationInstructionV1.AllocationInstructionResult
+allocationFactory_v1_allocateImpl this self alloc = do
+  resv2 <- AllocationInstructionV2.allocationFactory_allocateImpl 
+    this
+    (coerceInterfaceContractId @AllocationInstructionV2.AllocationFactory self) 
+    (allocation_factory_allocate_v1_to_v2 alloc)
+  return (allocation_instruction_result_v2_to_v1 resv2)
+
+
+allocationFactory_v1_publicFetchImpl : AllocationInstructionV2.AllocationFactory -> ContractId AllocationInstructionV1.AllocationFactory -> AllocationInstructionV1.AllocationFactory_PublicFetch -> Update AllocationInstructionV1.AllocationFactoryView
+allocationFactory_v1_publicFetchImpl this self AllocationInstructionV1.AllocationFactory_PublicFetch{..} = do
+  resv2 <- AllocationInstructionV2.allocationFactory_publicFetchImpl 
+    this
+    (coerceInterfaceContractId @AllocationInstructionV2.AllocationFactory self) 
+    AllocationInstructionV2.AllocationFactory_PublicFetch {..}
+  return (allocation_factory_view_v2_to_v1 resv2)
+
+
+-- TransferInstruction
+----------------------
+
+-- Upcast
+transfer_v1_to_v2 : TransferInstructionV1.Transfer -> TransferInstructionV2.Transfer
+transfer_v1_to_v2 TransferInstructionV1.Transfer{..} =
+  TransferInstructionV2.Transfer with
+    sender = senderAccount
+    receiver = receiverAccount
+    amount
+    instrumentId = instrumentId_v1_to_v2 instrumentId
+    requestedAt
+    executeBefore
+    inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
+    meta
+  where
+    senderAccount = HoldingV2.Account
+      with
+        provider = (TextMap.lookup "canton.network/sender.provider" meta.values) >>= partyFromText
+        id = TextMap.lookup "canton.network/sender.id" meta.values
+        owner = sender
+    receiverAccount = HoldingV2.Account
+      with
+        provider = (TextMap.lookup "canton.network/receiver.provider" meta.values) >>= partyFromText
+        id = TextMap.lookup "canton.network/receiver.id" meta.values
+        owner = receiver
+
+transfer_instruction_status_v1_to_v2 : TransferInstructionV1.TransferInstructionStatus -> TransferInstructionV2.TransferInstructionStatus
+transfer_instruction_status_v1_to_v2 tis = case tis of
+  TransferInstructionV1.TransferPendingReceiverAcceptance -> 
+    TransferInstructionV2.TransferPendingReceiverAcceptance
+  TransferInstructionV1.TransferPendingInternalWorkflow pendingActions -> 
+    TransferInstructionV2.TransferPendingInternalWorkflow pendingActions
+
+transfer_instruction_view_v1_to_v2 : TransferInstructionV1.TransferInstructionView -> TransferInstructionV2.TransferInstructionView
+transfer_instruction_view_v1_to_v2 TransferInstructionV1.TransferInstructionView{..} =
+  TransferInstructionV2.TransferInstructionView with
+    originalInstructionCid = fmap coerceInterfaceContractId originalInstructionCid
+    transfer = transfer_v1_to_v2 transfer
+    status = transfer_instruction_status_v1_to_v2 status
+    meta
+  
+
+-- Downcast
+transfer_v2_to_v1 : TransferInstructionV2.Transfer -> TransferInstructionV1.Transfer
+transfer_v2_to_v1 TransferInstructionV2.Transfer{..} =
+  TransferInstructionV1.Transfer with
+    sender = sender.owner
+    receiver = receiver.owner
+    amount
+    instrumentId = instrumentId_v2_to_v1 instrumentId
+    requestedAt
+    executeBefore
+    inputHoldingCids = map coerceInterfaceContractId inputHoldingCids
+    meta = meta'
+    ..
+  where
+   meta' = Metadata with 
+      values = 
+        insertOptional "canton.network/sender.provider" (partyToText <$> sender.provider) $
+        insertOptional "canton.network/sender.id" (sender.id) $
+        insertOptional "canton.network/receiver.provider" (partyToText <$> receiver.provider) $
+        insertOptional "canton.network/receiver.id" (receiver.id) $
+        meta.values
+
+transfer_instruction_status_v2_to_v1 : TransferInstructionV2.TransferInstructionStatus -> TransferInstructionV1.TransferInstructionStatus
+transfer_instruction_status_v2_to_v1 tis = case tis of
+  TransferInstructionV2.TransferPendingReceiverAcceptance -> 
+    TransferInstructionV1.TransferPendingReceiverAcceptance
+  TransferInstructionV2.TransferPendingInternalWorkflow pendingActions -> 
+    TransferInstructionV1.TransferPendingInternalWorkflow pendingActions
+
+transfer_instruction_view_v2_to_v1 : TransferInstructionV2.TransferInstructionView -> TransferInstructionV1.TransferInstructionView
+transfer_instruction_view_v2_to_v1 TransferInstructionV2.TransferInstructionView{..} =
+  TransferInstructionV1.TransferInstructionView with
+    originalInstructionCid = fmap coerceInterfaceContractId originalInstructionCid
+    transfer = transfer_v2_to_v1 transfer
+    status = transfer_instruction_status_v2_to_v1 status
+    meta
+
+-- Choices
+
+transfer_instruction_result_output_v2_to_v1 : TransferInstructionV2.TransferInstructionResult_Output -> TransferInstructionV1.TransferInstructionResult_Output
+transfer_instruction_result_output_v2_to_v1 tiro = case tiro of
+  TransferInstructionV2.TransferInstructionResult_Pending with transferInstructionCid ->
+    TransferInstructionV1.TransferInstructionResult_Pending with
+      transferInstructionCid = (coerceInterfaceContractId transferInstructionCid)
+  TransferInstructionV2.TransferInstructionResult_Completed with receiverHoldingCids ->
+    TransferInstructionV1.TransferInstructionResult_Completed with
+      receiverHoldingCids = (map coerceInterfaceContractId receiverHoldingCids)
+  TransferInstructionV2.TransferInstructionResult_Failed  ->
+    TransferInstructionV1.TransferInstructionResult_Failed
+
+transfer_instruction_result_v2_to_v1 : TransferInstructionV2.TransferInstructionResult -> TransferInstructionV1.TransferInstructionResult
+transfer_instruction_result_v2_to_v1 TransferInstructionV2.TransferInstructionResult{..} =
+  TransferInstructionV1.TransferInstructionResult with
+    output = transfer_instruction_result_output_v2_to_v1 output
+    senderChangeCids = map coerceInterfaceContractId senderChangeCids
+    meta
+
+transferInstruction_v1_acceptImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Accept -> Update TransferInstructionV1.TransferInstructionResult
+transferInstruction_v1_acceptImpl this self TransferInstructionV1.TransferInstruction_Accept{..} = do
+  resv2 <- TransferInstructionV2.transferInstruction_acceptImpl 
+    this
+    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
+    (TransferInstructionV2.TransferInstruction_Accept{actor = None; ..})
+  return (transfer_instruction_result_v2_to_v1 resv2)
+    
+
+transferInstruction_v1_rejectImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Reject -> Update TransferInstructionV1.TransferInstructionResult
+transferInstruction_v1_rejectImpl this self TransferInstructionV1.TransferInstruction_Reject{..} = do
+  resv2 <- TransferInstructionV2.transferInstruction_rejectImpl 
+    this
+    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
+    (TransferInstructionV2.TransferInstruction_Reject{actor = None; ..})
+  return (transfer_instruction_result_v2_to_v1 resv2)
+
+transferInstruction_v1_withdrawImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Withdraw -> Update TransferInstructionV1.TransferInstructionResult
+transferInstruction_v1_withdrawImpl this self TransferInstructionV1.TransferInstruction_Withdraw{..} = do
+  resv2 <- TransferInstructionV2.transferInstruction_withdrawImpl 
+    this
+    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
+    (TransferInstructionV2.TransferInstruction_Withdraw{actor = None; ..})
+  return (transfer_instruction_result_v2_to_v1 resv2)
+
+transferInstruction_v1_updateImpl : TransferInstructionV2.TransferInstruction -> ContractId TransferInstructionV1.TransferInstruction -> TransferInstructionV1.TransferInstruction_Update -> Update TransferInstructionV1.TransferInstructionResult
+transferInstruction_v1_updateImpl this self TransferInstructionV1.TransferInstruction_Update{..} = do
+  resv2 <- TransferInstructionV2.transferInstruction_updateImpl 
+    this
+    (coerceInterfaceContractId @TransferInstructionV2.TransferInstruction self) 
+    (TransferInstructionV2.TransferInstruction_Update{..})
+  return (transfer_instruction_result_v2_to_v1 resv2)
+
+-- TransferFactory
+------------------
+
+-- Updast
+transfer_factory_view_v1_to_v2 : TransferInstructionV1.TransferFactoryView -> TransferInstructionV2.TransferFactoryView
+transfer_factory_view_v1_to_v2 TransferInstructionV1.TransferFactoryView{..} =
+  TransferInstructionV2.TransferFactoryView with ..
+
+-- Downcast
+transfer_factory_view_v2_to_v1 : TransferInstructionV2.TransferFactoryView -> TransferInstructionV1.TransferFactoryView
+transfer_factory_view_v2_to_v1 TransferInstructionV2.TransferFactoryView{..} =
+  TransferInstructionV1.TransferFactoryView with ..
+
+-- Choices
+
+transfer_factory_transfer_v1_to_v2 : TransferInstructionV1.TransferFactory_Transfer -> TransferInstructionV2.TransferFactory_Transfer
+transfer_factory_transfer_v1_to_v2 TransferInstructionV1.TransferFactory_Transfer{..} =
+  TransferInstructionV2.TransferFactory_Transfer with
+    expectedAdmin
+    transfer = transfer_v1_to_v2 transfer
+    actor = None
+    extraArgs
+
+transferFactory_v1_transferImpl : TransferInstructionV2.TransferFactory -> ContractId TransferInstructionV1.TransferFactory -> TransferInstructionV1.TransferFactory_Transfer -> Update TransferInstructionV1.TransferInstructionResult
+transferFactory_v1_transferImpl this self args = do
+  resv2 <- TransferInstructionV2.transferFactory_transferImpl 
+    this
+    (coerceInterfaceContractId @TransferInstructionV2.TransferFactory self) 
+    (transfer_factory_transfer_v1_to_v2 args)
+  return (transfer_instruction_result_v2_to_v1 resv2)
+
+transferFactory_v1_publicFetchImpl : TransferInstructionV2.TransferFactory -> ContractId TransferInstructionV1.TransferFactory -> TransferInstructionV1.TransferFactory_PublicFetch -> Update TransferInstructionV1.TransferFactoryView
+transferFactory_v1_publicFetchImpl this self TransferInstructionV1.TransferFactory_PublicFetch{..} = do
+  resv2 <- TransferInstructionV2.transferFactory_publicFetchImpl 
+    this
+    (coerceInterfaceContractId @TransferInstructionV2.TransferFactory self) 
+    TransferInstructionV2.TransferFactory_PublicFetch with ..
+  return (transfer_factory_view_v2_to_v1 resv2)
+
+

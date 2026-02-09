@@ -58,6 +58,14 @@ import Splice.Testing.TokenStandard.RegistryApi
 
 import Daml.Script
 
+-- Utils to keep V1 alive
+-------------------------
+
+-- | Shared definition of the instrument-id used for amulets.
+amuletInstrumentIdV1 : Party -> InstrumentId
+amuletInstrumentIdV1 dso =
+  InstrumentId with admin = dso; id = "Amulet"
+
 -- Registry representation
 --------------------------
 
@@ -120,7 +128,7 @@ initialize config = do
   dso <- allocatePartyExact config.dsoPartyName
   let registry = AmuletRegistry with
         dso
-        instrumentId = amuletInstrumentId dso
+        instrumentId = amuletInstrumentIdV1 dso
 
   let amuletConfig
         | config.noTransferFee = defaultAmuletConfig with
@@ -301,7 +309,7 @@ registryApi_getAllocation_abortTwoStepTransferContext registry instrCid = do
   let lockedAmuletActive = isSome optLockedAmulet
   -- this can only happen if the locked amulet already expired
   now <- getTime
-  unless (lockedAmuletActive || amuletAlloc.allocation.settlement.settleBefore <= now) $
+  unless (lockedAmuletActive || amuletAlloc.expiresAt <= now) $
     fail "Invariant violation: the locked amulet is archived, but the settlement is not yet expired"
   -- this context communicates whether to unlock the amulet
   let expireLockC = OpenApiChoiceContext with
