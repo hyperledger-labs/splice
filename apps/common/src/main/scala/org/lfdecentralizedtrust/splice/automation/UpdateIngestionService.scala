@@ -68,13 +68,10 @@ class UpdateIngestionService(
             _ = logger.debug(
               s"Starting ingestion from participant begin at $participantBegin"
             )
-            _ <- ingestionSink
-              .ingestAcs(
-                participantBegin,
-                Seq.empty,
-                Seq.empty,
-                Seq.empty,
-              )
+            _ <- ingestionSink.ingestAcsStreamInBatches(
+              Source.empty,
+              participantBegin,
+            )
           } yield participantBegin
         case IngestionStart.InitializeAcsAtLatestOffset =>
           for {

@@ -42,6 +42,7 @@ import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import io.circe.Json
 import org.apache.pekko.stream.Materializer
@@ -746,6 +747,7 @@ object MultiDomainAcsStore extends StoreErrors {
     /** Must be the first method called. Returns information about where and how to start ingestion. */
     def initialize()(implicit traceContext: TraceContext): Future[IngestionStart]
 
+    @VisibleForTesting
     def ingestAcs(
         offset: Long,
         acs: Seq[ActiveContract],

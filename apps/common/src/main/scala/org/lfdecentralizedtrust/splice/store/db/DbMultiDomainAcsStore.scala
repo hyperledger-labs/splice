@@ -1104,33 +1104,45 @@ final class DbMultiDomainAcsStore[TXE](
         tc: TraceContext,
         mat: Materializer,
     ): Future[Unit] = {
-      // TODO: this is still loading everything into memory
-      val summaryState = MutableIngestionSummary.empty
-      for {
-        // If we crash halfway through we want to start over with the whole ACS ingestion.
-        // If the offset is the same between calls, this isn't strictly necessary, as `on conflict do nothing` prevents any issues.
-        // But if the offset changes between calls (which can happen in InitializeAcsAtLatestOffset), then we might miss some archival events,
-        // and thus we need to ingest the entire ACS from the beginning.
-        _ <- clearDataForCurrentMigrationId()
-        _ <- source.runWith(
-          Sink.foreachAsync[Seq[BaseLedgerConnection.ActiveContractsItem]](parallelism = 1) {
-            batch =>
-              ingestAcsBatch(
-                offset,
-                batch.collect { case ActiveContractsItem.ActiveContract(contract) => contract },
-                batch.collect { case ActiveContractsItem.IncompleteUnassign(unassign) =>
-                  unassign
-                },
-                batch.collect { case ActiveContractsItem.IncompleteAssign(assign) => assign },
-                summaryState,
-              )
-          }
+      if (hasFinishedAcsIngestion) {
+        Future.failed(
+          new RuntimeException(
+            s"ACS was already ingested for store $acsStoreId, cannot ingest again"
+          )
         )
-        // A store is considered initialized if the last ingested offset is set
-        // Therefore, we must do that after the ACS is ingested,
-        // so that in case of failure the whole ACS ingestion will be retried.
-        _ <- markAcsIngestedAsOf(offset, summaryState)
-      } yield ()
+      } else {
+        // TODO: this is still loading everything into memory
+        val summaryState = MutableIngestionSummary.empty
+        for {
+          // If we crash halfway through we want to start over with the whole ACS ingestion.
+          // If the offset is the same between calls, this isn't strictly necessary, as `on conflict do nothing` prevents any issues.
+          // But if the offset changes between calls (which can happen in InitializeAcsAtLatestOffset), then we might miss some archival events,
+          // and thus we need to ingest the entire ACS from the beginning.
+          // Since we are not using any long-running transaction spanning the entire ACS ingestion
+          // process, ACS queries could return incomplete data shorty after application start.
+          // This is fine because all clients are expected to use [[waitUntilAcsIngested()]] to avoid
+          // reading ACS data before it has finished ingesting.
+          _ <- clearDataForCurrentMigrationId()
+          _ <- source.runWith(
+            Sink.foreachAsync[Seq[BaseLedgerConnection.ActiveContractsItem]](parallelism = 1) {
+              batch =>
+                ingestAcsBatch(
+                  offset,
+                  batch.collect { case ActiveContractsItem.ActiveContract(contract) => contract },
+                  batch.collect { case ActiveContractsItem.IncompleteUnassign(unassign) =>
+                    unassign
+                  },
+                  batch.collect { case ActiveContractsItem.IncompleteAssign(assign) => assign },
+                  summaryState,
+                )
+            }
+          )
+          // A store is considered initialized if the last ingested offset is set
+          // Therefore, we must do that after the ACS is ingested,
+          // so that in case of failure the whole ACS ingestion will be retried.
+          _ <- markAcsIngestedAsOf(offset, summaryState)
+        } yield ()
+      }
     }
 
     private def clearDataForCurrentMigrationId()(implicit
@@ -1275,35 +1287,27 @@ final class DbMultiDomainAcsStore[TXE](
     private def markAcsIngestedAsOf(offset: Long, summaryState: MutableIngestionSummary)(implicit
         traceContext: TraceContext
     ): Future[Unit] = {
-      if (hasFinishedAcsIngestion) {
-        Future.failed(
-          new RuntimeException(
-            s"ACS was already ingested for store $acsStoreId, cannot ingest again"
-          )
+      storage.update(updateOffset(offset), "markAcsIngestedAsOf").map { _ =>
+        val newAcsSize = summaryState.acsSizeDiff
+        val summary = summaryState.toIngestionSummary(
+          offset = offset,
+          synchronizerIdToRecordTime = Map.empty,
+          newAcsSize = newAcsSize,
+          metrics = metrics,
         )
-      } else {
-        storage.update(updateOffset(offset), "markAcsIngestedAsOf").map { _ =>
-          val newAcsSize = summaryState.acsSizeDiff
-          val summary = summaryState.toIngestionSummary(
-            offset = offset,
-            synchronizerIdToRecordTime = Map.empty,
-            newAcsSize = newAcsSize,
-            metrics = metrics,
+        state
+          .getAndUpdate(
+            _.withUpdate(newAcsSize, offset)
           )
-          state
-            .getAndUpdate(
-              _.withUpdate(newAcsSize, offset)
-            )
-            .signalOffsetChanged(offset)
+          .signalOffsetChanged(offset)
 
-          logger.debug(show"Ingested complete ACS at offset $offset: $summary")
-          handleIngestionSummary(summary)
+        logger.debug(show"Ingested complete ACS at offset $offset: $summary")
+        handleIngestionSummary(summary)
 
-          finishedAcsIngestion.success(())
-          logger.info(
-            s"Store $acsStoreId ingested the ACS and switched to ingesting updates at $offset"
-          )
-        }
+        finishedAcsIngestion.success(())
+        logger.info(
+          s"Store $acsStoreId ingested the ACS and switched to ingesting updates at $offset"
+        )
       }
     }
 
