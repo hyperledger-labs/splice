@@ -23,24 +23,12 @@ abstract class TransferInputStoreTest extends StoreTestBase {
         _ <- dummyDomain.ingest(mintTransaction(user, 13.0, 3L, 4.0))(store.multiDomainAcsStore)
         _ <- dummyDomain.ingest(mintTransaction(user, 10.0, 4L, 1.0))(store.multiDomainAcsStore)
       } yield {
-        def top3At(round: Long): Seq[Double] =
-          store
-            .listSortedAmuletsAndQuantity(round, PageLimit.tryCreate(3))
-            .futureValue
-            .map(_._1.toDouble)
-
-        // Values of the 4 amulets by time:
-        // 11 10 09 08 07 06 05 04 03 02
-        //    12 10 08 06 04 02 00 00 00
-        //       13 09 05 01 00 00 00 00
-        //          10 09 08 07 06 05 04
-        // Note: need to start at round 4, as listSortedAmuletsAndQuantity() does not filter out amulets
-        // created after the given round
-        top3At(4L) should contain theSameElementsInOrderAs Seq(10.0, 9.0, 8.0)
-        top3At(5L) should contain theSameElementsInOrderAs Seq(9.0, 7.0, 6.0)
-        top3At(6L) should contain theSameElementsInOrderAs Seq(8.0, 6.0, 4.0)
-        top3At(7L) should contain theSameElementsInOrderAs Seq(7.0, 5.0, 2.0)
-        top3At(8L) should contain theSameElementsInOrderAs Seq(6.0, 4.0)
+        // We don't deduct holding fees here (anymore)
+        // TODO(#2257): we also shouldn't need to pass a round here anymore...
+        store
+          .listSortedAmuletsAndQuantity(5L, PageLimit.tryCreate(5))
+          .futureValue
+          .map(_._1.toDouble) shouldBe Seq(13.0, 12.0, 11.0, 10.0)
       }
     }
   }
