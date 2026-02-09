@@ -149,24 +149,26 @@ class UpdateHistorySanityCheckPlugin(
       founder: ScanAppBackendReference,
       others: Seq[ScanAppBackendReference],
   ): Unit = {
-    val founderHistory = paginateHistory(founder, None, Chain.empty).toVector
-    forAll(others) { otherScan =>
-      withClue(s"Comparing ${otherScan.name} to ${founder.name}") {
-        val otherScanHistory = paginateHistory(otherScan, None, Chain.empty).toVector
-        // One of them might be more advanced than the other.
-        // That's fine, we mostly want to check that backfilling works as expected.
-        val minSize = Math.min(founderHistory.size, otherScanHistory.size)
-        val otherComparable = otherScanHistory
-          .take(minSize)
-        val founderComparable = founderHistory
-          .take(minSize)
-        val different = otherComparable
-          .zip(founderComparable)
-          .collect {
-            case (otherItem, founderItem) if founderItem != otherItem =>
-              otherItem -> founderItem
-          }
-        different should be(empty)
+    if (others.nonEmpty) {
+      val founderHistory = paginateHistory(founder, None, Chain.empty).toVector
+      forAll(others) { otherScan =>
+        withClue(s"Comparing ${otherScan.name} to ${founder.name}") {
+          val otherScanHistory = paginateHistory(otherScan, None, Chain.empty).toVector
+          // One of them might be more advanced than the other.
+          // That's fine, we mostly want to check that backfilling works as expected.
+          val minSize = Math.min(founderHistory.size, otherScanHistory.size)
+          val otherComparable = otherScanHistory
+            .take(minSize)
+          val founderComparable = founderHistory
+            .take(minSize)
+          val different = otherComparable
+            .zip(founderComparable)
+            .collect {
+              case (otherItem, founderItem) if founderItem != otherItem =>
+                otherItem -> founderItem
+            }
+          different should be(empty)
+        }
       }
     }
   }
@@ -288,19 +290,21 @@ class UpdateHistorySanityCheckPlugin(
       founder: ScanAppBackendReference,
       others: Seq[ScanAppBackendReference],
   ) = {
-    val founderSnapshots = getAllSnapshots(founder, CantonTimestamp.MaxValue, Nil)
-    forAll(others) { otherScan =>
-      withClue(s"Comparing ${otherScan.name} to ${founder.name}") {
-        val otherScanSnapshots = getAllSnapshots(otherScan, CantonTimestamp.MaxValue, Nil)
-        // One of them might have more snapshots than the other.
-        val minSize = Math.min(founderSnapshots.size, otherScanSnapshots.size)
-        val otherComparable = otherScanSnapshots.take(minSize).map(toComparableSnapshot)
-        val founderComparable = founderSnapshots.take(minSize).map(toComparableSnapshot)
-        val different = otherComparable.zipWithIndex.collect {
-          case (otherItem, idx) if founderComparable(idx) != otherItem =>
-            (idx, otherItem, founderComparable(idx))
+    if (others.nonEmpty) {
+      val founderSnapshots = getAllSnapshots(founder, CantonTimestamp.MaxValue, Nil)
+      forAll(others) { otherScan =>
+        withClue(s"Comparing ${otherScan.name} to ${founder.name}") {
+          val otherScanSnapshots = getAllSnapshots(otherScan, CantonTimestamp.MaxValue, Nil)
+          // One of them might have more snapshots than the other.
+          val minSize = Math.min(founderSnapshots.size, otherScanSnapshots.size)
+          val otherComparable = otherScanSnapshots.take(minSize).map(toComparableSnapshot)
+          val founderComparable = founderSnapshots.take(minSize).map(toComparableSnapshot)
+          val different = otherComparable.zipWithIndex.collect {
+            case (otherItem, idx) if founderComparable(idx) != otherItem =>
+              (idx, otherItem, founderComparable(idx))
+          }
+          different should be(empty)
         }
-        different should be(empty)
       }
     }
   }
