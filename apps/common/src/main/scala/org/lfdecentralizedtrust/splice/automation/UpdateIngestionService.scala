@@ -4,23 +4,22 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import cats.data.NonEmptyList
-import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.config.AutomationConfig
-import org.lfdecentralizedtrust.splice.environment.{
-  RetryProvider,
-  SpliceLedgerConnection,
-  SpliceLedgerSubscription,
-}
-import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.common.annotations.VisibleForTesting
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
-import org.apache.pekko.stream.scaladsl.{Sink, Source}
-import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.ActiveContractsItem
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
+import org.lfdecentralizedtrust.splice.config.AutomationConfig
+import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
+import org.lfdecentralizedtrust.splice.environment.{
+  RetryProvider,
+  SpliceLedgerConnection,
+  SpliceLedgerSubscription,
+}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
@@ -69,7 +68,13 @@ class UpdateIngestionService(
             _ = logger.debug(
               s"Starting ingestion from participant begin at $participantBegin"
             )
-            _ <- ingestionSink.makeAcsIngestor().markAcsIngestedAsOf(participantBegin)
+            _ <- ingestionSink
+              .ingestAcs(
+                participantBegin,
+                Seq.empty,
+                Seq.empty,
+                Seq.empty,
+              )
           } yield participantBegin
         case IngestionStart.InitializeAcsAtLatestOffset =>
           for {
@@ -106,23 +111,10 @@ class UpdateIngestionService(
   private def ingestAcsAndInFlight(
       offset: Long
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    val acsIngestor = ingestionSink.makeAcsIngestor()
-    for {
-      _ <- acsIngestor.deleteExistingAcs()
-      _ <- batchSource(connection.activeContracts(filter, offset))
-        .runWith(Sink.foreachAsync(parallelism = 1) { batch =>
-          acsIngestor.ingestAcsBatch(
-            offset,
-            batch.collect { case ActiveContractsItem.ActiveContract(contract) => contract },
-            batch.collect { case ActiveContractsItem.IncompleteUnassign(unassign) => unassign },
-            batch.collect { case ActiveContractsItem.IncompleteAssign(assign) => assign },
-          )
-        })
-      // A store is considered initialized if the last ingested offset is set
-      // Therefore, we must do that after the ACS is ingested,
-      // so that in case of failure the whole ACS ingestion will be retried.
-      _ <- acsIngestor.markAcsIngestedAsOf(offset)
-    } yield ()
+    ingestionSink.ingestAcsStreamInBatches(
+      batchSource(connection.activeContracts(filter, offset)),
+      offset,
+    )
   }
 
   private def batchSource[T](source: Source[T, NotUsed]): Source[Vector[T], NotUsed] =

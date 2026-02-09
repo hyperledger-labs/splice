@@ -5,14 +5,14 @@ package org.lfdecentralizedtrust.splice.store.db
 
 import cats.data.{NonEmptyList, NonEmptyVector, OptionT}
 import org.apache.pekko.NotUsed
-import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, Transaction}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
-import org.lfdecentralizedtrust.splice.environment.RetryProvider
+import org.lfdecentralizedtrust.splice.environment.{BaseLedgerConnection, RetryProvider}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -61,7 +61,9 @@ import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
 import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
 import io.circe.Json
+import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.ActiveContractsItem
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
@@ -1095,173 +1097,201 @@ final class DbMultiDomainAcsStore[TXE](
         .transactionally
     }
 
-    override def makeAcsIngestor(): AcsIngestor = new AcsIngestor {
+    def ingestAcsStreamInBatches(
+        source: Source[Seq[BaseLedgerConnection.ActiveContractsItem], NotUsed],
+        offset: Long,
+    )(implicit
+        tc: TraceContext,
+        mat: Materializer,
+    ): Future[Unit] = {
       // TODO: this is still loading everything into memory
-      private val summaryState = MutableIngestionSummary.empty
-
-      override def deleteExistingAcs()(implicit traceContext: TraceContext): Future[Unit] = storage
-        .update(
-          sqlu"delete from #$acsTableName where store_id = $acsStoreId and migration_id = $domainMigrationId",
-          "deleteExistingAcs",
-        )
-        .map { nDeleted =>
-          if (nDeleted > 0) {
-            logger.warn(
-              s"Deleted $nDeleted rows from ACS table for store $acsStoreId and migration $domainMigrationId. " +
-                "This should only happen if the store already had some data, but was not marked as having ingested the ACS " +
-                "(because of a previous failed ACS ingestion attempt)."
-            )
-          }
-        }
-
-      override def markAcsIngestedAsOf(offset: Long)(implicit
-          traceContext: TraceContext
-      ): Future[Unit] = {
-        if (hasFinishedAcsIngestion) {
-          Future.failed(
-            new RuntimeException(
-              s"ACS was already ingested for store $acsStoreId, cannot ingest again"
-            )
-          )
-        } else {
-          storage.update(updateOffset(offset), "markAcsIngestedAsOf").map { _ =>
-            val newAcsSize = summaryState.acsSizeDiff
-            val summary = summaryState.toIngestionSummary(
-              updateId = None,
-              offset = offset,
-              synchronizerIdToRecordTime = Map.empty,
-              newAcsSize = newAcsSize,
-              metrics = metrics,
-            )
-            state
-              .getAndUpdate(
-                _.withUpdate(newAcsSize, offset)
+      val summaryState = MutableIngestionSummary.empty
+      for {
+        _ <- deleteExistingAcs()
+        _ <- source.runWith(
+          Sink.foreachAsync[Seq[BaseLedgerConnection.ActiveContractsItem]](parallelism = 1) {
+            batch =>
+              ingestAcsBatch(
+                offset,
+                batch.collect { case ActiveContractsItem.ActiveContract(contract) => contract },
+                batch.collect { case ActiveContractsItem.IncompleteUnassign(unassign) =>
+                  unassign
+                },
+                batch.collect { case ActiveContractsItem.IncompleteAssign(assign) => assign },
+                summaryState,
               )
-              .signalOffsetChanged(offset)
-
-            logger.debug(show"Ingested complete ACS at offset $offset: $summary")
-            handleIngestionSummary(summary)
-
-            finishedAcsIngestion.success(())
-            logger.info(
-              s"Store $acsStoreId ingested the ACS and switched to ingesting updates at $offset"
-            )
           }
+        )
+        // A store is considered initialized if the last ingested offset is set
+        // Therefore, we must do that after the ACS is ingested,
+        // so that in case of failure the whole ACS ingestion will be retried.
+        _ <- markAcsIngestedAsOf(offset, summaryState)
+      } yield ()
+    }
+
+    private def deleteExistingAcs()(implicit traceContext: TraceContext): Future[Unit] = storage
+      .update(
+        sqlu"delete from #$acsTableName where store_id = $acsStoreId and migration_id = $domainMigrationId",
+        "deleteExistingAcs",
+      )
+      .map { nDeleted =>
+        if (nDeleted > 0) {
+          logger.warn(
+            s"Deleted $nDeleted rows from ACS table for store $acsStoreId and migration $domainMigrationId. " +
+              "This should only happen if the store already had some data, but was not marked as having ingested the ACS " +
+              "(because of a previous failed ACS ingestion attempt)."
+          )
         }
       }
 
-      override def ingestAcsBatch(
-          offset: Long,
-          acs: Seq[ActiveContract],
-          incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
-          incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
-      )(implicit traceContext: TraceContext): Future[Unit] = {
-        if (hasFinishedAcsIngestion) {
-          Future.failed(
-            new RuntimeException(
-              s"ACS was already ingested for store $acsStoreId, cannot ingest again"
+    private def ingestAcsBatch(
+        offset: Long,
+        acs: Seq[ActiveContract],
+        incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
+        incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
+        summaryState: MutableIngestionSummary,
+    )(implicit traceContext: TraceContext): Future[Unit] = {
+      if (hasFinishedAcsIngestion) {
+        Future.failed(
+          new RuntimeException(
+            s"ACS was already ingested for store $acsStoreId, cannot ingest again"
+          )
+        )
+      } else {
+        // Filter out all contracts we are not interested in
+        val todoAcs = acs
+          .filter(contract => contractFilter.contains(contract.createdEvent))
+        todoAcs.foreach { contract =>
+          contractFilter.ensureStakeholderOf(contract.createdEvent)
+        }
+        val todoIncompleteOut = incompleteOut
+          .filter(event => contractFilter.contains(event.createdEvent))
+        todoIncompleteOut.foreach { event =>
+          contractFilter.ensureStakeholderOf(event.createdEvent)
+        }
+        val todoIncompleteIn = incompleteIn
+          .filter(event => contractFilter.contains(event.reassignmentEvent.createdEvent))
+        todoIncompleteIn.foreach { event =>
+          contractFilter.ensureStakeholderOf(event.reassignmentEvent.createdEvent)
+        }
+
+        // TODO: on conflict do nothing doesn't work if the offset changes (which it will in InitializeAcsAtLatestOffset) because it misses archivals of previously inserted contracts
+        val acsInserts = NonEmptyList
+          .fromFoldable(todoAcs)
+          .map(acs =>
+            doIngestAcsInserts(
+              acs.map { ac =>
+                AcsInsertEntry(
+                  offset,
+                  ac.createdEvent,
+                  stateRowDataFromActiveContract(
+                    ac.synchronizerId,
+                    ac.reassignmentCounter,
+                  ),
+                )
+              },
+              summaryState,
+              onConflictDoNothing = true,
             )
           )
-        } else {
-          // Filter out all contracts we are not interested in
-          val todoAcs = acs
-            .filter(contract => contractFilter.contains(contract.createdEvent))
-          todoAcs.foreach { contract =>
-            contractFilter.ensureStakeholderOf(contract.createdEvent)
-          }
-          val todoIncompleteOut = incompleteOut
-            .filter(event => contractFilter.contains(event.createdEvent))
-          todoIncompleteOut.foreach { event =>
-            contractFilter.ensureStakeholderOf(event.createdEvent)
-          }
-          val todoIncompleteIn = incompleteIn
-            .filter(event => contractFilter.contains(event.reassignmentEvent.createdEvent))
-          todoIncompleteIn.foreach { event =>
-            contractFilter.ensureStakeholderOf(event.reassignmentEvent.createdEvent)
-          }
 
-          // TODO: on conflict do nothing doesn't work if the offset changes (which it will in InitializeAcsAtLatestOffset) because it misses archivals of previously inserted contracts
-          val acsInserts = NonEmptyList
-            .fromFoldable(todoAcs)
-            .map(acs =>
-              doIngestAcsInserts(
-                acs.map { ac =>
-                  AcsInsertEntry(
-                    offset,
-                    ac.createdEvent,
-                    stateRowDataFromActiveContract(
-                      ac.synchronizerId,
-                      ac.reassignmentCounter,
-                    ),
-                  )
-                },
-                summaryState,
-                onConflictDoNothing = true,
-              )
-            )
-
-          val incompleteOutInserts = NonEmptyList
-            .fromFoldable(todoIncompleteOut)
-            .map { evts =>
-              doIngestAcsInserts(
-                evts.map { evt =>
-                  AcsInsertEntry(
-                    offset,
-                    evt.createdEvent,
-                    stateRowDataFromUnassign(evt.reassignmentEvent),
-                  )
-                },
-                summaryState,
-                onConflictDoNothing = true,
-              )
-            }
-            .toList ++ todoIncompleteOut.map { evt =>
-            // TODO (#3884): batch inserts
-            doRegisterIncompleteReassignment(
-              evt.createdEvent.getContractId,
-              evt.reassignmentEvent.source,
-              evt.reassignmentEvent.unassignId,
-              isAssignment = false,
+        val incompleteOutInserts = NonEmptyList
+          .fromFoldable(todoIncompleteOut)
+          .map { evts =>
+            doIngestAcsInserts(
+              evts.map { evt =>
+                AcsInsertEntry(
+                  offset,
+                  evt.createdEvent,
+                  stateRowDataFromUnassign(evt.reassignmentEvent),
+                )
+              },
               summaryState,
+              onConflictDoNothing = true,
             )
           }
+          .toList ++ todoIncompleteOut.map { evt =>
+          // TODO (#3884): batch inserts
+          doRegisterIncompleteReassignment(
+            evt.createdEvent.getContractId,
+            evt.reassignmentEvent.source,
+            evt.reassignmentEvent.unassignId,
+            isAssignment = false,
+            summaryState,
+          )
+        }
 
-          val incompleteInInserts = NonEmptyList
-            .fromFoldable(todoIncompleteIn)
-            .map { evts =>
-              doIngestAcsInserts(
-                evts.map { evt =>
-                  AcsInsertEntry(
-                    offset,
-                    evt.reassignmentEvent.createdEvent,
-                    stateRowDataFromAssign(evt.reassignmentEvent),
-                  )
-                },
-                summaryState,
-                onConflictDoNothing = true,
-              )
-            }
-            .toList ++ todoIncompleteIn.map { evt =>
-            // TODO (#3884): batch inserts
-            doRegisterIncompleteReassignment(
-              evt.reassignmentEvent.createdEvent.getContractId,
-              evt.reassignmentEvent.source,
-              evt.reassignmentEvent.unassignId,
-              isAssignment = true,
+        val incompleteInInserts = NonEmptyList
+          .fromFoldable(todoIncompleteIn)
+          .map { evts =>
+            doIngestAcsInserts(
+              evts.map { evt =>
+                AcsInsertEntry(
+                  offset,
+                  evt.reassignmentEvent.createdEvent,
+                  stateRowDataFromAssign(evt.reassignmentEvent),
+                )
+              },
               summaryState,
+              onConflictDoNothing = true,
             )
           }
+          .toList ++ todoIncompleteIn.map { evt =>
+          // TODO (#3884): batch inserts
+          doRegisterIncompleteReassignment(
+            evt.reassignmentEvent.createdEvent.getContractId,
+            evt.reassignmentEvent.source,
+            evt.reassignmentEvent.unassignId,
+            isAssignment = true,
+            summaryState,
+          )
+        }
 
-          for {
-            _ <- storage
-              .queryAndUpdate(
-                DBIO
-                  .sequence(
-                    acsInserts.toList ++ incompleteOutInserts ++ incompleteInInserts
-                  ),
-                "ingestAcsBatch",
-              )
-          } yield ()
+        for {
+          _ <- storage
+            .queryAndUpdate(
+              DBIO
+                .sequence(
+                  acsInserts.toList ++ incompleteOutInserts ++ incompleteInInserts
+                ),
+              "ingestAcsBatch",
+            )
+        } yield ()
+      }
+    }
+
+    private def markAcsIngestedAsOf(offset: Long, summaryState: MutableIngestionSummary)(implicit
+        traceContext: TraceContext
+    ): Future[Unit] = {
+      if (hasFinishedAcsIngestion) {
+        Future.failed(
+          new RuntimeException(
+            s"ACS was already ingested for store $acsStoreId, cannot ingest again"
+          )
+        )
+      } else {
+        storage.update(updateOffset(offset), "markAcsIngestedAsOf").map { _ =>
+          val newAcsSize = summaryState.acsSizeDiff
+          val summary = summaryState.toIngestionSummary(
+            updateId = None,
+            offset = offset,
+            synchronizerIdToRecordTime = Map.empty,
+            newAcsSize = newAcsSize,
+            metrics = metrics,
+          )
+          state
+            .getAndUpdate(
+              _.withUpdate(newAcsSize, offset)
+            )
+            .signalOffsetChanged(offset)
+
+          logger.debug(show"Ingested complete ACS at offset $offset: $summary")
+          handleIngestionSummary(summary)
+
+          finishedAcsIngestion.success(())
+          logger.info(
+            s"Store $acsStoreId ingested the ACS and switched to ingesting updates at $offset"
+          )
         }
       }
     }

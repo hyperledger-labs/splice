@@ -19,7 +19,6 @@ import org.lfdecentralizedtrust.splice.store.{
   TestTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
-import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -51,7 +50,6 @@ class DbMultiDomainAcsStoreTest
       DbMultiDomainAcsStore[TestTxLogEntry]
     ]
     with SplicePostgresTest
-    with HasActorSystem
     with AcsJdbcTypes {
 
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile
