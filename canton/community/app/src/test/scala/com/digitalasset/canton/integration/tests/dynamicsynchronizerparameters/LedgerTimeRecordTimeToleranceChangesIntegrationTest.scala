@@ -42,7 +42,7 @@ trait LedgerTimeRecordTimeToleranceChangesIntegrationTest
 
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P1_S1M1
-      .addConfigTransforms(ConfigTransforms.useStaticTime)
+      .addConfigTransform(ConfigTransforms.useStaticTime)
       .withSetup { implicit env =>
         import env.*
 

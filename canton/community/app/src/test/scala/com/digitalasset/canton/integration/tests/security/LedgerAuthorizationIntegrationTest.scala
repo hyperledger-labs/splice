@@ -217,7 +217,7 @@ trait LedgerAuthorizationIntegrationTest
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P3_S1M1
-      .addConfigTransforms(ConfigTransforms.useStaticTime)
+      .addConfigTransform(ConfigTransforms.useStaticTime)
       .withSetup { implicit env =>
         import env.*
 

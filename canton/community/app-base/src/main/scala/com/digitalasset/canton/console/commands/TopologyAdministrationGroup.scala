@@ -9,18 +9,17 @@ import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.RpcError
+import com.digitalasset.canton.{config, networking}
+import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, TopologyAdminCommands}
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
-import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, TopologyAdminCommands}
-import com.digitalasset.canton.admin.api.client.data.topology.*
 import com.digitalasset.canton.admin.api.client.data.{
   TopologyQueueStatus,
   DynamicSynchronizerParameters as ConsoleDynamicSynchronizerParameters,
 }
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.admin.api.client.data.topology.*
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
-import com.digitalasset.canton.console.CommandErrors.GenericCommandError
-import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
   CommandErrors,
@@ -33,6 +32,9 @@ import com.digitalasset.canton.console.{
   Helpful,
   InstanceReference,
 }
+import com.digitalasset.canton.console.CommandErrors.GenericCommandError
+import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
+import com.digitalasset.canton.console.FeatureFlag.Preview
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -40,8 +42,8 @@ import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.grpc.ByteStringStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
 import com.digitalasset.canton.topology.admin.v30.{
   ExportTopologySnapshotResponse,
   ExportTopologySnapshotV2Response,
@@ -63,7 +65,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
-import com.digitalasset.canton.{config, networking}
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.google.protobuf.ByteString
 import io.grpc.{Context, Status}
@@ -2656,9 +2657,9 @@ class TopologyAdministrationGroup(
               (
                 serial.increment,
                 // first filter out all existing packages that either get re-added (i.e. modified) or removed
-                item.packages.filter(vp => !allChangedPackageIds.contains(vp.packageId))
-                // now we can add all the adds the also haven't been in the remove set
-                  ++ adds,
+                item.packages.filter(vp =>
+                  !allChangedPackageIds.contains(vp.packageId)
+                ) /* now we can add all the adds the also haven't been in the remove set */ ++ adds,
               )
             case Some(
                   ListVettedPackagesResult(
@@ -3498,7 +3499,7 @@ class TopologyAdministrationGroup(
     }
   }
 
-  object synchronizer_upgrade extends Helpful {
+  object lsu extends Helpful {
 
     // TODO(#28972) Remove preview flag once LSU is stable
     @Help.Summary("Inspect synchronizer migration announcements", FeatureFlag.Preview)
@@ -3511,9 +3512,9 @@ class TopologyAdministrationGroup(
           operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
           filterSynchronizer: String = "",
           filterSigningKey: String = "",
-      ): Seq[ListSynchronizerUpgradeAnnouncementResult] = consoleEnvironment.run {
+      ): Seq[ListLsuAnnouncementResult] = consoleEnvironment.run {
         adminCommand(
-          TopologyAdminCommands.Read.ListSynchronizerUpgradeAnnouncement(
+          TopologyAdminCommands.Read.ListLsuAnnouncement(
             BaseQuery(
               store,
               proposals,
@@ -3527,7 +3528,7 @@ class TopologyAdministrationGroup(
         )
       }
 
-      @Help.Summary("Propose the announcement of a synchronizer migration")
+      @Help.Summary("Propose the announcement of a synchronizer migration", FeatureFlag.Preview)
       @Help.Description(
         """Parameters:
           |- physicalSynchronizerId: The physical synchronizer id of the synchronizer on which the
@@ -3567,10 +3568,10 @@ class TopologyAdministrationGroup(
           synchronize: Option[config.NonNegativeDuration] = Some(
             consoleEnvironment.commandTimeouts.unbounded
           ),
-      ): SignedTopologyTransaction[TopologyChangeOp, SynchronizerUpgradeAnnouncement] =
+      ): SignedTopologyTransaction[TopologyChangeOp, LsuAnnouncement] =
         // TODO(#28972) Remove preview flag once LSU is stable
         check(FeatureFlag.Preview) {
-          val mapping = SynchronizerUpgradeAnnouncement(
+          val mapping = LsuAnnouncement(
             successorPhysicalSynchronizerId,
             upgradeTime,
           )
@@ -3631,10 +3632,10 @@ class TopologyAdministrationGroup(
           synchronize: Option[config.NonNegativeDuration] = Some(
             consoleEnvironment.commandTimeouts.unbounded
           ),
-      ): SignedTopologyTransaction[TopologyChangeOp, SynchronizerUpgradeAnnouncement] =
+      ): SignedTopologyTransaction[TopologyChangeOp, LsuAnnouncement] =
         // TODO(#28972) Remove preview flag once LSU is stable
         check(FeatureFlag.Preview) {
-          val mapping = SynchronizerUpgradeAnnouncement(
+          val mapping = LsuAnnouncement(
             successorPhysicalSynchronizerId,
             upgradeTime,
           )
@@ -3657,7 +3658,10 @@ class TopologyAdministrationGroup(
     }
 
     object sequencer_successors extends Helpful {
-      @Help.Summary("Propose the connection details of a sequencer on the successor synchronizer")
+      @Help.Summary(
+        "Propose the connection details of a sequencer on the successor synchronizer",
+        FeatureFlag.Preview,
+      )
       @Help.Description(
         """Parameters:
           |- sequencerId: The ID of the sequencer that will be reachable by the provided endpoints.
@@ -3702,33 +3706,34 @@ class TopologyAdministrationGroup(
           synchronize: Option[config.NonNegativeDuration] = Some(
             consoleEnvironment.commandTimeouts.unbounded
           ),
-      ): SignedTopologyTransaction[TopologyChangeOp, SequencerConnectionSuccessor] =
-        consoleEnvironment.run {
-
-          adminCommand(
-            TopologyAdminCommands.Write.Propose(
-              mapping = networking.Endpoint
-                .fromUris(endpoints)
-                .map { case (validatedEndpoints, useTls) =>
-                  SequencerConnectionSuccessor(
-                    sequencerId,
-                    synchronizerId,
-                    GrpcConnection(
-                      validatedEndpoints,
-                      useTls,
-                      customTrustCertificates,
-                    ),
-                  )
-                },
-              signedBy = signedBy.toList,
-              serial = serial,
-              change = operation,
-              mustFullyAuthorize = mustFullyAuthorize,
-              forceChanges = ForceFlags.none,
-              store = store.getOrElse(synchronizerId),
-              waitToBecomeEffective = synchronize,
+      ): SignedTopologyTransaction[TopologyChangeOp, LsuSequencerConnectionSuccessor] =
+        check(Preview) {
+          consoleEnvironment.run {
+            adminCommand(
+              TopologyAdminCommands.Write.Propose(
+                mapping = networking.Endpoint
+                  .fromUris(endpoints)
+                  .map { case (validatedEndpoints, useTls) =>
+                    LsuSequencerConnectionSuccessor(
+                      sequencerId,
+                      synchronizerId,
+                      GrpcConnection(
+                        validatedEndpoints,
+                        useTls,
+                        customTrustCertificates,
+                      ),
+                    )
+                  },
+                signedBy = signedBy.toList,
+                serial = serial,
+                change = operation,
+                mustFullyAuthorize = mustFullyAuthorize,
+                forceChanges = ForceFlags.none,
+                store = store.getOrElse(synchronizerId),
+                waitToBecomeEffective = synchronize,
+              )
             )
-          )
+          }
         }
 
       def list(
@@ -3738,9 +3743,9 @@ class TopologyAdministrationGroup(
           operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
           filterSequencerId: String = "",
           filterSigningKey: String = "",
-      ): Seq[ListSequencerConnectionSuccessorResult] = consoleEnvironment.run {
+      ): Seq[ListLsuSequencerConnectionSuccessorResult] = consoleEnvironment.run {
         adminCommand(
-          TopologyAdminCommands.Read.ListSequencerConnectionSuccessor(
+          TopologyAdminCommands.Read.ListLsuSequencerConnectionSuccessor(
             BaseQuery(
               store,
               proposals,
@@ -3753,9 +3758,7 @@ class TopologyAdministrationGroup(
           )
         )
       }
-
     }
-
   }
 
   @Help.Summary("Inspect topology stores")

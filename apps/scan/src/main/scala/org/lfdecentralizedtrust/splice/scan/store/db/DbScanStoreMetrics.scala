@@ -3,9 +3,9 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
+import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory}
 import com.daml.metrics.api.MetricQualification.Latency
-import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -65,14 +65,12 @@ class DbScanStoreMetrics(
 
   override protected def onClosed(): Unit = {
     LifeCycle.close(
-      (Seq(earliestAggregatedRound, latestAggregatedRound, history) ++
-        cacheOfMetrics.values
-          .map(cache =>
-            new AutoCloseable {
-              override def close(): Unit = cache.closeAcquired()
-            }
-          )
-          .toSeq)*
+      Seq(earliestAggregatedRound, latestAggregatedRound, history)
+        .map(cache =>
+          new AutoCloseable {
+            def close(): Unit = cache.close()
+          }
+        )*
     )(logger)
     cacheOfMetrics.clear()
   }

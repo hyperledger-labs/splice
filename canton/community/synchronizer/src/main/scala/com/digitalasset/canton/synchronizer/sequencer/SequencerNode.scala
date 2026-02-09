@@ -233,18 +233,6 @@ class SequencerNodeBootstrap(
     })
     addCloseable(sequencerPublicApiHealthService)
     addCloseable(sequencerHealth)
-    // TODO(#25118) clean up manual cache removal
-    addCloseable(new AutoCloseable {
-      override def close(): Unit = {
-        // This is a pretty ugly work around for the fact that cache metrics are left dangling and
-        // are not closed properly
-        arguments.metrics.trafficControl.purchaseCache.closeAcquired()
-        arguments.metrics.trafficControl.consumedCache.closeAcquired()
-        arguments.metrics.eventBuffer.closeAcquired()
-        arguments.metrics.memberCache.closeAcquired()
-        arguments.metrics.payloadCache.closeAcquired()
-      }
-    })
 
     private def createSequencerFactory(
         protocolVersion: ProtocolVersion
@@ -531,11 +519,17 @@ class SequencerNodeBootstrap(
                   _ <- sequencerSnapshot
                     .map { snapshot =>
                       logger.debug("Uploading sequencer snapshot to sequencer driver")
+                      logger.trace(
+                        s"Initial topology transactions used to establish last sequenced and effective time: ${initialTopologyTransactions.result}"
+                      )
                       val initialState = SequencerInitialState(
                         psid,
                         snapshot,
                         initialTopologyTransactions.result.view
                           .map(tx => (tx.sequenced.value, tx.validFrom.value)),
+                      )
+                      logger.debug(
+                        s"last sequencer event timestamp = ${initialState.latestSequencerEventTimestamp}, initial topology effective timestamp = ${initialState.initialTopologyEffectiveTimestamp}"
                       )
                       // TODO(#14070) make initialize idempotent to support crash recovery during init
                       sequencerFactory
@@ -595,7 +589,7 @@ class SequencerNodeBootstrap(
           processorAndClient <- EitherT
             .right(
               TopologyTransactionProcessor
-                .createProcessorAndClientForSynchronizerWithWriteThroughCache(
+                .createProcessorAndClientForSynchronizer(
                   synchronizerTopologyStore,
                   synchronizerUpgradeTime = parameters.sequencingTimeLowerBoundExclusive,
                   crypto.pureCrypto,
@@ -603,6 +597,7 @@ class SequencerNodeBootstrap(
                   arguments.config.topology,
                   clock,
                   crypto.staticSynchronizerParameters,
+                  arguments.metrics.topologyCache,
                   futureSupervisor,
                   synchronizerLoggerFactory,
                 )(sequencerSnapshotTimestamp)

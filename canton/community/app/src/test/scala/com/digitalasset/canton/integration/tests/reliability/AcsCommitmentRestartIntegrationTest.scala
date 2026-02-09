@@ -117,7 +117,7 @@ trait AcsCommitmentRestartIntegrationTest
       import env.*
 
       val simClock = environment.simClock.value
-// Advance the sim clock so that we can be sure that the reconciliation interval of one minute is used
+      // Advance the sim clock so that we can be sure that the reconciliation interval of one minute is used
       simClock.advance(java.time.Duration.ofDays(1))
       val start = simClock.uniqueTime()
       preCommitmentTs = start

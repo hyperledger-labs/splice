@@ -458,6 +458,7 @@ abstract class ParticipantRestartTest
             mock[PackageMetadataView],
             Eval.now(pnps.ledgerApiStore),
             Eval.now(pnps.contractStore),
+            ParticipantTestMetrics,
             futureSupervisor,
             loggerFactory,
           )
@@ -575,7 +576,7 @@ abstract class ParticipantRestartTest
 class ParticipantRestartCausalityIntegrationTest extends ParticipantRestartTest with EntitySyntax {
 
   override lazy val environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.P4S2M2Manual
+    EnvironmentDefinition.P4S2M2_Manual
       .addConfigTransforms(ConfigTransforms.updateTargetTimestampForwardTolerance(30.seconds))
       .withSetup { implicit env =>
         NetworkBootstrapper(EnvironmentDefinition.S1M1_S1M1)

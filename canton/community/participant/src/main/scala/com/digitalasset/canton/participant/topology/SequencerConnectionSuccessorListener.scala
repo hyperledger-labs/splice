@@ -16,7 +16,6 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore
 import com.digitalasset.canton.participant.sync.SyncServiceError
-import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.topology.client.SynchronizerTopologyClient
 import com.digitalasset.canton.topology.processing.{
   EffectiveTime,
@@ -25,7 +24,7 @@ import com.digitalasset.canton.topology.processing.{
 }
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
-import com.digitalasset.canton.topology.{KnownPhysicalSynchronizerId, LSU, PhysicalSynchronizerId}
+import com.digitalasset.canton.topology.{KnownPhysicalSynchronizerId, Lsu, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureUnlessShutdownUtil
 import com.digitalasset.canton.{SequencerCounter, SynchronizerAlias}
@@ -86,7 +85,7 @@ class SequencerConnectionSuccessorListener(
       (synchronizerUpgradeOngoing, _) <- OptionT(snapshot.synchronizerUpgradeOngoing())
       SynchronizerSuccessor(successorPSId, upgradeTime) = synchronizerUpgradeOngoing
 
-      logger = LSU.Logger(loggerFactory, getClass, synchronizerUpgradeOngoing)
+      logger = Lsu.Logger(loggerFactory, getClass, synchronizerUpgradeOngoing)
 
       _ = logger.info(
         s"Checking whether the participant can migrate $alias from ${activeConfig.configuredPSId} to $successorPSId"
@@ -117,15 +116,7 @@ class SequencerConnectionSuccessorListener(
       _ = logger.info(s"New set of sequencer connections for successors: $successorConnections")
 
       sequencerConnections <- OptionT.fromOption[FutureUnlessShutdown](
-        SequencerConnections
-          .many(
-            connections = successorConnections,
-            activeConfig.config.sequencerConnections.sequencerTrustThreshold,
-            activeConfig.config.sequencerConnections.sequencerLivenessMargin,
-            activeConfig.config.sequencerConnections.submissionRequestAmplification,
-            activeConfig.config.sequencerConnections.sequencerConnectionPoolDelays,
-          )
-          .toOption
+        activeConfig.config.sequencerConnections.modifyConnections(successorConnections).toOption
       )
 
       currentSuccessorConfigO =
@@ -179,7 +170,7 @@ class SequencerConnectionSuccessorListener(
             else
               logger.error(s"Unable to perform handshake with $successorPSId: $error")
 
-          case Right(_: PhysicalSynchronizerId) =>
+          case Right(()) =>
             logger.info(s"Handshake with $successorPSId was successful")
         },
       level = Level.INFO,
@@ -190,5 +181,5 @@ class SequencerConnectionSuccessorListener(
 trait HandshakeWithPSId {
   def performHandshake(psid: PhysicalSynchronizerId)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SyncServiceError, PhysicalSynchronizerId]
+  ): EitherT[FutureUnlessShutdown, SyncServiceError, Unit]
 }
