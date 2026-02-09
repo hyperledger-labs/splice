@@ -7,7 +7,6 @@ import com.digitalasset.canton.admin.api.client.data.OnboardingRestriction.{
   RestrictedOpen,
   UnrestrictedOpen,
 }
-import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -52,7 +51,7 @@ class PermissionedSynchronizerIntegrationTest
       )
       .withManualStart
 
-  "start validator in permissioned mode" in { implicit env =>
+  "onboard validator in permissioned mode" in { implicit env =>
     initDsoWithSv1Only()
     // start an extra participant
     withCanton(
@@ -68,106 +67,117 @@ class PermissionedSynchronizerIntegrationTest
 
       // create a ParticipantSynchronizerPermission for the SV1 validator participant
 
-      sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions.find(
-        decentralizedSynchronizerId,
-        sv1ValidatorBackend.participantClientWithAdminToken.id,
-      ) match {
-        case Some(res)
-            if res.item.permission == ParticipantPermission.Submission => {} // ParticipantSynchronizerPermission already exists
+      withClue("Phase 1: Set ParticipantSynchronizerPermission for SV1") {
 
-        case Some(res) =>
-          sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
-            .propose(
-              decentralizedSynchronizerId,
-              sv1ValidatorBackend.participantClientWithAdminToken.id,
-              permission = ParticipantPermission.Submission,
-              serial = Some(res.context.serial.increment),
-            )
-
-        case None =>
-          sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
-            .propose(
-              decentralizedSynchronizerId,
-              sv1ValidatorBackend.participantClientWithAdminToken.id,
-              permission = ParticipantPermission.Submission,
-              serial = Some(com.digitalasset.canton.config.RequireTypes.PositiveInt.one),
-            )
-      }
-
-      // set the onboarding restriction to RestrictedOpen
-
-      if (
-        sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
-          .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
-          .onboardingRestriction != RestrictedOpen
-      ) {
-        sv1ValidatorBackend.participantClient.topology.synchronizer_parameters.propose_update(
+        sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions.find(
           decentralizedSynchronizerId,
-          _.update(onboardingRestriction = RestrictedOpen),
-        )
-      }
+          sv1ValidatorBackend.participantClientWithAdminToken.id,
+        ) match {
+          case Some(res)
+              if res.item.permission == ParticipantPermission.Submission => {} // ParticipantSynchronizerPermission already exists
 
-      val aliceParticipantId = ParticipantId(
-        com.digitalasset.canton.topology.UniqueIdentifier.tryCreate(
-          aliceValidatorBackend.config.ledgerApiUser,
-          sv1ValidatorBackend.participantClientWithAdminToken.id.uid.namespace, // or which namespace should we use?
-        )
-      )
-
-      // create a ParticipantSynchronizerPermission for the alice participant
-
-      sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions.find(
-        decentralizedSynchronizerId,
-        aliceParticipantId,
-      ) match {
-        case Some(res) if res.item.permission == ParticipantPermission.Submission => {}
-
-        case Some(res) =>
-          sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
-            .propose(
-              decentralizedSynchronizerId,
-              aliceParticipantId,
-              permission = ParticipantPermission.Submission,
-              serial = Some(res.context.serial.increment),
-            )
-
-        case None =>
-          sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
-            .propose(
-              decentralizedSynchronizerId,
-              aliceParticipantId,
-              permission = ParticipantPermission.Submission,
-              serial = Some(com.digitalasset.canton.config.RequireTypes.PositiveInt.one),
-            )
-      }
-
-      withClue("Wait until alice topology transaction is registered") {
-        eventually(60.seconds, 1.second) {
-          val authorized =
+          case Some(res) =>
             sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
-              .find(
+              .propose(
                 decentralizedSynchronizerId,
-                aliceParticipantId,
+                sv1ValidatorBackend.participantClientWithAdminToken.id,
+                permission = ParticipantPermission.Submission,
+                serial = Some(res.context.serial.increment),
               )
-          authorized.exists(_.item.permission == ParticipantPermission.Submission) shouldBe true
+
+          case None =>
+            sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
+              .propose(
+                decentralizedSynchronizerId,
+                sv1ValidatorBackend.participantClientWithAdminToken.id,
+                permission = ParticipantPermission.Submission,
+                serial = Some(com.digitalasset.canton.config.RequireTypes.PositiveInt.one),
+              )
         }
       }
 
-      // start the alice validator participant
+      withClue("Phase 2: change onboarding restriction to RestrictedOpen") {
 
-      aliceValidatorBackend.startSync()
+        // set the onboarding restriction to RestrictedOpen
 
-      // set the onboarding restriction back to UnrestrictedOpen
+        if (
+          sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
+            .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
+            .onboardingRestriction != RestrictedOpen
+        ) {
+          sv1ValidatorBackend.participantClient.topology.synchronizer_parameters.propose_update(
+            decentralizedSynchronizerId,
+            _.update(onboardingRestriction = RestrictedOpen),
+          )
+        }
+      }
 
-      if (
-        sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
-          .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
-          .onboardingRestriction != UnrestrictedOpen
-      ) {
-        sv1ValidatorBackend.participantClient.topology.synchronizer_parameters.propose_update(
+      withClue("Phase 3: Submit a ParticipantSynchronizerPermission for the alice participant") {
+
+        // create a ParticipantSynchronizerPermission for the alice participant
+
+        val aliceParticipantId = aliceValidatorBackend.participantClientWithAdminToken.id
+
+        sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions.find(
           decentralizedSynchronizerId,
-          _.update(onboardingRestriction = UnrestrictedOpen),
-        )
+          aliceParticipantId,
+        ) match {
+          case Some(res) if res.item.permission == ParticipantPermission.Submission => {}
+
+          case Some(res) =>
+            sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
+              .propose(
+                decentralizedSynchronizerId,
+                aliceParticipantId,
+                permission = ParticipantPermission.Submission,
+                serial = Some(res.context.serial.increment),
+              )
+
+          case None =>
+            sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
+              .propose(
+                decentralizedSynchronizerId,
+                aliceParticipantId,
+                permission = ParticipantPermission.Submission,
+                serial = Some(com.digitalasset.canton.config.RequireTypes.PositiveInt.one),
+              )
+        }
+
+        withClue("Wait until alice topology transaction is registered") {
+          eventually(60.seconds, 1.second) {
+            val authorized =
+              sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
+                .find(
+                  decentralizedSynchronizerId,
+                  aliceParticipantId,
+                )
+            authorized.exists(_.item.permission == ParticipantPermission.Submission) shouldBe true
+          }
+        }
+      }
+
+      withClue("Phase 4: Start the alice validator participant") {
+
+        // start the alice validator participant
+
+        aliceValidatorBackend.startSync()
+
+      }
+
+      withClue("Phase 5: Reset the onboarding restriction back to UnrestrictedOpen") {
+
+        // set the onboarding restriction back to UnrestrictedOpen
+
+        if (
+          sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
+            .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
+            .onboardingRestriction != UnrestrictedOpen
+        ) {
+          sv1ValidatorBackend.participantClient.topology.synchronizer_parameters.propose_update(
+            decentralizedSynchronizerId,
+            _.update(onboardingRestriction = UnrestrictedOpen),
+          )
+        }
       }
 
     }
