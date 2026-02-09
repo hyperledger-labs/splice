@@ -110,6 +110,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
       .addConfigTransform((_, config) =>
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
       )
+      .withAmuletPrice(1.0)
       .withManualStart
 
   "migrate global domain to new nodes without downtime" in { implicit env =>
@@ -439,8 +440,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
             0L,
             Some("transfer-command-description"),
           )
-        // remove extended timeUntilSuccess after we also migrate traffic
-        actAndCheck(timeUntilSuccess = 2.minutes)(
+        actAndCheck()(
           "Submit signed TransferCommand creation",
           aliceValidatorBackend.submitTransferPreapprovalSend(
             externalPartyOnboarding.party,
