@@ -77,9 +77,10 @@ class DevelopmentFundCouponIntegrationTest
       "5 UnclaimedDevelopmentFundCoupons are created, and the trigger does not merge the coupons, " +
         "as it only acts when the number of coupons is ≥ 2 × threshold",
       _ => {
-        val coupons = sv1ScanBackend.listUnclaimedDevelopmentFundCoupons().map(_.contract)
-        coupons.size shouldBe 5
-        BigDecimal(coupons.head.payload.amount)
+        val coupons = sv1ScanBackend.listUnclaimedDevelopmentFundCoupons()
+        coupons should have size 5
+        aliceValidatorBackend.scanProxy.listUnclaimedDevelopmentFundCoupons() shouldBe coupons
+        BigDecimal(coupons.head.contract.payload.amount)
       },
     )
 
