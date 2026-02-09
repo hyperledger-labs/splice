@@ -22,11 +22,12 @@ plugins=(
   "pulumi/command=1.1.3"
   "pulumi/kubernetes-cert-manager=0.2.0"
   "pulumiverse/grafana=0.16.3"
-  # used by cert manager
-  "pulumi/kubernetes=4.22.0"
-  "pulumi/kubernetes=4.21.1"
   # old versions so that old pulumi state can be interpreted
   # each can be removed once MainNet uses a newer version
+  "pulumi/kubernetes=4.23.0"
+  "pulumi/random=4.18.2"
+  "pulumi/auth0=3.21.0"
+  "pulumi/command=1.1.0"
 )
 
 function genSrc() {
