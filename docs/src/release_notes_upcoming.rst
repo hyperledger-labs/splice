@@ -11,7 +11,7 @@ release-notes:: Upcoming
 
 - Daml
 
-  - Optimize the number of views in the automation run by the SV to convert ``FeaturedAppActivityMarker`` contracts into ``AppRewardCoupon`` contracts.
+  - Optimize the number of views in the automation run by the SV app to convert ``FeaturedAppActivityMarker`` contracts into ``AppRewardCoupon`` contracts.
 
     This requires a Daml upgrade to
 
