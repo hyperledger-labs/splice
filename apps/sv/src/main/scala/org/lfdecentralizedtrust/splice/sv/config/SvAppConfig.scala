@@ -370,7 +370,7 @@ case class SvAppBackendConfig(
     svAcsStoreDescriptorUserVersion: Option[Long] = None,
     dsoAcsStoreDescriptorUserVersion: Option[Long] = None,
     convertFeaturedAppActivityMarkerObservers: Boolean =
-      true, // Safety option in case setting the observers ends up causing issues e.g. overloading validators that now receiver larger transactions.
+      true, // Safety option in case setting the observers ends up causing issues e.g. overloading validators that now receive larger transactions.
 ) extends SpliceBackendConfig {
 
   def shouldSkipSynchronizerInitialization =
