@@ -36,8 +36,10 @@ class TimeBasedTreasuryIntegrationTest
         )(config)
       )
       .addConfigTransforms((_, config) =>
-        updateAllSvAppFoundDsoConfigs_(c => c.focus(_.initialHoldingFee).replace(holdingFee))
-        (config))
+        updateAllSvAppFoundDsoConfigs_(c => c.focus(_.initialHoldingFee).replace(holdingFee))(
+          config
+        )
+      )
       // TODO (#965) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)
 
@@ -118,7 +120,7 @@ class TimeBasedTreasuryIntegrationTest
         Some(3),
         (99, 100),
         (9, 10),
-        exactly(holdingFee)
+        exactly(holdingFee),
       )
   }
 
@@ -212,19 +214,21 @@ class TimeBasedTreasuryIntegrationTest
     val (_, _) = onboardAliceAndBob()
     val aliceUserName = aliceWalletClient.config.ledgerApiUser
     val mergeAmuletsTrigger = aliceValidatorBackend
-        .userWalletAutomation(aliceUserName)
-        .futureValue
-        .trigger[CollectRewardsAndMergeAmuletsTrigger]
+      .userWalletAutomation(aliceUserName)
+      .futureValue
+      .trigger[CollectRewardsAndMergeAmuletsTrigger]
 
     clue("Pause amulet merges and expires") {
       sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAmuletTrigger].pause().futureValue
       mergeAmuletsTrigger.pause().futureValue
     }
 
-    actAndCheck("Tap amulet that will expire in a round", {
-      aliceWalletClient.tap(1)
-      aliceWalletClient.tap(1)
-    })(
+    actAndCheck(
+      "Tap amulet that will expire in a round", {
+        aliceWalletClient.tap(1)
+        aliceWalletClient.tap(1)
+      },
+    )(
       "Alice has 2 Amulets",
       _ => {
         aliceWalletClient.list().amulets should have length 2
@@ -235,11 +239,16 @@ class TimeBasedTreasuryIntegrationTest
       advanceRoundsToNextRoundOpening
     }
 
-    actAndCheck("Resume amulets merging automation", {
-      mergeAmuletsTrigger.resume() }
-      )("Amulets got merged", _ => {
+    actAndCheck(
+      "Resume amulets merging automation", {
+        mergeAmuletsTrigger.resume()
+      },
+    )(
+      "Amulets got merged",
+      _ => {
         aliceWalletClient.list().amulets should have length 1
-      })
+      },
+    )
     clue("Final sanity check") {
       checkBalance(
         aliceWalletClient,

@@ -13,11 +13,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
-import org.lfdecentralizedtrust.splice.util.{
-  AmuletConfigUtil,
-  TimeTestUtil,
-  WalletTestUtil,
-}
+import org.lfdecentralizedtrust.splice.util.{AmuletConfigUtil, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.automation.AmuletMetricsTrigger
 import org.slf4j.event.Level
 
