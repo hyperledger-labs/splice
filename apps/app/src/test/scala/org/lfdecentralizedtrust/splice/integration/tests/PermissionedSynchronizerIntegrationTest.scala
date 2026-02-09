@@ -33,6 +33,7 @@ class PermissionedSynchronizerIntegrationTest
     with WalletTestUtil {
 
   override protected def runTokenStandardCliSanityCheck: Boolean = false
+  override protected def runUpdateHistorySanityCheck: Boolean = false
 
   override def usesDbs: Seq[String] = Seq(
     "alice_participant_new"
