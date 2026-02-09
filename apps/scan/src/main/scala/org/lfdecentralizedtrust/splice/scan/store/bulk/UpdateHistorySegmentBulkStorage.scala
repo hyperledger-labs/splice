@@ -8,7 +8,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.{Flow, Source}
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
-import org.apache.pekko.stream.OverflowStrategy
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.pattern.after
 import org.lfdecentralizedtrust.splice.http.v0.definitions
@@ -19,7 +18,6 @@ import org.apache.pekko.actor.ActorSystem
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.math.Ordering.Implicits.*
@@ -68,9 +66,6 @@ class UpdateHistorySegmentBulkStorage(
             val last = updatesInSegment.lastOption.getOrElse(
               throw new RuntimeException("Unexpected failure")
             )
-            lastEmitted.set(
-              Some(TimestampWithMigrationId(last.update.update.recordTime, last.migrationId))
-            )
             Future.successful(
               Some(
                 (
@@ -113,9 +108,6 @@ class UpdateHistorySegmentBulkStorage(
     )
     updatesBytes
   }
-
-  private val s3ObjIdx = new AtomicInteger(0)
-  private val lastEmitted = new AtomicReference[Option[TimestampWithMigrationId]](None)
 
   case class State(
       obj: s3Connection.AppendWriteObject,
@@ -164,45 +156,20 @@ class UpdateHistorySegmentBulkStorage(
       )
       .mapAsync(4) {
         case chunk: ObjectChunk if chunk.partNumber >= 0 =>
+          logger.debug(s"Uploading a chunk of size ${chunk.bytes.toArrayUnsafe().length} as partNumber ${chunk.partNumber} of ${chunk.obj.key}")
           chunk.obj.upload(chunk.partNumber, ByteBuffer.wrap(chunk.bytes.toArrayUnsafe())).map(_ => chunk)
         case chunk => Future.successful(chunk)
       }.mapAsync(1) {
-        case chunk: ObjectChunk if chunk.isLastChunkInObject => chunk.obj.finish().map(_ => Some(chunk.obj.key))
-        case _ => Future.successful(None)
+        case chunk: ObjectChunk if chunk.isLastChunkInObject => {
+          logger.debug(s"Finished uploading part ${chunk.partNumber}, which is the last one for the object ${chunk.obj.key}, finishing the upload")
+          chunk.obj.finish().map(_ => Some(chunk.obj.key))
+        }
+        case chunk => {
+          logger.debug(s"Finished uploading part ${chunk.partNumber}")
+          Future.successful(None)
+        }
       }
       .collect{case Some(key) => (segment, key)}
-//
-//
-//
-//
-//
-//      // Add a buffer so that the next object continues accumulating while we write the previous one
-//      .buffer(
-//        1,
-//        OverflowStrategy.backpressure,
-//      )
-//      .mapAsync(1) { case ByteStringWithTermination(zstdObj, isLast) =>
-//        // TODO(#3429): cleanup the path syntax, and move it somewhere that we can use also for the ACS snapshots
-//        val objectKey =
-//          if (isLast)
-//            s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_${s3ObjIdx}_last.zstd"
-//          else s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_$s3ObjIdx.zstd"
-//        // TODO(#3429): For now, we accumulate the full object in memory, then write it as a whole.
-//        //    Consider streaming it to S3 instead. Need to make sure that it then handles crashes correctly,
-//        //    i.e. that until we tell S3 that we're done writing, if we stop, then S3 throws away the
-//        //    partially written object.
-//        for {
-//          _ <- s3Connection.writeFullObject(objectKey, ByteBuffer.wrap(zstdObj.toArrayUnsafe()))
-//        } yield {
-//          s3ObjIdx.addAndGet(1)
-//          ()
-//        }
-//      }
-//      // emit a Unit upon completion of the write to s3
-//      .fold(()) { case ((), _) => () }
-//      // emit the timestamp of the last update dumped upon completion.
-//      .map(_ => (segment, lastEmitted.get()))
-
   }
 }
 object UpdateHistorySegmentBulkStorage {

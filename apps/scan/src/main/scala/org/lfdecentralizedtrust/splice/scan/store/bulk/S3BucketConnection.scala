@@ -78,7 +78,7 @@ class S3BucketConnection(
 
     /* Must be called sequentially. It is a fast operation that just initializes the next upload slot */
     def prepareUploadNext(): Int = {
-      parts.set(parts.get ++ None)
+      parts.set(parts.get :+ None)
       parts.get().length // Part numbers are 1-based in S3
     }
 

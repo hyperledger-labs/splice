@@ -77,6 +77,7 @@ object ScanStorageConfigs {
     dbAcsSnapshotPeriodHours = 3,
     bulkAcsSnapshotPeriodHours = 24,
     bulkDbReadChunkSize = 1000,
-    bulkMaxFileSize = 64L * 1024 * 1024,
+    bulkZstdChunkSize = 12L * 1024 * 1024,
+    bulkMaxFileSize = 128L * 1024 * 1024,
   )
 }

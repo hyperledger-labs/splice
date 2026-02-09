@@ -574,6 +574,7 @@ class AcsSnapshotTriggerTest
       1, // ignored in this test
       0, // ignored in this test
       0L, // ignored in this test
+      0L, // ignored in this test
     )
     final def snapshotPeriodHours: Int = 1
 
