@@ -9,7 +9,16 @@ import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCrede
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.{S3AsyncClient, S3Configuration}
-import software.amazon.awssdk.services.s3.model.{CompleteMultipartUploadRequest, CompletedMultipartUpload, CompletedPart, CreateMultipartUploadRequest, GetObjectRequest, GetObjectResponse, PutObjectRequest, UploadPartRequest}
+import software.amazon.awssdk.services.s3.model.{
+  CompleteMultipartUploadRequest,
+  CompletedMultipartUpload,
+  CompletedPart,
+  CreateMultipartUploadRequest,
+  GetObjectRequest,
+  GetObjectResponse,
+  PutObjectRequest,
+  UploadPartRequest,
+}
 
 import scala.jdk.FutureConverters.*
 import scala.jdk.CollectionConverters.*
@@ -26,8 +35,8 @@ case class S3Config(
 )
 
 class S3BucketConnection(
-    val s3Client: S3AsyncClient,
-    val bucketName: String,
+    val s3Client: S3AsyncClient, // TODO: make it private, and wrap all methods that we want to be used?
+    bucketName: String,
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging {
   // Reads the full content of an s3 object into a ByteBuffer.
@@ -61,11 +70,14 @@ class S3BucketConnection(
       .map(_ => ())
   }
 
-  /**
-   * Wrapper around multi-part upload that simplifies uploading parts in order
-   */
-  class AppendWriteObject(val key: String)(implicit
-      ec: ExecutionContext,
+  def newAppendWriteObject(
+      key: String
+  )(implicit ec: ExecutionContext): AppendWriteObject = new AppendWriteObject(key)
+
+  /** Wrapper around multi-part upload that simplifies uploading parts in order
+    */
+  class AppendWriteObject protected[S3BucketConnection] (val key: String)(implicit
+      ec: ExecutionContext
   ) {
     val createRequest = CreateMultipartUploadRequest
       .builder()
@@ -78,7 +90,7 @@ class S3BucketConnection(
 
     /* Must be called sequentially. It is a fast operation that just initializes the next upload slot */
     def prepareUploadNext(): Int = {
-      parts.set(parts.get ++ None)
+      parts.set(parts.get :+ None)
       parts.get().length // Part numbers are 1-based in S3
     }
 
@@ -88,33 +100,57 @@ class S3BucketConnection(
     def upload(partNumber: Int, content: ByteBuffer): Future[Unit] = {
       for {
         id <- uploadId
-        partRequest = UploadPartRequest.builder()
+        partRequest = UploadPartRequest
+          .builder()
           .bucket(bucketName)
           .key(key)
           .uploadId(id)
           .partNumber(partNumber)
           .build()
-        response <- s3Client.uploadPart(partRequest, AsyncRequestBody.fromByteBuffer(content)).asScala
+        response <- s3Client
+          .uploadPart(partRequest, AsyncRequestBody.fromByteBuffer(content))
+          .asScala
       } yield {
         blocking {
           synchronized {
-            parts.set(parts.get.updated(partNumber-1, Some(CompletedPart.builder()
-              .partNumber(partNumber)
-              .eTag(response.eTag())
-              .build())))
+            parts.set(
+              parts.get.updated(
+                partNumber - 1,
+                Some(
+                  CompletedPart
+                    .builder()
+                    .partNumber(partNumber)
+                    .eTag(response.eTag())
+                    .build()
+                ),
+              )
+            )
           }
         }
       }
     }
 
     def finish(): Future[Unit] = {
+      require(parts.get().nonEmpty)
       for {
         id <- uploadId
-        completedMultipartUpload = CompletedMultipartUpload.builder()
-          .parts(parts.get.map(_.getOrElse(throw new RuntimeException("completeMultiPartUpload may not be called before all parts have finished uploading"))).asJava)
+        completedMultipartUpload = CompletedMultipartUpload
+          .builder()
+          .parts(
+            parts.get
+              .map(
+                _.getOrElse(
+                  throw new RuntimeException(
+                    "completeMultiPartUpload may not be called before all parts have finished uploading"
+                  )
+                )
+              )
+              .asJava
+          )
           .build();
 
-        completeRequest = CompleteMultipartUploadRequest.builder()
+        completeRequest = CompleteMultipartUploadRequest
+          .builder()
           .bucket(bucketName)
           .key(key)
           .uploadId(id)

@@ -53,7 +53,7 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
       Region.US_EAST_1,
       AwsBasicCredentials.create("mock_id", "mock_key"),
     )
-    S3BucketConnection(s3Config, "bucket", loggerFactory)
+    S3BucketConnectionForUnitTests(s3Config, "bucket", loggerFactory)
   }
 
   def readUncompressAndDecode[T](
@@ -62,6 +62,7 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
   )(s3obj: S3Object)(implicit ec: ExecutionContext, tag: reflect.ClassTag[T]): Array[T] = {
     val bufferAllocator = PooledByteBufAllocator.DEFAULT
     val compressed = s3BucketConnection.readFullObject(s3obj.key()).futureValue
+    println(s"Found ${compressed.array().length} compressed bytes")
     val compressedDirect = bufferAllocator.directBuffer(compressed.capacity())
     // Empirically, our data is compressed by a factor of at most 200 (and is deterministic, so this is not expected to flake)
     val uncompressedDirect = bufferAllocator.directBuffer(compressed.capacity() * 200)
@@ -73,7 +74,10 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
       }
       uncompressedNio.flip()
       val allContractsStr = StandardCharsets.UTF_8.newDecoder().decode(uncompressedNio).toString
+      println(s"allContractsStr length: ${allContractsStr.length}")
       val allContracts = allContractsStr.split("\n")
+      println(s"allContracts contains ${allContracts.length} lines:")
+      allContracts.foreach(println)
       allContracts.map(decoder(_).value)
     } finally {
       compressedDirect.release()

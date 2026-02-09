@@ -8,18 +8,20 @@ import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.{Flow, Source}
 import org.lfdecentralizedtrust.splice.scan.config.ScanStorageConfig
-import org.apache.pekko.stream.OverflowStrategy
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.pattern.after
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.scan.admin.http.ScanHttpEncodings
-import org.lfdecentralizedtrust.splice.store.{HardLimit, TimestampWithMigrationId, TreeUpdateWithMigrationId, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
+  TimestampWithMigrationId,
+  TreeUpdateWithMigrationId,
+  UpdateHistory,
+}
 import io.circe.syntax.*
 import org.apache.pekko.actor.ActorSystem
 
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.math.Ordering.Implicits.*
@@ -64,12 +66,13 @@ class UpdateHistorySegmentBulkStorage(
         ) {
           if (updatesInSegment.nonEmpty) {
             // Found enough updates to add
+            logger.debug(
+              s"Adding ${updatesInSegment.length} updates, between record time ${updatesInSegment.headOption
+                  .map(_.update.update.recordTime)} and ${updatesInSegment.lastOption.map(_.update.update.recordTime)}"
+            )
             val updatesBytes: ByteString = encodeUpdates(updatesInSegment)
             val last = updatesInSegment.lastOption.getOrElse(
               throw new RuntimeException("Unexpected failure")
-            )
-            lastEmitted.set(
-              Some(TimestampWithMigrationId(last.update.update.recordTime, last.migrationId))
             )
             Future.successful(
               Some(
@@ -81,6 +84,9 @@ class UpdateHistorySegmentBulkStorage(
             )
           } else {
             // All updates are outside the segment, so we're done
+            logger.debug(
+              "No more updates inside the segment, done dumping updates from this segment"
+            )
             Future.successful(None)
           }
         } else {
@@ -114,13 +120,10 @@ class UpdateHistorySegmentBulkStorage(
     updatesBytes
   }
 
-  private val s3ObjIdx = new AtomicInteger(0)
-  private val lastEmitted = new AtomicReference[Option[TimestampWithMigrationId]](None)
-
   case class State(
       obj: s3Connection.AppendWriteObject,
       s3ObjIdx: Int,
-      s3ObjSize: Int
+      s3ObjSize: Int,
   )
   case class ObjectChunk(
       bytes: ByteString,
@@ -136,73 +139,79 @@ class UpdateHistorySegmentBulkStorage(
     Source
       .unfoldAsync(segment.fromTimestamp)(ts => getUpdatesChunk(ts))
       .via(ZstdGroupedWeight(config.bulkZstdChunkSize))
-      .statefulMap(() => State(
-        new s3Connection.AppendWriteObject(s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_0.zstd"),
-        0,
-        0
-      ))(
+      .statefulMap(() =>
+        State(
+          s3Connection.newAppendWriteObject(
+            s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_0.zstd"
+          ),
+          0,
+          0,
+        )
+      )(
         {
           case (state, chunk) if state.s3ObjSize + chunk.bytes.length > config.bulkMaxFileSize =>
+            logger.debug(
+              s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they cross the threshold of ${config.bulkMaxFileSize}, so this is the last chunk for the object"
+            )
+            logger.debug(
+              s"First 4 bytes are: ${chunk.bytes.take(4).map(b => f"${b & 0xff}%02X").mkString(" ")}"
+            )
             (
               State(
-                new s3Connection.AppendWriteObject(s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_${state.s3ObjIdx+1}.zstd"),
+                s3Connection.newAppendWriteObject(
+                  s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_${state.s3ObjIdx + 1}.zstd"
+                ),
                 state.s3ObjIdx + 1,
-                0),
-              ObjectChunk(chunk.bytes, state.obj, true, chunk.isLast, state.obj.prepareUploadNext())
+                0,
+              ),
+              ObjectChunk(chunk.bytes, state.obj, true, chunk.isLast, state.obj.prepareUploadNext()),
             )
           case (state, chunk) =>
+            logger.debug(
+              s"Adding a chunk of ${chunk.bytes.length} bytes. The object size so far has been: ${state.s3ObjSize}, together they are not yet at the threshold of ${config.bulkMaxFileSize}"
+            )
             (
               State(
                 state.obj,
                 state.s3ObjIdx,
-                state.s3ObjSize + chunk.bytes.length
+                state.s3ObjSize + chunk.bytes.length,
               ),
-              ObjectChunk(chunk.bytes, state.obj, false, chunk.isLast, state.obj.prepareUploadNext())
+              ObjectChunk(
+                chunk.bytes,
+                state.obj,
+                false,
+                chunk.isLast,
+                state.obj.prepareUploadNext(),
+              ),
             )
         },
-        onComplete = state => Some(ObjectChunk(ByteString.empty, state.obj, true, true, -1))
+        onComplete = state => {
+          logger.debug("Done reading updates for segment")
+          Some(
+            ObjectChunk(ByteString.empty, state.obj, true, true, -1)
+          )
+        },
       )
       .mapAsync(4) {
         case chunk: ObjectChunk if chunk.partNumber >= 0 =>
-          chunk.obj.upload(chunk.partNumber, ByteBuffer.wrap(chunk.bytes.toArrayUnsafe())).map(_ => chunk)
+          logger.debug(
+            s"Uploading a chunk of size ${chunk.bytes.toArrayUnsafe().length} as partNumber ${chunk.partNumber} of ${chunk.obj.key}"
+          )
+          chunk.obj.upload(chunk.partNumber, chunk.bytes.asByteBuffer).map(_ => chunk)
         case chunk => Future.successful(chunk)
-      }.mapAsync(1) {
-        case chunk: ObjectChunk if chunk.isLastChunkInObject => chunk.obj.finish().map(_ => Some(chunk.obj.key))
-        case _ => Future.successful(None)
       }
-      .collect{case Some(key) => (segment, key)}
-//
-//
-//
-//
-//
-//      // Add a buffer so that the next object continues accumulating while we write the previous one
-//      .buffer(
-//        1,
-//        OverflowStrategy.backpressure,
-//      )
-//      .mapAsync(1) { case ByteStringWithTermination(zstdObj, isLast) =>
-//        // TODO(#3429): cleanup the path syntax, and move it somewhere that we can use also for the ACS snapshots
-//        val objectKey =
-//          if (isLast)
-//            s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_${s3ObjIdx}_last.zstd"
-//          else s"${segment.fromTimestamp}-${segment.toTimestamp}/updates_$s3ObjIdx.zstd"
-//        // TODO(#3429): For now, we accumulate the full object in memory, then write it as a whole.
-//        //    Consider streaming it to S3 instead. Need to make sure that it then handles crashes correctly,
-//        //    i.e. that until we tell S3 that we're done writing, if we stop, then S3 throws away the
-//        //    partially written object.
-//        for {
-//          _ <- s3Connection.writeFullObject(objectKey, ByteBuffer.wrap(zstdObj.toArrayUnsafe()))
-//        } yield {
-//          s3ObjIdx.addAndGet(1)
-//          ()
-//        }
-//      }
-//      // emit a Unit upon completion of the write to s3
-//      .fold(()) { case ((), _) => () }
-//      // emit the timestamp of the last update dumped upon completion.
-//      .map(_ => (segment, lastEmitted.get()))
-
+      .mapAsync(1) {
+        case chunk: ObjectChunk if chunk.isLastChunkInObject =>
+          logger.debug(
+            s"Finished uploading part ${chunk.partNumber}, which is the last one for the object ${chunk.obj.key}, finishing the upload"
+          )
+          chunk.obj.finish().map(_ => Some(chunk.obj.key))
+        case chunk => {
+          logger.debug(s"Finished uploading part ${chunk.partNumber}")
+          Future.successful(None)
+        }
+      }
+      .collect { case Some(key) => (segment, key) }
   }
 }
 object UpdateHistorySegmentBulkStorage {

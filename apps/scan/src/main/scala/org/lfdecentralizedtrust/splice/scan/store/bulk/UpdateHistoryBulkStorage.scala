@@ -127,17 +127,20 @@ class UpdateHistoryBulkStorage(
       .statefulMap(() => None: Option[UpdatesSegment])(
         {
           case (lastSegment, (segment, objKey))
-            if lastSegment.isDefined && segment != lastSegment.getOrElse(throw new RuntimeException()) =>
-            logger.info(s"Wrote object $objKey (first object in a new segment, closing segment $lastSegment)")
+              if lastSegment.isDefined && segment != lastSegment
+                .getOrElse(throw new RuntimeException()) =>
+            logger.info(
+              s"Wrote object $objKey (first object in a new segment, closing segment $lastSegment)"
+            )
             (Some(segment), lastSegment)
           case (_, (segment, objKey)) =>
             logger.info(s"Wrote object $objKey")
             (Some(segment), None)
         },
-        onComplete = _ => None // Should never complete
+        onComplete = _ => None, // Should never complete
         // TODO: consider if we're handling correctly the case of a segment with no updates
       )
-      .collect{case Some(segment) => segment}
+      .collect { case Some(segment) => segment }
       .mapAsync(1) { segment =>
         kvProvider.setLatestUpdatesSegmentInBulkStorage(segment).map(_ => segment)
       }

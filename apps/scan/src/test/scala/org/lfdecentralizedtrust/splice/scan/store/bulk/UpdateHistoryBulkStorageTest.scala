@@ -28,6 +28,7 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 import scala.math.Ordering.Implicits.*
+import java.nio.ByteBuffer
 
 class UpdateHistoryBulkStorageTest
     extends StoreTestBase
@@ -35,16 +36,32 @@ class UpdateHistoryBulkStorageTest
     with HasActorSystem
     with HasS3Mock
     with SplicePostgresTest {
-  val maxFileSize = 30000L
+  val maxFileSize = 25000L
   val bulkStorageTestConfig = ScanStorageConfig(
     dbAcsSnapshotPeriodHours = 1,
     bulkAcsSnapshotPeriodHours = 2,
-    bulkDbReadChunkSize = 1000,
+    bulkDbReadChunkSize = 500,
     bulkZstdChunkSize = 10000L,
     maxFileSize,
   )
 
   "UpdateHistoryBulkStorage" should {
+
+    "multipart upload works" in {
+      withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
+        val o = bucketConnection.newAppendWriteObject("test")
+        o.prepareUploadNext()
+        o.prepareUploadNext()
+        for {
+          _ <- o.upload(1, ByteBuffer.wrap("hello".getBytes("UTF-8")))
+          _ <- o.upload(2, ByteBuffer.wrap("world".getBytes("UTF-8")))
+          _ <- o.finish()
+          content <- bucketConnection.readFullObject("test")
+        } yield {
+          new String(content.array(), "UTF-8") shouldBe "helloworld"
+        }
+      }
+    }
 
     "successfully dump a single segment of updates to an s3 bucket" in {
       withS3Mock(loggerFactory) { (bucketConnection: S3BucketConnection) =>
@@ -73,7 +90,7 @@ class UpdateHistoryBulkStorageTest
           .toMat(TestSink.probe[(UpdatesSegment, String)])(Keep.right)
           .run()
 
-        probe.request(2)
+        probe.request(3)
 
         clue(
           "Initially, 1000 updates will be ready, but the segment will not be complete, so no output is expected"
@@ -86,7 +103,16 @@ class UpdateHistoryBulkStorageTest
         ) {
           mockStore.mockIngestion(1000)
           probe.expectNext(20.seconds) should be(
-            (segment, Some(TimestampWithMigrationId(toTimestamp, 0)))
+            (
+              segment,
+              "TimestampWithMigrationId(1970-01-01T00:00:00.100Z,0)-TimestampWithMigrationId(1970-01-01T00:00:02.300Z,0)/updates_0.zstd",
+            )
+          )
+          probe.expectNext(20.seconds) should be(
+            (
+              segment,
+              "TimestampWithMigrationId(1970-01-01T00:00:00.100Z,0)-TimestampWithMigrationId(1970-01-01T00:00:02.300Z,0)/updates_1.zstd",
+            )
           )
           probe.expectComplete()
         }
