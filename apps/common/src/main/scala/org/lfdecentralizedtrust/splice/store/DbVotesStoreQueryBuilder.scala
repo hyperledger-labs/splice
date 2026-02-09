@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.store
 
 import cats.data.NonEmptyList
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
@@ -104,13 +105,15 @@ trait DbVotesAcsStoreQueryBuilder extends AcsQueries with LimitHelpers with Name
   ): SqlStreamingAction[Vector[
     AcsQueries.SelectFromAcsTableResult
   ], AcsQueries.SelectFromAcsTableResult, Effect.Read] = {
-    val voteRequestTrackingCidsSql = inClause(trackingCids)
+    val cids: Seq[ContractId[?]] = trackingCids
+    val voteRequestTrackingCidsSql =
+      inClause(trackingCidColumnName, cids)
     selectFromAcsTable(
       acsTableName,
       acsStoreId,
       domainMigrationId,
       VoteRequest.COMPANION,
-      where = (sql""" #$trackingCidColumnName in """ ++ voteRequestTrackingCidsSql).toActionBuilder,
+      where = voteRequestTrackingCidsSql,
       orderLimit = sql"""limit ${sqlLimit(limit)}""",
     )
   }

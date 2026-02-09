@@ -241,7 +241,6 @@ final class DbMultiDomainAcsStore[TXE](
   ): Future[Boolean] = waitUntilAcsIngested {
     if (ids.isEmpty) Future.successful(false)
     else {
-      val contractIds = inClause(ids)
       val expectedCount = ids.size
       storage
         .query(
@@ -250,7 +249,7 @@ final class DbMultiDomainAcsStore[TXE](
          from #$acsTableName acs
          where acs.store_id = $acsStoreId
          and acs.migration_id = $domainMigrationId
-         and acs.contract_id in """ ++ contractIds ++ sql"""
+         and """ ++ inClause("acs.contract_id", ids) ++ sql"""
          """).toActionBuilder
             .as[Int]
             .head,
@@ -1561,8 +1560,9 @@ final class DbMultiDomainAcsStore[TXE](
           .sequence(contractIds.grouped(ingestionConfig.maxLookupsPerStatement).map { contractIds =>
             (sql"""
            select distinct contract_id from incomplete_reassignments
-           where store_id = $acsStoreId and migration_id = $domainMigrationId and contract_id in """ ++ inClause(
-              contractIds
+           where store_id = $acsStoreId and migration_id = $domainMigrationId and """ ++ inClause(
+              "contract_id",
+              contractIds.map(lengthLimited),
             )).toActionBuilder.as[String].map(_.toSet)
           })
           .map(_.foldLeft(Set.empty[String])(_ ++ _))
@@ -1755,8 +1755,9 @@ final class DbMultiDomainAcsStore[TXE](
             delete from #$acsTableName
             where store_id = $acsStoreId
               and migration_id = $domainMigrationId
-              and contract_id in """ ++ inClause(
-            events.map(_.getContractId)
+              and """ ++ inClause(
+            "contract_id",
+            events.map(e => lengthLimited(e.getContractId)),
           ) ++ sql" returning contract_id").toActionBuilder.as[String].map { deletedCids =>
             val deletedCidSet = deletedCids.toSet
             val ingestedArchivedEvents =

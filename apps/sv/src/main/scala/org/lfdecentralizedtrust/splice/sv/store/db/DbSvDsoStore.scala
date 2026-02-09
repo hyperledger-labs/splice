@@ -38,8 +38,13 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{AcsStoreId, SelectFromAcsTableResult}
-import org.lfdecentralizedtrust.splice.store.db.StoreDescriptor
-import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsJdbcTypes,
+  AcsQueries,
+  AcsTables,
+  DbAppStore,
+  StoreDescriptor,
+}
 import org.lfdecentralizedtrust.splice.store.{
   DbVotesAcsStoreQueryBuilder,
   IngestionSummary,
@@ -49,6 +54,7 @@ import org.lfdecentralizedtrust.splice.store.{
 }
 import org.lfdecentralizedtrust.splice.sv.store.{AppRewardCouponsSum, SvDsoStore, SvStore}
 import SvDsoStore.RoundBatch
+import com.digitalasset.canton.config.CantonRequireTypes.String2066
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template
 import com.digitalasset.canton.data.CantonTimestamp
@@ -104,6 +110,7 @@ class DbSvDsoStore(
     with SvDsoStore
     with AcsTables
     with AcsQueries
+    with AcsJdbcTypes
     with DbVotesAcsStoreQueryBuilder
     with LimitHelpers {
   import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
@@ -519,12 +526,13 @@ class DbSvDsoStore(
         companion match {
           case SvRewardCoupon.COMPANION =>
             // only SV reward coupons have a beneficiary field
-            (sql"and reward_party not in " ++ inClause(ignoredParties) ++
-              sql" and create_arguments ->> 'beneficiary' not in " ++ inClause(
-                ignoredParties
+            (sql"and " ++ notInClause("reward_party", ignoredParties) ++
+              sql" and " ++ notInClause(
+                "create_arguments ->> 'beneficiary'",
+                ignoredParties,
               )).toActionBuilder
           case _ =>
-            (sql"and reward_party not in " ++ inClause(ignoredParties)).toActionBuilder
+            (sql"and " ++ notInClause("reward_party", ignoredParties)).toActionBuilder
         }
       else sql""
     waitUntilAcsIngested {
@@ -834,7 +842,7 @@ class DbSvDsoStore(
       ignoredParties: Set[PartyId]
   ): ListExpiredContracts[splice.amulet.Amulet.ContractId, splice.amulet.Amulet] = {
     val filterClause = if (ignoredParties.nonEmpty) {
-      (sql" and create_arguments->>'owner' not in " ++ inClause(ignoredParties)).toActionBuilder
+      (sql" and " ++ notInClause("create_arguments->>'owner'", ignoredParties)).toActionBuilder
     } else {
       sql""
     }
@@ -844,18 +852,11 @@ class DbSvDsoStore(
   override def listLockedExpiredAmulets(
       ignoredParties: Set[PartyId]
   ): ListExpiredContracts[splice.amulet.LockedAmulet.ContractId, splice.amulet.LockedAmulet] = {
-    import slick.jdbc.*
-    import java.sql.JDBCType
-    // slick does not have builtin array conversions so we add an ad-hoc one here.
-    implicit val stringArraySetParameter: SetParameter[Array[String]] =
-      (strings: Array[String], pp: PositionedParameters) =>
-        pp.setObject(
-          pp.ps.getConnection.createArrayOf("text", strings.map(x => x)),
-          JDBCType.ARRAY.getVendorTypeNumber,
-        )
     val filterClause = if (ignoredParties.nonEmpty) {
-      (sql" and create_arguments->'amulet'->>'owner' not in " ++ inClause(ignoredParties) ++
-        sql" and not (create_arguments->'lock'->'holders' ??| ${ignoredParties.map(_.toProtoPrimitive).toArray: Array[String]})").toActionBuilder
+      (sql" and " ++ notInClause("create_arguments->'amulet'->>'owner'", ignoredParties) ++
+        sql" and not (create_arguments->'lock'->'holders' ??| ${ignoredParties
+            .map(p => lengthLimited(p.toProtoPrimitive))
+            .toArray: Array[String2066]})").toActionBuilder
     } else {
       sql""
     }
@@ -931,10 +932,11 @@ class DbSvDsoStore(
     for {
       dsoRules <- getDsoRules()
       voterParties = inClause(
+        "voter",
         dsoRules.payload.svs.asScala
           .map { case (party, _) =>
             lengthLimited(party)
-          }
+          },
       )
       result <- storage
         .query(
@@ -943,7 +945,7 @@ class DbSvDsoStore(
             acsStoreId,
             domainMigrationId,
             AmuletPriceVote.COMPANION,
-            where = (sql"""voter in """ ++ voterParties).toActionBuilder,
+            where = voterParties,
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
           "listSvAmuletPriceVotes",
@@ -1326,7 +1328,7 @@ class DbSvDsoStore(
     if (roundNumbers.isEmpty)
       Future.successful(Seq.empty)
     else {
-      val roundNumbersClause = inClause(roundNumbers)
+      val roundNumbersClause = inClause("mining_round", roundNumbers)
       waitUntilAcsIngested {
         for {
           result <- storage
@@ -1337,7 +1339,7 @@ class DbSvDsoStore(
                 domainMigrationId,
                 ClosedMiningRound.COMPANION,
                 where =
-                  (sql"""assigned_domain = $synchronizerId AND mining_round IN """ ++ roundNumbersClause).toActionBuilder,
+                  (sql"""assigned_domain = $synchronizerId AND """ ++ roundNumbersClause).toActionBuilder,
                 orderLimit = sql"""limit ${sqlLimit(limit)}""",
               ),
               "listClosedRounds",
