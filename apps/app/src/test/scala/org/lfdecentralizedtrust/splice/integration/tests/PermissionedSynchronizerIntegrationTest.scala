@@ -94,6 +94,17 @@ class PermissionedSynchronizerIntegrationTest
                 serial = Some(com.digitalasset.canton.config.RequireTypes.PositiveInt.one),
               )
         }
+
+        eventually(60.seconds, 1.second) {
+          val authorized =
+            sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
+              .find(
+                decentralizedSynchronizerId,
+                sv1ValidatorBackend.participantClientWithAdminToken.id,
+              )
+          authorized.exists(_.item.permission == ParticipantPermission.Submission) shouldBe true
+        }
+
       }
 
       withClue("Phase 2: change onboarding restriction to RestrictedOpen") {
@@ -109,6 +120,13 @@ class PermissionedSynchronizerIntegrationTest
             decentralizedSynchronizerId,
             _.update(onboardingRestriction = RestrictedOpen),
           )
+        }
+
+        eventually(60.seconds, 1.second) {
+          val currentParams = sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
+            .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
+
+          currentParams.onboardingRestriction shouldBe RestrictedOpen
         }
       }
 
@@ -177,6 +195,13 @@ class PermissionedSynchronizerIntegrationTest
             decentralizedSynchronizerId,
             _.update(onboardingRestriction = UnrestrictedOpen),
           )
+        }
+
+        eventually(60.seconds, 1.second) {
+          val currentParams = sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
+            .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
+
+          currentParams.onboardingRestriction shouldBe UnrestrictedOpen
         }
       }
 
