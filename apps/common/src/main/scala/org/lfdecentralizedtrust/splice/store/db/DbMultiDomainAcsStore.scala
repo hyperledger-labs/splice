@@ -1273,7 +1273,6 @@ final class DbMultiDomainAcsStore[TXE](
         storage.update(updateOffset(offset), "markAcsIngestedAsOf").map { _ =>
           val newAcsSize = summaryState.acsSizeDiff
           val summary = summaryState.toIngestionSummary(
-            updateId = None,
             offset = offset,
             synchronizerIdToRecordTime = Map.empty,
             newAcsSize = newAcsSize,
@@ -1325,7 +1324,6 @@ final class DbMultiDomainAcsStore[TXE](
                   .signalOffsetChanged(lastTree.getOffset)
                 val summary =
                   summaryState.toIngestionSummary(
-                    updateId = None,
                     offset = lastTree.getOffset,
                     synchronizerIdToRecordTime = synchronizerIdToRecordTime.toMap,
                     newAcsSize = state.get().acsSize,
@@ -1353,7 +1351,6 @@ final class DbMultiDomainAcsStore[TXE](
                   .signalOffsetChanged(reassignment.offset)
                 val summary =
                   summaryState.toIngestionSummary(
-                    updateId = None,
                     synchronizerIdToRecordTime = Map(synchronizerId -> reassignment.recordTime),
                     offset = reassignment.offset,
                     newAcsSize = state.get().acsSize,
@@ -1375,7 +1372,6 @@ final class DbMultiDomainAcsStore[TXE](
                   .signalOffsetChanged(offset)
                 val summary =
                   MutableIngestionSummary.empty.toIngestionSummary(
-                    updateId = None,
                     synchronizerIdToRecordTime = Map.empty,
                     offset = offset,
                     newAcsSize = state.get().acsSize,

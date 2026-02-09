@@ -19,7 +19,6 @@ import com.digitalasset.canton.topology.SynchronizerId
 import scala.collection.mutable
 
 final case class IngestionSummary(
-    updateId: Option[String],
     offset: Option[Long],
     synchronizerIdToRecordTime: Map[SynchronizerId, CantonTimestamp],
     newAcsSize: Int,
@@ -42,7 +41,6 @@ private[store] object IngestionSummary {
   def empty[TXE]: IngestionSummary = Empty
 
   private val Empty: IngestionSummary = IngestionSummary(
-    updateId = None,
     offset = None,
     synchronizerIdToRecordTime = Map.empty,
     newAcsSize = 0,
@@ -70,7 +68,6 @@ private[store] object IngestionSummary {
 
     prettyNode(
       "", // intentionally left empty, as that worked better in the log messages above
-      paramIfDefined("updateId", _.updateId.map(_.unquoted)),
       paramIfDefined("offset", _.offset),
       param("newAcsSize", _.newAcsSize),
       param("synchronizerIdToRecordTime", _.synchronizerIdToRecordTime),
@@ -123,7 +120,6 @@ case class MutableIngestionSummary(
   def acsSizeDiff: Int = ingestedCreatedEvents.size - ingestedArchivedEvents.size
 
   def toIngestionSummary(
-      updateId: Option[String],
       synchronizerIdToRecordTime: Map[SynchronizerId, CantonTimestamp],
       offset: Long,
       newAcsSize: Int,
@@ -146,7 +142,6 @@ case class MutableIngestionSummary(
         .updateValue(recordTime.toEpochMilli)
     }
     IngestionSummary(
-      updateId = updateId,
       offset = Some(offset),
       synchronizerIdToRecordTime = synchronizerIdToRecordTime,
       newAcsSize = newAcsSize,
