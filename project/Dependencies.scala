@@ -64,5 +64,6 @@ object Dependencies {
 
   lazy val aws_s3 = "software.amazon.awssdk" % "s3" % CantonDependencies.aws_version
 
-  lazy val s3mock_testcontainers = "com.adobe.testing" % "s3mock-testcontainers" % "4.11.0" % "test"
+  lazy val localstack_testcontainers = "com.dimafeng" % "testcontainers-scala-localstack-v2_2.13" % "0.44.1" % "test"
+
 }

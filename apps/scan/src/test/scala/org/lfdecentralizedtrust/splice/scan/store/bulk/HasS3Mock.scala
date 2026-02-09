@@ -7,15 +7,13 @@ import io.grpc.netty.shaded.io.netty.buffer.PooledByteBufAllocator
 import org.lfdecentralizedtrust.splice.scan.admin.http.CompactJsonScanHttpEncodings
 import org.scalatest.EitherValues
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
-import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.model.S3Object
-import com.adobe.testing.s3mock.testcontainers.S3MockContainer
+import software.amazon.awssdk.services.s3.model.{CreateBucketRequest, S3Object}
+import com.dimafeng.testcontainers.LocalStackV2Container
+import org.testcontainers.containers.localstack.LocalStackContainer.Service
 
-import java.net.URI
 import java.nio.charset.StandardCharsets
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Using
-import scala.jdk.CollectionConverters.*
 
 trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with BaseTest {
 
@@ -24,34 +22,36 @@ trait HasS3Mock extends NamedLogging with FutureHelpers with EitherValues with B
       loggerFactory: NamedLoggerFactory
   )(test: S3BucketConnection => Future[A])(implicit ec: ExecutionContext): Future[A] = {
 
-    val container = new S3MockContainer("4.11.0")
-      .withInitialBuckets("bucket")
-      .withEnv(
-        Map(
-          "debug" -> "true"
-        ).asJava
-      )
+    val localstack = LocalStackV2Container(
+      tag = "3.0",
+      services = Seq(Service.S3),
+    )
 
-    container.start()
+    localstack.start()
 
-    container.followOutput { frame =>
-      logger.debug(s"[s3Mock] ${frame.getUtf8String}")
+    localstack.container.followOutput { frame =>
+      logger.debug(s"[localstack] ${frame.getUtf8String}")
     }
 
-    test(getS3BucketConnection(loggerFactory, container)).andThen({ case _ =>
-      container.stop()
+    val s3Connection = getS3BucketConnection(loggerFactory, localstack)
+    s3Connection.s3Client.createBucket(CreateBucketRequest.builder().bucket("bucket").build())
+    test(s3Connection).andThen({ case _ =>
+      localstack.stop()
     })
   }
 
   private def getS3BucketConnection(
       loggerFactory: NamedLoggerFactory,
-      container: S3MockContainer,
+      localstack: LocalStackV2Container,
   ): S3BucketConnection = {
     val s3Config = S3Config(
-      URI.create(container.getHttpEndpoint),
+      localstack.endpointOverride(Service.S3),
       "bucket",
-      Region.US_EAST_1,
-      AwsBasicCredentials.create("mock_id", "mock_key"),
+      localstack.region,
+      AwsBasicCredentials.create(
+        localstack.container.getAccessKey,
+        localstack.container.getSecretKey,
+      ),
     )
     S3BucketConnection(s3Config, "bucket", loggerFactory)
   }

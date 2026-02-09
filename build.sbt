@@ -1116,7 +1116,7 @@ lazy val `apps-scan` =
         scalapb_runtime,
         zstd,
         aws_s3,
-        s3mock_testcontainers,
+        localstack_testcontainers,
       ),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
