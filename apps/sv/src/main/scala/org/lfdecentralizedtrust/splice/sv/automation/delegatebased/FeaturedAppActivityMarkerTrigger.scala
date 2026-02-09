@@ -165,11 +165,17 @@ class FeaturedAppActivityMarkerTrigger(
       informees = (dsoRules.payload.dso +: task.markers.flatMap(m =>
         Seq(m.payload.provider, m.payload.beneficiary)
       )).toSet
-      convertFeaturedAppActivityMarkerObservers <- svTaskContext.packageVersionSupport
-        .supportsConvertFeaturedAppActivityMarkerObservers(
-          informees.map(PartyId.tryFromProtoPrimitive(_)).toSeq,
-          context.clock.now,
-        )
+      supportsConvertFeaturedAppActivityMarkerObservers <-
+        if (svConfig.convertFeaturedAppActivityMarkerObservers) {
+          svTaskContext.packageVersionSupport
+            .supportsConvertFeaturedAppActivityMarkerObservers(
+              informees.map(PartyId.tryFromProtoPrimitive(_)).toSeq,
+              context.clock.now,
+            )
+            .map(_.supported)
+        } else {
+          Future.successful(false)
+        }
       // Note that we don't group by provider or beneficiary. There is no strong need to do so
       // as we want to
       update = dsoRules.exercise(
@@ -180,7 +186,7 @@ class FeaturedAppActivityMarkerTrigger(
             openMiningRound.contractId,
             Option
               .when(
-                svConfig.convertFeaturedAppActivityMarkerObservers && convertFeaturedAppActivityMarkerObservers.supported
+                supportsConvertFeaturedAppActivityMarkerObservers
               )(informees.toSeq.asJava)
               .toJava,
           ),
