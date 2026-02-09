@@ -25,6 +25,7 @@ import com.digitalasset.canton.time.{NonNegativeFiniteDuration, WallClock}
 import com.digitalasset.canton.topology.{PartyKind, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, W3CTraceContext}
 import com.digitalasset.canton.util.FutureInstances.*
+import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.{CheckedT, MaxBytesToDecompress}
 import com.digitalasset.canton.version.{
   ProtocolVersion,
@@ -370,7 +371,7 @@ trait BaseTest
     logger.debug(s"Running clue: $message")
     Try(expr) match {
       case Success(value) =>
-        value.onComplete {
+        value.thereafter {
           case Success(_) =>
             logger.debug(s"Finished clue: $message")
           case Failure(ex) =>
@@ -396,7 +397,7 @@ trait BaseTest
     logger.debug(s"Running clue: $message")
     Try(expr) match {
       case Success(value) =>
-        value.onComplete {
+        value.thereafter {
           case Success(_) =>
             logger.debug(s"Finished clue: $message")
           case Failure(ex) =>

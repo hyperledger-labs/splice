@@ -15,12 +15,13 @@ import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.metrics.CacheMetrics
 import com.digitalasset.canton.participant.admin.party.OnboardingClearanceScheduler
 import com.digitalasset.canton.participant.config.UnsafeOnlinePartyReplicationConfig
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.ledger.api.LedgerApiStore
 import com.digitalasset.canton.participant.protocol.ParticipantTopologyTerminateProcessing
-import com.digitalasset.canton.participant.sync.LogicalSynchronizerUpgradeCallback
+import com.digitalasset.canton.participant.sync.LsuCallback
 import com.digitalasset.canton.participant.topology.client.MissingKeysAlerter
 import com.digitalasset.canton.store.SequencedEventStore
 import com.digitalasset.canton.time.Clock
@@ -56,14 +57,18 @@ class TopologyComponentFactory(
     unsafeOnlinePartyReplication: Option[UnsafeOnlinePartyReplicationConfig],
     exitOnFatalFailures: Boolean,
     topologyStore: TopologyStore[SynchronizerStore],
+    topologyCacheMetrics: CacheMetrics,
     loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext) {
 
   private val topologyStateCache = new TopologyStateWriteThroughCache(
     topologyStore,
     batching.topologyCacheAggregator,
+    cacheEvictionThreshold = topology.topologyStateCacheEvictionThreshold,
     maxCacheSize = topology.maxTopologyStateCacheItems,
     enableConsistencyChecks = topology.enableTopologyStateCacheConsistencyChecks,
+    topologyCacheMetrics,
+    futureSupervisor,
     timeouts,
     loggerFactory,
   )
@@ -74,7 +79,7 @@ class TopologyComponentFactory(
       onboardingClearanceScheduler: OnboardingClearanceScheduler,
       topologyClient: SynchronizerTopologyClientWithInit,
       recordOrderPublisher: RecordOrderPublisher,
-      lsuCallback: LogicalSynchronizerUpgradeCallback,
+      lsuCallback: LsuCallback,
       retrieveAndStoreMissingSequencerIds: TraceContext => EitherT[
         FutureUnlessShutdown,
         String,
@@ -140,9 +145,7 @@ class TopologyComponentFactory(
     }
   }
 
-  def createInitialTopologySnapshotValidator(
-      topologyConfig: TopologyConfig
-  )(implicit
+  def createInitialTopologySnapshotValidator()(implicit
       executionContext: ExecutionContext,
       materializer: Materializer,
   ): InitialTopologySnapshotValidator =
@@ -150,7 +153,7 @@ class TopologyComponentFactory(
       crypto.pureCrypto,
       topologyStore,
       batching.topologyCacheAggregator,
-      topologyConfig,
+      topology,
       Some(crypto.staticSynchronizerParameters),
       timeouts,
       loggerFactory,

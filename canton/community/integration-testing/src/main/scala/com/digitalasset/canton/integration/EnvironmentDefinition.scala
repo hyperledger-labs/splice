@@ -718,6 +718,20 @@ object EnvironmentDefinition extends LazyLogging {
       numMediators = 1,
     )
 
+  lazy val P3S4M4_Config: EnvironmentDefinition =
+    buildBaseEnvironmentDefinition(
+      numParticipants = 3,
+      numSequencers = 4,
+      numMediators = 4,
+    )
+
+  lazy val P3S6M6_Config: EnvironmentDefinition =
+    buildBaseEnvironmentDefinition(
+      numParticipants = 3,
+      numSequencers = 6,
+      numMediators = 6,
+    )
+
   /**   - 3 participants '''not''' connected to any synchronizer
     *   - 1 synchronizer with 1 sequencer and 1 mediator
     */
@@ -802,14 +816,22 @@ object EnvironmentDefinition extends LazyLogging {
     }
 
   /**   - 4 participants '''not''' connected to any synchronizer
-    *   - 2 synchronizers with 1 sequencer and 1 mediator each
+    *   - 2 sequencers
+    *   - 2 mediators
     */
-  lazy val P4_S1M1_S1M1_Manual: EnvironmentDefinition =
+  lazy val P4S2M2_Manual: EnvironmentDefinition =
     buildBaseEnvironmentDefinition(
       numParticipants = 4,
       numSequencers = 2,
       numMediators = 2,
     ).withManualStart
+
+  lazy val P4S3M3_Config: EnvironmentDefinition =
+    buildBaseEnvironmentDefinition(
+      numParticipants = 4,
+      numSequencers = 3,
+      numMediators = 3,
+    )
 
   /**   - 5 participants '''not''' connected to any synchronizer
     *   - 1 synchronizer with 1 sequencer and 1 mediator

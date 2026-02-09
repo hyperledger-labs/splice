@@ -112,8 +112,6 @@ You are using an unreleased and unstable version of damml3. This will break with
 curl.*The requested URL returned error
 WARNING: Failed to fetch secret, retrying in 10 seconds
 
-.*Condition \[isDefined\("LOG_LAST_ERRORS"\)\] evaluated.*
-
 # This is actually not a warning
 .*No want/action statements, nothing to do
 

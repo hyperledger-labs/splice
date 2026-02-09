@@ -52,7 +52,7 @@ import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors
 import com.digitalasset.canton.participant.*
 import com.digitalasset.canton.participant.Pruning.*
 import com.digitalasset.canton.participant.admin.*
-import com.digitalasset.canton.participant.admin.data.{ManualLSURequest, UploadDarData}
+import com.digitalasset.canton.participant.admin.data.{ManualLsuRequest, UploadDarData}
 import com.digitalasset.canton.participant.admin.grpc.PruningServiceError
 import com.digitalasset.canton.participant.admin.inspection.{
   JournalGarbageCollectorControl,
@@ -123,9 +123,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
-import java.util.concurrent.CompletionStage
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.jdk.FutureConverters.*
 import scala.util.{Failure, Right, Success}
 
 /** The Canton-based synchronization service.
@@ -453,8 +451,7 @@ class CantonSyncService(
       processedDisclosedContracts: ImmArray[LfFatContractInst],
   )(implicit
       traceContext: TraceContext
-  ): CompletionStage[SubmissionResult] = {
-    import scala.jdk.FutureConverters.*
+  ): Future[SubmissionResult] =
     withSpan("CantonSyncService.submitTransaction") { implicit traceContext => span =>
       span.setAttribute("command_id", submitterInfo.commandId)
       logger.debug(s"Received submit-transaction ${submitterInfo.commandId} from ledger-api server")
@@ -475,8 +472,7 @@ class CantonSyncService(
         // We merely retain it until here so that the span ends only after the asynchronous computation
         SubmissionResult.Acknowledged
       }.merge
-    ).asJava
-  }
+    )
 
   lazy val stateInspection = new SyncStateInspection(
     syncPersistentStateManager,
@@ -509,7 +505,7 @@ class CantonSyncService(
   override def prune(
       pruneUpToInclusive: Offset,
       submissionId: LedgerSubmissionId,
-  ): CompletionStage[PruningResult] =
+  ): Future[PruningResult] =
     withNewTrace("CantonSyncService.prune") { implicit traceContext => span =>
       span.setAttribute("submission_id", submissionId)
       pruneInternally(pruneUpToInclusive)
@@ -520,7 +516,7 @@ class CantonSyncService(
         .onShutdown(
           PruningResult.NotPruned(GrpcErrors.AbortedDueToShutdown.Error().asGrpcStatus)
         )
-    }.asJava
+    }
 
   def pruneInternally(
       pruneUpToInclusive: Offset
@@ -1222,16 +1218,16 @@ class CantonSyncService(
     }
 
   /** Perform a handshake with the given synchronizer.
-    * @param synchronizerId
+    * @param psid
     *   the physical synchronizer id of the synchronizer.
     * @return
     */
   def connectToPSIdWithHandshake(
-      synchronizerId: PhysicalSynchronizerId
+      psid: PhysicalSynchronizerId
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SyncServiceError, PhysicalSynchronizerId] =
-    connectionsManager.connectToPSIdWithHandshake(synchronizerId)
+  ): EitherT[FutureUnlessShutdown, SyncServiceError, Unit] =
+    connectionsManager.connectToPSIdWithHandshake(psid)
 
   /** Disconnect the given synchronizer from the sync service. */
   def disconnectSynchronizer(
@@ -1240,7 +1236,7 @@ class CantonSyncService(
     connectionsManager.disconnectSynchronizer(synchronizerAlias)
 
   def manuallyUpgradeSynchronizerTo(
-      request: ManualLSURequest
+      request: ManualLsuRequest
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] =
     connectionsManager.manuallyUpgradeSynchronizerTo(request)
 
@@ -1365,8 +1361,7 @@ class CantonSyncService(
       reassignmentCommands: Seq[ReassignmentCommand],
   )(implicit
       traceContext: TraceContext
-  ): CompletionStage[SubmissionResult] = {
-    import scala.jdk.FutureConverters.*
+  ): Future[SubmissionResult] = {
     withSpan("CantonSyncService.submitReassignment") { implicit traceContext => span =>
       span.setAttribute("command_id", commandId)
       logger.debug(s"Received submit-reassignment $commandId from ledger-api server")
@@ -1485,7 +1480,7 @@ class CantonSyncService(
               .asGrpcError
           )
       }
-    }.asJava
+    }
   }
 
   override def getConnectedSynchronizers(

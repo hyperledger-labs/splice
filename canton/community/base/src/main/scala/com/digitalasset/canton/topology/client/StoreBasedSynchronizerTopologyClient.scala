@@ -110,10 +110,10 @@ trait TopologyAwaiter extends FlagCloseable {
 
 /** The synchronizer topology client that reads data from a topology store
   *
-  * @param synchronizerId
-  *   The synchronizer id corresponding to this store
+  * @param staticSynchronizerParameters
+  *   The static synchronizer parameters of the synchronizer
   * @param store
-  *   The store
+  *   The store used by the client
   */
 class StoreBasedSynchronizerTopologyClient(
     val clock: Clock,
@@ -124,6 +124,8 @@ class StoreBasedSynchronizerTopologyClient(
     override val timeouts: ProcessingTimeout,
     override protected val futureSupervisor: FutureSupervisor,
     val loggerFactory: NamedLoggerFactory,
+    override val executionOrder: Int =
+      2, // overriding the executionOrder during creation (default is 10)
 )(implicit val executionContext: ExecutionContext)
     extends SynchronizerTopologyClientWithInit
     with TopologyAwaiter
@@ -210,12 +212,13 @@ class StoreBasedSynchronizerTopologyClient(
       traceContext: TraceContext
   ): Unit = {
     logger.debug(
-      s"Head update: sequenced=$sequencedTimestamp, effective=$effectiveTimestamp, approx=$approximateTimestamp, topologyChange=$topologyChange"
+      s"Head update requested: sequenced=$sequencedTimestamp, effective=$effectiveTimestamp, approx=$approximateTimestamp, topologyChange=$topologyChange"
     )
     val curHead =
       head.updateAndGet(
         _.update(sequencedTimestamp, effectiveTimestamp, approximateTimestamp, topologyChange)
       )
+    logger.debug(s"New head: $curHead")
     // waiting for a sequenced time has "inclusive" semantics
     sequencedTimeAwaiter.notifyAwaitedFutures(curHead.sequencedTimestamp.value)
     // now notify the futures that wait for this update here. as the update is active at t+epsilon, (see most recent timestamp),
@@ -314,11 +317,6 @@ class StoreBasedSynchronizerTopologyClient(
     new StoreBasedTopologySnapshot(psid, timestamp, store, packageDependencyResolver, loggerFactory)
   }
 
-  def findTopologyIntervalForTimestamp(timestamp: CantonTimestamp)(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[(EffectiveTime, Option[EffectiveTime])]] =
-    store.findTopologyIntervalForTimestamp(timestamp)
-
   override def snapshot(
       timestamp: CantonTimestamp
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[TopologySnapshotLoader] =
@@ -344,6 +342,15 @@ class StoreBasedSynchronizerTopologyClient(
 
   override def latestTopologyChangeTimestamp: CantonTimestamp =
     head.get().lastChangeTimestamp.value.immediateSuccessor
+
+  /** return both values above consistently */
+  def knownUntilAndLatestChangeTimestamps: (CantonTimestamp, CantonTimestamp) = {
+    val tmp = head.get()
+    (
+      tmp.effectiveTimestamp.value.immediateSuccessor,
+      tmp.lastChangeTimestamp.value.immediateSuccessor,
+    )
+  }
 
   /** returns the current approximate timestamp
     *
@@ -448,6 +455,11 @@ class StoreBasedSynchronizerTopologyClient(
         logger.debug(s"Taking into account sequencer snapshot at $effectiveTime")
         (SequencedTime(effectiveTime.value), effectiveTime)
       }
+      // `sequencerSnapshotTimes` contains `lastTs` and in principle its sequencing time should become
+      //  the head's sequencing time, which may not happen in the following logic that only keeps
+      //  the head update with the maximum effective time.
+      //  In practice, this is not a problem, because currently the sequencing time head is not
+      //  relied upon during onboarding.
       val initialHeadTimestamps =
         (adjustedStoreMaxTimestamp.toList ++ upgradeTimes.toList ++ sequencerSnapshotTimes.toList)
           .maxByOption { case (_, effectiveTime: EffectiveTime) =>

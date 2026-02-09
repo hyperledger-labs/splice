@@ -4,7 +4,6 @@
 package com.digitalasset.canton.platform.apiserver.services.command
 
 import cats.data.EitherT
-import com.daml.scalautil.future.FutureConversion.CompletionStageConversionOps
 import com.daml.timer.Delayed
 import com.digitalasset.base.error.ErrorCode.LoggedApiException
 import com.digitalasset.canton.ledger.api.messages.command.submission.SubmitRequest
@@ -95,7 +94,9 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
   ): FutureUnlessShutdown[Unit] =
     withEnrichedLoggingContext(logging.commands(request.commands)) { implicit loggingContext =>
       logger.info(
-        show"Phase 1 started: Submitting commands for interpretation: ${request.commands}."
+        show"Phase 1 started: Submitting ${request.commands.commands.commands.length} command(s) for interpretation on behalf of ${request.commands.actAs
+            .limit(5)
+            .toSeq}."
       )
       val cmds = request.commands.commands.commands
       logger.debug(show"Submitted commands are: ${if (cmds.length > 1) "\n  " else ""}${cmds
@@ -223,7 +224,6 @@ private[apiserver] final class CommandSubmissionServiceImpl private[services] (
         result.commandInterpretationResult.globalKeyMapping,
         result.commandInterpretationResult.processedDisclosedContracts,
       )
-      .toScalaUnwrapped
   }
 
   override def close(): Unit = ()

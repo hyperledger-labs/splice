@@ -240,14 +240,14 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
       val announcement = clue(s"Announce upgrade at $upgradeTime") {
         allBackends.par.map { backend =>
-          backend.participantClientWithAdminToken.topology.synchronizer_upgrade.announcement
+          backend.participantClientWithAdminToken.topology.lsu.announcement
             .propose(
               successorPsid,
               upgradeTime,
               store = Some(Synchronizer(decentralizedSynchronizerId)),
             )
         }
-        allBackends.head.participantClientWithAdminToken.topology.synchronizer_upgrade.announcement
+        allBackends.head.participantClientWithAdminToken.topology.lsu.announcement
           .list()
           .head
       }
@@ -360,7 +360,7 @@ class LogicalSynchronizerUpgradeIntegrationTest
 
       clue("Announce new sequencer urls") {
         allBackends.zip(allNewBackends).par.map { case (oldBackend, newBackend) =>
-          oldBackend.sequencerClient.topology.synchronizer_upgrade.sequencer_successors
+          oldBackend.sequencerClient.topology.lsu.sequencer_successors
             .propose_successor(
               oldBackend.sequencerClient.id,
               NonEmpty(

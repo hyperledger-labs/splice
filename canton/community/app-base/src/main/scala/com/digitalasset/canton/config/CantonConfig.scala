@@ -420,8 +420,7 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[Option[DefaultPorts], Self
         enableStrictDarValidation = participantParameters.enableStrictDarValidation,
         commandProgressTracking = participantParameters.commandProgressTracker,
         unsafeOnlinePartyReplication = participantParameters.unsafeOnlinePartyReplication,
-        automaticallyPerformLogicalSynchronizerUpgrade =
-          participantParameters.automaticallyPerformLogicalSynchronizerUpgrade,
+        automaticallyPerformLsu = participantParameters.automaticallyPerformLsu,
         reassignmentsConfig = participantParameters.reassignmentsConfig,
         doNotAwaitOnCheckingIncomingCommitments =
           participantParameters.doNotAwaitOnCheckingIncomingCommitments,
@@ -1271,6 +1270,18 @@ object CantonConfig {
 
     lazy implicit final val participantNodeParameterConfigReader
         : ConfigReader[ParticipantNodeParameterConfig] = {
+
+      implicit val deprecatedFields: DeprecatedFieldsFor[ParticipantNodeParameterConfig] =
+        new DeprecatedFieldsFor[ParticipantNodeParameterConfig] {
+          override def movedFields: List[DeprecatedConfigUtils.MovedConfigPath] = List(
+            DeprecatedConfigUtils.MovedConfigPath(
+              "automatically-perform-logical-synchronizer-upgrade",
+              since = "3.5.0",
+              to = Seq("automatically-perform-lsu"),
+            )
+          )
+        }
+
       implicit val cantonEngineConfigReader: ConfigReader[CantonEngineConfig] = {
         implicit val engineLoggingConfigReader: ConfigReader[EngineLoggingConfig] =
           deriveReader[EngineLoggingConfig]
@@ -1296,7 +1307,7 @@ object CantonConfig {
         deriveReader[UnsafeOnlinePartyReplicationConfig]
       implicit val reassignmentsReader: ConfigReader[ReassignmentsConfig] =
         deriveReader[ReassignmentsConfig]
-      deriveReader[ParticipantNodeParameterConfig]
+      deriveReader[ParticipantNodeParameterConfig].applyDeprecations
     }
     lazy implicit final val timeTrackerConfigReader: ConfigReader[SynchronizerTimeTrackerConfig] = {
       implicit val timeRequestConfigReader: ConfigReader[TimeProofRequestConfig] =

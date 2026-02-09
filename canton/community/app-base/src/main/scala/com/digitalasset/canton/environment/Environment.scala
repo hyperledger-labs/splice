@@ -195,7 +195,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
 
   private val lock = new Mutex()
 
-  protected val futureSupervisor =
+  protected[canton] val futureSupervisor =
     if (config.monitoring.logging.logSlowFutures)
       new FutureSupervisor.Impl(timeouts.slowFutureWarn, loggerFactory)
     else FutureSupervisor.Noop

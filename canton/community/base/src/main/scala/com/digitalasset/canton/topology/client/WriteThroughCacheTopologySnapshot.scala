@@ -20,9 +20,9 @@ import com.digitalasset.canton.topology.store.{
 }
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Replace
 import com.digitalasset.canton.topology.transaction.{
+  LsuSequencerConnectionSuccessor,
   MediatorSynchronizerState,
   OwnerToKeyMapping,
-  SequencerConnectionSuccessor,
   SequencerSynchronizerState,
   SynchronizerParametersState,
   SynchronizerTrustCertificate,
@@ -42,6 +42,7 @@ import com.digitalasset.canton.topology.{
 }
 import com.digitalasset.canton.tracing.TraceContext
 
+import scala.annotation.nowarn
 import scala.concurrent.ExecutionContext
 
 /** A topology snapshot backed by the TopologyStateWriteThroughCache for most methods. Some data
@@ -104,7 +105,7 @@ class WriteThroughCacheTopologySnapshot(
   // actual implementations specific to the
   // state write through cache
   // ===============================================
-
+  @nowarn("cat=deprecation")
   override def memberFirstKnownAt(member: Member)(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]] =
@@ -117,7 +118,9 @@ class WriteThroughCacheTopologySnapshot(
             uid,
             TopologyMapping.Code.SynchronizerTrustCertificate,
           )
-          .map(_.headOption.map(stored => (stored.sequenced, stored.validFrom)))
+          .map(
+            _.minByOption(_.validFrom.value).map(stored => (stored.sequenced, stored.validFrom))
+          )
       case med @ MediatorId(_) =>
         stateLookup
           .lookupHistoryForUid(
@@ -150,6 +153,11 @@ class WriteThroughCacheTopologySnapshot(
           )
     }
 
+  @deprecated(
+    message =
+      "Do not use methods that scan the topology state as they don’t scale and don’t work with topology scalability.",
+    since = "3.5.0",
+  )
   override def listDynamicSynchronizerParametersChanges()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Seq[DynamicSynchronizerParametersWithValidity]] =
@@ -169,6 +177,11 @@ class WriteThroughCacheTopologySnapshot(
         )
       })
 
+  @deprecated(
+    message =
+      "Do not use methods that scan the topology state as they don’t scale and don’t work with topology scalability.",
+    since = "3.5.0",
+  )
   override def allMembers()(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Set[Member]] =
@@ -191,7 +204,7 @@ class WriteThroughCacheTopologySnapshot(
 
   override def sequencerConnectionSuccessors()(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[SequencerId, SequencerConnectionSuccessor]] =
+  ): FutureUnlessShutdown[Map[SequencerId, LsuSequencerConnectionSuccessor]] =
     // since the state lookup cannot look at the state just based on the type,
     // we first have to load the current registered sequencers in SequencerSynchronizerState,
     // and then lookup the corresponding SequencerConnectionSuccessor transactions.
@@ -219,7 +232,7 @@ class WriteThroughCacheTopologySnapshot(
         )
       )
     } yield txs
-      .collectOfMapping[SequencerConnectionSuccessor]
+      .collectOfMapping[LsuSequencerConnectionSuccessor]
       .result
       .view
       .map(stored => stored.mapping.sequencerId -> stored.mapping)

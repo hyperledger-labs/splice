@@ -235,6 +235,7 @@ object ConfigTransforms {
               h2Config.focus(_.parameters.connectionTimeout).replace(newConnectionTimeout)
           }
         },
+        ConfigTransforms.setSessionSigningKeys(SessionSigningKeysConfig.default),
       )
 
   def updateAllInitialProtocolVersion(pv: ProtocolVersion): ConfigTransform =
@@ -319,7 +320,7 @@ object ConfigTransforms {
   def allInMemory: ConfigTransform =
     modifyAllStorageConfigs((_, _, _) => StorageConfig.Memory())
 
-  /** Use the given crypto factory config on all nodes with `nodeFilter(name)`.
+  /** Use the given crypto config on all nodes with `nodeFilter(name)`.
     */
   def setCrypto(
       cryptoConfig: CryptoConfig,
@@ -333,6 +334,26 @@ object ConfigTransforms {
       case (_, config) => config
     } compose updateAllMediatorConfigs {
       case (name, config) if nodeFilter(name) => config.focus(_.crypto).replace(cryptoConfig)
+      case (_, config) => config
+    }
+
+  /** Use the given session signing keys config on all nodes with `nodeFilter(name)`.
+    */
+  def setSessionSigningKeys(
+      sessionSigningKeysConfig: SessionSigningKeysConfig,
+      nodeFilter: String => Boolean = _ => true,
+  ): ConfigTransform =
+    updateAllParticipantConfigs {
+      case (name, config) if nodeFilter(name) =>
+        config.focus(_.crypto.sessionSigningKeys).replace(sessionSigningKeysConfig)
+      case (_, config) => config
+    } compose updateAllSequencerConfigs {
+      case (name, config) if nodeFilter(name) =>
+        config.focus(_.crypto.sessionSigningKeys).replace(sessionSigningKeysConfig)
+      case (_, config) => config
+    } compose updateAllMediatorConfigs {
+      case (name, config) if nodeFilter(name) =>
+        config.focus(_.crypto.sessionSigningKeys).replace(sessionSigningKeysConfig)
       case (_, config) => config
     }
 
@@ -374,7 +395,11 @@ object ConfigTransforms {
         .replace(config.NonNegativeFiniteDuration.ofDays(10000))
     )
 
-    mainUpdates compose sequencerWriteBound
+    // TODO(#30068): Enable session keys after sim clock advances are synced
+    val disableSessionKeys =
+      ConfigTransforms.setSessionSigningKeys(SessionSigningKeysConfig.disabled)
+
+    mainUpdates compose sequencerWriteBound compose disableSessionKeys
   }
 
   /** Enable the testing time service in the ledger API */
