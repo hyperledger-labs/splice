@@ -89,6 +89,7 @@ testFeaturedAppActivityMarkers = do
     argument = AmuletRules_ConvertFeaturedAppActivityMarkers with
       markerCids = [marker1, marker3, marker2, marker4] -- interleave different providers to test grouping
       openMiningRoundCid
+      observers = Some [provider1, provider2, beneficiary]
     sv = Some sv1
 
   -- markers are archived
@@ -151,6 +152,7 @@ testFeaturedAppActivityMarkersConfigDisabled = do
   AmuletRules_ConvertFeaturedAppActivityMarkersResult couponCids <- submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_ConvertFeaturedAppActivityMarkers with
       markerCids = [fromInterfaceContractId markerIface]
       openMiningRoundCid
+      observers = Some [alice.primaryParty]
   couponCids === []
   None <- queryInterfaceContractId app.dso markerIface
 
@@ -167,6 +169,7 @@ testFeaturedAppActivityMarkersConfigDisabled = do
   AmuletRules_ConvertFeaturedAppActivityMarkersResult couponCids <- submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_ConvertFeaturedAppActivityMarkers with
       markerCids = [fromInterfaceContractId markerIface]
       openMiningRoundCid
+      observers = Some [alice.primaryParty]
   couponCids === []
   None <- queryInterfaceContractId app.dso markerIface
 
