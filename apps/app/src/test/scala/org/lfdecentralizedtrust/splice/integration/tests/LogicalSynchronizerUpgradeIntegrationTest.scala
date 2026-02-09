@@ -4,8 +4,8 @@ import better.files.File.apply
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.admin.api.client.data
+import com.digitalasset.canton.config.{NonNegativeDuration, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -31,7 +31,6 @@ import org.lfdecentralizedtrust.splice.setup.NodeInitializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.{Minutes, Span}
 
 import java.net.URI
@@ -374,19 +373,18 @@ class LogicalSynchronizerUpgradeIntegrationTest
         }
       }
 
-      clue("Wait until upgrade time") {
-        wallClock
-          .scheduleAt(
-            _ =>
-              allNewBackends.zip(allBackends).par.map { case (newBackend, oldBackend) =>
-                clue(s"transfer traffic for  ${oldBackend.name}") {
-                  newBackend.sequencerClient.traffic_control
-                    .set_lsu_state(oldBackend.sequencerClient.traffic_control.get_lsu_state())
-                }
-              },
-            upgradeTime,
-          )
-          .futureValueUS(Timeout(2.minutes))
+      clue("transfer traffic after upgrade") {
+        allNewBackends.zip(allBackends).par.map { case (newBackend, oldBackend) =>
+          eventually(timeUntilSuccess = 2.minutes) {
+            oldBackend.mediatorClient.testing
+              .fetch_synchronizer_time(NonNegativeDuration.ofSeconds(10)) should be > upgradeTime
+          }
+
+          clue(s"transfer traffic for  ${oldBackend.name}") {
+            newBackend.sequencerClient.traffic_control
+              .set_lsu_state(oldBackend.sequencerClient.traffic_control.get_lsu_state())
+          }
+        }
       }
 
       val newSequencerUrls = allNewBackends.map { newBackend =>
