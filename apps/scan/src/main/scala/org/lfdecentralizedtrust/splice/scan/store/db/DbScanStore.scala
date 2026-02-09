@@ -79,6 +79,7 @@ import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
+import slick.jdbc.canton.SQLActionBuilder
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -440,12 +441,15 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[TxLogEntry.TransactionTxLogEntry]] =
     waitUntilAcsIngested {
-      val entryTypeCondition = sql"""entry_type in (
-                  ${EntryType.TransferTxLogEntry},
-                  ${EntryType.TapTxLogEntry},
-                  ${EntryType.MintTxLogEntry},
-                  ${EntryType.AbortTransferInstructionTxLogEntry}
-                )"""
+      val entryTypeCondition: SQLActionBuilder = inClause(
+        "entry_type",
+        List(
+          EntryType.TransferTxLogEntry,
+          EntryType.TapTxLogEntry,
+          EntryType.MintTxLogEntry,
+          EntryType.AbortTransferInstructionTxLogEntry,
+        ),
+      )
       // Literal sort order since Postgres complains when trying to bind it to a parameter
       val (compareEntryNumber, orderLimit) = sortOrder match {
         case SortOrder.Ascending =>
@@ -740,7 +744,7 @@ class DbScanStore(
   override def getValidatorLicenseByValidator(validators: Vector[PartyId])(implicit
       tc: TraceContext
   ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]] = waitUntilAcsIngested {
-    val validatorPartyIds = inClause(validators)
+    val validatorPartyIds = inClause("validator", validators)
     for {
       rows <- storage
         .query(
@@ -749,7 +753,7 @@ class DbScanStore(
             acsStoreId,
             domainMigrationId,
             ValidatorLicense.COMPANION,
-            where = (sql"""validator in """ ++ validatorPartyIds).toActionBuilder,
+            where = validatorPartyIds,
           ),
           "getValidatorLicenseByValidator",
         )

@@ -1427,7 +1427,7 @@ class UpdateHistory(
         contract_key
 
       from update_history_creates
-      where update_row_id IN """ ++ inClause(transactionRowIds)).toActionBuilder
+      where """ ++ inClause("update_row_id", transactionRowIds)).toActionBuilder
             .as[SelectFromCreateEvents],
           "queryCreateEvents",
         )
@@ -1499,7 +1499,7 @@ class UpdateHistory(
         interface_id_module_name,
         interface_id_entity_name
       from update_history_exercises
-      where update_row_id IN """ ++ inClause(transactionRowIds)).toActionBuilder
+      where """ ++ inClause("update_row_id", transactionRowIds)).toActionBuilder
             .as[SelectFromExerciseEvents],
           "queryExerciseEvents",
         )
