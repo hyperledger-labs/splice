@@ -6,7 +6,7 @@ import sbt.*
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.5.0-snapshot.20260127.14547.0.v5f754737"
+  val version: String = "3.5.0-snapshot.20260203.14554.0.v07f81520"
   val canton_library_version = "3.5.0-snapshot.20260206.17966.0.va5798b31"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
@@ -87,14 +87,14 @@ object CantonDependencies {
   lazy val daml_test_evidence_generator_scalatest =
     "com.daml" %% "test-evidence-generator" % daml_libraries_version
   lazy val daml_lf_archive_reader = "com.daml" %% "daml-lf-archive-reader" % daml_libraries_version
-  lazy val daml_lf_data = "com.daml" %% "daml-lf-data" % daml_libraries_version
-  lazy val daml_lf_engine = "com.daml" %% "daml-lf-engine" % daml_libraries_version
+  lazy val daml_lf_data = "com.daml" %% "daml-lf-data" % canton_library_version
+  lazy val daml_lf_engine = "com.daml" %% "daml-lf-engine" % canton_library_version
   lazy val daml_lf_language = "com.daml" %% "daml-lf-language" % daml_libraries_version
-  lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % daml_libraries_version
+  lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % canton_library_version
   lazy val daml_lf_transaction_test_lib =
-    "com.daml" %% "daml-lf-transaction-test-lib" % daml_libraries_version
+    "com.daml" %% "daml-lf-transaction-test-lib" % canton_library_version
   lazy val daml_lf_api_type_signature =
-    "com.daml" %% "daml-lf-api-type-signature" % daml_libraries_version
+    "com.daml" %% "daml-lf-api-type-signature" % canton_library_version
   lazy val daml_libs_scala_grpc_test_utils =
     "com.daml" %% "grpc-test-utils" % daml_libraries_version
 
@@ -102,6 +102,8 @@ object CantonDependencies {
   lazy val canton_ledger_api_scala = "com.daml" %% "ledger-api-scala" % canton_library_version
   lazy val canton_observability_metrics =
     "com.daml" %% "observability-metrics" % canton_library_version
+  lazy val canton_contextualized_logging =
+    "com.daml" %% "contextualized-logging" % canton_library_version
 
   lazy val canton_transcode_json = "com.daml" % "transcode-codec-json_3" % canton_library_version
   lazy val canton_transcode_proto_scala =
@@ -124,8 +126,6 @@ object CantonDependencies {
   lazy val daml_nonempty = "com.daml" %% "nonempty" % daml_libraries_version
   lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version
   lazy val daml_metrics_test_lib = "com.daml" %% "metrics-test-lib" % daml_libraries_version
-  lazy val daml_contextualized_logging =
-    "com.daml" %% "contextualized-logging" % daml_libraries_version
   lazy val daml_tracing = "com.daml" %% "tracing" % daml_libraries_version
   lazy val daml_tracing_test_lib = "com.daml" %% "tracing-test-lib" % daml_libraries_version
   lazy val daml_executors = "com.daml" %% "executors" % daml_libraries_version

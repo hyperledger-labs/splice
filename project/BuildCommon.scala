@@ -473,10 +473,10 @@ object BuildCommon {
         libraryDependencies ++= Seq(
           better_files,
           canton_observability_metrics,
+          canton_contextualized_logging,
           daml_lf_data,
           daml_nonempty_cats,
           daml_tracing,
-          daml_contextualized_logging,
           logback_classic,
           logback_core,
           scala_logging,
@@ -1151,7 +1151,7 @@ object BuildCommon {
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //      addProtobufFilesToHeaderCheck(Compile),
         libraryDependencies ++= Seq(
-          daml_contextualized_logging,
+          canton_contextualized_logging,
           daml_lf_engine,
           daml_lf_archive_reader,
           CantonDependencies.canton_java_bindings,
