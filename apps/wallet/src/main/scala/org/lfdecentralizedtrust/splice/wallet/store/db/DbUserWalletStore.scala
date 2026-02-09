@@ -451,6 +451,7 @@ class DbUserWalletStore(
       )
     }
 
+  // Paginated development fund coupon history ordered by most recent archival
   override def listDevelopmentFundCouponHistory(after: Option[Long], limit: PageLimit)(implicit
       lc: TraceContext
   ): Future[
