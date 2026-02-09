@@ -1130,19 +1130,11 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
       def mkTransferTransactionWithDevelopmentFundCouponArchive(
           contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
           beneficiary: PartyId,
-//          fundManager: PartyId,
-//          amount: Double,
-//          expiresAt: CantonTimestamp,
-//          reason: String,
       )(offset: Long) = {
         mkTransferTransactionWithDevelopmentFundCouponArchiveTx(
           offset,
           contractId,
           beneficiary,
-//          fundManager,
-//          amount,
-//          expiresAt,
-//          reason,
         )
       }
 
@@ -1150,19 +1142,11 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
           store: UserWalletStore,
           contractId: amuletCodegen.DevelopmentFundCoupon.ContractId,
           beneficiary: PartyId,
-//          fundManager: PartyId,
-//          amount: Double,
-//          expiresAt: CantonTimestamp,
-//          reason: String,
       ) =
         dummyDomain.ingest(
           mkTransferTransactionWithDevelopmentFundCouponArchive(
             contractId,
             beneficiary,
-//            fundManager,
-//            amount,
-//            expiresAt,
-//            reason,
           )
         )(
           store.multiDomainAcsStore
