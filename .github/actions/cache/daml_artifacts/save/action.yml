@@ -4,7 +4,7 @@ inputs:
   cache_version:
     description: "Version of the cache"
     required: true
-  splice_repo_path:
+  splice_root:
     description: "Path to splice repo"
     default: ${{ github.repository == 'hyperledger-labs/splice' && '.' || 'splice' }}
   load_cache_hit:
@@ -19,7 +19,7 @@ runs:
       shell: bash
       run: |
         mkdir -p /tmp/daml
-        find ${{ inputs.splice_repo_path }} -type d -name ".daml" | tar --use-compress-program=pigz -cf /tmp/daml/daml.tar.gz -T -
+        find ${{ inputs.splice_root }} -type d -name ".daml" | tar --use-compress-program=pigz -cf /tmp/daml/daml.tar.gz -T -
     - name: Not archiving Daml artifacts
       if: ${{ fromJson(inputs.load_cache_hit) }}
       shell: bash
@@ -31,5 +31,5 @@ runs:
       with:
         path: |
           /tmp/daml
-          ${{ format('{0}/apps/common/frontend/daml.js', inputs.splice_repo_path) }}
-        key: daml-artifacts-${{ inputs.cache_version }} branch:${{ github.head_ref || github.ref_name }} dependencies:${{ hashFiles(format('{0}/project/build.properties', inputs.splice_repo_path), format('{0}/project/BuildCommon.scala', inputs.splice_repo_path), format('{0}/project/DamlPlugin.scala', inputs.splice_repo_path), format('{0}/build.sbt', inputs.splice_repo_path), format('{0}/daml/dars.lock', inputs.splice_repo_path), format('{0}/nix/canton-sources.json', inputs.splice_repo_path)) }} rev:${{ github.sha }}
+          ${{ format('{0}/apps/common/frontend/daml.js', inputs.splice_root) }}
+        key: daml-artifacts-${{ inputs.cache_version }} branch:${{ github.head_ref || github.ref_name }} dependencies:${{ hashFiles(format('{0}/project/build.properties', inputs.splice_root), format('{0}/project/BuildCommon.scala', inputs.splice_root), format('{0}/project/DamlPlugin.scala', inputs.splice_root), format('{0}/build.sbt', inputs.splice_root), format('{0}/daml/dars.lock', inputs.splice_root), format('{0}/nix/canton-sources.json', inputs.splice_root)) }} rev:${{ github.sha }}
