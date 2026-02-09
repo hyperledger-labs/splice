@@ -769,7 +769,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "addPreviousOutputInEnv": true,
       "create": "bash SPLICE_ROOT/cluster/pulumi/operator/pulumi-operator-crd-update.sh 2.4.1"
     },
     "name": "update-pulumi-operator-crd-2.4.1",
