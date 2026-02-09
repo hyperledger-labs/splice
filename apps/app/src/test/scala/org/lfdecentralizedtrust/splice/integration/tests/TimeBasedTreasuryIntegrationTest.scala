@@ -24,6 +24,9 @@ class TimeBasedTreasuryIntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
+  // We increase holding fees for this test so we see something happen within a few rounds
+  val holdingFee = BigDecimal(1.0)
+
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
@@ -32,9 +35,8 @@ class TimeBasedTreasuryIntegrationTest
           _.withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
       )
-      // Increase holding fees so we see something happen within a few rounds
       .addConfigTransforms((_, config) =>
-        updateAllSvAppFoundDsoConfigs_(c => c.focus(_.initialHoldingFee).replace(BigDecimal(1.0)))
+        updateAllSvAppFoundDsoConfigs_(c => c.focus(_.initialHoldingFee).replace(holdingFee))
         (config))
       // TODO (#965) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)
@@ -116,7 +118,7 @@ class TimeBasedTreasuryIntegrationTest
         Some(3),
         (99, 100),
         (9, 10),
-        exactly(SpliceUtil.defaultHoldingFee.rate),
+        exactly(holdingFee)
       )
   }
 
@@ -241,10 +243,11 @@ class TimeBasedTreasuryIntegrationTest
     clue("Final sanity check") {
       checkBalance(
         aliceWalletClient,
-        Some(1),
+        Some(2),
         (1, 2),
         exactly(0),
-        exactly(SpliceUtil.defaultHoldingFee.rate),
+        // We just merged => fresh amulet
+        exactly(0),
       )
     }
   }
