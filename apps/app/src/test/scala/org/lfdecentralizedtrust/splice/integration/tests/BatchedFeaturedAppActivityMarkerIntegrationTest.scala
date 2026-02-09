@@ -132,7 +132,7 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
         Seq((Seq((splitwell, 1.0)), 50)),
       ),
     )(
-      "sv1 observers 150 total markers",
+      "sv1 observes 150 total markers",
       _ =>
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(amulet.FeaturedAppActivityMarker.COMPANION)(dsoParty) should have size 200,
