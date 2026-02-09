@@ -283,13 +283,13 @@ class DevelopmentFundCouponIntegrationTest
               reason = withdrawalReason,
             )
           )
-          // As the fund manager, Alice can view the claimed coupon
+          // As the fund manager, Alice can view the withdrawn coupon
           assertListDevelopmentFundCouponHistoryStatuses(
             aliceValidatorWalletClient,
             Seq(expectedStatus),
           )
-          // As the beneficiary, Bob can view the claimed coupon
-          assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, Seq(expectedStatus))
+          // Beneficiary cannot view the withdrawn coupon
+          assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, Seq())
         },
       )
     }
@@ -380,8 +380,8 @@ class DevelopmentFundCouponIntegrationTest
         aliceValidatorWalletClient,
         Seq(expectedStatus),
       )
-      // As the beneficiary, Bob can view the claimed coupon
-      assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, Seq(expectedStatus))
+      // Beneficiary cannot view the claimed coupon
+      assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, Seq())
     }
   }
 
@@ -471,13 +471,13 @@ class DevelopmentFundCouponIntegrationTest
             status = httpDef.ArchivedDevelopmentFundCouponExpiredStatus.Status.Expired
           )
         )
-        // As the fund manager, Alice can view the claimed coupon
+        // As the fund manager, Alice can view the expired coupon
         assertListDevelopmentFundCouponHistoryStatuses(
           aliceValidatorWalletClient,
           Seq(expectedStatus),
         )
-        // As the beneficiary, Bob can view the claimed coupon
-        assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, Seq(expectedStatus))
+        // Beneficiary cannot view the expired coupon
+        assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, Seq())
       }
     }
   }
@@ -565,13 +565,13 @@ class DevelopmentFundCouponIntegrationTest
             reason = rejectionReason,
           )
         )
-        // As the fund manager, Alice can view the claimed coupon
+        // As the fund manager, Alice can view the rejected coupon
         assertListDevelopmentFundCouponHistoryStatuses(
           aliceValidatorWalletClient,
           Seq(expectedStatus),
         )
-        // As the beneficiary, Bob can view the claimed coupon
-        assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, Seq(expectedStatus))
+        // Beneficiary cannot view the rejected coupon
+        assertListDevelopmentFundCouponHistoryStatuses(bobWalletClient, Seq())
       }
     }
   }
@@ -652,7 +652,7 @@ class DevelopmentFundCouponIntegrationTest
         "Mint some development fund coupons", {
           amounts.foreach { amount =>
             createDevelopmentFundCoupon(
-              sv1ValidatorBackend.participantClientWithAdminToken, // TODOV use alice backend
+              sv1ValidatorBackend.participantClientWithAdminToken,
               sv1UserId,
               beneficiary,
               fundManager,

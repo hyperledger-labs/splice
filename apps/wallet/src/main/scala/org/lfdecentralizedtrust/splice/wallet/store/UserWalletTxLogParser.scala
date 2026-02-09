@@ -986,8 +986,7 @@ object UserWalletTxLogParser {
           case to: TransferOfferTxLogEntry => to.sender == partyStr || to.receiver == partyStr
           case btr: BuyTrafficRequestTxLogEntry => btr.buyer == partyStr
           case b: BalanceChangeTxLogEntry => b.receiver == partyStr
-          case fcc: DevelopmentFundCouponCreatedTxLogEntry =>
-            fcc.fundManager == partyStr || fcc.beneficiary == partyStr
+          case fcc: DevelopmentFundCouponCreatedTxLogEntry => fcc.fundManager == partyStr
           case _: DevelopmentFundCouponArchivedTxLogEntry => true
           // Only relevant notifications are added to parsing state
           case _: NotificationTxLogEntry => true

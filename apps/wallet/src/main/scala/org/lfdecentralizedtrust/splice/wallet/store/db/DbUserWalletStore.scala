@@ -54,7 +54,6 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
-import org.lfdecentralizedtrust.splice.util.PrettyInstances.PrettyContractId
 
 import scala.concurrent.*
 import scala.jdk.OptionConverters.*
@@ -551,18 +550,8 @@ class DbUserWalletStore(
             for {
               createdByCid <- collectCreated(createdScanStartAfter, Map.empty)
               // Keep the order of ARCHIVED page (DESC by archived entry_number)
-              zipped = archivedEntries.map { a =>
-                createdByCid.get(a.contractId) match {
-                  case Some(c) => c -> a
-                  case None =>
-                    // should not happen if invariant holds (every archived has a created)
-                    throw contractIdNotFound(
-                      PrettyContractId(
-                        amuletCodegen.DevelopmentFundCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
-                        a.contractId,
-                      )
-                    )
-                }
+              zipped = archivedEntries.flatMap { a =>
+                createdByCid.get(a.contractId).map(c => c -> a)
               }
             } yield ResultsPage(zipped, nextPageToken)
         }
