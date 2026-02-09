@@ -36,7 +36,6 @@ splice-amulet-name-service 0.1.9 f1b5915ad45ded616f43f83c735b7ee158b5eb58abe758a
 splice-amulet-name-service-test 0.1.20 094173c6bd4f58e603578045bd3ff50a1d98cd5739eb19263b6df0327049bac8
 splice-amulet-test 0.1.19 070ac7e7fe1a08ae15a000662fe0055b51bfd74ae59ba004a0b9b70d423db5c1
 splice-api-featured-app-v1 1.0.0 7804375fe5e4c6d5afe067bd314c42fe0b7d005a1300019c73154dd939da4dda
-splice-api-featured-app-v2 1.0.0 9663b7052da52d66d2d68f4d9e87bb69070904dd638b0e3ebaaab8bcf1f61bf2
 splice-api-token-allocation-instruction-v1 1.0.0 275064aacfe99cea72ee0c80563936129563776f67415ef9f13e4297eecbc520
 splice-api-token-allocation-request-v1 1.0.0 6fe848530b2404017c4a12874c956ad7d5c8a419ee9b040f96b5c13172d2e193
 splice-api-token-allocation-v1 1.0.0 93c942ae2b4c2ba674fb152fe38473c507bda4e82b4e4c5da55a552a9d8cce1d
