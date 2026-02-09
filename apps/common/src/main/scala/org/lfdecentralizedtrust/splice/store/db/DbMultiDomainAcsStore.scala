@@ -1107,7 +1107,11 @@ final class DbMultiDomainAcsStore[TXE](
       // TODO: this is still loading everything into memory
       val summaryState = MutableIngestionSummary.empty
       for {
-        _ <- deleteExistingAcs()
+        // If we crash halfway through we want to start over with the whole ACS ingestion.
+        // If the offset is the same between calls, this isn't strictly necessary, as `on conflict do nothing` prevents any issues.
+        // But if the offset changes between calls (which can happen in InitializeAcsAtLatestOffset), then we might miss some archival events,
+        // and thus we need to ingest the entire ACS from the beginning.
+        _ <- clearDataForCurrentMigrationId()
         _ <- source.runWith(
           Sink.foreachAsync[Seq[BaseLedgerConnection.ActiveContractsItem]](parallelism = 1) {
             batch =>
@@ -1129,20 +1133,29 @@ final class DbMultiDomainAcsStore[TXE](
       } yield ()
     }
 
-    private def deleteExistingAcs()(implicit traceContext: TraceContext): Future[Unit] = storage
-      .update(
-        sqlu"delete from #$acsTableName where store_id = $acsStoreId and migration_id = $domainMigrationId",
-        "deleteExistingAcs",
-      )
-      .map { nDeleted =>
-        if (nDeleted > 0) {
+    private def clearDataForCurrentMigrationId()(implicit
+        traceContext: TraceContext
+    ): Future[Unit] = {
+      for {
+        nAcs <- storage
+          .update(
+            sqlu"delete from #$acsTableName where store_id = $acsStoreId and migration_id = $domainMigrationId",
+            "clearDataForCurrentMigrationId.deleteAcs",
+          )
+        nReassignments <- storage.update(
+          sqlu"delete from incomplete_reassignments where store_id = $acsStoreId and migration_id = $domainMigrationId",
+          "clearDataForCurrentMigrationId.deleteReassignments",
+        )
+      } yield {
+        if (nAcs > 0 || nReassignments > 0) {
           logger.warn(
-            s"Deleted $nDeleted rows from ACS table for store $acsStoreId and migration $domainMigrationId. " +
+            s"Deleted $nAcs rows from ACS table and $nReassignments incomplete reassignments for store $acsStoreId and migration $domainMigrationId. " +
               "This should only happen if the store already had some data, but was not marked as having ingested the ACS " +
               "(because of a previous failed ACS ingestion attempt)."
           )
         }
       }
+    }
 
     private def ingestAcsBatch(
         offset: Long,
@@ -1175,7 +1188,6 @@ final class DbMultiDomainAcsStore[TXE](
           contractFilter.ensureStakeholderOf(event.reassignmentEvent.createdEvent)
         }
 
-        // TODO: on conflict do nothing doesn't work if the offset changes (which it will in InitializeAcsAtLatestOffset) because it misses archivals of previously inserted contracts
         val acsInserts = NonEmptyList
           .fromFoldable(todoAcs)
           .map(acs =>
@@ -1709,8 +1721,12 @@ final class DbMultiDomainAcsStore[TXE](
             .asUpdateReturning[(String, Long)]
           rawContractIdToEventNumberMap = rawContractIdToEventNumber.toMap
           interfaceViewsValues = insertValues.toList.flatMap { case (contractId, insertValue) =>
-            // if the contract was inserted, so were its interface views
-            // if a new view is introduced, then the store_descriptor changed and the row cannot be already inserted
+            // If there's no conflict, this will include all views.
+            // If there's a conflict (which then does NOT include the row in the result):
+            // The contract was inserted in a previous call and therefore so were its interface views, so we can skip their inserts.
+            // To introduce a new view the store_descriptor must change, and therefore either:
+            // - Both the contract and view are already inserted
+            // - Neither are inserted
             rawContractIdToEventNumberMap.get(contractId).toList.flatMap { eventNumber =>
               insertValue.interfaceViews(eventNumber)
             }
