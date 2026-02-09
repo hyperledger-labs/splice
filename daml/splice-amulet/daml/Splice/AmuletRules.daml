@@ -709,6 +709,8 @@ template AmuletRules
       with
         markerCids : [ContractId FeaturedAppActivityMarker]
         openMiningRoundCid : ContractId OpenMiningRound
+        observers : Optional [Party] -- ^ A list of choice observers. This is expected to be set to the union of all providers and beneficiaries to ensure that this creates only one view.
+      observer fromOptional [] observers
       controller dso
       do now <- getTime
          markers <- mapA (fetchAndArchive (ForDso dso)) markerCids

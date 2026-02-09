@@ -11,6 +11,7 @@ import {
   clusterBaseDomain,
   clusterBasename,
   enableGCReaperJob,
+  infraConfig,
   monitoringConfig,
 } from './config';
 import { installExtraCustomResources } from './extraCustomResources';
@@ -20,6 +21,7 @@ import {
   installGcpLoggingAlerts,
   installClusterMaintenanceUpdateAlerts,
 } from './gcpAlerts';
+import { configureGKEL7Gateway } from './gcpLoadBalancer';
 import { configureIstio, istioMonitoring } from './istio';
 import { deployGCPodReaper } from './maintenance';
 import { configureNetwork } from './network';
@@ -32,10 +34,37 @@ export const ingressIp = network.ingressIp.address;
 export const ingressNs = network.ingressNs.ns.metadata.name;
 export const egressIp = network.egressIp.address;
 
-const istio = configureIstio(network.ingressNs, ingressIp, network.cometbftIngressIp.address);
+const cloudArmorSecurityPolicy = configureCloudArmorPolicy(cloudArmorConfig);
+const useGKEL7Gateway = infraConfig.gkeGateway.proxyForIstioHttp;
+
+if (!useGKEL7Gateway && cloudArmorSecurityPolicy) {
+  throw new Error(
+    'Cloud Armor requires infra.gkeGateway.proxyForIstioHttp to be enabled to take effect'
+  );
+}
+
+const istio = configureIstio(
+  network.ingressNs,
+  ingressIp,
+  network.cometbftIngressIp.address,
+  useGKEL7Gateway
+);
+
+if (useGKEL7Gateway) {
+  configureGKEL7Gateway({
+    ingressNs: network.ingressNs,
+    ingressAddress: network.ingressIp,
+    gatewayName: 'cn-gke-l7-gateway',
+    backendServiceName: istio.httpServiceName,
+    serviceTarget: { port: 443 }, // see configureGateway for why 443
+    tlsSecretName: `cn-${clusterBasename}net-tls`,
+    securityPolicy: cloudArmorSecurityPolicy,
+    istioResource: istio.istioResource,
+  });
+}
 
 // Ensures that images required from Quay for observability can be pulled
-const observabilityDependsOn = istio.concat([network]);
+const observabilityDependsOn = istio.allResources.concat([network]);
 configureObservability(observabilityDependsOn);
 if (enableAlerts && !clusterIsResetPeriodically) {
   const notificationChannel = getNotificationChannel();
@@ -50,8 +79,6 @@ if (enableAlerts && !clusterIsResetPeriodically) {
 istioMonitoring(network.ingressNs, []);
 
 configureStorage();
-
-configureCloudArmorPolicy(cloudArmorConfig);
 
 installExtraCustomResources();
 

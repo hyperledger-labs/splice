@@ -2943,18 +2943,13 @@ components:
           $ref: "#/components/schemas/AbortTransferInstruction"
     Transfer:
       description: |
-        A transfer between one sender and possibly many receivers, provided by an application provider.
+        A transfer between one sender and possibly many receivers
       type: object
       required:
-        - provider
         - sender
         - receivers
         - balance_changes
       properties:
-        provider:
-          description: |
-            The application provider.
-          type: string
         sender:
           description: |
             The sender amounts and fees.

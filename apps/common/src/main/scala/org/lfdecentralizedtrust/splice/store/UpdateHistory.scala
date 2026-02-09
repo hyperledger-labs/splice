@@ -1240,6 +1240,22 @@ class UpdateHistory(
     }
   }
 
+  def getLowestMigrationForRecordTime(
+      recordTime: CantonTimestamp
+  )(implicit tc: TraceContext): Future[Option[Long]] = {
+    // Including migration >= 0 to make sure it hits the indices
+    val filter = NonEmptyList.of(sql"migration_id >= 0 and record_time > ${recordTime}")
+    val orderBy = sql"migration_id, record_time, domain_id"
+    val limit = HardLimit.tryCreate(1)
+    for {
+      txs <- getTxUpdates(filter, orderBy, limit)
+      assignments <- getAssignmentUpdates(filter, orderBy, limit)
+      unassignments <- getUnassignmentUpdates(filter, orderBy, limit)
+    } yield {
+      (txs ++ assignments ++ unassignments).sorted.headOption.map(_.migrationId)
+    }
+  }
+
   def getAllUpdates(
       afterO: Option[(Long, CantonTimestamp)],
       limit: PageLimit,

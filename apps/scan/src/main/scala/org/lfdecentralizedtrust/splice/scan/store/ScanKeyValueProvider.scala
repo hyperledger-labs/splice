@@ -12,6 +12,7 @@ import cats.data.OptionT
 import cats.implicits.toBifunctorOps
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.scan.store.ScanKeyValueProvider.*
+import org.lfdecentralizedtrust.splice.scan.store.bulk.UpdatesSegment
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -19,6 +20,7 @@ class ScanKeyValueProvider(val store: KeyValueStore, val loggerFactory: NamedLog
     extends NamedLogging {
 
   private val latestAcsSnapshotInBulkStorageKey = "latest_acs_snapshot_in_bulk_storage"
+  private val latestUpdatesSegmentInBulkStorageKey = "latest_updates_segment_in_bulk_storage"
 
   final def setLatestAcsSnapshotsInBulkStorage(
       ts: TimestampWithMigrationId
@@ -33,6 +35,19 @@ class ScanKeyValueProvider(val store: KeyValueStore, val loggerFactory: NamedLog
   ): OptionT[Future, TimestampWithMigrationId] = {
     store.readValueAndLogOnDecodingFailure(latestAcsSnapshotInBulkStorageKey)
   }
+
+  final def setLatestUpdatesSegmentInBulkStorage(
+      segment: UpdatesSegment
+  )(implicit tc: TraceContext): Future[Unit] = store.setValue(
+    latestUpdatesSegmentInBulkStorageKey,
+    segment,
+  )
+
+  final def getLatestUpdatesSegmentInBulkStorage()(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): OptionT[Future, UpdatesSegment] =
+    store.readValueAndLogOnDecodingFailure(latestUpdatesSegmentInBulkStorageKey)
 }
 
 object ScanKeyValueProvider {
@@ -44,4 +59,6 @@ object ScanKeyValueProvider {
       )
   implicit val acsSnapshotTimestampMigrationCodec: Codec[TimestampWithMigrationId] =
     deriveCodec[TimestampWithMigrationId]
+
+  implicit val updatesSegmentCodec: Codec[UpdatesSegment] = deriveCodec[UpdatesSegment]
 }

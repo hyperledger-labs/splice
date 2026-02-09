@@ -73,7 +73,7 @@ class AcsSnapshotBulkStorage(
       .flatMapConcat {
         case Some(start: TimestampWithMigrationId) =>
           logger.info(
-            s"Latest dumped snapshot was from migration $start.migrationId, timestamp $start.afterTimestamp"
+            s"Latest dumped snapshot was from migration ${start.migrationId}, timestamp ${start.timestamp}"
           )
           getAcsSnapshotTimestampsAfter(start)
         case None =>
