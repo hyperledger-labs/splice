@@ -110,8 +110,10 @@ class LogicalSynchronizerUpgradeIntegrationTest
       .addConfigTransform((_, config) =>
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
       )
-      .withAmuletPrice(1.0)
+      .withAmuletPrice(walletAmuletPrice)
       .withManualStart
+
+  override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
 
   "migrate global domain to new nodes without downtime" in { implicit env =>
     startAllSync(
