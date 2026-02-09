@@ -3,13 +3,17 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
+  updateAllSvAppFoundDsoConfigs_,
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{SpliceUtil, TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
+import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExpiredAmuletTrigger
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.HasExecutionContext
+import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
 import java.time.Duration
@@ -28,6 +32,10 @@ class TimeBasedTreasuryIntegrationTest
           _.withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
       )
+      // Increase holding fees so we see something happen within a few rounds
+      .addConfigTransforms((_, config) =>
+        updateAllSvAppFoundDsoConfigs_(c => c.focus(_.initialHoldingFee).replace(BigDecimal(1.0)))
+        (config))
       // TODO (#965) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)
 
@@ -198,4 +206,46 @@ class TimeBasedTreasuryIntegrationTest
     )
   }
 
+  "merge also amulet that should be expired" in { implicit env =>
+    val (_, _) = onboardAliceAndBob()
+    val aliceUserName = aliceWalletClient.config.ledgerApiUser
+    val mergeAmuletsTrigger = aliceValidatorBackend
+        .userWalletAutomation(aliceUserName)
+        .futureValue
+        .trigger[CollectRewardsAndMergeAmuletsTrigger]
+
+    clue("Pause amulet merges and expires") {
+      sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAmuletTrigger].pause().futureValue
+      mergeAmuletsTrigger.pause().futureValue
+    }
+
+    actAndCheck("Tap amulet that will expire in a round", {
+      aliceWalletClient.tap(1)
+      aliceWalletClient.tap(1)
+    })(
+      "Alice has 2 Amulets",
+      _ => {
+        aliceWalletClient.list().amulets should have length 2
+      },
+    )
+
+    clue("Advance rounds so that holding fees become relevant") {
+      advanceRoundsToNextRoundOpening
+    }
+
+    actAndCheck("Resume amulets merging automation", {
+      mergeAmuletsTrigger.resume() }
+      )("Amulets got merged", _ => {
+        aliceWalletClient.list().amulets should have length 1
+      })
+    clue("Final sanity check") {
+      checkBalance(
+        aliceWalletClient,
+        Some(1),
+        (1, 2),
+        exactly(0),
+        exactly(SpliceUtil.defaultHoldingFee.rate),
+      )
+    }
+  }
 }
