@@ -40,6 +40,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationv1,
   transferinstructionv1,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedDevelopmentFundCoupon
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommandCounter
 
 import java.time.Instant
@@ -401,6 +402,16 @@ abstract class ValidatorAppReference(
       consoleEnvironment.run {
         httpCommand(
           HttpScanProxyAppClient.LookupTransferCommandStatus(sender, nonce)
+        )
+      }
+    }
+
+    def listUnclaimedDevelopmentFundCoupons(): Seq[
+      ContractWithState[UnclaimedDevelopmentFundCoupon.ContractId, UnclaimedDevelopmentFundCoupon]
+    ] = {
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanProxyAppClient.ListUnclaimedDevelopmentFundCoupons
         )
       }
     }

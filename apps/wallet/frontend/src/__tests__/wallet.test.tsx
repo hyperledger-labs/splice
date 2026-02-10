@@ -606,11 +606,11 @@ describe('Wallet user can', () => {
       expect(expiration.textContent).toContain('2050');
     });
 
-    // Verify withdraw buttons are present for each delegation
-    const withdrawButtons = document.querySelectorAll('.delegation-withdraw');
-    expect(withdrawButtons.length).toBe(mockMintingDelegationsSorted.length);
-    withdrawButtons.forEach(button => {
-      expect(button.textContent).toBe('Withdraw');
+    // Verify cancel buttons are present for each delegation
+    const cancelButtons = document.querySelectorAll('.delegation-cancel');
+    expect(cancelButtons.length).toBe(mockMintingDelegationsSorted.length);
+    cancelButtons.forEach(button => {
+      expect(button.textContent).toBe('Cancel');
     });
   });
 
@@ -651,14 +651,14 @@ describe('Wallet user can', () => {
     expect(screen.queryByRole('table', { name: 'delegations table' })).toBeNull();
   });
 
-  test('can withdraw a minting delegation', async () => {
+  test('can cancel a minting delegation', async () => {
     server.use(featureSupportHandler(true, true));
 
-    // Track the withdraw API call
-    const calledWithdrawArgs: string[] = [];
+    // Track the cancel API call
+    const calledCancelArgs: string[] = [];
     server.use(
       rest.post(`${walletUrl}/v0/wallet/minting-delegations/:cid/reject`, (req, res, ctx) => {
-        calledWithdrawArgs.push(req.params.cid.toString());
+        calledCancelArgs.push(req.params.cid.toString());
         return res(ctx.status(200));
       })
     );
@@ -674,18 +674,18 @@ describe('Wallet user can', () => {
     const delegationsLink = await screen.findByRole('link', { name: 'Delegations' });
     await user.click(delegationsLink);
 
-    // Find and click the first Withdraw button
-    const withdrawButtons = await screen.findAllByRole('button', { name: 'Withdraw' });
-    expect(withdrawButtons.length).toBe(mockMintingDelegations.length);
+    // Find and click the first Cancel button
+    const cancelButtons = await screen.findAllByRole('button', { name: 'Cancel' });
+    expect(cancelButtons.length).toBe(mockMintingDelegations.length);
 
-    await user.click(withdrawButtons[0]);
+    await user.click(cancelButtons[0]);
 
-    // Confirm the withdrawal in the confirmation dialog
+    // Confirm the cancellation in the confirmation dialog
     const proceedButton = await screen.findByRole('button', { name: 'Proceed' });
     await user.click(proceedButton);
 
-    // Assert the withdraw API was called once
-    expect(calledWithdrawArgs).toHaveLength(1);
+    // Assert the cancel API was called once
+    expect(calledCancelArgs).toHaveLength(1);
   });
 
   test("can 'accept' a minting delegation proposal", async () => {

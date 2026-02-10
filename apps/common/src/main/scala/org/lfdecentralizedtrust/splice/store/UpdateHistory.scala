@@ -1232,6 +1232,22 @@ class UpdateHistory(
     }
   }
 
+  def getLowestMigrationForRecordTime(
+      recordTime: CantonTimestamp
+  )(implicit tc: TraceContext): Future[Option[Long]] = {
+    // Including migration >= 0 to make sure it hits the indices
+    val filter = NonEmptyList.of(sql"migration_id >= 0 and record_time > ${recordTime}")
+    val orderBy = sql"migration_id, record_time, domain_id"
+    val limit = HardLimit.tryCreate(1)
+    for {
+      txs <- getTxUpdates(filter, orderBy, limit)
+      assignments <- getAssignmentUpdates(filter, orderBy, limit)
+      unassignments <- getUnassignmentUpdates(filter, orderBy, limit)
+    } yield {
+      (txs ++ assignments ++ unassignments).sorted.headOption.map(_.migrationId)
+    }
+  }
+
   def getAllUpdates(
       afterO: Option[(Long, CantonTimestamp)],
       limit: PageLimit,
@@ -1406,7 +1422,7 @@ class UpdateHistory(
         contract_key
 
       from update_history_creates
-      where update_row_id IN """ ++ inClause(transactionRowIds)).toActionBuilder
+      where """ ++ inClause("update_row_id", transactionRowIds)).toActionBuilder
             .as[SelectFromCreateEvents],
           "queryCreateEvents",
         )
@@ -1478,7 +1494,7 @@ class UpdateHistory(
         interface_id_module_name,
         interface_id_entity_name
       from update_history_exercises
-      where update_row_id IN """ ++ inClause(transactionRowIds)).toActionBuilder
+      where """ ++ inClause("update_row_id", transactionRowIds)).toActionBuilder
             .as[SelectFromExerciseEvents],
           "queryExerciseEvents",
         )

@@ -529,6 +529,26 @@ function subcmd_gcloud_logs_ui() {
     open "$url"
 }
 
+subcommand_whitelist[gcloud_alert_logs_ui]='Open the gcloud logs viewer for this cluster, filtered to show only warnings that trigger alerts'
+
+function subcmd_gcloud_alert_logs_ui() {
+    _cluster_must_exist
+
+    base_query="resource.labels.cluster_name%3D%22${GCP_CLUSTER_NAME}%22"
+    cluster=$(basename "$PWD")
+    expected_file="../../expected/infra/expected-${cluster}.json"
+    _info "Using filter from $expected_file"
+    query=$(cat "${expected_file}" | jq '.[] | select(.name == "log_warnings") | .inputs.filter')
+    encoded_query=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote($query))")
+
+    url="https://console.cloud.google.com/logs/query?query=$encoded_query&project=$CLOUDSDK_CORE_PROJECT&duration=PT1H"
+    _info "Opening gcloud logs viewer: $url"
+    open "$url"
+}
+
+
+
+
 ###
 
 subcommand_whitelist[upgrade]='Upgrades the cluster to the latest GKE version'
@@ -926,6 +946,64 @@ function subcmd_cluster_enable_http_load_balancing() {
 
     _info "Enabling http load balancing for the cluster ${GCP_CLUSTER_NAME}."
     gcloud container clusters update "${GCP_CLUSTER_NAME}" --update-addons=HttpLoadBalancing=ENABLED
+}
+
+subcommand_whitelist[cluster_enable_gke_l7_alb]='Enable GKE Gateway API and create proxy-only subnet for L7 ALB.'
+
+# idempotent; safe to rerun (no-op takes ~23s)
+# --dry-run to check what mutating commands will run
+function subcmd_cluster_enable_gke_l7_alb() {
+    local dry_run=""
+    if [[ ${1-} == --dry-run ]]; then
+        dry_run='echo'
+    fi
+
+    # Subnet range selection:
+    # - On size choice: https://docs.cloud.google.com/load-balancing/docs/proxy-only-subnets#proxy-subnet-size
+    # - On resizing later: https://docs.cloud.google.com/load-balancing/docs/proxy-only-subnets#proxy_only_subnet_change
+    # - Check existing subnets for overlap: gcloud compute networks subnets list --network=default
+    # - This default based on actual dev/test/main subnets; alter to taste
+    # - Avoid the reserved range 10.128.0.0/9 (used by GCP auto-mode networks)
+    local subnet_cidr='10.120.0.0/23'
+
+    # Check if Gateway API is already enabled
+    local gateway_api_enabled
+    gateway_api_enabled=$(gcloud container clusters describe "${GCP_CLUSTER_NAME}" \
+        --format='value(networkConfig.gatewayApiConfig.channel)')
+
+    # If you see the error in k9s describe of the gateway
+    #   no matches for kind "Gateway" in version "gateway.networking.k8s.io/v1"
+    # this part is needed
+    if [[ $gateway_api_enabled == CHANNEL_STANDARD ]]; then
+        _info "Gateway API is already enabled for cluster $GCP_CLUSTER_NAME."
+    else
+        _info "Enabling Gateway API for cluster $GCP_CLUSTER_NAME (may take 15-20min)..."
+        $dry_run gcloud container clusters update "$GCP_CLUSTER_NAME" --gateway-api=standard
+    fi
+
+    # Check if any proxy-only subnet exists for this project and region
+    local existing_subnet
+    existing_subnet=$(gcloud compute networks subnets list \
+        --network=default \
+        --filter="purpose=REGIONAL_MANAGED_PROXY AND region:${CLOUDSDK_COMPUTE_REGION}" \
+        --format="value(name)" \
+        --limit=1 | head -n 1) # much faster with `head`
+
+    # If you see the error
+    #   An active proxy-only subnetwork is required in the same region and VPC as the forwarding rule.
+    # this part is needed
+    if [[ -n $existing_subnet ]]; then
+        _info "Proxy-only subnet already exists in $CLOUDSDK_COMPUTE_REGION: $existing_subnet"
+    else
+        _info "Creating proxy-only subnet for GKE L7 regional ALB in $CLOUDSDK_COMPUTE_REGION at CIDR $subnet_cidr..."
+        $dry_run gcloud compute networks subnets create proxy-only-subnet-for-gkel7 \
+            --description='proxy-only subnet required for GKE L7 regional ALB' \
+            --purpose=REGIONAL_MANAGED_PROXY \
+            --role=ACTIVE \
+            --region="${CLOUDSDK_COMPUTE_REGION}" \
+            --network=default \
+            --range="$subnet_cidr"
+    fi
 }
 
 ###

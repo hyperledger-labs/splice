@@ -4,7 +4,7 @@
 sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
 name: splice-util-token-standard-wallet-test
 source: daml
-version: 1.0.2
+version: 1.0.3
 dependencies:
   - daml-prim
   - daml-stdlib

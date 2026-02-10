@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.validator.admin.api.client.commands
 
 import cats.data.EitherT
 import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommand
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
@@ -13,6 +14,7 @@ import org.lfdecentralizedtrust.splice.http.v0.{definitions, scanproxy as scanPr
 import org.lfdecentralizedtrust.splice.http.v0.scanproxy.{GetDsoPartyIdResponse, ScanproxyClient}
 import org.lfdecentralizedtrust.splice.util.{Codec, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedDevelopmentFundCoupon
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommandCounter
 
@@ -179,6 +181,31 @@ object HttpScanProxyAppClient {
         Right(Some(ev))
       case scanProxy.LookupTransferCommandStatusResponse.NotFound(_) =>
         Right(None)
+    }
+  }
+
+  case object ListUnclaimedDevelopmentFundCoupons
+      extends ScanProxyBaseCommand[
+        scanProxy.ListUnclaimedDevelopmentFundCouponsResponse,
+        Seq[ContractWithState[
+          UnclaimedDevelopmentFundCoupon.ContractId,
+          UnclaimedDevelopmentFundCoupon,
+        ]],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.listUnclaimedDevelopmentFundCoupons(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case scanProxy.ListUnclaimedDevelopmentFundCouponsResponse.OK(response) =>
+      response.unclaimedDevelopmentFundCoupons
+        .traverse(coupon =>
+          ContractWithState.fromHttp(UnclaimedDevelopmentFundCoupon.COMPANION)(coupon)
+        )
+        .leftMap(_.toString)
     }
   }
 

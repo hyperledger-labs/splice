@@ -16,6 +16,12 @@ infra:
     retentionDuration: "1y"
     retentionSize: "1500GB"
     storageSize: "2Ti"
+  gkeGateway:
+    # swapping this comes with ~5min of downtime
+    # when changing true->false, pulumi gets delete order wrong; try
+    #   cncluster pulumi infra up --target urn:pulumi:infra.$GCP_CLUSTER_BASENAME::infra::kubernetes:gateway.networking.k8s.io/v1:Gateway::cn-gke-l7-gateway --target-dependents
+    # before normal update
+    proxyForIstioHttp: false
   istio:
     enableIngressAccessLogging: true
 # configs specific for the pulumi project

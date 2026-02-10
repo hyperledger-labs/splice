@@ -7,23 +7,22 @@
 
 .. NOTE: add your upcoming release notes below this line. They are included in the `release_notes.rst`.
 
-.. release-notes:: Upcoming
+release-notes:: Upcoming
 
-   - Deployment
+- Daml
 
-    - postgres-exporter: disabled exporting the settings table, to workaround `an issue of postgres-exporter <https://github.com/prometheus-community/postgres_exporter/issues/1240>`__.
+  - Optimize the number of views in the automation run by the SV app to convert ``FeaturedAppActivityMarker`` contracts into ``AppRewardCoupon`` contracts.
 
-    - Splice apps and Canton components deployed via Docker compose now log at ``INFO`` level by default instead of ``DEBUG``.
-      In case you do want to change this, export the ``LOG_LEVEL`` environment variable before running ``./start.sh``. e.g., ``export LOG_LEVEL="DEBUG"; ./start.sh``.
+    This requires a Daml upgrade to
 
-   - SV app
-
-    - Add a new trigger, ``ExpiredDevelopmentFundCouponTrigger`` for expiring development fund coupons.
-
-   - Wallet UI
-
-     - Remove the provider field from transaction history.
-
-   - Scan UI
-
-     - Remove the provider field from transaction history. The update API continues to expose it.
+      ================== =======
+      name               version
+      ================== =======
+      amulet             0.1.16
+      amuletNameService  0.1.17
+      dsoGovernance      0.1.22
+      splitwell          0.1.16
+      validatorLifecycle 0.1.6
+      wallet             0.1.17
+      walletPayments     0.1.16
+      ================== =======
