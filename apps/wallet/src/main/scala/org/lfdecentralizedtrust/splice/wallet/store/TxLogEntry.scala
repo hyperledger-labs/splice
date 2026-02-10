@@ -19,7 +19,6 @@ import org.lfdecentralizedtrust.splice.history.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpDef
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
-  ArchivedDevelopmentFundCouponStatus,
   GetBuyTrafficRequestStatusResponse,
   GetTransferOfferStatusResponse,
 }
@@ -450,6 +449,7 @@ object TxLogEntry extends StoreErrors {
       val createdAt = createdEntry.createdAt.getOrElse(throw txMissingField())
       val archivedAt = archivedEntry.archivedAt.getOrElse(throw txMissingField())
       val expiresAt = createdEntry.expiresAt.getOrElse(throw txMissingField())
+      val (status, optRejectionOrWithdrawalReason) = toStatusResponse(archivedEntry.status)
       httpDef.ArchivedDevelopmentFundCoupon(
         createdAt = java.time.OffsetDateTime.ofInstant(createdAt, ZoneOffset.UTC),
         archivedAt = java.time.OffsetDateTime.ofInstant(archivedAt, ZoneOffset.UTC),
@@ -458,62 +458,23 @@ object TxLogEntry extends StoreErrors {
         amount = Codec.encode(createdEntry.amount),
         expiresAt = java.time.OffsetDateTime.ofInstant(expiresAt, ZoneOffset.UTC),
         reason = createdEntry.reason,
-        status = toStatusResponse(archivedEntry.status),
+        status = status,
+        rejectionOrWithdrawalReason = optRejectionOrWithdrawalReason,
       )
     }
 
     private def toStatusResponse(
         status: DevelopmentFundCouponArchivedTxLogEntry.Status
-    ): ArchivedDevelopmentFundCouponStatus = status match {
+    ): (httpDef.ArchivedDevelopmentFundCoupon.Status, Option[String]) = status match {
       case DevelopmentFundCouponArchivedTxLogEntry.Status.Empty => throw txMissingField()
       case _: DevelopmentFundCouponArchivedTxLogEntry.Status.Claimed =>
-        toArchivedDevelopmentFundClaimedStatus
+        httpDef.ArchivedDevelopmentFundCoupon.Status.Claimed -> None
       case _: DevelopmentFundCouponArchivedTxLogEntry.Status.Expired =>
-        toArchivedDevelopmentFundExpiredStatus
+        httpDef.ArchivedDevelopmentFundCoupon.Status.Expired -> None
       case status: DevelopmentFundCouponArchivedTxLogEntry.Status.Rejected =>
-        toArchivedDevelopmentFundRejectedStatus(status.value.reason)
+        httpDef.ArchivedDevelopmentFundCoupon.Status.Rejected -> Some(status.value.reason)
       case status: DevelopmentFundCouponArchivedTxLogEntry.Status.Withdrawn =>
-        toArchivedDevelopmentFundWithdrawnStatus(status.value.reason)
-    }
-
-    private def toArchivedDevelopmentFundClaimedStatus
-        : httpDef.ArchivedDevelopmentFundCouponStatus = {
-      httpDef.ArchivedDevelopmentFundCouponStatus(
-        httpDef.ArchivedDevelopmentFundCouponClaimedStatus(
-          status = httpDef.ArchivedDevelopmentFundCouponClaimedStatus.Status.Claimed
-        )
-      )
-    }
-
-    private def toArchivedDevelopmentFundExpiredStatus
-        : httpDef.ArchivedDevelopmentFundCouponStatus = {
-      httpDef.ArchivedDevelopmentFundCouponStatus(
-        httpDef.ArchivedDevelopmentFundCouponExpiredStatus(
-          status = httpDef.ArchivedDevelopmentFundCouponExpiredStatus.Status.Expired
-        )
-      )
-    }
-
-    private def toArchivedDevelopmentFundWithdrawnStatus(
-        reason: String
-    ): httpDef.ArchivedDevelopmentFundCouponStatus = {
-      httpDef.ArchivedDevelopmentFundCouponStatus(
-        httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus(
-          status = httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus.Status.Withdrawn,
-          reason = reason,
-        )
-      )
-    }
-
-    private def toArchivedDevelopmentFundRejectedStatus(
-        reason: String
-    ): httpDef.ArchivedDevelopmentFundCouponStatus = {
-      httpDef.ArchivedDevelopmentFundCouponStatus(
-        httpDef.ArchivedDevelopmentFundCouponRejectedStatus(
-          status = httpDef.ArchivedDevelopmentFundCouponRejectedStatus.Status.Rejected,
-          reason = reason,
-        )
-      )
+        httpDef.ArchivedDevelopmentFundCoupon.Status.Withdrawn -> Some(status.value.reason)
     }
   }
 

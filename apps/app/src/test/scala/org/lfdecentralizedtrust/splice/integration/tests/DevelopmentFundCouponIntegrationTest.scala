@@ -275,12 +275,8 @@ class DevelopmentFundCouponIntegrationTest
           )
 
           // Verify that the withdrawn coupon is listed in listDevelopmentFundCouponHistory as withdrawn
-          val expectedStatus = httpDef.ArchivedDevelopmentFundCouponStatus(
-            httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus(
-              status = httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus.Status.Withdrawn,
-              reason = withdrawalReason,
-            )
-          )
+          val expectedStatus =
+            httpDef.ArchivedDevelopmentFundCoupon.Status.Withdrawn -> Some(withdrawalReason)
           // As the fund manager, Alice can view the withdrawn coupon
           assertListDevelopmentFundCouponHistoryStatuses(
             aliceValidatorWalletClient,
@@ -368,11 +364,7 @@ class DevelopmentFundCouponIntegrationTest
     }
 
     clue("Collected coupon is listed in listDevelopmentFundCouponHistory as claimed") {
-      val expectedStatus = httpDef.ArchivedDevelopmentFundCouponStatus(
-        httpDef.ArchivedDevelopmentFundCouponClaimedStatus(
-          status = httpDef.ArchivedDevelopmentFundCouponClaimedStatus.Status.Claimed
-        )
-      )
+      val expectedStatus = httpDef.ArchivedDevelopmentFundCoupon.Status.Claimed -> None
       // As the fund manager, Alice can view the claimed coupon
       assertListDevelopmentFundCouponHistoryStatuses(
         aliceValidatorWalletClient,
@@ -463,11 +455,7 @@ class DevelopmentFundCouponIntegrationTest
       }
 
       clue("The expired coupon is listed in listDevelopmentFundCouponHistory as expired") {
-        val expectedStatus = httpDef.ArchivedDevelopmentFundCouponStatus(
-          httpDef.ArchivedDevelopmentFundCouponExpiredStatus(
-            status = httpDef.ArchivedDevelopmentFundCouponExpiredStatus.Status.Expired
-          )
-        )
+        val expectedStatus = httpDef.ArchivedDevelopmentFundCoupon.Status.Expired -> None
         // As the fund manager, Alice can view the expired coupon
         assertListDevelopmentFundCouponHistoryStatuses(
           aliceValidatorWalletClient,
@@ -556,12 +544,8 @@ class DevelopmentFundCouponIntegrationTest
       )
 
       clue("The rejected coupon is listed in listDevelopmentFundCouponHistory as rejected") {
-        val expectedStatus = httpDef.ArchivedDevelopmentFundCouponStatus(
-          httpDef.ArchivedDevelopmentFundCouponRejectedStatus(
-            status = httpDef.ArchivedDevelopmentFundCouponRejectedStatus.Status.Rejected,
-            reason = rejectionReason,
-          )
-        )
+        val expectedStatus =
+          httpDef.ArchivedDevelopmentFundCoupon.Status.Rejected -> Some(rejectionReason)
         // As the fund manager, Alice can view the rejected coupon
         assertListDevelopmentFundCouponHistoryStatuses(
           aliceValidatorWalletClient,
@@ -709,17 +693,12 @@ class DevelopmentFundCouponIntegrationTest
           // Verify data
           val expectedAmounts = amounts.sorted.init
           history.map(_.amount.toDouble).sorted shouldBe expectedAmounts
-          val expectedStatus = httpDef.ArchivedDevelopmentFundCouponStatus(
-            httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus(
-              status = httpDef.ArchivedDevelopmentFundCouponWithdrawnStatus.Status.Withdrawn,
-              reason = withdrawalReason,
-            )
-          )
           history.foreach { coupon =>
             coupon.fundManager shouldBe fundManager.toProtoPrimitive
             coupon.beneficiary shouldBe beneficiary.toProtoPrimitive
             coupon.reason shouldBe reason
-            coupon.status shouldBe expectedStatus
+            coupon.status shouldBe httpDef.ArchivedDevelopmentFundCoupon.Status.Withdrawn
+            coupon.rejectionOrWithdrawalReason shouldBe Some(withdrawalReason)
           }
         },
       )
@@ -742,12 +721,12 @@ class DevelopmentFundCouponIntegrationTest
 
   private def assertListDevelopmentFundCouponHistoryStatuses(
       walletClient: WalletAppClientReference,
-      expectedStatuses: Seq[httpDef.ArchivedDevelopmentFundCouponStatus],
+      expectedStatuses: Seq[(httpDef.ArchivedDevelopmentFundCoupon.Status, Option[String])],
       limit: Int = 10,
   ) =
     walletClient
       .listDevelopmentFundCouponHistory(None, limit)
       .developmentFundCouponHistory
-      .map(_.status) shouldBe expectedStatuses
+      .map(c => c.status -> c.rejectionOrWithdrawalReason) shouldBe expectedStatuses
 
 }

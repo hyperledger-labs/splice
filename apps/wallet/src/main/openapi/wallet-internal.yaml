@@ -1936,56 +1936,18 @@ components:
         reason:
           type: string
         status:
-          $ref: "#/components/schemas/ArchivedDevelopmentFundCouponStatus"
-
-    ArchivedDevelopmentFundCouponStatus:
-      oneOf:
-        - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponWithdrawnStatus"
-        - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponRejectedStatus"
-        - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponClaimedStatus"
-        - $ref: "#/components/schemas/ArchivedDevelopmentFundCouponExpiredStatus"
-
-    ArchivedDevelopmentFundCouponWithdrawnStatus:
-      type: object
-      required:
-        - status
-        - reason
-      properties:
-        status:
           type: string
-          enum: [ withdrawn ]
-        reason:
+          enum:
+            - withdrawn
+            - rejected
+            - claimed
+            - expired
+        rejection_or_withdrawal_reason:
           type: string
-
-    ArchivedDevelopmentFundCouponRejectedStatus:
-      type: object
-      required:
-        - status
-        - reason
-      properties:
-        status:
-          type: string
-          enum: [ rejected ]
-        reason:
-          type: string
-
-    ArchivedDevelopmentFundCouponClaimedStatus:
-      type: object
-      required:
-        - status
-      properties:
-        status:
-          type: string
-          enum: [ claimed ]
-
-    ArchivedDevelopmentFundCouponExpiredStatus:
-      type: object
-      required:
-        - status
-      properties:
-        status:
-          type: string
-          enum: [ expired ]
+          description: |
+            Explanation for why the coupon was rejected or withdrawn.
+            This field is present only when status is 'rejected' or 'withdrawn'
+            and must be omitted when status is 'claimed' or 'expired'.
 
     WithdrawDevelopmentFundCouponRequest:
       type: object
