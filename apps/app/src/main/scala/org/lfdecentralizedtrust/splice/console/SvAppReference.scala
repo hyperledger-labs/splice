@@ -389,6 +389,12 @@ class SvAppBackendReference(
       httpCommand(HttpSvOperatorAppClient.GetCometBftNodeDump())
     }
 
+  @Help.Summary("Get the party to participant mapping for a given party")
+  def getPartyToParticipant(partyId: String): definitions.GetPartyToParticipantResponse =
+    consoleEnvironment.run {
+      httpCommand(HttpSvOperatorAppClient.GetPartyToParticipant(partyId))
+    }
+
   @Help.Summary("Get the sequencer node status")
   def sequencerNodeStatus(): NodeStatus[SpliceStatus] =
     consoleEnvironment.run {

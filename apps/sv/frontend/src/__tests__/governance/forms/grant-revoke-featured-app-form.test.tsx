@@ -88,8 +88,8 @@ describe('Grant Featured App Form', () => {
     expect(submitButton).toBeInTheDocument();
 
     await user.click(submitButton);
-    expect(submitButton.getAttribute('disabled')).toBeDefined();
-    expect(async () => await user.click(submitButton)).rejects.toThrowError(
+    expect(submitButton).toBeDisabled();
+    await expect(async () => await user.click(submitButton)).rejects.toThrowError(
       /Unable to perform pointer interaction/
     );
 
@@ -108,11 +108,11 @@ describe('Grant Featured App Form', () => {
 
     const providerInput = screen.getByTestId('grant-featured-app-idValue');
     expect(providerInput).toBeInTheDocument();
-    await user.type(providerInput, 'abcde12345');
+    await user.type(providerInput, 'a-party-id::1014912492');
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-    expect(submitButton.getAttribute('disabled')).toBeNull();
+    expect(submitButton).not.toBeDisabled();
   });
 
   test('expiry date must be in the future', async () => {
@@ -194,14 +194,20 @@ describe('Grant Featured App Form', () => {
     await user.type(urlInput, 'https://example.com');
 
     const providerInput = screen.getByTestId('grant-featured-app-idValue');
-    await user.type(providerInput, 'abcde12345');
+    await user.type(providerInput, 'a-party-id::1014912492');
 
     expect(screen.getByText('Review Proposal')).toBeInTheDocument();
     const submitButton = screen.getByTestId('submit-button');
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
+    await waitFor(() => {
+      expect(screen.queryByText('Validating provider...')).not.toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Provider party not found on ledger')).not.toBeInTheDocument();
+
     await waitFor(async () => {
-      expect(submitButton.getAttribute('disabled')).toBeNull();
+      expect(submitButton).not.toBeDisabled();
     });
 
     await user.click(submitButton);
@@ -256,7 +262,7 @@ describe('Revoke Featured App Form', () => {
     expect(submitButton).toBeInTheDocument();
 
     await user.click(submitButton);
-    expect(submitButton.getAttribute('disabled')).toBeDefined();
+    expect(submitButton).toBeDisabled();
     expect(async () => await user.click(submitButton)).rejects.toThrowError(
       /Unable to perform pointer interaction/
     );
@@ -280,7 +286,7 @@ describe('Revoke Featured App Form', () => {
 
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
-    expect(submitButton.getAttribute('disabled')).toBeNull();
+    expect(submitButton).not.toBeDisabled();
   });
 
   test('expiry date must be in the future', async () => {
@@ -367,7 +373,7 @@ describe('Revoke Featured App Form', () => {
 
     const submitButton = screen.getByTestId('submit-button');
     await waitFor(async () => {
-      expect(submitButton.getAttribute('disabled')).toBeNull();
+      expect(submitButton).not.toBeDisabled();
     });
 
     await user.click(submitButton);
@@ -408,7 +414,7 @@ describe('Revoke Featured App Form', () => {
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
     await waitFor(async () => {
-      expect(submitButton.getAttribute('disabled')).toBeNull();
+      expect(submitButton).not.toBeDisabled();
     });
 
     await user.click(submitButton); //review proposal
@@ -452,7 +458,7 @@ describe('Revoke Featured App Form', () => {
     await user.click(actionInput); // using this to trigger the onBlur event which triggers the validation
 
     await waitFor(async () => {
-      expect(submitButton.getAttribute('disabled')).toBeNull();
+      expect(submitButton).not.toBeDisabled();
     });
 
     await user.click(submitButton); //review proposal

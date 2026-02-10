@@ -14,8 +14,10 @@ import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ErrorUtil
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice as spliceCodegen
@@ -405,6 +407,64 @@ class HttpSvOperatorHandler(
       withMediatorConnectionOrNotFound(respond.NotFound)(
         _.getStatus.map(SpliceStatus.toHttpNodeStatus(_))
       )
+    }
+  }
+
+  override def getPartyToParticipant(
+      respond: r0.GetPartyToParticipantResponse.type
+  )(partyId: String)(
+      extracted: ActAsKnownUserRequest
+  ): Future[r0.GetPartyToParticipantResponse] = {
+    implicit val ActAsKnownUserRequest(traceContext) = extracted
+    withSpan(s"$workflowId.getPartyToParticipant") { _ => _ =>
+      withSequencerConnectionOrNotFound(respond.NotFound) { sequencerConnection =>
+        for {
+          party <- PartyId.fromProtoPrimitive(partyId, "partyId") match {
+            case Right(party) => Future.successful(party)
+            case Left(error) =>
+              Future.failed(
+                HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
+              )
+          }
+          dsoRules <- dsoStore.getDsoRules()
+          partyToParticipant <- sequencerConnection
+            .getPartyToParticipant(
+              dsoRules.domain,
+              party,
+            )
+          _ <- {
+            if (partyToParticipant.mapping.partyId == party) {
+              Future.unit
+            } else {
+              Future.failed(
+                HttpErrorHandler.notFound(s"Party not found: $partyId")
+              )
+            }
+          }
+          participantId <- partyToParticipant.mapping.participants match {
+            case Seq(participant) => Future.successful(participant.participantId.toProtoPrimitive)
+            case Seq() =>
+              Future.failed(
+                HttpErrorHandler.notFound(s"No participant id found hosting party: $partyId")
+              )
+            case _ =>
+              Future.failed(
+                HttpErrorHandler.internalServerError(
+                  s"Party $partyId is hosted on multiple participants, which is not currently supported"
+                )
+              )
+          }
+        } yield {
+          r0.GetPartyToParticipantResponse.OK(
+            definitions.GetPartyToParticipantResponse(participantId)
+          )
+        }
+      }.recoverWith {
+        case e: StatusRuntimeException if e.getStatus.getCode == Status.NOT_FOUND.getCode =>
+          Future.successful(
+            respond.NotFound(definitions.ErrorResponse(s"Party not found: $partyId"))
+          )
+      }
     }
   }
 
