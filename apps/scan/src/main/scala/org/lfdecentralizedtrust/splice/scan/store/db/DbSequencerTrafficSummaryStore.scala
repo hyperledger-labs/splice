@@ -15,8 +15,6 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import slick.jdbc.PostgresProfile
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import io.circe.Json
-import io.circe.syntax.*
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
@@ -24,23 +22,21 @@ import org.lfdecentralizedtrust.splice.store.{TimestampWithMigrationId, UpdateHi
 
 object DbSequencerTrafficSummaryStore {
 
-  /** Represents an envelope within a traffic summary */
+  /** Represents an envelope within a traffic summary (in-memory representation for inserts) */
   final case class EnvelopeT(
       trafficCost: Long,
       viewHashes: Seq[String],
   )
 
-  object EnvelopeT {
+  /** Represents an envelope row in the database */
+  final case class EnvelopeRowT(
+      trafficSummaryRowId: Long,
+      envelopeIndex: Int,
+      trafficCost: Long,
+      viewHashes: Seq[String],
+  )
 
-    /** Encode view hashes as JSON for database storage */
-    def encodeViewHashes(envelopes: Seq[Seq[String]]): Json =
-      envelopes.asJson
-
-    /** Decode view hashes from JSON */
-    def decodeViewHashes(json: Json): Seq[Seq[String]] =
-      json.as[Seq[Seq[String]]].getOrElse(Seq.empty)
-  }
-
+  /** Traffic summary for inserts (includes envelopes) */
   final case class TrafficSummaryT(
       rowId: Long,
       migrationId: Long,
@@ -49,6 +45,16 @@ object DbSequencerTrafficSummaryStore {
       sender: String,
       totalTrafficCost: Long,
       envelopes: Seq[EnvelopeT],
+  )
+
+  /** Traffic summary row from database (envelopes fetched separately via listEnvelopes) */
+  final case class TrafficSummaryRowT(
+      rowId: Long,
+      migrationId: Long,
+      domainId: SynchronizerId,
+      sequencingTime: CantonTimestamp,
+      sender: String,
+      totalTrafficCost: Long,
   )
 
   def apply(
@@ -95,50 +101,41 @@ class DbSequencerTrafficSummaryStore(
 
   object Tables {
     val trafficSummaries = "sequencer_traffic_summary_store"
+    val envelopes = "sequencer_traffic_envelope_store"
   }
 
   type TrafficSummaryT = DbSequencerTrafficSummaryStore.TrafficSummaryT
   val TrafficSummaryT = DbSequencerTrafficSummaryStore.TrafficSummaryT
+  type TrafficSummaryRowT = DbSequencerTrafficSummaryStore.TrafficSummaryRowT
+  val TrafficSummaryRowT = DbSequencerTrafficSummaryStore.TrafficSummaryRowT
   type EnvelopeT = DbSequencerTrafficSummaryStore.EnvelopeT
   val EnvelopeT = DbSequencerTrafficSummaryStore.EnvelopeT
+  type EnvelopeRowT = DbSequencerTrafficSummaryStore.EnvelopeRowT
+  val EnvelopeRowT = DbSequencerTrafficSummaryStore.EnvelopeRowT
 
-  /** Reconstruct envelopes from parallel arrays of traffic costs and view hashes JSON */
-  private def parseEnvelopes(
-      trafficCosts: Array[Long],
-      viewHashesJson: Json,
-  ): Seq[EnvelopeT] = {
-    val viewHashes = EnvelopeT.decodeViewHashes(viewHashesJson)
-    require(
-      trafficCosts.length == viewHashes.length,
-      s"Mismatched array lengths: trafficCosts=${trafficCosts.length}, viewHashes=${viewHashes.length}",
-    )
-    trafficCosts
-      .zip(viewHashes)
-      .map { case (cost, hashes) =>
-        EnvelopeT(cost, hashes)
-      }
-      .toSeq
-  }
-
-  private implicit val GetResultTrafficSummaryRow: GetResult[TrafficSummaryT] = GetResult { prs =>
+  private implicit val GetResultTrafficSummaryRow: GetResult[TrafficSummaryRowT] = GetResult { prs =>
     import prs.*
-    TrafficSummaryT(
+    TrafficSummaryRowT(
       <<[Long], // row_id
       <<[Long], // migration_id
       <<[SynchronizerId], // domain_id
       <<[CantonTimestamp], // sequencing_time
       <<[String], // sender
       <<[Long], // total_traffic_cost
-      parseEnvelopes(
-        <<[Array[Long]],
-        <<[Json],
-      ), // envelope_traffic_costs, envelope_view_hashes
     )
   }
 
-  private def sqlInsertTrafficSummary(row: TrafficSummaryT) = {
-    val trafficCosts = row.envelopes.map(_.trafficCost)
-    val viewHashesJson = EnvelopeT.encodeViewHashes(row.envelopes.map(_.viewHashes))
+  private implicit val GetResultEnvelopeRow: GetResult[EnvelopeRowT] = GetResult { prs =>
+    import prs.*
+    EnvelopeRowT(
+      <<[Long], // traffic_summary_row_id
+      <<[Int], // envelope_index
+      <<[Long], // traffic_cost
+      stringArrayGetResult(prs).toSeq, // view_hashes
+    )
+  }
+
+  private def sqlInsertTrafficSummaryReturningId(row: TrafficSummaryT) = {
     sql"""
       insert into #${Tables.trafficSummaries}(
         history_id,
@@ -146,23 +143,35 @@ class DbSequencerTrafficSummaryStore(
         domain_id,
         sequencing_time,
         sender,
-        total_traffic_cost,
-        envelope_traffic_costs,
-        envelope_view_hashes
+        total_traffic_cost
       ) values (
         $historyId,
         ${row.migrationId},
         ${row.domainId},
         ${row.sequencingTime},
         ${row.sender},
-        ${row.totalTrafficCost},
-        $trafficCosts,
-        $viewHashesJson
+        ${row.totalTrafficCost}
+      ) returning row_id
+    """.as[Long].headOption
+  }
+
+  private def sqlInsertEnvelope(row: EnvelopeRowT) = {
+    sql"""
+      insert into #${Tables.envelopes}(
+        traffic_summary_row_id,
+        envelope_index,
+        traffic_cost,
+        view_hashes
+      ) values (
+        ${row.trafficSummaryRowId},
+        ${row.envelopeIndex},
+        ${row.trafficCost},
+        ${row.viewHashes.map(lengthLimited).toSeq}
       )
     """.asUpdate
   }
 
-  /** Insert multiple traffic summaries in a single transaction.
+  /** Insert multiple traffic summaries and their envelopes in a single transaction.
     *
     * We check for existing sequencing_times first, then insert only non-existing items.
     * The unique index on (history_id, sequencing_time) serves as a safety net.
@@ -188,16 +197,31 @@ class DbSequencerTrafficSummaryStore(
         _ = logger.info(
           s"Already ingested traffic summaries: ${alreadyExisting.size}. Non-existing: ${nonExisting.size}."
         )
-        _ <- if (nonExisting.nonEmpty) {
-          DBIO
-            .sequence(nonExisting.map(sqlInsertTrafficSummary))
-            .map { counts =>
-              val inserted = counts.sum
-              logger.info(s"Inserted $inserted traffic summaries.")
-            }
-        } else {
-          DBIO.successful(())
-        }
+        _ <-
+          if (nonExisting.nonEmpty) {
+            DBIO
+              .sequence(nonExisting.map { summary =>
+                for {
+                  idOpt <- sqlInsertTrafficSummaryReturningId(summary)
+                  rowId <- idOpt match {
+                    case Some(id) => DBIO.successful(id)
+                    case None =>
+                      DBIO.failed(
+                        new RuntimeException("insertTrafficSummary did not return row_id")
+                      )
+                  }
+                  envelopeRows = summary.envelopes.zipWithIndex.map { case (env, idx) =>
+                    EnvelopeRowT(rowId, idx, env.trafficCost, env.viewHashes)
+                  }
+                  _ <- DBIO.sequence(envelopeRows.map(sqlInsertEnvelope)).map(_ => ())
+                } yield ()
+              })
+              .map { _ =>
+                logger.info(s"Inserted ${nonExisting.size} traffic summaries.")
+              }
+          } else {
+            DBIO.successful(())
+          }
       } yield ()
 
       futureUnlessShutdownToFuture(
@@ -216,7 +240,7 @@ class DbSequencerTrafficSummaryStore(
   def listTrafficSummaries(
       afterO: Option[TimestampWithMigrationId],
       limit: Int,
-  )(implicit tc: TraceContext): Future[Seq[TrafficSummaryT]] = {
+  )(implicit tc: TraceContext): Future[Seq[TrafficSummaryRowT]] = {
     val (migrationFilter, timeFilter) = afterO match {
       case None =>
         (sql"migration_id >= 0", sql"sequencing_time > ${CantonTimestamp.MinValue}")
@@ -234,15 +258,31 @@ class DbSequencerTrafficSummaryStore(
         domain_id,
         sequencing_time,
         sender,
-        total_traffic_cost,
-        envelope_traffic_costs,
-        envelope_view_hashes
+        total_traffic_cost
       from #${Tables.trafficSummaries}
       where history_id = $historyId
         and """ ++ migrationFilter ++ sql" and " ++ timeFilter ++
       sql" order by migration_id, sequencing_time limit $limit"
 
-    storage.query(query.toActionBuilder.as[TrafficSummaryT], "scanTraffic.listTrafficSummaries")
+    storage.query(query.toActionBuilder.as[TrafficSummaryRowT], "scanTraffic.listTrafficSummaries")
+  }
+
+  def listEnvelopes(trafficSummaryRowId: Long)(implicit
+      tc: TraceContext
+  ): Future[Seq[EnvelopeRowT]] = {
+    storage.query(
+      sql"""
+        select
+          traffic_summary_row_id,
+          envelope_index,
+          traffic_cost,
+          view_hashes
+        from #${Tables.envelopes}
+        where traffic_summary_row_id = $trafficSummaryRowId
+        order by envelope_index asc
+      """.as[EnvelopeRowT],
+      "scanTraffic.listEnvelopes",
+    )
   }
 
   def maxSequencingTime(migrationId: Long)(implicit
