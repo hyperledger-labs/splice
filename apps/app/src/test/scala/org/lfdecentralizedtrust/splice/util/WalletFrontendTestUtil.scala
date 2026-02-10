@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestC
 
 trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =>
 
+  /** Tap amulets by interacting with the UI, and waits until the amulets are visible in the transaction history. */
   protected def tapAmulets(
       tapQuantity: BigDecimal
   )(implicit webDriver: WebDriverType, env: SpliceTestConsoleEnvironment): Unit = {
@@ -21,13 +22,35 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       eventuallyClickOn(id("tap-button"))
     }
 
-    val txDatesBefore =
-      clue("Getting state before tap") {
-        // The long eventually makes this robust against `StaleElementReferenceException` errors
-        eventually(timeUntilSuccess = 2.minute)(
-          findAll(className("tx-row")).toSeq.map(readDateFromRow)
-        )
+    val txDatesBefore = clue("Getting state before tap") {
+      // The long eventually makes this robust against `StaleElementReferenceException` errors
+      eventually(timeUntilSuccess = 2.minute)(
+        findAll(className("tx-row")).toSeq.map(readDateFromRow)
+      )
+    }
+    def assertTapResultIsVisible(): Unit = {
+      val newTaps = clue(s"Checking for new taps") {
+        val txs = findAll(className("tx-row")).toSeq
+        val txDatesAfter = txs.map(readDateFromRow)
+        logger.debug(s"Transaction dates after tap: $txDatesAfter")
+        val tapsAfter = txs.flatMap(readTapFromRow)
+        val newTaps = tapsAfter.filter(tap => !txDatesBefore.exists(_ == tap.date))
+        logger.debug(s"New taps: $newTaps")
+        newTaps
       }
+      forAtLeast(1, newTaps) { tap =>
+        {
+          val roundError = 0.01
+          assertInRange(tap.tapAmountUsd, (tapQuantity - roundError, tapQuantity + roundError))
+          val tapQuantityAmt = walletUsdToAmulet(tapQuantity, 1.0 / tap.usdToAmulet)
+          assertInRange(
+            tap.tapAmountAmulet,
+            (tapQuantityAmt - roundError, tapQuantityAmt + roundError),
+          )
+        }
+      }
+      logger.debug(s"Tap succeeded, the following new taps were found: $newTaps")
+    }
 
     logger.debug(s"Transaction dates before tap: $txDatesBefore")
 
@@ -35,6 +58,18 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       tap()
     }
 
+    /** Notes: the tap API endpoint is synchronous, and not idempotent.
+      * - The validator backend picks command id, and retries picking a round and submitting the tap command.
+      *   It will only retry if it encounters a retryable error. For example, it will not retry if the tap
+      *   failed due to missing traffic balance, even though we know that there is another background process
+      *   that tops up traffic balance and would likely make a retry successful.
+      *   See [[org.lfdecentralizedtrust.splice.wallet.admin.http.HttpWalletHandler.tap]].
+      * - The frontend code does NOT retry the tap call, since it is not idempotent.
+      *   See `apps/wallet/frontend/src/hooks/useTap.ts`
+      * - The HTTP server (the validator backend) aborts the call if it exceeds a timeout of 38sec.
+      *   See `apps/app/src/main/resources/application.conf.
+      * - The HTTP client (the web frontend using react-query) does NOT abort calls due to timeouts.
+      */
     clue("Making sure the tap has been processed") {
       // This will have to change if we add a reload button here instead of auto-refreshing transactions.
       // The long eventually makes this robust against `StaleElementReferenceException` errors
@@ -54,26 +89,23 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
               case Some(errDetails) if errDetails.contains("NOT_CONNECTED_TO_DOMAIN") =>
                 tap()
                 fail(s"Tapping again due to a participant not connected to domain error")
-              case errDetails => errDetails
+              case Some(errDetails)
+                  if errDetails.contains("The server is taking too long to respond") =>
+                // The tap might still succeed after the HTTP server timeout,
+                // for example if the command completion is delayed because of the record order publisher.
+                // The ledger api command might also have failed after the HTTP timeout (e.g., if it times out with a
+                // NOT_SEQUENCED_TIMEOUT), but we can't easily distinguish that from the case where the command
+                // is just taking a long time to complete.
+                logger.debug(
+                  s"Tap call timed out, checking if the tap result appears in case the command completed after the HTTP timeout."
+                )
+                assertTapResultIsVisible()
+              case Some(errDetails) =>
+                fail(s"Tap failed: ${errElem.text.trim} ($errDetails)")
+              case None =>
+                assertTapResultIsVisible()
             },
           )
-        } shouldBe empty
-        val txs = findAll(className("tx-row")).toSeq
-        val txDatesAfter = txs.map(readDateFromRow)
-        logger.debug(s"Transaction dates after tap: $txDatesAfter")
-        val tapsAfter = txs.flatMap(readTapFromRow)
-        val newTaps = tapsAfter.filter(tap => !txDatesBefore.exists(_ == tap.date))
-        logger.debug(s"New taps: $newTaps")
-        forAtLeast(1, newTaps) { tap =>
-          {
-            val roundError = 0.01
-            assertInRange(tap.tapAmountUsd, (tapQuantity - roundError, tapQuantity + roundError))
-            val tapQuantityAmt = walletUsdToAmulet(tapQuantity, 1.0 / tap.usdToAmulet)
-            assertInRange(
-              tap.tapAmountAmulet,
-              (tapQuantityAmt - roundError, tapQuantityAmt + roundError),
-            )
-          }
         }
       }
     }
