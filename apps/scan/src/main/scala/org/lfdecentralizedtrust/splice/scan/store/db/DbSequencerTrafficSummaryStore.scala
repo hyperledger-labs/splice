@@ -19,6 +19,8 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import org.lfdecentralizedtrust.splice.store.{TimestampWithMigrationId, UpdateHistory}
+import cats.data.NonEmptyList
+import slick.jdbc.canton.SQLActionBuilder
 
 object DbSequencerTrafficSummaryStore {
 
@@ -113,16 +115,17 @@ class DbSequencerTrafficSummaryStore(
   type EnvelopeRowT = DbSequencerTrafficSummaryStore.EnvelopeRowT
   val EnvelopeRowT = DbSequencerTrafficSummaryStore.EnvelopeRowT
 
-  private implicit val GetResultTrafficSummaryRow: GetResult[TrafficSummaryRowT] = GetResult { prs =>
-    import prs.*
-    TrafficSummaryRowT(
-      <<[Long], // row_id
-      <<[Long], // migration_id
-      <<[SynchronizerId], // domain_id
-      <<[CantonTimestamp], // sequencing_time
-      <<[String], // sender
-      <<[Long], // total_traffic_cost
-    )
+  private implicit val GetResultTrafficSummaryRow: GetResult[TrafficSummaryRowT] = GetResult {
+    prs =>
+      import prs.*
+      TrafficSummaryRowT(
+        <<[Long], // row_id
+        <<[Long], // migration_id
+        <<[SynchronizerId], // domain_id
+        <<[CantonTimestamp], // sequencing_time
+        <<[String], // sender
+        <<[Long], // total_traffic_cost
+      )
   }
 
   private implicit val GetResultEnvelopeRow: GetResult[EnvelopeRowT] = GetResult { prs =>
@@ -241,18 +244,33 @@ class DbSequencerTrafficSummaryStore(
       afterO: Option[TimestampWithMigrationId],
       limit: Int,
   )(implicit tc: TraceContext): Future[Seq[TrafficSummaryRowT]] = {
-    val (migrationFilter, timeFilter) = afterO match {
+    val filters = afterFilters(afterO)
+    val query = trafficSummariesQuery(filters, limit)
+    storage.query(query.toActionBuilder.as[TrafficSummaryRowT], "scanTraffic.listTrafficSummaries")
+  }
+
+  private def afterFilters(
+      afterO: Option[TimestampWithMigrationId]
+  ): NonEmptyList[SQLActionBuilder] = {
+    afterO match {
       case None =>
-        (sql"migration_id >= 0", sql"sequencing_time > ${CantonTimestamp.MinValue}")
+        NonEmptyList.of(sql"migration_id >= 0 and sequencing_time > ${CantonTimestamp.MinValue}")
       case Some(TimestampWithMigrationId(afterSequencingTime, afterMigrationId)) =>
-        (
-          sql"migration_id >= $afterMigrationId",
-          sql"(migration_id > $afterMigrationId or (migration_id = $afterMigrationId and sequencing_time > $afterSequencingTime))",
+        // Split into two queries for better index utilization (avoids OR causing seq scan)
+        NonEmptyList.of(
+          sql"migration_id = $afterMigrationId and sequencing_time > $afterSequencingTime",
+          sql"migration_id > $afterMigrationId and sequencing_time > ${CantonTimestamp.MinValue}",
         )
     }
+  }
 
-    val query = sql"""
-      select
+  private def trafficSummariesQuery(
+      filters: NonEmptyList[SQLActionBuilder],
+      limit: Int,
+  ) = {
+    def makeSubQuery(afterFilter: SQLActionBuilder) = {
+      sql"""
+      (select
         row_id,
         migration_id,
         domain_id,
@@ -260,11 +278,19 @@ class DbSequencerTrafficSummaryStore(
         sender,
         total_traffic_cost
       from #${Tables.trafficSummaries}
-      where history_id = $historyId
-        and """ ++ migrationFilter ++ sql" and " ++ timeFilter ++
-      sql" order by migration_id, sequencing_time limit $limit"
+      where history_id = $historyId and """ ++ afterFilter ++
+        sql" order by migration_id, sequencing_time limit $limit)"
+    }
 
-    storage.query(query.toActionBuilder.as[TrafficSummaryRowT], "scanTraffic.listTrafficSummaries")
+    if (filters.size == 1) makeSubQuery(filters.head)
+    else {
+      // Using an OR in a query might cause the query planner to do a Seq scan,
+      // whereas using a union all makes it so that the individual queries use the right index,
+      // and are merged via Merge Append.
+      val unionAll = filters.map(makeSubQuery).reduceLeft(_ ++ sql" union all " ++ _)
+      sql"select * from (" ++ unionAll ++ sql") all_queries " ++
+        sql"order by migration_id, sequencing_time limit $limit"
+    }
   }
 
   def listEnvelopes(trafficSummaryRowId: Long)(implicit
