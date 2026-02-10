@@ -68,6 +68,11 @@ class UpdateIngestionService(
             _ = logger.debug(
               s"Starting ingestion from participant begin at $participantBegin"
             )
+            /** * This only applies to UpdateHistory. Does not load any ACS. Anything before the latest pruned offset:
+              * - Scan: it will be backfilled.
+              * - Wallet: won't miss any updates, because all updates visible to the wallet party only appear
+              *           after you onboard that party through the wallet app. Does not backfill.
+              */
             _ <- ingestionSink.ingestAcsStreamInBatches(
               Source.empty,
               participantBegin,

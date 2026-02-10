@@ -961,6 +961,15 @@ abstract class StoreTestBase
     updateId = updateId,
   )
 
+  protected def acsImportEntryToActiveContract(entry: StoreTestBase.AcsImportEntry) = entry match {
+    case StoreTestBase.AcsImportEntry(contract, domain, counter, implementedInterfaces) =>
+      ActiveContract(
+        domain,
+        toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
+        counter,
+      )
+  }
+
   protected def acs(
       acs: Seq[StoreTestBase.AcsImportEntry] = Seq.empty,
       incompleteOut: Seq[StoreTestBase.AcsImportIncompleteEntry] = Seq.empty,
@@ -969,14 +978,7 @@ abstract class StoreTestBase
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.ingestAcs(
       acsOffset,
-      acs.map {
-        case StoreTestBase.AcsImportEntry(contract, domain, counter, implementedInterfaces) =>
-          ActiveContract(
-            domain,
-            toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
-            counter,
-          )
-      },
+      acs.map(acsImportEntryToActiveContract),
       incompleteOut.map {
         case StoreTestBase.AcsImportIncompleteEntry(
               c,

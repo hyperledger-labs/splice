@@ -4,7 +4,11 @@ import com.daml.ledger.javaapi.data.{DamlRecord, Identifier, OffsetCheckpoint}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
-import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
+import org.lfdecentralizedtrust.splice.environment.{
+  BaseLedgerConnection,
+  DarResources,
+  RetryProvider,
+}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TransactionTreeUpdate,
   TreeUpdateOrOffsetCheckpoint,
@@ -39,9 +43,10 @@ import org.slf4j.event.Level
 import slick.jdbc.JdbcProfile
 
 import java.time.Instant
-import scala.concurrent.Future
+import scala.concurrent.{Future, Promise}
 import StoreTestBase.*
 import cats.data.NonEmptyList
+import org.apache.pekko.stream.scaladsl.Source
 import org.lfdecentralizedtrust.splice.config.IngestionConfig
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -157,6 +162,34 @@ class DbMultiDomainAcsStoreTest
           _ <- acs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))(store)
           error <- acs(Seq(StoreTestBase.AcsImportEntry(c(1), d1, 0L)))(store).failed
           _ = error.getMessage should include("already ingested")
+        } yield succeed
+      }
+      "does not report the ACS as ingested until all batches are ingested" in {
+        val store = mkStore(txLogId = Some(0))
+        val ingestedOneItem = Promise[Unit]()
+        val continueIngesting = Promise[Unit]()
+        for {
+          _ <- store.ingestionSink.initialize()
+          _ = store.hasFinishedAcsIngestion should be(false)
+          ingestionCompletedFuture = store.ingestionSink.ingestAcsStreamInBatches(
+            Source
+              .single(StoreTestBase.AcsImportEntry(c(1), d1, 0L))
+              .map { e =>
+                ingestedOneItem.trySuccess(())
+                e
+              }
+              .concat(Source.future(continueIngesting.future.map { _ =>
+                StoreTestBase.AcsImportEntry(c(2), d1, 0L)
+              }))
+              .map(acsImportEntryToActiveContract)
+              .map(c => Seq(BaseLedgerConnection.ActiveContractsItem.ActiveContract(c))),
+            123L,
+          )
+          _ <- ingestedOneItem.future
+          _ = store.hasFinishedAcsIngestion should be(false)
+          _ = continueIngesting.success(())
+          _ <- ingestionCompletedFuture // which will complete once element 2 is finally ingested
+          _ <- assertList(c(1) -> Some(d1), c(2) -> Some(d1))(store)
         } yield succeed
       }
       "initialize empty stores with equal descriptors" in {
