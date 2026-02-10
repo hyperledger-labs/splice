@@ -505,8 +505,7 @@ describe('Update SV Reward Weight Form', () => {
     await user.click(submitButton); // submit proposal
 
     await waitFor(() => {
-      expect(requestBody).toContain('1000');
+      expect(requestBody).toContain('"newRewardWeight":"1000"');
     });
-    expect(requestBody).not.toContain('_');
   });
 });
