@@ -20,7 +20,7 @@ import io.circe.syntax.*
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
-import org.lfdecentralizedtrust.splice.store.UpdateHistory
+import org.lfdecentralizedtrust.splice.store.{TimestampWithMigrationId, UpdateHistory}
 
 object DbSequencerTrafficSummaryStore {
 
@@ -199,13 +199,13 @@ class DbSequencerTrafficSummaryStore(
   }
 
   def listTrafficSummaries(
-      afterO: Option[(Long, CantonTimestamp)],
+      afterO: Option[TimestampWithMigrationId],
       limit: Int,
   )(implicit tc: TraceContext): Future[Seq[TrafficSummaryT]] = {
     val (migrationFilter, timeFilter) = afterO match {
       case None =>
         (sql"migration_id >= 0", sql"sequencing_time > ${CantonTimestamp.MinValue}")
-      case Some((afterMigrationId, afterSequencingTime)) =>
+      case Some(TimestampWithMigrationId(afterSequencingTime, afterMigrationId)) =>
         (
           sql"migration_id >= $afterMigrationId",
           sql"(migration_id > $afterMigrationId or (migration_id = $afterMigrationId and sequencing_time > $afterSequencingTime))",
