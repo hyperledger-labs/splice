@@ -7,8 +7,10 @@ import com.digitalasset.canton.admin.api.client.data.OnboardingRestriction.{
   RestrictedOpen,
   UnrestrictedOpen,
 }
+import com.digitalasset.canton.crypto.SigningKeyUsage
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{PostgresAroundEach, ProcessTestUtil, WalletTestUtil}
@@ -55,6 +57,72 @@ class PermissionedSynchronizerIntegrationTest
   "onboard validator in permissioned mode" in { implicit env =>
     initDsoWithSv1Only()
     // start an extra participant
+
+    // create a ParticipantSynchronizerPermission for the SV1 validator participant
+
+    withClue("Phase 1: Set ParticipantSynchronizerPermission for SV1") {
+
+      sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions.find(
+        decentralizedSynchronizerId,
+        sv1ValidatorBackend.participantClientWithAdminToken.id,
+      ) match {
+        case Some(res)
+            if res.item.permission == ParticipantPermission.Submission => {} // ParticipantSynchronizerPermission already exists
+
+        case Some(res) =>
+          sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
+            .propose(
+              decentralizedSynchronizerId,
+              sv1ValidatorBackend.participantClientWithAdminToken.id,
+              permission = ParticipantPermission.Submission,
+              serial = Some(res.context.serial.increment),
+            )
+
+        case None =>
+          sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
+            .propose(
+              decentralizedSynchronizerId,
+              sv1ValidatorBackend.participantClientWithAdminToken.id,
+              permission = ParticipantPermission.Submission,
+              serial = Some(com.digitalasset.canton.config.RequireTypes.PositiveInt.one),
+            )
+      }
+
+      eventually(60.seconds, 1.second) {
+        val authorized =
+          sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
+            .find(
+              decentralizedSynchronizerId,
+              sv1ValidatorBackend.participantClientWithAdminToken.id,
+            )
+        authorized.exists(_.item.permission == ParticipantPermission.Submission) shouldBe true
+      }
+
+    }
+
+    withClue("Phase 2: change onboarding restriction to RestrictedOpen") {
+
+      // set the onboarding restriction to RestrictedOpen
+
+      if (
+        sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
+          .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
+          .onboardingRestriction != RestrictedOpen
+      ) {
+        sv1ValidatorBackend.participantClient.topology.synchronizer_parameters.propose_update(
+          decentralizedSynchronizerId,
+          _.update(onboardingRestriction = RestrictedOpen),
+        )
+      }
+
+      eventually(60.seconds, 1.second) {
+        val currentParams = sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
+          .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
+
+        currentParams.onboardingRestriction shouldBe RestrictedOpen
+      }
+    }
+
     withCanton(
       Seq(
         testResourcesPath / "standalone-participant-extra.conf"
@@ -66,76 +134,46 @@ class PermissionedSynchronizerIntegrationTest
       "EXTRA_PARTICIPANT_DB" -> "alice_participant_new",
     ) {
 
-      // create a ParticipantSynchronizerPermission for the SV1 validator participant
-
-      withClue("Phase 1: Set ParticipantSynchronizerPermission for SV1") {
-
-        sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions.find(
-          decentralizedSynchronizerId,
-          sv1ValidatorBackend.participantClientWithAdminToken.id,
-        ) match {
-          case Some(res)
-              if res.item.permission == ParticipantPermission.Submission => {} // ParticipantSynchronizerPermission already exists
-
-          case Some(res) =>
-            sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
-              .propose(
-                decentralizedSynchronizerId,
-                sv1ValidatorBackend.participantClientWithAdminToken.id,
-                permission = ParticipantPermission.Submission,
-                serial = Some(res.context.serial.increment),
-              )
-
-          case None =>
-            sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
-              .propose(
-                decentralizedSynchronizerId,
-                sv1ValidatorBackend.participantClientWithAdminToken.id,
-                permission = ParticipantPermission.Submission,
-                serial = Some(com.digitalasset.canton.config.RequireTypes.PositiveInt.one),
-              )
-        }
-
-        eventually(60.seconds, 1.second) {
-          val authorized =
-            sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions
-              .find(
-                decentralizedSynchronizerId,
-                sv1ValidatorBackend.participantClientWithAdminToken.id,
-              )
-          authorized.exists(_.item.permission == ParticipantPermission.Submission) shouldBe true
-        }
-
-      }
-
-      withClue("Phase 2: change onboarding restriction to RestrictedOpen") {
-
-        // set the onboarding restriction to RestrictedOpen
-
-        if (
-          sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
-            .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
-            .onboardingRestriction != RestrictedOpen
-        ) {
-          sv1ValidatorBackend.participantClient.topology.synchronizer_parameters.propose_update(
-            decentralizedSynchronizerId,
-            _.update(onboardingRestriction = RestrictedOpen),
-          )
-        }
-
-        eventually(60.seconds, 1.second) {
-          val currentParams = sv1ValidatorBackend.participantClient.topology.synchronizer_parameters
-            .get_dynamic_synchronizer_parameters(decentralizedSynchronizerId)
-
-          currentParams.onboardingRestriction shouldBe RestrictedOpen
-        }
-      }
-
       withClue("Phase 3: Submit a ParticipantSynchronizerPermission for the alice participant") {
 
         // create a ParticipantSynchronizerPermission for the alice participant
 
-        val aliceParticipantId = aliceValidatorBackend.participantClientWithAdminToken.id
+        val aliceParticipantClient = new ParticipantClientReference(
+          env,
+          "extraStandaloneParticipant",
+          com.digitalasset.canton.participant.config.RemoteParticipantConfig(
+            adminApi = com.digitalasset.canton.config.FullClientConfig(
+              port = com.digitalasset.canton.config.RequireTypes.Port.tryCreate(27502)
+            ),
+            ledgerApi = com.digitalasset.canton.config.FullClientConfig(
+              port = com.digitalasset.canton.config.RequireTypes.Port.tryCreate(27501)
+            ),
+          ),
+        )
+
+        aliceParticipantClient.health.wait_for_ready_for_id()
+
+        val aliceRootKey = aliceParticipantClient.keys.secret
+          .generate_signing_key(
+            "aliceDupRootKey",
+            com.digitalasset.canton.crypto.SigningKeyUsage.NamespaceOnly,
+          )
+        val aliceNamespace = com.digitalasset.canton.topology.Namespace(aliceRootKey.fingerprint)
+
+        aliceParticipantClient.topology.init_id_from_uid(
+          com.digitalasset.canton.topology.ParticipantId("aliceDupValidator", aliceNamespace).uid,
+          waitForReady = true,
+        )
+
+        aliceParticipantClient.topology.namespace_delegations.propose_delegation(
+          aliceNamespace,
+          aliceRootKey,
+          delegationRestriction =
+            com.digitalasset.canton.topology.transaction.DelegationRestriction.CanSignAllMappings,
+          signedBy = Seq(aliceNamespace.fingerprint),
+        )
+
+        val aliceParticipantId = aliceParticipantClient.id
 
         sv1ValidatorBackend.participantClient.topology.participant_synchronizer_permissions.find(
           decentralizedSynchronizerId,
