@@ -104,11 +104,16 @@ case class ZstdGroupedWeight(minSize: Long)
         val elem = grab(in)
         val compressed = zstd.get().compress(elem)
         state.set(state.get().append(compressed))
+        println(state.get().bytes.length)
         if (state.get().left <= 0) {
+          println("here, left < 0")
+          println(s"before finishing: ${state.get().bytes.length} bytes")
           state.set(state.get().append(zstd.get().zstdFinish()))
+          println(s"after finishing: ${state.get().bytes.length} bytes")
           push(out, ByteStringWithTermination(state.get().bytes, false))
           reset()
         } else {
+          println("here, pulling more")
           pull(in)
         }
       }
