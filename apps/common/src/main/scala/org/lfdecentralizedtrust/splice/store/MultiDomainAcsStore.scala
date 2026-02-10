@@ -793,9 +793,14 @@ object MultiDomainAcsStore extends StoreErrors {
         */
       final case object InitializeAcsAtLatestOffset extends IngestionStart
 
-      /** Ingestion service should not ingest the ACS, and instead start from the participant's begin
+      /** Only for UpdateHistory, not app stores!
+        * Starts from the latest pruned offset under the assumptions:
+        * - Scan: anything before it will be backfilled.
+        * - Wallet: won't miss any updates, because all updates visible to the wallet party only appear
+        *           after you onboard that party through the wallet app. Does not backfill.
+        * Does not load any ACS.
         */
-      final case object InitializeAtParticipantBegin extends IngestionStart
+      final case object UpdateHistoryInitAtLatestPrunedOffset extends IngestionStart
 
       /** Ingestion service should ingest the ACS at the specified offset,
         * then resume ingesting updates from there

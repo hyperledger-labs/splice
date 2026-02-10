@@ -520,11 +520,6 @@
         Thereby making the ``AmuletRules`` contract smaller and saving traffic for transactions using it.
         This is motivated by `CIP-0078 CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0078/cip-0078.md>`__ .
 
-  - Splice apps
-
-       - Removed the `ingest-from-participant-begin` and `ingest-update-history-from-participant-begin` from splice apps,
-         and the corresponding `disableIngestUpdateHistoryFromParticipantBegin` from helm charts.
-
   - Canton and SDK:
 
      - Introduction of 2 new alpha primitives in ``DA.Crypto.Text`` Module

@@ -298,7 +298,7 @@ class UpdateHistory(
             case None =>
               logger.info(s"${description()} initialized")
               // Missing updates will be later backfilled using `ScanHistoryBackfillingTrigger`.
-              IngestionStart.InitializeAtParticipantBegin
+              IngestionStart.UpdateHistoryInitAtLatestPrunedOffset
           }
         }
       }
