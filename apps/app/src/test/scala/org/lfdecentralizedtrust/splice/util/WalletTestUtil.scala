@@ -67,9 +67,10 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       walletParty: PartyId,
       wallet: WalletAppClientReference,
       expectedAmountRanges: Seq[(BigDecimal, BigDecimal)],
+      holdingFee: BigDecimal = defaultHoldingFeeAmulet.bigDecimal,
   ): Unit = clue(s"checking wallet with $expectedAmountRanges") {
     val expectedRatePerRound = new feesCodegen.RatePerRound(
-      defaultHoldingFeeAmulet.bigDecimal setScale 10
+      holdingFee.bigDecimal setScale 10
     )
     eventually(10.seconds, 500.millis) {
       val amulets =

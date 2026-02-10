@@ -24,8 +24,9 @@ class TimeBasedTreasuryIntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
-  // We increase holding fees for this test so we see something happen within a few rounds
-  val holdingFee = BigDecimal(1.0)
+  // We increase holding fees for this test so we can expire amulets within a few rounds
+  // without running into problematic because of, e.g., create fees.
+  val holdingFee = BigDecimal(0.5)
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
@@ -52,7 +53,7 @@ class TimeBasedTreasuryIntegrationTest
 
     // create two amulets in alice's wallet
     aliceWalletClient.tap(50)
-    checkWallet(alice, aliceWalletClient, Seq(exactly(50)))
+    checkWallet(alice, aliceWalletClient, Seq(exactly(50)), holdingFee)
 
     // run a transfer such that alice's validator has some rewards
     p2pTransfer(aliceWalletClient, bobWalletClient, bob, 40.0)
@@ -60,7 +61,7 @@ class TimeBasedTreasuryIntegrationTest
     eventually()(aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1)
     // and give alice another amulet.
     aliceWalletClient.tap(50)
-    checkWallet(alice, aliceWalletClient, Seq((9, 10), exactly(50)))
+    checkWallet(alice, aliceWalletClient, Seq((9, 10), exactly(50)), holdingFee)
 
     // advance by two ticks, so the issuing round of round 1 is created
     advanceRoundsToNextRoundOpening
@@ -75,7 +76,7 @@ class TimeBasedTreasuryIntegrationTest
         .listAppRewardCoupons()
         .filter(_.payload.round.number == 1) should have size 0
       // and amulets are automatically merged.
-      checkWallet(alice, aliceWalletClient, Seq((59, 61)))
+      checkWallet(alice, aliceWalletClient, Seq((59, 61)), holdingFee)
       // same for validator rewards
       aliceValidatorWalletClient
         .listValidatorRewardCoupons()
@@ -87,9 +88,9 @@ class TimeBasedTreasuryIntegrationTest
     implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
-      aliceWalletClient.tap(110)
+      aliceWalletClient.tap(1100)
 
-      checkBalance(aliceWalletClient, Some(1), exactly(110), exactly(0), exactly(0))
+      checkBalance(aliceWalletClient, Some(1), exactly(1100), exactly(0), exactly(0))
       // leads to archival of open round 0
       advanceRoundsToNextRoundOpening
 
@@ -98,16 +99,16 @@ class TimeBasedTreasuryIntegrationTest
         aliceUserParty,
         aliceValidatorParty,
         aliceWalletClient.list().amulets,
-        10,
+        100,
         sv1ScanBackend,
-        Duration.ofDays(10),
+        Duration.ofDays(1),
         getLedgerTime,
       )
       checkBalance(
         aliceWalletClient,
         Some(2),
-        (99, 100),
-        exactly(10),
+        (999, 1000),
+        exactly(100),
         // due to merge in this round, no holding fees.
         exactly(0),
       )
@@ -118,8 +119,8 @@ class TimeBasedTreasuryIntegrationTest
       checkBalance(
         aliceWalletClient,
         Some(3),
-        (99, 100),
-        (9, 10),
+        (999, 1000),
+        exactly(100),
         exactly(holdingFee),
       )
   }
@@ -225,8 +226,8 @@ class TimeBasedTreasuryIntegrationTest
 
     actAndCheck(
       "Tap amulet that will expire in a round", {
-        aliceWalletClient.tap(1)
-        aliceWalletClient.tap(1)
+        aliceWalletClient.tap(holdingFee)
+        aliceWalletClient.tap(holdingFee)
       },
     )(
       "Alice has 2 Amulets",
@@ -253,7 +254,7 @@ class TimeBasedTreasuryIntegrationTest
       checkBalance(
         aliceWalletClient,
         Some(2),
-        (1, 2),
+        (holdingFee, 2 * holdingFee),
         exactly(0),
         // We just merged => fresh amulet
         exactly(0),
