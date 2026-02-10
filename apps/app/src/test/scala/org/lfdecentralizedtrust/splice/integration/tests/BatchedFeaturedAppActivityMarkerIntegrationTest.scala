@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.util.*
 import scala.jdk.CollectionConverters.*
 import com.digitalasset.canton.topology.PartyId
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_16
 class BatchedFeaturedAppActivityMarkerIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with ScanTestUtil
