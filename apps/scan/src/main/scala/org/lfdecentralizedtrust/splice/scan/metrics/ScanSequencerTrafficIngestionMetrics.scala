@@ -17,7 +17,7 @@ class ScanSequencerTrafficIngestionMetrics(metricsFactory: LabeledMetricsFactory
     metricsFactory,
     MetricInfo(
       name = prefix :+ "last_sequencing_time_us",
-      summary = "Latest ingested sequencer traffic summary sequencing_time",
+      summary = "Latest ingested sequencer traffic summary sequencing time",
       qualification = Traffic,
     ),
     initial = CantonTimestamp.MinValue,
