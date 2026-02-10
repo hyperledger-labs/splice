@@ -17,8 +17,10 @@ import org.lfdecentralizedtrust.splice.util.*
 import scala.jdk.CollectionConverters.*
 import com.digitalasset.canton.topology.PartyId
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_16
 class BatchedFeaturedAppActivityMarkerIntegrationTest
     extends IntegrationTestWithSharedEnvironment
+    with ScanTestUtil
     with WalletTestUtil
     with TimeTestUtil
     with SplitwellTestUtil
@@ -140,6 +142,8 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
           .filterJava(amulet.FeaturedAppActivityMarker.COMPANION)(dsoParty) should have size 200,
     )
 
+    val scanCursorBeforeConversion = latestEventHistoryCursor(sv1ScanBackend)
+
     actAndCheck(
       "Resume the featured app marker conversion",
       sv1Backend.dsoDelegateBasedAutomation.trigger[FeaturedAppActivityMarkerTrigger].resume(),
@@ -148,7 +152,8 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
       _ => {
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(amulet.FeaturedAppActivityMarker.COMPANION)(dsoParty) shouldBe empty
-        val events = sv1ScanBackend.getEventHistory(1000, None, CompactJson)
+        val events =
+          sv1ScanBackend.getEventHistory(1000, Some(scanCursorBeforeConversion), CompactJson)
         // Note: There may actually be multiple batches in the trigger because we can't easily synchronize on it having ingested all the markers.
         // We don't care all that much about whether the trigger needs to run multiple time for this test.
         val conversionEvents = events.filter {
@@ -163,7 +168,9 @@ class BatchedFeaturedAppActivityMarkerIntegrationTest
           }
         }
         // Check that we actually got some so the forAll does not become redundant
-        conversionEvents should not be empty
+        withClue(s"Unfiltered events: $events") {
+          conversionEvents should not be empty
+        }
         // Check that each conversion only produces 2 views, one for the SV and one for validator
         forAll(conversionEvents) { event =>
           val views = event.verdict.value.transactionViews.views
