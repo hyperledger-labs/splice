@@ -674,7 +674,8 @@ class UserWalletTxLogParser(
                         if nodeId.intValue() >= start &&
                           nodeId.intValue() <= end &&
                           ex.getChoice == amuletCodegen.DevelopmentFundCoupon.CHOICE_Archive.name &&
-                          ex.getTemplateId == amuletCodegen.DevelopmentFundCoupon.COMPANION.TEMPLATE_ID =>
+                          ex.getTemplateId.getModuleName == amuletCodegen.DevelopmentFundCoupon.COMPANION.TEMPLATE_ID.getModuleName &&
+                          ex.getTemplateId.getEntityName == amuletCodegen.DevelopmentFundCoupon.COMPANION.TEMPLATE_ID.getEntityName =>
                       nodeId
                   }.toList
 
