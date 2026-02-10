@@ -155,13 +155,13 @@ class PermissionedSynchronizerIntegrationTest
 
         val aliceRootKey = aliceParticipantClient.keys.secret
           .generate_signing_key(
-            "aliceDupRootKey",
+            "aliceRootKey",
             com.digitalasset.canton.crypto.SigningKeyUsage.NamespaceOnly,
           )
         val aliceNamespace = com.digitalasset.canton.topology.Namespace(aliceRootKey.fingerprint)
 
         aliceParticipantClient.topology.init_id_from_uid(
-          com.digitalasset.canton.topology.ParticipantId("aliceDupValidator", aliceNamespace).uid,
+          com.digitalasset.canton.topology.ParticipantId("aliceValidator", aliceNamespace).uid,
           waitForReady = true,
         )
 
